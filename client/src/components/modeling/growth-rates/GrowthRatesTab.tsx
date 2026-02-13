@@ -193,6 +193,398 @@ export function GrowthRatesTab({
 
   const cssVars = { '--label-width': labelWidth } as React.CSSProperties;
 
+  const storageItemCount = storageMode === 'universal' ? 1 : Math.max(storageRevenueCategories.length, 1);
+  const revenueItemCount = nonStorageRevenueCategories.length || 1;
+  const opexItemCount = expenseCategories.length || 1;
+  const deptItemCount = segmentExpenseCategories.length || 1;
+
+  const sections = useMemo(() => {
+    const all = [
+      { id: 'storage', items: storageItemCount + 2 },
+      { id: 'revenue', items: revenueItemCount + 4 },
+      { id: 'opex', items: opexItemCount + 5 },
+      { id: 'dept', items: deptItemCount + 2 },
+    ];
+
+    if (!useWideLayout) return { order: all.map(s => s.id), layout: 'stack' as const };
+
+    const sorted = [...all].sort((a, b) => b.items - a.items);
+    const col1: typeof all = [];
+    const col2: typeof all = [];
+    let col1Height = 0;
+    let col2Height = 0;
+
+    for (const section of sorted) {
+      if (col1Height <= col2Height) {
+        col1.push(section);
+        col1Height += section.items;
+      } else {
+        col2.push(section);
+        col2Height += section.items;
+      }
+    }
+
+    return {
+      col1: col1.map(s => s.id),
+      col2: col2.map(s => s.id),
+      layout: 'columns' as const,
+    };
+  }, [storageItemCount, revenueItemCount, opexItemCount, deptItemCount, useWideLayout]);
+
+  const renderSection = (id: string) => {
+    switch (id) {
+      case 'storage':
+        return (
+          <SectionCard
+            key="storage"
+            title="Storage Revenue Growth"
+            description="Year-specific growth rates for marina storage revenue"
+            accent="blue"
+            icon={Warehouse}
+            headerAction={
+              <ModeToggle
+                value={storageMode}
+                onChange={handleStorageModeChange}
+              />
+            }
+          >
+            <YearHeaders years={years} />
+            {storageMode === 'universal' ? (
+              <div>
+                <YearlyRateRow
+                  label="All Storage Types"
+                  icon={Globe}
+                  years={years}
+                  rates={getRatesArray(storageGrowth.universalRates, defaultStorageRate)}
+                  defaultRate={defaultStorageRate}
+                  onChangeYear={(idx, val) => {
+                    updateStorageUniversalRate(idx, val);
+                    triggerAutosave();
+                  }}
+                  onApplyToAll={(val) => {
+                    updateStorageUniversalRateAllYears(val);
+                    triggerAutosave();
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {storageRevenueCategories.map((category) => {
+                  const storageCategory = STORAGE_CATEGORIES.find(s => s.id === category.id);
+                  const IconComponent = storageCategory?.icon || Anchor;
+                  return (
+                    <YearlyRateRow
+                      key={category.id}
+                      label={category.name}
+                      icon={IconComponent}
+                      years={years}
+                      rates={getRatesArray(storageGrowth.typeRatesByYear?.[category.id], defaultStorageRate)}
+                      defaultRate={defaultStorageRate}
+                      onChangeYear={(idx, val) => {
+                        updateStorageTypeRate(category.id, idx, val);
+                        triggerAutosave();
+                      }}
+                      onApplyToAll={(val) => {
+                        updateStorageTypeRateAllYears(category.id, val);
+                        triggerAutosave();
+                      }}
+                    />
+                  );
+                })}
+                {storageRevenueCategories.length === 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
+                    No storage types enabled. Enable them in Department Configuration.
+                  </p>
+                )}
+              </div>
+            )}
+          </SectionCard>
+        );
+
+      case 'revenue':
+        return (
+          <SectionCard
+            key="revenue"
+            title="Revenue Growth Rates"
+            description="Year-specific growth rates for non-storage revenue"
+            accent="emerald"
+            icon={TrendingUp}
+            headerAction={<SetAllDropdown onSetAll={handleSetAllRevenue} />}
+          >
+            <YearHeaders years={years} />
+
+            <CategoryGroup title="Core Marina Revenue" columns={1}>
+              {REVENUE_CATEGORIES.coreMarineRevenue.map((cat) => {
+                const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
+                    defaultRate={defaultRevenueRate}
+                    onChangeYear={(idx, val) => {
+                      updateGrowthRate(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateGrowthRateAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Retail & Service" columns={1}>
+              {REVENUE_CATEGORIES.retailAndService.map((cat) => {
+                const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
+                    defaultRate={defaultRevenueRate}
+                    onChangeYear={(idx, val) => {
+                      updateGrowthRate(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateGrowthRateAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Boats" columns={1}>
+              {REVENUE_CATEGORIES.boats.map((cat) => {
+                const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
+                    defaultRate={defaultRevenueRate}
+                    onChangeYear={(idx, val) => {
+                      updateGrowthRate(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateGrowthRateAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Leases & Hospitality" columns={1}>
+              {REVENUE_CATEGORIES.leasesAndHospitality.map((cat) => {
+                const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
+                    defaultRate={defaultRevenueRate}
+                    onChangeYear={(idx, val) => {
+                      updateGrowthRate(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateGrowthRateAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            {nonStorageRevenueCategories.length === 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
+                No non-storage revenue categories enabled.
+              </p>
+            )}
+          </SectionCard>
+        );
+
+      case 'opex':
+        return (
+          <SectionCard
+            key="opex"
+            title="Operating Expense Growth"
+            description="Year-specific growth rates for operating expenses"
+            accent="slate"
+            icon={Receipt}
+            collapsible
+            headerAction={<SetAllDropdown onSetAll={handleSetAllOpex} />}
+          >
+            <YearHeaders years={years} />
+
+            <CategoryGroup title="Labor & Administration" columns={1}>
+              {OPEX_CATEGORIES.laborAndAdmin.map((cat) => {
+                const isEnabled = expenseCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(expenseGrowth[cat.id], cat.defaultValue || defaultExpenseRate)}
+                    defaultRate={cat.defaultValue || defaultExpenseRate}
+                    onChangeYear={(idx, val) => {
+                      updateExpenseGrowth(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateExpenseGrowthAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Marketing" columns={1}>
+              {OPEX_CATEGORIES.marketing.map((cat) => {
+                const isEnabled = expenseCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
+                    defaultRate={defaultExpenseRate}
+                    onChangeYear={(idx, val) => {
+                      updateExpenseGrowth(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateExpenseGrowthAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Operations" columns={1}>
+              {OPEX_CATEGORIES.operations.map((cat) => {
+                const isEnabled = expenseCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
+                    defaultRate={defaultExpenseRate}
+                    onChangeYear={(idx, val) => {
+                      updateExpenseGrowth(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateExpenseGrowthAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+
+            <CategoryGroup title="Financial" columns={1}>
+              {OPEX_CATEGORIES.financial.map((cat) => {
+                const isEnabled = expenseCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
+                    defaultRate={defaultExpenseRate}
+                    onChangeYear={(idx, val) => {
+                      updateExpenseGrowth(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateExpenseGrowthAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </CategoryGroup>
+          </SectionCard>
+        );
+
+      case 'dept':
+        return (
+          <SectionCard
+            key="dept"
+            title="Departmental Expense Growth"
+            description="Year-specific growth rates for segment-specific expenses"
+            accent="purple"
+            icon={PieChart}
+            collapsible
+            headerAction={<SetAllDropdown onSetAll={handleSetAllDepartmental} />}
+          >
+            <YearHeaders years={years} />
+            <div className="space-y-0.5">
+              {DEPARTMENTAL_EXPENSE_CATEGORIES.map((cat) => {
+                const isEnabled = segmentExpenseCategories.some(c => c.id === cat.id);
+                if (!isEnabled) return null;
+                return (
+                  <YearlyRateRow
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    years={years}
+                    rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
+                    defaultRate={defaultExpenseRate}
+                    onChangeYear={(idx, val) => {
+                      updateExpenseGrowth(cat.id, idx, val);
+                      triggerAutosave();
+                    }}
+                    onApplyToAll={(val) => {
+                      updateExpenseGrowthAllYears(cat.id, val);
+                      triggerAutosave();
+                    }}
+                  />
+                );
+              })}
+            </div>
+            {segmentExpenseCategories.length === 0 && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
+                No departmental expense categories enabled.
+              </p>
+            )}
+          </SectionCard>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-3" style={cssVars}>
       <QuickActionsBar
@@ -202,340 +594,20 @@ export function GrowthRatesTab({
         onPreset={handlePreset}
       />
 
-      <div className={useWideLayout ? "grid grid-cols-1 xl:grid-cols-2 gap-3" : "space-y-3"}>
-        <SectionCard
-          title="Storage Revenue Growth"
-          description="Year-specific growth rates for marina storage revenue"
-          accent="blue"
-          icon={Warehouse}
-          headerAction={
-            <ModeToggle
-              value={storageMode}
-              onChange={handleStorageModeChange}
-            />
-          }
-        >
-          <YearHeaders years={years} />
-          {storageMode === 'universal' ? (
-            <div>
-              <YearlyRateRow
-                label="All Storage Types"
-                icon={Globe}
-                years={years}
-                rates={getRatesArray(storageGrowth.universalRates, defaultStorageRate)}
-                defaultRate={defaultStorageRate}
-                onChangeYear={(idx, val) => {
-                  updateStorageUniversalRate(idx, val);
-                  triggerAutosave();
-                }}
-                onApplyToAll={(val) => {
-                  updateStorageUniversalRateAllYears(val);
-                  triggerAutosave();
-                }}
-              />
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {storageRevenueCategories.map((category) => {
-                const storageCategory = STORAGE_CATEGORIES.find(s => s.id === category.id);
-                const IconComponent = storageCategory?.icon || Anchor;
-                return (
-                  <YearlyRateRow
-                    key={category.id}
-                    label={category.name}
-                    icon={IconComponent}
-                    years={years}
-                    rates={getRatesArray(storageGrowth.typeRatesByYear?.[category.id], defaultStorageRate)}
-                    defaultRate={defaultStorageRate}
-                    onChangeYear={(idx, val) => {
-                      updateStorageTypeRate(category.id, idx, val);
-                      triggerAutosave();
-                    }}
-                    onApplyToAll={(val) => {
-                      updateStorageTypeRateAllYears(category.id, val);
-                      triggerAutosave();
-                    }}
-                  />
-                );
-              })}
-              {storageRevenueCategories.length === 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
-                  No storage types enabled. Enable them in Department Configuration.
-                </p>
-              )}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Revenue Growth Rates"
-          description="Year-specific growth rates for non-storage revenue"
-          accent="emerald"
-          icon={TrendingUp}
-          headerAction={<SetAllDropdown onSetAll={handleSetAllRevenue} />}
-        >
-          <YearHeaders years={years} />
-
-          <CategoryGroup title="Core Marina Revenue" columns={1}>
-            {REVENUE_CATEGORIES.coreMarineRevenue.map((cat) => {
-              const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
-                  defaultRate={defaultRevenueRate}
-                  onChangeYear={(idx, val) => {
-                    updateGrowthRate(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateGrowthRateAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Retail & Service" columns={1}>
-            {REVENUE_CATEGORIES.retailAndService.map((cat) => {
-              const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
-                  defaultRate={defaultRevenueRate}
-                  onChangeYear={(idx, val) => {
-                    updateGrowthRate(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateGrowthRateAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Boats" columns={1}>
-            {REVENUE_CATEGORIES.boats.map((cat) => {
-              const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
-                  defaultRate={defaultRevenueRate}
-                  onChangeYear={(idx, val) => {
-                    updateGrowthRate(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateGrowthRateAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Leases & Hospitality" columns={1}>
-            {REVENUE_CATEGORIES.leasesAndHospitality.map((cat) => {
-              const isEnabled = nonStorageRevenueCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(growthRates[cat.id], defaultRevenueRate)}
-                  defaultRate={defaultRevenueRate}
-                  onChangeYear={(idx, val) => {
-                    updateGrowthRate(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateGrowthRateAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          {nonStorageRevenueCategories.length === 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
-              No non-storage revenue categories enabled.
-            </p>
-          )}
-        </SectionCard>
-      </div>
-
-      <div className={useWideLayout ? "grid grid-cols-1 xl:grid-cols-2 gap-3" : "space-y-3"}>
-        <SectionCard
-          title="Operating Expense Growth"
-          description="Year-specific growth rates for operating expenses"
-          accent="slate"
-          icon={Receipt}
-          collapsible
-          headerAction={<SetAllDropdown onSetAll={handleSetAllOpex} />}
-        >
-          <YearHeaders years={years} />
-
-          <CategoryGroup title="Labor & Administration" columns={1}>
-            {OPEX_CATEGORIES.laborAndAdmin.map((cat) => {
-              const isEnabled = expenseCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(expenseGrowth[cat.id], cat.defaultValue || defaultExpenseRate)}
-                  defaultRate={cat.defaultValue || defaultExpenseRate}
-                  onChangeYear={(idx, val) => {
-                    updateExpenseGrowth(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateExpenseGrowthAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Marketing" columns={1}>
-            {OPEX_CATEGORIES.marketing.map((cat) => {
-              const isEnabled = expenseCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                  defaultRate={defaultExpenseRate}
-                  onChangeYear={(idx, val) => {
-                    updateExpenseGrowth(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateExpenseGrowthAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Operations" columns={1}>
-            {OPEX_CATEGORIES.operations.map((cat) => {
-              const isEnabled = expenseCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                  defaultRate={defaultExpenseRate}
-                  onChangeYear={(idx, val) => {
-                    updateExpenseGrowth(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateExpenseGrowthAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-
-          <CategoryGroup title="Financial" columns={1}>
-            {OPEX_CATEGORIES.financial.map((cat) => {
-              const isEnabled = expenseCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                  defaultRate={defaultExpenseRate}
-                  onChangeYear={(idx, val) => {
-                    updateExpenseGrowth(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateExpenseGrowthAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
-          </CategoryGroup>
-        </SectionCard>
-
-        <SectionCard
-          title="Departmental Expense Growth"
-          description="Year-specific growth rates for segment-specific expenses"
-          accent="purple"
-          icon={PieChart}
-          collapsible
-          headerAction={<SetAllDropdown onSetAll={handleSetAllDepartmental} />}
-        >
-          <YearHeaders years={years} />
-          <div className="space-y-0.5">
-            {DEPARTMENTAL_EXPENSE_CATEGORIES.map((cat) => {
-              const isEnabled = segmentExpenseCategories.some(c => c.id === cat.id);
-              if (!isEnabled) return null;
-              return (
-                <YearlyRateRow
-                  key={cat.id}
-                  label={cat.label}
-                  icon={cat.icon}
-                  years={years}
-                  rates={getRatesArray(expenseGrowth[cat.id], defaultExpenseRate)}
-                  defaultRate={defaultExpenseRate}
-                  onChangeYear={(idx, val) => {
-                    updateExpenseGrowth(cat.id, idx, val);
-                    triggerAutosave();
-                  }}
-                  onApplyToAll={(val) => {
-                    updateExpenseGrowthAllYears(cat.id, val);
-                    triggerAutosave();
-                  }}
-                />
-              );
-            })}
+      {sections.layout === 'stack' ? (
+        <div className="space-y-3">
+          {(sections as { order: string[]; layout: 'stack' }).order.map(renderSection)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+          <div className="space-y-3">
+            {(sections as { col1: string[]; col2: string[]; layout: 'columns' }).col1.map(renderSection)}
           </div>
-          {segmentExpenseCategories.length === 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
-              No departmental expense categories enabled.
-            </p>
-          )}
-        </SectionCard>
-      </div>
+          <div className="space-y-3">
+            {(sections as { col1: string[]; col2: string[]; layout: 'columns' }).col2.map(renderSection)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
