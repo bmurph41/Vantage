@@ -482,6 +482,27 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
+  const { data: rentRollMetrics } = useQuery<{
+    occupancyRate: number;
+    totalUnits: number;
+    occupiedUnits: number;
+    unitsByType: Record<string, { count: number; totalRent: number }>;
+  }>({
+    queryKey: ['/api/modeling-rent-roll/projects', projectId, 'metrics'],
+  });
+
+  const { data: rentRollUnits = [] } = useQuery<Array<{
+    id: string;
+    unitNumber: string;
+    storageType: string;
+    status: string;
+    dock?: string;
+    section?: string;
+    monthlyRent: string;
+  }>>({
+    queryKey: ['/api/modeling-rent-roll/projects', projectId, 'units'],
+  });
+
   const initScenariosMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios/init`),
     onSuccess: () => {
@@ -579,19 +600,87 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   const [occupancyViewMode, setOccupancyViewMode] = useState<'annualized' | 'monthly'>('annualized');
   const [occupancyInputMode, setOccupancyInputMode] = useState<'percent' | 'count'>('percent');
 
+  const storageTypeToConfigId: Record<string, string> = {
+    'Wet Slip': 'wet_slips',
+    'Dry Storage': 'dry_racks_indoor',
+    'Dry Rack': 'dry_racks_indoor',
+    'Dry Stack': 'dry_racks_outdoor',
+    'Mooring': 'moorings',
+    'Trailer Storage': 'trailers',
+    'Lift Storage': 'lift_slips',
+    'Other': 'land_storage',
+  };
+
+  const hasRentRollData = rentRollUnits.length > 0;
+
   const enabledStorageTypes = useMemo(() => {
     if (!config?.departments) return [];
-    return storageTypesConfig.filter(st => 
-      config.departments[st.id]?.isEnabled === true
-    ).map(st => ({
-      ...st,
-      totalUnits: config.departments[st.id]?.totalUnits || 50,
-      locations: st.locations.map(loc => ({
-        ...loc,
-        units: Math.floor((config.departments[st.id]?.totalUnits || 50) / st.locations.length),
-      })),
-    }));
-  }, [config]);
+
+    const enabledIds = Object.entries(config.departments)
+      .filter(([_, dept]: [string, any]) => dept?.isEnabled === true)
+      .map(([id]) => id);
+
+    if (hasRentRollData && rentRollUnits.length > 0) {
+      const groupedByType: Record<string, typeof rentRollUnits> = {};
+      rentRollUnits.forEach(unit => {
+        const type = unit.storageType || 'Other';
+        if (!groupedByType[type]) groupedByType[type] = [];
+        groupedByType[type].push(unit);
+      });
+
+      return Object.entries(groupedByType).map(([typeName, units]) => {
+        const configId = storageTypeToConfigId[typeName] || typeName.toLowerCase().replace(/\s+/g, '_');
+        const stConfig = storageTypesConfig.find(s => s.id === configId);
+
+        const dockGroups: Record<string, typeof units> = {};
+        units.forEach(u => {
+          const locKey = u.dock || u.section || 'Main';
+          if (!dockGroups[locKey]) dockGroups[locKey] = [];
+          dockGroups[locKey].push(u);
+        });
+
+        const locations = Object.entries(dockGroups).map(([dockName, dockUnits]) => ({
+          id: `${configId}_${dockName.toLowerCase().replace(/\s+/g, '_')}`,
+          name: dockName,
+          units: dockUnits.length,
+          occupiedUnits: dockUnits.filter(u => u.status === 'occupied').length,
+        }));
+
+        return {
+          id: configId,
+          name: typeName,
+          icon: stConfig?.icon || <Warehouse className="h-4 w-4" />,
+          totalUnits: units.length,
+          occupiedUnits: units.filter(u => u.status === 'occupied').length,
+          locations,
+          dataSource: 'rent_roll' as const,
+        };
+      });
+    }
+
+    return enabledIds
+      .filter(id => storageTypesConfig.some(st => st.id === id))
+      .map(id => {
+        const stConfig = storageTypesConfig.find(s => s.id === id)!;
+        const deptConfig = config.departments![id] as any;
+        const totalUnits = deptConfig?.totalUnits || 0;
+        return {
+          id,
+          name: stConfig.name,
+          icon: stConfig.icon,
+          totalUnits,
+          occupiedUnits: 0,
+          locations: [{
+            id: `${id}_all`,
+            name: 'All Units',
+            units: totalUnits,
+            occupiedUnits: 0,
+          }],
+          dataSource: (totalUnits > 0 ? 'setup_wizard' : 'placeholder') as 'setup_wizard' | 'placeholder',
+        };
+      })
+      .filter(st => st.totalUnits > 0);
+  }, [config, hasRentRollData, rentRollUnits]);
 
   const toggleOccupancyTypeExpanded = (typeId: string) => {
     setExpandedOccupancyTypes(prev => ({ ...prev, [typeId]: !prev[typeId] }));
@@ -767,11 +856,24 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
   function getDefaultOccupancy(years: number[]): OccupancyData {
     const defaultOccupancy: OccupancyData = {};
-    storageOptions.forEach(opt => {
-      defaultOccupancy[opt.id] = {};
-      years.forEach(year => {
-        defaultOccupancy[opt.id][year] = 85;
+    enabledStorageTypes.forEach(st => {
+      st.locations.forEach(loc => {
+        const locOccRate = loc.units > 0 && loc.occupiedUnits > 0
+          ? (loc.occupiedUnits / loc.units) * 100
+          : (rentRollMetrics?.occupancyRate || 85);
+        defaultOccupancy[loc.id] = {};
+        years.forEach(year => {
+          defaultOccupancy[loc.id][year] = Math.round(locOccRate * 10) / 10;
+        });
       });
+    });
+    storageOptions.forEach(opt => {
+      if (!defaultOccupancy[opt.id]) {
+        defaultOccupancy[opt.id] = {};
+        years.forEach(year => {
+          defaultOccupancy[opt.id][year] = rentRollMetrics?.occupancyRate || 85;
+        });
+      }
     });
     return defaultOccupancy;
   }
@@ -1490,6 +1592,11 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Set occupancy by storage type across the hold period
+                    {hasRentRollData && (
+                      <span className="ml-1.5 text-blue-600">
+                        &middot; Sourced from Rent Roll data ({rentRollUnits.length} units)
+                      </span>
+                    )}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1529,9 +1636,16 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
             </CardHeader>
             <CardContent className="pt-0">
               {enabledStorageTypes.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No storage types enabled. Enable them in Department Configuration.
-                </p>
+                <div className="py-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    No storage types configured yet. Occupancy data can come from:
+                  </p>
+                  <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+                    <li>The <strong>Rent Roll</strong> tab (most detailed - unit-level dock/section breakdown)</li>
+                    <li>The <strong>Setup Wizard</strong> storage mix entries (basic capacity &amp; occupancy)</li>
+                    <li>Enable storage types in <strong>Department Configuration</strong></li>
+                  </ul>
+                </div>
               ) : occupancyViewMode === 'annualized' ? (
                 <div className="overflow-x-auto">
                   <Table>
@@ -1552,83 +1666,73 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                         const hasMultipleLocations = storageType.locations.length > 1;
                         return (
                           <Fragment key={storageType.id}>
-                            <TableRow className={hasMultipleLocations ? 'bg-muted/20' : ''}>
-                              <TableCell className="py-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => hasMultipleLocations && toggleOccupancyTypeExpanded(storageType.id)}
-                                  className={`flex items-center gap-1.5 text-sm font-medium ${hasMultipleLocations ? 'cursor-pointer hover:text-primary' : 'cursor-default'}`}
-                                >
-                                  {hasMultipleLocations && (
-                                    isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
-                                  )}
-                                  {storageType.icon}
-                                  <span className="truncate">{storageType.name}</span>
-                                </button>
-                              </TableCell>
-                              <TableCell className="text-right text-xs text-muted-foreground py-1.5">
-                                {storageType.totalUnits}
-                              </TableCell>
-                              {years.map(year => {
-                                if (hasMultipleLocations) {
+                            {hasMultipleLocations && (
+                              <TableRow className="bg-muted/20">
+                                <TableCell className="py-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleOccupancyTypeExpanded(storageType.id)}
+                                    className="flex items-center gap-1.5 text-sm font-medium cursor-pointer hover:text-primary"
+                                  >
+                                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                    {storageType.icon}
+                                    <span className="truncate">{storageType.name}</span>
+                                    {storageType.dataSource === 'rent_roll' && (
+                                      <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 text-blue-600 border-blue-200">Rent Roll</Badge>
+                                    )}
+                                    {storageType.dataSource === 'setup_wizard' && (
+                                      <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 text-amber-600 border-amber-200">Setup</Badge>
+                                    )}
+                                  </button>
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground py-1.5">
+                                  <span title="Total units">{storageType.totalUnits}</span>
+                                </TableCell>
+                                {years.map(year => {
                                   const avgOcc = getStorageTypeAvgOccupancy(storageType, year);
                                   const avgCount = percentToCount(avgOcc, storageType.totalUnits);
                                   return (
                                     <TableCell key={year} className="p-1 text-center">
-                                      <div className="text-xs font-medium">
+                                      <div className="text-xs font-semibold">
                                         {occupancyInputMode === 'percent'
                                           ? `${avgOcc.toFixed(1)}%`
                                           : `${avgCount}`
                                         }
                                       </div>
-                                      <div className="text-[10px] text-muted-foreground">
-                                        {occupancyInputMode === 'percent'
+                                      <div className="text-[9px] text-muted-foreground">
+                                        avg &middot; {occupancyInputMode === 'percent'
                                           ? `${avgCount} units`
                                           : `${avgOcc.toFixed(1)}%`
                                         }
                                       </div>
                                     </TableCell>
                                   );
-                                }
-                                const loc = storageType.locations[0];
-                                const occPercent = getLocationOccupancy(loc.id, year);
-                                const occupiedCount = percentToCount(occPercent, storageType.totalUnits);
-                                return (
-                                  <TableCell key={year} className="p-1 text-center">
-                                    {occupancyInputMode === 'percent' ? (
-                                      <PercentInput
-                                        value={occPercent}
-                                        onChange={(val) => updateLocationOccupancy(loc.id, year, val)}
-                                        className="h-7 w-full text-xs mx-auto max-w-[68px]"
-                                      />
-                                    ) : (
-                                      <CountInput
-                                        value={occupiedCount}
-                                        max={storageType.totalUnits}
-                                        onChange={(val) => updateOccupancyFromCount(loc.id, year, val, storageType.totalUnits)}
-                                        className="h-7 w-full text-xs mx-auto max-w-[68px]"
-                                      />
-                                    )}
-                                    <div className="text-[10px] text-muted-foreground mt-0.5">
-                                      {occupancyInputMode === 'percent'
-                                        ? `${occupiedCount} units`
-                                        : `${occPercent.toFixed(1)}%`
-                                      }
-                                    </div>
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                            {isExpanded && hasMultipleLocations && storageType.locations.map((location) => (
+                                })}
+                              </TableRow>
+                            )}
+                            {(!hasMultipleLocations || isExpanded) && storageType.locations.map((location) => (
                               <TableRow key={location.id}>
-                                <TableCell className="py-1 pl-10">
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <MapPin className="h-2.5 w-2.5" />
-                                    {location.name}
-                                  </div>
+                                <TableCell className={`py-1 ${hasMultipleLocations ? 'pl-10' : 'pl-3'}`}>
+                                  {hasMultipleLocations ? (
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                      <MapPin className="h-2.5 w-2.5" />
+                                      {location.name}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                                      {storageType.icon}
+                                      <span className="truncate">{storageType.name}</span>
+                                      {storageType.dataSource === 'rent_roll' && (
+                                        <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 text-blue-600 border-blue-200">Rent Roll</Badge>
+                                      )}
+                                      {storageType.dataSource === 'setup_wizard' && (
+                                        <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 text-amber-600 border-amber-200">Setup</Badge>
+                                      )}
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right text-[11px] text-muted-foreground py-1">
-                                  {location.units}
+                                  {hasMultipleLocations ? location.units : storageType.totalUnits}
                                 </TableCell>
                                 {years.map(year => {
                                   const locOccPercent = getLocationOccupancy(location.id, year);
@@ -1677,6 +1781,12 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                           {storageType.icon}
                           <span className="font-medium text-sm">{storageType.name}</span>
                           <Badge variant="secondary" className="text-[10px] h-5">{storageType.totalUnits} units</Badge>
+                          {storageType.dataSource === 'rent_roll' && (
+                            <Badge variant="outline" className="text-[9px] h-4 px-1 text-blue-600 border-blue-200">Rent Roll</Badge>
+                          )}
+                          {storageType.dataSource === 'setup_wizard' && (
+                            <Badge variant="outline" className="text-[9px] h-4 px-1 text-amber-600 border-amber-200">Setup</Badge>
+                          )}
                         </div>
                         <div className="overflow-x-auto">
                           <Table>
