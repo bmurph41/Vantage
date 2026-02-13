@@ -21,7 +21,11 @@ export function normalizeOptional<T>(value: T | undefined | null): T | null {
 
 /**
  * Normalize saved search data for create/update mutations
- * Explicitly includes all fields with proper null normalization
+ * Transforms frontend field names to match backend schema:
+ *   searchName -> name
+ *   queryText, categories, entities -> criteria (JSON object)
+ *   alertFrequency -> alertFrequency
+ * Note: isActive defaults to true in the database, toggle is handled separately
  */
 export function normalizeSavedSearchData(data: {
   searchName?: string;
@@ -34,27 +38,25 @@ export function normalizeSavedSearchData(data: {
   const result: any = {};
   
   if (data.searchName !== undefined) {
-    result.searchName = data.searchName.trim();
+    result.name = data.searchName.trim();
   }
   
-  if (data.queryText !== undefined) {
-    result.queryText = data.queryText.trim();
-  }
-  
-  if (data.categories !== undefined) {
-    result.categories = normalizeArray(data.categories);
-  }
-  
-  if (data.entities !== undefined) {
-    result.entities = normalizeArray(data.entities);
-  }
-  
-  if (data.emailAlerts !== undefined) {
-    result.emailAlerts = data.emailAlerts;
+  const hasCriteriaFields = data.queryText !== undefined || data.categories !== undefined || data.entities !== undefined;
+  if (hasCriteriaFields) {
+    result.criteria = {};
+    if (data.queryText !== undefined) {
+      result.criteria.search = data.queryText.trim();
+    }
+    if (data.categories !== undefined) {
+      result.criteria.categories = normalizeArray(data.categories);
+    }
+    if (data.entities !== undefined) {
+      result.criteria.entities = normalizeArray(data.entities);
+    }
   }
   
   if (data.alertFrequency !== undefined) {
-    result.alertFrequency = normalizeString(data.alertFrequency);
+    result.alertFrequency = normalizeString(data.alertFrequency) || "none";
   }
   
   return result;

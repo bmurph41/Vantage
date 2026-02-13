@@ -127,13 +127,14 @@ type EmailSettingsForm = z.infer<typeof emailSettingsSchema>;
 
 interface SavedSearch {
   id: string;
-  searchName: string;
-  queryText: string;
-  categories: string[];
-  entities: string[];
-  dateFrom: string | null;
-  dateTo: string | null;
-  emailAlerts: boolean;
+  name: string;
+  criteria: {
+    search?: string;
+    categories?: string[] | null;
+    entities?: string[] | null;
+    sentiment?: string;
+    dealsOnly?: boolean;
+  };
   alertFrequency: string | null;
   isActive: boolean;
   createdAt: string;
@@ -344,10 +345,10 @@ export default function SavedSearchesPage() {
 
   const openEditDialog = (search: SavedSearch) => {
     setEditingAlert(search);
-    setAlertName(search.searchName);
-    setAlertKeywords(search.queryText);
-    setAlertCategories(search.categories || []);
-    setAlertEntities((search.entities || []).join(", "));
+    setAlertName(search.name);
+    setAlertKeywords(search.criteria?.search || "");
+    setAlertCategories(search.criteria?.categories || []);
+    setAlertEntities((search.criteria?.entities || []).join(", "));
     setAlertFrequency(search.alertFrequency || "daily");
     setIsAddDialogOpen(true);
   };
@@ -380,8 +381,8 @@ export default function SavedSearchesPage() {
     }
   };
 
-  const activeAlerts = searches.filter(s => s.emailAlerts);
-  const pausedAlerts = searches.filter(s => !s.emailAlerts);
+  const activeAlerts = searches.filter(s => s.isActive);
+  const pausedAlerts = searches.filter(s => !s.isActive);
   const userEmail = form.watch("email");
   const userTimezone = form.watch("timezone");
   const userDeliveryTime = form.watch("deliveryTime");
@@ -581,13 +582,10 @@ export default function SavedSearchesPage() {
                     onEdit={openEditDialog}
                     onDelete={(id) => setDeleteAlertId(id)}
                     onToggle={(id, enabled) => {
-                      const normalizedData = normalizeSavedSearchData({
-                        emailAlerts: enabled,
-                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : null,
-                        categories: search.categories || [],
-                        entities: search.entities || [],
-                      });
-                      updateMutation.mutate({ id, data: normalizedData });
+                      updateMutation.mutate({ id, data: {
+                        isActive: enabled,
+                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : 'none',
+                      }});
                     }}
                     isUpdating={updateMutation.isPending}
                     expandedSearch={expandedSearch}
@@ -612,13 +610,10 @@ export default function SavedSearchesPage() {
                     onEdit={openEditDialog}
                     onDelete={(id) => setDeleteAlertId(id)}
                     onToggle={(id, enabled) => {
-                      const normalizedData = normalizeSavedSearchData({
-                        emailAlerts: enabled,
-                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : null,
-                        categories: search.categories || [],
-                        entities: search.entities || [],
-                      });
-                      updateMutation.mutate({ id, data: normalizedData });
+                      updateMutation.mutate({ id, data: {
+                        isActive: enabled,
+                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : 'none',
+                      }});
                     }}
                     isUpdating={updateMutation.isPending}
                     expandedSearch={expandedSearch}
@@ -839,7 +834,7 @@ function AlertCard({
   searchResults: Article[];
 }) {
   const isExpanded = expandedSearch === search.id;
-  const isActive = search.emailAlerts;
+  const isActive = search.isActive;
 
   return (
     <Card
@@ -858,7 +853,7 @@ function AlertCard({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-base truncate">{search.searchName}</h3>
+              <h3 className="font-semibold text-base truncate">{search.name}</h3>
               {search.alertFrequency && isActive && (
                 <Badge variant="outline" className="text-xs flex-shrink-0">
                   {getFrequencyLabel(search.alertFrequency)}
@@ -866,19 +861,21 @@ function AlertCard({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
-              <Search className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="truncate">{search.queryText}</span>
-            </div>
+            {search.criteria?.search && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+                <Search className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{search.criteria.search}</span>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-1">
-              {(search.categories || []).map((cat, idx) => (
+              {(search.criteria?.categories || []).map((cat, idx) => (
                 <Badge key={idx} variant="secondary" className="text-xs">
                   <Tag className="h-3 w-3 mr-1" />
                   {cat}
                 </Badge>
               ))}
-              {(search.entities || []).map((entity, idx) => (
+              {(search.criteria?.entities || []).map((entity, idx) => (
                 <Badge key={idx} variant="outline" className="text-xs">
                   <Building2 className="h-3 w-3 mr-1" />
                   {entity}

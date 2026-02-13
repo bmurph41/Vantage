@@ -2536,7 +2536,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     timezone: z.string().default("America/New_York"),
   });
 
-  const SavedSearchUpdateSchema = SavedSearchSchema.partial();
+  const SavedSearchUpdateSchema = SavedSearchSchema.partial().extend({
+    isActive: z.boolean().optional(),
+  });
 
   app.get("/api/docktalk/saved-searches", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {
