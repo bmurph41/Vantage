@@ -118,7 +118,7 @@ export function calculateEarnout(input: EarnoutEngineInput): EarnoutEngineResult
       ordinary_income: dynamicOrdinaryRate,
       mixed: (dynamicCapGainRate + dynamicOrdinaryRate) / 2,
     };
-    const effectiveTaxRate = taxRates[tranche.taxTreatment] || 0.32;
+    const effectiveTaxRate = taxRates[tranche.taxTreatment] ?? 0.32;
     const afterTaxAmount = probabilityWeightedAmount * (1 - effectiveTaxRate);
 
     const scenarios: EarnoutScenarioOutcome[] = [

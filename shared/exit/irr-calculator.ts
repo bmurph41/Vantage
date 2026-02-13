@@ -23,9 +23,9 @@ export function calculateIRR(
 ): number | null {
   if (cashFlows.length < 2) return null;
 
-  const values = cashFlows
-    .sort((a, b) => a.period - b.period)
-    .map(cf => cf.type === 'investment' ? -Math.abs(cf.amount) : cf.amount);
+  const sorted = [...cashFlows].sort((a, b) => a.period - b.period);
+  const values = sorted.map(cf => cf.type === 'investment' ? -Math.abs(cf.amount) : cf.amount);
+  const periods = sorted.map(cf => cf.period);
 
   if (values.length === 0) return null;
 
@@ -39,7 +39,7 @@ export function calculateIRR(
 
   for (let i = 0; i < maxIterations; i++) {
     mid = (low + high) / 2;
-    const npv = calculateNPV(values, mid);
+    const npv = calculateNPV(values, mid, periods);
 
     if (Math.abs(npv) < tolerance) {
       return mid;
@@ -59,9 +59,15 @@ export function calculateIRR(
   return mid;
 }
 
-export function calculateNPV(values: number[], rate: number): number {
+/**
+ * Calculate NPV using actual period values for discounting.
+ * When periods are provided, each value is discounted by its period (year).
+ * When omitted, falls back to array-index-based discounting for backward compatibility.
+ */
+export function calculateNPV(values: number[], rate: number, periods?: number[]): number {
   return values.reduce((sum, value, index) => {
-    return sum + value / Math.pow(1 + rate, index);
+    const t = periods ? periods[index] : index;
+    return sum + value / Math.pow(1 + rate, t);
   }, 0);
 }
 
