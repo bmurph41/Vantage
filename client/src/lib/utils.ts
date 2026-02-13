@@ -6,13 +6,40 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 let _globalRoundingDigits = 0;
+let _globalEbitdaRoundingDigits = 0;
+let _globalLineItemRoundingDigits = 0;
+let _globalPercentRoundingDecimals = 1;
 
 export function setGlobalRoundingDigits(digits: number) {
   _globalRoundingDigits = digits;
 }
 
+export function setGlobalEbitdaRoundingDigits(digits: number) {
+  _globalEbitdaRoundingDigits = digits;
+}
+
+export function setGlobalLineItemRoundingDigits(digits: number) {
+  _globalLineItemRoundingDigits = digits;
+}
+
+export function setGlobalPercentRoundingDecimals(decimals: number) {
+  _globalPercentRoundingDecimals = decimals;
+}
+
 export function getGlobalRoundingDigits(): number {
   return _globalRoundingDigits;
+}
+
+export function getGlobalEbitdaRoundingDigits(): number {
+  return _globalEbitdaRoundingDigits;
+}
+
+export function getGlobalLineItemRoundingDigits(): number {
+  return _globalLineItemRoundingDigits;
+}
+
+export function getGlobalPercentRoundingDecimals(): number {
+  return _globalPercentRoundingDecimals;
 }
 
 function applyRounding(value: number, roundingDigits: number): number {
@@ -23,12 +50,21 @@ function applyRounding(value: number, roundingDigits: number): number {
 
 export function formatCurrency(
   value: number | string | null | undefined,
-  options?: { roundingDigits?: number; dash?: boolean }
+  options?: { roundingDigits?: number; dash?: boolean; context?: 'price' | 'ebitda' | 'lineItem' }
 ): string {
   if (value === null || value === undefined) return options?.dash ? '-' : '$0';
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return options?.dash ? '-' : '$0';
-  const digits = options?.roundingDigits ?? _globalRoundingDigits;
+  let digits: number;
+  if (options?.roundingDigits !== undefined) {
+    digits = options.roundingDigits;
+  } else if (options?.context === 'ebitda') {
+    digits = _globalEbitdaRoundingDigits;
+  } else if (options?.context === 'lineItem') {
+    digits = _globalLineItemRoundingDigits;
+  } else {
+    digits = _globalRoundingDigits;
+  }
   const rounded = applyRounding(num, digits);
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -42,13 +78,13 @@ export function formatPercent(
   value: number | string | null | undefined,
   options?: { decimals?: number; dash?: boolean; showSign?: boolean }
 ): string {
-  const dash = options?.dash ? '-' : '0.0%';
+  const effectiveDecimals = options?.decimals ?? _globalPercentRoundingDecimals;
+  const dash = options?.dash ? '-' : `0.${'0'.repeat(effectiveDecimals)}%`;
   if (value === null || value === undefined) return dash;
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return dash;
-  const decimals = options?.decimals ?? 1;
   const sign = options?.showSign && num >= 0 ? '+' : '';
-  return `${sign}${num.toFixed(decimals)}%`;
+  return `${sign}${num.toFixed(effectiveDecimals)}%`;
 }
 
 export function formatNumber(value: number | string | null | undefined): string {

@@ -151,7 +151,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </div>
           <div>
             <div className="kpi-label">Purchase Price</div>
-            <div className="kpi-value">{formatCurrency(project.purchasePrice, { dash: true })}</div>
+            <div className="kpi-value">{formatCurrency(project.purchasePrice, { dash: true, context: 'price' })}</div>
           </div>
         </div>
         <div className="finance-kpi-card variant-green" data-testid="card-overview-caprate">
@@ -178,7 +178,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
           </div>
           <div>
             <div className="kpi-label">EBITDA</div>
-            <div className="kpi-value">{formatCurrency(project.ebitda, { dash: true })}</div>
+            <div className="kpi-value">{formatCurrency(project.ebitda, { dash: true, context: 'ebitda' })}</div>
           </div>
         </div>
       </div>

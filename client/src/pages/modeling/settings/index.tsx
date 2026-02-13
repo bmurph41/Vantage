@@ -136,6 +136,9 @@ function SortableRow({ region, onEdit, onDelete }: {
 
 type DisplayPreferences = {
   priceRoundingDigits: number;
+  ebitdaRoundingDigits: number;
+  lineItemRoundingDigits: number;
+  percentRoundingDecimals: number;
   bottomLineMetric: 'noi' | 'ebitda';
 };
 
@@ -147,6 +150,31 @@ const ROUNDING_OPTIONS = [
   { value: 4, label: 'Nearest $10,000', example: '$3,290,000' },
   { value: 5, label: 'Nearest $100,000', example: '$3,300,000' },
   { value: 6, label: 'Nearest $1,000,000', example: '$3,000,000' },
+];
+
+const EBITDA_ROUNDING_OPTIONS = [
+  { value: 0, label: 'No rounding', example: '$1,287,567' },
+  { value: 1, label: 'Nearest $10', example: '$1,287,570' },
+  { value: 2, label: 'Nearest $100', example: '$1,287,600' },
+  { value: 3, label: 'Nearest $1,000', example: '$1,288,000' },
+  { value: 4, label: 'Nearest $10,000', example: '$1,290,000' },
+  { value: 5, label: 'Nearest $100,000', example: '$1,300,000' },
+  { value: 6, label: 'Nearest $1,000,000', example: '$1,000,000' },
+];
+
+const LINE_ITEM_ROUNDING_OPTIONS = [
+  { value: 0, label: 'No rounding', example: '$47,823' },
+  { value: 1, label: 'Nearest $10', example: '$47,820' },
+  { value: 2, label: 'Nearest $100', example: '$47,800' },
+  { value: 3, label: 'Nearest $1,000', example: '$48,000' },
+];
+
+const PERCENT_ROUNDING_OPTIONS = [
+  { value: 0, label: 'Whole number', example: '5%' },
+  { value: 1, label: '1 decimal', example: '5.2%' },
+  { value: 2, label: '2 decimals', example: '5.25%' },
+  { value: 3, label: '3 decimals', example: '5.250%' },
+  { value: 4, label: '4 decimals', example: '5.2500%' },
 ];
 
 export default function ModelingSettings() {
@@ -358,36 +386,113 @@ export default function ModelingSettings() {
               <DollarSign className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-base">Price Rounding</CardTitle>
+              <CardTitle className="text-base">Display Rounding</CardTitle>
               <CardDescription>
-                Control how dollar amounts are rounded on the Financial Model projects list
+                Control how values are rounded throughout the financial models
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="min-w-[120px]">Round prices to</Label>
-              <Select
-                value={String(displayPrefs?.priceRoundingDigits ?? 0)}
-                onValueChange={(val) => updatePrefsMutation.mutate({ priceRoundingDigits: Number(val) })}
-              >
-                <SelectTrigger className="w-[220px]" data-testid="select-rounding">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROUNDING_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <Label className="min-w-[160px] font-medium">Purchase Price</Label>
+                <Select
+                  value={String(displayPrefs?.priceRoundingDigits ?? 0)}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ priceRoundingDigits: Number(val) })}
+                >
+                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-price">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUNDING_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
+                Preview: {ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.priceRoundingDigits ?? 0))?.example || '$3,287,567'}
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-              Preview: {ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.priceRoundingDigits ?? 0))?.example || '$3,287,567'}
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center gap-4">
+                <Label className="min-w-[160px] font-medium">EBITDA / NOI</Label>
+                <Select
+                  value={String(displayPrefs?.ebitdaRoundingDigits ?? 0)}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ ebitdaRoundingDigits: Number(val) })}
+                >
+                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-ebitda">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EBITDA_ROUNDING_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
+                Preview: {EBITDA_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.ebitdaRoundingDigits ?? 0))?.example || '$1,287,567'}
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center gap-4">
+                <Label className="min-w-[160px] font-medium">Line Item Values</Label>
+                <Select
+                  value={String(displayPrefs?.lineItemRoundingDigits ?? 0)}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ lineItemRoundingDigits: Number(val) })}
+                >
+                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-lineitem">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LINE_ITEM_ROUNDING_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
+                Preview: {LINE_ITEM_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.lineItemRoundingDigits ?? 0))?.example || '$47,823'}
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center gap-4">
+                <Label className="min-w-[160px] font-medium">Percentages</Label>
+                <Select
+                  value={String(displayPrefs?.percentRoundingDecimals ?? 1)}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ percentRoundingDecimals: Number(val) })}
+                >
+                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-percent">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERCENT_ROUNDING_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
+                Preview: {PERCENT_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.percentRoundingDecimals ?? 1))?.example || '5.2%'}
+              </div>
             </div>
           </div>
         </CardContent>

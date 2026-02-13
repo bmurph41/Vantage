@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { setGlobalRoundingDigits } from '@/lib/utils';
+import { setGlobalRoundingDigits, setGlobalEbitdaRoundingDigits, setGlobalLineItemRoundingDigits, setGlobalPercentRoundingDecimals } from '@/lib/utils';
 
 interface DisplayPreferences {
   priceRoundingDigits: number;
+  ebitdaRoundingDigits: number;
+  lineItemRoundingDigits: number;
+  percentRoundingDecimals: number;
   bottomLineMetric: 'noi' | 'ebitda';
 }
 
@@ -13,12 +16,18 @@ export function useDisplayPreferences() {
   });
 
   const roundingDigits = prefs?.priceRoundingDigits ?? 0;
+  const ebitdaRoundingDigits = prefs?.ebitdaRoundingDigits ?? 0;
+  const lineItemRoundingDigits = prefs?.lineItemRoundingDigits ?? 0;
+  const percentRoundingDecimals = prefs?.percentRoundingDecimals ?? 1;
   const bottomLineMetric = prefs?.bottomLineMetric ?? 'noi';
   const metricLabel = bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI';
 
   useEffect(() => {
     setGlobalRoundingDigits(roundingDigits);
-  }, [roundingDigits]);
+    setGlobalEbitdaRoundingDigits(ebitdaRoundingDigits);
+    setGlobalLineItemRoundingDigits(lineItemRoundingDigits);
+    setGlobalPercentRoundingDecimals(percentRoundingDecimals);
+  }, [roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals]);
 
-  return { roundingDigits, bottomLineMetric, metricLabel };
+  return { roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, bottomLineMetric, metricLabel };
 }

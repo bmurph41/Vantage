@@ -16932,7 +16932,7 @@ Current context: Project ${req.params.projectId}`;
       const [prefs] = await db.select().from(modelingDisplayPreferences)
         .where(eq(modelingDisplayPreferences.orgId, orgId))
         .limit(1);
-      res.json(prefs || { priceRoundingDigits: 0, bottomLineMetric: 'noi' });
+      res.json(prefs || { priceRoundingDigits: 0, ebitdaRoundingDigits: 0, lineItemRoundingDigits: 0, percentRoundingDecimals: 1, bottomLineMetric: 'noi' });
     } catch (error: any) {
       console.error('Failed to get display preferences:', error);
       res.status(500).json({ error: 'Failed to get display preferences' });
@@ -16942,7 +16942,7 @@ Current context: Project ${req.params.projectId}`;
   app.patch('/api/modeling/display-preferences', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { priceRoundingDigits, bottomLineMetric } = req.body;
+      const { priceRoundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, bottomLineMetric } = req.body;
 
       const updates: Record<string, any> = { updatedAt: new Date() };
 
@@ -16951,6 +16951,27 @@ Current context: Project ${req.params.projectId}`;
           return res.status(400).json({ error: 'priceRoundingDigits must be a number between 0 and 6' });
         }
         updates.priceRoundingDigits = priceRoundingDigits;
+      }
+
+      if (ebitdaRoundingDigits !== undefined) {
+        if (typeof ebitdaRoundingDigits !== 'number' || ebitdaRoundingDigits < 0 || ebitdaRoundingDigits > 6) {
+          return res.status(400).json({ error: 'ebitdaRoundingDigits must be a number between 0 and 6' });
+        }
+        updates.ebitdaRoundingDigits = ebitdaRoundingDigits;
+      }
+
+      if (lineItemRoundingDigits !== undefined) {
+        if (typeof lineItemRoundingDigits !== 'number' || lineItemRoundingDigits < 0 || lineItemRoundingDigits > 6) {
+          return res.status(400).json({ error: 'lineItemRoundingDigits must be a number between 0 and 6' });
+        }
+        updates.lineItemRoundingDigits = lineItemRoundingDigits;
+      }
+
+      if (percentRoundingDecimals !== undefined) {
+        if (typeof percentRoundingDecimals !== 'number' || percentRoundingDecimals < 0 || percentRoundingDecimals > 4) {
+          return res.status(400).json({ error: 'percentRoundingDecimals must be a number between 0 and 4' });
+        }
+        updates.percentRoundingDecimals = percentRoundingDecimals;
       }
 
       if (bottomLineMetric !== undefined) {
