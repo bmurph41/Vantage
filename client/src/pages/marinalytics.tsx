@@ -112,7 +112,7 @@ export default function MarinalyticsPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <BarChart3 className="h-6 w-6 text-primary" />
-                Marinalytics
+                Market Intelligence
               </h1>
               <p className="text-muted-foreground text-sm mt-1">
                 Portfolio company analytics and marina operating benchmarks

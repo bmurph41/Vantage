@@ -826,7 +826,7 @@ export default function CompanyDetailModal({
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Tracked in Marinalytics for operating metrics and benchmarking
+                            Tracked in Market Intelligence for operating metrics and benchmarking
                           </p>
                         </div>
                       </div>

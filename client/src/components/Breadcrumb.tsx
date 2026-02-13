@@ -23,7 +23,7 @@ const CATEGORIES = {
   VDR: { label: 'VDR', href: '/vdr', icon: FolderLock },
   MODELING: { label: 'Financial Model', href: '/modeling/projects', icon: TrendingUp },
   DOCKTALK: { label: 'The Docket', href: '/docktalk', icon: MessageSquare },
-  ANALYSIS: { label: 'Marinalytics', href: '/analysis/sales-comps', icon: BarChart3 },
+  ANALYSIS: { label: 'Market Intelligence', href: '/analysis/sales-comps', icon: BarChart3 },
   MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },
 };
 

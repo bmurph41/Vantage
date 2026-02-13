@@ -297,7 +297,7 @@ export const sidebarConfig: SidebarGroup[] = [
   // ─────────────────────────────────────────────────────────────
   {
     id: 'marinalytics',
-    label: 'Marinalytics',
+    label: 'Market Intelligence',
     icon: BarChart3,
     matchRoutes: ['/marinalytics', '/analytics', '/docktalk', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis'],
     requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
