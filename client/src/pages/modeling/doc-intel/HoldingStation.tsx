@@ -87,10 +87,35 @@ interface StagedFile {
   docType: DocType;
   customTypeName?: string;
   year: string;
+  isT12?: boolean;
+  t12StartMonth?: string;
+  t12StartYear?: string;
+  t12EndMonth?: string;
+  t12EndYear?: string;
   status: "pending" | "uploading" | "uploaded" | "parsing" | "parsed" | "error";
   progress: number;
   errorMessage?: string;
-  uploadId?: string; // Set after upload completes
+  uploadId?: string;
+}
+
+const MONTHS = [
+  { value: '1', label: 'Jan' }, { value: '2', label: 'Feb' }, { value: '3', label: 'Mar' },
+  { value: '4', label: 'Apr' }, { value: '5', label: 'May' }, { value: '6', label: 'Jun' },
+  { value: '7', label: 'Jul' }, { value: '8', label: 'Aug' }, { value: '9', label: 'Sep' },
+  { value: '10', label: 'Oct' }, { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
+];
+
+function parseDateRange(filename: string): { startMonth: string; startYear: string; endMonth: string; endYear: string } | null {
+  const dateRangePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*[-–—]+\s*(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
+  const match = filename.match(dateRangePattern);
+  if (!match) return null;
+  const [, startMonth, , startYearRaw, endMonth, , endYearRaw] = match;
+  const sm = parseInt(startMonth);
+  const em = parseInt(endMonth);
+  if (sm < 1 || sm > 12 || em < 1 || em > 12) return null;
+  const startYear = startYearRaw.length === 2 ? `20${startYearRaw}` : startYearRaw;
+  const endYear = endYearRaw.length === 2 ? `20${endYearRaw}` : endYearRaw;
+  return { startMonth: sm.toString(), startYear, endMonth: em.toString(), endYear };
 }
 
 const BUILTIN_DOC_TYPES: Record<string, { label: string; icon: typeof FileSpreadsheet }> = {
@@ -167,11 +192,18 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
       const formData = new FormData();
       formData.append("file", stagedFile.file);
       formData.append("docType", stagedFile.docType === "other" && stagedFile.customTypeName ? "other" : stagedFile.docType);
-      formData.append("year", stagedFile.year);
+      formData.append("year", stagedFile.isT12 ? (stagedFile.t12EndYear || new Date().getFullYear().toString()) : stagedFile.year);
       formData.append("holdingStatus", "staging");
       formData.append("displayName", stagedFile.displayName);
       if (stagedFile.customTypeName) {
         formData.append("customTypeName", stagedFile.customTypeName);
+      }
+      if (stagedFile.isT12) {
+        formData.append("isT12", "true");
+        if (stagedFile.t12StartMonth) formData.append("t12StartMonth", stagedFile.t12StartMonth);
+        if (stagedFile.t12StartYear) formData.append("t12StartYear", stagedFile.t12StartYear);
+        if (stagedFile.t12EndMonth) formData.append("t12EndMonth", stagedFile.t12EndMonth);
+        if (stagedFile.t12EndYear) formData.append("t12EndYear", stagedFile.t12EndYear);
       }
 
       const csrfToken = await ensureCsrfToken();
@@ -234,15 +266,35 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
   });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => ({
-      file,
-      id: crypto.randomUUID(),
-      displayName: file.name,
-      docType: guessDocType(file.name),
-      year: new Date().getFullYear().toString(),
-      status: "pending" as const,
-      progress: 0,
-    }));
+    const now = new Date();
+    const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => {
+      const isT12 = guessIsT12(file.name);
+      const base: StagedFile = {
+        file,
+        id: crypto.randomUUID(),
+        displayName: file.name,
+        docType: guessDocType(file.name),
+        year: isT12 ? "T12" : now.getFullYear().toString(),
+        isT12,
+        status: "pending" as const,
+        progress: 0,
+      };
+      if (isT12) {
+        const parsed = parseDateRange(file.name);
+        if (parsed) {
+          base.t12StartMonth = parsed.startMonth;
+          base.t12StartYear = parsed.startYear;
+          base.t12EndMonth = parsed.endMonth;
+          base.t12EndYear = parsed.endYear;
+        } else {
+          base.t12StartMonth = (now.getMonth() + 1).toString();
+          base.t12StartYear = (now.getFullYear() - 1).toString();
+          base.t12EndMonth = (now.getMonth() + 1).toString();
+          base.t12EndYear = now.getFullYear().toString();
+        }
+      }
+      return base;
+    });
     setStagedFiles((prev) => [...prev, ...newStagedFiles]);
   }, []);
 
@@ -257,6 +309,13 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
     maxSize: 50 * 1024 * 1024,
     multiple: true,
   });
+
+  const guessIsT12 = (filename: string): boolean => {
+    const lower = filename.toLowerCase();
+    if (lower.includes("t12") || lower.includes("trailing")) return true;
+    if (parseDateRange(filename)) return true;
+    return false;
+  };
 
   const guessDocType = (filename: string): DocType => {
     const lower = filename.toLowerCase();
@@ -292,6 +351,18 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
   const uploadAndParseAll = async () => {
     const pendingFiles = stagedFiles.filter((f) => f.status === "pending");
     if (pendingFiles.length === 0) return;
+
+    const t12Missing = pendingFiles.filter(
+      (f) => f.isT12 && (!f.t12StartMonth || !f.t12StartYear || !f.t12EndMonth || !f.t12EndYear)
+    );
+    if (t12Missing.length > 0) {
+      toast({
+        title: "Missing T12 period",
+        description: `Please set the start and end month/year for: ${t12Missing.map(f => f.displayName).join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsProcessing(true);
     setProcessingMessage(`Uploading ${pendingFiles.length} document(s)...`);
@@ -417,7 +488,8 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
   };
 
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 10 }, (_, i) => (currentYear - i).toString());
+  const yearOptions = ["T12", ...Array.from({ length: 10 }, (_, i) => (currentYear - i).toString())];
+  const t12YearOptions = Array.from({ length: 12 }, (_, i) => (currentYear + 1 - i).toString());
 
   return (
     <div className="space-y-6">
@@ -547,7 +619,7 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
                     </div>
 
                     {staged.status === "pending" && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
                         <Select
                           value={staged.docType}
                           onValueChange={(v) => updateStagedFile(staged.id, { docType: v as DocType })}
@@ -563,14 +635,35 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
                         </Select>
                         <Select
                           value={staged.year}
-                          onValueChange={(v) => updateStagedFile(staged.id, { year: v })}
+                          onValueChange={(v) => {
+                            const now = new Date();
+                            const updates: Partial<StagedFile> = { year: v };
+                            if (v === "T12") {
+                              updates.isT12 = true;
+                              if (!staged.t12StartMonth) {
+                                updates.t12StartMonth = (now.getMonth() + 1).toString();
+                                updates.t12StartYear = (now.getFullYear() - 1).toString();
+                                updates.t12EndMonth = (now.getMonth() + 1).toString();
+                                updates.t12EndYear = now.getFullYear().toString();
+                              }
+                            } else {
+                              updates.isT12 = false;
+                              updates.t12StartMonth = undefined;
+                              updates.t12StartYear = undefined;
+                              updates.t12EndMonth = undefined;
+                              updates.t12EndYear = undefined;
+                            }
+                            updateStagedFile(staged.id, updates);
+                          }}
                         >
                           <SelectTrigger className="w-20 h-8 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {yearOptions.map((y) => (
-                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                              <SelectItem key={y} value={y}>
+                                {y === "T12" ? <span className="font-semibold text-primary">T12</span> : y}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -582,6 +675,64 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
                         >
                           <X className="h-4 w-4" />
                         </Button>
+                        {staged.isT12 && (
+                          <div className="w-full flex items-center gap-1.5 mt-1 pl-10">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">From:</span>
+                            <Select
+                              value={staged.t12StartMonth || "1"}
+                              onValueChange={(v) => updateStagedFile(staged.id, { t12StartMonth: v })}
+                            >
+                              <SelectTrigger className="w-16 h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS.map((m) => (
+                                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={staged.t12StartYear || currentYear.toString()}
+                              onValueChange={(v) => updateStagedFile(staged.id, { t12StartYear: v })}
+                            >
+                              <SelectTrigger className="w-[72px] h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {t12YearOptions.map((y) => (
+                                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">To:</span>
+                            <Select
+                              value={staged.t12EndMonth || "1"}
+                              onValueChange={(v) => updateStagedFile(staged.id, { t12EndMonth: v })}
+                            >
+                              <SelectTrigger className="w-16 h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS.map((m) => (
+                                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={staged.t12EndYear || currentYear.toString()}
+                              onValueChange={(v) => updateStagedFile(staged.id, { t12EndYear: v })}
+                            >
+                              <SelectTrigger className="w-[72px] h-7 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {t12YearOptions.map((y) => (
+                                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     )}
 
