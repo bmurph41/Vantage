@@ -7414,7 +7414,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const pendingContacts = await storage.getPendingContactsForOrg(orgId);
 
-      const allContacts = await storage.getContactsForOrg(orgId);
+      const allContacts = await storage.getContactsByOrg(orgId);
 
       const enrichedPending = pendingContacts.map((pending: any) => {
         const pendingFullName = pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim();
@@ -7534,7 +7534,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const pendingCompanies = await storage.getPendingCompaniesForOrg(orgId);
 
-      const allCompanies = await storage.getCompaniesForOrg(orgId);
+      const allCompanies = await storage.getCrmCompaniesForOrg(orgId);
 
       const enrichedPending = pendingCompanies.map((pending: any) => {
         if (!pending.name) return pending;
@@ -15161,7 +15161,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Pending contact not found" });
       }
 
-      const allContacts = await storage.getContactsForOrg(orgId);
+      const allContacts = await storage.getContactsByOrg(orgId);
 
       const similarityScores = allContacts.map(contact => {
         let score = 0;
@@ -15287,7 +15287,7 @@ Current context: Project ${req.params.projectId}`;
       const pendingCompanies = await storage.getPendingCompaniesForOrg(orgId);
       
       // Enrich with real-time duplicate detection using enhanced fuzzy matching
-      const allCompanies = await storage.getCompaniesForOrg(orgId);
+      const allCompanies = await storage.getCrmCompaniesForOrg(orgId);
       
       const enrichedPending = pendingCompanies.map((pending: any) => {
         if (!pending.name) return pending;
@@ -15328,7 +15328,7 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Pending company not found" });
       }
 
-      const allCompanies = await storage.getCompaniesForOrg(orgId);
+      const allCompanies = await storage.getCrmCompaniesForOrg(orgId);
 
       // Use enhanced fuzzy matching with entity suffix stripping
       const duplicates = findCompanyDuplicates(
