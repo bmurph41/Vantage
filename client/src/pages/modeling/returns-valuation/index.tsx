@@ -55,17 +55,17 @@ const formatMultiple = (val: number | null | undefined) => {
 };
 
 const outcomeColors: Record<string, string> = {
-  active: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  under_contract: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  closed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  passed: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  lost: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  active: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+  under_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  won: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  passed: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+  lost: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
 };
 
 const outcomeLabels: Record<string, string> = {
   active: "Active",
-  under_contract: "Under Contract",
-  closed: "Closed",
+  under_review: "Under Review",
+  won: "Won",
   passed: "Passed",
   lost: "Lost",
 };
@@ -256,7 +256,7 @@ export default function ReturnsValuationPage() {
                             }
                           >
                             {outcomeLabels[project.dealOutcome] ||
-                              project.dealOutcome}
+                              project.dealOutcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
