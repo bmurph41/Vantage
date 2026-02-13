@@ -1,4 +1,6 @@
 import type { LoanScheduleResult } from './mortgage-amortization';
+import { calculateIRR as canonicalIRR } from './irr-calculator';
+import type { CashFlow } from './irr-calculator';
 
 export interface CashflowProjectionInput {
   holdingPeriodYears: number;
@@ -195,7 +197,7 @@ export function projectCashflows(input: CashflowProjectionInput): CashflowProjec
     }
   }
   
-  const leveredIrr = calculateIRR(investmentCashflows);
+  const leveredIrr = rawArrayIRR(investmentCashflows);
   
   const unleveredCashflows: number[] = [-input.initialEquityInvestment - (input.debtSchedules?.reduce((sum, s) => sum + s.schedule[0]?.beginningBalance || 0, 0) || 0)];
   for (const cf of yearlyCashflows) {
@@ -204,7 +206,7 @@ export function projectCashflows(input: CashflowProjectionInput): CashflowProjec
   if (input.exitSalePrice) {
     unleveredCashflows[unleveredCashflows.length - 1] += input.exitSalePrice - (input.exitClosingCosts || 0);
   }
-  const unleveredIrr = calculateIRR(unleveredCashflows);
+  const unleveredIrr = rawArrayIRR(unleveredCashflows);
   
   return {
     yearlyCashflows,
@@ -224,34 +226,15 @@ export function projectCashflows(input: CashflowProjectionInput): CashflowProjec
   };
 }
 
-function calculateIRR(cashflows: number[], maxIterations: number = 1000, tolerance: number = 0.0001): number | null {
+// Thin adapter: converts number[] to CashFlow[] for the canonical IRR
+function rawArrayIRR(cashflows: number[]): number | null {
   if (cashflows.length < 2) return null;
-  if (cashflows[0] >= 0) return null;
-  
-  const totalCashflows = cashflows.reduce((sum, cf) => sum + cf, 0);
-  if (totalCashflows <= 0) return null;
-  
-  let lowerBound = -0.99;
-  let upperBound = 10.0;
-  let guess = 0.1;
-  
-  for (let i = 0; i < maxIterations; i++) {
-    const npv = cashflows.reduce((sum, cf, t) => sum + cf / Math.pow(1 + guess, t), 0);
-    
-    if (Math.abs(npv) < tolerance) {
-      return guess;
-    }
-    
-    if (npv > 0) {
-      lowerBound = guess;
-    } else {
-      upperBound = guess;
-    }
-    
-    guess = (lowerBound + upperBound) / 2;
-  }
-  
-  return guess;
+  const flows: CashFlow[] = cashflows.map((cf, i) => ({
+    period: i,
+    amount: Math.abs(cf),
+    type: (cf < 0 ? 'investment' : (i === cashflows.length - 1 ? 'distribution' : 'intermediate')) as 'investment' | 'distribution' | 'intermediate',
+  }));
+  return canonicalIRR(flows);
 }
 
 export interface CCIMCFAWResult {

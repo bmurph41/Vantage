@@ -93,6 +93,37 @@ export function calculate1031ExchangeEngine(input: Exchange1031EngineInput): Exc
 
   const realizedGain = input.relinquishedProperty.salePrice - input.relinquishedProperty.adjustedBasis;
 
+  // Guard: empty replacement properties → no deferral possible, all gain recognized
+  if (input.replacementProperties.length === 0) {
+    warnings.push({
+      code: 'NO_REPLACEMENT_PROPERTIES',
+      severity: 'error',
+      message: 'No replacement properties identified. All gain will be recognized — no deferral benefit.',
+    });
+
+    const qiChecklist = buildQIChecklist(input);
+    return {
+      timeline,
+      identificationRules,
+      replacementResults: [],
+      bootAnalysis: {
+        cashBootReceived: 0,
+        mortgageBoot: 0,
+        totalBoot: 0,
+        bootTaxable: realizedGain > 0,
+        recognizedGain: Math.max(0, realizedGain),
+        taxOnBoot: 0,
+      },
+      qiChecklist,
+      totalRealizedGain: realizedGain,
+      totalDeferredGain: 0,
+      totalRecognizedGain: Math.max(0, realizedGain),
+      newAggregatedBasis: 0,
+      isFullyDeferred: false,
+      warnings,
+    };
+  }
+
   const totalReplacementValue = input.replacementProperties.reduce((sum, p) => sum + p.purchasePrice, 0);
   const totalReplacementMortgage = input.replacementProperties.reduce((sum, p) => sum + p.newMortgage, 0);
 
@@ -114,8 +145,10 @@ export function calculate1031ExchangeEngine(input: Exchange1031EngineInput): Exc
 
   const bootTaxable = totalBoot > 0;
 
-  const estimatedCapGainsRate = 0.238;
-  const taxOnBoot = recognizedGain * estimatedCapGainsRate;
+  // Boot tax is now computed by the orchestrator through the tax engine, which
+  // accounts for filing status, income brackets, state tax, and NIIT eligibility.
+  // We set taxOnBoot = 0 here; the orchestrator pro-rates full tax to recognized gain.
+  const taxOnBoot = 0;
 
   const bootAnalysis: BootAnalysis = {
     cashBootReceived,
@@ -155,6 +188,14 @@ export function calculate1031ExchangeEngine(input: Exchange1031EngineInput): Exc
       code: 'BOOT_RECEIVED',
       severity: 'warning',
       message: `Boot of ${formatCurrency(totalBoot)} will result in ${formatCurrency(recognizedGain)} of recognized gain.`,
+    });
+  }
+
+  if (realizedGain <= 0) {
+    warnings.push({
+      code: 'NO_GAIN_TO_DEFER',
+      severity: 'warning',
+      message: 'No gain to defer — a 1031 exchange provides no tax benefit when selling at a loss.',
     });
   }
 

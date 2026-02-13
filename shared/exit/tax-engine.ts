@@ -453,7 +453,7 @@ export function calculateInstallmentTaxSchedule(
   installmentConfig: { downPaymentPercent: number; termYears: number; interestRate: number }
 ): InstallmentTaxSchedule[] {
   const taxConfig = getTaxYearConfig(profile.taxYear || 2025);
-  const salePrice = allocation.netSalePrice + (allocation.netSalePrice - allocation.adjustedBasis < allocation.totalGain ? 0 : 0);
+  const salePrice = allocation.netSalePrice;
 
   const grossProfit = allocation.totalGain;
   const grossProfitRatio = grossProfit / allocation.netSalePrice;
@@ -495,19 +495,25 @@ export function calculateInstallmentTaxSchedule(
 
     const gainRecognized = principalReceived * grossProfitRatio;
 
+    // IRS §453(d)(1): ALL depreciation recapture is recognized in the year of sale,
+    // regardless of installment treatment. Recapture is NOT limited by the
+    // gross profit ratio of the down payment — it is frontloaded in full.
     let section1250RecapturedThisYear = 0;
     if (year === 0 && remainingRecapture1250 > 0) {
-      section1250RecapturedThisYear = Math.min(remainingRecapture1250, gainRecognized);
-      remainingRecapture1250 -= section1250RecapturedThisYear;
+      section1250RecapturedThisYear = remainingRecapture1250; // Full amount, not capped by gainRecognized
+      remainingRecapture1250 = 0;
     }
 
     let section1245RecapturedThisYear = 0;
     if (year === 0 && remainingRecapture1245 > 0) {
-      section1245RecapturedThisYear = Math.min(remainingRecapture1245, gainRecognized - section1250RecapturedThisYear);
-      remainingRecapture1245 -= section1245RecapturedThisYear;
+      section1245RecapturedThisYear = remainingRecapture1245; // Full amount
+      remainingRecapture1245 = 0;
     }
 
-    const ltcgThisYear = Math.max(0, gainRecognized - section1250RecapturedThisYear - section1245RecapturedThisYear);
+    // In Year 0, total recognized = full recapture + any remaining LTCG from down payment
+    // In subsequent years, recognized gain is pure LTCG (no recapture remaining)
+    const totalRecaptureThisYear = section1250RecapturedThisYear + section1245RecapturedThisYear;
+    const ltcgThisYear = Math.max(0, gainRecognized - totalRecaptureThisYear);
 
     const taxableIncome = profile.otherOrdinaryIncome + ltcgThisYear;
     const ltcgRateThisYear = getLtcgRate(profile.filingStatus, taxableIncome, taxConfig);
@@ -573,7 +579,7 @@ export function runTaxEngine(
   );
 
   if (allocation.totalGain < 0) {
-    warnings.push({ code: 'LOSS_SALE', severity: 'warning', message: 'Sale results in a loss. Tax treatment of losses may differ.' });
+    warnings.push({ code: 'LOSS_SALE', severity: 'warning', message: 'Sale results in a loss. No tax liability on the loss. Tax treatment of losses may differ — consult a tax advisor.' });
   }
 
   if (!allocation.isLongTerm) {

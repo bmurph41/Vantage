@@ -119,9 +119,10 @@ export default function ModelingAnalytics() {
     },
   });
 
-  const { data: contacts = [] } = useQuery<Contact[]>({
+  const { data: contactsRaw } = useQuery<any>({
     queryKey: ['/api/crm/contacts'],
   });
+  const contacts: Contact[] = Array.isArray(contactsRaw) ? contactsRaw : (contactsRaw?.contacts || []);
 
   const exportToCSV = () => {
     if (!analytics) return;

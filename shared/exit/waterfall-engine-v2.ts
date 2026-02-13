@@ -1,3 +1,5 @@
+import { calculateXIRR } from './irr-calculator';
+
 export interface WaterfallV2Input {
   capitalCalls: DatedCapitalEvent[];
   distributions: DatedCapitalEvent[];
@@ -92,6 +94,24 @@ export function calculateWaterfallV2(input: WaterfallV2Input): WaterfallV2Result
 
   const totalCapitalCalled = input.capitalCalls.reduce((sum, c) => sum + c.amount, 0);
   const totalDistributions = input.distributions.reduce((sum, d) => sum + d.amount, 0);
+
+  // Guard: no capital calls or no distributions → return zeroed-out result with warning
+  if (totalCapitalCalled <= 0 || input.capitalCalls.length === 0) {
+    warnings.push({
+      code: 'NO_CAPITAL_CALLS',
+      severity: 'error',
+      message: 'No capital calls provided. Cannot compute waterfall without invested capital.',
+    });
+    return buildEmptyWaterfallResult(warnings);
+  }
+  if (totalDistributions <= 0 || input.distributions.length === 0) {
+    warnings.push({
+      code: 'NO_DISTRIBUTIONS',
+      severity: 'warning',
+      message: 'No distributions provided. All metrics will show zero returns.',
+    });
+    return buildEmptyWaterfallResult(warnings);
+  }
 
   const gpCapital = totalCapitalCalled * input.gpCommitmentPercent;
   const lpCapital = totalCapitalCalled - gpCapital;
@@ -285,10 +305,10 @@ export function calculateWaterfallV2(input: WaterfallV2Input): WaterfallV2Result
   const rvpi = paidInCapital > 0 ? residualValue / paidInCapital : 0;
 
   const lpCashFlows = buildLpCashFlows(input.capitalCalls, input.distributions, cumulativeLp, totalDistributions, lpCapital, totalCapitalCalled);
-  const lpIrr = dateBasedXIRR(lpCashFlows);
+  const lpIrr = calculateXIRR(lpCashFlows);
 
   const gpCashFlows = buildGpCashFlows(input.capitalCalls, input.distributions, cumulativeGp, totalDistributions, gpCapital, totalCapitalCalled);
-  const gpIrr = dateBasedXIRR(gpCashFlows);
+  const gpIrr = calculateXIRR(gpCashFlows);
 
   let jCurveBreakevenYear: number | null = null;
   {
@@ -372,6 +392,37 @@ function computePreferredReturn(
     default:
       return capital * Math.pow(1 + rate, years) - capital;
   }
+}
+
+function buildEmptyWaterfallResult(warnings: WaterfallV2Warning[]): WaterfallV2Result {
+  return {
+    distributions: [],
+    investorAllocations: [],
+    clawback: {
+      clawbackRequired: false,
+      clawbackAmount: 0,
+      gpOverDistributed: 0,
+      targetGpShare: 0,
+      actualGpShare: 0,
+      gpNetAfterClawback: 0,
+    },
+    fundMetrics: {
+      grossMoic: 0,
+      netMoic: 0,
+      dpi: 0,
+      tvpi: 0,
+      rvpi: 0,
+      lpIrr: null,
+      gpIrr: null,
+      paidInCapital: 0,
+      distributedCapital: 0,
+      residualValue: 0,
+      jCurveBreakevenYear: null,
+    },
+    lpTotalDistribution: 0,
+    gpTotalDistribution: 0,
+    warnings,
+  };
 }
 
 function calculateHoldingYears(
@@ -497,39 +548,7 @@ function buildGpCashFlows(
   return cashFlows.sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-function dateBasedXIRR(
-  cashFlows: { date: Date; amount: number }[],
-  guess: number = 0.1,
-  maxIter: number = 1000,
-  tol: number = 1e-7
-): number | null {
-  if (cashFlows.length < 2) return null;
-  const hasPos = cashFlows.some(cf => cf.amount > 0);
-  const hasNeg = cashFlows.some(cf => cf.amount < 0);
-  if (!hasPos || !hasNeg) return null;
-
-  const sorted = [...cashFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const startDate = sorted[0].date;
-
-  let rate = guess;
-  for (let i = 0; i < maxIter; i++) {
-    let npv = 0;
-    let dnpv = 0;
-    for (const cf of sorted) {
-      const years = (cf.date.getTime() - startDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-      const disc = Math.pow(1 + rate, years);
-      npv += cf.amount / disc;
-      dnpv -= (years * cf.amount) / (disc * (1 + rate));
-    }
-    if (Math.abs(npv) < tol) return rate;
-    if (Math.abs(dnpv) < tol) return null;
-    const newRate = rate - npv / dnpv;
-    if (Math.abs(newRate - rate) < tol) return newRate;
-    rate = newRate;
-    if (rate < -0.99 || rate > 100) return null;
-  }
-  return null;
-}
+// dateBasedXIRR removed — using canonical calculateXIRR from irr-calculator.ts
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {

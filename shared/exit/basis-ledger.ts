@@ -63,8 +63,19 @@ export function calculateBasisLedger(input: BasisLedgerInput): BasisCalculationR
   let improvementBasis = input.improvementValueAtAcquisition;
   const personalPropertyValue = input.personalPropertyValue || 0;
   
-  const improvementAnnualDepreciation = improvementBasis / input.depreciationScheduleYears;
-  const personalPropertyDepreciation = personalPropertyValue / 5; // 5-year for personal property
+  // Guard: depreciationScheduleYears=0 would cause Infinity
+  let improvementAnnualDepreciation = 0;
+  if (input.depreciationScheduleYears > 0) {
+    improvementAnnualDepreciation = improvementBasis / input.depreciationScheduleYears;
+  } else if (improvementBasis > 0) {
+    basisBreakdown.push({
+      description: 'WARNING: Depreciation schedule years is 0 — no depreciation computed',
+      amount: 0,
+      isAddition: false,
+      category: 'depreciation'
+    });
+  }
+  const personalPropertyDepreciation = personalPropertyValue > 0 ? personalPropertyValue / 5 : 0;
   const annualDepreciation = improvementAnnualDepreciation + personalPropertyDepreciation;
   
   const costRecoveryByYear: Record<number, number> = {};

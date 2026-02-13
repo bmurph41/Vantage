@@ -216,14 +216,7 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
     installmentSale: input.installmentSale,
   };
 
-  const taxResult = runTaxEngine(gainInput, input.taxProfile);
-
-  for (const w of taxResult.warnings) {
-    allWarnings.push({ ...w, source: 'tax_engine' });
-  }
-
-  const afterTaxEquityProceeds = beforeTaxEquityProceeds - taxResult.totalTaxLiability;
-
+  // --- 1031 exchange must be computed BEFORE tax so we can adjust the taxable gain ---
   let exchange1031Result: Exchange1031EngineResult | undefined;
   if (input.scenarioType === 'exchange_1031' && input.exchange1031) {
     const exchangeInput: Exchange1031EngineInput = {
@@ -248,6 +241,70 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
     for (const w of exchange1031Result.warnings) {
       allWarnings.push({ ...w, source: '1031_exchange' });
     }
+  }
+
+  // For 1031 exchanges, only the recognized gain (boot) is taxable, not the full gain.
+  // Build an adjusted gain input that caps the taxable gain at recognizedGain.
+  let taxGainInput = gainInput;
+  if (input.scenarioType === 'exchange_1031' && exchange1031Result) {
+    const recognizedGain = exchange1031Result.totalRecognizedGain;
+    if (recognizedGain === 0) {
+      // Full deferral: no tax at all
+      taxGainInput = { ...gainInput, _overrideTotalGainToZero: true } as any;
+    }
+    // Note: for partial boot, the full tax engine runs on full gain, then we
+    // cap the actual liability to boot-only tax below.
+  }
+
+  const fullTaxResult = runTaxEngine(gainInput, input.taxProfile);
+
+  // Compute the effective tax result: for 1031, cap tax to recognized gain only
+  let taxResult = fullTaxResult;
+  let afterTaxEquityProceeds: number;
+
+  if (input.scenarioType === 'exchange_1031' && exchange1031Result) {
+    const recognizedGain = exchange1031Result.totalRecognizedGain;
+    const fullGain = fullTaxResult.gainAllocation.totalGain;
+
+    if (recognizedGain <= 0) {
+      // Full deferral → $0 tax
+      afterTaxEquityProceeds = beforeTaxEquityProceeds;
+      taxResult = {
+        ...fullTaxResult,
+        totalTaxLiability: 0,
+        effectiveTaxRate: 0,
+        afterTaxProceeds: fullTaxResult.gainAllocation.netSalePrice,
+      };
+      allWarnings.push({
+        code: '1031_FULL_DEFERRAL',
+        severity: 'info',
+        message: `Full 1031 deferral: ${formatCurrency(fullGain)} gain deferred. $0 tax due.`,
+        source: '1031_exchange',
+      });
+    } else {
+      // Partial deferral: tax only on recognizedGain, pro-rated from full tax
+      const gainRatio = fullGain > 0 ? recognizedGain / fullGain : 0;
+      const bootTaxLiability = fullTaxResult.totalTaxLiability * gainRatio;
+      afterTaxEquityProceeds = beforeTaxEquityProceeds - bootTaxLiability;
+      taxResult = {
+        ...fullTaxResult,
+        totalTaxLiability: bootTaxLiability,
+        effectiveTaxRate: recognizedGain > 0 ? bootTaxLiability / recognizedGain : 0,
+        afterTaxProceeds: fullTaxResult.gainAllocation.netSalePrice - bootTaxLiability,
+      };
+      allWarnings.push({
+        code: '1031_PARTIAL_DEFERRAL',
+        severity: 'info',
+        message: `Partial 1031 deferral: ${formatCurrency(recognizedGain)} recognized (boot), ${formatCurrency(fullGain - recognizedGain)} deferred.`,
+        source: '1031_exchange',
+      });
+    }
+  } else {
+    afterTaxEquityProceeds = beforeTaxEquityProceeds - taxResult.totalTaxLiability;
+  }
+
+  for (const w of fullTaxResult.warnings) {
+    allWarnings.push({ ...w, source: 'tax_engine' });
   }
 
   let dstResult: DstEngineResult | undefined;
@@ -306,15 +363,48 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
   const totalCashReturned = afterTaxEquityProceeds + totalRefCashOut;
 
   const moic = totalEquityInvested > 0 ? totalCashReturned / totalEquityInvested : 0;
-  const annualizedReturn = input.property.holdingPeriodYears > 0
-    ? Math.pow(moic, 1 / input.property.holdingPeriodYears) - 1
-    : 0;
+
+  // Guard: holdingPeriodYears <= 0 would cause Infinity
+  let annualizedReturn = 0;
+  if (input.property.holdingPeriodYears <= 0) {
+    annualizedReturn = 0;
+    allWarnings.push({
+      code: 'ZERO_HOLDING_PERIOD',
+      severity: 'warning',
+      message: 'Holding period is zero — annualized return cannot be computed.',
+      source: 'orchestrator',
+    });
+  } else {
+    annualizedReturn = Math.pow(moic, 1 / input.property.holdingPeriodYears) - 1;
+  }
+
   const cashOnCash = totalEquityInvested > 0 ? afterTaxEquityProceeds / totalEquityInvested : 0;
 
-  const investmentCashFlows = [
+  // Build full cashflow timeline including intermediate refi cash-outs (T-3)
+  const investmentCashFlows: { period: number; amount: number; type: 'investment' | 'distribution' | 'intermediate' }[] = [
     { period: 0, amount: totalEquityInvested, type: 'investment' as const },
-    { period: input.property.holdingPeriodYears, amount: totalCashReturned, type: 'distribution' as const },
   ];
+
+  // Add each refi cash-out as an intermediate distribution at its year
+  if (refinanceSummary && refinanceSummary.events.length > 0) {
+    for (const refiEvt of refinanceSummary.events) {
+      if (refiEvt.netCashOut > 0) {
+        investmentCashFlows.push({
+          period: refiEvt.year,
+          amount: refiEvt.netCashOut,
+          type: 'intermediate' as const,
+        });
+      }
+    }
+  }
+
+  // Terminal distribution = after-tax equity proceeds at exit (NOT including refi already counted)
+  investmentCashFlows.push({
+    period: input.property.holdingPeriodYears,
+    amount: afterTaxEquityProceeds,
+    type: 'distribution' as const,
+  });
+
   const irr = calculateIRR(investmentCashFlows);
 
   const deferredGain = exchange1031Result?.totalDeferredGain || 0;

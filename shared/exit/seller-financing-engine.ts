@@ -1,3 +1,8 @@
+import { STATE_CAPITAL_GAINS_RATES, getTaxYearConfig } from './tax-engine';
+import type { FilingStatus } from './tax-engine';
+import { calculateIRR as canonicalBisectionIRR } from './irr-calculator';
+import type { CashFlow } from './irr-calculator';
+
 export interface SellerFinancingEngineInput {
   salePrice: number;
   adjustedBasis: number;
@@ -131,6 +136,69 @@ export function calculateSellerFinancing(input: SellerFinancingEngineInput): Sel
   const downPayment = input.salePrice * input.downPaymentPercent;
   const faceValue = input.salePrice - downPayment;
 
+  // Guard: 100% down payment means no note — return cash-sale-equivalent
+  if (faceValue <= 0) {
+    warnings.push({
+      code: 'CASH_SALE_EQUIVALENT',
+      severity: 'info',
+      message: '100% down payment — this is equivalent to a cash sale. No installment note created.',
+    });
+
+    const grossProfit = input.salePrice - input.adjustedBasis;
+    const buyerRiskScore = scoreBuyerRisk(input.buyerCreditProfile);
+
+    return {
+      noteTerms: {
+        faceValue: 0,
+        interestRate: input.noteInterestRate,
+        termYears: input.noteTermYears,
+        amortizationYears: input.amortizationYears || input.noteTermYears,
+        hasBalloon: false,
+        balloonYear: null,
+        balloonAmount: 0,
+        monthlyPayment: 0,
+        totalInterestIncome: 0,
+      },
+      amortization: [],
+      installmentTaxSchedule: [{
+        year: 0,
+        principalReceived: downPayment,
+        interestIncome: 0,
+        installmentGain: grossProfit,
+        recaptureGain: Math.min(input.accumulatedDepreciation, Math.max(0, grossProfit)),
+        ltcgGain: Math.max(0, grossProfit - input.accumulatedDepreciation),
+        federalTax: 0,
+        stateTax: 0,
+        totalTax: 0,
+        netAfterTax: downPayment,
+      }],
+      cashFlowSummary: {
+        downPayment,
+        totalPrincipalReceived: downPayment,
+        totalInterestReceived: 0,
+        totalCashReceived: downPayment,
+        totalTaxPaid: 0,
+        netAfterTax: downPayment,
+        npvAtDiscount: downPayment,
+      },
+      afrCompliance: {
+        afrRate: input.afrRate || 0.04,
+        noteRate: input.noteInterestRate,
+        isCompliant: true,
+        imputedInterest: 0,
+      },
+      creditLossAnalysis: {
+        scenarios: [],
+        expectedLoss: 0,
+        expectedNetProceeds: downPayment,
+        riskAdjustedIRR: null,
+        creditReserveRecommended: 0,
+      },
+      buyerRiskScore,
+      warnings,
+    };
+  }
+
   const amortYears = input.amortizationYears || input.noteTermYears;
   const monthlyRate = input.noteInterestRate / 12;
   const amortPayments = amortYears * 12;
@@ -183,11 +251,23 @@ export function calculateSellerFinancing(input: SellerFinancingEngineInput): Sel
   const installmentTaxSchedule: InstallmentTaxEntry[] = [];
   let remainingRecapture = input.accumulatedDepreciation;
 
-  const stateRates: Record<string, number> = {
-    CA: 0.133, NY: 0.109, NJ: 0.1075, FL: 0, TX: 0, WA: 0.07, MA: 0.09,
-    IL: 0.0495, PA: 0.0307, OH: 0.04, GA: 0.0549, NC: 0.0525,
-  };
-  const stateRate = stateRates[input.taxProfile.stateOfResidence.toUpperCase()] || 0.05;
+  // Use canonical state rates from tax-engine (51 jurisdictions) instead of hardcoded 12-state table
+  const residenceCode = input.taxProfile.stateOfResidence.toUpperCase();
+  const stateInfo = STATE_CAPITAL_GAINS_RATES[residenceCode];
+  const stateRate = stateInfo ? stateInfo.rate : 0;
+
+  // Use bracket-based LTCG rate from tax-engine based on filing status + income
+  const taxConfig = getTaxYearConfig(input.taxProfile.taxYear || 2025);
+  const filingStatus = input.taxProfile.filingStatus as FilingStatus;
+  const taxableIncome = input.taxProfile.otherOrdinaryIncome + grossProfit;
+  const brackets = taxConfig.federalLtcgBrackets[filingStatus];
+  let computedLtcgRate = 0.20; // fallback
+  for (const bracket of brackets) {
+    if (taxableIncome >= bracket.min && taxableIncome < bracket.max) {
+      computedLtcgRate = bracket.rate;
+      break;
+    }
+  }
 
   const yearlyPrincipal: number[] = [];
   const yearlyInterest: number[] = [];
@@ -217,16 +297,17 @@ export function calculateSellerFinancing(input: SellerFinancingEngineInput): Sel
     const installmentGain = principalReceived * grossProfitRatio;
 
     let recaptureGain = 0;
+    // IRS §453(d)(1): ALL depreciation recapture must be recognized in year of sale
     if (i === 0 && remainingRecapture > 0) {
-      recaptureGain = Math.min(remainingRecapture, installmentGain);
-      remainingRecapture -= recaptureGain;
+      recaptureGain = remainingRecapture; // Full amount, NOT capped by installmentGain
+      remainingRecapture = 0;
     }
 
     const ltcgGain = Math.max(0, installmentGain - recaptureGain);
 
-    const ltcgRate = 0.20;
-    const recaptureRate = 0.25;
-    const ordinaryRate = 0.37;
+    const ltcgRate = computedLtcgRate;
+    const recaptureRate = taxConfig.section1250Rate;
+    const ordinaryRate = taxConfig.ordinaryTopRate;
 
     const federalTax =
       (ltcgGain * ltcgRate) +
@@ -468,11 +549,17 @@ function buildCreditLossModel(
   const expectedLoss = scenarios.reduce((sum, s) => sum + s.expectedLoss, 0);
   const expectedNetProceeds = noteBalance - expectedLoss;
 
-  const riskAdjustedCashFlows = [-noteBalance * (1 - baseDefaultProb)];
+  const riskAdjustedIrrFlows: CashFlow[] = [
+    { period: 0, amount: noteBalance * (1 - baseDefaultProb), type: 'investment' },
+  ];
   for (let year = 1; year <= termYears; year++) {
-    riskAdjustedCashFlows.push(monthlyPayment * 12 * (1 - baseDefaultProb * 0.5));
+    riskAdjustedIrrFlows.push({
+      period: year,
+      amount: monthlyPayment * 12 * (1 - baseDefaultProb * 0.5),
+      type: year === termYears ? 'distribution' : 'intermediate',
+    });
   }
-  const riskAdjustedIRR = bisectionIRR(riskAdjustedCashFlows);
+  const riskAdjustedIRR = canonicalBisectionIRR(riskAdjustedIrrFlows);
 
   const creditReserveRecommended = expectedLoss * 1.5;
 
@@ -485,19 +572,4 @@ function buildCreditLossModel(
   };
 }
 
-function bisectionIRR(cashflows: number[], maxIter = 1000, tol = 1e-7): number | null {
-  if (cashflows.length < 2) return null;
-  const hasPos = cashflows.some(v => v > 0);
-  const hasNeg = cashflows.some(v => v < 0);
-  if (!hasPos || !hasNeg) return null;
-
-  let lo = -0.99, hi = 10.0;
-  for (let i = 0; i < maxIter; i++) {
-    const mid = (lo + hi) / 2;
-    const npv = cashflows.reduce((s, cf, t) => s + cf / Math.pow(1 + mid, t), 0);
-    if (Math.abs(npv) < tol) return mid;
-    if (npv > 0) lo = mid; else hi = mid;
-    if (hi - lo < tol) return mid;
-  }
-  return (lo + hi) / 2;
-}
+// bisectionIRR removed — using canonical calculateIRR from irr-calculator.ts

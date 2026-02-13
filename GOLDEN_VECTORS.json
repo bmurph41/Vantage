@@ -1,0 +1,466 @@
+{
+  "_meta": {
+    "description": "Deterministic scenario inputs + expected invariants for exit scenario engine validation",
+    "version": "1.0.0",
+    "generated": "2026-02-13",
+    "notes": "Outputs are high-level invariants, not exact penny amounts. Use as acceptance tests."
+  },
+
+  "vectors": [
+    {
+      "id": "cash_sale_baseline",
+      "description": "Simple cash sale of $5M marina, 10yr hold, no debt, single filer in FL",
+      "input": {
+        "scenarioName": "Cash Sale Baseline",
+        "scenarioType": "cash_sale",
+        "property": {
+          "purchasePrice": 3000000,
+          "acquisitionCosts": 60000,
+          "landValue": 600000,
+          "improvementValue": 2400000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 10
+        },
+        "sale": {
+          "salePrice": 5000000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 50000,
+          "holdingPeriodMonths": 120
+        },
+        "debt": {
+          "outstandingBalance": 0,
+          "prepaymentPenalty": 0
+        },
+        "taxProfile": {
+          "filingStatus": "single",
+          "otherOrdinaryIncome": 200000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "FL",
+          "taxYear": 2025
+        }
+      },
+      "expected_invariants": {
+        "costsOfSale_equals": "5000000 * 0.05 + 50000 = 300000",
+        "netSaleProceeds_equals": "5000000 - 300000 = 4700000",
+        "adjustedBasis_less_than": 3060000,
+        "adjustedBasis_note": "initialBasis (3060000) minus ~10 years of depreciation on 2400000/39 = ~615384",
+        "totalGain_positive": true,
+        "isLongTerm": true,
+        "unrecapturedSection1250_gt_zero": true,
+        "unrecapturedSection1250_note": "Should equal accumulated straight-line depreciation (~615384)",
+        "section1250_taxed_at_25_percent": true,
+        "FL_state_tax_equals_zero": true,
+        "NIIT_should_apply": true,
+        "NIIT_note": "MAGI = 200000 + gain > 200000 threshold for single",
+        "effectiveTaxRate_between": [0.18, 0.28],
+        "afterTaxEquityProceeds_positive": true,
+        "afterTaxEquityProceeds_lt_netSaleProceeds": true
+      }
+    },
+
+    {
+      "id": "1031_full_deferral",
+      "description": "1031 exchange trading UP — full deferral, no boot, married filer",
+      "input": {
+        "scenarioName": "1031 Full Deferral",
+        "scenarioType": "exchange_1031",
+        "property": {
+          "purchasePrice": 3000000,
+          "acquisitionCosts": 60000,
+          "landValue": 600000,
+          "improvementValue": 2400000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 7
+        },
+        "sale": {
+          "salePrice": 5000000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 50000,
+          "holdingPeriodMonths": 84
+        },
+        "debt": {
+          "outstandingBalance": 1500000,
+          "prepaymentPenalty": 0
+        },
+        "taxProfile": {
+          "filingStatus": "married",
+          "otherOrdinaryIncome": 150000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "FL",
+          "taxYear": 2025
+        },
+        "exchange1031": {
+          "saleDate": "2025-06-15",
+          "replacementProperties": [
+            {
+              "name": "Replacement Marina A",
+              "purchasePrice": 6000000,
+              "newMortgage": 4000000,
+              "closingCosts": 120000,
+              "identificationPriority": "primary"
+            }
+          ],
+          "qualifiedIntermediaryFee": 3000,
+          "additionalCashInvested": 500000
+        }
+      },
+      "expected_invariants": {
+        "totalReplacementValue_gt_salePrice": true,
+        "totalReplacementValue_gt_salePrice_note": "6000000 > 5000000 → trading up",
+        "newMortgage_gt_oldMortgage": true,
+        "newMortgage_gt_oldMortgage_note": "4000000 > 1500000 → no mortgage boot",
+        "cashBootReceived_equals_zero": true,
+        "mortgageBoot_equals_zero": true,
+        "totalBoot_equals_zero": true,
+        "recognizedGain_equals_zero": true,
+        "isFullyDeferred": true,
+        "CRITICAL_BUG_CHECK": "afterTaxEquityProceeds should NOT subtract full tax liability — only boot tax (which is $0)",
+        "afterTaxEquityProceeds_should_equal_beforeTaxEquityProceeds": true,
+        "taxOnBoot_equals_zero": true,
+        "deferredGain_positive": true,
+        "npvOfTaxSavings_positive": true,
+        "timeline_has_3_deadlines": true,
+        "45_day_deadline": "2025-07-30",
+        "180_day_deadline": "2025-12-12"
+      }
+    },
+
+    {
+      "id": "1031_with_boot",
+      "description": "1031 exchange trading DOWN — boot recognized, partial deferral",
+      "input": {
+        "scenarioName": "1031 With Boot",
+        "scenarioType": "exchange_1031",
+        "property": {
+          "purchasePrice": 5000000,
+          "acquisitionCosts": 100000,
+          "landValue": 1000000,
+          "improvementValue": 4000000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 5
+        },
+        "sale": {
+          "salePrice": 7000000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 75000,
+          "holdingPeriodMonths": 60
+        },
+        "debt": {
+          "outstandingBalance": 3000000,
+          "prepaymentPenalty": 25000
+        },
+        "taxProfile": {
+          "filingStatus": "single",
+          "otherOrdinaryIncome": 300000,
+          "otherInvestmentIncome": 50000,
+          "stateOfResidence": "CA",
+          "taxYear": 2025
+        },
+        "exchange1031": {
+          "saleDate": "2025-09-01",
+          "replacementProperties": [
+            {
+              "name": "Smaller Marina",
+              "purchasePrice": 4000000,
+              "newMortgage": 2000000,
+              "closingCosts": 80000,
+              "identificationPriority": "primary"
+            }
+          ],
+          "qualifiedIntermediaryFee": 3000,
+          "additionalCashInvested": 0
+        }
+      },
+      "expected_invariants": {
+        "totalReplacementValue_lt_salePrice": true,
+        "trading_down_warning_present": true,
+        "mortgageBoot_gt_zero": true,
+        "mortgageBoot_note": "3000000 - 2000000 = 1000000 mortgage relief boot",
+        "cashBootReceived_may_be_positive": true,
+        "recognizedGain_gt_zero": true,
+        "recognizedGain_lte_totalBoot": true,
+        "recognizedGain_lte_realizedGain": true,
+        "isFullyDeferred": false,
+        "CRITICAL_BUG_CHECK": "Tax should be computed on recognizedGain only, NOT on full gain",
+        "CA_state_tax_rate": 0.133,
+        "NIIT_should_apply_note": "MAGI = 300000+50000+gain > 200000"
+      }
+    },
+
+    {
+      "id": "installment_recapture",
+      "description": "Seller financing with 20% down — test that ALL depreciation recapture hits Year 0",
+      "input": {
+        "scenarioName": "Installment Recapture Test",
+        "scenarioType": "seller_financing",
+        "property": {
+          "purchasePrice": 4000000,
+          "acquisitionCosts": 80000,
+          "landValue": 800000,
+          "improvementValue": 3200000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 10
+        },
+        "sale": {
+          "salePrice": 6000000,
+          "brokerCommissionRate": 0.04,
+          "closingCosts": 40000,
+          "holdingPeriodMonths": 120
+        },
+        "debt": {
+          "outstandingBalance": 2000000,
+          "prepaymentPenalty": 0
+        },
+        "taxProfile": {
+          "filingStatus": "married",
+          "otherOrdinaryIncome": 250000,
+          "otherInvestmentIncome": 20000,
+          "stateOfResidence": "NY",
+          "taxYear": 2025
+        },
+        "installmentSale": {
+          "enabled": true,
+          "downPaymentPercent": 0.20,
+          "termYears": 10,
+          "interestRate": 0.07
+        },
+        "sellerFinancing": {
+          "downPaymentPercent": 0.20,
+          "noteInterestRate": 0.07,
+          "noteTermYears": 10,
+          "amortizationYears": 25,
+          "buyerCreditProfile": {
+            "creditScore": 720,
+            "debtToIncomeRatio": 0.35,
+            "liquidReserves": 600000,
+            "yearsInBusiness": 10,
+            "hasBankruptcy": false,
+            "hasForeclosure": false,
+            "personalGuarantee": true
+          },
+          "collateral": {
+            "appraisedValue": 6300000,
+            "lienPosition": "first",
+            "hasUccFiling": true,
+            "hasPersonalGuarantee": true
+          }
+        }
+      },
+      "expected_invariants": {
+        "accumulated_depreciation_approx": "3200000 / 39 * 10 ≈ 820513",
+        "CRITICAL_BUG_CHECK": "Year 0 section1250RecapturedThisYear must equal FULL accumulated depreciation (~820513), NOT just downPayment * grossProfitRatio",
+        "year0_recapture_equals_full_accumulated_depreciation": true,
+        "subsequent_years_recapture_equals_zero": true,
+        "subsequent_years_gain_is_pure_LTCG": true,
+        "installment_NPV_savings_positive": true,
+        "NY_state_rate": 0.109,
+        "NIIT_applies": true,
+        "grossProfitRatio_note": "totalGain / netSalePrice, used to prorate principal → gain"
+      }
+    },
+
+    {
+      "id": "refi_irr",
+      "description": "Cash sale with mid-holding refinance — IRR must reflect interim cash-out",
+      "input": {
+        "scenarioName": "Refi IRR Test",
+        "scenarioType": "cash_sale",
+        "property": {
+          "purchasePrice": 4000000,
+          "acquisitionCosts": 80000,
+          "landValue": 800000,
+          "improvementValue": 3200000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 8
+        },
+        "sale": {
+          "salePrice": 6500000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 50000,
+          "holdingPeriodMonths": 96
+        },
+        "debt": {
+          "outstandingBalance": 2400000,
+          "prepaymentPenalty": 0,
+          "refinanceEvents": [
+            {
+              "year": 3,
+              "newLoanAmount": 3500000,
+              "interestRate": 0.065,
+              "termYears": 25,
+              "cashOutProceeds": 1000000,
+              "closingCosts": 35000
+            }
+          ]
+        },
+        "taxProfile": {
+          "filingStatus": "married",
+          "otherOrdinaryIncome": 200000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "FL",
+          "taxYear": 2025
+        }
+      },
+      "expected_invariants": {
+        "refi_net_cashout": "1000000 - 35000 = 965000",
+        "refi_is_tax_free": true,
+        "currentDebtBalance_after_refi": 3500000,
+        "CRITICAL_BUG_CHECK": "IRR must include refi cash-out as Year 3 intermediate distribution, not just initial+terminal",
+        "IRR_with_refi_gt_IRR_without_refi": true,
+        "IRR_should_use_3_cashflows_minimum": true,
+        "totalCashReturned_includes_refi_cashout": true
+      }
+    },
+
+    {
+      "id": "edge_zero_depreciation_years",
+      "description": "Edge case — depreciationScheduleYears = 0 should not crash",
+      "input": {
+        "scenarioName": "Zero Depreciation Edge",
+        "scenarioType": "cash_sale",
+        "property": {
+          "purchasePrice": 1000000,
+          "acquisitionCosts": 20000,
+          "landValue": 1000000,
+          "improvementValue": 0,
+          "depreciationScheduleYears": 0,
+          "holdingPeriodYears": 5
+        },
+        "sale": {
+          "salePrice": 1500000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 20000,
+          "holdingPeriodMonths": 60
+        },
+        "debt": { "outstandingBalance": 0, "prepaymentPenalty": 0 },
+        "taxProfile": {
+          "filingStatus": "single",
+          "otherOrdinaryIncome": 100000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "TX",
+          "taxYear": 2025
+        }
+      },
+      "expected_invariants": {
+        "no_NaN_in_any_output": true,
+        "no_Infinity_in_any_output": true,
+        "annualDepreciation_equals_zero": true,
+        "adjustedBasis_equals_initialBasis": true,
+        "should_not_throw": true,
+        "warning_about_zero_depreciation": true
+      }
+    },
+
+    {
+      "id": "edge_empty_replacement_properties",
+      "description": "Edge case — 1031 exchange with empty replacement list",
+      "input": {
+        "scenarioName": "Empty Replacement Edge",
+        "scenarioType": "exchange_1031",
+        "property": {
+          "purchasePrice": 2000000,
+          "acquisitionCosts": 40000,
+          "landValue": 400000,
+          "improvementValue": 1600000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 5
+        },
+        "sale": {
+          "salePrice": 3000000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 30000,
+          "holdingPeriodMonths": 60
+        },
+        "debt": { "outstandingBalance": 1000000, "prepaymentPenalty": 0 },
+        "taxProfile": {
+          "filingStatus": "single",
+          "otherOrdinaryIncome": 150000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "FL",
+          "taxYear": 2025
+        },
+        "exchange1031": {
+          "saleDate": "2025-06-01",
+          "replacementProperties": [],
+          "qualifiedIntermediaryFee": 2500,
+          "additionalCashInvested": 0
+        }
+      },
+      "expected_invariants": {
+        "no_NaN_in_any_output": true,
+        "no_Infinity_in_any_output": true,
+        "should_not_throw": true,
+        "recognizedGain_equals_realizedGain": true,
+        "recognizedGain_note": "All gain recognized — no replacement property means no deferral",
+        "isFullyDeferred": false,
+        "warning_no_replacement_present": true
+      }
+    },
+
+    {
+      "id": "edge_100_percent_down",
+      "description": "Edge case — seller financing with 100% down payment",
+      "input": {
+        "scenarioName": "100% Down Edge",
+        "scenarioType": "seller_financing",
+        "property": {
+          "purchasePrice": 2000000,
+          "acquisitionCosts": 40000,
+          "landValue": 400000,
+          "improvementValue": 1600000,
+          "depreciationScheduleYears": 39,
+          "holdingPeriodYears": 5
+        },
+        "sale": {
+          "salePrice": 3000000,
+          "brokerCommissionRate": 0.05,
+          "closingCosts": 30000,
+          "holdingPeriodMonths": 60
+        },
+        "debt": { "outstandingBalance": 0, "prepaymentPenalty": 0 },
+        "taxProfile": {
+          "filingStatus": "single",
+          "otherOrdinaryIncome": 150000,
+          "otherInvestmentIncome": 0,
+          "stateOfResidence": "FL",
+          "taxYear": 2025
+        },
+        "sellerFinancing": {
+          "downPaymentPercent": 1.0,
+          "noteInterestRate": 0.07,
+          "noteTermYears": 10,
+          "amortizationYears": 25,
+          "buyerCreditProfile": {
+            "creditScore": 750,
+            "debtToIncomeRatio": 0.30,
+            "liquidReserves": 500000,
+            "yearsInBusiness": 15,
+            "hasBankruptcy": false,
+            "hasForeclosure": false,
+            "personalGuarantee": true
+          },
+          "collateral": {
+            "appraisedValue": 3000000,
+            "lienPosition": "first",
+            "hasUccFiling": true,
+            "hasPersonalGuarantee": true
+          }
+        },
+        "installmentSale": {
+          "enabled": true,
+          "downPaymentPercent": 1.0,
+          "termYears": 10,
+          "interestRate": 0.07
+        }
+      },
+      "expected_invariants": {
+        "no_NaN_in_any_output": true,
+        "no_Infinity_in_any_output": true,
+        "faceValue_equals_zero": true,
+        "amortization_schedule_empty_or_skipped": true,
+        "totalInterestIncome_equals_zero": true,
+        "warning_about_cash_sale_equivalent": true
+      }
+    }
+  ]
+}

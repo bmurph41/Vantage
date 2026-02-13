@@ -3,6 +3,13 @@ export interface EarnoutEngineInput {
   tranches: EarnoutTranche[];
   discountRate: number;
   holdingPeriodYears: number;
+  taxProfile?: {
+    filingStatus: 'single' | 'married' | 'head_of_household';
+    otherOrdinaryIncome: number;
+    otherInvestmentIncome?: number;
+    stateOfResidence: string;
+    taxYear?: number;
+  };
 }
 
 export interface EarnoutTranche {
@@ -62,8 +69,39 @@ export interface EarnoutWarning {
   message: string;
 }
 
+import { STATE_CAPITAL_GAINS_RATES, getTaxYearConfig } from './tax-engine';
+import type { FilingStatus } from './tax-engine';
+
 export function calculateEarnout(input: EarnoutEngineInput): EarnoutEngineResult {
   const warnings: EarnoutWarning[] = [];
+
+  // Compute dynamic tax rates from tax-engine when profile is provided;
+  // fall back to hardcoded max-bracket rates for backward compatibility.
+  let dynamicCapGainRate = 0.238;
+  let dynamicOrdinaryRate = 0.407;
+  if (input.taxProfile) {
+    const taxConfig = getTaxYearConfig(input.taxProfile.taxYear || 2025);
+    const filingStatus = input.taxProfile.filingStatus as FilingStatus;
+    const taxableIncome = input.taxProfile.otherOrdinaryIncome;
+    const brackets = taxConfig.federalLtcgBrackets[filingStatus];
+    let ltcgRate = 0.20;
+    for (const bracket of brackets) {
+      if (taxableIncome >= bracket.min && taxableIncome < bracket.max) {
+        ltcgRate = bracket.rate;
+        break;
+      }
+    }
+    // Add NIIT if applicable
+    const niitThreshold = taxConfig.niitThresholds[filingStatus];
+    const magi = taxableIncome + (input.taxProfile.otherInvestmentIncome || 0);
+    const niitRate = magi > niitThreshold ? taxConfig.niitRate : 0;
+    // Add state rate
+    const stateInfo = STATE_CAPITAL_GAINS_RATES[input.taxProfile.stateOfResidence.toUpperCase()];
+    const stateRate = stateInfo ? stateInfo.rate : 0;
+
+    dynamicCapGainRate = ltcgRate + niitRate + stateRate;
+    dynamicOrdinaryRate = taxConfig.ordinaryTopRate + niitRate + stateRate;
+  }
 
   const trancheResults: EarnoutTrancheResult[] = input.tranches.map(tranche => {
     const prob = Math.max(0, Math.min(1, tranche.probabilityOfAchievement));
@@ -76,9 +114,9 @@ export function calculateEarnout(input: EarnoutEngineInput): EarnoutEngineResult
     const npvOfTranche = probabilityWeightedAmount / Math.pow(1 + input.discountRate, expectedPaymentYear);
 
     const taxRates: Record<string, number> = {
-      capital_gain: 0.238,
-      ordinary_income: 0.407,
-      mixed: 0.32,
+      capital_gain: dynamicCapGainRate,
+      ordinary_income: dynamicOrdinaryRate,
+      mixed: (dynamicCapGainRate + dynamicOrdinaryRate) / 2,
     };
     const effectiveTaxRate = taxRates[tranche.taxTreatment] || 0.32;
     const afterTaxAmount = probabilityWeightedAmount * (1 - effectiveTaxRate);

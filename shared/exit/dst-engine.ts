@@ -1,3 +1,6 @@
+import { calculateIRR as canonicalBisectionIRR } from './irr-calculator';
+import type { CashFlow } from './irr-calculator';
+
 export interface DstEngineInput {
   investmentAmount: number;
   totalOfferingSize: number;
@@ -197,13 +200,18 @@ export function calculateDstAnalysis(input: DstEngineInput): DstEngineResult {
 
   const totalReturn = totalDistributions + investorShare;
 
-  const cashFlows = [-input.investmentAmount];
-  for (const dist of distributionProjections) {
-    cashFlows.push(dist.distributionAmount);
+  const irrCashFlows: CashFlow[] = [{ period: 0, amount: input.investmentAmount, type: 'investment' }];
+  for (let i = 0; i < distributionProjections.length; i++) {
+    irrCashFlows.push({ period: i + 1, amount: distributionProjections[i].distributionAmount, type: 'intermediate' });
   }
-  cashFlows[cashFlows.length - 1] += investorShare;
+  // Add exit proceeds to the last period
+  irrCashFlows[irrCashFlows.length - 1] = {
+    ...irrCashFlows[irrCashFlows.length - 1],
+    amount: irrCashFlows[irrCashFlows.length - 1].amount + investorShare,
+    type: 'distribution',
+  };
 
-  const irr = bisectionIRR(cashFlows);
+  const irr = canonicalBisectionIRR(irrCashFlows);
   const equityMultiple = input.investmentAmount > 0 ? totalReturn / input.investmentAmount : 0;
 
   const depreciableValue = input.propertyPurchasePrice * 0.80;
@@ -319,19 +327,4 @@ function evaluateDstRisks(
   return flags;
 }
 
-function bisectionIRR(cashflows: number[], maxIter = 1000, tol = 1e-7): number | null {
-  if (cashflows.length < 2) return null;
-  const hasPos = cashflows.some(v => v > 0);
-  const hasNeg = cashflows.some(v => v < 0);
-  if (!hasPos || !hasNeg) return null;
-
-  let lo = -0.99, hi = 10.0;
-  for (let i = 0; i < maxIter; i++) {
-    const mid = (lo + hi) / 2;
-    const npv = cashflows.reduce((s, cf, t) => s + cf / Math.pow(1 + mid, t), 0);
-    if (Math.abs(npv) < tol) return mid;
-    if (npv > 0) lo = mid; else hi = mid;
-    if (hi - lo < tol) return mid;
-  }
-  return (lo + hi) / 2;
-}
+// bisectionIRR removed — using canonical calculateIRR from irr-calculator.ts
