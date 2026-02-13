@@ -16235,6 +16235,69 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Get portfolio summary for the Rent Roll Portfolio page
+  app.get('/api/operations/rent-roll/portfolio', authenticateUser, requireRentRoll(), async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      
+      // Fetch all rent roll locations with their leases
+      const locations = await db.query.rraMarinaLocations.findMany({
+        where: eq(rraMarinaLocations.orgId, orgId),
+      });
+
+      if (!locations || locations.length === 0) {
+        return res.json([]);
+      }
+
+      const locationIds = locations.map(l => l.id);
+      
+      // Fetch all leases for these locations
+      const leases = await db.query.rraLeases.findMany({
+        where: locationIds.length > 0 
+          ? inArray(rraLeases.locationId, locationIds)
+          : undefined,
+      });
+
+      // Transform the data to match the PropertyData interface
+      const portfolioData = locations.map(location => {
+        const locationLeases = leases.filter(l => l.locationId === location.id);
+        const activeLeases = locationLeases.filter(l => {
+          const today = new Date();
+          const expDate = l.leaseExpiration ? new Date(l.leaseExpiration) : null;
+          return !expDate || expDate > today;
+        });
+        
+        const expiringIn90Days = locationLeases.filter(l => {
+          const today = new Date();
+          const in90Days = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+          const expDate = l.leaseExpiration ? new Date(l.leaseExpiration) : null;
+          return expDate && expDate <= in90Days && expDate > today;
+        }).length;
+
+        const monthlyRevenue = activeLeases.reduce((sum, lease) => {
+          const amount = lease.leaseAmount ? parseFloat(lease.leaseAmount as any) : 0;
+          return sum + amount;
+        }, 0);
+
+        return {
+          id: location.id,
+          name: location.name || 'Unnamed Location',
+          location: location.code || 'N/A',
+          slips: location.capacity || 0,
+          occupied: activeLeases.length,
+          monthlyRevenue,
+          leasesExpiringIn90Days: expiringIn90Days,
+          status: location.isActive ? 'active' : 'inactive',
+        };
+      });
+
+      res.json(portfolioData);
+    } catch (error: any) {
+      console.error('Failed to fetch rent roll portfolio:', error);
+      res.status(500).json({ error: 'Failed to fetch rent roll portfolio' });
+    }
+  });
+
   // Get a single rent roll
   app.get('/api/operations/rent-rolls/:id', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
