@@ -7409,8 +7409,47 @@ Current context: Project ${req.params.projectId}`;
   // CRM Pending Contacts
   app.get("/api/crm/pending-contacts", async (req: any, res) => {
     try {
-      const pendingContacts = await storage.getPendingContactsForOrg(req.user.orgId);
-      res.json(pendingContacts);
+      const orgId = req.user.orgId;
+      const pendingContacts = await storage.getPendingContactsForOrg(orgId);
+
+      const allContacts = await storage.getContactsForOrg(orgId);
+
+      const enrichedPending = pendingContacts.map((pending: any) => {
+        const pendingFullName = pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim();
+        if (!pendingFullName && !pending.email && !pending.phone) return pending;
+
+        const duplicates = allContacts.map(contact => {
+          let score = 0;
+          const contactFullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+
+          if (pendingFullName && contactFullName) {
+            const np = pendingFullName.toLowerCase().trim();
+            const nc = contactFullName.toLowerCase().trim();
+            if (np === nc) score += 100;
+            else if (np.includes(nc) || nc.includes(np)) score += 70;
+          }
+
+          if (pending.email && contact.email && pending.email.toLowerCase() === contact.email.toLowerCase()) {
+            score += 80;
+          }
+
+          if (pending.phone && contact.phone) {
+            const pp = pending.phone.replace(/\D/g, '');
+            const cp = contact.phone.replace(/\D/g, '');
+            if (pp === cp) score += 60;
+          }
+
+          return { contact, score };
+        }).filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score);
+
+        return {
+          ...pending,
+          suggestedDuplicates: duplicates.map(d => d.contact.id),
+        };
+      });
+
+      res.json(enrichedPending);
     } catch (error: any) {
       console.error("Failed to get pending contacts:", error);
       res.status(500).json({ error: "Failed to retrieve pending contacts" });
@@ -7490,8 +7529,33 @@ Current context: Project ${req.params.projectId}`;
   // CRM Pending Companies
   app.get("/api/crm/pending-companies", async (req: any, res) => {
     try {
-      const pendingCompanies = await storage.getPendingCompaniesForOrg(req.user.orgId);
-      res.json(pendingCompanies);
+      const orgId = req.user.orgId;
+      const pendingCompanies = await storage.getPendingCompaniesForOrg(orgId);
+
+      const allCompanies = await storage.getCompaniesForOrg(orgId);
+
+      const enrichedPending = pendingCompanies.map((pending: any) => {
+        if (!pending.name) return pending;
+
+        const duplicates = findCompanyDuplicates(
+          pending.name,
+          pending.address,
+          pending.city,
+          pending.state,
+          pending.zipCode,
+          allCompanies,
+          undefined,
+          40
+        );
+
+        return {
+          ...pending,
+          suggestedDuplicates: duplicates.map(d => d.company.id),
+          duplicateMatches: duplicates,
+        };
+      });
+
+      res.json(enrichedPending);
     } catch (error: any) {
       console.error("Failed to get pending companies:", error);
       res.status(500).json({ error: "Failed to retrieve pending companies" });

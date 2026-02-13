@@ -67,19 +67,15 @@ export function PendingCompanyDetailDialog({
   const { data: duplicateCompanies = [], isLoading: duplicatesLoading } = useQuery<CrmCompany[]>({
     queryKey: ['/api/crm/pending-companies', pending?.id, 'duplicates'],
     queryFn: async () => {
-      if (!pending?.suggestedDuplicates || !Array.isArray(pending.suggestedDuplicates) || pending.suggestedDuplicates.length === 0) {
+      if (!pending?.id) return [];
+      try {
+        const response = await fetch(`/api/pending-companies/${pending.id}/all-duplicates`);
+        if (!response.ok) return [];
+        const matches = await response.json();
+        return matches.map((m: any) => m.company);
+      } catch {
         return [];
       }
-      const results: CrmCompany[] = [];
-      for (const dupId of pending.suggestedDuplicates as string[]) {
-        try {
-          const response = await fetch(`/api/crm/companies/${dupId}`);
-          if (response.ok) {
-            results.push(await response.json());
-          }
-        } catch {}
-      }
-      return results;
     },
     enabled: !!pending?.id && open,
   });

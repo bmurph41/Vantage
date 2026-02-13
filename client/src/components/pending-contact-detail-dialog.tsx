@@ -81,19 +81,15 @@ export function PendingContactDetailDialog({
   const { data: duplicateContacts = [], isLoading: duplicatesLoading } = useQuery<CrmContact[]>({
     queryKey: ['/api/crm/pending-contacts', pending?.id, 'duplicates'],
     queryFn: async () => {
-      if (!pending?.suggestedDuplicates || !Array.isArray(pending.suggestedDuplicates) || pending.suggestedDuplicates.length === 0) {
+      if (!pending?.id) return [];
+      try {
+        const response = await fetch(`/api/pending-contacts/${pending.id}/all-duplicates`);
+        if (!response.ok) return [];
+        const matches = await response.json();
+        return matches.map((m: any) => m.contact);
+      } catch {
         return [];
       }
-      const results: CrmContact[] = [];
-      for (const dupId of pending.suggestedDuplicates as string[]) {
-        try {
-          const response = await fetch(`/api/crm/contacts/${dupId}`);
-          if (response.ok) {
-            results.push(await response.json());
-          }
-        } catch {}
-      }
-      return results;
     },
     enabled: !!pending?.id && open,
   });
