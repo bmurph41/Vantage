@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -41,12 +44,15 @@ import {
   Info,
   FileSpreadsheet,
   AlertCircle,
-  History
+  History,
+  Settings2,
+  Pencil
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
+import { REVENUE_CATEGORIES, OPEX_CATEGORIES, DEPARTMENTAL_EXPENSE_CATEGORIES } from '@/components/modeling/growth-rates/index';
 
 interface WorkspaceProFormaProps {
   projectId: string;
@@ -139,6 +145,129 @@ function isTrailing12(startDate: string, endDate: string): boolean {
 
 type KPIDrilldownType = 'baseline-revenue' | 'baseline-noi' | 'year1-noi' | 'exit-noi' | null;
 
+function departmentNameToCategoryKey(deptName: string, category: 'Revenue' | 'COGS' | 'Expenses'): { key: string; isRevenue: boolean } | null {
+  const normalizedName = deptName.toLowerCase().trim();
+  if (category === 'Revenue' || category === 'COGS') {
+    for (const group of Object.values(REVENUE_CATEGORIES)) {
+      for (const cat of group) {
+        if (cat.label.toLowerCase() === normalizedName || cat.id?.toLowerCase() === normalizedName) {
+          return { key: cat.key, isRevenue: true };
+        }
+      }
+    }
+  }
+  if (category === 'Expenses' || category === 'COGS') {
+    for (const group of Object.values(OPEX_CATEGORIES)) {
+      for (const cat of group) {
+        if (cat.label.toLowerCase() === normalizedName || cat.id?.toLowerCase() === normalizedName) {
+          return { key: cat.key, isRevenue: false };
+        }
+      }
+    }
+    for (const cat of DEPARTMENTAL_EXPENSE_CATEGORIES) {
+      if (cat.label.toLowerCase() === normalizedName || cat.id?.toLowerCase() === normalizedName) {
+        return { key: cat.key, isRevenue: false };
+      }
+    }
+  }
+  return null;
+}
+
+function InlineGrowthEditor({
+  departmentName,
+  category,
+  years,
+  currentRates,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  departmentName: string;
+  category: 'Revenue' | 'COGS' | 'Expenses';
+  years: number[];
+  currentRates: number[];
+  onSave: (rates: number[]) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [rates, setRates] = useState<number[]>(() => [...currentRates]);
+  const [setAllValue, setSetAllValue] = useState('');
+
+  const handleYearChange = (index: number, value: number) => {
+    const newRates = [...rates];
+    newRates[index] = value;
+    setRates(newRates);
+  };
+
+  const handleApplyAll = () => {
+    const val = parseFloat(setAllValue);
+    if (!isNaN(val)) {
+      setRates(Array(years.length).fill(val));
+    }
+  };
+
+  const typeLabel = category === 'Revenue' || category === 'COGS' ? 'Revenue' : 'Expense';
+
+  return (
+    <div className="w-72 space-y-3">
+      <div className="flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-primary" />
+        <h4 className="text-sm font-semibold">{departmentName} {typeLabel} Growth Rate</h4>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Label className="text-xs text-muted-foreground whitespace-nowrap">Set All:</Label>
+        <Input
+          type="number"
+          step="0.5"
+          min={-50}
+          max={100}
+          placeholder={String(rates[0] ?? 3.0)}
+          value={setAllValue}
+          onChange={(e) => setSetAllValue(e.target.value)}
+          className="h-7 text-xs w-20 text-right"
+        />
+        <span className="text-xs text-muted-foreground">%</span>
+        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={handleApplyAll}>
+          Apply
+        </Button>
+      </div>
+
+      <div className="space-y-1.5">
+        {years.map((year, idx) => (
+          <div key={year} className="flex items-center justify-between gap-2">
+            <Label className="text-xs text-muted-foreground w-24">Year {idx + 1} ({year}):</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                step="0.5"
+                min={-50}
+                max={100}
+                value={rates[idx] ?? 3.0}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v)) handleYearChange(idx, v);
+                }}
+                className="h-7 text-xs w-20 text-right"
+              />
+              <span className="text-xs text-muted-foreground">%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t">
+        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button size="sm" className="text-xs h-7" onClick={() => onSave(rates)} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceProFormaProps) {
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('');
@@ -155,6 +284,8 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   };
   const [showHistorical, setShowHistorical] = useState(true);
   const [selectedKPI, setSelectedKPI] = useState<KPIDrilldownType>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<{ department: string; category: 'Revenue' | 'COGS' | 'Expenses' } | null>(null);
   const { toast } = useToast();
 
   // Fetch project configuration
@@ -179,6 +310,90 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const { data: actualsData } = useQuery<Record<string, unknown>>({
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
+
+  // Fetch scenarios for inline growth rate editing
+  const { data: scenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
+  });
+
+  const activeScenario = useMemo(() => {
+    return scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
+  }, [scenarios]);
+
+  const getGrowthRatesForDepartment = (department: string, category: 'Revenue' | 'COGS' | 'Expenses'): number[] => {
+    if (!activeScenario?.assumptions) return Array(holdPeriod).fill(3.0);
+    const mapping = departmentNameToCategoryKey(department, category);
+    if (!mapping) return Array(holdPeriod).fill(3.0);
+    const { key, isRevenue } = mapping;
+    const assumptions = activeScenario.assumptions;
+    if (isRevenue) {
+      if (assumptions.growthRatesByYear?.[key]) {
+        const arr = assumptions.growthRatesByYear[key];
+        if (arr.length >= holdPeriod) return arr.slice(0, holdPeriod);
+        return [...arr, ...Array(holdPeriod - arr.length).fill(arr[arr.length - 1] ?? 3.0)];
+      }
+      if (assumptions.growthRates?.[key] !== undefined) {
+        return Array(holdPeriod).fill(assumptions.growthRates[key]);
+      }
+    } else {
+      if (assumptions.expenseGrowthByYear?.[key]) {
+        const arr = assumptions.expenseGrowthByYear[key];
+        if (arr.length >= holdPeriod) return arr.slice(0, holdPeriod);
+        return [...arr, ...Array(holdPeriod - arr.length).fill(arr[arr.length - 1] ?? 3.0)];
+      }
+      if (assumptions.expenseGrowth?.[key] !== undefined) {
+        return Array(holdPeriod).fill(assumptions.expenseGrowth[key]);
+      }
+    }
+    return Array(holdPeriod).fill(3.0);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ categoryKey, rates, isRevenue }: { categoryKey: string; rates: number[]; isRevenue: boolean }) => {
+      if (!activeScenario) throw new Error('No active scenario found');
+      const currentAssumptions = { ...activeScenario.assumptions };
+
+      if (isRevenue) {
+        const growthRatesByYear = { ...(currentAssumptions.growthRatesByYear || {}) };
+        growthRatesByYear[categoryKey] = rates;
+        currentAssumptions.growthRatesByYear = growthRatesByYear;
+        const growthRates = { ...(currentAssumptions.growthRates || {}) };
+        growthRates[categoryKey] = rates[0];
+        currentAssumptions.growthRates = growthRates;
+      } else {
+        const expenseGrowthByYear = { ...(currentAssumptions.expenseGrowthByYear || {}) };
+        expenseGrowthByYear[categoryKey] = rates;
+        currentAssumptions.expenseGrowthByYear = expenseGrowthByYear;
+        const expenseGrowth = { ...(currentAssumptions.expenseGrowth || {}) };
+        expenseGrowth[categoryKey] = rates[0];
+        currentAssumptions.expenseGrowth = expenseGrowth;
+      }
+
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
+        assumptions: currentAssumptions,
+        createNewVersion: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'assumptions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      toast({ title: 'Updated', description: 'Growth rate updated. Pro Forma recalculating...' });
+      setEditingDepartment(null);
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to update growth rate.', variant: 'destructive' });
+    },
+  });
+
+  const handleInlineSave = (department: string, category: 'Revenue' | 'COGS' | 'Expenses', rates: number[]) => {
+    const mapping = departmentNameToCategoryKey(department, category);
+    if (!mapping) {
+      toast({ title: 'Error', description: 'Could not map department to category key.', variant: 'destructive' });
+      return;
+    }
+    saveMutation.mutate({ categoryKey: mapping.key, rates, isRevenue: mapping.isRevenue });
+  };
 
   const startDate = config?.startDate || `${new Date().getFullYear()}-01-31`;
   const seasonMonths = config?.seasonMonths || [4, 5, 6, 7, 8, 9, 10];
@@ -644,6 +859,20 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 ))}
               </SelectContent>
             </Select>
+          )}
+          {viewMode === 'annual' && activeScenario && (
+            <Button
+              variant={editMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setEditMode(!editMode);
+                if (editMode) setEditingDepartment(null);
+              }}
+              className="gap-2"
+            >
+              <Settings2 className="h-4 w-4" />
+              Adjust Assumptions
+            </Button>
           )}
           <Button variant="outline" size="sm" onClick={exportProForma}>
             <Download className="h-4 w-4 mr-2" />
@@ -1214,7 +1443,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                           <Fragment key={`${category}-${department}`}>
                             <TableRow 
                               className="bg-slate-50 dark:bg-slate-900 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-                              onClick={() => toggleDepartment(`${category}-${department}`)}
+                              onClick={() => {
+                                toggleDepartment(`${category}-${department}`);
+                                if (editMode && viewMode === 'annual') {
+                                  const mapping = departmentNameToCategoryKey(department, category);
+                                  if (mapping) {
+                                    setEditingDepartment(
+                                      editingDepartment?.department === department && editingDepartment?.category === category
+                                        ? null
+                                        : { department, category }
+                                    );
+                                  }
+                                }
+                              }}
                             >
                               <TableCell className="pl-6 font-medium sticky left-0 bg-slate-50 dark:bg-slate-900 z-10">
                                 <div className="flex items-center gap-1.5">
@@ -1224,6 +1465,41 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                     <ChevronRight className="h-3.5 w-3.5" />
                                   )}
                                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                  {editMode && viewMode === 'annual' && (
+                                    <Popover
+                                      open={editingDepartment?.department === department && editingDepartment?.category === category}
+                                      onOpenChange={(open) => {
+                                        if (!open) setEditingDepartment(null);
+                                      }}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingDepartment(
+                                              editingDepartment?.department === department && editingDepartment?.category === category
+                                                ? null
+                                                : { department, category }
+                                            );
+                                          }}
+                                          className="ml-1 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent side="right" align="start" className="w-auto p-4">
+                                        <InlineGrowthEditor
+                                          departmentName={department}
+                                          category={category}
+                                          years={years}
+                                          currentRates={getGrowthRatesForDepartment(department, category)}
+                                          onSave={(rates) => handleInlineSave(department, category, rates)}
+                                          onCancel={() => setEditingDepartment(null)}
+                                          isSaving={saveMutation.isPending}
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  )}
                                 </div>
                               </TableCell>
 
