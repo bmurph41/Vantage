@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQueries, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
@@ -22,7 +22,6 @@ import {
   LayoutGrid,
   List,
   Table2,
-  StopCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,10 +122,6 @@ export function MultiDocumentReview({
   const [isApplying, setIsApplying] = useState(false);
   const [viewMode, setViewMode] = useState<'matrix' | 'list'>('matrix');
 
-  // NEW: Confirm All state (Requirement G)
-  const [isConfirmingAll, setIsConfirmingAll] = useState(false);
-  const [confirmProgress, setConfirmProgress] = useState({ current: 0, total: 0, skipped: 0 });
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch items for each document using useQueries (Requirement F - ensures all docs are fetched)
   const itemQueries = useQueries({
@@ -361,111 +356,6 @@ export function MultiDocumentReview({
     }
   };
 
-  // NEW: Confirm All with cancellation, validation, and partial confirm (Requirement G)
-  const handleConfirmAll = async () => {
-    // Get all pending items across all documents
-    const pendingItemsByDoc: { uploadId: string; item: ExtractedItemWithCategory }[] = [];
-
-    for (const upload of uploads) {
-      const items = queryDataMap[upload.id] || [];
-      items
-        .filter(i => i.status === "pending")
-        .forEach(item => pendingItemsByDoc.push({ uploadId: upload.id, item }));
-    }
-
-    if (pendingItemsByDoc.length === 0) {
-      toast({ title: "No pending items", description: "All items have already been reviewed." });
-      return;
-    }
-
-    // Validate: items need both category AND department (Requirement G)
-    const validItems = pendingItemsByDoc.filter(({ item }) => {
-      const tier = item.categoryTierConfirmed || item.categoryTierSuggested || item.categoryConfirmed || item.categorySuggested;
-      if (!tier) return false;
-      const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
-      if (effectiveTier === 'expense') {
-        return !!(item.expenseDeptConfirmed || item.expenseDeptSuggested);
-      } else {
-        return !!(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
-      }
-    });
-    const invalidItems = pendingItemsByDoc.filter(({ item }) => {
-      const tier = item.categoryTierConfirmed || item.categoryTierSuggested || item.categoryConfirmed || item.categorySuggested;
-      if (!tier) return true;
-      const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
-      if (effectiveTier === 'expense') {
-        return !(item.expenseDeptConfirmed || item.expenseDeptSuggested);
-      } else {
-        return !(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
-      }
-    });
-
-    if (validItems.length === 0) {
-      toast({ 
-        title: "Cannot confirm", 
-        description: `${invalidItems.length} items are missing Category or Department. Please classify all items first.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Setup abort controller for cancellation
-    abortControllerRef.current = new AbortController();
-    setIsConfirmingAll(true);
-    setConfirmProgress({ current: 0, total: validItems.length, skipped: invalidItems.length });
-
-    let confirmed = 0;
-    let errors = 0;
-
-    for (const { uploadId, item } of validItems) {
-      // Check if cancelled
-      if (abortControllerRef.current.signal.aborted) {
-        break;
-      }
-
-      try {
-        const effectiveTier = item.categoryTierConfirmed || item.categoryTierSuggested;
-        const dept = effectiveTier === 'expense'
-          ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
-          : (item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
-        await confirmItemMutation.mutateAsync({
-          uploadId,
-          itemId: item.id,
-          categoryId: item.categoryConfirmed || item.categorySuggested!,
-          department: dept || undefined,
-        });
-        confirmed++;
-        setConfirmProgress(p => ({ ...p, current: confirmed }));
-      } catch (e) {
-        errors++;
-        // Continue on error
-      }
-    }
-
-    setIsConfirmingAll(false);
-    abortControllerRef.current = null;
-
-    // Show summary (Requirement G)
-    const wasAborted = confirmed < validItems.length && errors === 0;
-    toast({
-      title: wasAborted ? "Confirm All Cancelled" : "Confirm All Complete",
-      description: `Confirmed ${confirmed} items.${invalidItems.length > 0 ? ` ${invalidItems.length} items skipped (missing Category/Department).` : ''}${errors > 0 ? ` ${errors} errors.` : ''}`,
-    });
-
-    // Refresh all queries
-    for (const upload of uploads) {
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/modeling/projects", projectId, "documents", upload.id, "items"] 
-      });
-    }
-  };
-
-  // Cancel Confirm All (Requirement G)
-  const handleCancelConfirmAll = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  };
 
   const handleAutoConfirmAll = async () => {
     for (const upload of uploads) {
@@ -605,37 +495,6 @@ export function MultiDocumentReview({
         </div>
       )}
 
-      {/* NEW: Confirm All Progress Overlay (Requirement G) */}
-      {isConfirmingAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 p-8 rounded-lg bg-card border shadow-lg max-w-md w-full">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <div className="text-center w-full">
-              <p className="text-lg font-semibold">Confirming All Items</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {confirmProgress.current} of {confirmProgress.total} items confirmed
-                {confirmProgress.skipped > 0 && (
-                  <span className="text-amber-600"> • {confirmProgress.skipped} skipped</span>
-                )}
-              </p>
-              <Progress 
-                value={(confirmProgress.current / Math.max(confirmProgress.total, 1)) * 100} 
-                className="h-2 mt-3"
-              />
-            </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleCancelConfirmAll}
-              className="mt-2"
-            >
-              <StopCircle className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -663,16 +522,6 @@ export function MultiDocumentReview({
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* NEW: Confirm All button (Requirement G) */}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleConfirmAll}
-                disabled={isConfirmingAll || totalPending === 0}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Confirm All
-              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
