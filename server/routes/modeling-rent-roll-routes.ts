@@ -443,6 +443,144 @@ function mapRraStorageType(rraType: string | null): string {
   return mapping[rraType || ''] || 'Other';
 }
 
+// Get analysis dashboard data for a modeling project's rent roll
+router.get("/projects/:projectId/analysis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+
+    const config = await db.query.modelingRentRollConfig.findFirst({
+      where: and(
+        eq(modelingRentRollConfig.orgId, orgId),
+        eq(modelingRentRollConfig.modelingProjectId, projectId)
+      ),
+    });
+
+    const units = await db.query.modelingRentRollUnits.findMany({
+      where: and(
+        eq(modelingRentRollUnits.orgId, orgId),
+        eq(modelingRentRollUnits.modelingProjectId, projectId)
+      ),
+    });
+
+    const project = await db.query.modelingProjects.findFirst({
+      where: and(
+        eq(modelingProjects.orgId, orgId),
+        eq(modelingProjects.id, projectId)
+      ),
+    });
+
+    const totalUnits = units.length;
+    const occupiedUnits = units.filter(u => u.status === 'occupied').length;
+    const vacantUnits = totalUnits - occupiedUnits;
+    const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+
+    const totalMonthlyRent = units.reduce((sum, u) => sum + parseFloat(u.monthlyRent || '0'), 0);
+    const totalAnnualRevenue = totalMonthlyRent * 12;
+    const averageRentPerUnit = occupiedUnits > 0 ? totalMonthlyRent / occupiedUnits : 0;
+    const grossPotentialRent = totalUnits > 0 ? (totalMonthlyRent / (occupiedUnits || 1)) * totalUnits : 0;
+    const vacancyLoss = grossPotentialRent - totalMonthlyRent;
+
+    const activeLeaseCount = units.filter(u => u.status === 'occupied' && (u.leaseStartDate || u.tenantName)).length;
+    const monthToMonthCount = units.filter(u => u.isMonthToMonth).length;
+
+    const now = new Date();
+    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const expiringLeases90Days = units.filter(u => {
+      if (!u.leaseEndDate || u.isMonthToMonth) return false;
+      const endDate = new Date(u.leaseEndDate);
+      return endDate >= now && endDate <= ninetyDaysFromNow;
+    }).length;
+
+    const leaseExpirations: { month: string; count: number; rent: number }[] = [];
+    for (let i = 0; i < 12; i++) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + i + 1, 0);
+      const monthName = monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const expiring = units.filter(u => {
+        if (!u.leaseEndDate || u.isMonthToMonth) return false;
+        const endDate = new Date(u.leaseEndDate);
+        return endDate >= monthStart && endDate <= monthEnd;
+      });
+      if (expiring.length > 0) {
+        leaseExpirations.push({
+          month: monthName,
+          count: expiring.length,
+          rent: expiring.reduce((sum, u) => sum + parseFloat(u.monthlyRent || '0'), 0),
+        });
+      }
+    }
+
+    const storageTypeBreakdown: Record<string, { 
+      count: number; occupied: number; vacant: number; totalRent: number; avgRent: number; occupancyRate: number 
+    }> = {};
+    units.forEach(u => {
+      const type = u.storageType || 'Other';
+      if (!storageTypeBreakdown[type]) {
+        storageTypeBreakdown[type] = { count: 0, occupied: 0, vacant: 0, totalRent: 0, avgRent: 0, occupancyRate: 0 };
+      }
+      storageTypeBreakdown[type].count += 1;
+      if (u.status === 'occupied') {
+        storageTypeBreakdown[type].occupied += 1;
+      } else {
+        storageTypeBreakdown[type].vacant += 1;
+      }
+      storageTypeBreakdown[type].totalRent += parseFloat(u.monthlyRent || '0');
+    });
+    Object.values(storageTypeBreakdown).forEach(item => {
+      item.avgRent = item.occupied > 0 ? item.totalRent / item.occupied : 0;
+      item.occupancyRate = item.count > 0 ? (item.occupied / item.count) * 100 : 0;
+    });
+
+    const dockBreakdown: Record<string, { count: number; occupied: number; totalRent: number }> = {};
+    units.forEach(u => {
+      const dock = u.dock || 'Unassigned';
+      if (!dockBreakdown[dock]) {
+        dockBreakdown[dock] = { count: 0, occupied: 0, totalRent: 0 };
+      }
+      dockBreakdown[dock].count += 1;
+      if (u.status === 'occupied') dockBreakdown[dock].occupied += 1;
+      dockBreakdown[dock].totalRent += parseFloat(u.monthlyRent || '0');
+    });
+
+    const recentActivity: { type: string; description: string; date: string }[] = [];
+    const sortedByCreated = [...units].sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    sortedByCreated.slice(0, 5).forEach(u => {
+      recentActivity.push({
+        type: 'lease',
+        description: `${u.tenantName || 'Unknown'} - ${u.unitNumber} (${u.storageType})`,
+        date: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Unknown',
+      });
+    });
+
+    res.json({
+      projectName: project?.marinaName || 'Unknown',
+      dataSourceMode: config?.dataSourceMode || 'standalone',
+      linkedRraLocationId: config?.linkedRraLocationId || null,
+      totalUnits,
+      occupiedUnits,
+      vacantUnits,
+      occupancyRate,
+      totalMonthlyRent,
+      totalAnnualRevenue,
+      averageRentPerUnit,
+      grossPotentialRent,
+      vacancyLoss,
+      activeLeaseCount,
+      monthToMonthCount,
+      expiringLeases90Days,
+      leaseExpirations,
+      storageTypeBreakdown,
+      dockBreakdown,
+      recentActivity,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get available RRA locations for import
 router.get("/available-rra-locations", async (req: Request, res: Response, next: NextFunction) => {
   try {

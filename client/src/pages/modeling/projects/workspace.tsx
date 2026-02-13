@@ -70,6 +70,7 @@ import ProfitCentersPage from './workspace/profit-centers';
 import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
+import RentRollAnalysis from './workspace/rent-roll-analysis';
 import LeaseListPage from '@/components/leases/LeaseListPage';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
@@ -170,6 +171,30 @@ TAB_GROUPS.forEach((group) => {
 
 function getGroupForTab(tabValue: string): string {
   return TAB_TO_GROUP[tabValue] || 'overview';
+}
+
+function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { projectId: string; projectName: string; onTabChange: (tab: string) => void }) {
+  const [subTab, setSubTab] = useState('lease-data');
+  return (
+    <Tabs value={subTab} onValueChange={setSubTab} className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="lease-data" className="gap-2">
+          <FileSpreadsheet className="h-4 w-4" />
+          Lease Data
+        </TabsTrigger>
+        <TabsTrigger value="analysis" className="gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Rent Roll Analysis
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="lease-data">
+        <RentRollDataTab projectId={projectId} projectName={projectName} />
+      </TabsContent>
+      <TabsContent value="analysis">
+        <RentRollAnalysis projectId={projectId} projectName={projectName} onTabChange={onTabChange} />
+      </TabsContent>
+    </Tabs>
+  );
 }
 
 export default function ProjectWorkspace() {
@@ -472,7 +497,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="storage-leases" className="space-y-6">
-          <RentRollDataTab projectId={projectId!} projectName={project.marinaName} />
+          <StorageLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="commercial-leases" className="space-y-6">
