@@ -1,5 +1,5 @@
 import {
-  useState, useEffect, useMemo, useRef, useCallback } from 'react';
+  useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import {
   useQuery, useMutation } from '@tanstack/react-query';
 import {
@@ -90,7 +90,8 @@ import {
   Store,
   Wrench,
   Container,
-  Sailboat
+  Sailboat,
+  Hash
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -139,6 +140,61 @@ function PercentInput({
       id={id}
       type="text"
       value={displayValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      className={`text-right ${className}`}
+      data-testid={dataTestId}
+    />
+  );
+}
+
+function CountInput({
+  value,
+  onChange,
+  className = '',
+  max,
+  id,
+  'data-testid': dataTestId,
+}: {
+  value: number;
+  onChange: (value: string) => void;
+  className?: string;
+  max?: number;
+  id?: string;
+  'data-testid'?: string;
+}) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState(String(Math.round(value)));
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalValue(String(Math.round(value)));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setLocalValue(String(Math.round(value)));
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    let parsed = Math.round(parseFloat(localValue) || 0);
+    if (max !== undefined) parsed = Math.min(parsed, max);
+    if (parsed < 0) parsed = 0;
+    onChange(String(parsed));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalValue(e.target.value);
+  };
+
+  return (
+    <Input
+      id={id}
+      type="text"
+      value={isFocused ? localValue : String(Math.round(value))}
       onChange={handleChange}
       onFocus={handleFocus}
       onBlur={handleBlur}
@@ -521,6 +577,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     );
   }, [storageRevenueCategories, storageGrowth.typeRates, storageGrowth.universalRate]);
   const [occupancyViewMode, setOccupancyViewMode] = useState<'annualized' | 'monthly'>('annualized');
+  const [occupancyInputMode, setOccupancyInputMode] = useState<'percent' | 'count'>('percent');
 
   const enabledStorageTypes = useMemo(() => {
     if (!config?.departments) return [];
@@ -583,6 +640,41 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     const currentOccupied = Math.round((currentOcc / 100) * totalUnits);
     const prevOccupied = Math.round((prevOcc / 100) * totalUnits);
     return currentOccupied - prevOccupied;
+  };
+
+  const percentToCount = (percent: number, totalUnits: number) => Math.round((percent / 100) * totalUnits);
+  const countToPercent = (count: number, totalUnits: number) => totalUnits > 0 ? (count / totalUnits) * 100 : 0;
+
+  const getOccupancyCount = (locationId: string, year: number, totalUnits: number, month?: number) => {
+    return percentToCount(getLocationOccupancy(locationId, year, month), totalUnits);
+  };
+
+  const updateOccupancyFromCount = (locationId: string, year: number, countStr: string, totalUnits: number, month?: number) => {
+    const count = Math.round(parseFloat(countStr) || 0);
+    const clampedCount = Math.max(0, Math.min(count, totalUnits));
+    const percent = countToPercent(clampedCount, totalUnits);
+    updateLocationOccupancy(locationId, year, String(percent), month);
+  };
+
+  const getStorageTypeOccupancy = (storageType: typeof enabledStorageTypes[0], year: number) => {
+    if (storageType.locations.length === 0) return 85;
+    const primaryLoc = storageType.locations[0];
+    return getLocationOccupancy(primaryLoc.id, year);
+  };
+
+  const updateStorageTypeOccupancy = (storageType: typeof enabledStorageTypes[0], year: number, value: string, month?: number) => {
+    storageType.locations.forEach(loc => {
+      updateLocationOccupancy(loc.id, year, value, month);
+    });
+  };
+
+  const updateStorageTypeOccupancyFromCount = (storageType: typeof enabledStorageTypes[0], year: number, countStr: string, month?: number) => {
+    const count = Math.round(parseFloat(countStr) || 0);
+    const clampedCount = Math.max(0, Math.min(count, storageType.totalUnits));
+    const percent = countToPercent(clampedCount, storageType.totalUnits);
+    storageType.locations.forEach(loc => {
+      updateLocationOccupancy(loc.id, year, String(percent), month);
+    });
   };
 
   useEffect(() => {
@@ -1387,22 +1479,44 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
           />
         </TabsContent>
 
-        <TabsContent value="occupancy" className="space-y-6">
+        <TabsContent value="occupancy" className="space-y-4">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-4">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Percent className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Percent className="h-4 w-4" />
                     Occupancy Projections
                   </CardTitle>
-                  <CardDescription>
-                    Set occupancy rates by storage type and location across the hold period
+                  <CardDescription className="text-xs">
+                    Set occupancy by storage type across the hold period
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center rounded-md border bg-muted/30 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setOccupancyInputMode('percent')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        occupancyInputMode === 'percent' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Percent className="h-3 w-3" />
+                      Rate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOccupancyInputMode('count')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        occupancyInputMode === 'count' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Hash className="h-3 w-3" />
+                      Count
+                    </button>
+                  </div>
                   <Select value={occupancyViewMode} onValueChange={(v) => setOccupancyViewMode(v as 'annualized' | 'monthly')}>
-                    <SelectTrigger className="w-[140px]">
+                    <SelectTrigger className="w-[120px] h-8 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1413,178 +1527,232 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {enabledStorageTypes.length === 0 && (
+            <CardContent className="pt-0">
+              {enabledStorageTypes.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4">
                   No storage types enabled. Enable them in Department Configuration.
                 </p>
-              )}
-              {enabledStorageTypes.map((storageType) => (
-                <div key={storageType.id} className="border rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => toggleOccupancyTypeExpanded(storageType.id)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      {storageType.icon}
-                      <span className="font-medium">{storageType.name}</span>
-                      <Badge variant="secondary" className="ml-2">
-                        {storageType.totalUnits} units
-                      </Badge>
-                      <Badge variant="outline" className="ml-1">
-                        {storageType.locations.length} location{storageType.locations.length !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {years.slice(0, 3).map(year => (
-                        <div key={year} className="text-center">
-                          <span className="text-xs text-muted-foreground">{year}</span>
-                          <div className="font-medium text-sm">
-                            {getStorageTypeAvgOccupancy(storageType, year).toFixed(1)}%
-                          </div>
-                        </div>
-                      ))}
-                      {expandedOccupancyTypes[storageType.id] ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </div>
-                  </button>
-
-                  {expandedOccupancyTypes[storageType.id] && (
-                    <div className="border-t">
-                      {occupancyViewMode === 'annualized' ? (
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/30">
-                                <TableHead className="w-48">Location</TableHead>
-                                <TableHead className="w-16 text-right">Units</TableHead>
-                                {years.map(year => (
-                                  <TableHead key={year} className="text-center w-28">
-                                    <div>{year}</div>
-                                    <div className="text-[10px] text-muted-foreground font-normal">Occ% / YoY / Net</div>
-                                  </TableHead>
-                                ))}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {storageType.locations.map((location) => (
-                                <TableRow key={location.id}>
-                                  <TableCell className="font-medium">
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                                      {location.name}
+              ) : occupancyViewMode === 'annualized' ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="w-40 text-xs">Storage Type</TableHead>
+                        <TableHead className="w-14 text-right text-xs">Units</TableHead>
+                        {years.map(year => (
+                          <TableHead key={year} className="text-center text-xs min-w-[70px]">
+                            {year}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enabledStorageTypes.map((storageType) => {
+                        const isExpanded = expandedOccupancyTypes[storageType.id];
+                        const hasMultipleLocations = storageType.locations.length > 1;
+                        return (
+                          <Fragment key={storageType.id}>
+                            <TableRow className={hasMultipleLocations ? 'bg-muted/20' : ''}>
+                              <TableCell className="py-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => hasMultipleLocations && toggleOccupancyTypeExpanded(storageType.id)}
+                                  className={`flex items-center gap-1.5 text-sm font-medium ${hasMultipleLocations ? 'cursor-pointer hover:text-primary' : 'cursor-default'}`}
+                                >
+                                  {hasMultipleLocations && (
+                                    isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />
+                                  )}
+                                  {storageType.icon}
+                                  <span className="truncate">{storageType.name}</span>
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-right text-xs text-muted-foreground py-1.5">
+                                {storageType.totalUnits}
+                              </TableCell>
+                              {years.map(year => {
+                                if (hasMultipleLocations) {
+                                  const avgOcc = getStorageTypeAvgOccupancy(storageType, year);
+                                  const avgCount = percentToCount(avgOcc, storageType.totalUnits);
+                                  return (
+                                    <TableCell key={year} className="p-1 text-center">
+                                      <div className="text-xs font-medium">
+                                        {occupancyInputMode === 'percent'
+                                          ? `${avgOcc.toFixed(1)}%`
+                                          : `${avgCount}`
+                                        }
+                                      </div>
+                                      <div className="text-[10px] text-muted-foreground">
+                                        {occupancyInputMode === 'percent'
+                                          ? `${avgCount} units`
+                                          : `${avgOcc.toFixed(1)}%`
+                                        }
+                                      </div>
+                                    </TableCell>
+                                  );
+                                }
+                                const loc = storageType.locations[0];
+                                const occPercent = getLocationOccupancy(loc.id, year);
+                                const occupiedCount = percentToCount(occPercent, storageType.totalUnits);
+                                return (
+                                  <TableCell key={year} className="p-1 text-center">
+                                    {occupancyInputMode === 'percent' ? (
+                                      <PercentInput
+                                        value={occPercent}
+                                        onChange={(val) => updateLocationOccupancy(loc.id, year, val)}
+                                        className="h-7 w-full text-xs mx-auto max-w-[68px]"
+                                      />
+                                    ) : (
+                                      <CountInput
+                                        value={occupiedCount}
+                                        max={storageType.totalUnits}
+                                        onChange={(val) => updateOccupancyFromCount(loc.id, year, val, storageType.totalUnits)}
+                                        className="h-7 w-full text-xs mx-auto max-w-[68px]"
+                                      />
+                                    )}
+                                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                                      {occupancyInputMode === 'percent'
+                                        ? `${occupiedCount} units`
+                                        : `${occPercent.toFixed(1)}%`
+                                      }
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right text-muted-foreground text-sm">
-                                    {location.units}
-                                  </TableCell>
-                                  {years.map(year => {
-                                    const yoyChange = getYoYChange(location.id, year);
-                                    const netAdds = getNetAdds(location.id, year, location.units);
-                                    return (
-                                      <TableCell key={year} className="p-1">
-                                        <div className="flex flex-col items-center gap-0.5">
-                                          <PercentInput
-                                            value={getLocationOccupancy(location.id, year)}
-                                            onChange={(val) => updateLocationOccupancy(location.id, year, val)}
-                                            className="h-7 w-16 text-xs"
-                                          />
-                                          <div className="flex items-center gap-1 text-[10px]">
-                                            {yoyChange !== null && (
-                                              <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}%
-                                              </span>
-                                            )}
-                                            {yoyChange !== null && <span className="text-muted-foreground">|</span>}
-                                            <span className={netAdds >= 0 ? 'text-blue-600' : 'text-orange-600'}>
-                                              {netAdds >= 0 ? '+' : ''}{netAdds}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </TableCell>
-                                    );
-                                  })}
-                                </TableRow>
-                              ))}
-                              <TableRow className="bg-muted/30 font-medium">
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {storageType.icon}
-                                    {storageType.name} Average
+                                );
+                              })}
+                            </TableRow>
+                            {isExpanded && hasMultipleLocations && storageType.locations.map((location) => (
+                              <TableRow key={location.id}>
+                                <TableCell className="py-1 pl-10">
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <MapPin className="h-2.5 w-2.5" />
+                                    {location.name}
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{storageType.totalUnits}</TableCell>
+                                <TableCell className="text-right text-[11px] text-muted-foreground py-1">
+                                  {location.units}
+                                </TableCell>
                                 {years.map(year => {
-                                  const avgOcc = getStorageTypeAvgOccupancy(storageType, year);
-                                  const prevAvgOcc = year === years[0] ? 85 : getStorageTypeAvgOccupancy(storageType, year - 1);
-                                  const yoyChange = year === years[0] ? null : avgOcc - prevAvgOcc;
-                                  const totalNetAdds = storageType.locations.reduce((sum, loc) => sum + getNetAdds(loc.id, year, loc.units), 0);
+                                  const locOccPercent = getLocationOccupancy(location.id, year);
+                                  const locCount = percentToCount(locOccPercent, location.units);
                                   return (
-                                    <TableCell key={year} className="text-center">
-                                      <div className="flex flex-col items-center gap-0.5">
-                                        <span className="font-semibold">{avgOcc.toFixed(1)}%</span>
-                                        <div className="flex items-center gap-1 text-[10px]">
-                                          {yoyChange !== null && (
-                                            <span className={yoyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                              {yoyChange >= 0 ? '+' : ''}{yoyChange.toFixed(1)}%
-                                            </span>
-                                          )}
-                                          {yoyChange !== null && <span className="text-muted-foreground">|</span>}
-                                          <span className={totalNetAdds >= 0 ? 'text-blue-600' : 'text-orange-600'}>
-                                            {totalNetAdds >= 0 ? '+' : ''}{totalNetAdds}
-                                          </span>
-                                        </div>
+                                    <TableCell key={year} className="p-0.5 text-center">
+                                      {occupancyInputMode === 'percent' ? (
+                                        <PercentInput
+                                          value={locOccPercent}
+                                          onChange={(val) => updateLocationOccupancy(location.id, year, val)}
+                                          className="h-6 w-full text-[11px] mx-auto max-w-[60px]"
+                                        />
+                                      ) : (
+                                        <CountInput
+                                          value={locCount}
+                                          max={location.units}
+                                          onChange={(val) => updateOccupancyFromCount(location.id, year, val, location.units)}
+                                          className="h-6 w-full text-[11px] mx-auto max-w-[60px]"
+                                        />
+                                      )}
+                                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                                        {occupancyInputMode === 'percent'
+                                          ? `${locCount}`
+                                          : `${locOccPercent.toFixed(1)}%`
+                                        }
                                       </div>
                                     </TableCell>
                                   );
                                 })}
                               </TableRow>
+                            ))}
+                          </Fragment>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {enabledStorageTypes.map((storageType) => {
+                    const hasMultiLoc = storageType.locations.length > 1;
+                    const locationsToShow = hasMultiLoc ? storageType.locations : [storageType.locations[0]];
+                    return (
+                      <div key={storageType.id} className="border rounded-lg">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b">
+                          {storageType.icon}
+                          <span className="font-medium text-sm">{storageType.name}</span>
+                          <Badge variant="secondary" className="text-[10px] h-5">{storageType.totalUnits} units</Badge>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs sticky left-0 bg-background z-10 min-w-[80px]">
+                                  {hasMultiLoc ? 'Location / Year' : 'Year'}
+                                </TableHead>
+                                {months.map(m => (
+                                  <TableHead key={m} className="text-center text-[10px] min-w-[52px] px-0.5">{m}</TableHead>
+                                ))}
+                                <TableHead className="text-center text-[10px] min-w-[52px] px-0.5 bg-muted/20 font-semibold">Avg</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {locationsToShow.map((location) => (
+                                <Fragment key={location.id}>
+                                  {hasMultiLoc && (
+                                    <TableRow className="bg-muted/10">
+                                      <TableCell colSpan={14} className="py-1 sticky left-0 bg-muted/10 z-10">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                          <MapPin className="h-2.5 w-2.5" />
+                                          {location.name}
+                                          <span className="text-[10px]">({location.units} units)</span>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                  {years.map(year => {
+                                    const locUnits = hasMultiLoc ? location.units : storageType.totalUnits;
+                                    const monthValues = months.map((_, idx) => getLocationOccupancy(location.id, year, idx));
+                                    const avgOcc = monthValues.reduce((a, b) => a + b, 0) / 12;
+                                    return (
+                                      <TableRow key={`${location.id}_${year}`}>
+                                        <TableCell className="text-xs font-medium py-1 sticky left-0 bg-background z-10">{year}</TableCell>
+                                        {months.map((_, idx) => {
+                                          const monthOccPercent = getLocationOccupancy(location.id, year, idx);
+                                          const monthCount = percentToCount(monthOccPercent, locUnits);
+                                          return (
+                                            <TableCell key={idx} className="p-0.5 text-center">
+                                              {occupancyInputMode === 'percent' ? (
+                                                <PercentInput
+                                                  value={monthOccPercent}
+                                                  onChange={(val) => updateLocationOccupancy(location.id, year, val, idx)}
+                                                  className="h-6 w-full text-[10px] px-1"
+                                                />
+                                              ) : (
+                                                <CountInput
+                                                  value={monthCount}
+                                                  max={locUnits}
+                                                  onChange={(val) => updateOccupancyFromCount(location.id, year, val, locUnits, idx)}
+                                                  className="h-6 w-full text-[10px] px-1"
+                                                />
+                                              )}
+                                            </TableCell>
+                                          );
+                                        })}
+                                        <TableCell className="text-center text-[10px] font-medium bg-muted/20 py-1">
+                                          {occupancyInputMode === 'percent'
+                                            ? `${avgOcc.toFixed(1)}%`
+                                            : percentToCount(avgOcc, locUnits)
+                                          }
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </Fragment>
+                              ))}
                             </TableBody>
                           </Table>
                         </div>
-                      ) : (
-                        <div className="p-4 space-y-4">
-                          {storageType.locations.map((location) => (
-                            <div key={location.id} className="space-y-2">
-                              <div className="flex items-center gap-2 mb-2">
-                                <MapPin className="h-3 w-3 text-muted-foreground" />
-                                <span className="font-medium text-sm">{location.name}</span>
-                                <Badge variant="secondary" className="text-xs">{location.units} units</Badge>
-                              </div>
-                              {years.map(year => (
-                                <div key={year} className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium w-12">{year}</span>
-                                    <div className="text-xs text-muted-foreground">
-                                      Annual: {getLocationOccupancy(location.id, year).toFixed(1)}%
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-12 gap-1">
-                                    {months.map((month, idx) => (
-                                      <div key={month} className="text-center">
-                                        <span className="text-[10px] text-muted-foreground">{month}</span>
-                                        <PercentInput
-                                          value={getLocationOccupancy(location.id, year, idx)}
-                                          onChange={(val) => updateLocationOccupancy(location.id, year, val, idx)}
-                                          className="h-6 w-full text-[10px] px-1"
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </TabsContent>
