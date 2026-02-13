@@ -17,6 +17,7 @@
  */
 
 import { db } from '../db';
+import { calculateXIRR, type DatedCashFlow } from '../utils/financial-calculations';
 import { 
   modelingProjects,
   modelingScenarioVersions,
@@ -39,7 +40,6 @@ import {
   buildModelingPeriods,
   buildT12AwarePeriods,
   annualToMonthlyRate,
-  monthlyIrrToAnnualized,
   getStabilizedNoiPeriodIndex,
   type TimelineConfig,
   type MonthlyPeriod,
@@ -191,8 +191,8 @@ export interface ProFormaData {
     purchasePrice: number;
     exitValue: number;
     totalReturn: number;
-    irr: number;  // Monthly IRR by default
-    irrAnnualized: number;  // Annualized IRR
+    irr: number;  // XIRR-based annualized IRR as percentage (e.g., 15 for 15%)
+    irrAnnualized: number;  // Same as irr (always XIRR annualized)
     irrDisplayPreference: IrrDisplayPreference;
     equityMultiple: number;
     year1Noi: number;
@@ -1008,9 +1008,12 @@ export class ProFormaEngineService {
     const workingCapitalRecovery = Math.round(workingCapitalAmount * workingCapitalRecoveryPct);
     const netExitProceeds = exitValue - sellingFees - loanPayoff - loanExitFees + workingCapitalRecovery;
     
-    // IRR calculation using monthly levered cash flows
+    // XIRR calculation using dated monthly levered cash flows
     const totalEquityInvested = purchasePrice + workingCapitalAmount;
-    const monthlyCashFlows = [-totalEquityInvested];
+    const datedCashFlows: DatedCashFlow[] = [
+      { date: projectionStartDate, amount: -totalEquityInvested }
+    ];
+    let totalDistributions = 0;
     for (let i = 0; i < monthlyPeriods.length; i++) {
       const period = monthlyPeriods[i];
       let cf = leveredCashFlowMonthly[period.key] || 0;
@@ -1019,14 +1022,14 @@ export class ProFormaEngineService {
         cf += netExitProceeds;
       }
       
-      monthlyCashFlows.push(cf);
+      totalDistributions += cf;
+      datedCashFlows.push({ date: period.date, amount: cf });
     }
     
-    const monthlyIrr = this.calculateIRR(monthlyCashFlows, 0.01);
-    const annualizedIrr = monthlyIrrToAnnualized(monthlyIrr / 100) * 100;
+    const xirrResult = calculateXIRR(datedCashFlows, 0.1);
+    const annualizedIrr = Math.round(xirrResult * 10000) / 100;
     
-    // Total return & equity multiple
-    const totalDistributions = monthlyCashFlows.slice(1).reduce((sum, cf) => sum + cf, 0);
+    // Equity multiple
     const equityMultiple = totalEquityInvested > 0 ? (totalDistributions / totalEquityInvested) : 0;
     
     // ========================================
@@ -1103,9 +1106,9 @@ export class ProFormaEngineService {
         purchasePrice,
         exitValue,
         totalReturn: totalDistributions,
-        irr: irrDisplayPreference === 'monthly' ? monthlyIrr : annualizedIrr,
+        irr: annualizedIrr,
         irrAnnualized: annualizedIrr,
-        irrDisplayPreference,
+        irrDisplayPreference: 'annualized' as IrrDisplayPreference,
         equityMultiple,
         year1Noi,
         year3Noi,
@@ -1230,47 +1233,6 @@ export class ProFormaEngineService {
     }
   }
 
-  /**
-   * Calculate IRR using Newton-Raphson method.
-   * Works for both monthly and annual cash flows.
-   */
-  private calculateIRR(cashFlows: number[], guess: number = 0.1): number {
-    const maxIterations = 100;
-    const precision = 0.00001;
-    let rate = guess;
-
-    if (cashFlows.length < 2) return 0;
-    if (cashFlows[0] >= 0) return 0;
-    
-    const totalInflows = cashFlows.slice(1).reduce((sum, cf) => sum + cf, 0);
-    if (totalInflows <= 0) return -100;
-
-    for (let i = 0; i < maxIterations; i++) {
-      let npv = 0;
-      let dnpv = 0;
-
-      for (let j = 0; j < cashFlows.length; j++) {
-        const discountFactor = Math.pow(1 + rate, j);
-        if (discountFactor === 0) continue;
-        
-        npv += cashFlows[j] / discountFactor;
-        dnpv -= j * cashFlows[j] / (discountFactor * (1 + rate));
-      }
-
-      if (Math.abs(dnpv) < precision) break;
-
-      const newRate = rate - npv / dnpv;
-      
-      const boundedRate = Math.max(-0.99, Math.min(10, newRate));
-      
-      if (Math.abs(boundedRate - rate) < precision) {
-        return Math.round(boundedRate * 10000) / 100;
-      }
-      rate = boundedRate;
-    }
-
-    return Math.round(rate * 10000) / 100;
-  }
 
   /**
    * Get historical P&L data for a project.

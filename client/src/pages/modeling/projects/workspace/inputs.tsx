@@ -582,7 +582,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Monthly uses XIRR for precise return calculations
+                Controls whether projections display monthly or annual periods
               </p>
             </div>
           </CardContent>
