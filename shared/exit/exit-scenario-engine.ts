@@ -16,6 +16,49 @@ import { calculateIRR, calculateXIRR } from './irr-calculator';
 
 export type ExitStrategyType = 'cash_sale' | 'exchange_1031' | 'seller_financing' | 'dst_investment' | 'hybrid';
 
+export interface ClosingCostLineItem {
+  label: string;
+  amount: number;
+  category: 'broker' | 'title' | 'transfer_tax' | 'recording' | 'escrow' | 'legal' | 'other';
+}
+
+export interface ClosingCostsBreakdown {
+  brokerCommission: number;
+  brokerCommissionRate: number;
+  titleAndEscrow: number;
+  transferTax: number;
+  docStamps: number;
+  recordingFees: number;
+  legalFees: number;
+  otherClosingCosts: number;
+  totalClosingCosts: number;
+  lineItems: ClosingCostLineItem[];
+}
+
+export interface GainBreakdown {
+  grossSalePrice: number;
+  totalClosingCosts: number;
+  netSaleProceeds: number;
+  adjustedBasis: number;
+  totalRealizedGain: number;
+  depreciationRecapture: number;
+  depreciationRecaptureRate: number;
+  capitalGain: number;
+  capitalGainRate: number;
+  section1245Recapture: number;
+  isLongTerm: boolean;
+}
+
+export interface TaxDeferredBreakdown {
+  recaptureTaxAvoided: number;
+  capitalGainsTaxAvoided: number;
+  stateTaxAvoided: number;
+  niitAvoided: number;
+  totalTaxDeferred: number;
+  newCarryoverBasis: number;
+  embeddedGain: number;
+}
+
 export interface ExitScenarioInput {
   scenarioName: string;
   scenarioType: ExitStrategyType;
@@ -40,6 +83,7 @@ export interface ExitScenarioInput {
     brokerCommissionRate: number;
     closingCosts: number;
     holdingPeriodMonths: number;
+    closingCostsBreakdown?: ClosingCostLineItem[];
   };
 
   debt: {
@@ -82,12 +126,15 @@ export interface ExitScenarioResult {
 
   grossSaleProceeds: number;
   costsOfSale: number;
+  closingCostsBreakdown: ClosingCostsBreakdown;
   netSaleProceeds: number;
   debtPayoff: number;
   prepaymentPenalty: number;
   beforeTaxEquityProceeds: number;
 
+  gainBreakdown: GainBreakdown;
   taxResult: TaxEngineResult;
+  taxDeferredBreakdown?: TaxDeferredBreakdown;
   afterTaxEquityProceeds: number;
 
   exchange1031Result?: Exchange1031EngineResult;
@@ -110,6 +157,7 @@ export interface ExitScenarioResult {
   comparisonMetrics: {
     effectiveTaxRate: number;
     deferredGain: number;
+    taxDeferredAmount: number;
     npvOfTaxSavings: number;
     riskScore: number;
   };
@@ -142,6 +190,76 @@ export interface ScenarioWarning {
   source: string;
 }
 
+/**
+ * Build itemized closing costs breakdown.
+ * When detailed line items are provided, uses them directly.
+ * When only a lump sum is provided, estimates common categories.
+ */
+function buildClosingCostsBreakdown(
+  brokerCommission: number,
+  brokerCommissionRate: number,
+  otherClosingCosts: number,
+  detailedItems?: ClosingCostLineItem[],
+): ClosingCostsBreakdown {
+  const lineItems: ClosingCostLineItem[] = [
+    { label: 'Broker Commission', amount: brokerCommission, category: 'broker' },
+  ];
+
+  let titleAndEscrow = 0;
+  let transferTax = 0;
+  let docStamps = 0;
+  let recordingFees = 0;
+  let legalFees = 0;
+  let otherCosts = 0;
+
+  if (detailedItems && detailedItems.length > 0) {
+    // Use provided detailed breakdown
+    for (const item of detailedItems) {
+      lineItems.push(item);
+      switch (item.category) {
+        case 'title': titleAndEscrow += item.amount; break;
+        case 'transfer_tax': transferTax += item.amount; break;
+        case 'recording': docStamps += item.amount; recordingFees += item.amount; break;
+        case 'escrow': titleAndEscrow += item.amount; break;
+        case 'legal': legalFees += item.amount; break;
+        default: otherCosts += item.amount; break;
+      }
+    }
+  } else if (otherClosingCosts > 0) {
+    // Estimate common breakdown from lump sum (typical commercial allocation)
+    titleAndEscrow = Math.round(otherClosingCosts * 0.30);
+    transferTax = Math.round(otherClosingCosts * 0.25);
+    docStamps = Math.round(otherClosingCosts * 0.15);
+    recordingFees = Math.round(otherClosingCosts * 0.05);
+    legalFees = Math.round(otherClosingCosts * 0.15);
+    otherCosts = otherClosingCosts - titleAndEscrow - transferTax - docStamps - recordingFees - legalFees;
+
+    lineItems.push(
+      { label: 'Title Insurance & Escrow', amount: titleAndEscrow, category: 'title' },
+      { label: 'Transfer Tax', amount: transferTax, category: 'transfer_tax' },
+      { label: 'Documentary Stamps', amount: docStamps, category: 'recording' },
+      { label: 'Recording Fees', amount: recordingFees, category: 'recording' },
+      { label: 'Legal / Attorney Fees', amount: legalFees, category: 'legal' },
+    );
+    if (otherCosts > 0) {
+      lineItems.push({ label: 'Other Closing Costs', amount: otherCosts, category: 'other' });
+    }
+  }
+
+  return {
+    brokerCommission,
+    brokerCommissionRate,
+    titleAndEscrow,
+    transferTax,
+    docStamps,
+    recordingFees,
+    legalFees,
+    otherClosingCosts: otherCosts,
+    totalClosingCosts: brokerCommission + otherClosingCosts,
+    lineItems,
+  };
+}
+
 const DISCLAIMER = 'This analysis is for informational purposes only and does not constitute tax, legal, or financial advice. Consult qualified professionals before making investment decisions. Tax laws change frequently; calculations use estimates based on current law.';
 
 export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
@@ -167,6 +285,15 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
 
   const costsOfSale = (input.sale.salePrice * input.sale.brokerCommissionRate) + input.sale.closingCosts;
   const netSaleProceeds = input.sale.salePrice - costsOfSale;
+
+  // Build detailed closing costs breakdown
+  const brokerCommission = input.sale.salePrice * input.sale.brokerCommissionRate;
+  const closingCostsBreakdown: ClosingCostsBreakdown = buildClosingCostsBreakdown(
+    brokerCommission,
+    input.sale.brokerCommissionRate,
+    input.sale.closingCosts,
+    input.sale.closingCostsBreakdown,
+  );
 
   let refinanceSummary: RefinanceSummary | null = null;
   let currentDebtBalance = input.debt.outstandingBalance;
@@ -307,6 +434,48 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
     allWarnings.push({ ...w, source: 'tax_engine' });
   }
 
+  // Build gain decomposition
+  const gainBreakdown: GainBreakdown = {
+    grossSalePrice: input.sale.salePrice,
+    totalClosingCosts: costsOfSale,
+    netSaleProceeds,
+    adjustedBasis: basisLedger.adjustedBasis,
+    totalRealizedGain: fullTaxResult.gainAllocation.totalGain,
+    depreciationRecapture: basisLedger.straightLineRecapture,
+    depreciationRecaptureRate: 0.25, // §1250 unrecaptured rate
+    capitalGain: Math.max(0, fullTaxResult.gainAllocation.totalGain - basisLedger.straightLineRecapture - basisLedger.section1245Recapture),
+    capitalGainRate: fullTaxResult.gainAllocation.isLongTerm ? 0.20 : fullTaxResult.effectiveTaxRate,
+    section1245Recapture: basisLedger.section1245Recapture,
+    isLongTerm: fullTaxResult.gainAllocation.isLongTerm,
+  };
+
+  // Build tax-deferred breakdown for 1031 exchanges
+  let taxDeferredBreakdown: TaxDeferredBreakdown | undefined;
+  if (input.scenarioType === 'exchange_1031' && exchange1031Result && exchange1031Result.totalDeferredGain > 0) {
+    const totalGain = Math.max(1, fullTaxResult.gainAllocation.totalGain);
+    const stateRate = fullTaxResult.dualState.residenceState.rate;
+    const recaptureAmt = Math.min(basisLedger.straightLineRecapture, exchange1031Result.totalDeferredGain);
+    const capitalGainAmt = exchange1031Result.totalDeferredGain - recaptureAmt;
+    const recaptureFedRate = 0.25;
+    const ltcgFedRate = fullTaxResult.gainAllocation.isLongTerm ? fullTaxResult.federal.ltcgRate : fullTaxResult.effectiveTaxRate;
+    const niitRate = fullTaxResult.federal.niitApplies ? (fullTaxResult.federal.niitTax / totalGain) : 0;
+
+    const recaptureTaxAvoided = recaptureAmt * (recaptureFedRate + stateRate);
+    const capitalGainsTaxAvoided = capitalGainAmt * (ltcgFedRate + stateRate);
+    const stateTaxAvoided = exchange1031Result.totalDeferredGain * stateRate;
+    const niitAvoided = exchange1031Result.totalDeferredGain * niitRate;
+
+    taxDeferredBreakdown = {
+      recaptureTaxAvoided,
+      capitalGainsTaxAvoided,
+      stateTaxAvoided,
+      niitAvoided,
+      totalTaxDeferred: fullTaxResult.totalTaxLiability - taxResult.totalTaxLiability,
+      newCarryoverBasis: exchange1031Result.newAggregatedBasis,
+      embeddedGain: exchange1031Result.totalDeferredGain,
+    };
+  }
+
   let dstResult: DstEngineResult | undefined;
   if ((input.scenarioType === 'dst_investment' || input.scenarioType === 'hybrid') && input.dstInvestment) {
     dstResult = calculateDstAnalysis(input.dstInvestment);
@@ -410,10 +579,11 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
   const deferredGain = exchange1031Result?.totalDeferredGain || 0;
 
   let npvOfTaxSavings = 0;
-  if (deferredGain > 0) {
-    const estTaxOnDeferred = deferredGain * taxResult.effectiveTaxRate;
+  // Tax deferred = what would have been owed minus what is actually owed
+  const taxDeferredAmount = fullTaxResult.totalTaxLiability - taxResult.totalTaxLiability;
+  if (taxDeferredAmount > 0) {
     const deferralYears = 10;
-    npvOfTaxSavings = estTaxOnDeferred * (1 - 1 / Math.pow(1.06, deferralYears));
+    npvOfTaxSavings = taxDeferredAmount * (1 - 1 / Math.pow(1.06, deferralYears));
   }
 
   if (taxResult.installmentNpvSavings && taxResult.installmentNpvSavings > 0) {
@@ -436,12 +606,15 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
 
     grossSaleProceeds: input.sale.salePrice,
     costsOfSale,
+    closingCostsBreakdown,
     netSaleProceeds,
     debtPayoff,
     prepaymentPenalty,
     beforeTaxEquityProceeds,
 
+    gainBreakdown,
     taxResult,
+    taxDeferredBreakdown,
     afterTaxEquityProceeds,
 
     exchange1031Result,
@@ -464,6 +637,7 @@ export function runExitScenario(input: ExitScenarioInput): ExitScenarioResult {
     comparisonMetrics: {
       effectiveTaxRate: taxResult.effectiveTaxRate,
       deferredGain,
+      taxDeferredAmount,
       npvOfTaxSavings,
       riskScore,
     },

@@ -208,7 +208,7 @@ describe('GOLDEN VECTOR: 1031_full_deferral (PATCH 1)', () => {
   });
 
   it('npvOfTaxSavings is positive', () => {
-    expect(result.comparisonMetrics.npvOfTaxSavings).toBeGreaterThanOrEqual(0);
+    expect(result.comparisonMetrics.npvOfTaxSavings).toBeGreaterThan(0);
   });
 
   it('timeline has 3 deadlines', () => {
@@ -285,17 +285,17 @@ describe('GOLDEN VECTOR: 1031_with_boot (PATCH 1 partial)', () => {
   });
 
   it('CRITICAL: tax is computed on recognized gain only, not full gain', () => {
-    // Recognized gain should be less than what would be the full realized gain
-    // (i.e., partial deferral means some gain is deferred)
+    // When trading way down, boot may exceed realized gain.
+    // In that case, recognizedGain = realizedGain and deferredGain = 0.
     const recognizedGain = result.exchange1031Result!.totalRecognizedGain;
     const deferredGain = result.exchange1031Result!.totalDeferredGain;
-    expect(deferredGain).toBeGreaterThanOrEqual(0); // Boot may exceed gain → no deferral
-    expect(recognizedGain).toBeGreaterThan(0); // But boot creates recognized gain
+    expect(deferredGain).toBeGreaterThanOrEqual(0); // May be 0 when boot ≥ gain
+    expect(recognizedGain).toBeGreaterThan(0); // Boot creates recognized gain
     expect(recognizedGain).toBeLessThanOrEqual(
       result.exchange1031Result!.bootAnalysis.totalBoot
     );
-    // Tax liability should be proportionally reduced
-    expect(result.taxResult.totalTaxLiability).toBeGreaterThan(0); // Not zero — boot exists
+    // Tax liability should be positive since there IS recognized gain
+    expect(result.taxResult.totalTaxLiability).toBeGreaterThan(0);
   });
 
   it('CA state tax rate warning or presence', () => {
@@ -965,5 +965,224 @@ describe('PATCH 14: Canonical IRR consistency', () => {
     const xirr = calculateXIRR(flows);
     expect(xirr).not.toBeNull();
     expect(xirr!).toBeCloseTo(0.084, 2);
+  });
+});
+
+// ============================================================================
+// GOLDEN VECTOR: User's 1031 Exchange Full Worked Example
+// Validates every intermediate step matches the reference calculation:
+//   Step 1: Adjusted Basis = Cost + Improvements - Depreciation = $3,300,000
+//   Step 2: Net Sales Proceeds = $7,500,000 - $525,000 = $6,975,000
+//   Step 3: Realized Gain = $6,975,000 - $3,300,000 = $3,675,000
+//   Step 4: Net Equity = $7,500,000 - $2,500,000 - $525,000 = $4,475,000
+//   Step 5: Full Deferral → $0 boot, $3,675,000 deferred
+//   Step 6: New Carryover Basis = $9,000,000 - $3,675,000 = $5,325,000
+// ============================================================================
+describe('GOLDEN VECTOR: 1031 Exchange Full Worked Example', () => {
+  // Inputs chosen to produce exactly $500,000 accumulated depreciation:
+  //   improvementValue=1,650,000 → 1,650,000/39*10 = 423,076.92
+  //   capitalAddition=300,000 (yr1) → 300,000/39*10 = 76,923.08
+  //   Total = 500,000.00
+  const input: ExitScenarioInput = {
+    scenarioName: '1031 Full Worked Example',
+    scenarioType: 'exchange_1031',
+    property: {
+      purchasePrice: 3500000,
+      acquisitionCosts: 0,
+      landValue: 1850000,
+      improvementValue: 1650000,
+      depreciationScheduleYears: 39,
+      holdingPeriodYears: 10,
+      capitalAdditionsByYear: { 1: 300000 },
+    },
+    sale: {
+      salePrice: 7500000,
+      brokerCommissionRate: 0.05,
+      closingCosts: 150000,
+      holdingPeriodMonths: 120,
+    },
+    debt: { outstandingBalance: 2500000, prepaymentPenalty: 0 },
+    taxProfile: {
+      filingStatus: 'single',
+      otherOrdinaryIncome: 300000,
+      otherInvestmentIncome: 0,
+      stateOfResidence: 'AL',  // Alabama = exactly 5% state rate
+      taxYear: 2025,
+    },
+    exchange1031: {
+      saleDate: '2025-06-15',
+      replacementProperties: [
+        {
+          name: 'Replacement Marina',
+          purchasePrice: 9000000,
+          newMortgage: 4525000,   // Exactly absorbs all net equity → zero boot
+          closingCosts: 0,
+          identificationPriority: 'primary',
+        },
+      ],
+      qualifiedIntermediaryFee: 0,
+      additionalCashInvested: 0,
+    },
+  };
+
+  let result: ExitScenarioResult;
+  it('runs without throwing', () => {
+    result = runExitScenario(input);
+  });
+
+  // Step 1: Adjusted Basis
+  it('Step 1: adjustedBasis = cost + improvements - depreciation = $3,300,000', () => {
+    expect(result.basisLedger.adjustedBasis).toBeCloseTo(3300000, 0);
+  });
+
+  it('Step 1: accumulatedDepreciation = $500,000', () => {
+    expect(result.basisLedger.accumulatedCostRecovery).toBeCloseTo(500000, 0);
+  });
+
+  it('Step 1: capitalAdditions = $300,000', () => {
+    expect(result.basisLedger.capitalAdditions).toBe(300000);
+  });
+
+  // Step 2: Net Sales Proceeds
+  it('Step 2: costsOfSale = $525,000 (5% broker + $150K closing)', () => {
+    expect(result.costsOfSale).toBe(525000);
+  });
+
+  it('Step 2: netSaleProceeds = $6,975,000', () => {
+    expect(result.netSaleProceeds).toBe(6975000);
+  });
+
+  // Step 3: Realized Gain
+  it('Step 3: realizedGain = netSaleProceeds - adjustedBasis = $3,675,000', () => {
+    expect(result.exchange1031Result!.totalRealizedGain).toBeCloseTo(3675000, 0);
+  });
+
+  it('Step 3: depreciation recapture component = $500,000', () => {
+    expect(result.basisLedger.straightLineRecapture).toBeCloseTo(500000, 0);
+  });
+
+  // Step 4: Net Equity
+  it('Step 4: beforeTaxEquityProceeds (net equity) = $4,475,000', () => {
+    expect(result.beforeTaxEquityProceeds).toBe(4475000);
+  });
+
+  // Step 5: Full Deferral
+  it('Step 5: isFullyDeferred = true', () => {
+    expect(result.exchange1031Result!.isFullyDeferred).toBe(true);
+  });
+
+  it('Step 5: totalBoot = $0', () => {
+    expect(result.exchange1031Result!.bootAnalysis.totalBoot).toBe(0);
+  });
+
+  it('Step 5: cashBootReceived = $0', () => {
+    expect(result.exchange1031Result!.bootAnalysis.cashBootReceived).toBe(0);
+  });
+
+  it('Step 5: mortgageBoot = $0', () => {
+    expect(result.exchange1031Result!.bootAnalysis.mortgageBoot).toBe(0);
+  });
+
+  it('Step 5: recognizedGain = $0', () => {
+    expect(result.exchange1031Result!.totalRecognizedGain).toBe(0);
+  });
+
+  it('Step 5: deferredGain = $3,675,000 (100% deferred)', () => {
+    expect(result.exchange1031Result!.totalDeferredGain).toBeCloseTo(3675000, 0);
+  });
+
+  it('Step 5: totalTaxLiability = $0', () => {
+    expect(result.taxResult.totalTaxLiability).toBe(0);
+  });
+
+  it('Step 5: afterTaxEquityProceeds = beforeTaxEquityProceeds', () => {
+    expect(result.afterTaxEquityProceeds).toBe(result.beforeTaxEquityProceeds);
+  });
+
+  // Step 6: Tax Deferred / Saved
+  it('Step 6: taxDeferredAmount > $800,000 (substantial tax savings)', () => {
+    // User's back-of-envelope: ~$943,750 (25%+5% on recapture, 20%+5% on LTCG)
+    // Engine uses actual brackets so it won't be exact, but should be in range
+    expect(result.comparisonMetrics.taxDeferredAmount).toBeGreaterThan(800000);
+    expect(result.comparisonMetrics.taxDeferredAmount).toBeLessThan(1100000);
+  });
+
+  it('Step 6: npvOfTaxSavings is positive', () => {
+    expect(result.comparisonMetrics.npvOfTaxSavings).toBeGreaterThan(0);
+  });
+
+  // Carryover Basis
+  it('New carryover basis = replacementPrice - deferredGain = $5,325,000', () => {
+    expect(result.exchange1031Result!.newAggregatedBasis).toBeCloseTo(5325000, 0);
+  });
+
+  // Gain decomposition check
+  it('capitalGain portion = realizedGain - recapture = ~$3,175,000', () => {
+    const realizedGain = result.exchange1031Result!.totalRealizedGain;
+    const recapture = result.basisLedger.straightLineRecapture;
+    const capitalGain = realizedGain - recapture;
+    expect(capitalGain).toBeCloseTo(3175000, 0);
+  });
+
+  it('no NaN/Infinity in output', () => {
+    assertNoNaNOrInfinity(result);
+  });
+
+  // Closing Costs Breakdown
+  it('closingCostsBreakdown.brokerCommission = $375,000', () => {
+    expect(result.closingCostsBreakdown.brokerCommission).toBe(375000);
+  });
+
+  it('closingCostsBreakdown.totalClosingCosts = $525,000', () => {
+    expect(result.closingCostsBreakdown.totalClosingCosts).toBe(525000);
+  });
+
+  it('closingCostsBreakdown has estimated line items (lump sum mode)', () => {
+    expect(result.closingCostsBreakdown.lineItems.length).toBeGreaterThan(1);
+    expect(result.closingCostsBreakdown.titleAndEscrow).toBeGreaterThan(0);
+    expect(result.closingCostsBreakdown.transferTax).toBeGreaterThan(0);
+    expect(result.closingCostsBreakdown.docStamps).toBeGreaterThan(0);
+  });
+
+  // Gain Breakdown
+  it('gainBreakdown.depreciationRecapture = $500,000', () => {
+    expect(result.gainBreakdown.depreciationRecapture).toBeCloseTo(500000, 0);
+  });
+
+  it('gainBreakdown.capitalGain = $3,175,000', () => {
+    expect(result.gainBreakdown.capitalGain).toBeCloseTo(3175000, 0);
+  });
+
+  it('gainBreakdown.isLongTerm = true (120 months)', () => {
+    expect(result.gainBreakdown.isLongTerm).toBe(true);
+  });
+
+  it('gainBreakdown.totalRealizedGain = $3,675,000', () => {
+    expect(result.gainBreakdown.totalRealizedGain).toBeCloseTo(3675000, 0);
+  });
+
+  // Tax Deferred Breakdown
+  it('taxDeferredBreakdown exists for 1031 with deferred gain', () => {
+    expect(result.taxDeferredBreakdown).toBeDefined();
+  });
+
+  it('taxDeferredBreakdown.totalTaxDeferred matches comparisonMetrics', () => {
+    expect(result.taxDeferredBreakdown!.totalTaxDeferred).toBe(result.comparisonMetrics.taxDeferredAmount);
+  });
+
+  it('taxDeferredBreakdown.recaptureTaxAvoided > 0', () => {
+    expect(result.taxDeferredBreakdown!.recaptureTaxAvoided).toBeGreaterThan(0);
+  });
+
+  it('taxDeferredBreakdown.capitalGainsTaxAvoided > 0', () => {
+    expect(result.taxDeferredBreakdown!.capitalGainsTaxAvoided).toBeGreaterThan(0);
+  });
+
+  it('taxDeferredBreakdown.newCarryoverBasis = $5,325,000', () => {
+    expect(result.taxDeferredBreakdown!.newCarryoverBasis).toBeCloseTo(5325000, 0);
+  });
+
+  it('taxDeferredBreakdown.embeddedGain = $3,675,000', () => {
+    expect(result.taxDeferredBreakdown!.embeddedGain).toBeCloseTo(3675000, 0);
   });
 });

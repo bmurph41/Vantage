@@ -91,7 +91,11 @@ export function calculate1031ExchangeEngine(input: Exchange1031EngineInput): Exc
 
   const identificationRules = evaluateIdentificationRules(input);
 
-  const realizedGain = input.relinquishedProperty.salePrice - input.relinquishedProperty.adjustedBasis;
+  // IRS formula: Amount Realized = Sale Price − Selling Expenses
+  // Realized Gain = Amount Realized − Adjusted Basis
+  const realizedGain = input.relinquishedProperty.salePrice
+    - input.relinquishedProperty.closingCosts
+    - input.relinquishedProperty.adjustedBasis;
 
   // Guard: empty replacement properties → no deferral possible, all gain recognized
   if (input.replacementProperties.length === 0) {
