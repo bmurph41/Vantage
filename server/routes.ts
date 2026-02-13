@@ -22755,13 +22755,14 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { projectId, uploadId } = req.params;
+      const { enabledDepartments } = req.body || {};
       
       const upload = await docIntelService.getUpload(orgId, uploadId);
       if (!upload || upload.modelingProjectId !== projectId) {
         return res.status(404).json({ error: 'Document not found' });
       }
       
-      const items = await docIntelService.categorizeItems(orgId, uploadId);
+      const items = await docIntelService.categorizeItems(orgId, uploadId, enabledDepartments);
       
       // Update upload to reviewing status
       await docIntelService.updateUpload(orgId, uploadId, { 

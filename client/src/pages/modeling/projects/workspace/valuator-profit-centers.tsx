@@ -1,21 +1,59 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp, BookOpen } from "lucide-react";
+import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp, BookOpen, Users, Store, FileText, Sailboat, Utensils, Car, Home } from "lucide-react";
 import ValuatorFuelSalesTab from "./valuator-fuel-sales";
 import ValuatorShipStoreTab from "./valuator-ship-store";
 import ValuatorOperationsSummary from "./valuator-operations-summary";
 import ValuatorServiceDeptTab from "./valuator-service-dept";
 import ValuatorBoatRentalsTab from "./valuator-boat-rentals";
 import ValuatorBookkeepingTab from "./valuator-bookkeeping";
+import type { ProjectConfig } from "@/types/modeling";
 
 interface ValuatorProfitCentersProps {
   projectId: string;
   projectName: string;
 }
 
+type ProfitCenterTab = {
+  id: string;
+  configKey: string;
+  label: string;
+  icon: any;
+  component: (props: { projectId: string; projectName: string }) => JSX.Element;
+};
+
+const ALL_PROFIT_CENTER_TABS: ProfitCenterTab[] = [
+  { id: "fuel", configKey: "pc_fuel_dock", label: "Fuel Sales", icon: Fuel, component: ValuatorFuelSalesTab },
+  { id: "store", configKey: "pc_ships_store", label: "Ship Store", icon: ShoppingCart, component: ValuatorShipStoreTab },
+  { id: "service", configKey: "pc_service", label: "Service Dept", icon: Wrench, component: ValuatorServiceDeptTab },
+  { id: "rentals", configKey: "pc_rental_boats", label: "Boat Rentals", icon: Ship, component: ValuatorBoatRentalsTab },
+  { id: "bookkeeping", configKey: "pc_boat_finance", label: "Bookkeeping", icon: BookOpen, component: ValuatorBookkeepingTab },
+];
+
 export default function ValuatorProfitCenters({ projectId, projectName }: ValuatorProfitCentersProps) {
   const [activeSubTab, setActiveSubTab] = useState("summary");
+
+  const { data: config } = useQuery<ProjectConfig>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+  });
+
+  const enabledTabs = useMemo(() => {
+    if (!config?.profitCenters) return ALL_PROFIT_CENTER_TABS;
+    return ALL_PROFIT_CENTER_TABS.filter(tab => {
+      const pcConfig = config.profitCenters?.[tab.configKey];
+      return pcConfig?.isEnabled === true;
+    });
+  }, [config?.profitCenters]);
+
+  useEffect(() => {
+    if (activeSubTab !== "summary" && !enabledTabs.some(t => t.id === activeSubTab)) {
+      setActiveSubTab("summary");
+    }
+  }, [enabledTabs, activeSubTab]);
+
+  const totalCols = enabledTabs.length + 1;
 
   return (
     <div className="space-y-4">
@@ -35,56 +73,34 @@ export default function ValuatorProfitCenters({ projectId, projectName }: Valuat
         </CardHeader>
         <CardContent className="pt-0">
           <Tabs value={activeSubTab} onValueChange={setActiveSubTab}>
-            <TabsList className="grid w-full grid-cols-6 mb-6">
+            <TabsList className={`grid w-full mb-6`} style={{ gridTemplateColumns: `repeat(${totalCols}, minmax(0, 1fr))` }}>
               <TabsTrigger value="summary" className="gap-2">
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Summary</span>
               </TabsTrigger>
-              <TabsTrigger value="fuel" className="gap-2">
-                <Fuel className="h-4 w-4" />
-                <span className="hidden sm:inline">Fuel Sales</span>
-              </TabsTrigger>
-              <TabsTrigger value="store" className="gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                <span className="hidden sm:inline">Ship Store</span>
-              </TabsTrigger>
-              <TabsTrigger value="service" className="gap-2">
-                <Wrench className="h-4 w-4" />
-                <span className="hidden sm:inline">Service Dept</span>
-              </TabsTrigger>
-              <TabsTrigger value="rentals" className="gap-2">
-                <Ship className="h-4 w-4" />
-                <span className="hidden sm:inline">Boat Rentals</span>
-              </TabsTrigger>
-              <TabsTrigger value="bookkeeping" className="gap-2">
-                <BookOpen className="h-4 w-4" />
-                <span className="hidden sm:inline">Bookkeeping</span>
-              </TabsTrigger>
+              {enabledTabs.map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
+                    <Icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
 
             <TabsContent value="summary" className="mt-0">
               <ValuatorOperationsSummary projectId={projectId} projectName={projectName} />
             </TabsContent>
 
-            <TabsContent value="fuel" className="mt-0">
-              <ValuatorFuelSalesTab projectId={projectId} projectName={projectName} />
-            </TabsContent>
-
-            <TabsContent value="store" className="mt-0">
-              <ValuatorShipStoreTab projectId={projectId} projectName={projectName} />
-            </TabsContent>
-
-            <TabsContent value="service" className="mt-0">
-              <ValuatorServiceDeptTab projectId={projectId} projectName={projectName} />
-            </TabsContent>
-
-            <TabsContent value="rentals" className="mt-0">
-              <ValuatorBoatRentalsTab projectId={projectId} projectName={projectName} />
-            </TabsContent>
-
-            <TabsContent value="bookkeeping" className="mt-0">
-              <ValuatorBookkeepingTab projectId={projectId} projectName={projectName} />
-            </TabsContent>
+            {enabledTabs.map(tab => {
+              const Component = tab.component;
+              return (
+                <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                  <Component projectId={projectId} projectName={projectName} />
+                </TabsContent>
+              );
+            })}
           </Tabs>
         </CardContent>
       </Card>

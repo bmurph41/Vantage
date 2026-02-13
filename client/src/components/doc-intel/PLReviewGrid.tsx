@@ -65,11 +65,15 @@ import {
   CategoryTier,
   CATEGORY_TIER_OPTIONS,
   getDeptOptionsForTier,
+  getFilteredDeptOptionsForTier,
+  getEnabledRevenueCogsDepts,
   getDeptLabel,
   CATEGORY_TIER_LABELS,
   EXPENSE_DEPT_OPTIONS,
   REVENUE_COGS_DEPT_OPTIONS,
+  type RevenueCogsDept,
 } from "@/lib/pnl-categories";
+import type { ProjectConfig } from "@/types/modeling";
 import { AutoConfirmedBadge } from "./AutoConfirmedBadge";
 
 interface ExtractedItem {
@@ -150,12 +154,14 @@ function BulkDepartmentSelect({
   items, 
   selectedIds, 
   onDeptChange, 
-  disabled 
+  disabled,
+  enabledRevCogsDepts 
 }: { 
   items: ExtractedItem[];
   selectedIds: Set<string>;
   onDeptChange: (tier: CategoryTier, dept: string) => void;
   disabled: boolean;
+  enabledRevCogsDepts?: RevenueCogsDept[];
 }) {
   const commonTier = useMemo(() => {
     const selectedItems = items.filter(i => selectedIds.has(i.id));
@@ -181,7 +187,7 @@ function BulkDepartmentSelect({
     );
   }
 
-  const deptOptions = getDeptOptionsForTier(commonTier);
+  const deptOptions = getFilteredDeptOptionsForTier(commonTier, enabledRevCogsDepts);
 
   return (
     <Select
@@ -222,6 +228,15 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   // Optimistic state for category/department changes (per line item name)
   const [optimisticCategories, setOptimisticCategories] = useState<Record<string, CategoryTier>>({});
   const [optimisticDepartments, setOptimisticDepartments] = useState<Record<string, string>>({});
+
+  const { data: projectConfig } = useQuery<ProjectConfig>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+  });
+
+  const enabledRevCogsDepts = useMemo(
+    () => getEnabledRevenueCogsDepts(projectConfig?.profitCenters),
+    [projectConfig?.profitCenters]
+  );
 
   const { data: items = [], isLoading, refetch } = useQuery<ExtractedItem[]>({
     queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"],
@@ -742,7 +757,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             return <span className="text-muted-foreground text-sm">Select category first</span>;
           }
 
-          const deptOptions = getDeptOptionsForTier(currentTier);
+          const deptOptions = getFilteredDeptOptionsForTier(currentTier, enabledRevCogsDepts);
           const currentDept =
             currentTier === "expense"
               ? (item.expenseDeptConfirmed || item.expenseDeptSuggested)
@@ -978,6 +993,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                 selectedIds={selectedIds}
                 onDeptChange={handleBulkDeptChange}
                 disabled={bulkUpdateMutation.isPending}
+                enabledRevCogsDepts={enabledRevCogsDepts}
               />
               <Button
                 size="sm"
@@ -1118,7 +1134,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                             <SelectValue placeholder={commonTier ? "Set department" : "Set category first"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(commonTier === 'expense' ? EXPENSE_DEPT_OPTIONS : REVENUE_COGS_DEPT_OPTIONS).map(opt => (
+                            {getFilteredDeptOptionsForTier(commonTier, enabledRevCogsDepts).map(opt => (
                               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1305,7 +1321,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               const serverTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
                               const currentTier = optimisticTier || serverTier;
                               if (!currentTier) return <span className="text-xs text-muted-foreground">-</span>;
-                              const deptOptions = currentTier === "expense" ? EXPENSE_DEPT_OPTIONS : REVENUE_COGS_DEPT_OPTIONS;
+                              const deptOptions = getFilteredDeptOptionsForTier(currentTier, enabledRevCogsDepts);
                               // Use optimistic state for department
                               const optimisticDept = optimisticDepartments[rowKey];
                               const serverDept = currentTier === "expense"

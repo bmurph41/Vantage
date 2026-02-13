@@ -1106,7 +1106,7 @@ class DocIntelService {
     return { text: line, amount: null };
   }
 
-  async categorizeItems(orgId: string, uploadId: string): Promise<DocIntelExtractedItem[]> {
+  async categorizeItems(orgId: string, uploadId: string, enabledDepartments?: string[]): Promise<DocIntelExtractedItem[]> {
     const items = await db
       .select()
       .from(docIntelExtractedItems)
@@ -1203,7 +1203,8 @@ class DocIntelService {
       const allCategories = await this.getCategories(orgId);
       const aiResults = await this.aiCategorizeItems(
         uncategorizedItems.map(i => ({ id: i.id, rawText: i.rawText, amount: i.amount })),
-        allCategories
+        allCategories,
+        enabledDepartments
       );
 
       for (const item of uncategorizedItems) {
@@ -1272,7 +1273,8 @@ class DocIntelService {
 
   private async aiCategorizeItems(
     items: { id: string; rawText: string; amount: string | null }[],
-    categories: PnlCategory[]
+    categories: PnlCategory[],
+    enabledDepartments?: string[]
   ): Promise<Map<string, { categoryId: string; tier: string; department: string; confidence: number }>> {
     const results = new Map<string, { categoryId: string; tier: string; department: string; confidence: number }>();
     
@@ -1287,6 +1289,10 @@ class DocIntelService {
       code: c.code,
     }));
 
+    const revenueDeptInstruction = enabledDepartments && enabledDepartments.length > 0
+      ? `For revenue/cogs, ONLY use these enabled departments: ${enabledDepartments.join(', ')}. Do NOT use departments not in this list.`
+      : `For revenue/cogs use: storage/fuel/marina_amenities/ship_store_retail/service/parts/boat_club/boat_rentals/boat_sales/boat_brokerage/boat_finance/fb/rv_park/hospitality_lodging/miscellaneous`;
+
     const prompt = `You are a marina/boat storage financial analyst. Categorize these P&L line items.
 
 Categories available (tier indicates Revenue, COGS, or Expense):
@@ -1298,7 +1304,8 @@ ${JSON.stringify(items.map(i => ({ id: i.id, text: i.rawText, amount: i.amount }
 For each item, determine:
 1. categoryId: The best matching category ID from the list
 2. tier: "revenue", "cogs", or "expense"
-3. department: For revenue/cogs use marina_ops/fuel/ship_store/other. For expenses use: admin/payroll/insurance/utilities/maintenance/marketing/other
+3. department: ${revenueDeptInstruction}
+   For expenses use: payroll/general_admin/advertising/repairs_maintenance/utilities/licenses_permits/security_contract_services/bank_cc_fees/professional_services/insurance/taxes/leases/miscellaneous
 4. confidence: 0.0 to 1.0
 
 Respond with JSON only:

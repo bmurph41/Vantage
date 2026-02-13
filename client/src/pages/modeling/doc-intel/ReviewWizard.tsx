@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getEnabledRevenueCogsDepts } from "@/lib/pnl-categories";
 import type { DocIntelUpload, DocIntelExtractedItem, PnlCategory } from "@shared/schema";
 
 interface ExtractedItemWithCategory extends DocIntelExtractedItem {
@@ -142,6 +143,15 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
     enabled: currentStep >= 4,
   });
 
+  const { data: projectConfig } = useQuery<any>({
+    queryKey: ["/api/modeling/projects", projectId, "config"],
+  });
+
+  const enabledRevCogsDepts = useMemo(() => {
+    if (!projectConfig?.profitCenters) return undefined;
+    return getEnabledRevenueCogsDepts(projectConfig.profitCenters);
+  }, [projectConfig]);
+
   const parseMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/parse`);
@@ -158,7 +168,9 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
   const categorizeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/categorize`);
+      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/categorize`, 
+        enabledRevCogsDepts ? { enabledDepartments: enabledRevCogsDepts } : undefined
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });

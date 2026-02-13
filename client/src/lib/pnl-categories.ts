@@ -114,3 +114,56 @@ export function getDeptLabel(tier: CategoryTier | null, dept: string | null): st
   }
   return EXPENSE_DEPT_LABELS[dept as ExpenseDept] || dept;
 }
+
+export const PROFIT_CENTER_TO_DEPT: Record<string, RevenueCogsDept> = {
+  pc_fuel_dock: "fuel",
+  pc_marina_amenities: "marina_amenities",
+  pc_ships_store: "ship_store_retail",
+  pc_service: "service",
+  pc_parts: "parts",
+  pc_boat_club: "boat_club",
+  pc_rental_boats: "boat_rentals",
+  pc_boat_sales: "boat_sales",
+  pc_boat_finance: "boat_finance",
+  pc_boat_brokerage: "boat_brokerage",
+  pc_fb: "fb",
+  pc_rv_park: "rv_park",
+  pc_hospitality: "hospitality_lodging",
+};
+
+export const DEPT_TO_PROFIT_CENTER: Record<string, string> = Object.fromEntries(
+  Object.entries(PROFIT_CENTER_TO_DEPT).map(([k, v]) => [v, k])
+);
+
+export function getEnabledRevenueCogsDepts(
+  profitCenters?: Record<string, { isEnabled?: boolean }> | null
+): RevenueCogsDept[] {
+  if (!profitCenters) return Object.keys(REVENUE_COGS_DEPT_LABELS) as RevenueCogsDept[];
+
+  const enabledDepts = new Set<RevenueCogsDept>();
+  enabledDepts.add("storage");
+  enabledDepts.add("miscellaneous");
+
+  for (const [pcId, cfg] of Object.entries(profitCenters)) {
+    if (cfg.isEnabled) {
+      const dept = PROFIT_CENTER_TO_DEPT[pcId];
+      if (dept) enabledDepts.add(dept);
+    }
+  }
+
+  return REVENUE_COGS_DEPT_OPTIONS
+    .map(o => o.value)
+    .filter(d => enabledDepts.has(d));
+}
+
+export function getFilteredDeptOptionsForTier(
+  tier: CategoryTier | null,
+  enabledRevenueCogsDepts?: RevenueCogsDept[]
+) {
+  if (!tier) return [];
+  if (tier === "expense") return EXPENSE_DEPT_OPTIONS;
+  if (enabledRevenueCogsDepts) {
+    return REVENUE_COGS_DEPT_OPTIONS.filter(o => enabledRevenueCogsDepts.includes(o.value));
+  }
+  return REVENUE_COGS_DEPT_OPTIONS;
+}
