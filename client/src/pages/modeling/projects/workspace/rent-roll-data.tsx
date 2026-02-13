@@ -285,10 +285,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
 
   const linkMutation = useMutation({
     mutationFn: (rraLocationId: string) =>
-      apiRequest('/api/rent-roll/modeling-links', {
-        method: 'POST',
-        body: JSON.stringify({ rraLocationId, modelingProjectId: projectId }),
-      }),
+      apiRequest('POST', '/api/rent-roll/modeling-links', { rraLocationId, modelingProjectId: projectId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/rent-roll/modeling-projects', projectId, 'rra-locations'] });
       toast({ title: "Linked", description: "RRA location linked to this modeling project." });

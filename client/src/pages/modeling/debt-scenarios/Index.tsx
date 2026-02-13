@@ -211,18 +211,10 @@ export default function DebtScenariosIndex() {
 
       if (currentScenarioId) {
         // Update existing
-        return await apiRequest(`/api/modeling/debt-scenarios/${currentScenarioId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scenarioData),
-        });
+        return await apiRequest('PUT', `/api/modeling/debt-scenarios/${currentScenarioId}`, scenarioData);
       } else {
         // Create new
-        return await apiRequest('/api/modeling/debt-scenarios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scenarioData),
-        });
+        return await apiRequest('POST', '/api/modeling/debt-scenarios', scenarioData);
       }
     },
     onSuccess: (data) => {

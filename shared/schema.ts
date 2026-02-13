@@ -16260,6 +16260,8 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   holdingStatus: holdingStationStatusEnum('holding_status').default('staging'),
   holdingTags: text('holding_tags').array(), // User-defined tags for organization
   holdingNotes: text('holding_notes'), // Notes about the document
+  isT12: boolean('is_t12').default(false),
+  periodMetadata: jsonb('period_metadata').$type<{ t12StartMonth?: number; t12StartYear?: number; t12EndMonth?: number; t12EndYear?: number }>(),
   isDuplicate: boolean('is_duplicate').default(false),
   duplicateOfId: varchar('duplicate_of_id'), // Reference to original if duplicate
   validationErrors: jsonb('validation_errors').$type<string[]>(), // Validation issues

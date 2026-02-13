@@ -22413,6 +22413,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       
       const displayName = req.body.displayName?.trim() || req.file.originalname;
       
+      const isT12 = req.body.isT12 === 'true';
+      const periodMetadata = isT12 ? {
+        t12StartMonth: req.body.t12StartMonth ? parseInt(req.body.t12StartMonth) : null,
+        t12StartYear: req.body.t12StartYear ? parseInt(req.body.t12StartYear) : null,
+        t12EndMonth: req.body.t12EndMonth ? parseInt(req.body.t12EndMonth) : null,
+        t12EndYear: req.body.t12EndYear ? parseInt(req.body.t12EndYear) : null,
+      } : null;
+
+      let holdingTagsList = holdingTags;
+      if (isT12 && !holdingTagsList.includes('T12')) {
+        holdingTagsList = [...holdingTagsList, 'T12'];
+      }
+      
       const result = await docIntelService.createUploadWithDuplicateCheck(
         orgId, 
         {
@@ -22427,8 +22440,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           uploadedBy: userId,
           status: 'uploaded',
           holdingStatus: req.body.holdingStatus || 'staging',
-          holdingTags: holdingTags.length > 0 ? holdingTags : null,
+          holdingTags: holdingTagsList.length > 0 ? holdingTagsList : null,
           holdingNotes: req.body.notes || null,
+          isT12: isT12,
+          periodMetadata: periodMetadata,
         },
         checkProjectOnly
       );

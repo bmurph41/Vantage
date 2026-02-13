@@ -73,9 +73,26 @@ const BUILT_IN_DOC_TYPES: Record<DocTypeEnum, { label: string }> = {
   other: { label: "Other" },
 };
 
+function parseDateRange(filename: string): { startMonth: string; startYear: string; endMonth: string; endYear: string } | null {
+  const dateRangePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})\s*[-–—]+\s*(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/;
+  const match = filename.match(dateRangePattern);
+  if (!match) return null;
+  const [, startMonth, , startYearRaw, endMonth, , endYearRaw] = match;
+  const sm = parseInt(startMonth);
+  const em = parseInt(endMonth);
+  if (sm < 1 || sm > 12 || em < 1 || em > 12) return null;
+  const startYear = startYearRaw.length === 2 ? `20${startYearRaw}` : startYearRaw;
+  const endYear = endYearRaw.length === 2 ? `20${endYearRaw}` : endYearRaw;
+  return { startMonth: sm.toString(), startYear, endMonth: em.toString(), endYear };
+}
+
 function guessDocType(filename: string): DocTypeEnum {
   const lower = filename.toLowerCase();
   if (lower.includes("t12") || lower.includes("trailing")) {
+    return "t12";
+  }
+  const dateRange = parseDateRange(filename);
+  if (dateRange) {
     return "t12";
   }
   if (lower.includes("p&l") || lower.includes("pnl") || lower.includes("profit") || lower.includes("income")) {
@@ -115,11 +132,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
   const createCustomTypeMutation = useMutation({
     mutationFn: async (name: string) => {
-      return apiRequest('/api/doc-intel/custom-document-types', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return apiRequest('POST', '/api/doc-intel/custom-document-types', { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/doc-intel/custom-document-types'] });
@@ -195,8 +208,9 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       const csrfToken = await ensureCsrfToken();
       const formData = new FormData();
       formData.append("file", staged.file);
-      formData.append("docType", staged.docType);
-      formData.append("year", staged.year);
+      formData.append("docType", staged.docType === 't12' ? 'pnl' : staged.docType);
+      formData.append("year", staged.docType === 't12' ? (staged.t12EndYear || staged.year) : staged.year);
+      formData.append("isT12", staged.docType === 't12' ? 'true' : 'false');
 
       if (staged.docType === 't12') {
         if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
@@ -313,10 +327,18 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
         progress: 0,
       };
       if (docType === 't12') {
-        base.t12StartMonth = (now.getMonth() + 1).toString();
-        base.t12StartYear = (now.getFullYear() - 1).toString();
-        base.t12EndMonth = (now.getMonth() + 1).toString();
-        base.t12EndYear = now.getFullYear().toString();
+        const parsed = parseDateRange(file.name);
+        if (parsed) {
+          base.t12StartMonth = parsed.startMonth;
+          base.t12StartYear = parsed.startYear;
+          base.t12EndMonth = parsed.endMonth;
+          base.t12EndYear = parsed.endYear;
+        } else {
+          base.t12StartMonth = (now.getMonth() + 1).toString();
+          base.t12StartYear = (now.getFullYear() - 1).toString();
+          base.t12EndMonth = (now.getMonth() + 1).toString();
+          base.t12EndYear = now.getFullYear().toString();
+        }
       }
       return base;
     });

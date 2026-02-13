@@ -221,7 +221,7 @@ export default function ProjectWorkspace() {
 
   const createOmMutation = useMutation({
     mutationFn: (data: { projectId: string; name: string; status: string; modelingProjectId: string }) =>
-      apiRequest('/api/om/oms', { method: 'POST', body: JSON.stringify(data) }),
+      apiRequest('POST', '/api/om/oms', data),
     onSuccess: (newOm: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/om/oms'] });
       toast({ title: "OM Created", description: "Offering Memorandum created successfully." });

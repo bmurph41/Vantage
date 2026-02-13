@@ -266,10 +266,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const promoteMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('/api/pnl/promote-to-actuals', {
-        method: 'POST',
-        body: JSON.stringify({ modelingProjectId: projectId })
-      });
+      return apiRequest('POST', '/api/pnl/promote-to-actuals', { modelingProjectId: projectId });
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals`] });

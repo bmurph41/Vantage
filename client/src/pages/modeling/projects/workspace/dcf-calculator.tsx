@@ -124,10 +124,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   // Real-time IRR calculation
   const calculateQuickIRR = useMutation({
     mutationFn: (input: any) =>
-      apiRequest('/api/dcf/quick-irr', {
-        method: 'POST',
-        body: JSON.stringify({ input }),
-      }),
+      apiRequest('POST', '/api/dcf/quick-irr', { input }),
   });
 
   const debouncedCalculate = useCallback(
