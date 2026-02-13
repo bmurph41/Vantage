@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AutosaveIndicator } from '@/components/ui/autosave-indicator';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { GrowthRatesTab } from '@/components/modeling/growth-rates/GrowthRatesTab';
+import { REVENUE_CATEGORIES } from '@/components/modeling/growth-rates';
 import type { AutoSaveStatus } from '@/hooks/use-local-autosave';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -540,10 +541,15 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
   // Storage type IDs for filtering
   const storageTypeIds = useMemo(() => storageTypeCategories.map(s => s.id), []);
 
-  // Non-storage revenue categories (excludes storage types like Wet Slips, Dry Racks, etc.)
   const nonStorageRevenueCategories = useMemo(() => {
-    return revenueCategories.filter(cat => !storageTypeIds.includes(cat.id));
-  }, [revenueCategories, storageTypeIds]);
+    const allRevCats = [
+      ...REVENUE_CATEGORIES.coreMarineRevenue,
+      ...REVENUE_CATEGORIES.retailAndService,
+      ...REVENUE_CATEGORIES.boats,
+      ...REVENUE_CATEGORIES.leasesAndHospitality,
+    ];
+    return allRevCats.map(cat => ({ id: cat.id, name: cat.label, icon: <cat.icon className="h-4 w-4" /> }));
+  }, []);
 
   // Storage revenue categories only
   const storageRevenueCategories = useMemo(() => {
@@ -773,16 +779,26 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       const loadedGrowth = assumptions.growthRatesByYear || assumptions.growthRates || getDefaultGrowthRates(activeScenarioType);
       const loadedExpense = assumptions.expenseGrowthByYear || assumptions.expenseGrowth || getDefaultExpenseGrowth(activeScenarioType);
 
+      const defaultRate = getDefaultGrowthRateValue(activeScenarioType);
+      let parsedGrowth: YearlyGrowthRates;
       if (loadedGrowth && typeof Object.values(loadedGrowth)[0] === 'number') {
-        setGrowthRates(convertFlatToYearly(loadedGrowth as Record<string, number>, holdPeriod, getDefaultGrowthRateValue(activeScenarioType)));
+        parsedGrowth = convertFlatToYearly(loadedGrowth as Record<string, number>, holdPeriod, defaultRate);
       } else {
-        const yearly = loadedGrowth as YearlyGrowthRates;
-        const normalized: YearlyGrowthRates = {};
-        for (const [key, val] of Object.entries(yearly)) {
-          normalized[key] = normalizeToYearlyArray(val, holdPeriod, getDefaultGrowthRateValue(activeScenarioType));
+        parsedGrowth = {};
+        for (const [key, val] of Object.entries(loadedGrowth as YearlyGrowthRates)) {
+          parsedGrowth[key] = normalizeToYearlyArray(val, holdPeriod, defaultRate);
         }
-        setGrowthRates(normalized);
       }
+      const allRevCatIds = [
+        ...REVENUE_CATEGORIES.coreMarineRevenue,
+        ...REVENUE_CATEGORIES.retailAndService,
+        ...REVENUE_CATEGORIES.boats,
+        ...REVENUE_CATEGORIES.leasesAndHospitality,
+      ];
+      allRevCatIds.forEach(cat => {
+        if (!parsedGrowth[cat.id]) parsedGrowth[cat.id] = Array(holdPeriod).fill(defaultRate);
+      });
+      setGrowthRates(parsedGrowth);
 
       if (loadedExpense && typeof Object.values(loadedExpense)[0] === 'number') {
         setExpenseGrowth(convertFlatToYearly(loadedExpense as Record<string, number>, holdPeriod, getDefaultExpenseRateValue(activeScenarioType)));
@@ -847,6 +863,15 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     const rate = getDefaultGrowthRateValue(scenarioType);
     const defaultGrowth: YearlyGrowthRates = {};
     allRevenueCategories.forEach(cat => { defaultGrowth[cat.id] = Array(holdPeriod).fill(rate); });
+    const allRevCatIds = [
+      ...REVENUE_CATEGORIES.coreMarineRevenue,
+      ...REVENUE_CATEGORIES.retailAndService,
+      ...REVENUE_CATEGORIES.boats,
+      ...REVENUE_CATEGORIES.leasesAndHospitality,
+    ];
+    allRevCatIds.forEach(cat => {
+      if (!defaultGrowth[cat.id]) defaultGrowth[cat.id] = Array(holdPeriod).fill(rate);
+    });
     return defaultGrowth;
   }
 
