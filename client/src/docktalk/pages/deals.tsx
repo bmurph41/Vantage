@@ -88,6 +88,13 @@ interface MAArticlesResponse {
   total: number;
 }
 
+interface MASpotlightAnalytics {
+  totalArticles: number;
+  recentCount: number;
+  monthlyArticles: Array<{ month: string; count: number }>;
+  byCategory: Array<{ category: string; count: number }>;
+}
+
 const TRANSACTION_TYPES = [
   "M&A",
   "Financing",
@@ -246,6 +253,16 @@ export default function DealsPage() {
 
   const { data: maArticlesData, isLoading: maArticlesLoading } = useQuery<MAArticlesResponse>({
     queryKey: [maArticlesUrl],
+    enabled: !!user,
+  });
+
+  // Query for M&A Spotlight analytics (article-based monthly counts)
+  const maAnalyticsParams = new URLSearchParams();
+  if (regionFilter) maAnalyticsParams.append("region", regionFilter);
+  const maAnalyticsUrl = `/api/docktalk/ma-spotlight-analytics${maAnalyticsParams.toString() ? `?${maAnalyticsParams.toString()}` : ''}`;
+
+  const { data: maAnalytics } = useQuery<MASpotlightAnalytics>({
+    queryKey: [maAnalyticsUrl],
     enabled: !!user,
   });
 
@@ -435,26 +452,40 @@ export default function DealsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Monthly Trends Chart */}
+                {/* Monthly Trends Chart - based on M&A/Marina Sale tagged articles */}
                 <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle>Deal Flow Trends</CardTitle>
-                    <CardDescription>Monthly deal activity (last 12 months)</CardDescription>
+                    <CardDescription>
+                      Monthly M&A / Marina Sale article activity (last 12 months)
+                      {maAnalytics && (
+                        <span className="ml-2 text-xs font-medium">
+                          ({maAnalytics.totalArticles} total articles tracked)
+                        </span>
+                      )}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={analytics.monthlyDeals.map(item => ({
-                        month: format(parse(item.month, 'yyyy-MM', new Date()), 'MMM yyyy'),
-                        count: item.count
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} name="Deals" />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {maAnalytics && maAnalytics.monthlyArticles.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={maAnalytics.monthlyArticles.map(item => ({
+                          month: format(parse(item.month, 'yyyy-MM', new Date()), 'MMM yyyy'),
+                          count: item.count
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} name="Articles" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No M&A or Marina Sale articles found</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

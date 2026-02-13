@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Calendar, Anchor } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ComposedChart, Area } from 'recharts';
+import { TrendingUp, TrendingDown, Minus, Calendar, Anchor, BarChart3 } from "lucide-react";
 
 interface YearlyRateData {
   year: number;
@@ -170,6 +170,53 @@ export default function RcTrendsView({ yearlyData, boatSizeData, isLoading }: Rc
                       dot={{ r: 3 }}
                     />
                   </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Rate Data Volume by Year */}
+          <Card data-testid="card-rate-data-volume">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Rate Data Volume by Year
+                  </CardTitle>
+                  <CardDescription className="mt-1">Number of rate entries and average rate tracked per year</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={sortedYearlyData} margin={{ left: 10, right: 20, top: 10, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="year" className="text-xs" stroke="currentColor" />
+                    <YAxis yAxisId="left" className="text-xs" stroke="currentColor" allowDecimals={false} />
+                    <YAxis 
+                      yAxisId="right" 
+                      orientation="right" 
+                      className="text-xs" 
+                      stroke="currentColor"
+                      tickFormatter={(value) => `$${value.toFixed(0)}`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                      formatter={(value: any, name: string) => {
+                        if (name === 'Avg Rate/Ft') return [formatRatePerFt(value), name];
+                        return [value.toLocaleString(), name];
+                      }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="count" fill="#3b82f6" name="Rate Entries" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="avgRatePerFt" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Avg Rate/Ft" />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>

@@ -1857,6 +1857,67 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
+  app.get("/api/docktalk/ma-spotlight-analytics", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const region = req.query.region as string | undefined;
+
+      const allArticles = await dockTalkStorage.getArticles(null, {
+        categories: ['M&A', 'Marina Sale'],
+        region,
+        limit: 500,
+        offset: 0,
+      });
+
+      const now = new Date();
+      const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+      const monthlyMap = new Map<string, number>();
+      const categoryMap = new Map<string, number>();
+
+      allArticles.forEach(article => {
+        if (article.publishedAt) {
+          const pubDate = new Date(article.publishedAt);
+          if (pubDate >= twelveMonthsAgo) {
+            const monthKey = `${pubDate.getFullYear()}-${String(pubDate.getMonth() + 1).padStart(2, '0')}`;
+            monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+          }
+        }
+        if (article.categories) {
+          (article.categories as string[]).forEach(cat => {
+            if (cat === 'M&A' || cat === 'Marina Sale') {
+              categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
+            }
+          });
+        }
+      });
+
+      const monthlyArticles: Array<{ month: string; count: number }> = [];
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthlyArticles.push({
+          month: monthKey,
+          count: monthlyMap.get(monthKey) || 0,
+        });
+      }
+
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const recentCount = allArticles.filter(a => a.publishedAt && new Date(a.publishedAt) >= thirtyDaysAgo).length;
+
+      const byCategory = Array.from(categoryMap.entries()).map(([category, count]) => ({ category, count }));
+
+      res.json({
+        totalArticles: allArticles.length,
+        recentCount,
+        monthlyArticles,
+        byCategory,
+      });
+    } catch (error) {
+      console.error("Error fetching M&A spotlight analytics:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // M&A Spotlight articles - articles tagged with M&A or Marina Sale categories
   app.get("/api/docktalk/ma-spotlight-articles", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
     try {

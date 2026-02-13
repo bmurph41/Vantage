@@ -89,7 +89,7 @@ const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#e
 
 export default function TrendsView() {
   const [filters, setFilters] = useState<TrendsFilters>({});
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("dealflow");
 
   const { data: trendsData, isLoading, refetch, isFetching } = useQuery<MarketTrendsData>({
     queryKey: ["/api/sales-comps/analytics/trends", filters],
@@ -268,12 +268,121 @@ export default function TrendsView() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-md">
+        <TabsList className="grid grid-cols-5 w-full max-w-lg">
+          <TabsTrigger value="dealflow">Deal Flow</TabsTrigger>
           <TabsTrigger value="overview">Volume & Price</TabsTrigger>
           <TabsTrigger value="regional">Regional</TabsTrigger>
           <TabsTrigger value="repeat">Repeat Sales</TabsTrigger>
           <TabsTrigger value="brokers">Top Brokers</TabsTrigger>
         </TabsList>
+
+        {/* Deal Flow Tab */}
+        <TabsContent value="dealflow" className="space-y-6 mt-6">
+          {/* Quarterly Deal Flow Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Quarterly Transaction Activity</CardTitle>
+              <CardDescription>Number of marina sales recorded per quarter</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                {quarterlyTrends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={quarterlyTrends}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="label" className="text-xs" />
+                      <YAxis yAxisId="left" className="text-xs" allowDecimals={false} />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right" 
+                        className="text-xs"
+                        tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'Volume') return [formatCurrency(value), name];
+                          return [value.toLocaleString(), name];
+                        }}
+                      />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="transactionCount" fill="#3b82f6" name="Transactions" radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="totalVolume" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Volume" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <BarChart3 className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">No quarterly data available</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Yearly Deal Flow Trend Line */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Annual Deal Flow</CardTitle>
+              <CardDescription>Year-over-year transaction count and total volume</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={yearlyTrends}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="year" className="text-xs" />
+                    <YAxis yAxisId="left" className="text-xs" allowDecimals={false} />
+                    <YAxis 
+                      yAxisId="right" 
+                      orientation="right" 
+                      className="text-xs"
+                      tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Total Volume') return [formatCurrency(value), name];
+                        return [value.toLocaleString(), name];
+                      }}
+                    />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="transactionCount" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} name="Transactions" />
+                    <Area yAxisId="right" type="monotone" dataKey="totalVolume" fill="#3b82f6" fillOpacity={0.1} stroke="#3b82f6" name="Total Volume" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cap Rate Trends */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Cap Rate Trends</CardTitle>
+              <CardDescription>Average cap rate by year</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={yearlyTrends.filter(y => y.avgCapRate > 0)}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="year" className="text-xs" />
+                    <YAxis 
+                      className="text-xs"
+                      tickFormatter={(value) => `${value.toFixed(1)}%`}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
+                      formatter={(value: number) => [`${value.toFixed(2)}%`, 'Avg Cap Rate']}
+                    />
+                    <Line type="monotone" dataKey="avgCapRate" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} name="Avg Cap Rate" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Volume & Price Trends Tab */}
         <TabsContent value="overview" className="space-y-6 mt-6">
