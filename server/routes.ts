@@ -16947,22 +16947,22 @@ Current context: Project ${req.params.projectId}`;
       const updates: Record<string, any> = { updatedAt: new Date() };
 
       if (priceRoundingDigits !== undefined) {
-        if (typeof priceRoundingDigits !== 'number' || priceRoundingDigits < 0 || priceRoundingDigits > 6) {
-          return res.status(400).json({ error: 'priceRoundingDigits must be a number between 0 and 6' });
+        if (typeof priceRoundingDigits !== 'number' || priceRoundingDigits < -1 || priceRoundingDigits > 6) {
+          return res.status(400).json({ error: 'priceRoundingDigits must be a number between -1 and 6' });
         }
         updates.priceRoundingDigits = priceRoundingDigits;
       }
 
       if (ebitdaRoundingDigits !== undefined) {
-        if (typeof ebitdaRoundingDigits !== 'number' || ebitdaRoundingDigits < 0 || ebitdaRoundingDigits > 6) {
-          return res.status(400).json({ error: 'ebitdaRoundingDigits must be a number between 0 and 6' });
+        if (typeof ebitdaRoundingDigits !== 'number' || ebitdaRoundingDigits < -1 || ebitdaRoundingDigits > 6) {
+          return res.status(400).json({ error: 'ebitdaRoundingDigits must be a number between -1 and 6' });
         }
         updates.ebitdaRoundingDigits = ebitdaRoundingDigits;
       }
 
       if (lineItemRoundingDigits !== undefined) {
-        if (typeof lineItemRoundingDigits !== 'number' || lineItemRoundingDigits < 0 || lineItemRoundingDigits > 6) {
-          return res.status(400).json({ error: 'lineItemRoundingDigits must be a number between 0 and 6' });
+        if (typeof lineItemRoundingDigits !== 'number' || lineItemRoundingDigits < -1 || lineItemRoundingDigits > 6) {
+          return res.status(400).json({ error: 'lineItemRoundingDigits must be a number between -1 and 6' });
         }
         updates.lineItemRoundingDigits = lineItemRoundingDigits;
       }

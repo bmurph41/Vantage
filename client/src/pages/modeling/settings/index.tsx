@@ -144,7 +144,8 @@ type DisplayPreferences = {
 };
 
 const ROUNDING_OPTIONS = [
-  { value: 0, label: 'No rounding', example: '$3,287,567' },
+  { value: -1, label: 'No rounding', example: '$3,287,567' },
+  { value: 0, label: 'Nearest $1', example: '$3,287,567' },
   { value: 1, label: 'Nearest $10', example: '$3,287,570' },
   { value: 2, label: 'Nearest $100', example: '$3,287,600' },
   { value: 3, label: 'Nearest $1,000', example: '$3,288,000' },
@@ -154,7 +155,8 @@ const ROUNDING_OPTIONS = [
 ];
 
 const EBITDA_ROUNDING_OPTIONS = [
-  { value: 0, label: 'No rounding', example: '$1,287,567' },
+  { value: -1, label: 'No rounding', example: '$1,287,567' },
+  { value: 0, label: 'Nearest $1', example: '$1,287,567' },
   { value: 1, label: 'Nearest $10', example: '$1,287,570' },
   { value: 2, label: 'Nearest $100', example: '$1,287,600' },
   { value: 3, label: 'Nearest $1,000', example: '$1,288,000' },
@@ -164,7 +166,8 @@ const EBITDA_ROUNDING_OPTIONS = [
 ];
 
 const LINE_ITEM_ROUNDING_OPTIONS = [
-  { value: 0, label: 'No rounding', example: '$47,823' },
+  { value: -1, label: 'No rounding', example: '$47,823' },
+  { value: 0, label: 'Nearest $1', example: '$47,823' },
   { value: 1, label: 'Nearest $10', example: '$47,820' },
   { value: 2, label: 'Nearest $100', example: '$47,800' },
   { value: 3, label: 'Nearest $1,000', example: '$48,000' },

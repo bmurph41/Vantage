@@ -43,7 +43,7 @@ export function getGlobalPercentRoundingDecimals(): number {
 }
 
 function applyRounding(value: number, roundingDigits: number): number {
-  if (roundingDigits <= 0) return value;
+  if (roundingDigits < 0) return value;
   const factor = Math.pow(10, roundingDigits);
   return Math.round(value / factor) * factor;
 }
