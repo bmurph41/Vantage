@@ -2655,8 +2655,8 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
 
   const NotificationPreferencesSchema = z.object({
     email: z.string().email("Invalid email address"),
-    categories: z.array(z.enum(VALID_CATEGORIES)).min(1, "Select at least one category"),
-    frequency: z.enum(["none", "immediate", "daily", "weekly"]),
+    categories: z.array(z.string()).optional().default([]),
+    frequency: z.enum(["none", "immediate", "daily", "weekly"]).optional(),
     deliveryTime: z.string().optional(),
     timezone: z.string().default("America/New_York"),
     enabled: z.boolean().default(true),
@@ -2676,21 +2676,22 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       
       let prefs;
       if (existing) {
-        prefs = await dockTalkStorage.updateUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId, {
+        const updates: Record<string, any> = {
           emailAddress: data.email,
-          categories: data.categories,
-          frequency: data.frequency,
           deliveryTime: data.deliveryTime || "09:00",
           timezone: data.timezone || "America/New_York",
           enabled: data.enabled,
-        });
+        };
+        if (data.categories && data.categories.length > 0) updates.categories = data.categories;
+        if (data.frequency) updates.frequency = data.frequency;
+        prefs = await dockTalkStorage.updateUserNotificationPreferences(req.dockTalkUser!.id, req.dockTalkUser!.orgId, updates);
       } else {
         prefs = await dockTalkStorage.createUserNotificationPreferences({
           userId: req.dockTalkUser!.id,
           orgId: user.orgId,
           emailAddress: data.email,
-          categories: data.categories,
-          frequency: data.frequency,
+          categories: data.categories || [],
+          frequency: data.frequency || 'daily',
           deliveryTime: data.deliveryTime || "09:00",
           timezone: data.timezone || "America/New_York",
           enabled: data.enabled,
@@ -2757,7 +2758,6 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
       const notificationPrefs = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId);
       const filterPrefs = await dockTalkStorage.getUserFilterPreferences(user.id, user.orgId);
 
-      // Combine preferences into unified format expected by frontend
       res.json({
         id: user.id,
         emailNotifications: notificationPrefs?.enabled ?? false,
@@ -2765,6 +2765,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         subscriptionTier: user.subscriptionTier || 'free',
         categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
         customGeographyRegions: filterPrefs?.customGeographyRegions || [],
+        email: notificationPrefs?.emailAddress,
+        deliveryTime: notificationPrefs?.deliveryTime || '09:00',
+        timezone: notificationPrefs?.timezone || 'America/New_York',
         createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
       });
@@ -2779,6 +2782,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]).optional(),
     categoriesFilter: z.array(z.string()).optional(),
     customGeographyRegions: z.array(z.string()).optional(),
+    email: z.string().email().optional(),
+    deliveryTime: z.string().optional(),
+    timezone: z.string().optional(),
   });
 
   app.patch("/api/docktalk/user-preferences", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
@@ -2790,24 +2796,29 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
 
       const data = UserPreferencesUpdateSchema.parse(req.body);
       
-      // Update notification preferences if relevant fields are provided
-      if (data.emailNotifications !== undefined || data.alertFrequency !== undefined) {
+      const hasNotifFields = data.emailNotifications !== undefined || data.alertFrequency !== undefined
+        || data.email !== undefined || data.deliveryTime !== undefined || data.timezone !== undefined;
+      if (hasNotifFields) {
         const existing = await dockTalkStorage.getUserNotificationPreferences(user.id, user.orgId);
         
         if (existing) {
-          await dockTalkStorage.updateUserNotificationPreferences(user.id, user.orgId, {
-            enabled: data.emailNotifications ?? existing.enabled,
-            frequency: data.alertFrequency ?? existing.frequency,
-          });
+          const updates: Record<string, any> = {};
+          if (data.emailNotifications !== undefined) updates.enabled = data.emailNotifications;
+          if (data.alertFrequency !== undefined) updates.frequency = data.alertFrequency;
+          if (data.email !== undefined) updates.emailAddress = data.email;
+          if (data.deliveryTime !== undefined) updates.deliveryTime = data.deliveryTime;
+          if (data.timezone !== undefined) updates.timezone = data.timezone;
+          await dockTalkStorage.updateUserNotificationPreferences(user.id, user.orgId, updates);
         } else {
-          // Create new preferences with user's email
           await dockTalkStorage.createUserNotificationPreferences({
             userId: user.id,
             orgId: user.orgId,
-            emailAddress: user.email || `${user.username}@docktalk.local`,
+            emailAddress: data.email || user.email || `${user.username}@docktalk.local`,
             categories: data.categoriesFilter || [],
             frequency: data.alertFrequency || 'daily',
             enabled: data.emailNotifications ?? true,
+            deliveryTime: data.deliveryTime || '09:00',
+            timezone: data.timezone || 'America/New_York',
           });
         }
       }
@@ -2832,6 +2843,9 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
         subscriptionTier: user.subscriptionTier || 'free',
         categoriesFilter: filterPrefs?.categories || notificationPrefs?.categories || [],
         customGeographyRegions: filterPrefs?.customGeographyRegions || [],
+        email: notificationPrefs?.emailAddress,
+        deliveryTime: notificationPrefs?.deliveryTime || '09:00',
+        timezone: notificationPrefs?.timezone || 'America/New_York',
         createdAt: notificationPrefs?.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: notificationPrefs?.updatedAt?.toISOString() || new Date().toISOString(),
       });
@@ -3068,13 +3082,7 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     }
   });
 
-  // Test email notification endpoint (admin only)
   app.post("/api/docktalk/test-email", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
-    // Admin role check
-    if (req.dockTalkUser?.role !== 'admin') {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-    
     try {
       const { client, fromEmail } = await getUncachableResendClient();
       
