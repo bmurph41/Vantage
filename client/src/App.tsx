@@ -2094,7 +2094,7 @@ function Router() {
       <Route path="/modeling/exit-strategies">
         {() => (
           <UnifiedLayout>
-            <ScenariosIndex />
+            <ExitStrategiesIndex />
           </UnifiedLayout>
         )}
       </Route>
