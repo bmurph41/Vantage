@@ -15,7 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Calculator, 
   TrendingUp, 
-  DollarSign,
   Percent,
   BarChart3,
   Brain,
@@ -262,22 +261,13 @@ function SharedInputsPanel() {
 
 const exitTools = [
   { 
-    id: "tax", 
-    name: "Tax Calculator", 
-    shortName: "Tax",
-    description: "Capital gains & depreciation recapture analysis", 
+    id: "tax-proceeds", 
+    name: "Tax & Net Proceeds", 
+    shortName: "Tax & Proceeds",
+    description: "Capital gains tax analysis and net proceeds waterfall", 
     icon: Calculator,
     color: "text-red-500",
     bgColor: "bg-red-50"
-  },
-  { 
-    id: "net-proceeds", 
-    name: "Net Proceeds", 
-    shortName: "Proceeds",
-    description: "Cash-on-cash analysis at exit", 
-    icon: DollarSign,
-    color: "text-green-500",
-    bgColor: "bg-green-50"
   },
   { 
     id: "1031", 
@@ -354,7 +344,7 @@ const exitTools = [
 ];
 
 export default function ExitStrategiesPage() {
-  const [activeTab, setActiveTab] = useState("tax");
+  const [activeTab, setActiveTab] = useState("tax-proceeds");
   const [, navigate] = useLocation();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
@@ -525,12 +515,8 @@ export default function ExitStrategiesPage() {
             ))}
           </TabsList>
 
-          <TabsContent value="tax" className="mt-6">
-            <TaxCalculatorPanel />
-          </TabsContent>
-
-          <TabsContent value="net-proceeds" className="mt-6">
-            <NetProceedsPanel />
+          <TabsContent value="tax-proceeds" className="mt-6">
+            <TaxAndProceedsPanel />
           </TabsContent>
 
           <TabsContent value="1031" className="mt-6">
@@ -570,28 +556,29 @@ export default function ExitStrategiesPage() {
   );
 }
 
-function TaxCalculatorPanel() {
+function TaxAndProceedsPanel() {
   const { masterInputs } = useExitStrategiesStore();
 
-  const calculateTax = () => {
-    const sale = masterInputs.salePrice;
-    const basis = masterInputs.costBasis;
-    const depreciation = masterInputs.depreciationTaken;
-    const fedRate = masterInputs.federalTaxRate / 100;
-    const stRate = masterInputs.stateTaxRate / 100;
-    
-    const capitalGain = sale - basis;
-    const federalTax = capitalGain * fedRate;
-    const stateTax = capitalGain * stRate;
-    const depTax = depreciation * 0.25;
-    const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
-    const totalTax = federalTax + stateTax + depTax + niit;
-    const netProceeds = sale - totalTax;
-    
-    return { capitalGain, federalTax, stateTax, depTax, niit, totalTax, netProceeds };
-  };
+  const sale = masterInputs.salePrice;
+  const basis = masterInputs.costBasis;
+  const depreciation = masterInputs.depreciationTaken;
+  const fedRate = masterInputs.federalTaxRate / 100;
+  const stRate = masterInputs.stateTaxRate / 100;
+  const loan = masterInputs.currentDebtBalance;
+  const closingCosts = masterInputs.closingCosts;
+  const brokerPct = masterInputs.brokerFeePercent / 100;
 
-  const results = calculateTax();
+  const capitalGain = sale - basis;
+  const federalTax = capitalGain * fedRate;
+  const stateTax = capitalGain * stRate;
+  const depTax = depreciation * 0.25;
+  const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
+  const totalTax = federalTax + stateTax + depTax + niit;
+
+  const brokerCost = sale * brokerPct;
+  const netSaleProceeds = sale - brokerCost - closingCosts;
+  const totalDeductions = loan + closingCosts + brokerCost + totalTax;
+  const netProceeds = sale - totalDeductions;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -599,10 +586,10 @@ function TaxCalculatorPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5 text-red-500" />
-            Tax Calculator
+            Sale & Tax Inputs
           </CardTitle>
           <CardDescription>
-            Using master inputs: Sale Price, Cost Basis, Depreciation, and Tax Rates
+            Values from Master Inputs panel
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -627,92 +614,6 @@ function TaxCalculatorPanel() {
               <span className="text-muted-foreground text-sm">Federal Rate / State Rate</span>
               <span className="font-medium">{masterInputs.federalTaxRate}% / {masterInputs.stateTaxRate}%</span>
             </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Edit these values in the Master Inputs panel above
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Tax Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Capital Gain</span>
-              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(results.capitalGain)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Federal Tax</span>
-              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(results.federalTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">State Tax</span>
-              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(results.stateTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
-              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(results.depTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">NIIT (3.8%)</span>
-              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(results.niit)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
-              <span className="font-semibold">Total Tax Liability</span>
-              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(results.totalTax)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-              <span className="font-semibold">Net Proceeds After Tax</span>
-              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(results.netProceeds)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function NetProceedsPanel() {
-  const { masterInputs } = useExitStrategiesStore();
-  const [taxes, setTaxes] = useState<string>("300000");
-
-  const calculate = () => {
-    const sale = masterInputs.salePrice;
-    const loan = masterInputs.currentDebtBalance;
-    const closing = masterInputs.closingCosts;
-    const brokerPct = masterInputs.brokerFeePercent / 100;
-    const tax = parseFloat(taxes) || 0;
-    
-    const brokerCost = sale * brokerPct;
-    const totalDeductions = loan + closing + brokerCost + tax;
-    const netProceeds = sale - totalDeductions;
-    
-    return { brokerCost, totalDeductions, netProceeds };
-  };
-
-  const results = calculate();
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
-            Net Proceeds Calculator
-          </CardTitle>
-          <CardDescription>
-            Using master inputs plus estimated taxes
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Sale Price</span>
-              <span className="font-medium">{formatCurrency(masterInputs.salePrice)}</span>
-            </div>
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground text-sm">Loan Balance</span>
               <span className="font-medium">{formatCurrency(masterInputs.currentDebtBalance)}</span>
@@ -726,42 +627,75 @@ function NetProceedsPanel() {
               <span className="font-medium">{masterInputs.brokerFeePercent}%</span>
             </div>
           </div>
-          <div>
-            <Label>Estimated Taxes (this tab only)</Label>
-            <CurrencyInput value={taxes} onChange={setTaxes} />
-          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Edit these values in the Master Inputs panel above
+          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Proceeds Summary</CardTitle>
+          <CardTitle>Tax Breakdown</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Gross Sale Price</span>
-              <span className="font-semibold">{formatCurrency(masterInputs.salePrice)}</span>
+              <span className="text-muted-foreground">Capital Gain</span>
+              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(capitalGain)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Loan Payoff</span>
-              <span className="text-red-600">-{formatCurrency(masterInputs.currentDebtBalance)}</span>
+              <span className="text-muted-foreground">Federal Tax</span>
+              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(federalTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">State Tax</span>
+              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(stateTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
+              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(depTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">NIIT (3.8%)</span>
+              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(niit)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
+              <span className="font-semibold">Total Tax Liability</span>
+              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(totalTax)}</span>
+            </div>
+          </div>
+
+          <div className="border-t my-4" />
+
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm">Net Proceeds Waterfall</h4>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Gross Sale</span>
+              <span className="font-semibold">{formatCurrency(sale)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Broker Commission</span>
-              <span className="text-red-600">-{formatCurrency(results.brokerCost)}</span>
+              <span className="text-red-600">-{formatCurrency(brokerCost)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Closing Costs</span>
-              <span className="text-red-600">-{formatCurrency(masterInputs.closingCosts)}</span>
+              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Taxes</span>
-              <span className="text-red-600">-{formatCurrency(taxes)}</span>
+              <span className="text-muted-foreground">Net Sale Proceeds</span>
+              <span className="font-semibold">{formatCurrency(netSaleProceeds)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Loan Payoff</span>
+              <span className="text-red-600">-{formatCurrency(loan)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Total Taxes</span>
+              <span className="text-red-600">-{formatCurrency(totalTax)}</span>
             </div>
             <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
               <span className="font-semibold">Net Cash Proceeds</span>
-              <span className="font-bold text-green-600">{formatCurrency(results.netProceeds)}</span>
+              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(netProceeds)}</span>
             </div>
           </div>
         </CardContent>

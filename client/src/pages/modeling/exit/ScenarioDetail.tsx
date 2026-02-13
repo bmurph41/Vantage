@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   ArrowLeft, 
   Calculator, 
-  DollarSign, 
   RefreshCcw, 
   Landmark,
   HandCoins,
@@ -41,8 +40,7 @@ export default function ExitScenarioDetail({ projectId, scenarioId }: ScenarioDe
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const tools = [
-    { id: "tax", name: "Tax Calculator", icon: Calculator, path: `/tax?scenario=${scenarioId}` },
-    { id: "net-proceeds", name: "Net Proceeds", icon: DollarSign, path: `/net-proceeds?scenario=${scenarioId}` },
+    { id: "tax-proceeds", name: "Tax & Net Proceeds", icon: Calculator, path: `/tax?scenario=${scenarioId}` },
     { id: "1031", name: "1031 Exchange", icon: RefreshCcw, path: `/1031?scenario=${scenarioId}` },
     { id: "dst", name: "DST Analysis", icon: Landmark, path: `/dst?scenario=${scenarioId}` },
     { id: "seller-financing", name: "Seller Financing", icon: HandCoins, path: `/seller-financing?scenario=${scenarioId}` },

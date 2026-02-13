@@ -30,22 +30,13 @@ interface ExitDashboardProps {
 
 const exitTools = [
   { 
-    id: "tax", 
-    name: "Tax Calculator", 
-    description: "Capital gains & depreciation recapture analysis", 
+    id: "tax-proceeds", 
+    name: "Tax & Net Proceeds", 
+    description: "Capital gains tax analysis and net proceeds waterfall", 
     icon: Calculator,
     path: "/tax",
     color: "text-red-500",
     bgColor: "bg-red-50"
-  },
-  { 
-    id: "net-proceeds", 
-    name: "Net Proceeds", 
-    description: "Cash-on-cash analysis at exit", 
-    icon: DollarSign,
-    path: "/net-proceeds",
-    color: "text-green-500",
-    bgColor: "bg-green-50"
   },
   { 
     id: "1031", 

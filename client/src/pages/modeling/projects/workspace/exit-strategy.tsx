@@ -184,22 +184,13 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
 
 const exitTools = [
   { 
-    id: "tax", 
-    name: "Tax Calculator", 
-    shortName: "Tax",
-    description: "Capital gains & depreciation recapture analysis", 
+    id: "tax-proceeds", 
+    name: "Tax & Net Proceeds", 
+    shortName: "Tax & Proceeds",
+    description: "Capital gains tax analysis and net proceeds waterfall", 
     icon: Calculator,
     color: "text-red-500",
     bgColor: "bg-red-50"
-  },
-  { 
-    id: "net-proceeds", 
-    name: "Net Proceeds", 
-    shortName: "Proceeds",
-    description: "Cash-on-cash analysis at exit", 
-    icon: DollarSign,
-    color: "text-green-500",
-    bgColor: "bg-green-50"
   },
   { 
     id: "1031", 
@@ -295,7 +286,7 @@ const exitTools = [
 
 export default function WorkspaceExitStrategy({ projectId, onTabChange }: WorkspaceExitStrategyProps) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState("tax");
+  const [activeTab, setActiveTab] = useState("tax-proceeds");
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [scenarioResults, setScenarioResults] = useState<ExitScenarioResult[]>([]);
 
@@ -547,16 +538,12 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           ))}
         </TabsList>
 
-        <TabsContent value="tax" className="mt-6">
-          <TaxCalculatorPanel 
+        <TabsContent value="tax-proceeds" className="mt-6">
+          <TaxAndProceedsPanel 
             salePrice={calculatedSalePrice.toString()}
             costBasis={purchasePrice.toString()}
             holdPeriod={holdPeriod.toString()}
           />
-        </TabsContent>
-
-        <TabsContent value="net-proceeds" className="mt-6">
-          <NetProceedsPanel salePrice={calculatedSalePrice.toString()} />
         </TabsContent>
 
         <TabsContent value="1031" className="mt-6">
@@ -636,23 +623,26 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
   );
 }
 
-interface TaxCalculatorPanelProps {
+interface TaxAndProceedsPanelProps {
   salePrice: string;
   costBasis: string;
   holdPeriod: string;
 }
 
-function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCostBasis, holdPeriod: initialHoldPeriod }: TaxCalculatorPanelProps) {
+function TaxAndProceedsPanel({ salePrice: initialSalePrice, costBasis: initialCostBasis, holdPeriod: initialHoldPeriod }: TaxAndProceedsPanelProps) {
   const [salePriceLinked, setSalePriceLinked] = useState(true);
   const [costBasisLinked, setCostBasisLinked] = useState(true);
   const [holdPeriodLinked, setHoldPeriodLinked] = useState(true);
-  
+
   const [salePrice, setSalePrice] = useState<string>(initialSalePrice);
   const [costBasis, setCostBasis] = useState<string>(initialCostBasis);
   const [holdingPeriod, setHoldingPeriod] = useState<string>(initialHoldPeriod);
   const [depreciationRecapture, setDepreciationRecapture] = useState<string>("500000");
   const [taxRate, setTaxRate] = useState<string>("20");
   const [stateRate, setStateRate] = useState<string>("5");
+  const [loanBalance, setLoanBalance] = useState<string>("2500000");
+  const [closingCosts, setClosingCosts] = useState<string>("150000");
+  const [brokerFee, setBrokerFee] = useState<string>("5");
 
   useEffect(() => {
     if (salePriceLinked) setSalePrice(initialSalePrice);
@@ -666,36 +656,37 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
     if (holdPeriodLinked) setHoldingPeriod(initialHoldPeriod);
   }, [initialHoldPeriod, holdPeriodLinked]);
 
-  const calculateTax = () => {
-    const sale = parseFloat(salePrice) || 0;
-    const basis = parseFloat(costBasis) || 0;
-    const depreciation = parseFloat(depreciationRecapture) || 0;
-    const fedRate = parseFloat(taxRate) / 100 || 0.20;
-    const stRate = parseFloat(stateRate) / 100 || 0.05;
-    
-    const capitalGain = sale - basis;
-    const federalTax = capitalGain * fedRate;
-    const stateTax = capitalGain * stRate;
-    const depTax = depreciation * 0.25;
-    const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
-    const totalTax = federalTax + stateTax + depTax + niit;
-    const netProceeds = sale - totalTax;
-    
-    return { capitalGain, federalTax, stateTax, depTax, niit, totalTax, netProceeds };
-  };
+  const sale = parseFloat(salePrice) || 0;
+  const basis = parseFloat(costBasis) || 0;
+  const depreciation = parseFloat(depreciationRecapture) || 0;
+  const fedRate = parseFloat(taxRate) / 100 || 0.20;
+  const stRate = parseFloat(stateRate) / 100 || 0.05;
 
-  const results = calculateTax();
+  const capitalGain = sale - basis;
+  const federalTax = capitalGain * fedRate;
+  const stateTax = capitalGain * stRate;
+  const depTax = depreciation * 0.25;
+  const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
+  const totalTax = federalTax + stateTax + depTax + niit;
+
+  const brokerPct = parseFloat(brokerFee) / 100 || 0;
+  const closing = parseFloat(closingCosts) || 0;
+  const loan = parseFloat(loanBalance) || 0;
+  const brokerCost = sale * brokerPct;
+  const netSaleProceeds = sale - brokerCost - closing;
+  const proceedsAfterDebt = netSaleProceeds - loan;
+  const netCashProceeds = proceedsAfterDebt - totalTax;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5 text-red-500" />
-            Tax Calculator
+            Sale & Tax Inputs
           </CardTitle>
           <CardDescription>
-            Calculate capital gains, depreciation recapture, and state taxes
+            Capital gains tax analysis and net proceeds waterfall
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -705,8 +696,8 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
                 Sale Price
                 {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
               </Label>
-              <CurrencyInput 
-                value={salePrice} 
+              <CurrencyInput
+                value={salePrice}
                 onChange={(v) => { setSalePrice(v); setSalePriceLinked(false); }}
                 linked={salePriceLinked}
                 onUnlink={() => setSalePriceLinked(false)}
@@ -718,20 +709,12 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
                 Cost Basis
                 {costBasisLinked && <Link2 className="h-3 w-3 text-blue-500" />}
               </Label>
-              <CurrencyInput 
-                value={costBasis} 
+              <CurrencyInput
+                value={costBasis}
                 onChange={(v) => { setCostBasis(v); setCostBasisLinked(false); }}
                 linked={costBasisLinked}
                 onUnlink={() => setCostBasisLinked(false)}
                 data-testid="input-cost-basis"
-              />
-            </div>
-            <div>
-              <Label>Depreciation Recapture</Label>
-              <CurrencyInput 
-                value={depreciationRecapture} 
-                onChange={setDepreciationRecapture}
-                data-testid="input-depreciation"
               />
             </div>
             <div>
@@ -740,9 +723,9 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
                 {holdPeriodLinked && <Link2 className="h-3 w-3 text-blue-500" />}
               </Label>
               <div className="relative">
-                <Input 
-                  type="number" 
-                  value={holdingPeriod} 
+                <Input
+                  type="number"
+                  value={holdingPeriod}
                   onChange={(e) => { setHoldingPeriod(e.target.value); setHoldPeriodLinked(false); }}
                   data-testid="input-holding-period"
                   className={holdPeriodLinked ? "pr-10 border-blue-300 bg-blue-50/50" : ""}
@@ -751,7 +734,7 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button 
+                        <button
                           onClick={() => setHoldPeriodLinked(false)}
                           className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-blue-100 rounded"
                           type="button"
@@ -768,124 +751,32 @@ function TaxCalculatorPanel({ salePrice: initialSalePrice, costBasis: initialCos
               </div>
             </div>
             <div>
+              <Label>Depreciation Recapture</Label>
+              <CurrencyInput
+                value={depreciationRecapture}
+                onChange={setDepreciationRecapture}
+                data-testid="input-depreciation"
+              />
+            </div>
+            <div>
               <Label>Federal Cap Gains Rate</Label>
-              <PercentInput 
-                value={taxRate} 
+              <PercentInput
+                value={taxRate}
                 onChange={setTaxRate}
                 data-testid="input-fed-rate"
               />
             </div>
             <div>
               <Label>State Tax Rate</Label>
-              <PercentInput 
-                value={stateRate} 
+              <PercentInput
+                value={stateRate}
                 onChange={setStateRate}
                 data-testid="input-state-rate"
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Tax Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Capital Gain</span>
-              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(results.capitalGain)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Federal Tax</span>
-              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(results.federalTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">State Tax</span>
-              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(results.stateTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
-              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(results.depTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">NIIT (3.8%)</span>
-              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(results.niit)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
-              <span className="font-semibold">Total Tax Liability</span>
-              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(results.totalTax)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-              <span className="font-semibold">Net Proceeds After Tax</span>
-              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(results.netProceeds)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-interface NetProceedsPanelProps {
-  salePrice: string;
-}
-
-function NetProceedsPanel({ salePrice: initialSalePrice }: NetProceedsPanelProps) {
-  const [salePriceLinked, setSalePriceLinked] = useState(true);
-  const [salePrice, setSalePrice] = useState<string>(initialSalePrice);
-  const [loanBalance, setLoanBalance] = useState<string>("2500000");
-  const [closingCosts, setClosingCosts] = useState<string>("150000");
-  const [brokerFee, setBrokerFee] = useState<string>("5");
-  const [taxes, setTaxes] = useState<string>("300000");
-
-  useEffect(() => {
-    if (salePriceLinked) setSalePrice(initialSalePrice);
-  }, [initialSalePrice, salePriceLinked]);
-
-  const calculate = () => {
-    const sale = parseFloat(salePrice) || 0;
-    const loan = parseFloat(loanBalance) || 0;
-    const closing = parseFloat(closingCosts) || 0;
-    const brokerPct = parseFloat(brokerFee) / 100 || 0;
-    const tax = parseFloat(taxes) || 0;
-    
-    const brokerCost = sale * brokerPct;
-    const totalDeductions = loan + closing + brokerCost + tax;
-    const netProceeds = sale - totalDeductions;
-    
-    return { brokerCost, totalDeductions, netProceeds };
-  };
-
-  const results = calculate();
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
-            Net Proceeds Calculator
-          </CardTitle>
-          <CardDescription>
-            Calculate cash proceeds after all deductions
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <div className="border-t my-2" />
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="flex items-center gap-1">
-                Sale Price
-                {salePriceLinked && <Link2 className="h-3 w-3 text-blue-500" />}
-              </Label>
-              <CurrencyInput 
-                value={salePrice} 
-                onChange={(v) => { setSalePrice(v); setSalePriceLinked(false); }}
-                linked={salePriceLinked}
-                onUnlink={() => setSalePriceLinked(false)}
-              />
-            </div>
             <div>
               <Label>Loan Balance</Label>
               <CurrencyInput value={loanBalance} onChange={setLoanBalance} />
@@ -898,9 +789,39 @@ function NetProceedsPanel({ salePrice: initialSalePrice }: NetProceedsPanelProps
               <Label>Broker Fee</Label>
               <PercentInput value={brokerFee} onChange={setBrokerFee} />
             </div>
-            <div className="col-span-2">
-              <Label>Estimated Taxes</Label>
-              <CurrencyInput value={taxes} onChange={setTaxes} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Capital Gain</span>
+              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(capitalGain)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Federal Tax</span>
+              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(federalTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">State Tax</span>
+              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(stateTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
+              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(depTax)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">NIIT (3.8%)</span>
+              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(niit)}</span>
+            </div>
+            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
+              <span className="font-semibold">Total Tax Liability</span>
+              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(totalTax)}</span>
             </div>
           </div>
         </CardContent>
@@ -908,33 +829,38 @@ function NetProceedsPanel({ salePrice: initialSalePrice }: NetProceedsPanelProps
 
       <Card>
         <CardHeader>
-          <CardTitle>Proceeds Summary</CardTitle>
+          <CardTitle>Net Proceeds Waterfall</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Gross Sale Price</span>
-              <span className="font-semibold">{formatCurrency(salePrice)}</span>
+              <span className="font-semibold">{formatCurrency(sale)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Loan Payoff</span>
-              <span className="text-red-600">-{formatCurrency(loanBalance)}</span>
+              <span className="text-muted-foreground">Less: Broker Commission</span>
+              <span className="text-red-600">-{formatCurrency(brokerCost)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Broker Commission</span>
-              <span className="text-red-600">-{formatCurrency(results.brokerCost)}</span>
+              <span className="text-muted-foreground">Less: Closing Costs</span>
+              <span className="text-red-600">-{formatCurrency(closing)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Closing Costs</span>
-              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
+              <span className="text-muted-foreground">= Net Sale Proceeds</span>
+              <span className="font-semibold">{formatCurrency(netSaleProceeds)}</span>
+            </div>
+            <div className="border-t my-1" />
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Less: Loan Payoff</span>
+              <span className="text-red-600">-{formatCurrency(loan)}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Taxes</span>
-              <span className="text-red-600">-{formatCurrency(taxes)}</span>
+              <span className="text-muted-foreground">Less: Total Taxes</span>
+              <span className="text-red-600">-{formatCurrency(totalTax)}</span>
             </div>
             <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-              <span className="font-semibold">Net Cash Proceeds</span>
-              <span className="font-bold text-green-600">{formatCurrency(results.netProceeds)}</span>
+              <span className="font-semibold">= Net Cash Proceeds</span>
+              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(netCashProceeds)}</span>
             </div>
           </div>
         </CardContent>
