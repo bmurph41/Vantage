@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Anchor, Warehouse, Fuel, Waves, ShoppingCart, Wrench, Package, Ship,
@@ -39,7 +39,27 @@ export function RateInput({
   size = 'default'
 }: RateInputProps) {
   const isModified = Math.abs(value - defaultValue) > 0.001;
+  const [localValue, setLocalValue] = useState(String(value));
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setLocalValue(String(value));
+    }
+  }, [value]);
   
+  const commitValue = () => {
+    isFocused.current = false;
+    const v = parseFloat(localValue);
+    if (!isNaN(v)) {
+      const clamped = Math.min(max, Math.max(min, v));
+      onChange(clamped);
+      setLocalValue(String(clamped));
+    } else {
+      setLocalValue(String(value));
+    }
+  };
+
   const decrement = () => onChange(Math.max(min, +(value - step).toFixed(2)));
   const increment = () => onChange(Math.min(max, +(value + step).toFixed(2)));
   
@@ -75,15 +95,28 @@ export function RateInput({
         
         <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
           <input
-            type="number"
-            value={value}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+            type="text"
+            inputMode="decimal"
+            value={localValue}
+            onFocus={(e) => {
+              isFocused.current = true;
+              e.target.select();
             }}
-            step={step}
-            min={min}
-            max={max}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === '' || raw === '-' || /^-?\d*\.?\d*$/.test(raw)) {
+                setLocalValue(raw);
+                const v = parseFloat(raw);
+                if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+              }
+            }}
+            onBlur={commitValue}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitValue();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
             className={cn(
               "w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none",
               "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
@@ -141,6 +174,26 @@ export function CompactYearRateInput({
   step = 0.5,
 }: CompactYearRateInputProps) {
   const isModified = Math.abs(value - defaultValue) > 0.001;
+  const [localValue, setLocalValue] = useState(String(value));
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setLocalValue(String(value));
+    }
+  }, [value]);
+
+  const commitValue = () => {
+    isFocused.current = false;
+    const v = parseFloat(localValue);
+    if (!isNaN(v)) {
+      const clamped = Math.min(max, Math.max(min, v));
+      onChange(clamped);
+      setLocalValue(String(clamped));
+    } else {
+      setLocalValue(String(value));
+    }
+  };
 
   return (
     <div className={cn(
@@ -150,15 +203,28 @@ export function CompactYearRateInput({
         : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
     )}>
       <input
-        type="number"
-        value={value}
-        onChange={(e) => {
-          const v = parseFloat(e.target.value);
-          if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+        type="text"
+        inputMode="decimal"
+        value={localValue}
+        onFocus={(e) => {
+          isFocused.current = true;
+          e.target.select();
         }}
-        step={step}
-        min={min}
-        max={max}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === '' || raw === '-' || /^-?\d*\.?\d*$/.test(raw)) {
+            setLocalValue(raw);
+            const v = parseFloat(raw);
+            if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+          }
+        }}
+        onBlur={commitValue}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            commitValue();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
         className={cn(
           "w-full min-w-[32px] text-center text-[11px] font-mono py-1 bg-transparent outline-none",
           "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
