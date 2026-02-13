@@ -103,7 +103,7 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { value: 'overview', label: 'Overview', icon: Home },
       { value: 'summary', label: 'Summary', icon: ClipboardList },
-      { value: 'validation', label: 'Validation', icon: AlertTriangle },
+      { value: 'validation', label: 'Advisor Review', icon: AlertTriangle },
     ],
   },
   {

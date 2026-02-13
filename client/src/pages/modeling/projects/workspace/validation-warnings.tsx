@@ -233,7 +233,7 @@ export default function ValidationWarnings({ projectId, compact = false, onTabCh
       }>
         <AlertTriangle className={`h-4 w-4 ${hasIssues ? 'text-amber-600' : 'text-blue-600'}`} />
         <AlertTitle className="flex items-center justify-between">
-          <span>Model Validation</span>
+          <span>Advisor Review</span>
           <div className="flex gap-2">
             {validationResult.summary.critical > 0 && (
               <Badge variant="destructive">{validationResult.summary.critical} Critical</Badge>
@@ -273,10 +273,10 @@ export default function ValidationWarnings({ projectId, compact = false, onTabCh
         <div>
           <h2 className="text-2xl font-semibold flex items-center gap-2">
             <AlertCircle className="h-6 w-6 text-primary" />
-            Model Validation
+            Advisor Review
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Review warnings and recommendations to improve model accuracy
+            A second opinion on your assumptions, projections, and model accuracy
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -292,7 +292,7 @@ export default function ValidationWarnings({ projectId, compact = false, onTabCh
               <div className={`text-5xl font-bold ${getScoreColor(validationResult.score)}`}>
                 {validationResult.score}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">Validation Score</p>
+              <p className="text-sm text-muted-foreground mt-1">Review Score</p>
               <Badge 
                 className={`mt-2 ${
                   validationResult.score >= 80 
@@ -333,7 +333,7 @@ export default function ValidationWarnings({ projectId, compact = false, onTabCh
 
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-lg">Validation Issues</CardTitle>
+            <CardTitle className="text-lg">Review Findings</CardTitle>
             <CardDescription>Address these items to improve model reliability</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
