@@ -113,7 +113,7 @@ export default function Contacts() {
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
       setSelectedIds(new Set());
-      toast({ title: `${ids.length} contact(s) deleted successfully` });
+      toast({ title: `${ids.length} ${ids.length === 1 ? 'contact' : 'contacts'} deleted successfully` });
     },
     onError: () => {
       toast({ title: "Failed to delete contacts", variant: "destructive" });
@@ -207,7 +207,7 @@ export default function Contacts() {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.size} contact(s)?`)) {
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} ${selectedIds.size === 1 ? 'contact' : 'contacts'}?`)) {
       bulkDeleteMutation.mutate(Array.from(selectedIds));
     }
   };
@@ -232,7 +232,7 @@ export default function Contacts() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: `Exported ${selectedIds.size} contact(s)` });
+    toast({ title: `Exported ${selectedIds.size} ${selectedIds.size === 1 ? 'contact' : 'contacts'}` });
   };
 
   const filteredContacts = useMemo(() => {
@@ -456,7 +456,7 @@ export default function Contacts() {
 
         {selectedIds.size > 0 && (
           <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900">{selectedIds.size} contact(s) selected</span>
+            <span className="text-sm font-medium text-blue-900">{selectedIds.size} {selectedIds.size === 1 ? 'contact' : 'contacts'} selected</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleBulkExport}><Download className="w-3.5 h-3.5 mr-1.5" />Export</Button>
               <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>

@@ -208,7 +208,7 @@ export default function Companies() {
     onSuccess: (_, ids) => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
       setSelectedIds(new Set());
-      toast({ title: `${ids.length} company(ies) deleted successfully` });
+      toast({ title: `${ids.length} ${ids.length === 1 ? 'company' : 'companies'} deleted successfully` });
     },
     onError: () => {
       toast({ title: "Failed to delete companies", variant: "destructive" });
@@ -283,7 +283,7 @@ export default function Companies() {
 
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.size} company(ies)?`)) {
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} ${selectedIds.size === 1 ? 'company' : 'companies'}?`)) {
       bulkDeleteMutation.mutate(Array.from(selectedIds));
     }
   };
@@ -305,7 +305,7 @@ export default function Companies() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: `Exported ${selectedIds.size} company(ies)` });
+    toast({ title: `Exported ${selectedIds.size} ${selectedIds.size === 1 ? 'company' : 'companies'}` });
   };
 
   const handleToggleSelect = (companyId: string) => {
@@ -573,7 +573,7 @@ export default function Companies() {
 
         {selectedIds.size > 0 && (
           <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900">{selectedIds.size} company(ies) selected</span>
+            <span className="text-sm font-medium text-blue-900">{selectedIds.size} {selectedIds.size === 1 ? 'company' : 'companies'} selected</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleBulkExport}><Download className="w-3.5 h-3.5 mr-1.5" />Export</Button>
               <Button variant="outline" size="sm" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}><Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete</Button>
