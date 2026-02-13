@@ -662,6 +662,29 @@ export const DEPARTMENTAL_EXPENSE_CATEGORIES = [
   { id: 'misc_dept', key: 'miscellaneous', label: 'Miscellaneous', icon: MoreHorizontal, coaCode: COA_CODES.departmentalExpenses.miscellaneous },
 ];
 
+export const DEPARTMENT_CARDS: Array<{
+  id: string;
+  revenueId: string;
+  label: string;
+  icon: LucideIcon;
+  deptExpenseId?: string;
+  hasCogs: boolean;
+}> = [
+  { id: 'fuel_dock', revenueId: 'fuel_dock', label: 'Fuel', icon: Fuel, hasCogs: true },
+  { id: 'ship_store', revenueId: 'ship_store', label: 'Ship Store', icon: ShoppingCart, hasCogs: true },
+  { id: 'service', revenueId: 'service', label: 'Service', icon: Wrench, deptExpenseId: 'service_dept', hasCogs: true },
+  { id: 'parts', revenueId: 'parts', label: 'Parts', icon: Package, deptExpenseId: 'parts_dept', hasCogs: true },
+  { id: 'restaurant', revenueId: 'restaurant', label: 'F&B / Restaurant', icon: UtensilsCrossed, deptExpenseId: 'f_and_b', hasCogs: true },
+  { id: 'rental_boats', revenueId: 'rental_boats', label: 'Rental Boats', icon: Ship, hasCogs: true },
+  { id: 'rv_sites', revenueId: 'rv_sites', label: 'RV Park', icon: Caravan, deptExpenseId: 'rv_park_dept', hasCogs: false },
+  { id: 'hospitality', revenueId: 'hospitality', label: 'Hospitality', icon: Hotel, deptExpenseId: 'hospitality_dept', hasCogs: false },
+  { id: 'misc_revenue', revenueId: 'misc_revenue', label: 'Miscellaneous', icon: MoreHorizontal, deptExpenseId: 'misc_dept', hasCogs: false },
+];
+
+export const REVENUE_ONLY_IDS = new Set([
+  'marina_amenities', 'boat_sales', 'boat_finance', 'boat_brokerage', 'boat_club', 'commercial_tenants'
+]);
+
 export const STORAGE_CATEGORIES = [
   { id: 'wet_slips', label: 'Wet Slips', icon: Anchor },
   { id: 'dry_racks_indoor', label: 'Dry Racks – Indoor', icon: Warehouse },
