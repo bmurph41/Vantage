@@ -395,6 +395,7 @@ export interface ParsedRow {
   label: string;
   normalizedLabel: string;
   values: ParsedRowValue[];
+  sectionHint?: 'revenue' | 'cogs' | 'expense' | 'payroll' | null;
   trace?: {
     page?: number;
     row?: number;
@@ -404,6 +405,9 @@ export interface ParsedRow {
     mappingMethod: PnlMappingMethod;
     mappingConfidence: number;
     normalizedLabel: string;
+    resolvedDepartment?: string | null;
+    resolvedBucket?: string | null;
+    resolvedByKeywordBank?: boolean;
   };
 }
 

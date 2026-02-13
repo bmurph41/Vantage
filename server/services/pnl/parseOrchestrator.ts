@@ -122,6 +122,14 @@ async function parsePdfV2(
   let numericCellsCount = 0;
   const rawBodySample: PdfV2ParseResult['rawExtraction']['bodyRowsSample'] = [];
 
+  const pdfSectionKeywords: Record<string, ParsedRow['sectionHint']> = {
+    'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
+    'cost of goods sold': 'cogs', 'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
+    'operating expense': 'expense', 'operating expenses': 'expense', 'expenses': 'expense', 'overhead': 'expense',
+    'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll', 'payroll expense': 'payroll', 'payroll expenses': 'payroll',
+  };
+  let pdfCurrentSection: ParsedRow['sectionHint'] = null;
+
   for (const row of bodyRows) {
     if (row.cells.length === 0) continue;
 
@@ -154,19 +162,36 @@ async function parsePdfV2(
     const label = labelCell.text.trim();
     if (!label) continue;
 
-    // Skip section headers: all caps with no numeric cells, or label ends with ":"
+    const lowerLabel = label.toLowerCase();
+
+    // Skip section headers but track which section we're in
     if (numericCells.length === 0) {
+      for (const [keyword, section] of Object.entries(pdfSectionKeywords)) {
+        if (lowerLabel === keyword || lowerLabel.startsWith(keyword + ' ') || lowerLabel.endsWith(' ' + keyword) || lowerLabel === keyword + ':') {
+          pdfCurrentSection = section as ParsedRow['sectionHint'];
+          break;
+        }
+      }
       const upperOrColon = label === label.toUpperCase() || label.endsWith(':');
-      if (upperOrColon) continue; // likely a section header
-      // Also skip "TOTAL" prefixed rows or known meta lines
+      if (upperOrColon) continue;
       if (/^total\b/i.test(label)) continue;
       if (/generated\s+sample|footnote|check:|page\s+\d|continuation|property:|note:/i.test(label)) continue;
-      continue; // no numeric cells → skip
+      continue;
     }
 
-    // Skip "TOTAL" rows (per existing v1 behavior)
-    const lowerLabel = label.toLowerCase();
-    if (lowerLabel.startsWith('total ') || lowerLabel === 'total') continue;
+    // Handle "TOTAL" rows — update section tracking then skip
+    if (lowerLabel.startsWith('total ') || lowerLabel === 'total') {
+      for (const [keyword] of Object.entries(pdfSectionKeywords)) {
+        if (lowerLabel.includes(keyword)) {
+          pdfCurrentSection = null;
+          break;
+        }
+      }
+      if (lowerLabel === 'gross profit' || lowerLabel.includes('gross margin')) {
+        pdfCurrentSection = null;
+      }
+      continue;
+    }
 
     // Align numeric cells to nearest header X
     const values: ParsedRow['values'] = [];
@@ -222,6 +247,7 @@ async function parsePdfV2(
       label,
       normalizedLabel: normalizeLabel(label),
       values: dedupedValues,
+      sectionHint: pdfCurrentSection,
       trace: {
         page: row.page,
         row: Math.round(row.y),
@@ -400,6 +426,14 @@ async function parseDocumentToStatement(
           });
         }
 
+        const sectionKeywords: Record<string, ParsedRow['sectionHint']> = {
+          'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
+          'cost of goods sold': 'cogs', 'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
+          'operating expense': 'expense', 'operating expenses': 'expense', 'expenses': 'expense', 'overhead': 'expense',
+          'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll', 'payroll expense': 'payroll', 'payroll expenses': 'payroll',
+        };
+        let currentSection: ParsedRow['sectionHint'] = null;
+
         for (let r = 1; r < jsonData.length; r++) {
           const rowData = jsonData[r];
           const label = String(rowData[0] ?? '').trim();
@@ -407,8 +441,34 @@ async function parseDocumentToStatement(
           if (!label) continue;
 
           const lowerLabel = label.toLowerCase();
+
+          const hasNumericValues = rowData.slice(1).some((v: any) => parseMoney(v) !== null);
+          if (!hasNumericValues) {
+            for (const [keyword, section] of Object.entries(sectionKeywords)) {
+              if (lowerLabel === keyword || lowerLabel.startsWith(keyword + ' ') || lowerLabel.endsWith(' ' + keyword)) {
+                currentSection = section as ParsedRow['sectionHint'];
+                break;
+              }
+            }
+          }
+
+          if (lowerLabel.startsWith('total ') || lowerLabel === 'total') {
+            for (const [keyword] of Object.entries(sectionKeywords)) {
+              if (lowerLabel.includes(keyword)) {
+                currentSection = null;
+                break;
+              }
+            }
+            continue;
+          }
+
           if (lowerLabel.includes('total') && !lowerLabel.includes('subtotal')) continue;
           if (/^={2,}$/.test(label) || /^-{2,}$/.test(label)) continue;
+
+          if (lowerLabel === 'gross profit' || lowerLabel === 'gross margin') {
+            currentSection = null;
+            continue;
+          }
 
           const values: ParsedRow['values'] = [];
 
@@ -433,6 +493,7 @@ async function parseDocumentToStatement(
               label,
               normalizedLabel: normalizeLabel(label),
               values,
+              sectionHint: currentSection,
               trace: {
                 page: workbook.SheetNames.indexOf(sheetName) + 1,
                 row: r + 1,

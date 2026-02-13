@@ -374,7 +374,7 @@ async function tryLlmClassification(
   orgId: string,
   label: string,
   normalized: string,
-  context?: { nearbyLabels?: string[]; vendorHint?: string }
+  context?: { nearbyLabels?: string[]; vendorHint?: string; sectionHint?: string }
 ): Promise<MapResult> {
   try {
     const classifier = getLlmClassifier();
@@ -461,9 +461,19 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
   const reviewInserts: any[] = [];
   let autoMappedCount = 0;
   
+  const sectionToBucket: Record<string, string> = {
+    'revenue': 'Revenue',
+    'cogs': 'COGS',
+    'expense': 'Expense',
+    'payroll': 'Expense',
+  };
+
   for (const row of rows) {
     const rawLabel = row.label ?? '';
     const normalized = row.normalizedLabel ?? normalizeLabel(rawLabel);
+    
+    const structuralSection = row.sectionHint || null;
+    const structuralBucket = structuralSection ? sectionToBucket[structuralSection] || null : null;
     
     let res = await tryAliasMatch(orgId, normalized);
     
@@ -492,22 +502,24 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
         .filter(r => r !== row)
         .map(r => r.label);
       
-      let sectionHint: string | undefined;
-      const sectionKeywords: Record<string, string> = {
-        'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
-        'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
-        'operating expense': 'expense', 'expenses': 'expense', 'overhead': 'expense',
-        'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll',
-      };
-      for (let si = rowIdx - 1; si >= Math.max(0, rowIdx - 15); si--) {
-        const headerLabel = (rows[si].label ?? '').toLowerCase().trim();
-        for (const [keyword, section] of Object.entries(sectionKeywords)) {
-          if (headerLabel === keyword || headerLabel.startsWith(keyword + ' ') || headerLabel.startsWith('total ' + keyword)) {
-            sectionHint = section;
-            break;
+      let sectionHint: string | undefined = structuralSection || undefined;
+      if (!sectionHint) {
+        const sectionKeywords: Record<string, string> = {
+          'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
+          'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
+          'operating expense': 'expense', 'expenses': 'expense', 'overhead': 'expense',
+          'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll',
+        };
+        for (let si = rowIdx - 1; si >= Math.max(0, rowIdx - 15); si--) {
+          const headerLabel = (rows[si].label ?? '').toLowerCase().trim();
+          for (const [keyword, section] of Object.entries(sectionKeywords)) {
+            if (headerLabel === keyword || headerLabel.startsWith(keyword + ' ') || headerLabel.startsWith('total ' + keyword)) {
+              sectionHint = section;
+              break;
+            }
           }
+          if (sectionHint) break;
         }
-        if (sectionHint) break;
       }
 
       const llmRes = await tryLlmClassification(orgId, rawLabel, normalized, {
@@ -520,16 +532,46 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
       }
     }
     
+    if (structuralBucket && res.bucket !== structuralBucket) {
+      res.bucket = structuralBucket;
+      if (structuralSection === 'payroll') {
+        res.department = res.department || 'Payroll';
+      }
+    }
+
     const hasValidCanonical = res.canonicalLineItemId && canonicalById.has(res.canonicalLineItemId);
     
+    if (hasValidCanonical && structuralBucket) {
+      const matchedCanonical = canonicalById.get(res.canonicalLineItemId!);
+      if (matchedCanonical) {
+        const canonicalSection = matchedCanonical.section;
+        const canonicalBucket = sectionToBucket[canonicalSection] || null;
+        if (canonicalBucket && canonicalBucket !== structuralBucket) {
+          const betterCanonical = canonical.find(c => {
+            const cb = sectionToBucket[c.section] || null;
+            return cb === structuralBucket && 
+              (normalizeLabel(c.displayName).includes(normalized) || normalized.includes(normalizeLabel(c.displayName)));
+          });
+          if (betterCanonical) {
+            res.canonicalLineItemId = betterCanonical.id;
+            res.department = betterCanonical.department;
+          }
+        }
+      }
+    }
+
     const wasResolvedByKeywordBank = res.mappingMethod === 'rule' && 
       res.matchedKeywordRuleId && 
       res.confidence >= 0.90;
     
     const ambiguityCheck = checkAmbiguity(normalized);
     if (ambiguityCheck.isAmbiguous && !wasResolvedByKeywordBank) {
-      res.isAmbiguous = true;
-      res.ambiguityInfo = ambiguityCheck.ambiguityInfo;
+      if (structuralBucket) {
+        res.isAmbiguous = false;
+      } else {
+        res.isAmbiguous = true;
+        res.ambiguityInfo = ambiguityCheck.ambiguityInfo;
+      }
     }
     
     const needsReview = (!hasValidCanonical && !wasResolvedByKeywordBank) || 
@@ -549,6 +591,7 @@ export async function mapParsedStatement(jobId: string): Promise<{ reviewCount: 
           suggestion: res.suggestion ?? null,
           department: res.department ? normalizeDepartment(res.department) : null,
           bucket: res.bucket ? normalizeBucket(res.bucket) : null,
+          sectionHint: structuralSection,
           isAmbiguous: res.isAmbiguous ?? false,
           ambiguityInfo: res.ambiguityInfo ?? null,
         },
