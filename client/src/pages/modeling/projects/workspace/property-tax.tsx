@@ -51,12 +51,16 @@ interface PropertyTaxConfig {
   millageRate: number;
   millageRatePer: 100 | 1000;
   reassessOnSale: boolean;
+  reassessmentMonth: number;
   reassessmentYear: number;
+  historicalAnnualTax: number;
   year1TaxJumpPct: number;
   standardGrowthRate: number;
   lastReassessmentDate: string;
   useCustomSchedule: boolean;
 }
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const DEFAULT_CONFIG: PropertyTaxConfig = {
   purchasePrice: 0,
@@ -66,7 +70,9 @@ const DEFAULT_CONFIG: PropertyTaxConfig = {
   millageRate: 0,
   millageRatePer: 1000,
   reassessOnSale: true,
-  reassessmentYear: 1,
+  reassessmentMonth: 1,
+  reassessmentYear: new Date().getFullYear(),
+  historicalAnnualTax: 0,
   year1TaxJumpPct: 0,
   standardGrowthRate: 2,
   lastReassessmentDate: '',
@@ -190,6 +196,7 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
         ...DEFAULT_CONFIG,
         purchasePrice: pp,
         taxableValue: pp,
+        reassessmentYear: baseYear,
       }));
       setHasChanges(false);
     }
@@ -277,36 +284,66 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
   };
 
   const taxProjections = useMemo(() => {
-    const projections: { year: number; label: string; taxableValue: number; tax: number; growthApplied: string }[] = [];
-    let currentTaxable = effectiveTaxableValue;
+    const projections: { year: number; label: string; taxableValue: number; tax: number; monthlyTax: number; growthApplied: string }[] = [];
+
+    const newAnnualTax = calculateTax(effectiveTaxableValue);
+    const reassessYear = config.reassessOnSale ? config.reassessmentYear : 0;
+    const reassessMonth = config.reassessOnSale ? config.reassessmentMonth : 1;
+    const oldAnnualTax = config.historicalAnnualTax || 0;
+
+    let postReassessTaxable = effectiveTaxableValue;
 
     for (let i = 0; i < holdPeriod; i++) {
       const yr = baseYear + i;
+      let annualTax = 0;
       let growthDesc = '';
+      let displayTaxable = 0;
 
-      if (i === 0) {
-        if (config.reassessOnSale && config.year1TaxJumpPct > 0) {
-          currentTaxable = effectiveTaxableValue * (1 + config.year1TaxJumpPct / 100);
-          growthDesc = `Reassessment +${config.year1TaxJumpPct}%`;
-        } else {
+      if (!config.reassessOnSale) {
+        if (i === 0) {
+          displayTaxable = effectiveTaxableValue;
           growthDesc = 'Base';
+        } else {
+          postReassessTaxable = (i === 1 ? effectiveTaxableValue : postReassessTaxable) * (1 + config.standardGrowthRate / 100);
+          displayTaxable = postReassessTaxable;
+          growthDesc = `+${config.standardGrowthRate}%`;
         }
+        annualTax = calculateTax(displayTaxable);
+      } else if (yr < reassessYear) {
+        const yearsFromBase = i;
+        const grownOldTax = oldAnnualTax * Math.pow(1 + config.standardGrowthRate / 100, yearsFromBase);
+        annualTax = grownOldTax;
+        displayTaxable = 0;
+        growthDesc = yearsFromBase === 0 ? 'Historical' : `Historical +${config.standardGrowthRate}%`;
+      } else if (yr === reassessYear) {
+        const monthsOld = reassessMonth - 1;
+        const monthsNew = 12 - monthsOld;
+        const yearsFromBase = i;
+        const grownOldMonthly = (oldAnnualTax * Math.pow(1 + config.standardGrowthRate / 100, yearsFromBase)) / 12;
+        const newMonthly = newAnnualTax / 12;
+        annualTax = (grownOldMonthly * monthsOld) + (newMonthly * monthsNew);
+        displayTaxable = effectiveTaxableValue;
+        postReassessTaxable = effectiveTaxableValue;
+        growthDesc = `Reassessed ${MONTH_NAMES[reassessMonth - 1]}`;
       } else {
-        currentTaxable = currentTaxable * (1 + config.standardGrowthRate / 100);
+        const yearsAfterReassess = yr - reassessYear;
+        postReassessTaxable = effectiveTaxableValue * Math.pow(1 + config.standardGrowthRate / 100, yearsAfterReassess);
+        displayTaxable = postReassessTaxable;
+        annualTax = calculateTax(postReassessTaxable);
         growthDesc = `+${config.standardGrowthRate}%`;
       }
 
-      const tax = calculateTax(currentTaxable);
       projections.push({
         year: yr,
         label: `Year ${i + 1} (${yr})`,
-        taxableValue: Math.round(currentTaxable),
-        tax: Math.round(tax),
+        taxableValue: Math.round(displayTaxable),
+        tax: Math.round(annualTax),
+        monthlyTax: Math.round(annualTax / 12),
         growthApplied: growthDesc,
       });
     }
     return projections;
-  }, [effectiveTaxableValue, config.millageRate, config.millageRatePer, config.reassessOnSale, config.year1TaxJumpPct, config.standardGrowthRate, holdPeriod, baseYear]);
+  }, [effectiveTaxableValue, config.millageRate, config.millageRatePer, config.reassessOnSale, config.reassessmentMonth, config.reassessmentYear, config.historicalAnnualTax, config.standardGrowthRate, holdPeriod, baseYear]);
 
   const currentAnnualTax = calculateTax(effectiveTaxableValue);
 
@@ -485,12 +522,12 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="flex items-center">
                   Reassessment on Sale
-                  <InfoTip text="When enabled, the property is reassessed at purchase, which can cause a Year 1 tax increase if the assessed value differs from the prior owner's taxable value." />
+                  <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date. Before that date, historical taxes (with standard growth) are used." />
                 </Label>
                 <Switch
                   checked={config.reassessOnSale}
@@ -500,41 +537,95 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
               {config.reassessOnSale && (
                 <div className="text-xs text-muted-foreground flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
-                  Tax may jump in Year 1 due to reassessment
+                  New tax will replace historical taxes starting at the reassessment date
                 </div>
               )}
             </div>
 
-            {config.reassessOnSale && (
-              <div className="space-y-2">
-                <Label className="flex items-center">
-                  Year 1 Tax Increase (%)
-                  <InfoTip text="The percentage increase in taxable value due to reassessment at acquisition. For example, if the previous assessment was $800K and the purchase price triggers reassessment to $1M, that's a 25% jump." />
-                </Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={config.year1TaxJumpPct || ''}
-                  onChange={(e) => updateField('year1TaxJumpPct', parseFloat(e.target.value) || 0)}
-                  placeholder="e.g., 25"
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label className="flex items-center">
                 Standard Annual Growth Rate (%)
-                <InfoTip text="The rate at which property taxes increase each year after Year 1. Typically 1-3% in most jurisdictions." />
+                <InfoTip text="The rate at which property taxes increase each year. Applied to historical taxes before reassessment and to the new assessed value after." />
               </Label>
-              <Input
-                type="number"
+              <PercentInput
+                value={config.standardGrowthRate}
+                onChange={(val) => updateField('standardGrowthRate', val)}
+                placeholder="2"
                 step="0.1"
-                value={config.standardGrowthRate || ''}
-                onChange={(e) => updateField('standardGrowthRate', parseFloat(e.target.value) || 0)}
-                placeholder="e.g., 2"
               />
             </div>
           </div>
+
+          {config.reassessOnSale && (
+            <>
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center">
+                    Historical Annual Tax
+                    <InfoTip text="The current/prior annual property tax before reassessment. This is what the property was paying before the sale triggers a new assessment." />
+                  </Label>
+                  <CurrencyInput
+                    value={config.historicalAnnualTax}
+                    onChange={(val) => updateField('historicalAnnualTax', val)}
+                    placeholder="Prior annual tax"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center">
+                    Reassessment Month
+                    <InfoTip text="The month when the new assessed tax goes into effect. Earlier months in the year mean more of the year uses the new tax; later months mean the old tax applies longer." />
+                  </Label>
+                  <Select
+                    value={String(config.reassessmentMonth)}
+                    onValueChange={(val) => updateField('reassessmentMonth', parseInt(val))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_NAMES.map((name, idx) => (
+                        <SelectItem key={idx + 1} value={String(idx + 1)}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center">
+                    Reassessment Year
+                    <InfoTip text="The calendar year when the reassessment takes effect. Typically the year of acquisition or the year after." />
+                  </Label>
+                  <Select
+                    value={String(config.reassessmentYear)}
+                    onValueChange={(val) => updateField('reassessmentYear', parseInt(val))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((yr) => (
+                        <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                <div className="text-muted-foreground">Reassessment Summary</div>
+                <div>
+                  <span className="font-medium">Before {MONTH_NAMES[config.reassessmentMonth - 1]} {config.reassessmentYear}:</span>{' '}
+                  {formatCurrencyVal(config.historicalAnnualTax)}/yr ({formatCurrencyVal(Math.round(config.historicalAnnualTax / 12))}/mo)
+                </div>
+                <div>
+                  <span className="font-medium">Starting {MONTH_NAMES[config.reassessmentMonth - 1]} {config.reassessmentYear}:</span>{' '}
+                  {formatCurrencyVal(currentAnnualTax)}/yr ({formatCurrencyVal(Math.round(currentAnnualTax / 12))}/mo)
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -566,9 +657,9 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                     <TableCell className="font-medium">{proj.label}</TableCell>
                     <TableCell className="text-right">{formatCurrencyVal(proj.taxableValue)}</TableCell>
                     <TableCell className="text-right font-semibold">{formatCurrencyVal(proj.tax)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{formatCurrencyVal(Math.round(proj.tax / 12))}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{formatCurrencyVal(proj.monthlyTax)}</TableCell>
                     <TableCell>
-                      <Badge variant={proj.growthApplied === 'Base' ? 'secondary' : 'outline'} className="text-xs">
+                      <Badge variant={proj.growthApplied.startsWith('Reassess') ? 'default' : proj.growthApplied === 'Base' || proj.growthApplied === 'Historical' ? 'secondary' : 'outline'} className="text-xs">
                         {proj.growthApplied}
                       </Badge>
                     </TableCell>
