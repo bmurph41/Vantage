@@ -542,6 +542,7 @@ export class ProFormaEngineService {
     };
     
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
+    const actualsMonthsPerYearPerSubcat: Record<string, Record<number, Set<number>>> = {};
     for (const actual of actuals) {
       const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
       const key = `${actual.year}-${String(actual.month).padStart(2, '0')}`;
@@ -549,7 +550,16 @@ export class ProFormaEngineService {
         actualsMonthlyLookup[subcat] = {};
       }
       actualsMonthlyLookup[subcat][key] = (actualsMonthlyLookup[subcat][key] || 0) + parseFloat(actual.amount?.toString() || '0');
+      if (!actualsMonthsPerYearPerSubcat[subcat]) actualsMonthsPerYearPerSubcat[subcat] = {};
+      if (!actualsMonthsPerYearPerSubcat[subcat][actual.year]) actualsMonthsPerYearPerSubcat[subcat][actual.year] = new Set();
+      actualsMonthsPerYearPerSubcat[subcat][actual.year].add(actual.month);
     }
+
+    const isAnnualOnlyData = (subcat: string, year: number): boolean => {
+      const months = actualsMonthsPerYearPerSubcat[subcat]?.[year];
+      if (!months) return false;
+      return months.size === 1 && months.has(1);
+    };
 
     const revenueLineItems: LineItem[] = Object.entries(revenueBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
@@ -572,7 +582,7 @@ export class ProFormaEngineService {
           cumulativeGrowth *= (1 + currentMonthlyRate);
         }
 
-        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
           continue;
         }
@@ -613,7 +623,7 @@ export class ProFormaEngineService {
       const projectionsMonthly: Record<string, number> = {};
       
       for (const period of monthlyPeriods) {
-        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
         }
       }
@@ -699,7 +709,7 @@ export class ProFormaEngineService {
       const projectionsMonthly: Record<string, number> = {};
       
       for (const period of monthlyPeriods) {
-        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
         }
       }

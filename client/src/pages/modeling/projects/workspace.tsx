@@ -80,6 +80,7 @@ import ExportModel from './workspace/export-model';
 import SensitivityTornado from './workspace/sensitivity-tornado';
 import ValidationWarnings from './workspace/validation-warnings';
 import ValuatorProfitCenters from './workspace/valuator-profit-centers';
+import PropertyTaxTab from './workspace/property-tax';
 
 interface TabItem {
   value: string;
@@ -114,6 +115,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'uploads', label: 'Uploads', icon: Upload },
       { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'assumptions', label: 'Assumptions', icon: TrendingUp },
+      { value: 'property-tax', label: 'Property Tax', icon: Building2 },
       { value: 'storage-leases', label: 'Storage Leases', icon: Anchor },
       { value: 'commercial-leases', label: 'Commercial Leases', icon: Building2 },
       { value: 'profit', label: 'Profit Centers', icon: Store },
@@ -460,6 +462,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="historical" className="space-y-6">
           <WorkspaceHistoricalPL projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        <TabsContent value="property-tax" className="space-y-6">
+          <PropertyTaxTab projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6" data-tour="valuator-analysis">
