@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { setGlobalRoundingDigits, setGlobalEbitdaRoundingDigits, setGlobalLineItemRoundingDigits, setGlobalPercentRoundingDecimals } from '@/lib/utils';
 
 interface DisplayPreferences {
@@ -22,12 +21,10 @@ export function useDisplayPreferences() {
   const bottomLineMetric = prefs?.bottomLineMetric ?? 'noi';
   const metricLabel = bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI';
 
-  useEffect(() => {
-    setGlobalRoundingDigits(roundingDigits);
-    setGlobalEbitdaRoundingDigits(ebitdaRoundingDigits);
-    setGlobalLineItemRoundingDigits(lineItemRoundingDigits);
-    setGlobalPercentRoundingDecimals(percentRoundingDecimals);
-  }, [roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals]);
+  setGlobalRoundingDigits(roundingDigits);
+  setGlobalEbitdaRoundingDigits(ebitdaRoundingDigits);
+  setGlobalLineItemRoundingDigits(lineItemRoundingDigits);
+  setGlobalPercentRoundingDecimals(percentRoundingDecimals);
 
   return { roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, bottomLineMetric, metricLabel };
 }
