@@ -32,7 +32,9 @@ import {
   Users,
   PieChart,
   Save,
-  Check
+  Check,
+  Play,
+  GitCompareArrows
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -43,6 +45,9 @@ import type { ModelingProject, ModelingCase, ExitScenario } from "@shared/schema
 import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { defaultScenarios, type ScenarioType, type ScenarioConfig } from '@/lib/modeling-scenarios';
+import { ScenarioBuilder } from '@/components/exit-strategies/ScenarioBuilder';
+import { ScenarioComparison } from '@/components/exit-strategies/ScenarioComparison';
+import type { ExitScenarioInput, ExitScenarioResult } from '@shared/exit/exit-scenario-engine';
 
 interface WorkspaceExitStrategyProps {
   projectId: string;
@@ -268,12 +273,31 @@ const exitTools = [
     color: "text-pink-500",
     bgColor: "bg-pink-50"
   },
+  { 
+    id: "scenario-builder", 
+    name: "Scenario Builder", 
+    shortName: "Builder",
+    description: "Unified institutional-grade scenario runner", 
+    icon: Play,
+    color: "text-teal-500",
+    bgColor: "bg-teal-50"
+  },
+  { 
+    id: "comparison", 
+    name: "Comparison", 
+    shortName: "Compare",
+    description: "Side-by-side scenario comparison", 
+    icon: GitCompareArrows,
+    color: "text-rose-500",
+    bgColor: "bg-rose-50"
+  },
 ];
 
 export default function WorkspaceExitStrategy({ projectId, onTabChange }: WorkspaceExitStrategyProps) {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("tax");
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [scenarioResults, setScenarioResults] = useState<ExitScenarioResult[]>([]);
 
   const { toast } = useToast();
 
@@ -581,6 +605,30 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
             holdPeriod={holdPeriod}
             scenario={currentScenario.name}
           />
+        </TabsContent>
+
+        <TabsContent value="scenario-builder" className="mt-6">
+          <ScenarioBuilderPanel
+            salePrice={calculatedSalePrice}
+            purchasePrice={purchasePrice}
+            holdPeriod={holdPeriod}
+            scenarioName={currentScenario.name}
+            onScenarioResult={(result) => {
+              setScenarioResults(prev => {
+                const existing = prev.findIndex(r => r.scenarioName === result.scenarioName);
+                if (existing >= 0) {
+                  const updated = [...prev];
+                  updated[existing] = result;
+                  return updated;
+                }
+                return [...prev, result];
+              });
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="comparison" className="mt-6">
+          <ScenarioComparison scenarios={scenarioResults} />
         </TabsContent>
       </Tabs>
 
@@ -2223,5 +2271,215 @@ function AIInsightsPanel({ projectId, salePrice, purchasePrice, holdPeriod, scen
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+interface ScenarioBuilderPanelProps {
+  salePrice: number;
+  purchasePrice: number;
+  holdPeriod: number;
+  scenarioName: string;
+  onScenarioResult: (result: ExitScenarioResult) => void;
+}
+
+function ScenarioBuilderPanel({ salePrice, purchasePrice, holdPeriod, scenarioName, onScenarioResult }: ScenarioBuilderPanelProps) {
+  const [strategyType, setStrategyType] = useState<'cash_sale' | 'exchange_1031' | 'seller_financing' | 'dst_investment' | 'hybrid'>('cash_sale');
+  const [customName, setCustomName] = useState(`${scenarioName} - Cash Sale`);
+  const [debtBalance, setDebtBalance] = useState('0');
+  const [brokerRate, setBrokerRate] = useState('5');
+  const [closingCosts, setClosingCosts] = useState('50000');
+  const [depreciationYears, setDepreciationYears] = useState('39');
+  const [filingStatus, setFilingStatus] = useState<'single' | 'married' | 'head_of_household'>('married');
+  const [otherIncome, setOtherIncome] = useState('200000');
+  const [stateOfResidence, setStateOfResidence] = useState('FL');
+  const [includeRefinance, setIncludeRefinance] = useState(false);
+  const [refiYear, setRefiYear] = useState('3');
+  const [refiAmount, setRefiAmount] = useState('0');
+  const [refiCashOut, setRefiCashOut] = useState('0');
+
+  useEffect(() => {
+    const label = strategyType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    setCustomName(`${scenarioName} - ${label}`);
+  }, [strategyType, scenarioName]);
+
+  const scenarioInput: ExitScenarioInput = {
+    scenarioName: customName,
+    scenarioType: strategyType,
+    property: {
+      purchasePrice,
+      acquisitionCosts: purchasePrice * 0.02,
+      landValue: purchasePrice * 0.20,
+      improvementValue: purchasePrice * 0.80,
+      depreciationScheduleYears: parseInt(depreciationYears) || 39,
+      holdingPeriodYears: holdPeriod,
+    },
+    sale: {
+      salePrice,
+      brokerCommissionRate: parseFloat(brokerRate) / 100 || 0.05,
+      closingCosts: parseFloat(closingCosts) || 50000,
+      holdingPeriodMonths: holdPeriod * 12,
+    },
+    debt: {
+      outstandingBalance: parseFloat(debtBalance) || 0,
+      prepaymentPenalty: 0,
+      refinanceEvents: includeRefinance ? [{
+        year: parseInt(refiYear) || 3,
+        newLoanAmount: parseFloat(refiAmount) || 0,
+        interestRate: 0.065,
+        termYears: 25,
+        cashOutProceeds: parseFloat(refiCashOut) || 0,
+        closingCosts: (parseFloat(refiAmount) || 0) * 0.01,
+      }] : undefined,
+    },
+    taxProfile: {
+      filingStatus,
+      otherOrdinaryIncome: parseFloat(otherIncome) || 200000,
+      otherInvestmentIncome: 0,
+      stateOfResidence,
+    },
+    exchange1031: strategyType === 'exchange_1031' ? {
+      saleDate: new Date().toISOString().split('T')[0],
+      replacementProperties: [{
+        name: 'Replacement Property 1',
+        purchasePrice: salePrice * 1.1,
+        newMortgage: salePrice * 0.7,
+        closingCosts: salePrice * 0.02,
+        identificationPriority: 'primary' as const,
+      }],
+      qualifiedIntermediaryFee: 2500,
+      additionalCashInvested: salePrice * 0.1,
+    } : undefined,
+    sellerFinancing: strategyType === 'seller_financing' ? {
+      downPaymentPercent: 0.20,
+      noteInterestRate: 0.07,
+      noteTermYears: 10,
+      amortizationYears: 25,
+      buyerCreditProfile: {
+        creditScore: 720,
+        debtToIncomeRatio: 0.35,
+        liquidReserves: salePrice * 0.1,
+        yearsInBusiness: 10,
+        hasBankruptcy: false,
+        hasForeclosure: false,
+        personalGuarantee: true,
+      },
+      collateral: {
+        appraisedValue: salePrice * 1.05,
+        lienPosition: 'first' as const,
+        hasUccFiling: true,
+        hasPersonalGuarantee: true,
+      },
+    } : undefined,
+    installmentSale: strategyType === 'seller_financing' ? {
+      enabled: true,
+      downPaymentPercent: 0.20,
+      termYears: 10,
+      interestRate: 0.07,
+    } : undefined,
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Play className="h-4 w-4 text-teal-500" />
+            Scenario Configuration
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Configure and run institutional-grade exit analysis using the unified calculation engine
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Scenario Name</Label>
+              <Input value={customName} onChange={(e) => setCustomName(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Exit Strategy</Label>
+              <Select value={strategyType} onValueChange={(v: any) => setStrategyType(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash_sale">Cash Sale</SelectItem>
+                  <SelectItem value="exchange_1031">1031 Exchange</SelectItem>
+                  <SelectItem value="seller_financing">Seller Financing</SelectItem>
+                  <SelectItem value="dst_investment">DST Investment</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label className="text-xs">Outstanding Debt</Label>
+              <Input type="number" value={debtBalance} onChange={(e) => setDebtBalance(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Broker Rate (%)</Label>
+              <Input type="number" step="0.1" value={brokerRate} onChange={(e) => setBrokerRate(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Closing Costs</Label>
+              <Input type="number" value={closingCosts} onChange={(e) => setClosingCosts(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label className="text-xs">Filing Status</Label>
+              <Select value={filingStatus} onValueChange={(v: any) => setFilingStatus(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single</SelectItem>
+                  <SelectItem value="married">Married Filing Jointly</SelectItem>
+                  <SelectItem value="head_of_household">Head of Household</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Other Ordinary Income</Label>
+              <Input type="number" value={otherIncome} onChange={(e) => setOtherIncome(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">State of Residence</Label>
+              <Input value={stateOfResidence} onChange={(e) => setStateOfResidence(e.target.value)} maxLength={2} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 py-2 border-t">
+            <Switch checked={includeRefinance} onCheckedChange={setIncludeRefinance} />
+            <Label className="text-xs font-medium">Include Refinance Event</Label>
+          </div>
+
+          {includeRefinance && (
+            <div className="grid grid-cols-3 gap-4 pl-4 border-l-2 border-teal-200">
+              <div>
+                <Label className="text-xs">Refi Year</Label>
+                <Input type="number" value={refiYear} onChange={(e) => setRefiYear(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">New Loan Amount</Label>
+                <Input type="number" value={refiAmount} onChange={(e) => setRefiAmount(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Cash-Out Proceeds</Label>
+                <Input type="number" value={refiCashOut} onChange={(e) => setRefiCashOut(e.target.value)} />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ScenarioBuilder 
+        scenarioInput={scenarioInput} 
+        onResultChange={onScenarioResult}
+      />
+    </div>
   );
 }
