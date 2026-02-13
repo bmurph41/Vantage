@@ -22460,7 +22460,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       });
     } catch (error: any) {
       console.error('Failed to upload document:', error);
-      res.status(500).json({ error: 'Failed to upload document' });
+      res.status(500).json({ error: 'Failed to upload document', details: error?.message });
     }
   });
 
