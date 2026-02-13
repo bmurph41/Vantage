@@ -70,7 +70,7 @@ import ProfitCentersPage from './workspace/profit-centers';
 import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
-import LeasesCombined from './workspace/leases-combined';
+import LeaseListPage from '@/components/leases/LeaseListPage';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
@@ -112,7 +112,8 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'uploads', label: 'Uploads', icon: Upload },
       { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'assumptions', label: 'Assumptions', icon: TrendingUp },
-      { value: 'leases', label: 'Leases', icon: Users },
+      { value: 'storage-leases', label: 'Storage Leases', icon: Anchor },
+      { value: 'commercial-leases', label: 'Commercial Leases', icon: Building2 },
       { value: 'profit', label: 'Profit Centers', icon: Store },
     ],
   },
@@ -470,8 +471,12 @@ export default function ProjectWorkspace() {
           />
         </TabsContent>
 
-        <TabsContent value="leases" className="space-y-6">
-          <LeasesCombined projectId={projectId!} projectName={project.marinaName} />
+        <TabsContent value="storage-leases" className="space-y-6">
+          <RentRollDataTab projectId={projectId!} projectName={project.marinaName} />
+        </TabsContent>
+
+        <TabsContent value="commercial-leases" className="space-y-6">
+          <LeaseListPage projectId={projectId!} />
         </TabsContent>
 
         <TabsContent value="profit" className="space-y-6">
