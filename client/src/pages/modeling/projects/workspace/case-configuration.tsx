@@ -260,6 +260,11 @@ export default function CaseConfiguration({ projectId, onTabChange }: CaseConfig
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'cases'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
       toast({ title: 'Scenario Updated', description: 'Changes have been saved.' });
     },
     onError: (error: any) => {

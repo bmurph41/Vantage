@@ -588,6 +588,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     workingCapitalRecoveryPct: 100,
     workingCapitalAmount: 0,
   });
+  const [exitCapRateValue, setExitCapRateValue] = useState<number>(7.5);
   const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
   const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
 
@@ -812,6 +813,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
       setBelowTheLine(assumptions.belowTheLine || { managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions(assumptions.exitAssumptions || { sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
+      setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : 7.5);
       setHasChanges(false);
     } else {
       setGrowthRates(getDefaultGrowthRates(activeScenarioType));
@@ -821,6 +823,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       setStorageGrowth(getDefaultStorageGrowth(activeScenarioType));
       setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions({ sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
+      setExitCapRateValue(7.5);
       setHasChanges(false);
     }
   }, [activeScenario, activeScenarioType, holdPeriod]);
@@ -919,7 +922,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     if (pendingSaveRef.current) {
       changesSinceSaveRef.current = true;
     }
-  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions]);
+  }, [hasChanges, growthRates, expenseGrowth, occupancy, margins, storageGrowth, belowTheLine, exitAssumptions, exitCapRateValue]);
 
   const saveMutation = useMutation({
     mutationFn: ({ createNewVersion, isAutosave }: { createNewVersion: boolean; isAutosave?: boolean }) => {
@@ -944,22 +947,29 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         exitAssumptions,
         yearlyGrowthRates: yearlyGrowthRatesForEngine,
       };
+      const exitCapRateDecimal = (exitCapRateValue / 100).toFixed(4);
       if (!activeScenario) {
         return apiRequest('POST', `/api/modeling/projects/${projectId}/scenarios`, {
           scenarioType: activeScenarioType,
           name: getLabel(activeScenarioType as CaseType),
           revenueGrowthRate: avgRevenue,
           expenseGrowthRate: avgExpense,
+          exitCapRate: exitCapRateDecimal,
           assumptions,
         });
       }
       return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
         assumptions,
+        exitCapRate: exitCapRateDecimal,
         createNewVersion,
       });
     },
     onSuccess: (_, { createNewVersion, isAutosave }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
       if (!changesSinceSaveRef.current) {
         setHasChanges(false);
       }
@@ -2063,6 +2073,49 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         </TabsContent>
 
         <TabsContent value="exit" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Exit Cap Rate</CardTitle>
+              <CardDescription>
+                The capitalization rate applied to the final year's NOI to determine the exit (sale) value of the property.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div className="space-y-2 flex-1 max-w-xs">
+                  <Label>Exit Cap Rate (%)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      step="0.25"
+                      min="1"
+                      max="20"
+                      className="w-24"
+                      value={exitCapRateValue}
+                      onChange={(e) => {
+                        setExitCapRateValue(parseFloat(e.target.value) || 0);
+                        setHasChanges(true);
+                        changesSinceSaveRef.current = true;
+                        hasChangesRef.current = true;
+                      }}
+                      disabled={isScenarioLocked}
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Exit Value = Final Year NOI / Exit Cap Rate
+                  </p>
+                </div>
+                {exitCapRateValue > 0 && (
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-xs text-muted-foreground">Implied Exit Multiple</p>
+                    <p className="text-lg font-semibold">{(1 / (exitCapRateValue / 100)).toFixed(2)}x NOI</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Exit Assumptions</CardTitle>

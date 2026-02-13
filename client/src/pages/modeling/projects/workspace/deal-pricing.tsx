@@ -295,6 +295,43 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     enabled: !!projectId,
   });
 
+  const { data: scenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
+    enabled: !!projectId,
+  });
+  const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
+
+  useEffect(() => {
+    if (activeScenario?.exitCapRate) {
+      const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
+      if (capRatePercent > 0 && Math.abs(capRatePercent - parseFloat(exitCapRate)) > 0.01) {
+        setExitCapRate(capRatePercent.toString());
+      }
+    }
+  }, [activeScenario?.exitCapRate]);
+
+  const saveExitCapRateToScenario = useMutation({
+    mutationFn: (exitCapRatePercent: number) => {
+      if (!activeScenario?.id) return Promise.resolve();
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
+        exitCapRate: (exitCapRatePercent / 100).toFixed(4),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
+    },
+  });
+
+  const debouncedSaveCapRate = useCallback(
+    debounce((exitCapRatePercent: number) => {
+      saveExitCapRateToScenario.mutate(exitCapRatePercent);
+    }, 500),
+    [activeScenario?.id]
+  );
+
   const { data: adjustments } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects', projectId, 'period-adjustments'],
     enabled: !!projectId,
@@ -350,6 +387,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const handleExitCapRateChange = (value: string) => {
     setExitCapRate(value);
     if (isLinked) setPricingDriver('exitCap');
+    const numVal = parseFloat(value);
+    if (numVal > 0) {
+      debouncedSaveCapRate(numVal);
+    }
   };
 
   const handleTargetIRRChange = (value: string) => {

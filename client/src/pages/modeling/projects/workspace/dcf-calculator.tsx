@@ -98,6 +98,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   
   const { holdPeriod: sharedHoldPeriod, setHoldPeriod: setSharedHoldPeriod } = useHoldPeriod(projectId || '');
 
+  const { data: scenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
+    enabled: !!projectId,
+  });
+  const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
+
   // Real-time input state
   const [liveInputs, setLiveInputs] = useState({
     purchasePrice: 5000000,
@@ -111,6 +117,15 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   });
 
   useEffect(() => {
+    if (activeScenario?.exitCapRate) {
+      const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
+      if (capRatePercent > 0 && Math.abs(capRatePercent - liveInputs.exitCapRate) > 0.01) {
+        setLiveInputs(prev => ({ ...prev, exitCapRate: capRatePercent }));
+      }
+    }
+  }, [activeScenario?.exitCapRate]);
+
+  useEffect(() => {
     if (sharedHoldPeriod && sharedHoldPeriod !== liveInputs.holdPeriod) {
       setLiveInputs(prev => ({ ...prev, holdPeriod: sharedHoldPeriod }));
     }
@@ -120,6 +135,29 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     queryKey: ['/api/modeling/projects', projectId, 'dcf'],
     enabled: !!projectId,
   });
+
+  const saveExitCapRateToScenario = useMutation({
+    mutationFn: (exitCapRatePercent: number) => {
+      if (!activeScenario?.id) return Promise.resolve();
+      return apiRequest('PATCH', `/api/modeling/projects/${projectId}/scenarios/${activeScenario.id}`, {
+        exitCapRate: (exitCapRatePercent / 100).toFixed(4),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'dcf'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns'] });
+    },
+  });
+
+  const debouncedSaveCapRate = useCallback(
+    debounce((exitCapRatePercent: number) => {
+      saveExitCapRateToScenario.mutate(exitCapRatePercent);
+    }, 500),
+    [activeScenario?.id]
+  );
 
   // Real-time IRR calculation
   const calculateQuickIRR = useMutation({
@@ -150,6 +188,9 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     if (key === 'holdPeriod') {
       setSharedHoldPeriod(value);
     }
+    if (key === 'exitCapRate') {
+      debouncedSaveCapRate(value);
+    }
   };
 
   const formatCompactCurrency = (value: number) => {
@@ -177,7 +218,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   }
 
   const baseScenario = dcfAnalysis?.baseScenario;
-  const scenarios = dcfAnalysis?.scenarios || [];
+  const dcfScenarios = dcfAnalysis?.scenarios || [];
   const sensitivityMatrix = dcfAnalysis?.sensitivityMatrix;
   const probabilityResult = dcfAnalysis?.probabilityWeightedResult;
   const comparison = dcfAnalysis?.scenarioComparison;
@@ -546,7 +587,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {scenarios.map((scenario) => (
+                {dcfScenarios.map((scenario) => (
                   <Card 
                     key={scenario.id}
                     className={cn(
