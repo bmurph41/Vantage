@@ -24155,3 +24155,124 @@ export const ddSectionDefaults = pgTable('dd_section_defaults', {
   titleIdx: index('ddsd_title_idx').on(table.title),
 }));
 export type DdSectionDefault = typeof ddSectionDefaults.$inferSelect;
+
+// ================================================================================
+// RETURNS - Institutional-Grade Return Tracking & Analytics
+// ================================================================================
+
+export const returnsLedgerBucketEnum = pgEnum('returns_ledger_bucket', [
+  'ACQUISITION',
+  'EQUITY_CONTRIBUTION',
+  'LOAN_PROCEEDS',
+  'OPERATING_CASHFLOW',
+  'CAPEX',
+  'DEBT_SERVICE_INTEREST',
+  'DEBT_SERVICE_PRINCIPAL',
+  'REFI_PROCEEDS',
+  'SALE_PROCEEDS',
+  'SALE_COSTS',
+  'LOAN_PAYOFF',
+  'FEES_OTHER',
+]);
+
+export const returnsLedgerSourceEnum = pgEnum('returns_ledger_source', [
+  'MODEL',
+  'QBO',
+  'UPLOAD',
+  'MANUAL',
+]);
+
+export const returnsValuationSourceEnum = pgEnum('returns_valuation_source', [
+  'MODEL',
+  'MANUAL',
+  'APPRAISAL',
+  'MARKET_INDEX',
+]);
+
+export const returnsFrequencyEnum = pgEnum('returns_frequency', ['MONTHLY']);
+
+export const returnsLedger = pgTable('returns_ledger', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  propertyId: varchar('property_id'),
+  dealId: varchar('deal_id'),
+  modelId: varchar('model_id'),
+  scenarioId: varchar('scenario_id'),
+  asOfDate: date('as_of_date').notNull(),
+  frequency: returnsFrequencyEnum('frequency').notNull().default('MONTHLY'),
+  bucket: returnsLedgerBucketEnum('bucket').notNull(),
+  amount: decimal('amount', { precision: 14, scale: 2 }).notNull(),
+  source: returnsLedgerSourceEnum('source').notNull().default('MANUAL'),
+  memo: text('memo'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('returns_ledger_org_idx').on(table.orgId),
+  userIdx: index('returns_ledger_user_idx').on(table.userId),
+  modelIdx: index('returns_ledger_model_idx').on(table.modelId),
+  propertyIdx: index('returns_ledger_property_idx').on(table.propertyId),
+  dateIdx: index('returns_ledger_date_idx').on(table.asOfDate),
+}));
+
+export const insertReturnsLedgerSchema = createInsertSchema(returnsLedger).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ReturnsLedgerEntry = typeof returnsLedger.$inferSelect;
+export type InsertReturnsLedgerEntry = z.infer<typeof insertReturnsLedgerSchema>;
+
+export const returnsValuation = pgTable('returns_valuation', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  propertyId: varchar('property_id'),
+  modelId: varchar('model_id'),
+  scenarioId: varchar('scenario_id'),
+  asOfDate: date('as_of_date').notNull(),
+  marketValue: decimal('market_value', { precision: 14, scale: 2 }).notNull(),
+  valueSource: returnsValuationSourceEnum('value_source').notNull().default('MANUAL'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('returns_valuation_org_idx').on(table.orgId),
+  modelIdx: index('returns_valuation_model_idx').on(table.modelId),
+  propertyIdx: index('returns_valuation_property_idx').on(table.propertyId),
+  dateIdx: index('returns_valuation_date_idx').on(table.asOfDate),
+}));
+
+export const insertReturnsValuationSchema = createInsertSchema(returnsValuation).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ReturnsValuationEntry = typeof returnsValuation.$inferSelect;
+export type InsertReturnsValuationEntry = z.infer<typeof insertReturnsValuationSchema>;
+
+export const loanBalanceTimeline = pgTable('loan_balance_timeline', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  propertyId: varchar('property_id'),
+  modelId: varchar('model_id'),
+  scenarioId: varchar('scenario_id'),
+  asOfDate: date('as_of_date').notNull(),
+  loanBalance: decimal('loan_balance', { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('loan_balance_timeline_org_idx').on(table.orgId),
+  modelIdx: index('loan_balance_timeline_model_idx').on(table.modelId),
+  propertyIdx: index('loan_balance_timeline_property_idx').on(table.propertyId),
+  dateIdx: index('loan_balance_timeline_date_idx').on(table.asOfDate),
+}));
+
+export const insertLoanBalanceTimelineSchema = createInsertSchema(loanBalanceTimeline).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type LoanBalanceTimelineEntry = typeof loanBalanceTimeline.$inferSelect;
+export type InsertLoanBalanceTimelineEntry = z.infer<typeof insertLoanBalanceTimelineSchema>;

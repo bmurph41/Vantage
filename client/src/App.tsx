@@ -236,6 +236,7 @@ const ReturnsValuation = lazy(() => import("@/pages/modeling/returns-valuation")
 const SetupWizard = lazy(() => import("@/pages/modeling/projects/setup-wizard"));
 const ModelingProjectsIndex = lazy(() => import("@/pages/modeling/projects"));
 const ModelingPortfolio = lazy(() => import("@/pages/modeling/portfolio"));
+const PortfolioReturns = lazy(() => import("@/pages/modeling/portfolio/portfolio-returns"));
 const ModelingFunds = lazy(() => import("@/pages/modeling/funds"));
 const FundDetail = lazy(() => import("@/pages/modeling/funds/[fundId]"));
 const LPPortal = lazy(() => import("@/pages/modeling/lp-portal"));
@@ -1872,6 +1873,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ModelingSettings />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/portfolio/returns">
+        {() => (
+          <UnifiedLayout>
+            <PortfolioReturns />
           </UnifiedLayout>
         )}
       </Route>

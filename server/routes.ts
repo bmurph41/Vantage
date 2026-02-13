@@ -83,6 +83,7 @@ import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
+import returnsRoutes from "./routes/returns-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
@@ -460,6 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
   app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
+  app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);

@@ -71,6 +71,7 @@ import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
 import RentRollAnalysis from './workspace/rent-roll-analysis';
+import ModelReturns from './workspace/model-returns';
 import LeaseListPage from '@/components/leases/LeaseListPage';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
@@ -128,6 +129,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'capital', label: 'Capital Stack', icon: Building2 },
       { value: 'exit', label: 'Exit Strategy', icon: Target },
       { value: 'dcf', label: 'DCF', icon: Calculator },
+      { value: 'returns', label: 'Returns', icon: TrendingUp },
     ],
   },
   {
@@ -510,6 +512,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="dcf" className="space-y-6">
           <DCFCalculatorPage onTabChange={handleTabChange} />
+        </TabsContent>
+
+        <TabsContent value="returns" className="space-y-6">
+          <ModelReturns projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
         <TabsContent value="monte-carlo" className="space-y-6">
