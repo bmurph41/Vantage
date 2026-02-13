@@ -50,7 +50,12 @@ import {
   Plus,
   CircleDot,
   Check,
-  Loader2
+  Loader2,
+  LandPlot,
+  KeyRound,
+  ChevronDown,
+  ChevronRight,
+  Trash2
 } from 'lucide-react';
 import {
   Dialog,
@@ -133,6 +138,32 @@ const defaultProfitCenters: ProfitCenterConfig[] = [
   { id: 'pc_hospitality', name: 'Hospitality', isEnabled: false, icon: <Home className="h-4 w-4" /> },
 ];
 
+type OwnershipType = 'fee_simple' | 'submerged_land_lease' | 'ground_lease' | 'combined';
+
+type LeaseDetail = {
+  id: string;
+  type: 'submerged_land_lease' | 'ground_lease';
+  counterparty: string;
+  monthlyRent: string;
+  annualRent: string;
+  termRemaining: string;
+  termUnit: 'years' | 'months';
+  expirationDate: string;
+  renewalOptions: string;
+  notes: string;
+};
+
+type AcreageData = {
+  totalAcres: string;
+  uplandAcres: string;
+  submergedAcres: string;
+};
+
+type OwnershipData = {
+  type: OwnershipType;
+  leases: LeaseDetail[];
+};
+
 const months = [
   { value: 1, label: 'January', short: 'Jan' },
   { value: 2, label: 'February', short: 'Feb' },
@@ -182,6 +213,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
   const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
+  const [acreage, setAcreage] = useState<AcreageData>({ totalAcres: '', uplandAcres: '', submergedAcres: '' });
+  const [ownership, setOwnership] = useState<OwnershipData>({ type: 'fee_simple', leases: [] });
+  const [expandedLeases, setExpandedLeases] = useState<Set<string>>(new Set());
 
   // NEW: Save Now button state
   const [isSaving, setIsSaving] = useState(false);
@@ -219,6 +253,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       winterMonths,
       departments: storageSettings,
       profitCenters: profitCenterSettings,
+      acreage,
+      ownership,
     };
   };
 
@@ -263,6 +299,28 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           isEnabled: config.profitCenters[item.id]?.isEnabled ?? item.isEnabled
         })));
       }
+      if ((config as any).acreage) {
+        setAcreage((config as any).acreage);
+      }
+      if ((config as any).ownership) {
+        const savedOwnership = (config as any).ownership as OwnershipData;
+        let leases = savedOwnership.leases || [];
+        const type = savedOwnership.type;
+        if (type === 'submerged_land_lease' && !leases.some((l: LeaseDetail) => l.type === 'submerged_land_lease')) {
+          leases = [...leases, { id: `lease_${Date.now()}`, type: 'submerged_land_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+        } else if (type === 'ground_lease' && !leases.some((l: LeaseDetail) => l.type === 'ground_lease')) {
+          leases = [...leases, { id: `lease_${Date.now()}`, type: 'ground_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+        } else if (type === 'combined') {
+          if (!leases.some((l: LeaseDetail) => l.type === 'submerged_land_lease')) {
+            leases = [...leases, { id: `lease_${Date.now()}_s`, type: 'submerged_land_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+          }
+          if (!leases.some((l: LeaseDetail) => l.type === 'ground_lease')) {
+            leases = [...leases, { id: `lease_${Date.now()}_g`, type: 'ground_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+          }
+        }
+        setOwnership({ type, leases });
+        setExpandedLeases(new Set(leases.map((l: LeaseDetail) => l.id)));
+      }
     }
   }, [config]);
 
@@ -270,7 +328,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, designatedSpaces, profitCenters]);
+  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, designatedSpaces, profitCenters, acreage, ownership]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -384,6 +442,121 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     setNewProfitCenterName('');
     setShowAddProfitCenterDialog(false);
     triggerAutosave(getCurrentData());
+  };
+
+  const addLease = (type: 'submerged_land_lease' | 'ground_lease') => {
+    const newLease: LeaseDetail = {
+      id: `lease_${Date.now()}`,
+      type,
+      counterparty: '',
+      monthlyRent: '',
+      annualRent: '',
+      termRemaining: '',
+      termUnit: 'years',
+      expirationDate: '',
+      renewalOptions: '',
+      notes: '',
+    };
+    setOwnership(prev => ({ ...prev, leases: [...prev.leases, newLease] }));
+    setExpandedLeases(prev => new Set([...prev, newLease.id]));
+  };
+
+  const updateLease = (id: string, field: keyof LeaseDetail, value: string) => {
+    setOwnership(prev => ({
+      ...prev,
+      leases: prev.leases.map(l => {
+        if (l.id !== id) return l;
+        const updated = { ...l, [field]: value };
+        if (field === 'monthlyRent') {
+          if (value) {
+            const monthly = parseFloat(value);
+            if (!isNaN(monthly)) updated.annualRent = (monthly * 12).toFixed(2);
+          } else {
+            updated.annualRent = '';
+          }
+        } else if (field === 'annualRent') {
+          if (value) {
+            const annual = parseFloat(value);
+            if (!isNaN(annual)) updated.monthlyRent = (annual / 12).toFixed(2);
+          } else {
+            updated.monthlyRent = '';
+          }
+        }
+        return updated;
+      }),
+    }));
+  };
+
+  const removeLease = (id: string) => {
+    setOwnership(prev => ({
+      ...prev,
+      leases: prev.leases.filter(l => l.id !== id),
+    }));
+    setExpandedLeases(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleLeaseExpanded = (id: string) => {
+    setExpandedLeases(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const createDefaultLease = (type: 'submerged_land_lease' | 'ground_lease'): LeaseDetail => ({
+    id: `lease_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    type,
+    counterparty: '',
+    monthlyRent: '',
+    annualRent: '',
+    termRemaining: '',
+    termUnit: 'years',
+    expirationDate: '',
+    renewalOptions: '',
+    notes: '',
+  });
+
+  const handleOwnershipTypeChange = (type: OwnershipType) => {
+    setOwnership(prev => {
+      let leases = [...prev.leases];
+      if (type === 'fee_simple') {
+        return { type, leases: [] };
+      }
+      if (type === 'submerged_land_lease') {
+        const hasSubmerged = leases.some(l => l.type === 'submerged_land_lease');
+        if (!hasSubmerged) {
+          const newLease = createDefaultLease('submerged_land_lease');
+          leases = [...leases, newLease];
+          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+        }
+      } else if (type === 'ground_lease') {
+        const hasGround = leases.some(l => l.type === 'ground_lease');
+        if (!hasGround) {
+          const newLease = createDefaultLease('ground_lease');
+          leases = [...leases, newLease];
+          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+        }
+      } else if (type === 'combined') {
+        const hasSubmerged = leases.some(l => l.type === 'submerged_land_lease');
+        const hasGround = leases.some(l => l.type === 'ground_lease');
+        if (!hasSubmerged) {
+          const newLease = createDefaultLease('submerged_land_lease');
+          leases = [...leases, newLease];
+          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+        }
+        if (!hasGround) {
+          const newLease = createDefaultLease('ground_lease');
+          leases = [...leases, newLease];
+          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+        }
+      }
+      return { type, leases };
+    });
   };
 
   const getSeasonLabel = () => {
@@ -634,6 +807,266 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           </CardContent>
         </Card>
 
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LandPlot className="h-5 w-5" />
+              Acreage
+            </CardTitle>
+            <CardDescription>
+              Total property acreage broken down by upland and submerged land
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="totalAcres">Total Acres</Label>
+              <Input
+                id="totalAcres"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={acreage.totalAcres}
+                onChange={(e) => setAcreage(prev => ({ ...prev, totalAcres: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="uplandAcres">Upland Acres</Label>
+                <Input
+                  id="uplandAcres"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={acreage.uplandAcres}
+                  onChange={(e) => setAcreage(prev => ({ ...prev, uplandAcres: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">Land above the waterline</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="submergedAcres">Submerged Acres</Label>
+                <Input
+                  id="submergedAcres"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={acreage.submergedAcres}
+                  onChange={(e) => setAcreage(prev => ({ ...prev, submergedAcres: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">Submerged land / water area</p>
+              </div>
+            </div>
+            {acreage.uplandAcres && acreage.submergedAcres && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border text-sm">
+                <span className="text-muted-foreground">Calculated Total</span>
+                <span className="font-medium">
+                  {(parseFloat(acreage.uplandAcres || '0') + parseFloat(acreage.submergedAcres || '0')).toFixed(2)} acres
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Ownership Structure
+            </CardTitle>
+            <CardDescription>
+              Property ownership type and applicable lease details
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Ownership Type</Label>
+              <Select
+                value={ownership.type}
+                onValueChange={(v) => handleOwnershipTypeChange(v as OwnershipType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fee_simple">Fee Simple</SelectItem>
+                  <SelectItem value="submerged_land_lease">Submerged Land Lease</SelectItem>
+                  <SelectItem value="ground_lease">Ground Lease</SelectItem>
+                  <SelectItem value="combined">Combined (Multiple)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {ownership.type === 'fee_simple' && 'Full ownership of both upland and submerged land'}
+                {ownership.type === 'submerged_land_lease' && 'Fee simple on upland, leased submerged land'}
+                {ownership.type === 'ground_lease' && 'Operating on leased ground'}
+                {ownership.type === 'combined' && 'Mix of owned and leased parcels — add all applicable leases below'}
+              </p>
+            </div>
+
+            {ownership.type !== 'fee_simple' && (
+              <div className="space-y-3">
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Lease Details</h4>
+                  <div className="flex gap-2">
+                    {(ownership.type === 'submerged_land_lease' || ownership.type === 'combined') && (
+                      <Button variant="outline" size="sm" onClick={() => addLease('submerged_land_lease')}>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Submerged Lease
+                      </Button>
+                    )}
+                    {(ownership.type === 'ground_lease' || ownership.type === 'combined') && (
+                      <Button variant="outline" size="sm" onClick={() => addLease('ground_lease')}>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Ground Lease
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {ownership.leases.length === 0 && (
+                  <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-lg">
+                    No leases added yet. Click above to add a lease.
+                  </div>
+                )}
+
+                {ownership.leases.map((lease) => (
+                  <div key={lease.id} className="border rounded-lg overflow-hidden">
+                    <div
+                      className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer hover:bg-muted/50"
+                      onClick={() => toggleLeaseExpanded(lease.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {expandedLeases.has(lease.id) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {lease.type === 'submerged_land_lease' ? 'Submerged Land' : 'Ground Lease'}
+                        </Badge>
+                        <span className="text-sm font-medium">
+                          {lease.counterparty || 'Unnamed Lease'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {lease.annualRent && (
+                          <span className="text-xs text-muted-foreground">
+                            ${parseFloat(lease.annualRent).toLocaleString()}/yr
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); removeLease(lease.id); }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {expandedLeases.has(lease.id) && (
+                      <div className="p-4 space-y-4">
+                        <div className="space-y-2">
+                          <Label>Counterparty / Lessor</Label>
+                          <Input
+                            placeholder="e.g., State of Florida, City of Miami"
+                            value={lease.counterparty}
+                            onChange={(e) => updateLease(lease.id, 'counterparty', e.target.value)}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Monthly Rent ($)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={lease.monthlyRent}
+                              onChange={(e) => updateLease(lease.id, 'monthlyRent', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Annual Rent ($)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={lease.annualRent}
+                              onChange={(e) => updateLease(lease.id, 'annualRent', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Term Remaining</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={lease.termRemaining}
+                                onChange={(e) => updateLease(lease.id, 'termRemaining', e.target.value)}
+                                className="flex-1"
+                              />
+                              <Select
+                                value={lease.termUnit}
+                                onValueChange={(v) => updateLease(lease.id, 'termUnit', v)}
+                              >
+                                <SelectTrigger className="w-24">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="years">Years</SelectItem>
+                                  <SelectItem value="months">Months</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Expiration Date</Label>
+                            <Input
+                              type="date"
+                              value={lease.expirationDate}
+                              onChange={(e) => updateLease(lease.id, 'expirationDate', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Renewal Options</Label>
+                          <Input
+                            placeholder="e.g., Two 10-year renewal options at market rate"
+                            value={lease.renewalOptions}
+                            onChange={(e) => updateLease(lease.id, 'renewalOptions', e.target.value)}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Input
+                            placeholder="Additional lease terms, escalation clauses, etc."
+                            value={lease.notes}
+                            onChange={(e) => updateLease(lease.id, 'notes', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
