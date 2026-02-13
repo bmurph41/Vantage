@@ -382,6 +382,9 @@ export class ProFormaEngineService {
     const exitAssumptions = assumptions.exitAssumptions || {};
     const sellingFeePct = (exitAssumptions.sellingFeePct ?? 2) / 100;
     const loanExitFeePct = (exitAssumptions.loanExitFeePct || 0) / 100;
+
+    // Property tax assumptions
+    const propertyTaxConfig = assumptions.propertyTax || null;
     const workingCapitalRecoveryPct = (exitAssumptions.workingCapitalRecoveryPct ?? 100) / 100;
     const workingCapitalAmount = exitAssumptions.workingCapitalAmount || 0;
     
@@ -702,6 +705,40 @@ export class ProFormaEngineService {
       };
     });
 
+    const isPropertyTaxLine = (name: string): boolean => {
+      const lower = name.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+      return lower.includes('property tax') || lower.includes('real estate tax')
+        || lower === 'property taxes' || lower === 'real estate taxes'
+        || lower.includes('taxes property') || lower.includes('tax assessment')
+        || lower === 'ad valorem tax' || lower === 'ad valorem taxes';
+    };
+
+    const getPropertyTaxMonthly = (yearIndex: number): number | null => {
+      if (!propertyTaxConfig || !propertyTaxConfig.millageRate) return null;
+      const baseTaxableValue = propertyTaxConfig.taxableValueMode === 'purchase_price'
+        ? (propertyTaxConfig.purchasePrice || 0)
+        : (propertyTaxConfig.taxableValue || 0);
+      if (baseTaxableValue <= 0) return null;
+
+      let currentTaxable = baseTaxableValue;
+
+      if (yearIndex === 0) {
+        if (propertyTaxConfig.reassessOnSale && propertyTaxConfig.year1TaxJumpPct > 0) {
+          currentTaxable = baseTaxableValue * (1 + propertyTaxConfig.year1TaxJumpPct / 100);
+        }
+      } else {
+        if (propertyTaxConfig.reassessOnSale && propertyTaxConfig.year1TaxJumpPct > 0) {
+          currentTaxable = baseTaxableValue * (1 + propertyTaxConfig.year1TaxJumpPct / 100);
+        }
+        const growthRate = (propertyTaxConfig.standardGrowthRate || 2) / 100;
+        currentTaxable = currentTaxable * Math.pow(1 + growthRate, yearIndex);
+      }
+
+      const divisor = propertyTaxConfig.millageRatePer || 1000;
+      const annualTax = (currentTaxable / divisor) * propertyTaxConfig.millageRate;
+      return Math.round(annualTax / 12);
+    };
+
     const expenseLineItems: LineItem[] = Object.entries(expensesBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
       const annualGrowthRate = getExpenseGrowthForCategory(name, department);
@@ -714,7 +751,18 @@ export class ProFormaEngineService {
         }
       }
 
-      if (granularMargins[departmentToAssumptionKey(department)]) {
+      if (isPropertyTaxLine(name) && propertyTaxConfig && propertyTaxConfig.millageRate > 0) {
+        for (const period of monthlyPeriods) {
+          if (projectionsMonthly[period.key] !== undefined) continue;
+          const yearIndex = period.year - baseYear;
+          const taxMonthly = getPropertyTaxMonthly(yearIndex);
+          if (taxMonthly !== null) {
+            projectionsMonthly[period.key] = taxMonthly;
+          } else {
+            projectionsMonthly[period.key] = Math.round(baseMonthly);
+          }
+        }
+      } else if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
         const projectedMarginPct = marginData.projected / 100;
         const revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store';
@@ -1019,7 +1067,8 @@ export class ProFormaEngineService {
     const netExitProceeds = exitValue - sellingFees - loanPayoff - loanExitFees + workingCapitalRecovery;
     
     // XIRR calculation using dated monthly levered cash flows
-    const totalEquityInvested = purchasePrice + workingCapitalAmount;
+    const loanProceeds = debtSchedule?.totalDebtAtClose || 0;
+    const totalEquityInvested = purchasePrice - loanProceeds + workingCapitalAmount;
     const datedCashFlows: DatedCashFlow[] = [
       { date: projectionStartDate, amount: -totalEquityInvested }
     ];
