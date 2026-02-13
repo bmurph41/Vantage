@@ -40,7 +40,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight, Download, DollarSign } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Loader2, Settings, BookText, ChevronRight, Download, DollarSign, Calendar } from 'lucide-react';
 import { Link } from 'wouter';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -140,6 +140,7 @@ type DisplayPreferences = {
   lineItemRoundingDigits: number;
   percentRoundingDecimals: number;
   bottomLineMetric: 'noi' | 'ebitda';
+  year1Mode: 'calendar_year_end' | 'next_12_months';
 };
 
 const ROUNDING_OPTIONS = [
@@ -532,6 +533,55 @@ export default function ModelingSettings() {
             </div>
             <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
               This selection flows through the Projects list, Historical P&L, Pro Forma, and Exit calculations
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Calendar className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Year 1 Definition</CardTitle>
+              <CardDescription>
+                Control how Year 1 is defined when a T12 (Trailing 12 Months) is the most recent data source
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="min-w-[120px]">Year 1 Mode</Label>
+              <Select
+                value={displayPrefs?.year1Mode ?? 'calendar_year_end'}
+                onValueChange={(val) => updatePrefsMutation.mutate({ year1Mode: val as 'calendar_year_end' | 'next_12_months' })}
+              >
+                <SelectTrigger className="w-[280px]" data-testid="select-year1-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="calendar_year_end">Calendar Year-End</SelectItem>
+                  <SelectItem value="next_12_months">Next 12 Months (Rolling)</SelectItem>
+                </SelectContent>
+              </Select>
+              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 space-y-2">
+              {(displayPrefs?.year1Mode ?? 'calendar_year_end') === 'calendar_year_end' ? (
+                <>
+                  <p><span className="font-medium">Calendar Year-End:</span> Year 1 aligns to the calendar year. Months covered by T12 data within that year are shown as <span className="text-green-600 dark:text-green-400 font-medium">Actual</span>, and remaining months are <span className="text-blue-600 dark:text-blue-400 font-medium">Forecast</span>.</p>
+                  <p className="text-xs">Example: T12 Aug 2025–Jul 2026 → Year 1 = Jan–Dec 2026. Jan–Jul = Actual, Aug–Dec = Forecast.</p>
+                </>
+              ) : (
+                <>
+                  <p><span className="font-medium">Next 12 Months:</span> Year 1 starts the month after the T12 ends, running a full 12-month rolling period. All subsequent years follow the same rolling pattern.</p>
+                  <p className="text-xs">Example: T12 Aug 2025–Jul 2026 → Year 1 = Aug 2026–Jul 2027. Year 2 = Aug 2027–Jul 2028.</p>
+                </>
+              )}
             </div>
           </div>
         </CardContent>

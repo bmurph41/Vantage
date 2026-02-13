@@ -16981,6 +16981,14 @@ Current context: Project ${req.params.projectId}`;
         updates.bottomLineMetric = bottomLineMetric;
       }
 
+      const { year1Mode } = req.body;
+      if (year1Mode !== undefined) {
+        if (!['calendar_year_end', 'next_12_months'].includes(year1Mode)) {
+          return res.status(400).json({ error: 'year1Mode must be "calendar_year_end" or "next_12_months"' });
+        }
+        updates.year1Mode = year1Mode;
+      }
+
       const { modelingDisplayPreferences } = await import('@shared/schema');
 
       const [existing] = await db.select().from(modelingDisplayPreferences)

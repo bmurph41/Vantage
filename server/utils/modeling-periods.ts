@@ -25,6 +25,15 @@ import {
 export type ProjectionStartRule = 'acq_close_year' | 'next_full_calendar_year' | 'ttm_plus_one_month';
 export type StabilizedNoiMode = 'fixed_year' | 'user_set' | 'post_ramp';
 export type IrrDisplayPreference = 'monthly' | 'annualized';
+export type Year1Mode = 'calendar_year_end' | 'next_12_months';
+
+export interface T12Context {
+  t12StartMonth: number;  // 1-12
+  t12StartYear: number;
+  t12EndMonth: number;    // 1-12
+  t12EndYear: number;
+  year1Mode: Year1Mode;
+}
 
 export interface TimelineConfig {
   acquisitionCloseDate: Date | string | null;
@@ -32,6 +41,7 @@ export interface TimelineConfig {
   projectionStartRule: ProjectionStartRule;
   holdPeriodMonths: number;
   holdPeriodYears?: number; // Derived or legacy input
+  t12Context?: T12Context; // T12-aware projection context
 }
 
 export interface MonthlyPeriod {
@@ -46,6 +56,8 @@ export interface MonthlyPeriod {
   yearIndex: number;       // 0-based year from projection start (for annual rollups)
   isFirstMonthOfYear: boolean;
   isLastMonthOfYear: boolean;
+  isActual?: boolean;      // True if this month is covered by T12 actual data
+  isForecast?: boolean;    // True if this month is projected/forecast
 }
 
 export interface AnnualPeriod {
@@ -355,6 +367,161 @@ export function getStabilizedNoiPeriodIndex(
 }
 
 // ============================================
+// T12-AWARE PERIOD BUILDING
+// ============================================
+
+function isMonthInT12Range(year: number, month: number, t12: T12Context): boolean {
+  const t12StartVal = t12.t12StartYear * 12 + t12.t12StartMonth;
+  const t12EndVal = t12.t12EndYear * 12 + t12.t12EndMonth;
+  const monthVal = year * 12 + month;
+  return monthVal >= t12StartVal && monthVal <= t12EndVal;
+}
+
+export function buildT12AwarePeriods(config: TimelineConfig): PeriodResult {
+  const t12 = config.t12Context;
+  if (!t12) {
+    return buildModelingPeriods(config);
+  }
+
+  let holdPeriodMonths = config.holdPeriodMonths;
+  if (!holdPeriodMonths && config.holdPeriodYears) {
+    holdPeriodMonths = config.holdPeriodYears * 12;
+  }
+  if (!holdPeriodMonths) {
+    holdPeriodMonths = 60;
+  }
+
+  let projectionStartDate: Date;
+
+  if (t12.year1Mode === 'next_12_months') {
+    const endDate = new Date(t12.t12EndYear, t12.t12EndMonth - 1, 1);
+    projectionStartDate = startOfMonth(addMonths(endDate, 1));
+  } else {
+    let year1Year = t12.t12EndYear;
+    if (t12.t12EndMonth === 12) {
+      year1Year = t12.t12EndYear + 1;
+    }
+    projectionStartDate = new Date(year1Year, 0, 1);
+  }
+
+  const monthlyPeriods: MonthlyPeriod[] = [];
+  const startMonth = getMonth(projectionStartDate) + 1;
+
+  for (let i = 0; i < holdPeriodMonths; i++) {
+    const date = addMonths(projectionStartDate, i);
+    const year = getYear(date);
+    const month = getMonth(date) + 1;
+
+    let yearIndex: number;
+    if (t12.year1Mode === 'next_12_months') {
+      yearIndex = Math.floor(i / 12);
+    } else {
+      yearIndex = year - getYear(projectionStartDate);
+    }
+
+    const actual = isMonthInT12Range(year, month, t12);
+
+    let isFirstOfProjectionYear: boolean;
+    let isLastOfProjectionYear: boolean;
+
+    if (t12.year1Mode === 'next_12_months') {
+      isFirstOfProjectionYear = (i % 12) === 0;
+      isLastOfProjectionYear = (i % 12) === 11;
+    } else {
+      isFirstOfProjectionYear = month === 1;
+      isLastOfProjectionYear = month === 12;
+    }
+
+    monthlyPeriods.push({
+      index: i,
+      date: startOfMonth(date),
+      monthEnd: endOfMonth(date),
+      year,
+      month,
+      key: format(date, 'yyyy-MM'),
+      label: format(date, 'MMM yyyy'),
+      quarterIndex: Math.floor(i / 3),
+      yearIndex,
+      isFirstMonthOfYear: isFirstOfProjectionYear,
+      isLastMonthOfYear: isLastOfProjectionYear,
+      isActual: actual,
+      isForecast: !actual,
+    });
+  }
+
+  let annualPeriods: AnnualPeriod[];
+
+  if (t12.year1Mode === 'next_12_months') {
+    const yearMap = new Map<number, MonthlyPeriod[]>();
+    for (const period of monthlyPeriods) {
+      const existing = yearMap.get(period.yearIndex) || [];
+      existing.push(period);
+      yearMap.set(period.yearIndex, existing);
+    }
+
+    annualPeriods = [];
+    for (const [yIdx, months] of yearMap.entries()) {
+      const first = months[0];
+      const last = months[months.length - 1];
+      const startLabel = format(first.date, 'MMM yyyy');
+      const endLabel = format(last.date, 'MMM yyyy');
+
+      annualPeriods.push({
+        yearIndex: yIdx,
+        year: first.year,
+        label: `Year ${yIdx + 1} (${startLabel}–${endLabel})`,
+        monthIndices: months.map(m => m.index),
+        monthCount: months.length,
+      });
+    }
+    annualPeriods.sort((a, b) => a.yearIndex - b.yearIndex);
+  } else {
+    const yearMap = new Map<number, MonthlyPeriod[]>();
+    for (const period of monthlyPeriods) {
+      const existing = yearMap.get(period.yearIndex) || [];
+      existing.push(period);
+      yearMap.set(period.yearIndex, existing);
+    }
+
+    annualPeriods = [];
+    for (const [yIdx, months] of yearMap.entries()) {
+      const firstMonth = months[0];
+      const calYear = firstMonth.year;
+      const actualCount = months.filter(m => m.isActual).length;
+      const forecastCount = months.filter(m => m.isForecast).length;
+
+      let label = `Year ${yIdx + 1} (${calYear})`;
+      if (actualCount > 0 && forecastCount > 0) {
+        label = `Year ${yIdx + 1} (${calYear}) — ${actualCount}mo Actual, ${forecastCount}mo Forecast`;
+      }
+
+      annualPeriods.push({
+        yearIndex: yIdx,
+        year: calYear,
+        label,
+        monthIndices: months.map(m => m.index),
+        monthCount: months.length,
+      });
+    }
+    annualPeriods.sort((a, b) => a.yearIndex - b.yearIndex);
+  }
+
+  const projectionEndDate = monthlyPeriods.length > 0
+    ? monthlyPeriods[monthlyPeriods.length - 1].monthEnd
+    : projectionStartDate;
+
+  return {
+    projectionStartDate,
+    projectionEndDate,
+    monthlyPeriods,
+    annualPeriods,
+    holdPeriodMonths,
+    holdPeriodYears: Math.ceil(holdPeriodMonths / 12),
+    totalMonths: monthlyPeriods.length,
+  };
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 
@@ -363,6 +530,7 @@ export default {
   buildMonthlyPeriods,
   buildAnnualPeriods,
   buildModelingPeriods,
+  buildT12AwarePeriods,
   getPeriodIndexForDate,
   getPeriodsForYear,
   annualToMonthlyRate,

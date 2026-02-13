@@ -37,6 +37,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { debtScheduleService, type DebtSchedule, type DSCRMetrics } from './debt-schedule-service';
 import {
   buildModelingPeriods,
+  buildT12AwarePeriods,
   annualToMonthlyRate,
   monthlyIrrToAnnualized,
   getStabilizedNoiPeriodIndex,
@@ -45,7 +46,9 @@ import {
   type AnnualPeriod,
   type ProjectionStartRule,
   type StabilizedNoiMode,
-  type IrrDisplayPreference
+  type IrrDisplayPreference,
+  type Year1Mode,
+  type T12Context
 } from '../utils/modeling-periods';
 
 // ============================================
@@ -81,6 +84,8 @@ export interface MonthlyProjection {
   reserves: number;
   debtService: number;
   leveredCashFlow: number;
+  isActual?: boolean;
+  isForecast?: boolean;
 }
 
 export interface AnnualProjection {
@@ -119,6 +124,7 @@ export interface ProFormaData {
     holdPeriodMonths: number;
     holdPeriodYears: number;
     projectionStartRule: ProjectionStartRule;
+    t12Context?: T12Context;
   };
   
   // Legacy compatibility
@@ -276,15 +282,53 @@ export class ProFormaEngineService {
     const projectConfig = (project.customMetrics as any)?.config || {};
     const effectiveHoldPeriod = projectConfig.holdPeriod || config?.holdPeriod || 5;
     
+    const { docIntelUploads, modelingDisplayPreferences } = await import('@shared/schema');
+    
+    const t12Docs = await db.select()
+      .from(docIntelUploads)
+      .where(and(
+        eq(docIntelUploads.modelingProjectId, projectId),
+        eq(docIntelUploads.isT12, true)
+      ));
+    
+    const latestT12 = t12Docs
+      .filter(d => d.periodMetadata?.t12StartMonth && d.periodMetadata?.t12EndMonth)
+      .sort((a, b) => {
+        const aEnd = (a.periodMetadata?.t12EndYear || 0) * 12 + (a.periodMetadata?.t12EndMonth || 0);
+        const bEnd = (b.periodMetadata?.t12EndYear || 0) * 12 + (b.periodMetadata?.t12EndMonth || 0);
+        return bEnd - aEnd;
+      })[0];
+    
+    let t12Context: T12Context | undefined;
+    
+    if (latestT12?.periodMetadata) {
+      const pm = latestT12.periodMetadata;
+      const [orgPrefs] = await db.select()
+        .from(modelingDisplayPreferences)
+        .where(eq(modelingDisplayPreferences.orgId, orgId))
+        .limit(1);
+      
+      const year1Mode = ((orgPrefs as any)?.year1Mode as Year1Mode) || 'calendar_year_end';
+      
+      t12Context = {
+        t12StartMonth: pm.t12StartMonth!,
+        t12StartYear: pm.t12StartYear!,
+        t12EndMonth: pm.t12EndMonth!,
+        t12EndYear: pm.t12EndYear!,
+        year1Mode,
+      };
+    }
+    
     const timelineConfig: TimelineConfig = {
       acquisitionCloseDate: config?.acquisitionCloseDate || projectConfig.acquisitionCloseDate || null,
       ttmEndDate: config?.ttmEndDate || projectConfig.ttmEndDate || null,
       projectionStartRule: (config?.projectionStartRule as ProjectionStartRule) || 'acq_close_year',
       holdPeriodMonths: effectiveHoldPeriod * 12,
       holdPeriodYears: effectiveHoldPeriod,
+      t12Context,
     };
     
-    const periods = buildModelingPeriods(timelineConfig);
+    const periods = t12Context ? buildT12AwarePeriods(timelineConfig) : buildModelingPeriods(timelineConfig);
     const { monthlyPeriods, annualPeriods, projectionStartDate, projectionEndDate } = periods;
     
     // Legacy compatibility: extract years array
@@ -497,6 +541,16 @@ export class ProFormaEngineService {
       return currentOccPct / baseOccPct;
     };
     
+    const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
+    for (const actual of actuals) {
+      const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
+      const key = `${actual.year}-${String(actual.month).padStart(2, '0')}`;
+      if (!actualsMonthlyLookup[subcat]) {
+        actualsMonthlyLookup[subcat] = {};
+      }
+      actualsMonthlyLookup[subcat][key] = (actualsMonthlyLookup[subcat][key] || 0) + parseFloat(actual.amount?.toString() || '0');
+    }
+
     const revenueLineItems: LineItem[] = Object.entries(revenueBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
       const annualGrowthRate = getRevenueGrowthForDept(department, name);
@@ -516,6 +570,11 @@ export class ProFormaEngineService {
         
         if (period.index > 0) {
           cumulativeGrowth *= (1 + currentMonthlyRate);
+        }
+
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+          projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
+          continue;
         }
         
         let projectedAmount = baseMonthly * cumulativeGrowth;
@@ -553,6 +612,12 @@ export class ProFormaEngineService {
       const baseMonthly = data.amount / 12;
       const projectionsMonthly: Record<string, number> = {};
       
+      for (const period of monthlyPeriods) {
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+          projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
+        }
+      }
+
       if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
         const projectedMarginPct = marginData.projected / 100;
@@ -573,6 +638,7 @@ export class ProFormaEngineService {
               revPrevYear = period.year;
             }
             if (period.index > 0) revCumGrowth *= (1 + revMonthlyRate);
+            if (projectionsMonthly[period.key] !== undefined) continue;
             const projectedRevMonth = (revBase / 12) * revCumGrowth;
             projectionsMonthly[period.key] = Math.round(projectedRevMonth * (1 - projectedMarginPct));
           }
@@ -586,6 +652,7 @@ export class ProFormaEngineService {
               pYear = period.year;
             }
             if (period.index > 0) cumGrowth *= (1 + mRate);
+            if (projectionsMonthly[period.key] !== undefined) continue;
             projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
           }
         }
@@ -599,6 +666,7 @@ export class ProFormaEngineService {
             pYear = period.year;
           }
           if (period.index > 0) cumGrowth *= (1 + mRate);
+          if (projectionsMonthly[period.key] !== undefined) continue;
           projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
         }
       }
@@ -630,6 +698,12 @@ export class ProFormaEngineService {
       const baseMonthly = data.amount / 12;
       const projectionsMonthly: Record<string, number> = {};
       
+      for (const period of monthlyPeriods) {
+        if (period.isActual && actualsMonthlyLookup[name]?.[period.key]) {
+          projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
+        }
+      }
+
       if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
         const projectedMarginPct = marginData.projected / 100;
@@ -650,6 +724,7 @@ export class ProFormaEngineService {
               revPrevYear = period.year;
             }
             if (period.index > 0) revCumGrowth *= (1 + revMonthlyRate);
+            if (projectionsMonthly[period.key] !== undefined) continue;
             const projectedRevMonth = (revBase / 12) * revCumGrowth;
             projectionsMonthly[period.key] = Math.round(projectedRevMonth * (1 - projectedMarginPct));
           }
@@ -663,6 +738,7 @@ export class ProFormaEngineService {
               pYear = period.year;
             }
             if (period.index > 0) cumGrowth *= (1 + mRate);
+            if (projectionsMonthly[period.key] !== undefined) continue;
             projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
           }
         }
@@ -676,6 +752,7 @@ export class ProFormaEngineService {
             pYear = period.year;
           }
           if (period.index > 0) cumGrowth *= (1 + mRate);
+          if (projectionsMonthly[period.key] !== undefined) continue;
           projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
         }
       }
@@ -795,6 +872,8 @@ export class ProFormaEngineService {
       reserves: reservesMonthly[period.key] || 0,
       debtService: debtServiceMonthly[period.key] || 0,
       leveredCashFlow: leveredCashFlowMonthly[period.key] || 0,
+      isActual: period.isActual ?? false,
+      isForecast: period.isForecast ?? true,
     }));
     
     const annualProjections: AnnualProjection[] = annualPeriods.map((year, i) => ({
@@ -965,6 +1044,7 @@ export class ProFormaEngineService {
         holdPeriodMonths: periods.holdPeriodMonths,
         holdPeriodYears: periods.holdPeriodYears,
         projectionStartRule: timelineConfig.projectionStartRule,
+        t12Context: t12Context || undefined,
       },
       
       // Legacy compatibility
