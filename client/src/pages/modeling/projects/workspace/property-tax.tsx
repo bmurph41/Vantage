@@ -46,7 +46,8 @@ import {
 interface PropertyTaxConfig {
   purchasePrice: number;
   taxableValue: number;
-  taxableValueMode: 'manual' | 'purchase_price';
+  taxableValueMode: 'manual' | 'purchase_price' | 'pct_of_purchase';
+  assessedValuePct: number;
   millageRate: number;
   millageRatePer: 100 | 1000;
   reassessOnSale: boolean;
@@ -61,6 +62,7 @@ const DEFAULT_CONFIG: PropertyTaxConfig = {
   purchasePrice: 0,
   taxableValue: 0,
   taxableValueMode: 'purchase_price',
+  assessedValuePct: 85,
   millageRate: 0,
   millageRatePer: 1000,
   reassessOnSale: true,
@@ -73,6 +75,70 @@ const DEFAULT_CONFIG: PropertyTaxConfig = {
 
 function formatCurrencyVal(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+}
+
+function formatNumberWithCommas(value: number): string {
+  if (!value && value !== 0) return '';
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+}
+
+function parseFormattedNumber(str: string): number {
+  const cleaned = str.replace(/[^0-9.-]/g, '');
+  return parseFloat(cleaned) || 0;
+}
+
+function CurrencyInput({ value, onChange, placeholder }: { value: number; onChange: (val: number) => void; placeholder?: string }) {
+  const [displayValue, setDisplayValue] = useState(value ? formatNumberWithCommas(value) : '');
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(value ? formatNumberWithCommas(value) : '');
+    }
+  }, [value, isFocused]);
+
+  return (
+    <div className="relative">
+      <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Input
+        type="text"
+        inputMode="numeric"
+        className="pl-8"
+        value={displayValue}
+        onFocus={() => {
+          setIsFocused(true);
+          setDisplayValue(value ? String(value) : '');
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          setDisplayValue(value ? formatNumberWithCommas(value) : '');
+        }}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setDisplayValue(raw);
+          const parsed = parseFormattedNumber(raw);
+          onChange(parsed);
+        }}
+        placeholder={placeholder || 'Enter amount'}
+      />
+    </div>
+  );
+}
+
+function PercentInput({ value, onChange, placeholder, step }: { value: number; onChange: (val: number) => void; placeholder?: string; step?: string }) {
+  return (
+    <div className="relative">
+      <Input
+        type="number"
+        step={step || '1'}
+        className="pr-8"
+        value={value || ''}
+        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        placeholder={placeholder || '0'}
+      />
+      <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">%</span>
+    </div>
+  );
 }
 
 function InfoTip({ text }: { text: string }) {
@@ -135,8 +201,17 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
       if (field === 'taxableValueMode' && value === 'purchase_price') {
         next.taxableValue = next.purchasePrice;
       }
+      if (field === 'taxableValueMode' && value === 'pct_of_purchase') {
+        next.taxableValue = Math.round(next.purchasePrice * (next.assessedValuePct / 100));
+      }
       if (field === 'purchasePrice' && prev.taxableValueMode === 'purchase_price') {
         next.taxableValue = value as number;
+      }
+      if (field === 'purchasePrice' && prev.taxableValueMode === 'pct_of_purchase') {
+        next.taxableValue = Math.round((value as number) * (prev.assessedValuePct / 100));
+      }
+      if (field === 'assessedValuePct') {
+        next.taxableValue = Math.round(next.purchasePrice * ((value as number) / 100));
       }
       return next;
     });
@@ -188,7 +263,11 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
     },
   });
 
-  const effectiveTaxableValue = config.taxableValueMode === 'purchase_price' ? config.purchasePrice : config.taxableValue;
+  const effectiveTaxableValue = config.taxableValueMode === 'purchase_price'
+    ? config.purchasePrice
+    : config.taxableValueMode === 'pct_of_purchase'
+      ? Math.round(config.purchasePrice * (config.assessedValuePct / 100))
+      : config.taxableValue;
 
   const calculateTax = (taxableVal: number): number => {
     if (config.millageRatePer === 1000) {
@@ -276,50 +355,59 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Purchase Price</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  className="pl-8"
-                  value={config.purchasePrice || ''}
-                  onChange={(e) => updateField('purchasePrice', parseFloat(e.target.value) || 0)}
-                  placeholder="Enter purchase price"
-                />
-              </div>
+              <CurrencyInput
+                value={config.purchasePrice}
+                onChange={(val) => updateField('purchasePrice', val)}
+                placeholder="Enter purchase price"
+              />
             </div>
 
             <div className="space-y-2">
               <Label className="flex items-center">
                 Taxable Value Basis
-                <InfoTip text="Choose whether to base taxable value on the purchase price or enter a custom value (e.g., county assessed value)" />
+                <InfoTip text="Choose whether to base taxable value on the purchase price, a percentage of purchase price, or enter a custom value (e.g., county assessed value)" />
               </Label>
               <Select
                 value={config.taxableValueMode}
-                onValueChange={(val) => updateField('taxableValueMode', val as 'manual' | 'purchase_price')}
+                onValueChange={(val) => updateField('taxableValueMode', val as 'manual' | 'purchase_price' | 'pct_of_purchase')}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="purchase_price">Use Purchase Price</SelectItem>
+                  <SelectItem value="purchase_price">Use Purchase Price (100%)</SelectItem>
+                  <SelectItem value="pct_of_purchase">% of Purchase Price</SelectItem>
                   <SelectItem value="manual">Custom Assessed Value</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {config.taxableValueMode === 'pct_of_purchase' && (
+              <div className="space-y-2">
+                <Label className="flex items-center">
+                  Assessed Value %
+                  <InfoTip text="The percentage of the purchase price used as the taxable/assessed value. For example, 85% means the county assesses property at 85% of purchase price." />
+                </Label>
+                <PercentInput
+                  value={config.assessedValuePct}
+                  onChange={(val) => updateField('assessedValuePct', val)}
+                  placeholder="85"
+                  step="0.1"
+                />
+                <div className="text-xs text-muted-foreground">
+                  {config.assessedValuePct}% of {formatCurrencyVal(config.purchasePrice)} = {formatCurrencyVal(effectiveTaxableValue)}
+                </div>
+              </div>
+            )}
+
             {config.taxableValueMode === 'manual' && (
               <div className="space-y-2">
                 <Label>Custom Taxable Value</Label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="number"
-                    className="pl-8"
-                    value={config.taxableValue || ''}
-                    onChange={(e) => updateField('taxableValue', parseFloat(e.target.value) || 0)}
-                    placeholder="Enter assessed value"
-                  />
-                </div>
+                <CurrencyInput
+                  value={config.taxableValue}
+                  onChange={(val) => updateField('taxableValue', val)}
+                  placeholder="Enter assessed value"
+                />
               </div>
             )}
 
