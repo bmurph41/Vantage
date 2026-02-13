@@ -85,22 +85,22 @@ function SortableRow({ region, onEdit, onDelete }: {
 
   return (
     <TableRow ref={setNodeRef} style={style}>
-      <TableCell className="w-12">
+      <TableCell className="w-8 py-1.5 pr-0">
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab touch-none p-1 hover:bg-muted rounded"
+          className="cursor-grab touch-none p-0.5 hover:bg-muted rounded"
           data-testid={`drag-handle-${region.id}`}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </TableCell>
-      <TableCell className="font-medium" data-testid={`region-name-${region.id}`}>
+      <TableCell className="font-medium py-1.5 text-sm" data-testid={`region-name-${region.id}`}>
         {region.name}
       </TableCell>
-      <TableCell>
+      <TableCell className="py-1.5">
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
+          className={`px-1.5 py-0.5 rounded-full text-[11px] font-medium ${
             region.isActive
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
               : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
@@ -110,23 +110,25 @@ function SortableRow({ region, onEdit, onDelete }: {
           {region.isActive ? 'Active' : 'Inactive'}
         </span>
       </TableCell>
-      <TableCell className="text-right">
-        <div className="flex justify-end gap-2">
+      <TableCell className="text-right py-1.5">
+        <div className="flex justify-end gap-1">
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7"
             onClick={() => onEdit(region)}
             data-testid={`button-edit-region-${region.id}`}
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7"
             onClick={() => onDelete(region)}
             data-testid={`button-delete-region-${region.id}`}
           >
-            <Trash2 className="h-4 w-4 text-red-500" />
+            <Trash2 className="h-3.5 w-3.5 text-red-500" />
           </Button>
         </div>
       </TableCell>
@@ -180,6 +182,39 @@ const PERCENT_ROUNDING_OPTIONS = [
   { value: 3, label: '3 decimals', example: '5.250%' },
   { value: 4, label: '4 decimals', example: '5.2500%' },
 ];
+
+function RoundingRow({ label, value, options, onUpdate, isPending, testId }: {
+  label: string;
+  value: number;
+  options: { value: number; label: string; example: string }[];
+  onUpdate: (val: number) => void;
+  isPending: boolean;
+  testId: string;
+}) {
+  const preview = options.find(o => o.value === value)?.example;
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <Label className="min-w-[120px] text-sm">{label}</Label>
+      <Select
+        value={String(value)}
+        onValueChange={(val) => onUpdate(Number(val))}
+      >
+        <SelectTrigger className="w-[180px] h-8 text-sm" data-testid={testId}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={String(opt.value)}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-xs text-muted-foreground tabular-nums">{preview}</span>
+      {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
 
 export default function ModelingSettings() {
   const { toast } = useToast();
@@ -351,282 +386,182 @@ export default function ModelingSettings() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Settings className="h-8 w-8 text-muted-foreground" />
+    <div className="container mx-auto py-4 max-w-4xl space-y-4">
+      <div className="flex items-center gap-2.5 mb-1">
+        <Settings className="h-6 w-6 text-muted-foreground" />
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-settings-title">Model Settings</h1>
-          <p className="text-muted-foreground">Configure regions and preferences for modeling projects</p>
+          <h1 className="text-xl font-bold leading-tight" data-testid="text-settings-title">Model Settings</h1>
+          <p className="text-sm text-muted-foreground">Configure regions and preferences for modeling projects</p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Link href="/modeling/pnl/keyword-bank" data-testid="link-keyword-bank">
-          <Card className="cursor-pointer hover:border-primary/50 transition-colors" data-testid="card-keyword-bank">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <BookText className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">P&L Keyword Bank</CardTitle>
-                    <CardDescription>
-                      Manage keyword rules for automatic P&L classification
-                    </CardDescription>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      <Link href="/modeling/pnl/keyword-bank" data-testid="link-keyword-bank">
+        <Card className="cursor-pointer hover:border-primary/50 transition-colors" data-testid="card-keyword-bank">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-primary/10 rounded-md">
+                <BookText className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">P&L Keyword Bank</p>
+                <p className="text-xs text-muted-foreground">Manage keyword rules for automatic P&L classification</p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </Card>
+      </Link>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2 pt-3 px-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm">Display Rounding</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="divide-y">
+              <RoundingRow
+                label="Purchase Price"
+                value={displayPrefs?.priceRoundingDigits ?? 0}
+                options={ROUNDING_OPTIONS}
+                onUpdate={(val) => updatePrefsMutation.mutate({ priceRoundingDigits: val })}
+                isPending={updatePrefsMutation.isPending}
+                testId="select-rounding-price"
+              />
+              <RoundingRow
+                label="EBITDA / NOI"
+                value={displayPrefs?.ebitdaRoundingDigits ?? 0}
+                options={EBITDA_ROUNDING_OPTIONS}
+                onUpdate={(val) => updatePrefsMutation.mutate({ ebitdaRoundingDigits: val })}
+                isPending={updatePrefsMutation.isPending}
+                testId="select-rounding-ebitda"
+              />
+              <RoundingRow
+                label="Line Items"
+                value={displayPrefs?.lineItemRoundingDigits ?? 0}
+                options={LINE_ITEM_ROUNDING_OPTIONS}
+                onUpdate={(val) => updatePrefsMutation.mutate({ lineItemRoundingDigits: val })}
+                isPending={updatePrefsMutation.isPending}
+                testId="select-rounding-lineitem"
+              />
+              <RoundingRow
+                label="Percentages"
+                value={displayPrefs?.percentRoundingDecimals ?? 1}
+                options={PERCENT_ROUNDING_OPTIONS}
+                onUpdate={(val) => updatePrefsMutation.mutate({ percentRoundingDecimals: val })}
+                isPending={updatePrefsMutation.isPending}
+                testId="select-rounding-percent"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm">Bottom Line Metric</CardTitle>
               </div>
             </CardHeader>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="flex items-center gap-3 py-1">
+                <Label className="min-w-[60px] text-sm">Metric</Label>
+                <Select
+                  value={displayPrefs?.bottomLineMetric ?? 'noi'}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ bottomLineMetric: val as 'noi' | 'ebitda' })}
+                >
+                  <SelectTrigger className="w-full h-8 text-sm" data-testid="select-bottom-line-metric">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="noi">NOI (Net Operating Income)</SelectItem>
+                    <SelectItem value="ebitda">EBITDA</SelectItem>
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0" />}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                Flows through Projects list, Historical P&L, Pro Forma, and Exit calculations.
+              </p>
+            </CardContent>
           </Card>
-        </Link>
+
+          <Card>
+            <CardHeader className="pb-2 pt-3 px-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm">Year 1 Definition</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="flex items-center gap-3 py-1">
+                <Label className="min-w-[60px] text-sm">Mode</Label>
+                <Select
+                  value={displayPrefs?.year1Mode ?? 'calendar_year_end'}
+                  onValueChange={(val) => updatePrefsMutation.mutate({ year1Mode: val as 'calendar_year_end' | 'next_12_months' })}
+                >
+                  <SelectTrigger className="w-full h-8 text-sm" data-testid="select-year1-mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="calendar_year_end">Calendar Year-End</SelectItem>
+                    <SelectItem value="next_12_months">Next 12 Months (Rolling)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {updatePrefsMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0" />}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                {(displayPrefs?.year1Mode ?? 'calendar_year_end') === 'calendar_year_end' ? (
+                  <p>T12 months within the calendar year show as <span className="text-green-600 dark:text-green-400 font-medium">Actual</span>, remaining as <span className="text-blue-600 dark:text-blue-400 font-medium">Forecast</span>.</p>
+                ) : (
+                  <p>Year 1 starts the month after T12 ends, rolling forward 12 months each year.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <DollarSign className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Display Rounding</CardTitle>
-              <CardDescription>
-                Control how values are rounded throughout the financial models
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <Label className="min-w-[160px] font-medium">Purchase Price</Label>
-                <Select
-                  value={String(displayPrefs?.priceRoundingDigits ?? 0)}
-                  onValueChange={(val) => updatePrefsMutation.mutate({ priceRoundingDigits: Number(val) })}
-                >
-                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-price">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROUNDING_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={String(opt.value)}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              </div>
-              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
-                Preview: {ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.priceRoundingDigits ?? 0))?.example || '$3,287,567'}
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              <div className="flex items-center gap-4">
-                <Label className="min-w-[160px] font-medium">EBITDA / NOI</Label>
-                <Select
-                  value={String(displayPrefs?.ebitdaRoundingDigits ?? 0)}
-                  onValueChange={(val) => updatePrefsMutation.mutate({ ebitdaRoundingDigits: Number(val) })}
-                >
-                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-ebitda">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EBITDA_ROUNDING_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={String(opt.value)}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              </div>
-              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
-                Preview: {EBITDA_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.ebitdaRoundingDigits ?? 0))?.example || '$1,287,567'}
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              <div className="flex items-center gap-4">
-                <Label className="min-w-[160px] font-medium">Line Item Values</Label>
-                <Select
-                  value={String(displayPrefs?.lineItemRoundingDigits ?? 0)}
-                  onValueChange={(val) => updatePrefsMutation.mutate({ lineItemRoundingDigits: Number(val) })}
-                >
-                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-lineitem">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LINE_ITEM_ROUNDING_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={String(opt.value)}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              </div>
-              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
-                Preview: {LINE_ITEM_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.lineItemRoundingDigits ?? 0))?.example || '$47,823'}
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-3">
-              <div className="flex items-center gap-4">
-                <Label className="min-w-[160px] font-medium">Percentages</Label>
-                <Select
-                  value={String(displayPrefs?.percentRoundingDecimals ?? 1)}
-                  onValueChange={(val) => updatePrefsMutation.mutate({ percentRoundingDecimals: Number(val) })}
-                >
-                  <SelectTrigger className="w-[220px]" data-testid="select-rounding-percent">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERCENT_ROUNDING_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={String(opt.value)}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              </div>
-              <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 ml-[176px]">
-                Preview: {PERCENT_ROUNDING_OPTIONS.find(o => o.value === (displayPrefs?.percentRoundingDecimals ?? 1))?.example || '5.2%'}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Settings className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Bottom Line Metric</CardTitle>
-              <CardDescription>
-                Choose whether to display NOI or EBITDA throughout your financial models
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="min-w-[120px]">Metric</Label>
-              <Select
-                value={displayPrefs?.bottomLineMetric ?? 'noi'}
-                onValueChange={(val) => updatePrefsMutation.mutate({ bottomLineMetric: val as 'noi' | 'ebitda' })}
-              >
-                <SelectTrigger className="w-[280px]" data-testid="select-bottom-line-metric">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="noi">NOI (Net Operating Income)</SelectItem>
-                  <SelectItem value="ebitda">EBITDA</SelectItem>
-                </SelectContent>
-              </Select>
-              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            </div>
-            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-              This selection flows through the Projects list, Historical P&L, Pro Forma, and Exit calculations
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Calendar className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Year 1 Definition</CardTitle>
-              <CardDescription>
-                Control how Year 1 is defined when a T12 (Trailing 12 Months) is the most recent data source
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="min-w-[120px]">Year 1 Mode</Label>
-              <Select
-                value={displayPrefs?.year1Mode ?? 'calendar_year_end'}
-                onValueChange={(val) => updatePrefsMutation.mutate({ year1Mode: val as 'calendar_year_end' | 'next_12_months' })}
-              >
-                <SelectTrigger className="w-[280px]" data-testid="select-year1-mode">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="calendar_year_end">Calendar Year-End</SelectItem>
-                  <SelectItem value="next_12_months">Next 12 Months (Rolling)</SelectItem>
-                </SelectContent>
-              </Select>
-              {updatePrefsMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            </div>
-            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 space-y-2">
-              {(displayPrefs?.year1Mode ?? 'calendar_year_end') === 'calendar_year_end' ? (
-                <>
-                  <p><span className="font-medium">Calendar Year-End:</span> Year 1 aligns to the calendar year. Months covered by T12 data within that year are shown as <span className="text-green-600 dark:text-green-400 font-medium">Actual</span>, and remaining months are <span className="text-blue-600 dark:text-blue-400 font-medium">Forecast</span>.</p>
-                  <p className="text-xs">Example: T12 Aug 2025–Jul 2026 → Year 1 = Jan–Dec 2026. Jan–Jul = Actual, Aug–Dec = Forecast.</p>
-                </>
-              ) : (
-                <>
-                  <p><span className="font-medium">Next 12 Months:</span> Year 1 starts the month after the T12 ends, running a full 12-month rolling period. All subsequent years follow the same rolling pattern.</p>
-                  <p className="text-xs">Example: T12 Aug 2025–Jul 2026 → Year 1 = Aug 2026–Jul 2027. Year 2 = Aug 2027–Jul 2028.</p>
-                </>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
+        <CardHeader className="pb-2 pt-3 px-4">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Regions</CardTitle>
-              <CardDescription>
-                Define geographic regions for categorizing modeling projects. Drag to reorder.
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
+            <CardTitle className="text-sm">Regions</CardTitle>
+            <div className="flex gap-1.5">
               {regions.length === 0 && (
                 <Button
                   variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
                   onClick={() => seedDefaultsMutation.mutate()}
                   disabled={seedDefaultsMutation.isPending}
                   data-testid="button-seed-defaults"
                 >
-                  {seedDefaultsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add Default Regions
+                  {seedDefaultsMutation.isPending && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
+                  Add Defaults
                 </Button>
               )}
-              <Button onClick={() => handleOpenDialog()} data-testid="button-add-region">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm" className="h-7 text-xs" onClick={() => handleOpenDialog()} data-testid="button-add-region">
+                <Plus className="mr-1 h-3 w-3" />
                 Add Region
               </Button>
             </div>
           </div>
+          <CardDescription className="text-xs mt-0.5">
+            Geographic regions for categorizing modeling projects. Drag to reorder.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-3 pt-0">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : sortedRegions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-4 text-muted-foreground text-sm">
               <p>No regions configured yet.</p>
-              <p className="text-sm mt-1">Click "Add Default Regions" to get started with standard regions.</p>
+              <p className="text-xs mt-0.5">Click "Add Defaults" to get started.</p>
             </div>
           ) : (
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -634,10 +569,10 @@ export default function ModelingSettings() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="w-8 py-1.5"></TableHead>
+                      <TableHead className="py-1.5 text-xs">Name</TableHead>
+                      <TableHead className="py-1.5 text-xs">Status</TableHead>
+                      <TableHead className="text-right py-1.5 text-xs">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -658,49 +593,43 @@ export default function ModelingSettings() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Export Financial Model & Operations Code</CardTitle>
-          <CardDescription>
-            Download a ZIP archive containing all Financial Model workspace files, Operations modules,
-            Pro Forma engine, Document Intelligence pipeline, and a comprehensive guide on
-            how everything connects.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => {
-                const link = document.createElement('a');
-                link.href = '/api/valuator-export/download';
-                link.download = 'valuator-operations-export.zip';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download ZIP Archive
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Includes 200+ files with GUIDE.md documentation
-            </span>
+        <div className="flex items-center justify-between px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Export Financial Model & Operations Code</p>
+            <p className="text-xs text-muted-foreground">Download ZIP with all workspace files, Pro Forma engine, and GUIDE.md</p>
           </div>
-        </CardContent>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = '/api/valuator-export/download';
+              link.download = 'valuator-operations-export.zip';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+          >
+            <Download className="mr-1 h-3 w-3" />
+            Download ZIP
+          </Button>
+        </div>
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>{editingRegion ? 'Edit Region' : 'Add Region'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base">{editingRegion ? 'Edit Region' : 'Add Region'}</DialogTitle>
+            <DialogDescription className="text-xs">
               {editingRegion ? 'Update the region details' : 'Create a new region for modeling projects'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="region-name">Region Name</Label>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="region-name" className="text-sm">Region Name</Label>
               <Input
                 id="region-name"
+                className="h-8"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g., Southeast"
@@ -708,7 +637,7 @@ export default function ModelingSettings() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="region-active">Active</Label>
+              <Label htmlFor="region-active" className="text-sm">Active</Label>
               <Switch
                 id="region-active"
                 checked={formData.isActive}
@@ -718,11 +647,11 @@ export default function ModelingSettings() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel-region">
+            <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel-region">
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={isPending} data-testid="button-save-region">
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button size="sm" onClick={handleSubmit} disabled={isPending} data-testid="button-save-region">
+              {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               {editingRegion ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>
@@ -730,10 +659,10 @@ export default function ModelingSettings() {
       </Dialog>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-[400px]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Region</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-base">Delete Region</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
               Are you sure you want to delete "{deletingRegion?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -744,7 +673,7 @@ export default function ModelingSettings() {
               className="bg-red-600 hover:bg-red-700"
               data-testid="button-confirm-delete"
             >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
