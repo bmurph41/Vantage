@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,12 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCcw, ChevronRight, Download, Calendar, AlertCircle, CheckCircle, Plus, Trash2, Building, DollarSign, FileText, Clock } from "lucide-react";
+import { ArrowLeft, RefreshCcw, ChevronRight, Download, Calendar, AlertCircle, CheckCircle, Plus, Trash2, Building, DollarSign, FileText, Clock, PieChart } from "lucide-react";
 import type { ModelingProject } from "@shared/schema";
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
+import { runExitScenario } from "@shared/exit/exit-scenario-engine";
+import type { ExitScenarioInput, ExitScenarioResult } from "@shared/exit/exit-scenario-engine";
+import { ExchangeBreakdownPanel } from "@/components/exit-strategies/BreakdownCards";
 
 interface Exchange1031Props {
   projectId: string;
@@ -128,6 +131,68 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
   const uses200Percent = identifiedCount <= 3;
   const totalIdentifiedValue = replacementProperties.filter(p => p.status !== 'dropped').reduce((sum, p) => sum + p.value, 0);
   const uses200PercentValue = totalIdentifiedValue <= inputs.relinquishedValue * 2;
+
+  // ── Engine-computed breakdowns ────────────────────────────────────────────
+  const engineResult = useMemo<ExitScenarioResult | null>(() => {
+    try {
+      // Derive land/improvement split from cost basis (80/20 is typical commercial)
+      const costBasis = masterInputs.costBasis;
+      const landValue = Math.round(costBasis * 0.20);
+      const improvementValue = costBasis - landValue;
+
+      const engineInput: ExitScenarioInput = {
+        scenarioName: '1031 Exchange',
+        scenarioType: 'exchange_1031',
+        property: {
+          purchasePrice: costBasis,
+          acquisitionCosts: 0,
+          landValue,
+          improvementValue,
+          depreciationScheduleYears: 39,
+          holdingPeriodYears: masterInputs.holdingPeriod,
+          capitalAdditionsByYear: masterInputs.capitalImprovements > 0
+            ? { 1: masterInputs.capitalImprovements }
+            : undefined,
+        },
+        sale: {
+          salePrice: masterInputs.salePrice,
+          brokerCommissionRate: masterInputs.brokerFeePercent / 100,
+          closingCosts: masterInputs.closingCosts,
+          holdingPeriodMonths: masterInputs.holdingPeriod * 12,
+        },
+        debt: {
+          outstandingBalance: masterInputs.currentDebtBalance,
+          prepaymentPenalty: 0,
+        },
+        taxProfile: {
+          filingStatus: 'married',
+          otherOrdinaryIncome: 200000,
+          otherInvestmentIncome: 0,
+          stateOfResidence: 'FL',
+          taxYear: 2025,
+        },
+        exchange1031: {
+          saleDate: new Date().toISOString().slice(0, 10),
+          replacementProperties: replacementProperties
+            .filter(p => p.status !== 'dropped')
+            .map(p => ({
+              name: p.name || 'Replacement Property',
+              purchasePrice: p.value,
+              newMortgage: p.newDebt,
+              closingCosts: 0,
+              identificationPriority: 'primary' as const,
+            })),
+          qualifiedIntermediaryFee: exchangeOnlyInputs.qiFees,
+          additionalCashInvested: 0,
+        },
+      };
+
+      return runExitScenario(engineInput);
+    } catch (e) {
+      console.warn('Engine computation failed:', e);
+      return null;
+    }
+  }, [masterInputs, replacementProperties, exchangeOnlyInputs.qiFees]);
 
   const addReplacementProperty = () => {
     setReplacementProperties([...replacementProperties, {
@@ -274,6 +339,10 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
           <TabsTrigger value="milestones" className="gap-2">
             <Clock className="h-4 w-4" />
             Milestones
+          </TabsTrigger>
+          <TabsTrigger value="breakdowns" className="gap-2">
+            <PieChart className="h-4 w-4" />
+            Breakdowns
           </TabsTrigger>
         </TabsList>
 
@@ -674,6 +743,48 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="breakdowns" className="space-y-6">
+          {engineResult ? (
+            <ExchangeBreakdownPanel
+              closingCosts={engineResult.closingCostsBreakdown}
+              gainBreakdown={engineResult.gainBreakdown}
+              taxDeferredBreakdown={engineResult.taxDeferredBreakdown}
+              grossSalePrice={engineResult.grossSaleProceeds}
+              deferredGain={engineResult.comparisonMetrics.deferredGain}
+              isFullyDeferred={engineResult.exchange1031Result?.isFullyDeferred ?? false}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">
+                  Enter sale and replacement property details to see detailed breakdowns.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {engineResult && engineResult.warnings.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Engine Warnings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {engineResult.warnings.map((w, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <Badge variant={w.severity === 'error' ? 'destructive' : w.severity === 'warning' ? 'outline' : 'secondary'} className="text-xs shrink-0 mt-0.5">
+                        {w.severity}
+                      </Badge>
+                      <span className="text-muted-foreground">{w.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
