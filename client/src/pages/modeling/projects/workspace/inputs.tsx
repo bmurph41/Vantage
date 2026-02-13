@@ -150,6 +150,9 @@ type LeaseDetail = {
   termUnit: 'years' | 'months';
   expirationDate: string;
   renewalOptions: string;
+  renewalCount: string;
+  renewalLength: string;
+  renewalUnit: 'years' | 'months';
   notes: string;
 };
 
@@ -304,22 +307,48 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       }
       if ((config as any).ownership) {
         const savedOwnership = (config as any).ownership as OwnershipData;
-        let leases = savedOwnership.leases || [];
-        const type = savedOwnership.type;
-        if (type === 'submerged_land_lease' && !leases.some((l: LeaseDetail) => l.type === 'submerged_land_lease')) {
-          leases = [...leases, { id: `lease_${Date.now()}`, type: 'submerged_land_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
-        } else if (type === 'ground_lease' && !leases.some((l: LeaseDetail) => l.type === 'ground_lease')) {
-          leases = [...leases, { id: `lease_${Date.now()}`, type: 'ground_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
-        } else if (type === 'combined') {
-          if (!leases.some((l: LeaseDetail) => l.type === 'submerged_land_lease')) {
-            leases = [...leases, { id: `lease_${Date.now()}_s`, type: 'submerged_land_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+        let leases = (savedOwnership.leases || []).map((l: any) => {
+          let renewalCount = l.renewalCount ?? '';
+          let renewalLength = l.renewalLength ?? '';
+          let renewalUnit = l.renewalUnit ?? 'years';
+          if (!renewalCount && !renewalLength && l.renewalOptions) {
+            const match = l.renewalOptions.match(/(\d+)\s*[x×]\s*(\d+)[- ]?(year|month)/i);
+            if (match) {
+              renewalCount = match[1];
+              renewalLength = match[2];
+              renewalUnit = match[3].toLowerCase().startsWith('month') ? 'months' : 'years';
+            } else {
+              const numMatch = l.renewalOptions.match(/(\w+|(\d+))\s+(\d+)[- ]?(year|month)/i);
+              if (numMatch) {
+                const wordToNum: Record<string, string> = { one: '1', two: '2', three: '3', four: '4', five: '5' };
+                renewalCount = numMatch[2] || wordToNum[numMatch[1].toLowerCase()] || '1';
+                renewalLength = numMatch[3];
+                renewalUnit = numMatch[4].toLowerCase().startsWith('month') ? 'months' : 'years';
+              }
+            }
           }
-          if (!leases.some((l: LeaseDetail) => l.type === 'ground_lease')) {
-            leases = [...leases, { id: `lease_${Date.now()}_g`, type: 'ground_lease' as const, counterparty: '', monthlyRent: '', annualRent: '', termRemaining: '', termUnit: 'years' as const, expirationDate: '', renewalOptions: '', notes: '' }];
+          return { ...l, renewalCount, renewalLength, renewalUnit };
+        }) as LeaseDetail[];
+        const type = savedOwnership.type;
+        const mkLease = (t: 'submerged_land_lease' | 'ground_lease', suffix = ''): LeaseDetail => ({
+          id: `lease_${Date.now()}${suffix}`, type: t, counterparty: '', monthlyRent: '', annualRent: '',
+          termRemaining: '', termUnit: 'years', expirationDate: '', renewalOptions: '',
+          renewalCount: '', renewalLength: '', renewalUnit: 'years', notes: '',
+        });
+        if (type === 'submerged_land_lease' && !leases.some(l => l.type === 'submerged_land_lease')) {
+          leases = [...leases, mkLease('submerged_land_lease')];
+        } else if (type === 'ground_lease' && !leases.some(l => l.type === 'ground_lease')) {
+          leases = [...leases, mkLease('ground_lease')];
+        } else if (type === 'combined') {
+          if (!leases.some(l => l.type === 'submerged_land_lease')) {
+            leases = [...leases, mkLease('submerged_land_lease', '_s')];
+          }
+          if (!leases.some(l => l.type === 'ground_lease')) {
+            leases = [...leases, mkLease('ground_lease', '_g')];
           }
         }
         setOwnership({ type, leases });
-        setExpandedLeases(new Set(leases.map((l: LeaseDetail) => l.id)));
+        setExpandedLeases(new Set(leases.map(l => l.id)));
       }
     }
   }, [config]);
@@ -455,6 +484,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       termUnit: 'years',
       expirationDate: '',
       renewalOptions: '',
+      renewalCount: '',
+      renewalLength: '',
+      renewalUnit: 'years',
       notes: '',
     };
     setOwnership(prev => ({ ...prev, leases: [...prev.leases, newLease] }));
@@ -467,6 +499,16 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       leases: prev.leases.map(l => {
         if (l.id !== id) return l;
         const updated = { ...l, [field]: value };
+        if (field === 'renewalCount' || field === 'renewalLength' || field === 'renewalUnit') {
+          const count = field === 'renewalCount' ? value : updated.renewalCount;
+          const length = field === 'renewalLength' ? value : updated.renewalLength;
+          const unit = field === 'renewalUnit' ? value : updated.renewalUnit;
+          if (count && length) {
+            updated.renewalOptions = `${count} x ${length}-${unit} renewal option${parseInt(count) !== 1 ? 's' : ''}`;
+          } else {
+            updated.renewalOptions = '';
+          }
+        }
         if (field === 'monthlyRent') {
           if (value) {
             const monthly = parseFloat(value);
@@ -518,45 +560,49 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     termUnit: 'years',
     expirationDate: '',
     renewalOptions: '',
+    renewalCount: '',
+    renewalLength: '',
+    renewalUnit: 'years',
     notes: '',
   });
 
   const handleOwnershipTypeChange = (type: OwnershipType) => {
+    const newLeaseIds: string[] = [];
     setOwnership(prev => {
       let leases = [...prev.leases];
       if (type === 'fee_simple') {
+        setExpandedLeases(new Set());
         return { type, leases: [] };
       }
       if (type === 'submerged_land_lease') {
-        const hasSubmerged = leases.some(l => l.type === 'submerged_land_lease');
-        if (!hasSubmerged) {
+        if (!leases.some(l => l.type === 'submerged_land_lease')) {
           const newLease = createDefaultLease('submerged_land_lease');
           leases = [...leases, newLease];
-          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+          newLeaseIds.push(newLease.id);
         }
       } else if (type === 'ground_lease') {
-        const hasGround = leases.some(l => l.type === 'ground_lease');
-        if (!hasGround) {
+        if (!leases.some(l => l.type === 'ground_lease')) {
           const newLease = createDefaultLease('ground_lease');
           leases = [...leases, newLease];
-          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+          newLeaseIds.push(newLease.id);
         }
       } else if (type === 'combined') {
-        const hasSubmerged = leases.some(l => l.type === 'submerged_land_lease');
-        const hasGround = leases.some(l => l.type === 'ground_lease');
-        if (!hasSubmerged) {
+        if (!leases.some(l => l.type === 'submerged_land_lease')) {
           const newLease = createDefaultLease('submerged_land_lease');
           leases = [...leases, newLease];
-          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+          newLeaseIds.push(newLease.id);
         }
-        if (!hasGround) {
+        if (!leases.some(l => l.type === 'ground_lease')) {
           const newLease = createDefaultLease('ground_lease');
           leases = [...leases, newLease];
-          setExpandedLeases(prev => new Set([...prev, newLease.id]));
+          newLeaseIds.push(newLease.id);
         }
       }
       return { type, leases };
     });
+    if (newLeaseIds.length > 0) {
+      setExpandedLeases(prev => new Set([...prev, ...newLeaseIds]));
+    }
   };
 
   const getSeasonLabel = () => {
@@ -1042,13 +1088,45 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label>Renewal Options</Label>
-                          <Input
-                            placeholder="e.g., Two 10-year renewal options at market rate"
-                            value={lease.renewalOptions}
-                            onChange={(e) => updateLease(lease.id, 'renewalOptions', e.target.value)}
-                          />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Number of Renewal Options</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={lease.renewalCount}
+                                onChange={(e) => updateLease(lease.id, 'renewalCount', e.target.value)}
+                                className="flex-1"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Length of Each Option</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={lease.renewalLength}
+                                onChange={(e) => updateLease(lease.id, 'renewalLength', e.target.value)}
+                                className="flex-1"
+                              />
+                              <Select
+                                value={lease.renewalUnit}
+                                onValueChange={(v) => updateLease(lease.id, 'renewalUnit', v)}
+                              >
+                                <SelectTrigger className="w-24">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="years">Years</SelectItem>
+                                  <SelectItem value="months">Months</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="space-y-2">
