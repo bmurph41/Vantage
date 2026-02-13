@@ -459,7 +459,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                 <div>
                   <p className="font-medium">{upload.originalName}</p>
                   <p className="text-sm text-muted-foreground">
-                    {upload.docType?.toUpperCase()} • {upload.year || "Year not specified"} • {(upload.fileSize / 1024).toFixed(1)} KB
+                    {upload.docType?.toUpperCase()} • {upload.year || "Year not specified"} • {upload.dataGranularity === 'annual' ? 'Annualized' : 'Monthly'} • {(upload.fileSize / 1024).toFixed(1)} KB
                   </p>
                 </div>
               </div>

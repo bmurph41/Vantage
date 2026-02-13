@@ -16255,6 +16255,7 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   // Classification
   docType: docIntelDocTypeEnum('doc_type'),
   year: integer('year'), // Fiscal year of document
+  dataGranularity: text('data_granularity').$type<'monthly' | 'annual'>().default('monthly'),
 
   // Processing status
   status: docIntelProcessingStatusEnum('status').notNull().default('uploaded'),

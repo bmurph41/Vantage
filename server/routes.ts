@@ -22570,6 +22570,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const displayName = req.body.displayName?.trim() || req.file.originalname;
       
       const isT12 = req.body.isT12 === 'true';
+      const dataGranularity = req.body.dataGranularity === 'annual' ? 'annual' : 'monthly';
       const periodMetadata = isT12 ? {
         t12StartMonth: req.body.t12StartMonth ? parseInt(req.body.t12StartMonth) : null,
         t12StartYear: req.body.t12StartYear ? parseInt(req.body.t12StartYear) : null,
@@ -22593,6 +22594,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           fileSize: req.file.size,
           docType: req.body.docType || null,
           year: req.body.year ? parseInt(req.body.year) : null,
+          dataGranularity: dataGranularity as 'monthly' | 'annual',
           uploadedBy: userId,
           status: 'uploaded',
           holdingStatus: req.body.holdingStatus || 'staging',

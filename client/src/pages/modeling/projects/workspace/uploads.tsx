@@ -418,6 +418,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                             {upload.documentType.replace('_', ' ')}
                           </Badge>
                         )}
+                        {(upload as any).dataGranularity === 'annual' && (
+                          <Badge variant="secondary" className="text-xs">
+                            Annualized
+                          </Badge>
+                        )}
                       </div>
                       {upload.stats && upload.stats.total > 0 && (
                         <div className="mt-2 space-y-1">

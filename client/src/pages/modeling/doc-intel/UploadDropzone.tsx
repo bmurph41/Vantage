@@ -40,6 +40,8 @@ interface CustomDocumentType {
 
 type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
 
+type DataGranularity = "monthly" | "annual";
+
 interface StagedFile {
   id: string;
   file: File;
@@ -47,6 +49,7 @@ interface StagedFile {
   customTypeId: string | null;
   customTypeName: string;
   year: string;
+  dataGranularity: DataGranularity;
   t12StartMonth?: string;
   t12StartYear?: string;
   t12EndMonth?: string;
@@ -211,6 +214,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       formData.append("docType", staged.docType === 't12' ? 'pnl' : staged.docType);
       formData.append("year", staged.docType === 't12' ? (staged.t12EndYear || staged.year) : staged.year);
       formData.append("isT12", staged.docType === 't12' ? 'true' : 'false');
+      formData.append("dataGranularity", staged.dataGranularity);
 
       if (staged.docType === 't12') {
         if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
@@ -323,6 +327,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
         customTypeId: null,
         customTypeName: "",
         year: now.getFullYear().toString(),
+        dataGranularity: "monthly" as DataGranularity,
         status: "pending" as const,
         progress: 0,
       };
@@ -497,7 +502,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
                 {staged.status === "pending" && (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <Label className="text-xs">Type</Label>
                         <Select
@@ -568,6 +573,21 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                                 {y}
                               </SelectItem>
                             ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Data Format</Label>
+                        <Select
+                          value={staged.dataGranularity}
+                          onValueChange={(v) => updateStagedFile(staged.id, { dataGranularity: v as DataGranularity })}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="annual">Annualized</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

@@ -538,11 +538,13 @@ class DocIntelService {
     return true;
   }
 
-  async parseExcelFile(filePath: string): Promise<ParsedLineItem[]> {
+  async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number): Promise<ParsedLineItem[]> {
     const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer);
     const items: ParsedLineItem[] = [];
     let globalRow = 0;
+    const isAnnual = granularity === 'annual';
+    const yearForPeriod = fiscalYear || new Date().getFullYear();
 
     for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
       const sheetName = workbook.SheetNames[sheetIndex];
@@ -551,15 +553,18 @@ class DocIntelService {
 
       if (jsonData.length === 0) continue;
 
-      const monthHeaders = this.detectMonthHeaders(jsonData);
+      if (isAnnual) {
+        console.log(`[DocIntelService] Annualized data mode - skipping month header detection, treating values as annual totals for ${yearForPeriod}`);
+      }
+
+      const monthHeaders = isAnnual ? [] : this.detectMonthHeaders(jsonData);
       const isMultiColumnPnl = monthHeaders.length >= 3;
       let headerRowIndex = -1;
 
       if (isMultiColumnPnl) {
         headerRowIndex = this.findHeaderRowIndex(jsonData, monthHeaders);
         console.log(`[DocIntelService] Detected multi-column P&L with ${monthHeaders.length} month columns, header at row ${headerRowIndex + 1}`);
-      } else {
-        // Log first few rows for debugging when month headers aren't detected
+      } else if (!isAnnual) {
         console.log(`[DocIntelService] Single-column mode - no month headers found. First row samples:`);
         const firstRow = jsonData[0];
         if (firstRow) {
@@ -637,6 +642,7 @@ class DocIntelService {
               sourcePage: sheetIndex + 1,
               sourceRow: globalRow,
               isZeroValueSubtotal,
+              periodKey: isAnnual ? `${yearForPeriod}-ANNUAL` : undefined,
             });
           }
         }
@@ -940,9 +946,11 @@ class DocIntelService {
       let usedOcrFallback = false;
       
       const isPdf = upload.mimeType === 'application/pdf';
+      const granularity = upload.dataGranularity || 'monthly';
+      const fiscalYear = upload.year || new Date().getFullYear();
       
       if (isPdf) {
-        console.log(`[DocIntelService] Processing PDF file: ${upload.originalName}`);
+        console.log(`[DocIntelService] Processing PDF file: ${upload.originalName} (granularity: ${granularity})`);
         const ocrResult = await extractDocument(upload.storagePath, upload.mimeType);
         usedOcrFallback = ocrResult.meta?.usedOcrFallback === true;
         
@@ -951,8 +959,14 @@ class DocIntelService {
         }
         
         parsedItems = this.parsePdfOcrResult(ocrResult);
+        if (granularity === 'annual') {
+          parsedItems = parsedItems.map(item => ({
+            ...item,
+            periodKey: `${fiscalYear}-ANNUAL`,
+          }));
+        }
       } else {
-        parsedItems = await this.parseExcelFile(upload.storagePath);
+        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear);
       }
       
       const extractedItems: DocIntelExtractedItem[] = [];
@@ -1867,15 +1881,20 @@ Respond with JSON only:
         console.log('[DocIntel Import] Inferred tier from raw text:', item.rawText?.substring(0, 50), '->', plCategory);
       }
 
-      // Parse periodKey (YYYY-MM) or use fiscalYear
+      // Parse periodKey (YYYY-MM or YYYY-ANNUAL) or use fiscalYear
       let year = fiscalYear || new Date().getFullYear();
       let month = 1;
+      let isAnnualPeriod = false;
       
       if (item.periodKey) {
         const parts = item.periodKey.split('-');
         if (parts.length >= 2) {
           year = parseInt(parts[0]) || year;
-          month = parseInt(parts[1]) || 1;
+          if (parts[1] === 'ANNUAL') {
+            isAnnualPeriod = true;
+          } else {
+            month = parseInt(parts[1]) || 1;
+          }
         }
       } else if (item.extractedDate) {
         const dateMatch = item.extractedDate.match(/(\d{4})-(\d{2})/);
@@ -1887,50 +1906,99 @@ Respond with JSON only:
 
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');
 
-      // Insert into modelingActuals
-      const [actualRecord] = await db
-        .insert(modelingActuals)
-        .values({
-          orgId,
-          modelingProjectId: projectId,
-          year,
-          month,
-          category: plCategory,
-          subcategory: subcategory,
-          lineItemDescription: item.rawText,
-          amount: String(amount),
-          dataSource: 'doc_intel',
-          sourceRecordId: item.id,
-          sourceRecordType: 'doc_intel_extracted_item',
-          createdBy: userId,
-        })
-        .onConflictDoUpdate({
-          target: [
-            modelingActuals.modelingProjectId,
-            modelingActuals.year,
-            modelingActuals.month,
-            modelingActuals.category,
-            modelingActuals.subcategory,
-            modelingActuals.lineItemDescription
-          ],
-          set: {
-            amount: String(amount),
-            updatedAt: new Date(),
+      if (isAnnualPeriod) {
+        const monthlyAmount = amount / 12;
+        for (let m = 1; m <= 12; m++) {
+          const [actualRecord] = await db
+            .insert(modelingActuals)
+            .values({
+              orgId,
+              modelingProjectId: projectId,
+              year,
+              month: m,
+              category: plCategory,
+              subcategory: subcategory,
+              lineItemDescription: item.rawText,
+              amount: String(Math.round(monthlyAmount * 100) / 100),
+              dataSource: 'doc_intel',
+              sourceRecordId: item.id,
+              sourceRecordType: 'doc_intel_extracted_item',
+              createdBy: userId,
+            })
+            .onConflictDoUpdate({
+              target: [
+                modelingActuals.modelingProjectId,
+                modelingActuals.year,
+                modelingActuals.month,
+                modelingActuals.category,
+                modelingActuals.subcategory,
+                modelingActuals.lineItemDescription
+              ],
+              set: {
+                amount: String(Math.round(monthlyAmount * 100) / 100),
+                updatedAt: new Date(),
+              }
+            })
+            .returning();
+
+          if (m === 1) {
+            await db
+              .update(docIntelExtractedItems)
+              .set({
+                targetTable: 'modeling_actuals',
+                targetRecordId: actualRecord.id,
+                updatedAt: new Date(),
+              })
+              .where(eq(docIntelExtractedItems.id, item.id));
           }
-        })
-        .returning();
+          importedActuals.push(actualRecord);
+        }
+      } else {
+        // Insert into modelingActuals
+        const [actualRecord] = await db
+          .insert(modelingActuals)
+          .values({
+            orgId,
+            modelingProjectId: projectId,
+            year,
+            month,
+            category: plCategory,
+            subcategory: subcategory,
+            lineItemDescription: item.rawText,
+            amount: String(amount),
+            dataSource: 'doc_intel',
+            sourceRecordId: item.id,
+            sourceRecordType: 'doc_intel_extracted_item',
+            createdBy: userId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              modelingActuals.modelingProjectId,
+              modelingActuals.year,
+              modelingActuals.month,
+              modelingActuals.category,
+              modelingActuals.subcategory,
+              modelingActuals.lineItemDescription
+            ],
+            set: {
+              amount: String(amount),
+              updatedAt: new Date(),
+            }
+          })
+          .returning();
 
-      // Update extracted item with target reference
-      await db
-        .update(docIntelExtractedItems)
-        .set({
-          targetTable: 'modeling_actuals',
-          targetRecordId: actualRecord.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(docIntelExtractedItems.id, item.id));
+        // Update extracted item with target reference
+        await db
+          .update(docIntelExtractedItems)
+          .set({
+            targetTable: 'modeling_actuals',
+            targetRecordId: actualRecord.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(docIntelExtractedItems.id, item.id));
 
-      importedActuals.push(actualRecord);
+        importedActuals.push(actualRecord);
+      }
     }
 
     console.log('[DocIntel Import] Summary - imported:', importedActuals.length, 
