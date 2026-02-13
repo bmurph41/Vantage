@@ -285,6 +285,9 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
   const selectedBrokerageCompanyId = form.watch("brokerageCompanyId");
   const selectedSellerCompanyId = form.watch("sellerCompanyId");
   const selectedBuyerCompanyId = form.watch("buyerCompanyId");
+  const selectedStorageTypes = form.watch("storageTypes") || [];
+  const showWetSlipsCapacity = selectedStorageTypes.includes("Wet Slips");
+  const showDryRacksCapacity = selectedStorageTypes.some(t => t.startsWith("Dry Racks"));
 
   // Fetch all CRM companies for autocomplete
   const { data: allCompanies = [] } = useQuery<Array<{id: string; name: string; labels?: string[]}>>({
@@ -1115,46 +1118,6 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       <div className="grid grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
-                          name="wetSlips"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Wet Slips</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="text"
-                                  placeholder="e.g. 156"
-                                  data-testid="input-wet-slips"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="dryRacks"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Dry Racks</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  {...field} 
-                                  type="text"
-                                  placeholder="e.g. 89"
-                                  data-testid="input-dry-racks"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={form.control}
                           name="acres"
                           render={({ field }) => (
                             <FormItem>
@@ -1303,6 +1266,52 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           </FormItem>
                         )}
                       />
+
+                      {(showWetSlipsCapacity || showDryRacksCapacity) && (
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                          {showWetSlipsCapacity && (
+                            <FormField
+                              control={form.control}
+                              name="wetSlips"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Wet Slips Capacity</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      type="text"
+                                      placeholder="e.g. 156"
+                                      data-testid="input-wet-slips"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                          
+                          {showDryRacksCapacity && (
+                            <FormField
+                              control={form.control}
+                              name="dryRacks"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Dry Racks Capacity</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      type="text"
+                                      placeholder="e.g. 89"
+                                      data-testid="input-dry-racks"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
