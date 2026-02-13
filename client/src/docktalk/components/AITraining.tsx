@@ -227,10 +227,47 @@ function TrainingAnalyticsDashboard() {
       if (!res.ok) throw new Error("Failed to bulk review");
       return res.json();
     },
-    onSuccess: (data) => {
+    onMutate: async ({ articleIds, category, action }) => {
+      const capturedFilterKey = ["/api/docktalk/training/review-queue", reviewFilter] as const;
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/training/review-queue"] });
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/training/analytics"] });
+
+      const previousQueue = dockTalkQueryClient.getQueryData<{ articles: ReviewQueueArticle[]; filter: string; count: number }>(capturedFilterKey);
+      const previousAnalytics = dockTalkQueryClient.getQueryData<TrainingAnalytics>(["/api/docktalk/training/analytics"]);
+
+      if (previousQueue) {
+        dockTalkQueryClient.setQueryData<{ articles: ReviewQueueArticle[]; filter: string; count: number }>(
+          [...capturedFilterKey],
+          (old) => {
+            if (!old) return old;
+            const remaining = old.articles.filter(a => !articleIds.includes(a.id));
+            return { ...old, articles: remaining, count: remaining.length };
+          }
+        );
+      }
+
+      if (previousAnalytics) {
+        dockTalkQueryClient.setQueryData<TrainingAnalytics>(
+          ["/api/docktalk/training/analytics"],
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              manuallyReviewedCount: old.manuallyReviewedCount + articleIds.length,
+              correctedCategoriesCount: action === 'correct'
+                ? old.correctedCategoriesCount + articleIds.length
+                : old.correctedCategoriesCount,
+            };
+          }
+        );
+      }
+
       setSelectedArticles([]);
       setBulkCategory('');
-      // Invalidate all related queries for real-time updates across the app
+
+      return { previousQueue, previousAnalytics, capturedFilterKey: [...capturedFilterKey] };
+    },
+    onSuccess: (data) => {
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/review-queue"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/training/analytics"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/articles"] });
@@ -242,7 +279,13 @@ function TrainingAnalyticsDashboard() {
         description: `Updated ${data.updatedCount} articles`,
       });
     },
-    onError: () => {
+    onError: (_error, _variables, context) => {
+      if (context?.previousQueue && context?.capturedFilterKey) {
+        dockTalkQueryClient.setQueryData(context.capturedFilterKey, context.previousQueue);
+      }
+      if (context?.previousAnalytics) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/training/analytics"], context.previousAnalytics);
+      }
       toast({
         title: "Error",
         description: "Failed to bulk review articles",
@@ -766,14 +809,39 @@ function AdaptiveAITab() {
       if (!res.ok) throw new Error("Failed to add keyword");
       return res.json();
     },
+    onMutate: async () => {
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
+      const previousKeywords = dockTalkQueryClient.getQueryData<AiKeywordWeight[]>(["/api/docktalk/ai/keywords"]);
+      const optimisticKeyword: AiKeywordWeight = {
+        id: Date.now(),
+        keyword: newKeyword,
+        category: newKeywordCategory,
+        currentWeight: newKeywordWeight,
+        positiveSignals: 0,
+        negativeSignals: 0,
+        confidenceScore: 0,
+        isUserDefined: true,
+      };
+      dockTalkQueryClient.setQueryData<AiKeywordWeight[]>(["/api/docktalk/ai/keywords"], (old) =>
+        [...(old || []), optimisticKeyword]
+      );
+      const savedKeyword = newKeyword;
+      setNewKeyword("");
+      setNewKeywordWeight(5);
+      return { previousKeywords, savedKeyword };
+    },
     onSuccess: () => {
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/analytics"] });
-      setNewKeyword("");
-      setNewKeywordWeight(5);
       toast({ title: "Keyword Added", description: "The keyword has been added to the AI model." });
     },
-    onError: () => {
+    onError: (_error, _variables, context) => {
+      if (context?.previousKeywords) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/ai/keywords"], context.previousKeywords);
+      }
+      if (context?.savedKeyword) {
+        setNewKeyword(context.savedKeyword);
+      }
       toast({ title: "Error", description: "Failed to add keyword", variant: "destructive" });
     },
   });
@@ -787,10 +855,24 @@ function AdaptiveAITab() {
       if (!res.ok) throw new Error("Failed to delete keyword");
       return res.json();
     },
+    onMutate: async (keywordId) => {
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
+      const previousKeywords = dockTalkQueryClient.getQueryData<AiKeywordWeight[]>(["/api/docktalk/ai/keywords"]);
+      dockTalkQueryClient.setQueryData<AiKeywordWeight[]>(["/api/docktalk/ai/keywords"], (old) =>
+        old?.filter(kw => kw.id !== keywordId)
+      );
+      return { previousKeywords };
+    },
     onSuccess: () => {
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/keywords"] });
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/ai/analytics"] });
       toast({ title: "Keyword Removed", description: "The keyword has been removed." });
+    },
+    onError: (_error, _keywordId, context) => {
+      if (context?.previousKeywords) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/ai/keywords"], context.previousKeywords);
+      }
+      toast({ title: "Error", description: "Failed to remove keyword", variant: "destructive" });
     },
   });
 
@@ -1073,16 +1155,40 @@ export function AITraining() {
       }
       return res.json();
     },
-    onSuccess: () => {
-      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/tags"] });
+    onMutate: async (data) => {
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/tags"] });
+      const previousTags = dockTalkQueryClient.getQueryData<UserTag[]>(["/api/docktalk/tags"]);
+      const optimisticTag: UserTag = {
+        id: Date.now(),
+        userId: '',
+        orgId: '',
+        name: data.name,
+        description: data.description || null,
+        color: data.color,
+        isActive: true,
+        usageCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      dockTalkQueryClient.setQueryData<UserTag[]>(["/api/docktalk/tags"], (old) =>
+        [...(old || []), optimisticTag]
+      );
       setIsAddTagOpen(false);
       form.reset();
+      return { previousTags };
+    },
+    onSuccess: () => {
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/tags"] });
       toast({
         title: "Tag Created",
         description: "Your tag has been created successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.previousTags) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/tags"], context.previousTags);
+      }
+      setIsAddTagOpen(true);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create tag",
@@ -1105,16 +1211,27 @@ export function AITraining() {
       }
       return res.json();
     },
-    onSuccess: () => {
-      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/tags"] });
+    onMutate: async ({ id, data }) => {
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/tags"] });
+      const previousTags = dockTalkQueryClient.getQueryData<UserTag[]>(["/api/docktalk/tags"]);
+      dockTalkQueryClient.setQueryData<UserTag[]>(["/api/docktalk/tags"], (old) =>
+        old?.map(tag => tag.id === id ? { ...tag, ...data, updatedAt: new Date().toISOString() } : tag)
+      );
       setIsEditTagOpen(false);
       setEditingTag(null);
+      return { previousTags };
+    },
+    onSuccess: () => {
+      dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/tags"] });
       toast({
         title: "Tag Updated",
         description: "Your tag has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.previousTags) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/tags"], context.previousTags);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update tag",
@@ -1135,15 +1252,26 @@ export function AITraining() {
       }
       return res.json();
     },
+    onMutate: async (id) => {
+      await dockTalkQueryClient.cancelQueries({ queryKey: ["/api/docktalk/tags"] });
+      const previousTags = dockTalkQueryClient.getQueryData<UserTag[]>(["/api/docktalk/tags"]);
+      dockTalkQueryClient.setQueryData<UserTag[]>(["/api/docktalk/tags"], (old) =>
+        old?.filter(tag => tag.id !== id)
+      );
+      setDeleteTagId(null);
+      return { previousTags };
+    },
     onSuccess: () => {
       dockTalkQueryClient.invalidateQueries({ queryKey: ["/api/docktalk/tags"] });
-      setDeleteTagId(null);
       toast({
         title: "Tag Deleted",
         description: "Your tag has been deleted successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error, _id, context) => {
+      if (context?.previousTags) {
+        dockTalkQueryClient.setQueryData(["/api/docktalk/tags"], context.previousTags);
+      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete tag",
