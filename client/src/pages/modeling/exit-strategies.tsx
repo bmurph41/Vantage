@@ -828,11 +828,14 @@ function SharedInputsPanel() {
               <div>
                 <Label className="text-xs">State Tax Rate</Label>
                 <Select
-                  value={STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate)?.label || "custom"}
+                  value={masterInputs.selectedStateName || STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate)?.label || "custom"}
                   onValueChange={(val) => {
                     if (val === "custom") return;
                     const opt = STATE_TAX_OPTIONS.find(s => s.label === val);
-                    if (opt) setMasterInput('stateTaxRate', opt.value);
+                    if (opt) {
+                      setMasterInput('stateTaxRate', opt.value);
+                      setMasterInput('selectedStateName', opt.label);
+                    }
                   }}
                 >
                   <SelectTrigger className="w-full h-9 text-sm mt-1">
@@ -1282,13 +1285,15 @@ function TaxAndProceedsPanel() {
   const { masterInputs, setMasterInput } = useExitStrategiesStore();
   const b = getCashSaleBaseline(masterInputs);
 
-  const matchedState = STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate);
-  const selectedStateKey = matchedState ? matchedState.label : "custom";
+  const selectedStateKey = masterInputs.selectedStateName || STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate)?.label || "custom";
 
   const handleStateSelect = (val: string) => {
     if (val === "custom") return;
     const opt = STATE_TAX_OPTIONS.find(s => s.label === val);
-    if (opt) setMasterInput('stateTaxRate', opt.value);
+    if (opt) {
+      setMasterInput('stateTaxRate', opt.value);
+      setMasterInput('selectedStateName', opt.label);
+    }
   };
 
   return (

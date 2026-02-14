@@ -20,6 +20,7 @@ export interface MasterInputs {
   acquisitionDate: string;
   closingCosts: number;
   brokerFeePercent: number;
+  selectedStateName: string;
 }
 
 export interface ExitStrategiesMode {
@@ -76,6 +77,7 @@ const defaultMasterInputs: MasterInputs = {
   acquisitionDate: new Date().toISOString().split('T')[0],
   closingCosts: 150000,
   brokerFeePercent: 5,
+  selectedStateName: '',
 };
 
 const sanitizeInputValue = <K extends keyof MasterInputs>(key: K, value: MasterInputs[K]): MasterInputs[K] => {
@@ -94,6 +96,7 @@ const sanitizeInputValue = <K extends keyof MasterInputs>(key: K, value: MasterI
     case 'holdingPeriod':
       return sanitizeHoldingPeriod(value, defaultMasterInputs[key] as number) as MasterInputs[K];
     case 'acquisitionDate':
+    case 'selectedStateName':
       return (typeof value === 'string' && value.length > 0 ? value : defaultMasterInputs[key]) as MasterInputs[K];
     default:
       return value;
