@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import {
   DndContext,
   DragEndEvent,
@@ -37,6 +38,9 @@ import {
   AlertCircle,
   Filter,
   X,
+  Handshake,
+  Home,
+  FolderOpen,
 } from "lucide-react";
 import { format, isPast, isToday } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -193,6 +197,43 @@ function TaskCard({ task, onClick }: TaskCardProps) {
                 </Badge>
               )}
             </div>
+
+            {((task as any).dealId || (task as any).contactId || (task as any).propertyId || (task as any).projectId) && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {(task as any).dealId && (
+                  <Link href={`/crm/deals/${(task as any).dealId}`} onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); window.location.href = `/crm/deals/${(task as any).dealId}`; }}>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 cursor-pointer hover:bg-blue-50 gap-0.5">
+                      <Handshake className="h-2.5 w-2.5" />
+                      Deal
+                    </Badge>
+                  </Link>
+                )}
+                {(task as any).contactId && (
+                  <Link href={`/crm/contacts/${(task as any).contactId}`} onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); window.location.href = `/crm/contacts/${(task as any).contactId}`; }}>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 cursor-pointer hover:bg-green-50 gap-0.5">
+                      <User className="h-2.5 w-2.5" />
+                      Contact
+                    </Badge>
+                  </Link>
+                )}
+                {(task as any).propertyId && (
+                  <Link href={`/crm/properties/${(task as any).propertyId}`} onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); window.location.href = `/crm/properties/${(task as any).propertyId}`; }}>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 cursor-pointer hover:bg-purple-50 gap-0.5">
+                      <Home className="h-2.5 w-2.5" />
+                      Property
+                    </Badge>
+                  </Link>
+                )}
+                {(task as any).projectId && (
+                  <Link href={`/workspaces/${(task as any).projectId}`} onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); window.location.href = `/workspaces/${(task as any).projectId}`; }}>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 cursor-pointer hover:bg-orange-50 gap-0.5">
+                      <FolderOpen className="h-2.5 w-2.5" />
+                      Project
+                    </Badge>
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -392,7 +433,13 @@ function TaskColumn({ column, tasks, onTaskClick, onAddTask }: TaskColumnProps) 
         >
           {tasks.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
-              {isOver ? "Drop here" : "No tasks"}
+              {isOver ? "Drop here" : (
+                column.id === "pending" ? "No pending tasks. Click + to add one." :
+                column.id === "in_progress" ? "Nothing in progress. Drag a task here." :
+                column.id === "completed" ? "No completed tasks yet." :
+                column.id === "cancelled" ? "Nothing blocked. Great!" :
+                "No tasks"
+              )}
             </div>
           ) : (
             tasks.map((task) => (
@@ -413,6 +460,7 @@ export default function CrmTasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterDueDate, setFilterDueDate] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -465,6 +513,9 @@ export default function CrmTasks() {
       if (filterPriority !== "all" && task.priority !== filterPriority) {
         return false;
       }
+      if (filterType !== "all" && task.type !== filterType) {
+        return false;
+      }
       if (filterDueDate === "overdue" && task.dueDate) {
         if (!isPast(new Date(task.dueDate)) || task.status === "completed") {
           return false;
@@ -477,7 +528,7 @@ export default function CrmTasks() {
       }
       return true;
     });
-  }, [tasks, searchTerm, filterPriority, filterDueDate]);
+  }, [tasks, searchTerm, filterPriority, filterDueDate, filterType]);
 
   const tasksByStatus = useMemo(() => {
     const grouped: Record<TaskStatus, Task[]> = {
@@ -522,6 +573,16 @@ export default function CrmTasks() {
   const todayTasks = tasks.filter((t) => t.dueDate && isToday(new Date(t.dueDate)) && t.status !== "completed").length;
 
   const inProgressTasks = tasks.filter((t) => t.status === "in_progress").length;
+
+  const analytics = useMemo(() => {
+    if (totalTasks === 0) return null;
+    const completionRate = Math.round((completedTasks / totalTasks) * 100);
+    const overdueRatio = Math.round((overdueTasks / totalTasks) * 100);
+    const avgTasksPerDay = (completedTasks / 30).toFixed(1);
+    const overdueColor = overdueRatio > 25 ? "text-red-600" : overdueRatio >= 10 ? "text-yellow-600" : "text-green-600";
+    const overdueBg = overdueRatio > 25 ? "bg-red-100" : overdueRatio >= 10 ? "bg-yellow-100" : "bg-green-100";
+    return { completionRate, overdueRatio, avgTasksPerDay, overdueColor, overdueBg };
+  }, [totalTasks, completedTasks, overdueTasks]);
 
   if (isLoading) {
     return (
@@ -678,10 +739,60 @@ export default function CrmTasks() {
               <SelectItem value="today">Due Today</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-40" data-testid="select-filter-type">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="task">Task</SelectItem>
+              <SelectItem value="follow_up">Follow Up</SelectItem>
+              <SelectItem value="call">Call</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="meeting">Meeting</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
+        {analytics && (
+          <Card className="mb-4 border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-6">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">Completion Rate</span>
+                    <span className="text-sm font-bold text-gray-900">{analytics.completionRate}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-200">
+                    <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${analytics.completionRate}%` }} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">Overdue Ratio</span>
+                    <span className={`text-sm font-bold ${analytics.overdueColor}`}>{analytics.overdueRatio}%</span>
+                  </div>
+                  <div className={`h-2 rounded-full ${analytics.overdueBg}`}>
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        analytics.overdueRatio > 25 ? "bg-red-500" : analytics.overdueRatio >= 10 ? "bg-yellow-500" : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(analytics.overdueRatio, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-gray-500">Avg Tasks/Day</span>
+                  <div className="text-xl font-bold text-gray-900">{analytics.avgTasksPerDay}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}

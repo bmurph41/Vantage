@@ -25,10 +25,10 @@ const crmNav = [
 
 // Pipeline Navigation (Deal flow, marketing, analytics)
 const pipelineDealNav = [
-  { name: "Deal Board", href: "/deal-workspace" },
-  { name: "Activity Log", href: "/crm/activity" },
-  { name: "Follow-Ups", href: "/crm/tasks" },
-  { name: "Forecast", href: "/crm/forecast" },
+  { name: "Deal Board", href: "/pipeline/deal-board" },
+  { name: "Activity Log", href: "/pipeline/activity-log" },
+  { name: "Follow-Ups", href: "/pipeline/follow-ups" },
+  { name: "Forecast", href: "/pipeline/forecast" },
 ];
 
 
@@ -239,7 +239,7 @@ export default function UnifiedSidebar() {
     const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing') || location === '/prospecting' || location.startsWith('/prospecting/');
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
-    const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace');
+    const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/');
     // Prospecting section: Overview and Workroom
     const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
@@ -637,7 +637,7 @@ export default function UnifiedSidebar() {
               icon={Handshake}
               expanded={pipelineExpanded} 
               onToggle={() => setPipelineExpanded(!pipelineExpanded)}
-              isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast'].includes(location) || location.startsWith('/deal-workspace')}
+              isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/')}
             />
             {pipelineExpanded && (
               <>

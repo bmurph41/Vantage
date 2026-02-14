@@ -1315,6 +1315,36 @@ function Router() {
         )}
       </Route>
       
+      {/* Pipeline sub-pages */}
+      <Route path="/pipeline/deal-board">
+        {() => (
+          <UnifiedLayout>
+            <Pipeline />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/pipeline/follow-ups">
+        {() => (
+          <UnifiedLayout>
+            <CrmTasks />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/pipeline/activity-log">
+        {() => (
+          <UnifiedLayout>
+            <ActivityLog />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/pipeline/forecast">
+        {() => (
+          <UnifiedLayout>
+            <Forecast />
+          </UnifiedLayout>
+        )}
+      </Route>
+
       {/* Legacy route redirects to Deal Workspace */}
       <Route path="/crm/pipeline">
         {() => {

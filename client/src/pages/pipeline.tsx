@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,14 @@ import {
   Edit2,
   Check,
   X,
+  ExternalLink,
+  Timer,
+  AlertTriangle,
+  Target,
+  BarChart3,
+  Award,
 } from "lucide-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -261,6 +268,48 @@ function DealCard({ deal, onClick }: DealCardProps) {
                 {getInitials(deal.contact?.firstName, deal.contact?.lastName)}
               </div>
             </div>
+
+            {/* Cross-Module Links */}
+            {(deal.contactId || deal.companyId || deal.propertyId) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {deal.contactId && (
+                  <Link
+                    href={`/crm/contacts/${deal.contactId}`}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                      <User className="h-2.5 w-2.5 mr-0.5" />
+                      Contact
+                      <ExternalLink className="h-2 w-2 ml-0.5" />
+                    </Badge>
+                  </Link>
+                )}
+                {deal.companyId && (
+                  <Link
+                    href={`/crm/companies/${deal.companyId}`}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-purple-50 hover:border-purple-300 transition-colors">
+                      <Building2 className="h-2.5 w-2.5 mr-0.5" />
+                      Company
+                      <ExternalLink className="h-2 w-2 ml-0.5" />
+                    </Badge>
+                  </Link>
+                )}
+                {deal.propertyId && (
+                  <Link
+                    href={`/crm/properties/${deal.propertyId}`}
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors">
+                      <Building2 className="h-2.5 w-2.5 mr-0.5" />
+                      Property
+                      <ExternalLink className="h-2 w-2 ml-0.5" />
+                    </Badge>
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -403,6 +452,14 @@ function PipelineColumn({ stage, deals, onDealClick }: PipelineColumnProps) {
         >
           {formatCurrency(totalValue)}
         </div>
+        {deals.length > 0 && (
+          <div className="flex items-center gap-1 text-[10px] text-gray-500 mt-1">
+            <Timer className="h-3 w-3" />
+            <span>
+              Avg {Math.round(deals.reduce((sum, d) => sum + calculateDaysInStage(d.currentStageEnteredAt), 0) / deals.length)}d in stage
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Drop Zone */}
@@ -590,6 +647,41 @@ export default function Pipeline() {
     
     return grouped;
   }, [stages, filteredDeals]);
+
+  const pipelineKpis = useMemo(() => {
+    const isOpenDeal = (deal: DealWithRelations) => {
+      const stageName = (deal.stage || "").toLowerCase().replace(/[_\s]/g, "");
+      return stageName !== "closedwon" && stageName !== "won" && stageName !== "closedlost" && stageName !== "lost";
+    };
+    const isWonDeal = (deal: DealWithRelations) => {
+      const stageName = (deal.stage || "").toLowerCase().replace(/[_\s]/g, "");
+      return stageName === "closedwon" || stageName === "won";
+    };
+    const isLostDeal = (deal: DealWithRelations) => {
+      const stageName = (deal.stage || "").toLowerCase().replace(/[_\s]/g, "");
+      return stageName === "closedlost" || stageName === "lost";
+    };
+
+    const openDeals = deals.filter(isOpenDeal);
+    const wonDeals = deals.filter(isWonDeal);
+    const lostDeals = deals.filter(isLostDeal);
+
+    const totalPipelineValue = openDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const weightedValue = openDeals.reduce((sum, d) => {
+      const amount = Number(d.amount || 0);
+      const prob = (d.probability ?? 10) / 100;
+      return sum + amount * prob;
+    }, 0);
+    const avgDealSize = openDeals.length > 0 ? totalPipelineValue / openDeals.length : 0;
+    const totalClosed = wonDeals.length + lostDeals.length;
+    const winRate = totalClosed > 0 ? (wonDeals.length / totalClosed) * 100 : 0;
+    const avgDaysInStage = openDeals.length > 0
+      ? Math.round(openDeals.reduce((sum, d) => sum + calculateDaysInStage(d.currentStageEnteredAt), 0) / openDeals.length)
+      : 0;
+    const dealsAtRisk = openDeals.filter(d => calculateDaysInStage(d.currentStageEnteredAt) > 30).length;
+
+    return { totalPipelineValue, weightedValue, avgDealSize, winRate, avgDaysInStage, dealsAtRisk };
+  }, [deals]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -858,6 +950,80 @@ export default function Pipeline() {
         </div>
       </div>
 
+      {/* Pipeline KPI Summary Bar */}
+      {!isLoading && (
+        <div className="bg-gray-100 border-b border-gray-200 px-6 py-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Total Pipeline</span>
+                  <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
+                    <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{formatCurrency(pipelineKpis.totalPipelineValue)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Weighted Value</span>
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Target className="h-3.5 w-3.5 text-blue-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{formatCurrency(pipelineKpis.weightedValue)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Avg Deal Size</span>
+                  <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <BarChart3 className="h-3.5 w-3.5 text-purple-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{formatCurrency(pipelineKpis.avgDealSize)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Win Rate</span>
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <Award className="h-3.5 w-3.5 text-emerald-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{pipelineKpis.winRate.toFixed(1)}%</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Avg Days in Stage</span>
+                  <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center">
+                    <Timer className="h-3.5 w-3.5 text-orange-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{pipelineKpis.avgDaysInStage}d</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-medium text-gray-500">Deals at Risk</span>
+                  <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+                  </div>
+                </div>
+                <div className="text-lg font-bold text-gray-900">{pipelineKpis.dealsAtRisk}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden">
         {/* Kanban View */}
@@ -939,24 +1105,54 @@ export default function Pipeline() {
                           </td>
                           <td className="px-6 py-4">
                             {deal.contact ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
-                                  {getInitials(deal.contact.firstName, deal.contact.lastName)}
+                              deal.contactId ? (
+                                <Link
+                                  href={`/crm/contacts/${deal.contactId}`}
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                >
+                                  <div className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+                                      {getInitials(deal.contact.firstName, deal.contact.lastName)}
+                                    </div>
+                                    <span className="text-sm text-gray-900 hover:text-blue-600">
+                                      {deal.contact.firstName} {deal.contact.lastName}
+                                    </span>
+                                    <ExternalLink className="h-3 w-3 text-gray-400" />
+                                  </div>
+                                </Link>
+                              ) : (
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
+                                    {getInitials(deal.contact.firstName, deal.contact.lastName)}
+                                  </div>
+                                  <span className="text-sm text-gray-900">
+                                    {deal.contact.firstName} {deal.contact.lastName}
+                                  </span>
                                 </div>
-                                <span className="text-sm text-gray-900">
-                                  {deal.contact.firstName} {deal.contact.lastName}
-                                </span>
-                              </div>
+                              )
                             ) : (
                               <span className="text-sm text-gray-400">—</span>
                             )}
                           </td>
                           <td className="px-6 py-4">
                             {deal.company ? (
-                              <div className="flex items-center space-x-2">
-                                <Building2 className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-900">{deal.company.name}</span>
-                              </div>
+                              deal.companyId ? (
+                                <Link
+                                  href={`/crm/companies/${deal.companyId}`}
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                >
+                                  <div className="flex items-center space-x-2 hover:text-blue-600 transition-colors">
+                                    <Building2 className="w-4 h-4 text-gray-400" />
+                                    <span className="text-sm text-gray-900 hover:text-blue-600">{deal.company.name}</span>
+                                    <ExternalLink className="h-3 w-3 text-gray-400" />
+                                  </div>
+                                </Link>
+                              ) : (
+                                <div className="flex items-center space-x-2">
+                                  <Building2 className="w-4 h-4 text-gray-400" />
+                                  <span className="text-sm text-gray-900">{deal.company.name}</span>
+                                </div>
+                              )
                             ) : (
                               <span className="text-sm text-gray-400">—</span>
                             )}

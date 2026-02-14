@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, DollarSign, Target, Calendar, Award, Percent, BarChart3, Loader2 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, addMonths } from "date-fns";
+import { TrendingUp, DollarSign, Target, Calendar, Award, Percent, BarChart3, Loader2, AlertTriangle, Clock, Zap, Layers, ArrowRight } from "lucide-react";
+import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, addMonths, differenceInDays } from "date-fns";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { Link } from "wouter";
 import type { Deal, CrmPipelineStage } from "@shared/schema";
 
 type DealWithRelations = Deal & {
@@ -226,6 +227,95 @@ export default function Forecast() {
       .slice(0, 5);
   }, [periodDeals, wonStageIds, lostStageIds]);
 
+  const pipelineHealthMetrics = useMemo(() => {
+    const openDeals = periodDeals.filter(d => !isDealWon(d) && !isDealLost(d));
+    const now = new Date();
+
+    const pipelineCoverage = metrics.totalRevenue > 0
+      ? metrics.weightedPipeline / metrics.totalRevenue
+      : null;
+
+    const dealVelocities = openDeals.map(d => {
+      const created = d.createdAt ? new Date(d.createdAt) : now;
+      return differenceInDays(now, created);
+    });
+    const avgVelocity = dealVelocities.length > 0
+      ? Math.round(dealVelocities.reduce((a, b) => a + b, 0) / dealVelocities.length)
+      : 0;
+
+    const agingDeals = openDeals.filter(d => {
+      if (!d.expectedCloseDate) return false;
+      return new Date(d.expectedCloseDate) < now;
+    });
+
+    const newPipelineDeals = periodDeals.filter(d => {
+      if (!d.createdAt) return false;
+      const created = new Date(d.createdAt);
+      return isWithinInterval(created, dateRange) && !isDealWon(d) && !isDealLost(d);
+    });
+    const pipelineGrowth = newPipelineDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+
+    return { pipelineCoverage, avgVelocity, agingDealsCount: agingDeals.length, pipelineGrowth };
+  }, [periodDeals, metrics, dateRange, wonStageIds, lostStageIds]);
+
+  const stageFunnelData = useMemo(() => {
+    const openDeals = periodDeals.filter(d => !isDealWon(d) && !isDealLost(d));
+    const activeStages = stages
+      .filter(s => s.stageType !== 'won' && s.stageType !== 'lost')
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+    const stageData = activeStages.map((stage, index) => {
+      const stageDeals = openDeals.filter(d => d.stageId === stage.id);
+      const totalValue = stageDeals.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const nextStage = activeStages[index + 1];
+      const nextStageCount = nextStage
+        ? openDeals.filter(d => d.stageId === nextStage.id).length
+        : 0;
+      const conversionRate = stageDeals.length > 0
+        ? (nextStageCount / stageDeals.length) * 100
+        : 0;
+
+      return {
+        id: stage.id,
+        name: stage.name,
+        dealCount: stageDeals.length,
+        totalValue,
+        conversionRate,
+        isLast: index === activeStages.length - 1,
+      };
+    });
+
+    const maxCount = Math.max(...stageData.map(s => s.dealCount), 1);
+    return stageData.map(s => ({ ...s, barWidth: (s.dealCount / maxCount) * 100 }));
+  }, [periodDeals, stages, wonStageIds, lostStageIds]);
+
+  const dealAgingBuckets = useMemo(() => {
+    const openDeals = periodDeals.filter(d => !isDealWon(d) && !isDealLost(d));
+    const now = new Date();
+
+    const buckets = [
+      { label: "< 30 days", min: 0, max: 30, deals: [] as DealWithRelations[], color: "bg-green-500" },
+      { label: "30-60 days", min: 30, max: 60, deals: [] as DealWithRelations[], color: "bg-yellow-500" },
+      { label: "60-90 days", min: 60, max: 90, deals: [] as DealWithRelations[], color: "bg-orange-500" },
+      { label: "90+ days", min: 90, max: Infinity, deals: [] as DealWithRelations[], color: "bg-red-500" },
+    ];
+
+    openDeals.forEach(deal => {
+      const created = deal.createdAt ? new Date(deal.createdAt) : now;
+      const age = differenceInDays(now, created);
+      const bucket = buckets.find(b => age >= b.min && age < b.max);
+      if (bucket) bucket.deals.push(deal);
+    });
+
+    const totalDeals = openDeals.length || 1;
+    return buckets.map(b => ({
+      ...b,
+      count: b.deals.length,
+      totalValue: b.deals.reduce((sum, d) => sum + Number(d.amount || 0), 0),
+      percentage: (b.deals.length / totalDeals) * 100,
+    }));
+  }, [periodDeals, wonStageIds, lostStageIds]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -326,6 +416,74 @@ export default function Forecast() {
               </Card>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Pipeline Coverage</CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center">
+                    <Layers className="h-4 w-4 text-cyan-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {pipelineHealthMetrics.pipelineCoverage !== null
+                      ? `${pipelineHealthMetrics.pipelineCoverage.toFixed(1)}x`
+                      : "∞"}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pipelineHealthMetrics.pipelineCoverage !== null && pipelineHealthMetrics.pipelineCoverage > 3
+                      ? <span className="text-green-600">Healthy coverage</span>
+                      : pipelineHealthMetrics.pipelineCoverage !== null
+                        ? <span className="text-amber-600">Below 3x target</span>
+                        : "No won revenue yet"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Deal Velocity</CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-teal-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">{pipelineHealthMetrics.avgVelocity} days</div>
+                  <p className="text-xs text-gray-500 mt-1">Avg time in pipeline</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Aging Deals</CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">{pipelineHealthMetrics.agingDealsCount}</div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pipelineHealthMetrics.agingDealsCount > 0
+                      ? <span className="text-red-600">Overdue deals need attention</span>
+                      : "No overdue deals"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Pipeline Growth</CardTitle>
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">{formatCurrency(pipelineHealthMetrics.pipelineGrowth)}</div>
+                  <p className="text-xs text-gray-500 mt-1">New pipeline this period</p>
+                </CardContent>
+              </Card>
+            </div>
+
             {topDeals.length > 0 && (
               <Card className="mb-6" data-testid="card-top-deals">
                 <CardHeader>
@@ -348,12 +506,24 @@ export default function Forecast() {
                       return (
                         <div key={deal.id} className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0">
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900">{deal.title || deal.name}</div>
+                            <Link href={`/crm/deals/${deal.id}`} onClick={(e: any) => e.stopPropagation()}>
+                              <span className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{deal.title || deal.name}</span>
+                            </Link>
                             <div className="flex items-center gap-2 mt-1">
-                              {deal.contact && (
+                              {deal.contact && deal.contactId && (
+                                <Link href={`/crm/contacts/${deal.contactId}`} onClick={(e: any) => e.stopPropagation()}>
+                                  <span className="text-xs text-blue-500 hover:text-blue-700 hover:underline cursor-pointer">{deal.contact.firstName} {deal.contact.lastName}</span>
+                                </Link>
+                              )}
+                              {deal.contact && !deal.contactId && (
                                 <span className="text-xs text-gray-500">{deal.contact.firstName} {deal.contact.lastName}</span>
                               )}
-                              {deal.company && (
+                              {deal.company && deal.companyId && (
+                                <Link href={`/crm/companies/${deal.companyId}`} onClick={(e: any) => e.stopPropagation()}>
+                                  <span className="text-xs text-blue-500 hover:text-blue-700 hover:underline cursor-pointer">{deal.company.name}</span>
+                                </Link>
+                              )}
+                              {deal.company && !deal.companyId && (
                                 <span className="text-xs text-gray-500">{deal.company.name}</span>
                               )}
                               <Badge variant="outline" className="text-xs capitalize">{stageName}</Badge>
@@ -478,7 +648,7 @@ export default function Forecast() {
               </Card>
             </div>
 
-            <Card data-testid="card-source-breakdown">
+            <Card data-testid="card-source-breakdown" className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
@@ -519,6 +689,93 @@ export default function Forecast() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  Stage Funnel Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stageFunnelData.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <Layers className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No pipeline stages configured</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {stageFunnelData.map((stage) => (
+                      <div key={stage.id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 text-sm">{stage.name}</span>
+                            <Badge variant="secondary" className="text-xs">{stage.dealCount} deals</Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="font-semibold text-gray-900">{formatCurrency(stage.totalValue)}</span>
+                            {!stage.isLast && (
+                              <span className="flex items-center gap-1 text-gray-500">
+                                <ArrowRight className="w-3 h-3" />
+                                {stage.conversionRate.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-3">
+                          <div
+                            className="bg-indigo-500 h-3 rounded-full transition-all"
+                            style={{ width: `${Math.max(stage.barWidth, 2)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                  </div>
+                  Deal Aging Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {dealAgingBuckets.map((bucket) => (
+                    <div key={bucket.label} className={`rounded-lg p-4 ${bucket.label === "90+ days" ? "bg-red-50 border border-red-200" : "bg-gray-50"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-semibold text-sm ${bucket.label === "90+ days" ? "text-red-700" : "text-gray-900"}`}>
+                            {bucket.label}
+                          </span>
+                          {bucket.label === "90+ days" && bucket.count > 0 && (
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-gray-600">{bucket.count} deals</span>
+                          <span className="font-semibold text-gray-900">{formatCurrency(bucket.totalValue)}</span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className={`${bucket.color} h-2.5 rounded-full transition-all`}
+                          style={{ width: `${Math.max(bucket.percentage, 1)}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{bucket.percentage.toFixed(1)}% of open deals</div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
