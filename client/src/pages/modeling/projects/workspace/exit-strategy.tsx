@@ -89,11 +89,12 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
     exitCapRate: parseFloat(activeCase.exitCapRate || '0') * 100 || 7.5,
   } : defaultScenarios.base;
 
-  const exitCapRate = currentScenario.exitCapRate;
+  const exitCapRate = currentScenario.exitCapRate || 7.5;
   const year1NOI = proForma?.year1NOI || Number(project?.ebitda) || 0;
   const netGrowthRate = (currentScenario.revenueGrowth - currentScenario.expenseGrowth) / 100;
   const exitNOI = year1NOI * Math.pow(1 + netGrowthRate, holdPeriod);
-  const calculatedSalePrice = exitNOI / (exitCapRate / 100);
+  const rawSalePrice = exitCapRate > 0 ? exitNOI / (exitCapRate / 100) : 0;
+  const calculatedSalePrice = Number.isFinite(rawSalePrice) && rawSalePrice > 0 ? rawSalePrice : purchasePrice * 1.3;
 
   useEffect(() => {
     const hydrationKey = `${projectId}-${activeCaseId}-${purchasePrice}-${holdPeriod}-${calculatedSalePrice}`;
@@ -164,7 +165,10 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
                   {cases.filter(c => c.isEnabled).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full bg-${c.color || 'blue'}-500`} />
+                        <div 
+                          className="h-2 w-2 rounded-full" 
+                          style={{ backgroundColor: ({ blue: '#3b82f6', green: '#22c55e', red: '#ef4444', amber: '#f59e0b', purple: '#a855f7', cyan: '#06b6d4', orange: '#f97316' } as Record<string, string>)[c.color || 'blue'] || '#3b82f6' }}
+                        />
                         {c.name}
                         {c.isDefault && <Badge variant="outline" className="ml-1 text-[10px] py-0 px-1">Default</Badge>}
                       </div>
