@@ -477,12 +477,14 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
     const totalMonths = holdPeriodYears * 12;
     const rows: ProFormaCashFlowRow[] = [];
 
-    const annualCashOnCash = totalContributed * (inputs.preferredReturn / 100);
-    const monthlyDistribution = annualCashOnCash / 12;
+    const wf = calculateWaterfall;
+    const lpShare = lpContribution / (totalContributed || 1);
+    const gpShare = gpContribution / (totalContributed || 1);
 
-    const firstTier = tiers[0];
-    const lpPct = firstTier ? firstTier.lpSplit / 100 : 0.8;
-    const gpPct = 1 - lpPct;
+    const annualPrefLP = (wf.preferredReturn * lpShare) / holdPeriodYears;
+    const annualPrefGP = (wf.preferredReturn * gpShare) / holdPeriodYears;
+    const monthlyPrefLP = annualPrefLP / 12;
+    const monthlyPrefGP = annualPrefGP / 12;
 
     for (let m = 1; m <= totalMonths; m++) {
       const year = Math.ceil(m / 12);
@@ -490,29 +492,31 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
       const isExitMonth = m === totalMonths;
 
       const values: Record<string, number> = {
-        "LP Distribution": monthlyDistribution * lpPct,
-        "GP Promote": monthlyDistribution * gpPct,
-        "Total Distribution": monthlyDistribution,
+        "Pref Return - LP": monthlyPrefLP,
+        "Pref Return - GP": monthlyPrefGP,
+        "Total Distribution": monthlyPrefLP + monthlyPrefGP,
       };
 
       if (isExitMonth) {
-        const exitProceeds = inputs.totalDistribution;
-        const gain = Math.max(0, exitProceeds - totalContributed);
-        values["Exit - LP Share"] = gain * lpPct;
-        values["Exit - GP Share"] = gain * gpPct;
-        values["Return of Capital"] = totalContributed;
-        values["Total Distribution"] += exitProceeds;
+        const lpPromote = wf.tierDistributions.reduce((s, td) => s + td.lpAmount, 0);
+        const gpPromote = wf.tierDistributions.reduce((s, td) => s + td.gpAmount, 0);
+        values["Return of Capital"] = wf.returnOfCapital;
+        values["GP Catch-Up"] = wf.gpCatchUp;
+        values["LP Promote"] = lpPromote;
+        values["GP Promote"] = gpPromote;
+        values["Total Distribution"] += wf.returnOfCapital + wf.gpCatchUp + lpPromote + gpPromote;
       }
 
       rows.push({ period: m, year, month, values, isExitMonth });
     }
 
     const lineItems: ProFormaLineItem[] = [
-      { label: "LP Distribution" },
-      { label: "GP Promote" },
-      { label: "Exit - LP Share" },
-      { label: "Exit - GP Share" },
+      { label: "Pref Return - LP" },
+      { label: "Pref Return - GP" },
       { label: "Return of Capital" },
+      { label: "GP Catch-Up" },
+      { label: "LP Promote" },
+      { label: "GP Promote" },
       { label: "Total Distribution", isSubtotal: true, isBold: true },
     ];
 
@@ -526,11 +530,11 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
       summaryMetrics: [
         { label: "Total Distributions", value: `$${Math.round(totalCF).toLocaleString()}` },
         { label: "Total Capital", value: `$${Math.round(totalContributed).toLocaleString()}` },
-        { label: "LP Split", value: `${(lpPct * 100).toFixed(0)}%` },
-        { label: "GP Promote", value: `${(gpPct * 100).toFixed(0)}%` },
+        { label: "LP Total", value: `$${Math.round(wf.lpTotal).toLocaleString()}` },
+        { label: "GP Total", value: `$${Math.round(wf.gpTotal).toLocaleString()}` },
       ],
     };
-  }, [investors, tiers, inputs.holdingPeriodYears, inputs.preferredReturn, inputs.totalDistribution, totalContributed]);
+  }, [calculateWaterfall, inputs.holdingPeriodYears, totalContributed, lpContribution, gpContribution]);
 
   return (
     <TooltipProvider>

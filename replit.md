@@ -42,7 +42,7 @@ The platform utilizes a dual-sourced data model separating "Universal/Global" cu
 - **Due Diligence**: Project management, task tracking, template management, DD Fees Tracker, and project-level contact management with CRM pending contacts integration.
 - **Rent Roll V2**: Marina-centric lease management with normalized schema, supporting seasonal/year-round operations and CRM/DD integrations.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, validation, and Pending Sales Comps workflow (property sales history → pending review → accepted/rejected → sales comp creation).
-- **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence, Scenario Versioning, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
+- **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite (with monthly/annual Pro Forma cash flow projections on every exit strategy page via shared `ExitProForma` component), AI-powered Document Intelligence, Scenario Versioning, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
 - **Operations Modules**: Fuel Sales, Ship Store, Dockit (scheduling), and Marketing.
 - **Virtual Data Room (VDR)**: Secure document management with granular permissions and audit logging.
 - **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, and sentiment analysis.

@@ -272,8 +272,9 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
           const exitValue = alloc * appreciationMultiple;
           const totalFeePercent = dst.sponsorFees.dispositionFee;
           const dispositionFee = alloc * (totalFeePercent / 100);
-          values[`${dst.name} Exit`] = exitValue - alloc - dispositionFee;
-          totalDistribution += exitValue - alloc - dispositionFee;
+          const netExitProceeds = exitValue - dispositionFee;
+          values[`${dst.name} Exit`] = netExitProceeds;
+          totalDistribution += netExitProceeds;
         }
       }
 
