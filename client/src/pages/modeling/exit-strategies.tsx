@@ -47,6 +47,43 @@ const parsePercent = (value: string): string => {
   return num || '0';
 };
 
+function getCashSaleBaseline(m: MasterInputs) {
+  const adjustedBasis = m.costBasis + m.capitalImprovements - m.depreciationTaken;
+  const capitalGain = m.salePrice - adjustedBasis;
+  const depRecapture = Math.min(m.depreciationTaken, Math.max(0, capitalGain)) * 0.25;
+  const longTermGain = Math.max(0, capitalGain - m.depreciationTaken);
+  const federalTax = longTermGain * (m.federalTaxRate / 100);
+  const stateTax = longTermGain * (m.stateTaxRate / 100);
+  const niit = longTermGain > 250000 ? longTermGain * 0.038 : 0;
+  const totalTax = federalTax + stateTax + depRecapture + niit;
+  const brokerCost = m.salePrice * (m.brokerFeePercent / 100);
+  const closingCosts = m.closingCosts;
+  const netSaleProceeds = m.salePrice - brokerCost - closingCosts;
+  const netCashProceeds = netSaleProceeds - m.currentDebtBalance - totalTax;
+  const effectiveTaxRate = capitalGain > 0 ? (totalTax / capitalGain) * 100 : 0;
+  return { adjustedBasis, capitalGain, depRecapture, longTermGain, federalTax, stateTax, niit, totalTax, brokerCost, closingCosts, netSaleProceeds, netCashProceeds, effectiveTaxRate };
+}
+
+function CashSaleBaselineCard({ baseline, label }: { baseline: ReturnType<typeof getCashSaleBaseline>; label?: string }) {
+  return (
+    <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{label || "Cash Sale Baseline (for comparison)"}</h4>
+      <div className="flex justify-between py-1">
+        <span className="text-muted-foreground text-sm">Total Tax (Cash Sale)</span>
+        <span className="num font-medium text-red-600">{formatCurrency(baseline.totalTax)}</span>
+      </div>
+      <div className="flex justify-between py-1">
+        <span className="text-muted-foreground text-sm">Net Cash Proceeds</span>
+        <span className="num font-medium">{formatCurrency(baseline.netCashProceeds)}</span>
+      </div>
+      <div className="flex justify-between py-1">
+        <span className="text-muted-foreground text-sm">Effective Tax Rate</span>
+        <span className="num font-medium">{baseline.effectiveTaxRate.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
 interface CurrencyInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -558,504 +595,931 @@ export default function ExitStrategiesPage() {
 
 function TaxAndProceedsPanel() {
   const { masterInputs } = useExitStrategiesStore();
-
-  const sale = masterInputs.salePrice;
-  const basis = masterInputs.costBasis;
-  const depreciation = masterInputs.depreciationTaken;
-  const fedRate = masterInputs.federalTaxRate / 100;
-  const stRate = masterInputs.stateTaxRate / 100;
-  const loan = masterInputs.currentDebtBalance;
-  const closingCosts = masterInputs.closingCosts;
-  const brokerPct = masterInputs.brokerFeePercent / 100;
-
-  const capitalGain = sale - basis;
-  const federalTax = capitalGain * fedRate;
-  const stateTax = capitalGain * stRate;
-  const depTax = depreciation * 0.25;
-  const niit = capitalGain > 250000 ? capitalGain * 0.038 : 0;
-  const totalTax = federalTax + stateTax + depTax + niit;
-
-  const brokerCost = sale * brokerPct;
-  const netSaleProceeds = sale - brokerCost - closingCosts;
-  const totalDeductions = loan + closingCosts + brokerCost + totalTax;
-  const netProceeds = sale - totalDeductions;
+  const b = getCashSaleBaseline(masterInputs);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Tax Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Capital Gain</span>
-              <span className="font-semibold" data-testid="text-capital-gain">{formatCurrency(capitalGain)}</span>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tax Analysis</CardTitle>
+            <CardDescription>Capital gains and depreciation recapture breakdown</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Basis Calculation</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Original Cost Basis</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.costBasis)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">+ Capital Improvements</span>
+                <span className="num font-medium text-green-600">+{formatCurrency(masterInputs.capitalImprovements)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">- Accumulated Depreciation</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(masterInputs.depreciationTaken)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Adjusted Basis</span>
+                <span className="num font-semibold">{formatCurrency(b.adjustedBasis)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Federal Tax</span>
-              <span className="text-red-600" data-testid="text-federal-tax">-{formatCurrency(federalTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">State Tax</span>
-              <span className="text-red-600" data-testid="text-state-tax">-{formatCurrency(stateTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Depreciation Recapture (25%)</span>
-              <span className="text-red-600" data-testid="text-dep-recapture">-{formatCurrency(depTax)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">NIIT (3.8%)</span>
-              <span className="text-red-600" data-testid="text-niit">-{formatCurrency(niit)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-muted/50 rounded-lg px-3">
-              <span className="font-semibold">Total Tax Liability</span>
-              <span className="font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(totalTax)}</span>
-            </div>
-          </div>
 
-          <div className="border-t my-4" />
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gain Analysis</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Sale Price</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.salePrice)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Adjusted Basis</span>
+                <span className="num font-medium">-{formatCurrency(b.adjustedBasis)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Total Capital Gain</span>
+                <span className="num font-semibold text-green-600" data-testid="text-capital-gain">{formatCurrency(b.capitalGain)}</span>
+              </div>
+            </div>
 
-          <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Net Proceeds Waterfall</h4>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Gross Sale</span>
-              <span className="font-semibold">{formatCurrency(sale)}</span>
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Liability</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Depreciation Recapture (25%)</span>
+                <span className="num font-medium text-red-600" data-testid="text-dep-recapture">-{formatCurrency(b.depRecapture)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Federal Tax ({masterInputs.federalTaxRate}%)</span>
+                <span className="num font-medium text-red-600" data-testid="text-federal-tax">-{formatCurrency(b.federalTax)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">State Tax ({masterInputs.stateTaxRate}%)</span>
+                <span className="num font-medium text-red-600" data-testid="text-state-tax">-{formatCurrency(b.stateTax)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">NIIT (3.8%)</span>
+                <span className="num font-medium text-red-600" data-testid="text-niit">-{formatCurrency(b.niit)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
+                <span className="font-semibold">Total Tax Liability</span>
+                <span className="num font-bold text-red-600" data-testid="text-total-tax">{formatCurrency(b.totalTax)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Effective Tax Rate</span>
+                <span className="num font-medium">{b.effectiveTaxRate.toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Broker Commission</span>
-              <span className="text-red-600">-{formatCurrency(brokerCost)}</span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Net Proceeds Waterfall</CardTitle>
+            <CardDescription>Step-by-step deductions from gross sale to net cash</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Gross Sale Price</span>
+                <span className="num font-semibold">{formatCurrency(masterInputs.salePrice)}</span>
+              </div>
+
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Transaction Costs</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Broker Commission ({masterInputs.brokerFeePercent}%)</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(b.brokerCost)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Closing Costs</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(b.closingCosts)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Net Sale Proceeds</span>
+                <span className="num font-semibold">{formatCurrency(b.netSaleProceeds)}</span>
+              </div>
+
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-2">Obligations</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Loan Payoff</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(masterInputs.currentDebtBalance)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Taxes</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(b.totalTax)}</span>
+              </div>
+
+              <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
+                <span className="font-semibold">Net Cash to Seller</span>
+                <span className="num font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(b.netCashProceeds)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Closing Costs</span>
-              <span className="text-red-600">-{formatCurrency(closingCosts)}</span>
+
+            <div className="border-t pt-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Ratios</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Proceeds as % of Sale</span>
+                <span className="num font-medium">{masterInputs.salePrice > 0 ? ((b.netCashProceeds / masterInputs.salePrice) * 100).toFixed(1) : 0}%</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Total Costs & Taxes</span>
+                <span className="num font-medium text-red-600">{formatCurrency(masterInputs.salePrice - b.netCashProceeds)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Return on Basis</span>
+                <span className="num font-medium text-green-600">{b.adjustedBasis > 0 ? ((b.netCashProceeds / b.adjustedBasis - 1) * 100).toFixed(1) : 0}%</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Net Sale Proceeds</span>
-              <span className="font-semibold">{formatCurrency(netSaleProceeds)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Loan Payoff</span>
-              <span className="text-red-600">-{formatCurrency(loan)}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Taxes</span>
-              <span className="text-red-600">-{formatCurrency(totalTax)}</span>
-            </div>
-            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-              <span className="font-semibold">Net Cash Proceeds</span>
-              <span className="font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(netProceeds)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function Exchange1031Panel() {
   const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
   const [replacementValue, setReplacementValue] = useState<string>("6000000");
   const [bootReceived, setBootReceived] = useState<string>("0");
-  const [identificationDays] = useState<string>("45");
-  const [closingDays] = useState<string>("180");
+  const [exchangeCosts, setExchangeCosts] = useState<string>("25000");
 
   const relinquishedValue = masterInputs.salePrice;
-  const adjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
-  const gain = relinquishedValue - adjustedBasis;
-  const deferredGain = Math.min(gain, parseFloat(replacementValue) || 0);
-  const taxableGain = parseFloat(bootReceived) || 0;
-  const taxSaved = deferredGain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
+  const gain = baseline.capitalGain;
+  const boot = parseFloat(bootReceived) || 0;
+  const replacement = parseFloat(replacementValue) || 0;
+  const exchCosts = parseFloat(exchangeCosts) || 0;
+  const deferredGain = Math.max(0, gain - boot);
+  const bootTax = boot * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
+  const taxSaved = baseline.totalTax - bootTax;
+  const newBasis = replacement - deferredGain;
+  const equityRequired = replacement - (baseline.netSaleProceeds - masterInputs.currentDebtBalance);
+  const netBenefit = taxSaved - exchCosts;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RefreshCcw className="h-5 w-5 text-blue-500" />
-            1031 Exchange Planner
-          </CardTitle>
-          <CardDescription>
-            Relinquished value from master Sale Price
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Relinquished Value (Sale Price)</span>
-              <span className="font-medium">{formatCurrency(relinquishedValue)}</span>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCcw className="h-5 w-5 text-blue-500" />
+              1031 Exchange Planner
+            </CardTitle>
+            <CardDescription>Like-kind exchange with tax deferral analysis</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 bg-muted/30 rounded-lg p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Relinquished Property</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Sale Price</span>
+                <span className="num font-medium">{formatCurrency(relinquishedValue)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Adjusted Basis</span>
+                <span className="num font-medium">{formatCurrency(baseline.adjustedBasis)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Realized Gain</span>
+                <span className="num font-medium text-green-600">{formatCurrency(gain)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Adjusted Basis</span>
-              <span className="font-medium">{formatCurrency(adjustedBasis)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Realized Gain</span>
-              <span className="font-medium">{formatCurrency(gain)}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Replacement Property Value</Label>
-              <CurrencyInput value={replacementValue} onChange={setReplacementValue} />
-            </div>
-            <div>
-              <Label>Boot Received</Label>
-              <CurrencyInput value={bootReceived} onChange={setBootReceived} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Exchange Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Deferred Gain</span>
-              <span className="font-semibold text-green-600">{formatCurrency(deferredGain)}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Replacement Property Value</Label>
+                <CurrencyInput value={replacementValue} onChange={setReplacementValue} />
+              </div>
+              <div>
+                <Label className="text-xs">Boot Received</Label>
+                <CurrencyInput value={bootReceived} onChange={setBootReceived} />
+              </div>
+              <div>
+                <Label className="text-xs">Exchange Costs (QI fees, etc.)</Label>
+                <CurrencyInput value={exchangeCosts} onChange={setExchangeCosts} />
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Taxable Boot</span>
-              <span className="text-red-600">{formatCurrency(taxableGain)}</span>
+
+            <CashSaleBaselineCard baseline={baseline} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Exchange Analysis</CardTitle>
+            <CardDescription>Tax deferral and replacement property details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Deferral</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Gain</span>
+                <span className="num font-medium">{formatCurrency(gain)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Deferred Gain</span>
+                <span className="num font-medium text-green-600">{formatCurrency(deferredGain)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Recognized Gain (Boot)</span>
+                <span className="num font-medium text-red-600">{formatCurrency(boot)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Boot Tax Due</span>
+                <span className="num font-medium text-red-600">{formatCurrency(bootTax)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+                <span className="font-semibold">Tax Savings vs Cash Sale</span>
+                <span className="num font-bold text-green-600">{formatCurrency(taxSaved)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Tax Savings</span>
-              <span className="font-semibold text-green-600">{formatCurrency(taxSaved)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Replacement Property</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Replacement Value</span>
+                <span className="num font-medium">{formatCurrency(replacement)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">New Tax Basis</span>
+                <span className="num font-medium">{formatCurrency(newBasis)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Additional Equity Needed</span>
+                <span className="num font-medium">{formatCurrency(Math.max(0, equityRequired))}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Exchange Costs</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(exchCosts)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">ID Deadline</span>
-              <span>{identificationDays} days</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Net Benefit</h4>
+              <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
+                <span className="font-semibold">Net Benefit (Savings - Costs)</span>
+                <span className={`num font-bold ${netBenefit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(netBenefit)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Closing Deadline</span>
-              <span>{closingDays} days</span>
+
+            <div className="border-t pt-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deadlines</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Property Identification</span>
+                <span className="num font-medium">45 days</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Exchange Closing</span>
+                <span className="num font-medium">180 days</span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function DSTAnalysisPanel() {
   const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
   const [distributionRate, setDistributionRate] = useState<string>("5.5");
+  const [appreciationRate, setAppreciationRate] = useState<string>("3");
+  const [upfrontFee, setUpfrontFee] = useState<string>("6");
+  const [dispositionFee, setDispositionFee] = useState<string>("3");
 
   const investmentAmount = masterInputs.salePrice - masterInputs.currentDebtBalance - masterInputs.closingCosts;
-  const annualDistribution = investmentAmount * (parseFloat(distributionRate) / 100 || 0);
+  const feeAmount = investmentAmount * (parseFloat(upfrontFee) / 100 || 0);
+  const netInvested = investmentAmount - feeAmount;
+  const annualDistribution = netInvested * (parseFloat(distributionRate) / 100 || 0);
   const totalDistributions = annualDistribution * masterInputs.holdingPeriod;
-  const gain = masterInputs.salePrice - masterInputs.costBasis;
-  const deferredTax = gain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
+  const cashOnCash = investmentAmount > 0 ? (annualDistribution / investmentAmount) * 100 : 0;
+  const exitValue = netInvested * Math.pow(1 + (parseFloat(appreciationRate) / 100 || 0), masterInputs.holdingPeriod);
+  const exitFee = exitValue * (parseFloat(dispositionFee) / 100 || 0);
+  const netExitProceeds = exitValue - exitFee;
+  const totalReturn = totalDistributions + netExitProceeds;
+  const totalProfit = totalReturn - investmentAmount;
+  const deferredTax = baseline.totalTax;
+  const depreciationBenefit = investmentAmount * 0.8 / 27.5 * masterInputs.holdingPeriod;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Landmark className="h-5 w-5 text-purple-500" />
-            DST Analysis
-          </CardTitle>
-          <CardDescription>
-            Investment amount from net equity (Sale - Debt - Costs)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Net Equity Available</span>
-              <span className="font-medium">{formatCurrency(investmentAmount)}</span>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-purple-500" />
+              DST Analysis
+            </CardTitle>
+            <CardDescription>Delaware Statutory Trust investment via 1031 exchange</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 bg-muted/30 rounded-lg p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Investment Basis</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Sale Price</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.salePrice)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Less: Debt Payoff</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(masterInputs.currentDebtBalance)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Less: Closing Costs</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(masterInputs.closingCosts)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Net Equity to Invest</span>
+                <span className="num font-semibold">{formatCurrency(investmentAmount)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Hold Period</span>
-              <span className="font-medium">{masterInputs.holdingPeriod} years</span>
-            </div>
-          </div>
-          <div>
-            <Label>Distribution Rate</Label>
-            <PercentInput value={distributionRate} onChange={setDistributionRate} />
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>DST Returns</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Investment Amount</span>
-              <span className="font-semibold">{formatCurrency(investmentAmount)}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Distribution Rate (%)</Label>
+                <PercentInput value={distributionRate} onChange={setDistributionRate} />
+              </div>
+              <div>
+                <Label className="text-xs">Appreciation Rate (%)</Label>
+                <PercentInput value={appreciationRate} onChange={setAppreciationRate} />
+              </div>
+              <div>
+                <Label className="text-xs">Upfront Fee (%)</Label>
+                <PercentInput value={upfrontFee} onChange={setUpfrontFee} />
+              </div>
+              <div>
+                <Label className="text-xs">Disposition Fee (%)</Label>
+                <PercentInput value={dispositionFee} onChange={setDispositionFee} />
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Annual Distribution</span>
-              <span className="font-semibold text-green-600">{formatCurrency(annualDistribution)}</span>
+
+            <CashSaleBaselineCard baseline={baseline} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>DST Returns Analysis</CardTitle>
+            <CardDescription>Cash flow, exit projections, and tax benefits</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Gross Investment</span>
+                <span className="num font-medium">{formatCurrency(investmentAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Upfront Fees ({upfrontFee}%)</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(feeAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Net Working Capital</span>
+                <span className="num font-medium">{formatCurrency(netInvested)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Annual Distribution</span>
+                <span className="num font-medium text-green-600">{formatCurrency(annualDistribution)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Cash-on-Cash Yield</span>
+                <span className="num font-medium">{cashOnCash.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Distributions ({masterInputs.holdingPeriod} yrs)</span>
+                <span className="num font-medium text-green-600">{formatCurrency(totalDistributions)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Distributions ({masterInputs.holdingPeriod} yrs)</span>
-              <span className="font-semibold">{formatCurrency(totalDistributions)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exit Projection</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Projected Exit Value</span>
+                <span className="num font-medium">{formatCurrency(exitValue)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Disposition Fee ({dispositionFee}%)</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(exitFee)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Net Exit Proceeds</span>
+                <span className="num font-medium">{formatCurrency(netExitProceeds)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Total Return</span>
+                <span className="num font-semibold text-green-600">{formatCurrency(totalReturn)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Total Profit</span>
+                <span className={`num font-medium ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(totalProfit)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-              <span className="font-semibold">Tax Deferred via 1031</span>
-              <span className="font-bold text-green-600">{formatCurrency(deferredTax)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Benefits</h4>
+              <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+                <span className="font-semibold">Tax Deferred via 1031</span>
+                <span className="num font-bold text-green-600">{formatCurrency(deferredTax)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Est. Depreciation Benefit ({masterInputs.holdingPeriod} yrs)</span>
+                <span className="num font-medium text-green-600">{formatCurrency(depreciationBenefit)}</span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function SellerFinancingPanel() {
   const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
   const [downPaymentPercent, setDownPaymentPercent] = useState<string>("20");
   const [interestRate, setInterestRate] = useState<string>("6");
   const [term, setTerm] = useState<string>("10");
+  const [discountRate, setDiscountRate] = useState<string>("8");
 
   const salePrice = masterInputs.salePrice;
   const downPayment = salePrice * (parseFloat(downPaymentPercent) / 100 || 0);
   const loanAmount = salePrice - downPayment;
   const monthlyRate = (parseFloat(interestRate) / 100 || 0) / 12;
   const months = (parseFloat(term) || 0) * 12;
-  const monthlyPayment = monthlyRate > 0 ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) : 0;
-  const totalInterest = (monthlyPayment * months) - loanAmount;
-  
+  const monthlyPayment = monthlyRate > 0 && months > 0 ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) : 0;
+  const totalPayments = monthlyPayment * months;
+  const totalInterest = totalPayments - loanAmount;
+  const totalCashReceived = downPayment + totalPayments;
+
   const gain = salePrice - masterInputs.costBasis;
   const grossProfitRatio = salePrice > 0 ? gain / salePrice : 0;
-  const taxableDownPayment = downPayment * grossProfitRatio;
-  const annualPrincipal = loanAmount / (parseFloat(term) || 1);
+  const year1TaxableGain = downPayment * grossProfitRatio;
+  const annualPrincipal = months > 0 ? loanAmount / (parseFloat(term) || 1) : 0;
   const annualTaxableGain = annualPrincipal * grossProfitRatio;
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+  const year1Tax = year1TaxableGain * combinedRate;
+  const annualTax = annualTaxableGain * combinedRate;
+  const totalInstallmentTax = year1Tax + annualTax * (parseFloat(term) || 0);
+  const taxDeferral = baseline.totalTax - year1Tax;
+
+  const disc = parseFloat(discountRate) / 100 || 0;
+  let npv = downPayment;
+  for (let y = 1; y <= (parseFloat(term) || 0); y++) {
+    npv += (monthlyPayment * 12) / Math.pow(1 + disc, y);
+  }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HandCoins className="h-5 w-5 text-amber-500" />
-            Seller Financing
-          </CardTitle>
-          <CardDescription>
-            Sale price from master inputs with installment sale treatment
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Sale Price</span>
-              <span className="font-medium">{formatCurrency(salePrice)}</span>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HandCoins className="h-5 w-5 text-amber-500" />
+              Seller Financing
+            </CardTitle>
+            <CardDescription>Installment sale with tax deferral</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 bg-muted/30 rounded-lg p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Deal Structure</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Sale Price</span>
+                <span className="num font-medium">{formatCurrency(salePrice)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Cost Basis</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.costBasis)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Total Gain</span>
+                <span className="num font-medium text-green-600">{formatCurrency(gain)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Gross Profit Ratio</span>
+                <span className="num font-medium">{(grossProfitRatio * 100).toFixed(1)}%</span>
+              </div>
             </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Cost Basis</span>
-              <span className="font-medium">{formatCurrency(masterInputs.costBasis)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Gain</span>
-              <span className="font-medium">{formatCurrency(gain)}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Down Payment %</Label>
-              <PercentInput value={downPaymentPercent} onChange={setDownPaymentPercent} />
-            </div>
-            <div>
-              <Label>Interest Rate</Label>
-              <PercentInput value={interestRate} onChange={setInterestRate} />
-            </div>
-            <div>
-              <Label>Term (Years)</Label>
-              <Input type="number" value={term} onChange={(e) => setTerm(e.target.value)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Financing Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Down Payment</span>
-              <span className="font-semibold">{formatCurrency(downPayment)}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Down Payment %</Label>
+                <PercentInput value={downPaymentPercent} onChange={setDownPaymentPercent} />
+              </div>
+              <div>
+                <Label className="text-xs">Interest Rate</Label>
+                <PercentInput value={interestRate} onChange={setInterestRate} />
+              </div>
+              <div>
+                <Label className="text-xs">Term (Years)</Label>
+                <Input type="number" value={term} onChange={(e) => setTerm(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Discount Rate (NPV)</Label>
+                <PercentInput value={discountRate} onChange={setDiscountRate} />
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Note Amount</span>
-              <span className="font-semibold">{formatCurrency(loanAmount)}</span>
+
+            <CashSaleBaselineCard baseline={baseline} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Financing Analysis</CardTitle>
+            <CardDescription>Payment structure, tax treatment, and present value</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Loan Structure</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Down Payment ({downPaymentPercent}%)</span>
+                <span className="num font-medium">{formatCurrency(downPayment)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Note Amount</span>
+                <span className="num font-medium">{formatCurrency(loanAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Monthly Payment</span>
+                <span className="num font-medium text-green-600">{formatCurrency(monthlyPayment)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Interest Income</span>
+                <span className="num font-medium text-green-600">{formatCurrency(totalInterest)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Total Cash Received</span>
+                <span className="num font-semibold text-green-600">{formatCurrency(totalCashReceived)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Monthly Payment</span>
-              <span className="font-semibold text-green-600">{formatCurrency(monthlyPayment)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Installment Tax Treatment</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Year 1 Taxable Gain</span>
+                <span className="num font-medium text-amber-600">{formatCurrency(year1TaxableGain)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Year 1 Tax Due</span>
+                <span className="num font-medium text-red-600">{formatCurrency(year1Tax)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Annual Taxable Gain (Yrs 2+)</span>
+                <span className="num font-medium text-amber-600">{formatCurrency(annualTaxableGain)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Tax Over Life</span>
+                <span className="num font-medium text-red-600">{formatCurrency(totalInstallmentTax)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+                <span className="font-semibold">Year 1 Tax Deferral</span>
+                <span className="num font-bold text-green-600">{formatCurrency(taxDeferral)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Interest Income</span>
-              <span>{formatCurrency(totalInterest)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Present Value Analysis</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">NPV at {discountRate}% Discount Rate</span>
+                <span className="num font-medium">{formatCurrency(npv)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">NPV vs Cash Sale Proceeds</span>
+                <span className={`num font-medium ${npv >= baseline.netCashProceeds ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(npv - baseline.netCashProceeds)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Premium Over Sale Price</span>
+                <span className="num font-medium text-green-600">{formatCurrency(totalCashReceived - salePrice)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Gross Profit Ratio</span>
-              <span>{(grossProfitRatio * 100).toFixed(1)}%</span>
-            </div>
-            <div className="flex justify-between py-3 bg-amber-50 rounded-lg px-3">
-              <span className="font-semibold">Year 1 Taxable Gain</span>
-              <span className="font-bold text-amber-600">{formatCurrency(taxableDownPayment + annualTaxableGain)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function EarnoutPanel() {
+  const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
   const [basePrice, setBasePrice] = useState<string>("4000000");
   const [earnoutMax, setEarnoutMax] = useState<string>("1000000");
   const [probability, setProbability] = useState<string>("60");
+  const [earnoutYears, setEarnoutYears] = useState<string>("3");
+  const [discountRate, setDiscountRate] = useState<string>("10");
 
-  const expectedEarnout = (parseFloat(earnoutMax) || 0) * (parseFloat(probability) / 100 || 0);
-  const totalExpected = (parseFloat(basePrice) || 0) + expectedEarnout;
+  const base = parseFloat(basePrice) || 0;
+  const maxEarnout = parseFloat(earnoutMax) || 0;
+  const prob = parseFloat(probability) / 100 || 0;
+  const years = parseFloat(earnoutYears) || 1;
+  const disc = parseFloat(discountRate) / 100 || 0;
+
+  const expectedEarnout = maxEarnout * prob;
+  const totalExpected = base + expectedEarnout;
+  const maxValue = base + maxEarnout;
+
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+  const baseTax = base > masterInputs.costBasis ? (base - masterInputs.costBasis) * combinedRate : 0;
+  const earnoutTax = expectedEarnout * combinedRate;
+  const totalTax = baseTax + earnoutTax;
+  const netBaseProceeds = base - baseTax - masterInputs.closingCosts - (base * masterInputs.brokerFeePercent / 100) - masterInputs.currentDebtBalance;
+  const netExpectedProceeds = netBaseProceeds + expectedEarnout - earnoutTax;
+
+  const pvEarnout = expectedEarnout / Math.pow(1 + disc, years);
+  const riskAdjustedTotal = base + pvEarnout;
+  const guaranteedDiscount = masterInputs.salePrice - base;
+  const riskPremium = maxEarnout > 0 ? ((maxEarnout - expectedEarnout) / maxEarnout * 100) : 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5 text-indigo-500" />
-            Earnout Modeling
-          </CardTitle>
-          <CardDescription>
-            Contingent payment structures
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Base Price</Label>
-              <CurrencyInput value={basePrice} onChange={setBasePrice} />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-indigo-500" />
+              Earnout Modeling
+            </CardTitle>
+            <CardDescription>Contingent payment with probability-weighted analysis</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Base Price (Guaranteed)</Label>
+                <CurrencyInput value={basePrice} onChange={setBasePrice} />
+              </div>
+              <div>
+                <Label className="text-xs">Maximum Earnout</Label>
+                <CurrencyInput value={earnoutMax} onChange={setEarnoutMax} />
+              </div>
+              <div>
+                <Label className="text-xs">Achievement Probability</Label>
+                <PercentInput value={probability} onChange={setProbability} />
+              </div>
+              <div>
+                <Label className="text-xs">Earnout Period (Years)</Label>
+                <Input type="number" value={earnoutYears} onChange={(e) => setEarnoutYears(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Discount Rate (%)</Label>
+                <PercentInput value={discountRate} onChange={setDiscountRate} />
+              </div>
             </div>
-            <div>
-              <Label>Maximum Earnout</Label>
-              <CurrencyInput value={earnoutMax} onChange={setEarnoutMax} />
-            </div>
-            <div>
-              <Label>Achievement Probability</Label>
-              <PercentInput value={probability} onChange={setProbability} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Earnout Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Expected Earnout</span>
-              <span className="font-semibold text-green-600">{formatCurrency(expectedEarnout)}</span>
+            <CashSaleBaselineCard baseline={baseline} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Earnout Analysis</CardTitle>
+            <CardDescription>Value range, tax impact, and risk-adjusted returns</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Value Range</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Minimum (Base Only)</span>
+                <span className="num font-medium">{formatCurrency(base)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Expected ({(prob * 100).toFixed(0)}% probability)</span>
+                <span className="num font-medium text-green-600">{formatCurrency(totalExpected)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Maximum (100% achievement)</span>
+                <span className="num font-medium">{formatCurrency(maxValue)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Discount from Full Sale Price</span>
+                <span className="num font-medium text-amber-600">{formatCurrency(guaranteedDiscount)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Expected Value</span>
-              <span className="font-semibold">{formatCurrency(totalExpected)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Analysis</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Tax on Base Price</span>
+                <span className="num font-medium text-red-600">{formatCurrency(baseTax)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Tax on Expected Earnout</span>
+                <span className="num font-medium text-red-600">{formatCurrency(earnoutTax)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Expected Tax</span>
+                <span className="num font-medium text-red-600">{formatCurrency(totalTax)}</span>
+              </div>
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Net Expected Proceeds</span>
+                <span className="num font-semibold text-green-600">{formatCurrency(netExpectedProceeds)}</span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risk Analysis</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">PV of Expected Earnout ({discountRate}% disc.)</span>
+                <span className="num font-medium">{formatCurrency(pvEarnout)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Risk-Adjusted Total Value</span>
+                <span className="num font-medium">{formatCurrency(riskAdjustedTotal)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Risk Premium</span>
+                <span className="num font-medium">{riskPremium.toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-indigo-50 rounded-lg px-3">
+                <span className="font-semibold">vs Cash Sale Net Proceeds</span>
+                <span className={`num font-bold ${netExpectedProceeds >= baseline.netCashProceeds ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(netExpectedProceeds - baseline.netCashProceeds)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function WaterfallPanel() {
+  const { masterInputs } = useExitStrategiesStore();
   const [totalDistribution, setTotalDistribution] = useState<string>("10000000");
   const [lpCapital, setLpCapital] = useState<string>("8000000");
+  const [gpCapital, setGpCapital] = useState<string>("2000000");
   const [preferredReturn, setPreferredReturn] = useState<string>("8");
   const [carriedInterest, setCarriedInterest] = useState<string>("20");
 
-  const prefAmount = (parseFloat(lpCapital) || 0) * (parseFloat(preferredReturn) / 100 || 0);
-  const remaining = (parseFloat(totalDistribution) || 0) - prefAmount - (parseFloat(lpCapital) || 0);
-  const gpCarry = remaining > 0 ? remaining * (parseFloat(carriedInterest) / 100 || 0) : 0;
-  const lpShare = remaining - gpCarry;
+  const totalDist = parseFloat(totalDistribution) || 0;
+  const lpCap = parseFloat(lpCapital) || 0;
+  const gpCap = parseFloat(gpCapital) || 0;
+  const totalCapital = lpCap + gpCap;
+  const prefRate = parseFloat(preferredReturn) / 100 || 0;
+  const carryRate = parseFloat(carriedInterest) / 100 || 0;
+
+  const lpPref = lpCap * prefRate * masterInputs.holdingPeriod;
+  const gpPref = gpCap * prefRate * masterInputs.holdingPeriod;
+  const totalPref = lpPref + gpPref;
+  const afterPrefAndReturn = totalDist - totalPref - totalCapital;
+  const gpCarry = afterPrefAndReturn > 0 ? afterPrefAndReturn * carryRate : 0;
+  const lpProfit = afterPrefAndReturn > 0 ? afterPrefAndReturn - gpCarry : 0;
+  const lpTotal = lpCap + lpPref + lpProfit;
+  const gpTotal = gpCap + gpPref + gpCarry;
+  const lpMOIC = lpCap > 0 ? lpTotal / lpCap : 0;
+  const gpMOIC = gpCap > 0 ? gpTotal / gpCap : 0;
+  const dealMOIC = totalCapital > 0 ? totalDist / totalCapital : 0;
+  const lpIRR = lpCap > 0 && masterInputs.holdingPeriod > 0 ? (Math.pow(lpTotal / lpCap, 1 / masterInputs.holdingPeriod) - 1) * 100 : 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-cyan-500" />
-            Waterfall Analysis
-          </CardTitle>
-          <CardDescription>
-            Fund distribution modeling
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Total Distribution</Label>
-              <CurrencyInput value={totalDistribution} onChange={setTotalDistribution} />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-cyan-500" />
+              Waterfall Analysis
+            </CardTitle>
+            <CardDescription>GP/LP fund distribution with preferred return and carry</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Total Distribution</Label>
+                <CurrencyInput value={totalDistribution} onChange={setTotalDistribution} />
+              </div>
+              <div>
+                <Label className="text-xs">LP Capital</Label>
+                <CurrencyInput value={lpCapital} onChange={setLpCapital} />
+              </div>
+              <div>
+                <Label className="text-xs">GP Co-Invest</Label>
+                <CurrencyInput value={gpCapital} onChange={setGpCapital} />
+              </div>
+              <div>
+                <Label className="text-xs">Preferred Return</Label>
+                <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
+              </div>
+              <div>
+                <Label className="text-xs">Carried Interest</Label>
+                <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
+              </div>
             </div>
-            <div>
-              <Label>LP Capital</Label>
-              <CurrencyInput value={lpCapital} onChange={setLpCapital} />
-            </div>
-            <div>
-              <Label>Preferred Return</Label>
-              <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
-            </div>
-            <div>
-              <Label>Carried Interest</Label>
-              <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribution Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Preferred Return</span>
-              <span className="font-semibold">{formatCurrency(prefAmount)}</span>
+            <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Deal Context</h4>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Property Sale Price</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.salePrice)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Hold Period</span>
+                <span className="num font-medium">{masterInputs.holdingPeriod} years</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Total Equity</span>
+                <span className="num font-medium">{formatCurrency(totalCapital)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Capital Return</span>
-              <span className="font-semibold">{formatCurrency(lpCapital)}</span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribution Waterfall</CardTitle>
+            <CardDescription>Step-by-step allocation of proceeds</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1: Preferred Return</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">LP Preferred ({preferredReturn}% x {masterInputs.holdingPeriod} yrs)</span>
+                <span className="num font-medium">{formatCurrency(lpPref)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP Preferred ({preferredReturn}% x {masterInputs.holdingPeriod} yrs)</span>
+                <span className="num font-medium">{formatCurrency(gpPref)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">GP Carried Interest</span>
-              <span className="font-semibold">{formatCurrency(gpCarry)}</span>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2: Return of Capital</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">LP Capital Return</span>
+                <span className="num font-medium">{formatCurrency(lpCap)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP Capital Return</span>
+                <span className="num font-medium">{formatCurrency(gpCap)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">LP Profit Share</span>
-              <span className="font-semibold text-green-600">{formatCurrency(lpShare)}</span>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3: Profit Split</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Remaining Profit</span>
+                <span className="num font-medium">{formatCurrency(Math.max(0, afterPrefAndReturn))}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP Carried Interest ({carriedInterest}%)</span>
+                <span className="num font-medium">{formatCurrency(gpCarry)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">LP Profit Share ({100 - (parseFloat(carriedInterest) || 0)}%)</span>
+                <span className="num font-medium text-green-600">{formatCurrency(lpProfit)}</span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Returns Summary</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">LP Total Received</span>
+                <span className="num font-semibold text-green-600">{formatCurrency(lpTotal)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP Total Received</span>
+                <span className="num font-semibold">{formatCurrency(gpTotal)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">LP MOIC</span>
+                <span className="num font-semibold">{lpMOIC.toFixed(2)}x</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP MOIC</span>
+                <span className="num font-semibold">{gpMOIC.toFixed(2)}x</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Deal MOIC</span>
+                <span className="num font-semibold">{dealMOIC.toFixed(2)}x</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-cyan-50 rounded-lg px-3">
+                <span className="font-semibold">LP Est. IRR</span>
+                <span className="num font-bold text-cyan-600">{lpIRR.toFixed(1)}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function IRRCalculatorPanel() {
+  const { masterInputs } = useExitStrategiesStore();
   const [initialInvestment, setInitialInvestment] = useState<string>("1000000");
   const [year1, setYear1] = useState<string>("100000");
   const [year2, setYear2] = useState<string>("150000");
   const [year3, setYear3] = useState<string>("200000");
   const [exitValue, setExitValue] = useState<string>("1500000");
+  const [targetReturn, setTargetReturn] = useState<string>("15");
+  const [discountRate, setDiscountRate] = useState<string>("10");
 
-  const cashFlows = [
-    -(parseFloat(initialInvestment) || 0),
-    parseFloat(year1) || 0,
-    parseFloat(year2) || 0,
-    parseFloat(year3) || 0 + (parseFloat(exitValue) || 0)
-  ];
+  const invest = parseFloat(initialInvestment) || 0;
+  const cf1 = parseFloat(year1) || 0;
+  const cf2 = parseFloat(year2) || 0;
+  const cf3 = parseFloat(year3) || 0;
+  const exit = parseFloat(exitValue) || 0;
+  const target = parseFloat(targetReturn) || 0;
+  const disc = parseFloat(discountRate) / 100 || 0;
+
+  const cashFlows = [-invest, cf1, cf2, cf3 + exit];
+  const annualCFs = [cf1, cf2, cf3];
 
   const calculateIRR = (flows: number[]) => {
     let rate = 0.1;
@@ -1067,74 +1531,145 @@ function IRRCalculatorPanel() {
         npvDerivative -= t * flows[t] / Math.pow(1 + rate, t + 1);
       }
       if (Math.abs(npv) < 0.01) break;
-      rate = rate - npv / npvDerivative;
+      if (npvDerivative !== 0) rate = rate - npv / npvDerivative;
+      else break;
     }
-    return (rate * 100).toFixed(2);
+    return rate * 100;
   };
 
   const irr = calculateIRR(cashFlows);
-  const totalCashFlow = cashFlows.reduce((a, b) => a + b, 0);
-  const multiple = (totalCashFlow + (parseFloat(initialInvestment) || 0)) / (parseFloat(initialInvestment) || 1);
+  const totalCashFlow = cf1 + cf2 + cf3 + exit;
+  const totalProfit = totalCashFlow - invest;
+  const multiple = invest > 0 ? totalCashFlow / invest : 0;
+
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+  const afterTaxCFs = [-invest, cf1 * (1 - combinedRate * 0.3), cf2 * (1 - combinedRate * 0.3), (cf3 * (1 - combinedRate * 0.3)) + exit * (1 - combinedRate)];
+  const afterTaxIRR = calculateIRR(afterTaxCFs);
+
+  let npv = 0;
+  for (let t = 0; t < cashFlows.length; t++) {
+    npv += cashFlows[t] / Math.pow(1 + disc, t);
+  }
+
+  let cumulativeCF = -invest;
+  let paybackYear = 0;
+  for (let y = 0; y < annualCFs.length; y++) {
+    cumulativeCF += annualCFs[y];
+    if (cumulativeCF >= 0 && paybackYear === 0) {
+      paybackYear = y + 1;
+    }
+  }
+  if (paybackYear === 0 && cumulativeCF + exit >= 0) paybackYear = annualCFs.length;
+
+  const meetsTarget = irr >= target;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Percent className="h-5 w-5 text-emerald-500" />
-            IRR Calculator
-          </CardTitle>
-          <CardDescription>
-            Multi-period return analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Initial Investment</Label>
-              <CurrencyInput value={initialInvestment} onChange={setInitialInvestment} />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Percent className="h-5 w-5 text-emerald-500" />
+              IRR Calculator
+            </CardTitle>
+            <CardDescription>Multi-period return analysis with tax adjustment</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Initial Investment</Label>
+                <CurrencyInput value={initialInvestment} onChange={setInitialInvestment} />
+              </div>
+              <div>
+                <Label className="text-xs">Year 1 Cash Flow</Label>
+                <CurrencyInput value={year1} onChange={setYear1} />
+              </div>
+              <div>
+                <Label className="text-xs">Year 2 Cash Flow</Label>
+                <CurrencyInput value={year2} onChange={setYear2} />
+              </div>
+              <div>
+                <Label className="text-xs">Year 3 Cash Flow</Label>
+                <CurrencyInput value={year3} onChange={setYear3} />
+              </div>
+              <div>
+                <Label className="text-xs">Exit Value (Year 3)</Label>
+                <CurrencyInput value={exitValue} onChange={setExitValue} />
+              </div>
+              <div>
+                <Label className="text-xs">Target Return (%)</Label>
+                <PercentInput value={targetReturn} onChange={setTargetReturn} />
+              </div>
+              <div>
+                <Label className="text-xs">Discount Rate (NPV)</Label>
+                <PercentInput value={discountRate} onChange={setDiscountRate} />
+              </div>
             </div>
-            <div>
-              <Label>Year 1 Cash Flow</Label>
-              <CurrencyInput value={year1} onChange={setYear1} />
-            </div>
-            <div>
-              <Label>Year 2 Cash Flow</Label>
-              <CurrencyInput value={year2} onChange={setYear2} />
-            </div>
-            <div>
-              <Label>Year 3 Cash Flow</Label>
-              <CurrencyInput value={year3} onChange={setYear3} />
-            </div>
-            <div className="col-span-2">
-              <Label>Exit Value</Label>
-              <CurrencyInput value={exitValue} onChange={setExitValue} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Returns Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex justify-between py-3 bg-emerald-50 rounded-lg px-3">
-              <span className="font-semibold">IRR</span>
-              <span className="font-bold text-emerald-600">{irr}%</span>
+        <Card>
+          <CardHeader>
+            <CardTitle>Returns Analysis</CardTitle>
+            <CardDescription>IRR, NPV, multiples, and cash-on-cash returns</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Core Returns</h4>
+              <div className="flex justify-between py-2.5 bg-emerald-50 rounded-lg px-3">
+                <span className="font-semibold">Pre-Tax IRR</span>
+                <span className={`num font-bold ${irr >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{irr.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">After-Tax IRR (est.)</span>
+                <span className={`num font-medium ${afterTaxIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{afterTaxIRR.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Equity Multiple</span>
+                <span className="num font-medium">{multiple.toFixed(2)}x</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Total Profit</span>
+                <span className={`num font-medium ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(totalProfit)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">NPV at {discountRate}%</span>
+                <span className={`num font-medium ${npv >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(npv)}</span>
+              </div>
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Equity Multiple</span>
-              <span className="font-semibold">{multiple.toFixed(2)}x</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash-on-Cash by Year</h4>
+              {annualCFs.map((cf, i) => (
+                <div key={i} className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Year {i + 1}: {formatCurrency(cf)}</span>
+                  <span className="num font-medium">{invest > 0 ? ((cf / invest) * 100).toFixed(1) : 0}%</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Avg Cash-on-Cash</span>
+                <span className="num font-medium">{invest > 0 ? ((annualCFs.reduce((a, b) => a + b, 0) / annualCFs.length / invest) * 100).toFixed(1) : 0}%</span>
+              </div>
+              {paybackYear > 0 && (
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Payback Period</span>
+                  <span className="num font-medium">{paybackYear === annualCFs.length ? `${paybackYear} yrs (at exit)` : `${paybackYear} yrs`}</span>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-muted-foreground">Total Profit</span>
-              <span className="font-semibold text-green-600">{formatCurrency(totalCashFlow)}</span>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Return</h4>
+              <div className={`flex justify-between py-2.5 rounded-lg px-3 ${meetsTarget ? 'bg-green-50' : 'bg-red-50'}`}>
+                <span className="font-semibold">IRR vs Target ({target}%)</span>
+                <span className={`num font-bold ${meetsTarget ? 'text-green-600' : 'text-red-600'}`}>
+                  {meetsTarget ? 'Exceeds' : 'Below'} by {Math.abs(irr - target).toFixed(1)}pp
+                </span>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
