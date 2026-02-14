@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Check,
   X,
@@ -44,6 +45,9 @@ import {
   Link2,
   User,
   Building2,
+  ChevronDown,
+  ChevronRight,
+  Warehouse,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -143,6 +147,93 @@ function SectionHeader({ icon: Icon, title, accent = "slate" }: { icon: any; tit
   );
 }
 
+const PROFIT_CENTERS = [
+  { key: 'storage', label: 'Storage' },
+  { key: 'fuel', label: 'Fuel' },
+  { key: 'shipStore', label: "Ship's Store" },
+  { key: 'service', label: 'Service & Repair' },
+  { key: 'boatRentals', label: 'Boat Rentals' },
+  { key: 'boatSales', label: 'Boat Sales' },
+  { key: 'boatBrokerage', label: 'Boat Brokerage' },
+  { key: 'boatClub', label: 'Boat Club' },
+  { key: 'fnb', label: 'Food & Beverage' },
+  { key: 'hospitality', label: 'Hospitality' },
+  { key: 'events', label: 'Events' },
+  { key: 'parts', label: 'Parts' },
+  { key: 'thirdPartyLeases', label: 'Third-Party Leases' },
+  { key: 'rvPark', label: 'RV Park' },
+];
+
+const STORAGE_TYPES = [
+  { key: 'wet_slip', label: 'Wet Slips' },
+  { key: 'dry_rack', label: 'Dry Racks / Dry Storage' },
+  { key: 'dry_slip', label: 'Dry Slips' },
+  { key: 'mooring', label: 'Moorings' },
+  { key: 'anchorage', label: 'Anchorage' },
+  { key: 'indoor_rack', label: 'Indoor Rack Storage' },
+  { key: 'outdoor_rack', label: 'Outdoor Rack Storage' },
+  { key: 'trailer', label: 'Trailer / Yard Storage' },
+  { key: 'covered', label: 'Covered Slips' },
+  { key: 'lift', label: 'Boat Lift Slips' },
+];
+
+const AMENITIES = [
+  { key: 'fuel_dock', label: 'Fuel Dock' },
+  { key: 'pumpout', label: 'Pumpout Station' },
+  { key: 'restaurant', label: 'Restaurant / Bar' },
+  { key: 'pool', label: 'Pool' },
+  { key: 'ship_store', label: "Ship's Store / Pro Shop" },
+  { key: 'repairs', label: 'Repair / Service Center' },
+  { key: 'wifi', label: 'Wi-Fi' },
+  { key: 'laundry', label: 'Laundry' },
+  { key: 'showers', label: 'Showers / Restrooms' },
+  { key: 'electric', label: 'Shore Power / Electric' },
+  { key: 'water', label: 'Water Hook-ups' },
+  { key: 'security', label: 'Gated / Security' },
+  { key: 'boat_ramp', label: 'Boat Ramp' },
+  { key: 'travel_lift', label: 'Travel Lift / Crane' },
+  { key: 'dinghy_dock', label: 'Dinghy Dock' },
+  { key: 'parking', label: 'Parking' },
+  { key: 'cable_tv', label: 'Cable TV' },
+  { key: 'ice', label: 'Ice' },
+  { key: 'bait_tackle', label: 'Bait & Tackle' },
+  { key: 'boat_rental', label: 'Boat / Kayak Rental' },
+];
+
+function CollapsibleSection({ icon: Icon, title, accent, isOpen, onToggle, children }: {
+  icon: any; title: string; accent: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  const accentMap: Record<string, string> = {
+    blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+    emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+    amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+    cyan: "bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800",
+    teal: "bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800",
+    slate: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+  };
+  const borderMap: Record<string, string> = {
+    blue: "border-l-blue-500", emerald: "border-l-emerald-500", amber: "border-l-amber-500",
+    purple: "border-l-purple-500", cyan: "border-l-cyan-500", teal: "border-l-teal-500", slate: "border-l-slate-400",
+  };
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`flex items-center gap-2 px-3 py-2 w-full border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${borderMap[accent] || borderMap.slate} bg-slate-50/50 dark:bg-slate-800/30 rounded-t-lg hover:bg-slate-100/50 dark:hover:bg-slate-700/30 transition-colors`}
+      >
+        <div className={`p-1 rounded-md ${accentMap[accent] || accentMap.slate}`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <h4 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 flex-1 text-left">{title}</h4>
+        {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      {isOpen && <div className="p-4">{children}</div>}
+    </div>
+  );
+}
+
 function FieldDisplay({ label, value, suffix }: { label: string; value: any; suffix?: string }) {
   const displayVal = value === null || value === undefined || value === '' ? 'N/A' : String(value);
   return (
@@ -162,9 +253,23 @@ export function PendingPropertyDetailDialog({
 }: PendingPropertyDetailDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<Partial<PendingProperty>>({});
+  const [editedMetadata, setEditedMetadata] = useState<Record<string, any>>({});
   const [selectedDuplicateId, setSelectedDuplicateId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [compToDelete, setCompToDelete] = useState<string | null>(null);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  useEffect(() => {
+    if (!open) {
+      setIsEditing(false);
+      setEditedData({});
+      setEditedMetadata({});
+      setOpenSections({});
+      setSelectedDuplicateId(null);
+    }
+  }, [open, pending?.id]);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -201,6 +306,7 @@ export function PendingPropertyDetailDialog({
       toast({ title: "Property details updated successfully" });
       setIsEditing(false);
       setEditedData({});
+      setEditedMetadata({});
     },
     onError: () => {
       toast({ title: "Failed to update property", variant: "destructive" });
@@ -293,7 +399,11 @@ export function PendingPropertyDetailDialog({
   };
 
   const handleSaveEdit = () => {
-    updateMutation.mutate(editedData);
+    const mergedMeta = { ...(pending.sourceMetadata || {}), ...editedMetadata };
+    const dataToSave = Object.keys(editedMetadata).length > 0
+      ? { ...editedData, sourceMetadata: mergedMeta }
+      : editedData;
+    updateMutation.mutate(dataToSave);
   };
 
   const handleMerge = () => {
@@ -311,6 +421,17 @@ export function PendingPropertyDetailDialog({
   };
 
   const currentData = isEditing ? { ...pending, ...editedData } : pending;
+  const meta = { ...(pending.sourceMetadata || {}), ...editedMetadata } as Record<string, any>;
+  const selectedProfitCenters: string[] = meta.profitCenters || [];
+  const selectedStorageTypes: string[] = meta.storageTypes || [];
+  const selectedAmenities: string[] = meta.amenities || [];
+
+  const toggleArrayItem = (field: string, key: string) => {
+    const current: string[] = [...(meta[field] || [])];
+    const idx = current.indexOf(key);
+    if (idx >= 0) current.splice(idx, 1); else current.push(key);
+    setEditedMetadata({ ...editedMetadata, [field]: current });
+  };
 
   return (
     <>
@@ -355,6 +476,7 @@ export function PendingPropertyDetailDialog({
                       onClick={() => {
                         setIsEditing(false);
                         setEditedData({});
+                        setEditedMetadata({});
                       }}
                     >
                       Cancel
@@ -595,9 +717,93 @@ export function PendingPropertyDetailDialog({
                       </div>
                     </div>
                   </div>
+
+                  <CollapsibleSection
+                    icon={Warehouse}
+                    title={`Storage Types${selectedStorageTypes.length > 0 ? ` (${selectedStorageTypes.length})` : ''}`}
+                    accent="cyan"
+                    isOpen={!!openSections.storageTypes}
+                    onToggle={() => toggleSection('storageTypes')}
+                  >
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {STORAGE_TYPES.map(st => (
+                          <label key={st.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
+                            <Checkbox
+                              checked={selectedStorageTypes.includes(st.key)}
+                              onCheckedChange={() => toggleArrayItem('storageTypes', st.key)}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{st.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : selectedStorageTypes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedStorageTypes.map(k => {
+                          const item = STORAGE_TYPES.find(s => s.key === k);
+                          return <Badge key={k} variant="secondary" className="text-[11px]">{item?.label || k}</Badge>;
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No storage types selected</p>
+                    )}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    icon={Anchor}
+                    title={`Amenities & Services${selectedAmenities.length > 0 ? ` (${selectedAmenities.length})` : ''}`}
+                    accent="teal"
+                    isOpen={!!openSections.amenities}
+                    onToggle={() => toggleSection('amenities')}
+                  >
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {AMENITIES.map(am => (
+                          <label key={am.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
+                            <Checkbox
+                              checked={selectedAmenities.includes(am.key)}
+                              onCheckedChange={() => toggleArrayItem('amenities', am.key)}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{am.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : selectedAmenities.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedAmenities.map(k => {
+                          const item = AMENITIES.find(a => a.key === k);
+                          return <Badge key={k} variant="secondary" className="text-[11px]">{item?.label || k}</Badge>;
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No amenities selected</p>
+                    )}
+                  </CollapsibleSection>
                 </div>
 
                 <div className="space-y-4">
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                    <SectionHeader icon={DollarSign} title="Estimated Purchase Price" accent="amber" />
+                    <div className="p-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Estimated Purchase Price</Label>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            value={editedMetadata.estimatedPurchasePrice ?? meta.estimatedPurchasePrice ?? ''}
+                            onChange={(e) => setEditedMetadata({ ...editedMetadata, estimatedPurchasePrice: parseInt(e.target.value) || null })}
+                            placeholder="5,000,000"
+                            className="bg-white dark:bg-slate-900"
+                          />
+                        ) : (
+                          <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium">
+                            {meta.estimatedPurchasePrice ? formatCurrency(meta.estimatedPurchasePrice) : 'N/A'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {hasCompOrigin && (
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                       <SectionHeader icon={DollarSign} title="Financial Information" accent="amber" />
@@ -787,6 +993,37 @@ export function PendingPropertyDetailDialog({
                       </div>
                     </div>
                   </div>
+
+                  <CollapsibleSection
+                    icon={BarChart3}
+                    title={`Profit Centers${selectedProfitCenters.length > 0 ? ` (${selectedProfitCenters.length})` : ''}`}
+                    accent="amber"
+                    isOpen={!!openSections.profitCenters}
+                    onToggle={() => toggleSection('profitCenters')}
+                  >
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {PROFIT_CENTERS.map(pc => (
+                          <label key={pc.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
+                            <Checkbox
+                              checked={selectedProfitCenters.includes(pc.key)}
+                              onCheckedChange={() => toggleArrayItem('profitCenters', pc.key)}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{pc.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : selectedProfitCenters.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedProfitCenters.map(k => {
+                          const item = PROFIT_CENTERS.find(p => p.key === k);
+                          return <Badge key={k} variant="secondary" className="text-[11px]">{item?.label || k}</Badge>;
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No profit centers selected</p>
+                    )}
+                  </CollapsibleSection>
 
                   {(() => {
                     const matchingContacts = relatedContacts.filter((c: any) => {
