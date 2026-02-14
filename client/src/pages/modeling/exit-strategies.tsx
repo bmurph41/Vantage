@@ -351,7 +351,7 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
   );
 }
 
-function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
+export function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const { strategies } = computeStrategies(masterInputs, baseline);
@@ -584,7 +584,7 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
   );
 }
 
-function SharedInputsPanel() {
+export function SharedInputsPanel() {
   const [isOpen, setIsOpen] = useState(true);
   const [isNamingScenario, setIsNamingScenario] = useState(false);
   const [scenarioName, setScenarioName] = useState("");
@@ -889,7 +889,7 @@ function SharedInputsPanel() {
   );
 }
 
-const exitTools = [
+export const exitTools = [
   { 
     id: "summary", 
     name: "Strategy Summary", 
@@ -1281,7 +1281,7 @@ const STATE_TAX_OPTIONS = [
   { label: "Wyoming (0%)", value: 0 },
 ];
 
-function TaxAndProceedsPanel() {
+export function TaxAndProceedsPanel() {
   const { masterInputs, setMasterInput } = useExitStrategiesStore();
   const b = getCashSaleBaseline(masterInputs);
 
@@ -1686,7 +1686,7 @@ function TaxAndProceedsPanel() {
   );
 }
 
-function Exchange1031Panel() {
+export function Exchange1031Panel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const [properties, setProperties] = useState<Array<{name: string; value: string; type: string}>>([
@@ -2343,7 +2343,7 @@ function Exchange1031Panel() {
   );
 }
 
-function DSTAnalysisPanel() {
+export function DSTAnalysisPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const [distributionRate, setDistributionRate] = useState<string>("5.5");
@@ -2962,7 +2962,7 @@ function DSTAnalysisPanel() {
   );
 }
 
-function SellerFinancingPanel() {
+export function SellerFinancingPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const [downPaymentPercent, setDownPaymentPercent] = useState<string>("20");
@@ -3558,7 +3558,7 @@ function SellerFinancingPanel() {
   );
 }
 
-function EarnoutPanel() {
+export function EarnoutPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const [basePrice, setBasePrice] = useState<string>("4000000");
@@ -4600,7 +4600,7 @@ function computeIRRGatedWaterfall(params: {
   return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR, gpCatchupAmount, lpLookbackDeficiency, lpLookbackClawback };
 }
 
-function WaterfallPanel() {
+export function WaterfallPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const [lpCapital, setLpCapital] = useState<string>("8000000");
   const [gpCapital, setGpCapital] = useState<string>("2000000");
@@ -5419,7 +5419,7 @@ function WaterfallPanel() {
 }
 
 
-function IRRCalculatorPanel() {
+export function IRRCalculatorPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const [initialInvestment, setInitialInvestment] = useState<string>("1000000");
   const [yearCount, setYearCount] = useState(5);
@@ -6186,7 +6186,7 @@ function IRRCalculatorPanel() {
   );
 }
 
-function SensitivityPanel() {
+export function SensitivityPanel() {
   const { masterInputs, saveScenario } = useExitStrategiesStore();
   const { toast } = useToast();
   const [baseNOI, setBaseNOI] = useState<string>("500000");
@@ -7056,7 +7056,7 @@ function SensitivityPanel() {
   );
 }
 
-function CrossStrategyComparisonPanel() {
+export function CrossStrategyComparisonPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
 
@@ -7546,7 +7546,7 @@ function CrossStrategyComparisonPanel() {
   );
 }
 
-function AdvisorInsightsPanel() {
+export function AdvisorInsightsPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
