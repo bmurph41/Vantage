@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Slider } from "@/components/ui/slider";
 import { 
   Calculator, 
   TrendingUp, 
@@ -115,6 +116,42 @@ function CashSaleBaselineCard({ baseline, label }: { baseline: ReturnType<typeof
   );
 }
 
+function CrossPanelRecommendation({ recommendations }: { recommendations: Array<{ tabId: string; title: string; reason: string; icon: any }> }) {
+  return (
+    <Card className="border-dashed border-blue-200 bg-blue-50/30">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-amber-500" />
+          Next Steps to Consider
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {recommendations.map((rec) => {
+            const Icon = rec.icon;
+            return (
+              <button
+                key={rec.tabId}
+                onClick={() => {
+                  const tabsList = document.querySelector(`[data-state][value="${rec.tabId}"]`) as HTMLElement;
+                  if (tabsList) tabsList.click();
+                }}
+                className="flex items-start gap-2 p-2.5 rounded-lg border bg-white hover:bg-blue-50 transition-colors text-left group"
+              >
+                <Icon className="h-4 w-4 mt-0.5 text-muted-foreground group-hover:text-blue-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-medium group-hover:text-blue-600">{rec.title}</p>
+                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{rec.reason}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface CurrencyInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -193,6 +230,299 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
       step="0.01"
       data-testid={testId}
     />
+  );
+}
+
+function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
+
+  const getRecommendation = () => {
+    if (masterInputs.holdingPeriod >= 5 && baseline.capitalGain > 500000) {
+      return {
+        strategy: "1031 Exchange",
+        reason: "High capital gain with sufficient holding period makes tax deferral highly beneficial",
+        tab: "1031",
+        savings: baseline.totalTax,
+        icon: RefreshCcw,
+        color: "text-blue-500",
+      };
+    }
+    if (masterInputs.holdingPeriod > 15) {
+      return {
+        strategy: "DST Analysis",
+        reason: "Long holding period suggests passive income strategy may be optimal",
+        tab: "dst",
+        savings: baseline.totalTax * 0.85,
+        icon: Landmark,
+        color: "text-purple-500",
+      };
+    }
+    if (baseline.capitalGain < 200000) {
+      return {
+        strategy: "Cash Sale",
+        reason: "Lower capital gain reduces the tax burden, making a straightforward sale efficient",
+        tab: "tax-proceeds",
+        savings: 0,
+        icon: Calculator,
+        color: "text-red-500",
+      };
+    }
+    return {
+      strategy: "Cross-Strategy Comparison",
+      reason: "Multiple strategies may apply — review the comparison tool for a side-by-side analysis",
+      tab: "comparison",
+      savings: baseline.totalTax * 0.5,
+      icon: Target,
+      color: "text-teal-500",
+    };
+  };
+
+  const recommendation = getRecommendation();
+
+  const strategyEstimates = [
+    {
+      id: "tax-proceeds",
+      name: "Cash Sale",
+      icon: Calculator,
+      color: "text-red-500",
+      netProceeds: baseline.netCashProceeds,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Low" as const,
+      liquidity: "Immediate",
+    },
+    {
+      id: "1031",
+      name: "1031 Exchange",
+      icon: RefreshCcw,
+      color: "text-blue-500",
+      netProceeds: baseline.netSaleProceeds - 25000,
+      taxRate: 0,
+      risk: "Moderate" as const,
+      liquidity: "180 days",
+    },
+    {
+      id: "dst",
+      name: "DST Analysis",
+      icon: Landmark,
+      color: "text-purple-500",
+      netProceeds: baseline.netSaleProceeds * 0.95,
+      taxRate: 2,
+      risk: "Moderate" as const,
+      liquidity: "7-10 years",
+    },
+    {
+      id: "seller-financing",
+      name: "Seller Financing",
+      icon: HandCoins,
+      color: "text-amber-500",
+      netProceeds: baseline.netSaleProceeds * 1.15,
+      taxRate: baseline.effectiveTaxRate * 0.7,
+      risk: "Moderate" as const,
+      liquidity: "Term-based",
+    },
+    {
+      id: "earnout",
+      name: "Earnout",
+      icon: Award,
+      color: "text-indigo-500",
+      netProceeds: masterInputs.salePrice * 0.85 + masterInputs.salePrice * 0.15,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "High" as const,
+      liquidity: "1-3 years",
+    },
+    {
+      id: "waterfall",
+      name: "Waterfall",
+      icon: BarChart3,
+      color: "text-cyan-500",
+      netProceeds: baseline.netCashProceeds * 0.80,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Moderate" as const,
+      liquidity: "5-7 years",
+    },
+    {
+      id: "irr",
+      name: "IRR Calculator",
+      icon: Percent,
+      color: "text-emerald-500",
+      netProceeds: baseline.netCashProceeds,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Low" as const,
+      liquidity: "Varies",
+    },
+    {
+      id: "sensitivity",
+      name: "Sensitivity",
+      icon: TrendingUp,
+      color: "text-orange-500",
+      netProceeds: baseline.netCashProceeds,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Low" as const,
+      liquidity: "Varies",
+    },
+    {
+      id: "comparison",
+      name: "Strategy Comparison",
+      icon: Target,
+      color: "text-teal-500",
+      netProceeds: baseline.netCashProceeds,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Low" as const,
+      liquidity: "Varies",
+    },
+    {
+      id: "ai-insights",
+      name: "Advisor Insights",
+      icon: Brain,
+      color: "text-pink-500",
+      netProceeds: baseline.netCashProceeds,
+      taxRate: baseline.effectiveTaxRate,
+      risk: "Low" as const,
+      liquidity: "Varies",
+    },
+  ];
+
+  const riskColors = {
+    Low: "bg-green-100 text-green-700",
+    Moderate: "bg-amber-100 text-amber-700",
+    High: "bg-red-100 text-red-700",
+  };
+
+  const navigationStrategies = exitTools.filter(t => t.id !== "summary");
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-amber-500" />
+            <CardTitle>Recommended Strategy</CardTitle>
+          </div>
+          <CardDescription>Based on your current inputs and property profile</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200">
+            <div className="rounded-full bg-white p-3 shadow-sm">
+              <recommendation.icon className={`h-6 w-6 ${recommendation.color}`} />
+            </div>
+            <div className="flex-1 space-y-2">
+              <h3 className="text-lg font-semibold">{recommendation.strategy}</h3>
+              <p className="text-sm text-muted-foreground">{recommendation.reason}</p>
+              {recommendation.savings > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-700">
+                    <DollarSign className="h-3 w-3 mr-1" />
+                    Est. Tax Savings: {formatCurrency(recommendation.savings)}
+                  </Badge>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => onNavigate(recommendation.tab)}
+              >
+                View Details
+                <ArrowRightLeft className="h-3.5 w-3.5 ml-1.5" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            <CardTitle>Key Metrics At a Glance</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="rounded-lg border p-4 text-center space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Capital Gain</p>
+              <p className="text-xl font-bold">{formatCurrency(baseline.capitalGain)}</p>
+            </div>
+            <div className="rounded-lg border p-4 text-center space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cash Sale Net Proceeds</p>
+              <p className="text-xl font-bold">{formatCurrency(baseline.netCashProceeds)}</p>
+            </div>
+            <div className="rounded-lg border p-4 text-center space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Max Tax Savings (1031)</p>
+              <p className="text-xl font-bold text-green-600">{formatCurrency(baseline.totalTax)}</p>
+            </div>
+            <div className="rounded-lg border p-4 text-center space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Effective Tax Rate</p>
+              <p className="text-xl font-bold">{baseline.effectiveTaxRate.toFixed(1)}%</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <BarChart2 className="h-5 w-5 text-slate-600" />
+            <CardTitle>Quick Comparison Grid</CardTitle>
+          </div>
+          <CardDescription>Estimated outcomes across all exit strategies</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {strategyEstimates.map((strategy) => (
+              <div
+                key={strategy.id}
+                className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                onClick={() => onNavigate(strategy.id)}
+              >
+                <strategy.icon className={`h-5 w-5 ${strategy.color} shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{strategy.name}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-muted-foreground">Net: {formatCurrency(strategy.netProceeds)}</span>
+                    <span className="text-xs text-muted-foreground">Tax: {strategy.taxRate.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${riskColors[strategy.risk]}`}>
+                    {strategy.risk}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">{strategy.liquidity}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-blue-500" />
+            <CardTitle>Quick Navigation</CardTitle>
+          </div>
+          <CardDescription>Jump to any strategy calculator</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {navigationStrategies.map((tool) => (
+              <div
+                key={tool.id}
+                className="flex flex-col items-center gap-2 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors text-center"
+                onClick={() => onNavigate(tool.id)}
+              >
+                <div className={`rounded-full ${tool.bgColor} p-2.5`}>
+                  <tool.icon className={`h-5 w-5 ${tool.color}`} />
+                </div>
+                <p className="text-sm font-medium">{tool.name}</p>
+                <p className="text-[11px] text-muted-foreground leading-tight">{tool.description}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -348,21 +678,45 @@ function SharedInputsPanel() {
               </div>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div>
+              <div className="space-y-2">
                 <Label className="text-xs">Sale Price</Label>
                 <CurrencyInput
                   value={masterInputs.salePrice.toString()}
                   onChange={(v) => handleInputChange('salePrice', v)}
                   data-testid="master-sale-price"
                 />
+                <Slider
+                  value={[masterInputs.salePrice]}
+                  onValueChange={(v) => setMasterInput('salePrice', v[0])}
+                  min={500000}
+                  max={50000000}
+                  step={100000}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>$500K</span>
+                  <span>$50M</span>
+                </div>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label className="text-xs">Cost Basis</Label>
                 <CurrencyInput
                   value={masterInputs.costBasis.toString()}
                   onChange={(v) => handleInputChange('costBasis', v)}
                   data-testid="master-cost-basis"
                 />
+                <Slider
+                  value={[masterInputs.costBasis]}
+                  onValueChange={(v) => setMasterInput('costBasis', v[0])}
+                  min={0}
+                  max={Math.max(masterInputs.salePrice, 50000000)}
+                  step={50000}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>$0</span>
+                  <span>${Math.max(masterInputs.salePrice, 50000000) / 1000000}M</span>
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Depreciation Taken</Label>
@@ -372,7 +726,7 @@ function SharedInputsPanel() {
                   data-testid="master-depreciation"
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label className="text-xs">Holding Period (Yrs)</Label>
                 <Input
                   type="number"
@@ -380,14 +734,38 @@ function SharedInputsPanel() {
                   onChange={(e) => handleInputChange('holdingPeriod', e.target.value)}
                   data-testid="master-holding-period"
                 />
+                <Slider
+                  value={[masterInputs.holdingPeriod]}
+                  onValueChange={(v) => setMasterInput('holdingPeriod', v[0])}
+                  min={1}
+                  max={30}
+                  step={1}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>1 yr</span>
+                  <span>30 yrs</span>
+                </div>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label className="text-xs">Federal Tax Rate</Label>
                 <PercentInput
                   value={masterInputs.federalTaxRate.toString()}
                   onChange={(v) => handleInputChange('federalTaxRate', v)}
                   data-testid="master-fed-rate"
                 />
+                <Slider
+                  value={[masterInputs.federalTaxRate]}
+                  onValueChange={(v) => setMasterInput('federalTaxRate', v[0])}
+                  min={0}
+                  max={40}
+                  step={0.5}
+                  className="mt-1"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>0%</span>
+                  <span>40%</span>
+                </div>
               </div>
               <div>
                 <Label className="text-xs">State Tax Rate</Label>
@@ -438,6 +816,15 @@ function SharedInputsPanel() {
 }
 
 const exitTools = [
+  { 
+    id: "summary", 
+    name: "Strategy Summary", 
+    shortName: "Summary",
+    description: "At-a-glance overview of all exit strategies", 
+    icon: BarChart2,
+    color: "text-slate-600",
+    bgColor: "bg-slate-50"
+  },
   { 
     id: "tax-proceeds", 
     name: "Tax & Net Proceeds", 
@@ -531,12 +918,12 @@ const exitTools = [
 ];
 
 export default function ExitStrategiesPage() {
-  const [activeTab, setActiveTab] = useState("tax-proceeds");
+  const [activeTab, setActiveTab] = useState("summary");
   const [, navigate] = useLocation();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const { savedScenarios, activeScenarioId } = useExitStrategiesStore();
+  const { savedScenarios, activeScenarioId, masterInputs } = useExitStrategiesStore();
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -704,10 +1091,16 @@ export default function ExitStrategiesPage() {
           {activeScenarioId && (
             <p>Scenario: {savedScenarios.find(s => s.id === activeScenarioId)?.name}</p>
           )}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '12px', fontSize: '12px', color: '#6b7280' }}>
+            <span>Sale Price: {formatCurrency(masterInputs.salePrice)}</span>
+            <span>Cost Basis: {formatCurrency(masterInputs.costBasis)}</span>
+            <span>Hold Period: {masterInputs.holdingPeriod} yrs</span>
+            <span>Tax Rate: {masterInputs.federalTaxRate}% Fed / {masterInputs.stateTaxRate}% State</span>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1" data-no-print>
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 overflow-x-auto" data-no-print>
             {exitTools.map((tool) => (
               <TabsTrigger 
                 key={tool.id} 
@@ -720,6 +1113,10 @@ export default function ExitStrategiesPage() {
               </TabsTrigger>
             ))}
           </TabsList>
+
+          <TabsContent value="summary" className="mt-6">
+            <SummaryDashboardPanel onNavigate={setActiveTab} />
+          </TabsContent>
 
           <TabsContent value="tax-proceeds" className="mt-6">
             <TaxAndProceedsPanel />
@@ -1212,6 +1609,12 @@ function TaxAndProceedsPanel() {
           </Card>
         );
       })()}
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "1031", title: "1031 Exchange", reason: `Defer ${formatCurrency(b.totalTax)} in taxes by reinvesting into like-kind property`, icon: RefreshCcw },
+        { tabId: "dst", title: "DST Analysis", reason: "Explore passive DST investments to defer gains without active management", icon: Landmark },
+        { tabId: "seller-financing", title: "Seller Financing", reason: "Spread tax liability over time with installment sale method", icon: HandCoins },
+        { tabId: "comparison", title: "Compare All Strategies", reason: "See side-by-side comparison of all exit options", icon: Target },
+      ]} />
     </div>
   );
 }
@@ -1321,7 +1724,7 @@ function Exchange1031Panel() {
                       </Button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <Label className="text-xs">Name</Label>
                       <Input
@@ -1865,6 +2268,10 @@ function Exchange1031Panel() {
           </div>
         </CardContent>
       </Card>
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "dst", title: "DST Analysis", reason: "Consider DSTs as replacement property — no active management required", icon: Landmark },
+        { tabId: "sensitivity", title: "Sensitivity Analysis", reason: "Stress-test your exchange assumptions under different market conditions", icon: TrendingUp },
+      ]} />
     </div>
   );
 }
@@ -3785,7 +4192,7 @@ function EarnoutPanel() {
 
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
                     <div className="text-xs text-muted-foreground mb-1">Mean Payout</div>
                     <div className="num font-bold text-lg text-green-600">{formatCurrency(mean)}</div>
@@ -3818,7 +4225,7 @@ function EarnoutPanel() {
 
                 <div className="space-y-2 border-t pt-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Percentile Summary</h4>
-                  <div className="grid grid-cols-5 gap-2 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center">
                     {[
                       { label: 'P10', value: p10, color: 'text-red-600' },
                       { label: 'P25', value: p25, color: 'text-amber-600' },
@@ -3853,6 +4260,10 @@ function EarnoutPanel() {
           })()}
         </CardContent>
       </Card>
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "sensitivity", title: "Sensitivity Analysis", reason: "Model how changes in EBITDA assumptions affect your earnout payments", icon: TrendingUp },
+        { tabId: "waterfall", title: "Waterfall Distribution", reason: "Structure earnout within a waterfall framework for investor alignment", icon: BarChart3 },
+      ]} />
     </div>
   );
 }
@@ -4932,6 +5343,10 @@ function WaterfallPanel() {
           </div>
         </CardContent>
       </Card>
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "irr", title: "IRR Calculator", reason: "Calculate precise IRR for each waterfall tier to validate hurdle rates", icon: Percent },
+        { tabId: "comparison", title: "Compare Strategies", reason: "See how waterfall returns compare to other exit approaches", icon: Target },
+      ]} />
     </div>
   );
 }
@@ -5696,6 +6111,10 @@ function IRRCalculatorPanel() {
           </CardContent>
         </Card>
       </div>
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "sensitivity", title: "Sensitivity Analysis", reason: "Test how changes in key assumptions affect your IRR", icon: TrendingUp },
+        { tabId: "ai-insights", title: "Advisor Insights", reason: "Get AI-powered risk assessment and Monte Carlo analysis", icon: Brain },
+      ]} />
     </div>
   );
 }
@@ -6290,7 +6709,7 @@ function SensitivityPanel() {
               <>
                 <div className="space-y-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scenario Contributions</h4>
-                  <div className="rounded-lg border overflow-hidden">
+                  <div className="rounded-lg border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/50">
@@ -6365,7 +6784,7 @@ function SensitivityPanel() {
             };
             return (
               <>
-                <div className="rounded-lg border overflow-hidden">
+                <div className="rounded-lg border overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted/50">
@@ -6470,7 +6889,7 @@ function SensitivityPanel() {
 
             return (
               <>
-                <div className="rounded-lg border overflow-hidden">
+                <div className="rounded-lg border overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted/50">
@@ -6522,6 +6941,11 @@ function SensitivityPanel() {
           })()}
         </CardContent>
       </Card>
+
+      <CrossPanelRecommendation recommendations={[
+        { tabId: "comparison", title: "Compare Strategies", reason: "Use sensitivity insights to rank exit strategies", icon: Target },
+        { tabId: "ai-insights", title: "Advisor Insights", reason: "Run Monte Carlo simulation for probabilistic outcome modeling", icon: Brain },
+      ]} />
 
       <Card>
         <CardHeader>
@@ -8006,7 +8430,7 @@ function AdvisorInsightsPanel() {
 
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">QOZ vs. Regular Investment ({qozHoldYears}-Year Comparison at {(returnRate * 100).toFixed(0)}% Return)</h4>
-                  <div className="rounded-lg border overflow-hidden">
+                  <div className="rounded-lg border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/50">
