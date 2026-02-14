@@ -17,8 +17,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -520,10 +521,39 @@ export default function CrmTasks() {
   const overdueTasks = tasks.filter((t) => t.dueDate && isPast(new Date(t.dueDate)) && t.status !== "completed").length;
   const todayTasks = tasks.filter((t) => t.dueDate && isToday(new Date(t.dueDate)) && t.status !== "completed").length;
 
+  const inProgressTasks = tasks.filter((t) => t.status === "in_progress").length;
+
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading tasks...</div>
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            {[...Array(5)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div>
+                      <Skeleton className="h-6 w-12 mb-1" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="flex gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="w-80 flex-shrink-0">
+                <Skeleton className="h-[500px] rounded-lg" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -532,30 +562,83 @@ export default function CrmTasks() {
     <div className="h-screen flex flex-col bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Tasks</h1>
-            <p className="text-sm text-gray-600 mt-1">Manage your tasks and track progress</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4 text-sm">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900" data-testid="metric-total">{totalTasks}</div>
-                <div className="text-gray-500">Total</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600" data-testid="metric-completed">{completedTasks}</div>
-                <div className="text-gray-500">Completed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600" data-testid="metric-overdue">{overdueTasks}</div>
-                <div className="text-gray-500">Overdue</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600" data-testid="metric-today">{todayTasks}</div>
-                <div className="text-gray-500">Due Today</div>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900" data-testid="page-title">Follow-Ups & Tasks</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Manage your tasks and track progress across deals</p>
             </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-900" data-testid="metric-total">{totalTasks}</div>
+                  <div className="text-xs text-gray-500">Total</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-yellow-100 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 text-yellow-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-gray-900">{inProgressTasks}</div>
+                  <div className="text-xs text-gray-500">In Progress</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-green-600" data-testid="metric-completed">{completedTasks}</div>
+                  <div className="text-xs text-gray-500">Completed</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 text-red-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-red-600" data-testid="metric-overdue">{overdueTasks}</div>
+                  <div className="text-xs text-gray-500">Overdue</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <CalendarIcon className="w-4 h-4 text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-orange-600" data-testid="metric-today">{todayTasks}</div>
+                  <div className="text-xs text-gray-500">Due Today</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex items-center gap-3">

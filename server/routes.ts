@@ -11729,7 +11729,77 @@ Current context: Project ${req.params.projectId}`;
   app.get("/api/activities", async (req: any, res) => {
     try {
       const activities = await storage.getCrmActivitiesForOrg(req.user.id);
-      res.json(activities);
+
+      const enrichedActivities = await Promise.all(
+        activities.map(async (activity) => {
+          const enriched: any = {
+            id: activity.id,
+            type: activity.type || 'note',
+            direction: activity.direction || 'internal',
+            subject: activity.subject || activity.description?.slice(0, 80) || 'Activity',
+            description: activity.description,
+            date: activity.createdAt,
+            user: 'You',
+          };
+
+          if (activity.entityType === 'contact' && activity.entityId) {
+            try {
+              const contact = await db.query.crmContacts.findFirst({
+                where: eq(crmContacts.id, activity.entityId),
+              });
+              if (contact) {
+                enriched.contact = { id: contact.id, name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() };
+              }
+            } catch {}
+          }
+
+          if (activity.entityType === 'deal' && activity.entityId) {
+            try {
+              const deal = await db.query.crmDeals.findFirst({
+                where: eq(crmDeals.id, activity.entityId),
+              });
+              if (deal) {
+                enriched.deal = { id: deal.id, name: deal.title || deal.name || 'Deal' };
+                if (deal.contactId) {
+                  try {
+                    const contact = await db.query.crmContacts.findFirst({
+                      where: eq(crmContacts.id, deal.contactId),
+                    });
+                    if (contact) {
+                      enriched.contact = { id: contact.id, name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() };
+                    }
+                  } catch {}
+                }
+                if (deal.companyId) {
+                  try {
+                    const company = await db.query.crmCompanies.findFirst({
+                      where: eq(crmCompanies.id, deal.companyId),
+                    });
+                    if (company) {
+                      enriched.company = { id: company.id, name: company.name };
+                    }
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+
+          if (activity.entityType === 'company' && activity.entityId) {
+            try {
+              const company = await db.query.crmCompanies.findFirst({
+                where: eq(crmCompanies.id, activity.entityId),
+              });
+              if (company) {
+                enriched.company = { id: company.id, name: company.name };
+              }
+            } catch {}
+          }
+
+          return enriched;
+        })
+      );
+
+      res.json(enrichedActivities);
     } catch (error: any) {
       console.error("Failed to get activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
