@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, HandCoins, ChevronRight, Download, DollarSign, Percent, Calculator, AlertTriangle, TrendingUp, Shield, FileText, Plus, Trash2, BarChart3, Clock, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTooltip, StrategyOverview } from "@/components/ui/info-tooltip";
 import type { ModelingProject } from "@shared/schema";
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
@@ -601,6 +602,14 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
           </div>
         </div>
 
+        <StrategyOverview
+          title="Seller Financing"
+          description="Instead of receiving all cash at closing, you act as the lender and receive payments over time. This creates an income stream and can spread your tax liability across multiple years through the installment sale method."
+          bestFor="Sellers who want steady income, those in high tax brackets who benefit from spreading gains over time, or when buyer financing is difficult to obtain."
+          keyConsideration="You carry default risk — if the buyer stops paying, you may need to foreclose. Also, Section 453 installment sale rules limit how much gain you can defer if you have depreciation recapture."
+          riskLevel="Moderate"
+        />
+
         <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
           <CardContent className="pt-4 pb-3">
             <div className="flex items-start gap-4">
@@ -744,7 +753,13 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="downPayment">Down Payment (%)</Label>
+                      <div className="flex items-center gap-1">
+                        <Label htmlFor="downPayment">Down Payment (%)</Label>
+                        <InfoTooltip
+                          content="The upfront cash payment from the buyer. A higher down payment reduces your credit risk and gives the buyer more 'skin in the game.'"
+                          tip="Aim for at least 20-30% down payment to adequately protect against default risk, especially in marina transactions."
+                        />
+                      </div>
                       <Input
                         id="downPayment"
                         type="number"
@@ -754,7 +769,13 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="interestRate">Interest Rate (%)</Label>
+                      <div className="flex items-center gap-1">
+                        <Label htmlFor="interestRate">Interest Rate (%)</Label>
+                        <InfoTooltip
+                          content="The interest rate you charge the buyer. Should be at or above the Applicable Federal Rate (AFR) to avoid imputed interest issues with the IRS."
+                          tip="Consider pricing 1-2% above bank rates — you're taking on credit risk that a bank would price in."
+                        />
+                      </div>
                       <Input
                         id="interestRate"
                         type="number"
@@ -787,7 +808,12 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
 
                     {showBalloonYear && (
                       <div className="space-y-2">
-                        <Label htmlFor="balloonYear">Balloon Year</Label>
+                        <div className="flex items-center gap-1">
+                          <Label htmlFor="balloonYear">Balloon Year</Label>
+                          <InfoTooltip
+                            content="A large lump-sum payment due at the end of the loan term. Common in seller financing to limit the seller's exposure period while keeping monthly payments manageable."
+                          />
+                        </div>
                         <Input
                           id="balloonYear"
                           type="number"
@@ -826,7 +852,12 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                   <Separator />
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label htmlFor="installmentMethod">Use Installment Sale Method</Label>
+                      <div className="flex items-center gap-1">
+                        <Label htmlFor="installmentMethod">Use Installment Sale Method</Label>
+                        <InfoTooltip
+                          content="IRS Section 453 allows you to report gain proportionally as payments are received, rather than all at once. Each payment is split into return of basis, capital gain, and interest income."
+                        />
+                      </div>
                       <p className="text-xs text-muted-foreground">Defer gain recognition as principal is received</p>
                     </div>
                     <Switch
@@ -1294,7 +1325,13 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <Label>Prepayment Probability</Label>
+                        <div className="flex items-center gap-1">
+                          <Label>Prepayment Probability</Label>
+                          <InfoTooltip
+                            content="Conditional Prepayment Rate — the annualized percentage of the remaining loan balance expected to be prepaid. Higher CPR means faster payoff."
+                            tip="Consider including a prepayment penalty (1-3%) for the first 3-5 years to protect your expected interest income."
+                          />
+                        </div>
                         <span className="font-medium">{riskInputs.prepaymentProbability}%</span>
                       </div>
                       <Slider
@@ -1483,7 +1520,12 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <Label>PSA Speed</Label>
+                  <div className="flex items-center gap-1">
+                    <Label>PSA Speed</Label>
+                    <InfoTooltip
+                      content="Public Securities Association benchmark — 100% PSA assumes prepayment rates that ramp linearly over 30 months to a 6% CPR. Higher speeds mean faster expected prepayment."
+                    />
+                  </div>
                   <span className="font-medium">{psaSpeed}%</span>
                 </div>
                 <Slider

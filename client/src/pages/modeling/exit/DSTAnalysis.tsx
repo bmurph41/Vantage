@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Landmark, ChevronRight, Download, Plus, Trash2, Building, DollarSign, AlertTriangle, TrendingUp, PieChart, Percent, Calculator, Info, Clock, ArrowRight, Shield, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTooltip, StrategyOverview } from "@/components/ui/info-tooltip";
 import type { ModelingProject } from "@shared/schema";
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 import { ExitProForma, type ProFormaCashFlowRow, type ProFormaLineItem } from "@/components/exit-strategies/ExitProForma";
@@ -316,6 +317,13 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
   return (
     <TooltipProvider>
       <div className="p-6 space-y-6">
+        <StrategyOverview
+          title="Delaware Statutory Trust (DST) Analysis"
+          description="A DST lets you invest 1031 exchange proceeds into professionally managed, institutional-quality real estate without active management responsibilities. You become a beneficial owner of a trust that holds the property."
+          bestFor="Investors seeking passive income, those tired of active management, or those who want to diversify across multiple properties and markets with their exchange proceeds."
+          keyConsideration="DST interests are illiquid with limited secondary markets. You give up control over property decisions, and the trust has a fixed life (typically 7-10 years)."
+          riskLevel="Moderate"
+        />
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -509,7 +517,13 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Cash-on-Cash (%)</Label>
+                              <div className="flex items-center gap-2">
+                                <Label>Cash-on-Cash (%)</Label>
+                                <InfoTooltip
+                                  content="The annual cash distributions you receive as a percentage of your invested capital. DSTs typically target 4-6% annual distributions."
+                                  tip="DST distributions are not guaranteed. They depend on the underlying property's performance and occupancy."
+                                />
+                              </div>
                               <Input
                                 type="number"
                                 step="0.1"
@@ -535,7 +549,13 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>LTV (%)</Label>
+                              <div className="flex items-center gap-2">
+                                <Label>LTV (%)</Label>
+                                <InfoTooltip
+                                  content="The ratio of the trust's debt to the property's appraised value. Higher LTV means more leverage and potentially higher returns, but also more risk."
+                                  tip="Watch out for DSTs with LTV above 60% — refinancing risk at maturity is significant in rising rate environments."
+                                />
+                              </div>
                               <Input
                                 type="number"
                                 value={dst.ltv}
@@ -702,7 +722,13 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                       <TableHead>DST Name</TableHead>
                       <TableHead className="text-right">Investment</TableHead>
                       <TableHead className="text-right">Ownership %</TableHead>
-                      <TableHead className="text-right">Annual Distribution</TableHead>
+                      <TableHead className="text-right flex items-center justify-end gap-2">
+                        <span>Annual Distribution</span>
+                        <InfoTooltip
+                          content="The annual cash distributions you receive as a percentage of your invested capital. DSTs typically target 4-6% annual distributions."
+                          tip="DST distributions are not guaranteed. They depend on the underlying property's performance and occupancy."
+                        />
+                      </TableHead>
                       <TableHead className="text-right">Depreciation Pass-through</TableHead>
                       <TableHead className="text-right">Tax-Sheltered Income</TableHead>
                     </TableRow>
@@ -847,7 +873,13 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Secondary Market Liquidity Analysis
+              <div className="flex items-center gap-2">
+                <span>Secondary Market</span>
+                <InfoTooltip
+                  content="DST interests can sometimes be sold on secondary markets, but typically at a 15-30% discount to NAV. Liquidity is very limited."
+                />
+              </div>
+              Liquidity Analysis
             </CardTitle>
             <CardDescription>Estimated proceeds if DST interests are sold on the secondary market</CardDescription>
           </CardHeader>
@@ -930,7 +962,16 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ArrowRight className="h-5 w-5" />
-              DST-to-UPREIT Conversion (721 Exchange)
+              <div className="flex items-center gap-2">
+                <span>DST-to-UPREIT Conversion (</span>
+                <span className="flex items-center gap-1">
+                  <span>721 Exchange</span>
+                  <InfoTooltip
+                    content="A Section 721 exchange lets you convert DST interests into operating partnership units in a REIT, providing a path to eventual liquidity without triggering a taxable event."
+                  />
+                </span>
+                <span>)</span>
+              </div>
             </CardTitle>
             <CardDescription>Section 721 exchange pathway from DST interests to REIT shares</CardDescription>
           </CardHeader>
@@ -1076,7 +1117,12 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                         <TableHead className="text-right">Annual Debt Service</TableHead>
                         <TableHead className="text-right">Cash Flow Impact</TableHead>
                         <TableHead className="text-right">Breakeven Occupancy</TableHead>
-                        <TableHead className="text-right">DSCR</TableHead>
+                        <TableHead className="text-right flex items-center justify-end gap-2">
+                          <span>DSCR</span>
+                          <InfoTooltip
+                            content="The property's net operating income divided by its annual debt payments. A DSCR below 1.0x means the property can't cover its debt from operations alone."
+                          />
+                        </TableHead>
                         <TableHead className="text-right">Status</TableHead>
                       </TableRow>
                     </TableHeader>

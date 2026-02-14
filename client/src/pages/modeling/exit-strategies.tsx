@@ -63,6 +63,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { InfoTooltip, StrategyOverview } from "@/components/ui/info-tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useExitStrategiesStore, type MasterInputs, type SavedScenario } from "@/stores/exitStrategiesStore";
 import type { ModelingProject } from "@shared/schema";
@@ -833,6 +834,13 @@ function TaxAndProceedsPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Cash Sale — Tax & Proceeds Analysis"
+        description="A straightforward sale where you receive cash at closing. This analysis breaks down your federal and state tax obligations, net proceeds after all costs, and alternative reinvestment scenarios."
+        bestFor="Sellers who want immediate liquidity, simple transactions, or plan to use proceeds for non-real-estate investments."
+        keyConsideration="The combined federal + state tax bite can consume 25-40% of your capital gain. Compare against deferral strategies like 1031 exchanges."
+        riskLevel="Low"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -886,7 +894,7 @@ function TaxAndProceedsPanel() {
                 <span className="num font-medium">-{formatCurrency(b.adjustedBasis)}</span>
               </div>
               <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
-                <span className="font-semibold text-sm">Total Capital Gain</span>
+                <span className="font-semibold text-sm">Capital Gain <InfoTooltip content="The difference between your sale price and adjusted cost basis. This is the amount subject to capital gains tax." tip="Maximize your cost basis by including all capital improvements, closing costs from original purchase, and any other capitalizable expenses." /></span>
                 <span className="num font-semibold text-green-600" data-testid="text-capital-gain">{formatCurrency(b.capitalGain)}</span>
               </div>
             </div>
@@ -894,7 +902,7 @@ function TaxAndProceedsPanel() {
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Liability</h4>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Depreciation Recapture (25%)</span>
+                <span className="text-muted-foreground text-sm">Depreciation Recapture (§1250) <InfoTooltip content="When you sell, the IRS 'recaptures' depreciation deductions you took during ownership, taxing them at up to 25%." tip="Consider a cost segregation study before selling — it may actually increase recapture but could provide offsetting benefits through accelerated deductions." /></span>
                 <span className="num font-medium text-red-600" data-testid="text-dep-recapture">-{formatCurrency(b.depRecapture)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
@@ -906,7 +914,7 @@ function TaxAndProceedsPanel() {
                 <span className="num font-medium text-red-600" data-testid="text-state-tax">-{formatCurrency(b.stateTax)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">NIIT (3.8%)</span>
+                <span className="text-muted-foreground text-sm">Net Investment Income Tax (NIIT) <InfoTooltip content="An additional 3.8% tax on investment income for individuals with modified AGI above $200K ($250K married). Applies on top of capital gains tax." /></span>
                 <span className="num font-medium text-red-600" data-testid="text-niit">-{formatCurrency(b.niit)}</span>
               </div>
               <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
@@ -962,7 +970,7 @@ function TaxAndProceedsPanel() {
                     Alternative Minimum Tax (AMT) Analysis
                   </h4>
                   <div className="flex justify-between py-1.5 border-b">
-                    <span className="text-muted-foreground text-sm">AMT Exemption (2025)</span>
+                    <span className="text-muted-foreground text-sm">AMT Exemption (2025) <InfoTooltip content="The amount of income sheltered from AMT. For 2025, the exemption is $133,300 (married filing jointly) or $85,700 (single). It phases out at higher income levels." /></span>
                     <span className="num font-medium">{formatCurrency(amtExemption)}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
@@ -1075,7 +1083,7 @@ function TaxAndProceedsPanel() {
               </div>
 
               <div className="flex justify-between py-3 bg-green-50 rounded-lg px-3">
-                <span className="font-semibold">Net Cash to Seller</span>
+                <span className="font-semibold">Net Cash Proceeds <InfoTooltip content="Your actual take-home after all taxes, commissions, and closing costs. This is the number that matters for comparing exit strategies." tip="Compare this number across all exit strategies to find the most tax-efficient path." /></span>
                 <span className="num font-bold text-green-600" data-testid="text-net-proceeds">{formatCurrency(b.netCashProceeds)}</span>
               </div>
             </div>
@@ -1116,7 +1124,7 @@ function TaxAndProceedsPanel() {
                     <span className="num font-medium text-green-600">{proceedsPercent.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
-                    <span className="text-muted-foreground text-sm">Annualized ROE</span>
+                    <span className="text-muted-foreground text-sm">Annualized ROE <InfoTooltip content="Your annual return on the equity you invested, accounting for the holding period. Higher values indicate better capital efficiency." /></span>
                     <span className={`num font-medium ${annualizedROE >= 0 ? 'text-green-600' : 'text-red-600'}`}>{isFinite(annualizedROE) ? annualizedROE.toFixed(1) : '—'}%</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
@@ -1259,6 +1267,13 @@ function Exchange1031Panel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="1031 Like-Kind Exchange"
+        description="Defer 100% of capital gains tax by reinvesting sale proceeds into 'like-kind' replacement property. You must identify replacement properties within 45 days and close within 180 days."
+        bestFor="Investors who want to stay in real estate, upgrade to larger or better-performing properties, and defer taxes indefinitely."
+        keyConsideration="Strict timelines (45/180 days) and reinvestment rules. All equity must be reinvested to achieve full deferral — any cash taken out ('boot') is taxable."
+        riskLevel="Moderate"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -1351,7 +1366,13 @@ function Exchange1031Panel() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs">Boot Received</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Boot Received</Label>
+                  <InfoTooltip
+                    content="Cash or non-like-kind property received during the exchange. Boot is immediately taxable as capital gain."
+                    tip="To achieve full tax deferral, reinvest all equity and don't receive any cash or non-like-kind property at closing."
+                  />
+                </div>
                 <CurrencyInput value={bootReceived} onChange={setBootReceived} />
               </div>
               <div>
@@ -1451,7 +1472,13 @@ function Exchange1031Panel() {
                 <span className="num font-medium">{formatCurrency(gain)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Deferred Gain</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">Deferred Gain</span>
+                  <InfoTooltip
+                    content="The portion of your capital gain that is deferred (not taxed now) through the exchange. This gain transfers to the replacement property's basis."
+                    tip="Remember — deferred doesn't mean eliminated. The gain reduces your basis in the replacement property, so you'll face it when you eventually sell without exchanging."
+                  />
+                </div>
                 <span className="num font-medium text-green-600">{formatCurrency(deferredGain)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
@@ -1463,7 +1490,12 @@ function Exchange1031Panel() {
                 <span className="num font-medium text-red-600">{formatCurrency(bootTax)}</span>
               </div>
               <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
-                <span className="font-semibold">Tax Savings vs Cash Sale</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold">Tax Saved vs. Cash Sale</span>
+                  <InfoTooltip
+                    content="The dollar amount you save by exchanging instead of selling outright. This represents your tax deferral benefit."
+                  />
+                </div>
                 <span className="num font-bold text-green-600">{formatCurrency(taxSaved)}</span>
               </div>
             </div>
@@ -1479,7 +1511,13 @@ function Exchange1031Panel() {
                 <span className="num font-medium">{formatCurrency(newBasis)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Additional Equity Needed</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">Equity Required</span>
+                  <InfoTooltip
+                    content="The amount of additional cash you'll need to contribute to complete the exchange, beyond what your sale proceeds cover."
+                    tip="Line up financing early. Many exchanges fail because buyers can't close within the 180-day window."
+                  />
+                </div>
                 <span className="num font-medium">{formatCurrency(Math.max(0, equityRequired))}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
@@ -1491,7 +1529,12 @@ function Exchange1031Panel() {
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Net Benefit</h4>
               <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
-                <span className="font-semibold">Net Benefit (Savings - Costs)</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold">Net Benefit After Exchange Costs</span>
+                  <InfoTooltip
+                    content="Your net financial advantage after accounting for Qualified Intermediary fees, legal costs, and any additional exchange-related expenses."
+                  />
+                </div>
                 <span className={`num font-bold ${netBenefit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(netBenefit)}</span>
               </div>
             </div>
@@ -3119,6 +3162,13 @@ function EarnoutPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Earnout Structure"
+        description="Part of the sale price is contingent on future business performance. You receive a base payment at closing, with additional payments if the marina hits agreed-upon EBITDA or revenue targets over 1-3 years."
+        bestFor="Sellers confident in the business's growth trajectory, or when buyer and seller disagree on valuation. Bridges the gap between asking price and what the buyer is willing to pay upfront."
+        keyConsideration="You bear performance risk post-closing — if the new owner mismanages the business, your earnout payments may not materialize. Negotiate strong protections and clear metric definitions."
+        riskLevel="High"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -3131,7 +3181,13 @@ function EarnoutPanel() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-xs">Base Price (Guaranteed)</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Base Price (Guaranteed)</Label>
+                  <InfoTooltip
+                    content="The guaranteed portion of the sale price paid at closing, regardless of future performance."
+                    tip="Ensure the base price alone covers your minimum acceptable return. Treat earnout payments as upside, not guaranteed income."
+                  />
+                </div>
                 <CurrencyInput value={basePrice} onChange={setBasePrice} />
               </div>
               <div>
@@ -3139,11 +3195,22 @@ function EarnoutPanel() {
                 <CurrencyInput value={earnoutMax} onChange={setEarnoutMax} />
               </div>
               <div>
-                <Label className="text-xs">Achievement Probability</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Achievement Probability</Label>
+                  <InfoTooltip
+                    content="A statistical simulation that runs thousands of random scenarios to estimate the range and likelihood of different outcomes."
+                  />
+                </div>
                 <PercentInput value={probability} onChange={setProbability} />
               </div>
               <div>
-                <Label className="text-xs">Earnout Period (Years)</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Earnout Period (Years)</Label>
+                  <InfoTooltip
+                    content="The timeframe over which business performance is measured against targets. Typically 1-3 years post-closing."
+                    tip="Shorter earnout periods reduce your risk. Push for annual measurement with payments at each milestone rather than a single end-of-period payment."
+                  />
+                </div>
                 <Input type="number" value={earnoutYears} onChange={(e) => setEarnoutYears(e.target.value)} />
               </div>
               <div>
@@ -3160,7 +3227,12 @@ function EarnoutPanel() {
                   <CurrencyInput value={revenueTarget} onChange={setRevenueTarget} />
                 </div>
                 <div>
-                  <Label className="text-xs">EBITDA Threshold</Label>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs">EBITDA Threshold</Label>
+                    <InfoTooltip
+                      content="The performance metric the business must achieve for earnout payments to be triggered. Usually trailing 12-month EBITDA or revenue."
+                    />
+                  </div>
                   <CurrencyInput value={ebitdaThreshold} onChange={setEbitdaThreshold} />
                 </div>
                 <div>
@@ -3598,6 +3670,10 @@ function EarnoutPanel() {
             <CardTitle className="flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" />
               Dispute Resolution Cost Model
+              <InfoTooltip
+                content="Legal mechanism for resolving disagreements about earnout calculations. Include clear dispute procedures in the purchase agreement."
+                tip="Negotiate for independent third-party accounting review rights. This is your best protection against earnings manipulation."
+              />
             </CardTitle>
             <CardDescription>Estimated costs if earnout measurement is contested</CardDescription>
           </CardHeader>
@@ -4223,6 +4299,13 @@ function WaterfallPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Waterfall Distribution"
+        description="A structured distribution model commonly used in private equity and fund investments. Returns are distributed in tiers (or 'tranches'), with investors receiving their capital back first, then a preferred return, before profits are split with the fund manager."
+        bestFor="Fund-structured exits or joint ventures where investors and operators need a clear, incentive-aligned profit-sharing arrangement."
+        keyConsideration="The preferred return hurdle and GP catchup terms significantly impact how profits are shared. Small changes to the hurdle rate can shift millions between LP and GP."
+        riskLevel="Moderate"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -4243,12 +4326,24 @@ function WaterfallPanel() {
                 <CurrencyInput value={gpCapital} onChange={setGpCapital} />
               </div>
               <div>
-                <Label className="text-xs">Preferred Return</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Preferred Return</Label>
+                  <InfoTooltip
+                    content="The minimum annual return LPs (investors) must receive before the GP (manager) participates in profits. Acts as a performance floor."
+                    tip="Standard preferred returns in marina deals range from 7-10%. Higher prefs protect investors but may disincentivize the GP."
+                  />
+                </div>
                 <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
               </div>
               {!useIRRPromote && (
                 <div>
-                  <Label className="text-xs">Carried Interest</Label>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs">Carried Interest</Label>
+                    <InfoTooltip
+                      content="The GP's share of profits above the preferred return hurdle. Typically 20% of profits, but can range from 15-30%."
+                      tip="Negotiate a catch-up provision so the GP is incentivized to exceed the hurdle rate, not just meet it."
+                    />
+                  </div>
                   <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
                 </div>
               )}
@@ -4538,7 +4633,12 @@ function WaterfallPanel() {
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2.5: GP Catchup</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    Step 2.5: GP Catchup
+                    <InfoTooltip
+                      content="After LPs receive their preferred return, the GP receives 100% of distributions until they 'catch up' to their target profit share. This ensures the GP gets their full carried interest."
+                    />
+                  </h4>
                   <div className="flex justify-between py-1.5 border-b">
                     <span className="text-muted-foreground text-sm">GP Catchup Amount</span>
                     <span className="num font-medium">{formatCurrency(gpCatchup)}</span>
@@ -4556,11 +4656,22 @@ function WaterfallPanel() {
                     <span className="num font-medium">{formatCurrency(Math.max(0, afterCatchup))}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
-                    <span className="text-muted-foreground text-sm">GP Carried Interest ({carriedInterest}%)</span>
+                    <span className="text-muted-foreground text-sm flex items-center gap-1">
+                      GP Carried Interest ({carriedInterest}%)
+                      <InfoTooltip
+                        content="The GP's share of profits above the preferred return hurdle. Typically 20% of profits, but can range from 15-30%."
+                        tip="Negotiate a catch-up provision so the GP is incentivized to exceed the hurdle rate, not just meet it."
+                      />
+                    </span>
                     <span className="num font-medium">{formatCurrency(gpCarry)}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
-                    <span className="text-muted-foreground text-sm">LP Profit Share ({100 - (parseFloat(carriedInterest) || 0)}%)</span>
+                    <span className="text-muted-foreground text-sm flex items-center gap-1">
+                      LP Profit Share ({100 - (parseFloat(carriedInterest) || 0)}%)
+                      <InfoTooltip
+                        content="The portion of profits distributed to limited partners (investors) at each tier of the waterfall."
+                      />
+                    </span>
                     <span className="num font-medium text-green-600">{formatCurrency(lpProfit)}</span>
                   </div>
                 </div>
@@ -4624,15 +4735,30 @@ function WaterfallPanel() {
                 <span className="num font-semibold">{dealMOIC.toFixed(2)}x</span>
               </div>
               <div className="flex justify-between py-2.5 bg-cyan-50 rounded-lg px-3">
-                <span className="font-semibold">LP IRR (XIRR)</span>
+                <span className="font-semibold flex items-center gap-1">
+                  LP IRR (XIRR)
+                  <InfoTooltip
+                    content="Internal Rate of Return — the annualized return that makes the net present value of all cash flows equal to zero. Used as the hurdle rate for waterfall tier calculations."
+                  />
+                </span>
                 <span className="num font-bold text-cyan-600">{lpIRR.toFixed(2)}%</span>
               </div>
               <div className="flex justify-between py-2.5 bg-muted/30 rounded-lg px-3">
-                <span className="font-semibold">GP IRR (XIRR)</span>
+                <span className="font-semibold flex items-center gap-1">
+                  GP IRR (XIRR)
+                  <InfoTooltip
+                    content="Internal Rate of Return — the annualized return that makes the net present value of all cash flows equal to zero. Used as the hurdle rate for waterfall tier calculations."
+                  />
+                </span>
                 <span className="num font-bold">{gpIRR.toFixed(2)}%</span>
               </div>
               <div className="flex justify-between py-2.5 bg-muted/30 rounded-lg px-3">
-                <span className="font-semibold">Deal-Level IRR</span>
+                <span className="font-semibold flex items-center gap-1">
+                  Deal-Level IRR
+                  <InfoTooltip
+                    content="Internal Rate of Return — the annualized return that makes the net present value of all cash flows equal to zero. Used as the hurdle rate for waterfall tier calculations."
+                  />
+                </span>
                 <span className="num font-bold">{dealIRR.toFixed(2)}%</span>
               </div>
             </div>
@@ -4696,7 +4822,12 @@ function WaterfallPanel() {
             </div>
             {hasClawback && (
               <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
-                <span className="font-semibold text-red-700">Clawback Exposure</span>
+                <span className="font-semibold text-red-700 flex items-center gap-1">
+                  Clawback Exposure
+                  <InfoTooltip
+                    content="A protection mechanism that requires the GP to return excess distributions if, at the end of the fund's life, they've received more than their agreed share of total profits."
+                  />
+                </span>
                 <span className="num font-bold text-red-600">{formatCurrency(clawbackAmount)}</span>
               </div>
             )}
@@ -4991,6 +5122,13 @@ function IRRCalculatorPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="IRR Calculator"
+        description="Calculate the Internal Rate of Return for your marina investment using both standard IRR and XIRR (which accounts for exact cash flow dates). Compare how different reinvestment assumptions affect your real-world returns."
+        bestFor="Evaluating whether this investment outperforms alternatives on a time-adjusted basis. Essential for comparing deals with different hold periods and cash flow patterns."
+        keyConsideration="IRR assumes reinvestment at the IRR rate itself, which can overstate returns for high-IRR deals. MIRR (Modified IRR) with a realistic reinvestment rate gives a more conservative estimate."
+        riskLevel="Low"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -5003,7 +5141,10 @@ function IRRCalculatorPanel() {
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4 pb-2 border-b">
               <div className="flex-1">
-                <Label className="text-xs">Hold Period (Years)</Label>
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs">Holding Period</Label>
+                  <InfoTooltip content="The total time you hold the investment from acquisition to exit. Longer hold periods generally lower IRR even if total profit is higher." />
+                </div>
                 <div className="flex items-center gap-3">
                   <Input
                     type="range"
@@ -5131,12 +5272,21 @@ function IRRCalculatorPanel() {
                 <span className={`num font-medium ${displayAfterTaxIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{isFinite(displayAfterTaxIRR) ? displayAfterTaxIRR.toFixed(2) : '—'}%</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">MIRR ({reinvestmentRate}% reinvest)</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">MIRR ({reinvestmentRate}% reinvest)</span>
+                  <InfoTooltip 
+                    content="The rate at which interim cash flows (distributions) are assumed to be reinvested. Standard IRR assumes reinvestment at the IRR itself, which is often unrealistic." 
+                    tip="Use a reinvestment rate close to your actual expected return on idle cash (typically 3-5%) for more realistic projections."
+                  />
+                </div>
                 <span className={`num font-medium ${mirr >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{isFinite(mirr) ? mirr.toFixed(2) : '—'}%</span>
               </div>
               <p className="text-xs text-muted-foreground italic">MIRR uses a reinvestment rate assumption, making it more conservative than standard IRR for projects with interim cash flows.</p>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Equity Multiple</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground text-sm">Equity Multiple</span>
+                  <InfoTooltip content="Money-on-money multiple — total distributions divided by total invested capital. A 2.0x multiple means you doubled your money." />
+                </div>
                 <span className="num font-medium">{multiple.toFixed(2)}x</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
@@ -5150,7 +5300,10 @@ function IRRCalculatorPanel() {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash-on-Cash by Year</h4>
+              <div className="flex items-center gap-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash-on-Cash by Year</h4>
+                <InfoTooltip content="Annual cash distributions as a percentage of your original equity investment. Unlike IRR, this is a simple period-by-period measure without time-value adjustments." />
+              </div>
               {parsedCFs.map((cf, i) => (
                 <div key={i} className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Year {i + 1}: {formatCurrency(cf)}</span>
@@ -5461,7 +5614,13 @@ function IRRCalculatorPanel() {
                     </table>
                   </div>
                   <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
-                    <span className="font-semibold">XIRR (Date-Weighted)</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">XIRR (Date-Weighted)</span>
+                      <InfoTooltip 
+                        content="Extended Internal Rate of Return — uses exact dates for each cash flow instead of assuming equal periods. More accurate than standard IRR for irregular cash flows." 
+                        tip="Always prefer XIRR over IRR when you have specific transaction dates. Standard IRR can be misleading when cash flows aren't evenly spaced."
+                      />
+                    </div>
                     <span className={`num font-bold ${xirrResult >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{isFinite(xirrResult) ? xirrResult.toFixed(2) : '—'}%</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b">
@@ -5724,6 +5883,14 @@ function SensitivityPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Sensitivity Analysis"
+        description="Test how changes in key variables (cap rate, NOI, tax rates, interest rates) affect your net proceeds. This 'what-if' analysis reveals which factors have the biggest impact on your deal outcome."
+        bestFor="Understanding risk exposure and identifying which assumptions to stress-test most carefully. Essential for presenting investment scenarios to partners or investors."
+        keyConsideration="Sensitivity analysis tests one variable at a time. In reality, variables are correlated — cap rates and interest rates tend to move together. Use the correlation analysis section for a more realistic view."
+        riskLevel="Low"
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -5928,7 +6095,15 @@ function SensitivityPanel() {
                   const range = Math.abs(d.highProceeds - d.lowProceeds);
                   return (
                     <tr key={idx} className="border-b">
-                      <td className="p-2 font-medium">{d.name}</td>
+                      <td className="p-2 font-medium flex items-center gap-2">
+                        {d.name}
+                        {d.name === "Cap Rate" && (
+                          <InfoTooltip
+                            content="Capitalization rate — the ratio of NOI to property value. A 1% change in cap rate can shift your property value by 15-25%."
+                            tip="Cap rate is usually the single biggest driver of value. Focus your diligence on understanding local cap rate trends."
+                          />
+                        )}
+                      </td>
                       <td className="p-2 text-center num text-red-600">{formatCurrency(Math.min(d.lowProceeds, d.highProceeds))}</td>
                       <td className="p-2 text-center num font-semibold">{formatCurrency(d.baseProceeds)}</td>
                       <td className="p-2 text-center num text-green-600">{formatCurrency(Math.max(d.lowProceeds, d.highProceeds))}</td>
@@ -5947,6 +6122,9 @@ function SensitivityPanel() {
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-orange-500" />
             Sensitivity Ranking (Tornado)
+            <InfoTooltip
+              content="A tornado chart ranks variables by their impact on the outcome. The longest bars represent the most influential factors — focus your risk management here."
+            />
           </CardTitle>
           <CardDescription>Dimensions ranked by absolute impact on net proceeds</CardDescription>
         </CardHeader>
@@ -6048,7 +6226,12 @@ function SensitivityPanel() {
               <span className="num font-bold text-red-600">{formatCurrency(worstProceeds)}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b">
-              <span className="text-muted-foreground text-sm">Variance Range (Best - Worst)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-sm">Variance Range (Best - Worst)</span>
+                <InfoTooltip
+                  content="The spread between your best-case and worst-case net proceeds. A wider range indicates more uncertainty in the deal."
+                />
+              </div>
               <span className="num font-semibold">{formatCurrency(varianceRange)}</span>
             </div>
           </div>
@@ -6159,6 +6342,10 @@ function SensitivityPanel() {
           <CardTitle className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
             Correlation Analysis
+            <InfoTooltip
+              content="Correlation measures how two variables move together. A +1.0 means they move in perfect lockstep; -1.0 means perfectly opposite."
+              tip="High correlations between risk factors can amplify losses in downturns. If cap rates AND vacancy both worsen together, the compounded effect is much worse than either alone."
+            />
           </CardTitle>
           <CardDescription>How key variables move together and affect scenario outcomes</CardDescription>
         </CardHeader>
@@ -6221,6 +6408,9 @@ function SensitivityPanel() {
           <CardTitle className="flex items-center gap-2">
             <GitBranch className="h-5 w-5 text-teal-500" />
             Scenario Decision Tree
+            <InfoTooltip
+              content="A probability-weighted framework showing how market outcomes branch into sub-scenarios. The expected value represents the probability-weighted average across all possible paths."
+            />
           </CardTitle>
           <CardDescription>Branching outcome analysis with joint probabilities</CardDescription>
         </CardHeader>
@@ -6524,6 +6714,13 @@ function CrossStrategyComparisonPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Cross-Strategy Comparison"
+        description="Side-by-side comparison of all exit strategies on key dimensions: net proceeds, effective tax rate, liquidity timeline, and risk profile. Includes time-value adjusted (NPV) comparison and after-tax IRR estimates."
+        bestFor="Making the final exit decision. Once you've analyzed individual strategies, this view helps you see which approach maximizes after-tax, risk-adjusted value."
+        keyConsideration="Don't choose a strategy based solely on highest proceeds. Factor in your liquidity needs, risk tolerance, tax situation, and long-term investment plans."
+        riskLevel="Low"
+      />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -6540,9 +6737,25 @@ function CrossStrategyComparisonPanel() {
                   <th className="p-2 text-left font-semibold">Strategy</th>
                   <th className="p-2 text-center font-semibold">Net Proceeds</th>
                   <th className="p-2 text-center font-semibold">Total Tax</th>
-                  <th className="p-2 text-center font-semibold">Eff. Tax Rate</th>
-                  <th className="p-2 text-center font-semibold">Liquidity</th>
-                  <th className="p-2 text-center font-semibold">Risk</th>
+                  <th className="p-2 text-center font-semibold flex items-center justify-center gap-1">
+                    Eff. Tax Rate
+                    <InfoTooltip
+                      content="The total tax paid as a percentage of the sale price. Includes federal, state, NIIT, and depreciation recapture. Lower is better."
+                      tip="Compare effective rates, not marginal rates. Two strategies might have similar marginal rates but very different effective rates due to deferral or exclusions."
+                    />
+                  </th>
+                  <th className="p-2 text-center font-semibold flex items-center justify-center gap-1">
+                    Liquidity
+                    <InfoTooltip
+                      content="How quickly you can access your proceeds. Immediate means cash at closing; months-to-years means your capital is locked up or received in installments."
+                    />
+                  </th>
+                  <th className="p-2 text-center font-semibold flex items-center justify-center gap-1">
+                    Risk
+                    <InfoTooltip
+                      content="The overall risk profile considering execution complexity, counterparty risk, market risk, and regulatory risk."
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -6740,7 +6953,14 @@ function CrossStrategyComparisonPanel() {
                     <tr className="border-b">
                       <th className="p-2 text-left font-semibold">Strategy</th>
                       <th className="p-2 text-right font-semibold">Nominal Proceeds</th>
-                      <th className="p-2 text-right font-semibold">NPV @8%</th>
+                      <th className="p-2 text-right font-semibold flex items-center justify-end gap-1">
+                        NPV @8%
+                        <InfoTooltip
+                          content="The value of future proceeds discounted back to today's dollars at 8%. A dollar received in 5 years is worth less than a dollar today."
+                          tip="NPV is the fairest way to compare strategies with different timelines. A 1031 exchange might show higher nominal proceeds, but when discounted for the delay, a cash sale might win."
+                          side="left"
+                        />
+                      </th>
                       <th className="p-2 text-right font-semibold">Time Penalty</th>
                     </tr>
                   </thead>
@@ -6871,7 +7091,13 @@ function CrossStrategyComparisonPanel() {
                       <th className="p-2 text-right font-semibold">After-Tax Return</th>
                       <th className="p-2 text-right font-semibold">After-Tax Yield</th>
                       <th className="p-2 text-right font-semibold">Eff. Tax Rate</th>
-                      <th className="p-2 text-right font-semibold">Tax-Equiv. Yield</th>
+                      <th className="p-2 text-right font-semibold flex items-center justify-end gap-1">
+                        Tax-Equiv. Yield
+                        <InfoTooltip
+                          content="The pre-tax return you'd need to earn to match this strategy's after-tax return. Higher tax-equivalent yields indicate more tax-efficient strategies."
+                          side="left"
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -7063,6 +7289,14 @@ function AdvisorInsightsPanel() {
 
   return (
     <div className="space-y-6">
+      <StrategyOverview
+        title="Advisor Insights & Risk Intelligence"
+        description="AI-powered analysis combining Monte Carlo simulations, estate planning considerations, tax exclusion eligibility checks, and opportunity zone analysis. Provides a comprehensive advisory view of your exit transaction."
+        bestFor="Getting a 360-degree view of your transaction's implications beyond just the sale itself — including estate planning, tax optimization, and long-term wealth management."
+        keyConsideration="These insights are analytical tools, not professional advice. Always consult with your CPA, estate attorney, and financial advisor before making final decisions on complex tax strategies."
+        riskLevel="Low"
+      />
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -7256,7 +7490,12 @@ function AdvisorInsightsPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-purple-500" />
-            Monte Carlo Risk Simulation
+            Monte Carlo
+            <InfoTooltip
+              content="A simulation that runs 2,000 random scenarios to estimate the probability distribution of your net proceeds. Shows what's most likely, not just best/worst case."
+              tip="Focus on the P10-P90 range — this is where 80% of outcomes are likely to fall. If P10 is below your minimum acceptable proceeds, consider risk mitigation strategies."
+            />
+            Risk Simulation
           </CardTitle>
           <CardDescription className="text-xs">2,000-iteration simulation of net proceeds with variable inputs</CardDescription>
         </CardHeader>
@@ -7352,7 +7591,12 @@ function AdvisorInsightsPanel() {
                     <p className={`text-sm font-bold ${probBelowDebt > 0.1 ? "text-red-600" : "text-green-600"}`}>{(probBelowDebt * 100).toFixed(1)}%</p>
                   </div>
                   <div className="bg-muted/40 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Value at Risk (P5)</p>
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                      Value at Risk (P5)
+                      <InfoTooltip
+                        content="The maximum expected loss at the 5th percentile — meaning there's only a 5% chance your proceeds will fall below this level."
+                      />
+                    </p>
                     <p className={`text-sm font-bold ${valueAtRisk < 0 ? "text-red-600" : "text-green-600"}`}>{formatCurrency(valueAtRisk)}</p>
                   </div>
                 </div>
@@ -7387,7 +7631,12 @@ function AdvisorInsightsPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Landmark className="h-4 w-4 text-teal-500" />
-            Estate Planning Integration
+            Estate Tax
+            <InfoTooltip
+              content="Federal estate tax applies to estates exceeding $13.61M per person (2025). With proper planning, a married couple can shelter up to $27.22M."
+              tip="The current high exemption is set to sunset in 2026 (reverting to ~$7M). If your estate is in the $7-14M range, planning now is critical."
+            />
+            Planning Integration
           </CardTitle>
           <CardDescription className="text-xs">Estate tax impact and planning strategies at current 2025 rates</CardDescription>
         </CardHeader>
@@ -7477,7 +7726,14 @@ function AdvisorInsightsPanel() {
                   {estatePlanStrategies.map((s, i) => (
                     <div key={i} className="border rounded-lg p-3 space-y-2">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm font-semibold">{s.name}</h4>
+                        <div className="flex items-center gap-1">
+                          <h4 className="text-sm font-semibold">{s.name}</h4>
+                          {s.name === "GRAT (Grantor Retained Annuity Trust)" && (
+                            <InfoTooltip
+                              content="A trust that transfers future appreciation above a hurdle rate (currently ~5.2%) to beneficiaries gift-tax-free. Highly effective for appreciating assets."
+                            />
+                          )}
+                        </div>
                         <Badge variant="secondary" className="text-xs whitespace-nowrap shrink-0">
                           {s.savingsHigh ? `${formatCurrency(s.savings)} – ${formatCurrency(s.savingsHigh)}` : formatCurrency(s.savings)} est. savings
                         </Badge>
@@ -7513,7 +7769,12 @@ function AdvisorInsightsPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="h-4 w-4 text-blue-500" />
-            QSBS Exclusion Check (Section 1202)
+            QSBS
+            <InfoTooltip
+              content="Qualified Small Business Stock exclusion can eliminate up to $10M in capital gains tax. Requires C-corp structure, $50M asset limit, 5-year hold, and active business (not real estate)."
+              tip="Most marina businesses won't qualify due to the real estate exclusion, but if the business is structured with significant non-real-estate operations, it's worth investigating."
+            />
+            Exclusion Check (Section 1202)
           </CardTitle>
           <CardDescription className="text-xs">Qualified Small Business Stock exclusion eligibility assessment</CardDescription>
         </CardHeader>
@@ -7621,7 +7882,11 @@ function AdvisorInsightsPanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <MapPinned className="h-4 w-4 text-emerald-500" />
-            QOZ Investment Timeline
+            QOZ
+            <InfoTooltip
+              content="Qualified Opportunity Zone investments can defer and potentially eliminate capital gains tax on appreciated investments held 10+ years in designated census tracts."
+            />
+            Investment Timeline
           </CardTitle>
           <CardDescription className="text-xs">Qualified Opportunity Zone milestones, deadlines, and investment comparison</CardDescription>
         </CardHeader>
