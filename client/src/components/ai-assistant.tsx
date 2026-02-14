@@ -6,6 +6,7 @@ import {
   Send, 
   Loader2, 
   Sparkles,
+  EyeOff,
   AlertTriangle,
   Shield,
   BarChart3,
@@ -93,6 +94,18 @@ const getModeIcon = (iconName: string) => {
 export function AIAssistant() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isHidden, setIsHidden] = useState(() => localStorage.getItem('ai-assistant-hidden') === 'true');
+
+  const hideAssistant = useCallback(() => {
+    setIsHidden(true);
+    setIsOpen(false);
+    localStorage.setItem('ai-assistant-hidden', 'true');
+  }, []);
+
+  const showAssistant = useCallback(() => {
+    setIsHidden(false);
+    localStorage.removeItem('ai-assistant-hidden');
+  }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -310,6 +323,20 @@ export function AIAssistant() {
   const currentMode = ADVISORY_MODES.find(m => m.id === advisoryMode) || ADVISORY_MODES[0];
   const ModeIcon = getModeIcon(currentMode.icon);
 
+  if (isHidden) {
+    return (
+      <Button
+        onClick={showAssistant}
+        className="fixed bottom-6 right-6 h-8 w-8 rounded-full shadow-md z-50 bg-muted hover:bg-muted/80 text-muted-foreground opacity-40 hover:opacity-100 transition-all duration-300"
+        title="Show AI Assistant"
+        size="icon"
+        variant="ghost"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+      </Button>
+    );
+  }
+
   return (
     <>
       <Button
@@ -343,6 +370,15 @@ export function AIAssistant() {
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={hideAssistant}
+                className="text-white/80 hover:text-white hover:bg-white/10 h-8 w-8"
+                title="Hide assistant"
+              >
+                <EyeOff className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
