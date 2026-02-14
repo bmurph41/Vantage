@@ -543,11 +543,11 @@ export default function ExitStrategiesPage() {
               <TabsTrigger 
                 key={tool.id} 
                 value={tool.id}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600"
                 data-testid={`tab-${tool.id}`}
               >
-                <tool.icon className={`h-3.5 w-3.5 ${activeTab === tool.id ? tool.color : ''}`} />
-                <span className="hidden sm:inline">{tool.shortName}</span>
+                <tool.icon className={`h-3.5 w-3.5 ${activeTab === tool.id ? 'text-blue-600' : ''}`} />
+                <span>{tool.shortName}</span>
               </TabsTrigger>
             ))}
           </TabsList>
