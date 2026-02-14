@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { Button } from "./button"
+import { Button } from "../button"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
