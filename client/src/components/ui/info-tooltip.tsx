@@ -48,12 +48,10 @@ export function StrategyOverview({ title, description, bestFor, keyConsideration
   };
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/20 dark:border-blue-800 p-4 space-y-2.5">
+    <div className="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/20 dark:border-blue-800 px-3 py-2 space-y-1">
       <div className="flex items-start gap-2">
-        <div className="rounded-full bg-blue-100 dark:bg-blue-900/50 p-1.5 mt-0.5">
-          <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-        </div>
-        <div className="flex-1 space-y-1.5">
+        <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+        <div className="flex-1 space-y-1">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200">{title}</h4>
             <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", riskColors[riskLevel])}>
@@ -61,14 +59,14 @@ export function StrategyOverview({ title, description, bestFor, keyConsideration
             </span>
           </div>
           <p className="text-xs text-blue-800/80 dark:text-blue-300/70 leading-relaxed">{description}</p>
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <div className="flex-1 rounded bg-white/60 dark:bg-white/5 px-2.5 py-1.5">
+          <div className="flex flex-col sm:flex-row gap-1.5">
+            <div className="flex-1 rounded bg-white/60 dark:bg-white/5 px-2 py-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/60">Best For</span>
-              <p className="text-xs text-foreground/80 mt-0.5">{bestFor}</p>
+              <p className="text-[11px] text-foreground/80 mt-0.5 leading-snug">{bestFor}</p>
             </div>
-            <div className="flex-1 rounded bg-white/60 dark:bg-white/5 px-2.5 py-1.5">
+            <div className="flex-1 rounded bg-white/60 dark:bg-white/5 px-2 py-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/60">Key Consideration</span>
-              <p className="text-xs text-foreground/80 mt-0.5">{keyConsideration}</p>
+              <p className="text-[11px] text-foreground/80 mt-0.5 leading-snug">{keyConsideration}</p>
             </div>
           </div>
         </div>

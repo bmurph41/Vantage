@@ -237,13 +237,13 @@ function CashSaleBaselineCard({ baseline, label }: { baseline: ReturnType<typeof
 function CrossPanelRecommendation({ recommendations }: { recommendations: Array<{ tabId: string; title: string; reason: string; icon: any }> }) {
   return (
     <Card className="border-dashed border-blue-200 bg-blue-50/30">
-      <CardHeader className="pb-2">
+      <CardHeader className="px-4 py-3 pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-500" />
           Next Steps to Consider
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {recommendations.map((rec) => {
             const Icon = rec.icon;
@@ -448,16 +448,16 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
   const navigationStrategies = exitTools.filter(t => t.id !== "summary");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-amber-500" />
-            <CardTitle>Recommended Strategy</CardTitle>
+            <CardTitle className="text-base">Recommended Strategy</CardTitle>
           </div>
           <CardDescription>Based on your current inputs and property profile</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200">
             <div className="rounded-full bg-white p-3 shadow-sm">
               <RecommendedIcon className={`h-6 w-6 ${recommendedColor}`} />
@@ -490,13 +490,13 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-green-600" />
-            <CardTitle>Key Metrics At a Glance</CardTitle>
+            <CardTitle className="text-base">Key Metrics At a Glance</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="rounded-lg border p-4 text-center space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Capital Gain</p>
@@ -519,14 +519,14 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center gap-2">
             <BarChart2 className="h-5 w-5 text-slate-600" />
-            <CardTitle>Quick Comparison Grid</CardTitle>
+            <CardTitle className="text-base">Quick Comparison Grid</CardTitle>
           </div>
           <CardDescription>Estimated outcomes across all exit strategies</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {strategyEstimates.map((strategy) => (
               <div
@@ -555,14 +555,14 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-blue-500" />
-            <CardTitle>Quick Navigation</CardTitle>
+            <CardTitle className="text-base">Quick Navigation</CardTitle>
           </div>
           <CardDescription>Jump to any strategy calculator</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {navigationStrategies.map((tool) => (
               <div
@@ -652,11 +652,11 @@ function SharedInputsPanel() {
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="border-primary/20">
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Master Inputs</CardTitle>
+              <CardTitle className="text-base">Master Inputs</CardTitle>
               {activeScenario && (
                 <Badge variant={hasUnsavedChanges ? "outline" : "secondary"} className="text-xs ml-1">
                   {hasUnsavedChanges ? "Unsaved changes" : `Scenario: ${activeScenario.name}`}
@@ -685,7 +685,7 @@ function SharedInputsPanel() {
           </CardDescription>
         </CardHeader>
         <CollapsibleContent>
-          <CardContent className="pt-0 space-y-4">
+          <CardContent className="px-4 pb-4 pt-0 space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={activeScenarioId || "__new__"} onValueChange={handleScenarioSelect}>
                 <SelectTrigger className="w-[220px] h-8 text-xs">
@@ -1023,7 +1023,7 @@ export default function ExitStrategiesPage() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto space-y-3">
         <div className="flex items-center justify-end gap-2" data-no-print>
           <Button
             variant="outline"
@@ -1097,7 +1097,7 @@ export default function ExitStrategiesPage() {
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() => handleLinkToProject(project.id)}
                       >
-                        <CardContent className="p-4">
+                        <CardContent className="px-4 pb-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -1137,19 +1137,10 @@ export default function ExitStrategiesPage() {
           </DialogContent>
         </Dialog>
 
-        <Card className="bg-blue-50 border-blue-200" data-no-print>
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm text-blue-800 font-medium">Standalone Mode</p>
-                <p className="text-sm text-blue-700">
-                  Master inputs below are shared across all tabs. Change a value once and it updates everywhere.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700" data-no-print>
+          <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+          <span><span className="font-medium text-blue-800">Standalone Mode</span> — Master inputs are shared across all tabs.</span>
+        </div>
 
         <div data-no-print>
           <SharedInputsPanel />
@@ -1185,47 +1176,47 @@ export default function ExitStrategiesPage() {
             ))}
           </TabsList>
 
-          <TabsContent value="summary" className="mt-6">
+          <TabsContent value="summary" className="mt-3">
             <SummaryDashboardPanel onNavigate={setActiveTab} />
           </TabsContent>
 
-          <TabsContent value="tax-proceeds" className="mt-6">
+          <TabsContent value="tax-proceeds" className="mt-3">
             <TaxAndProceedsPanel />
           </TabsContent>
 
-          <TabsContent value="1031" className="mt-6">
+          <TabsContent value="1031" className="mt-3">
             <Exchange1031Panel />
           </TabsContent>
 
-          <TabsContent value="dst" className="mt-6">
+          <TabsContent value="dst" className="mt-3">
             <DSTAnalysisPanel />
           </TabsContent>
 
-          <TabsContent value="seller-financing" className="mt-6">
+          <TabsContent value="seller-financing" className="mt-3">
             <SellerFinancingPanel />
           </TabsContent>
 
-          <TabsContent value="earnout" className="mt-6">
+          <TabsContent value="earnout" className="mt-3">
             <EarnoutPanel />
           </TabsContent>
 
-          <TabsContent value="waterfall" className="mt-6">
+          <TabsContent value="waterfall" className="mt-3">
             <WaterfallPanel />
           </TabsContent>
 
-          <TabsContent value="irr" className="mt-6">
+          <TabsContent value="irr" className="mt-3">
             <IRRCalculatorPanel />
           </TabsContent>
 
-          <TabsContent value="sensitivity" className="mt-6">
+          <TabsContent value="sensitivity" className="mt-3">
             <SensitivityPanel />
           </TabsContent>
 
-          <TabsContent value="comparison" className="mt-6">
+          <TabsContent value="comparison" className="mt-3">
             <CrossStrategyComparisonPanel />
           </TabsContent>
 
-          <TabsContent value="ai-insights" className="mt-6">
+          <TabsContent value="ai-insights" className="mt-3">
             <AdvisorInsightsPanel />
           </TabsContent>
         </Tabs>
@@ -1301,7 +1292,7 @@ function TaxAndProceedsPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Cash Sale — Tax & Proceeds Analysis"
         description="A straightforward sale where you receive cash at closing. This analysis breaks down your federal and state tax obligations, net proceeds after all costs, and alternative reinvestment scenarios."
@@ -1309,13 +1300,13 @@ function TaxAndProceedsPanel() {
         keyConsideration="The combined federal + state tax bite can consume 25-40% of your capital gain. Compare against deferral strategies like 1031 exchanges."
         riskLevel="Low"
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Tax Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Tax Analysis</CardTitle>
             <CardDescription>Capital gains and depreciation recapture breakdown</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">State Tax Rate</h4>
               <Select value={selectedStateKey} onValueChange={handleStateSelect}>
@@ -1351,7 +1342,7 @@ function TaxAndProceedsPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gain Analysis</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Sale Price</span>
@@ -1367,7 +1358,7 @@ function TaxAndProceedsPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Liability</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Depreciation Recapture (§1250) <InfoTooltip content="When you sell, the IRS 'recaptures' depreciation deductions you took during ownership, taxing them at up to 25%." tip="Consider a cost segregation study before selling — it may actually increase recapture but could provide offsetting benefits through accelerated deductions." /></span>
@@ -1395,7 +1386,7 @@ function TaxAndProceedsPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Section 1250/1231 Breakdown</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Unrecaptured §1250 Gain (25%)</span>
@@ -1432,7 +1423,7 @@ function TaxAndProceedsPanel() {
               const isExposed = amtOwed > 0;
 
               return (
-                <div className="border-t pt-4 space-y-3">
+                <div className="border-t pt-3 space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
                     Alternative Minimum Tax (AMT) Analysis
@@ -1481,7 +1472,7 @@ function TaxAndProceedsPanel() {
               const studyCostEst = 25000;
               const roi = studyCostEst > 0 ? (yearOneSavings / studyCostEst) * 100 : 0;
               return (
-                <div className="border-t pt-4 space-y-3">
+                <div className="border-t pt-3 space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost Segregation Study Impact</h4>
                   <div className="flex justify-between py-1.5 border-b">
                     <span className="text-muted-foreground text-sm">Personal Property Portion (est. 20%)</span>
@@ -1515,11 +1506,11 @@ function TaxAndProceedsPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Net Proceeds Waterfall</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Net Proceeds Waterfall</CardTitle>
             <CardDescription>Step-by-step deductions from gross sale to net cash</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
                 <span className="font-semibold text-sm">Gross Sale Price</span>
@@ -1556,7 +1547,7 @@ function TaxAndProceedsPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t pt-3 space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Ratios</h4>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground text-sm">Proceeds as % of Sale</span>
@@ -1581,7 +1572,7 @@ function TaxAndProceedsPanel() {
               const friction = b.brokerCost + b.closingCosts + b.totalTax;
               const frictionPercent = masterInputs.salePrice > 0 ? (friction / masterInputs.salePrice) * 100 : 0;
               return (
-                <div className="border-t pt-4 space-y-2">
+                <div className="border-t pt-3 space-y-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Return on Equity</h4>
                   <div className="flex justify-between py-1.5 border-b">
                     <span className="text-muted-foreground text-sm">Equity Invested</span>
@@ -1622,11 +1613,11 @@ function TaxAndProceedsPanel() {
         const qozAdvantage = qozPath - cashSalePath;
         return (
           <Card>
-            <CardHeader>
-              <CardTitle>Qualified Opportunity Zone (QOZ) Comparison</CardTitle>
+            <CardHeader className="px-4 py-3">
+              <CardTitle className="text-base">Qualified Opportunity Zone (QOZ) Comparison</CardTitle>
               <CardDescription>Capital gains reinvestment into a QOZ fund</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-4 pb-4 space-y-4">
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">QOZ Investment</h4>
                 <div className="flex justify-between py-1.5 border-b">
@@ -1647,7 +1638,7 @@ function TaxAndProceedsPanel() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t pt-3 space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projected QOZ Growth (8% Annual Return)</h4>
                 <div className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Projected QOZ Value at Exit ({holdingPeriod} yrs)</span>
@@ -1659,7 +1650,7 @@ function TaxAndProceedsPanel() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t pt-3 space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash Sale vs QOZ Comparison</h4>
                 <div className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Cash Sale Path (reinvested at 8%)</span>
@@ -1740,7 +1731,7 @@ function Exchange1031Panel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="1031 Like-Kind Exchange"
         description="Defer 100% of capital gains tax by reinvesting sale proceeds into 'like-kind' replacement property. You must identify replacement properties within 45 days and close within 180 days."
@@ -1748,16 +1739,16 @@ function Exchange1031Panel() {
         keyConsideration="Strict timelines (45/180 days) and reinvestment rules. All equity must be reinvested to achieve full deferral — any cash taken out ('boot') is taxable."
         riskLevel="Moderate"
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <RefreshCcw className="h-5 w-5 text-blue-500" />
               1031 Exchange Planner
             </CardTitle>
             <CardDescription>Like-kind exchange with tax deferral analysis</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-2 bg-muted/30 rounded-lg p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Relinquished Property</h4>
               <div className="flex justify-between py-1">
@@ -1855,7 +1846,7 @@ function Exchange1031Panel() {
               </div>
             </div>
 
-            <div className="space-y-3 border-t pt-4">
+            <div className="space-y-3 border-t pt-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1934,11 +1925,11 @@ function Exchange1031Panel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Exchange Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Exchange Analysis</CardTitle>
             <CardDescription>Tax deferral and replacement property details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Deferral</h4>
               <div className="flex justify-between py-1.5 border-b">
@@ -1974,7 +1965,7 @@ function Exchange1031Panel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Replacement Property</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Total Replacement Value ({properties.length} {properties.length === 1 ? 'property' : 'properties'})</span>
@@ -2000,7 +1991,7 @@ function Exchange1031Panel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Net Benefit</h4>
               <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
                 <div className="flex items-center gap-1">
@@ -2025,7 +2016,7 @@ function Exchange1031Panel() {
               const taxReturnYear = saleDate.getFullYear() + 1;
               const taxReturnDeadline = new Date(taxReturnYear, 3, 15);
               return (
-                <div className="border-t pt-4 space-y-2">
+                <div className="border-t pt-3 space-y-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Timeline Calculator{isReverseExchange ? ' (Reverse Exchange)' : ''}
                   </h4>
@@ -2052,7 +2043,7 @@ function Exchange1031Panel() {
               );
             })()}
 
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t pt-3 space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Identification Rules</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">3-Property Rule</span>
@@ -2070,7 +2061,7 @@ function Exchange1031Panel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-2">
+            <div className="border-t pt-3 space-y-2">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Debt Replacement</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Relinquished Debt</span>
@@ -2110,14 +2101,14 @@ function Exchange1031Panel() {
 
         return (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="px-4 py-3">
+              <CardTitle className="text-base flex items-center gap-2">
                 <ArrowRightLeft className="h-5 w-5 text-amber-500" />
                 Reverse Exchange (EAT) Analysis
               </CardTitle>
               <CardDescription>Exchange Accommodation Titleholder structure for buying before selling</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-4 pb-4 space-y-4">
               <div className="space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reverse Exchange Timeline</h4>
                 <div className="flex items-center gap-2 py-3">
@@ -2147,7 +2138,7 @@ function Exchange1031Panel() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t pt-3 space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional Costs</h4>
                 <div className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">EAT Fee</span>
@@ -2167,7 +2158,7 @@ function Exchange1031Panel() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t pt-3 space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard vs Reverse Comparison</h4>
                 <div className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Standard Exchange Costs</span>
@@ -2183,7 +2174,7 @@ function Exchange1031Panel() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 space-y-2">
+              <div className="border-t pt-3 space-y-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requirements Checklist</h4>
                 <div className="space-y-2">
                   {[
@@ -2209,14 +2200,14 @@ function Exchange1031Panel() {
       })()}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-5 w-5 text-indigo-500" />
             Drop-and-Swap Entity Structuring
           </CardTitle>
           <CardDescription>Entity restructuring strategies for multi-member LLCs pursuing 1031 exchanges</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
             <p className="text-xs text-indigo-800">
               <span className="font-semibold">Multi-Member LLC Strategy:</span> When a multi-member LLC owns property, individual members cannot directly do a 1031 exchange on partnership interests. A drop-and-swap restructures ownership so each member can independently pursue tax-deferred exchanges.
@@ -2310,7 +2301,7 @@ function Exchange1031Panel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-3">
+          <div className="border-t pt-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost Impact on This Exchange</h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Exchange Gain to Defer</span>
@@ -2429,17 +2420,17 @@ function DSTAnalysisPanel() {
   const riskBg = compositeRiskScore <= 3 ? "bg-green-50" : compositeRiskScore <= 6 ? "bg-amber-50" : "bg-red-50";
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <Landmark className="h-5 w-5 text-purple-500" />
               DST Analysis
             </CardTitle>
             <CardDescription>Delaware Statutory Trust investment via 1031 exchange</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
               <p className="text-xs text-amber-800">
                 <span className="font-semibold">⚠ Accredited Investors Only:</span> DST investments require accredited investor status. Minimum investment typically $100,000–$250,000. These are illiquid securities with 7–10 year hold periods.
@@ -2485,7 +2476,7 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t pt-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -2636,11 +2627,11 @@ function DSTAnalysisPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>DST Returns Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">DST Returns Analysis</CardTitle>
             <CardDescription>Cash flow, exit projections, and tax benefits</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow</h4>
               <div className="flex justify-between py-1.5 border-b">
@@ -2669,7 +2660,7 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Character of Distributions</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Return of Capital (est. 40-60%)</span>
@@ -2689,7 +2680,7 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exit Projection</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Projected Exit Value</span>
@@ -2713,7 +2704,7 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Benefits</h4>
               <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
                 <span className="font-semibold">Tax Deferred via 1031</span>
@@ -2725,7 +2716,7 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                 <ShieldAlert className="h-4 w-4 text-amber-500" />
                 Risk Assessment
@@ -2824,11 +2815,11 @@ function DSTAnalysisPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Exit Strategy Comparison</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Exit Strategy Comparison</CardTitle>
           <CardDescription>Side-by-side comparison of cash sale, direct 1031, and DST</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -2877,14 +2868,14 @@ function DSTAnalysisPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
             UPREIT Conversion Path
           </CardTitle>
           <CardDescription>Converting DST interest to REIT operating partnership units</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conversion Overview</h4>
             <div className="flex justify-between py-1.5 border-b">
@@ -2919,7 +2910,7 @@ function DSTAnalysisPanel() {
             </div>
           </div>
 
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-3 border-t pt-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">REIT Income Projection</h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">OP Units Value</span>
@@ -2935,7 +2926,7 @@ function DSTAnalysisPanel() {
             </div>
           </div>
 
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-3 border-t pt-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estate Planning Benefit</h4>
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <div className="flex items-start gap-2">
@@ -2945,7 +2936,7 @@ function DSTAnalysisPanel() {
             </div>
           </div>
 
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-3 border-t pt-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />
               Timeline
@@ -3165,17 +3156,17 @@ function SellerFinancingPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <HandCoins className="h-5 w-5 text-amber-500" />
               Seller Financing
             </CardTitle>
             <CardDescription>Installment sale with tax deferral</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-2 bg-muted/30 rounded-lg p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Deal Structure</h4>
               <div className="flex justify-between py-1">
@@ -3254,11 +3245,11 @@ function SellerFinancingPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Financing Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Financing Analysis</CardTitle>
             <CardDescription>Payment structure, tax treatment, and present value</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Loan Structure</h4>
               <div className="flex justify-between py-1.5 border-b">
@@ -3295,7 +3286,7 @@ function SellerFinancingPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amortization Summary</h4>
               {amortSchedule.map((row) => (
                 <div key={row.year} className="flex justify-between py-1.5 border-b">
@@ -3305,7 +3296,7 @@ function SellerFinancingPanel() {
               ))}
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Installment Tax Treatment</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Year 1 Taxable Gain</span>
@@ -3329,7 +3320,7 @@ function SellerFinancingPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Present Value Analysis</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">NPV at {discountRate}% Discount Rate</span>
@@ -3345,7 +3336,7 @@ function SellerFinancingPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risk Assessment</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Loan-to-Value (LTV)</span>
@@ -3367,7 +3358,7 @@ function SellerFinancingPanel() {
               <p className="text-xs text-muted-foreground italic">Interest income taxed as ordinary income at marginal rate (up to 37% federal)</p>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -3428,11 +3419,11 @@ function SellerFinancingPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Total Tax Comparison</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Total Tax Comparison</CardTitle>
           <CardDescription>Cash sale vs seller financing tax analysis</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Cash Sale: Total Tax</span>
@@ -3466,14 +3457,14 @@ function SellerFinancingPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
             Note Sale Analysis
           </CardTitle>
           <CardDescription>Value of selling the promissory note to an investor</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs">Note Sale Year</Label>
@@ -3509,7 +3500,7 @@ function SellerFinancingPanel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-3">
+          <div className="border-t pt-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Proceeds Summary</h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Down Payment Received</span>
@@ -3535,7 +3526,7 @@ function SellerFinancingPanel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-3">
+          <div className="border-t pt-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Investor Analysis</h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Investor Purchase Price</span>
@@ -3639,7 +3630,7 @@ function EarnoutPanel() {
   const riskAdjustedNetEarnout = expectedEarnout - netAtRisk;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Earnout Structure"
         description="Part of the sale price is contingent on future business performance. You receive a base payment at closing, with additional payments if the marina hits agreed-upon EBITDA or revenue targets over 1-3 years."
@@ -3647,16 +3638,16 @@ function EarnoutPanel() {
         keyConsideration="You bear performance risk post-closing — if the new owner mismanages the business, your earnout payments may not materialize. Negotiate strong protections and clear metric definitions."
         riskLevel="High"
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <Award className="h-5 w-5 text-indigo-500" />
               Earnout Modeling
             </CardTitle>
             <CardDescription>Contingent payment with probability-weighted analysis</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center gap-1">
@@ -3697,7 +3688,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Milestone Structure</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -3725,7 +3716,7 @@ function EarnoutPanel() {
               <p className="text-xs text-muted-foreground italic">Milestone-based payout: earnout payments contingent on achieving revenue and EBITDA targets during the measurement period.</p>
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t pt-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -3811,11 +3802,11 @@ function EarnoutPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Earnout Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Earnout Analysis</CardTitle>
             <CardDescription>Value range, tax impact, and risk-adjusted returns</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Value Range</h4>
               <div className="flex justify-between py-1.5 border-b">
@@ -3836,7 +3827,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payout Probability Spectrum</h4>
               {useTiers ? (() => {
                 const thresholdProb = parseFloat(tiers[0]?.probability) || 0;
@@ -3910,7 +3901,7 @@ function EarnoutPanel() {
               })()}
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Year-by-Year Earnout Schedule</h4>
               {earnoutSchedule.map((row) => (
                 <div key={row.year} className="flex justify-between py-1.5 border-b">
@@ -3924,7 +3915,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Analysis</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Tax on Base Price</span>
@@ -3944,7 +3935,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Timing</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Treatment</span>
@@ -3964,7 +3955,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risk Analysis</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">PV of Expected Earnout ({discountRate}% disc.)</span>
@@ -3984,7 +3975,7 @@ function EarnoutPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seller Risk Scorecard</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Buyer Default Risk</span>
@@ -4001,7 +3992,7 @@ function EarnoutPanel() {
               <p className="text-xs text-muted-foreground italic">Consider escrow, holdback, and audit rights to mitigate earnout risks</p>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                 <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
                 Clawback & Indemnity Provisions
@@ -4070,14 +4061,14 @@ function EarnoutPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-500" />
             EBITDA Bridge Analysis
           </CardTitle>
           <CardDescription>Understand how EBITDA components drive earnout achievement</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           {(() => {
             const ebitdaTarget = parseFloat(ebitdaThreshold) || 500000;
             const revTarget = parseFloat(revenueTarget) || 2000000;
@@ -4112,16 +4103,16 @@ function EarnoutPanel() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
               Acceleration & Change-of-Control
             </CardTitle>
             <CardDescription>Triggers that accelerate earnout payments</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-4 pb-4 space-y-3">
             {[
               { trigger: 'Change of Control (Buyer resale)', impact: 'Full earnout accelerated at 100% payout', payout: maxEarnout, risk: 'Low' },
               { trigger: 'IPO / SPAC Merger', impact: 'Earnout converted to stock at target valuation', payout: maxEarnout * 0.85, risk: 'Medium' },
@@ -4144,8 +4135,8 @@ function EarnoutPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" />
               Dispute Resolution Cost Model
               <InfoTooltip
@@ -4155,7 +4146,7 @@ function EarnoutPanel() {
             </CardTitle>
             <CardDescription>Estimated costs if earnout measurement is contested</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             {(() => {
               const disputeScenarios = [
                 { method: 'Negotiation', cost: maxEarnout * 0.02, timeline: '1-3 months', successRate: 65 },
@@ -4201,14 +4192,14 @@ function EarnoutPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <BarChart2 className="h-5 w-5 text-blue-500" />
             Monte Carlo Earnout Simulation
           </CardTitle>
           <CardDescription>Probability distribution of earnout outcomes based on revenue and EBITDA volatility</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           {(() => {
             const iterations = 3000;
             const revMean = parseFloat(revenueTarget) || 2000000;
@@ -4780,7 +4771,7 @@ function WaterfallPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Waterfall Distribution"
         description="A structured distribution model commonly used in private equity and fund investments. Returns are distributed in tiers (or 'tranches'), with investors receiving their capital back first, then a preferred return, before profits are split with the fund manager."
@@ -4788,16 +4779,16 @@ function WaterfallPanel() {
         keyConsideration="The preferred return hurdle and GP catchup terms significantly impact how profits are shared. Small changes to the hurdle rate can shift millions between LP and GP."
         riskLevel="Moderate"
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-cyan-500" />
               Waterfall Analysis
             </CardTitle>
             <CardDescription>GP/LP fund distribution with IRR-based promote hurdles</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">LP Capital</Label>
@@ -5018,13 +5009,13 @@ function WaterfallPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Distribution Waterfall</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Distribution Waterfall</CardTitle>
             <CardDescription>
               {useIRRPromote ? "IRR-based capital account methodology" : "Step-by-step allocation of proceeds"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             {useIRRPromote ? (
               <div className="space-y-4">
                 {hurdleResults.map((hr, i) => (
@@ -5188,7 +5179,7 @@ function WaterfallPanel() {
               </div>
             )}
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Returns Summary</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">LP Total Distributions</span>
@@ -5249,12 +5240,12 @@ function WaterfallPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Tax Character Allocation</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Tax Character Allocation</CardTitle>
           <CardDescription>Estimated tax treatment and after-tax returns</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CardContent className="px-4 pb-4 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">LP Tax Character</h4>
               <div className="flex justify-between py-1.5 border-b">
@@ -5296,7 +5287,7 @@ function WaterfallPanel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-3">
+          <div className="border-t pt-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GP Promote Economics</h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Promote as % of GP Capital</span>
@@ -5319,7 +5310,7 @@ function WaterfallPanel() {
           </div>
 
           {useIRRPromote && includeGPCatchup && gpCatchup > 0 && (
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-purple-600 flex items-center gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 GP Catchup Provision
@@ -5335,7 +5326,7 @@ function WaterfallPanel() {
           )}
 
           {useIRRPromote && (
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-600 flex items-center gap-1.5">
                 <Shield className="h-3.5 w-3.5" />
                 LP Lookback Provision
@@ -5371,14 +5362,14 @@ function WaterfallPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
             American vs European Waterfall Comparison
           </CardTitle>
           <CardDescription>Key differences between waterfall structures</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -5607,7 +5598,7 @@ function IRRCalculatorPanel() {
   const baseNOI = parsedCFs[parsedCFs.length - 1] || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="IRR Calculator"
         description="Calculate the Internal Rate of Return for your marina investment using both standard IRR and XIRR (which accounts for exact cash flow dates). Compare how different reinvestment assumptions affect your real-world returns."
@@ -5615,16 +5606,16 @@ function IRRCalculatorPanel() {
         keyConsideration="IRR assumes reinvestment at the IRR rate itself, which can overstate returns for high-IRR deals. MIRR (Modified IRR) with a realistic reinvestment rate gives a more conservative estimate."
         riskLevel="Low"
       />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <Percent className="h-5 w-5 text-emerald-500" />
               IRR Calculator
             </CardTitle>
             <CardDescription>Multi-period return analysis with dynamic cash flows</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="flex items-center gap-4 pb-2 border-b">
               <div className="flex-1">
                 <div className="flex items-center gap-1">
@@ -5736,11 +5727,11 @@ function IRRCalculatorPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Returns Analysis</CardTitle>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base">Returns Analysis</CardTitle>
             <CardDescription>IRR, NPV, multiples, and cash-on-cash returns</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Core Returns{useMonthly ? ' (Monthly Compounding)' : ''}
@@ -5785,7 +5776,7 @@ function IRRCalculatorPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <div className="flex items-center gap-1">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash-on-Cash by Year</h4>
                 <InfoTooltip content="Annual cash distributions as a percentage of your original equity investment. Unlike IRR, this is a simple period-by-period measure without time-value adjustments." />
@@ -5809,7 +5800,7 @@ function IRRCalculatorPanel() {
             </div>
 
             {parsedDebtService > 0 && (
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t pt-3 space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Debt Service Coverage</h4>
                 {dscrByYear.map((dscr, i) => {
                   const badge = getDSCRBadge(dscr);
@@ -5835,7 +5826,7 @@ function IRRCalculatorPanel() {
               </div>
             )}
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Target Return</h4>
               <div className={`flex justify-between py-2.5 rounded-lg px-3 ${meetsTargetDisplay ? 'bg-green-50' : 'bg-red-50'}`}>
                 <span className="font-semibold">IRR vs Target ({target}%)</span>
@@ -5845,7 +5836,7 @@ function IRRCalculatorPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exit Cap Rate Sensitivity</h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -5878,14 +5869,14 @@ function IRRCalculatorPanel() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-500" />
             Promote & IRR Analysis
           </CardTitle>
           <CardDescription>See how IRR-based promote hurdles affect LP vs GP/Sponsor returns using your cash flows above</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b">
             <input
               type="checkbox"
@@ -6037,16 +6028,16 @@ function IRRCalculatorPanel() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <Clock className="h-5 w-5 text-blue-500" />
               XIRR with Actual Dates
             </CardTitle>
             <CardDescription>Date-weighted internal rate of return using exact cash flow timing</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             {(() => {
               const today = new Date();
               const xirrDates = [today];
@@ -6121,14 +6112,14 @@ function IRRCalculatorPanel() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="text-base flex items-center gap-2">
               <RefreshCcw className="h-5 w-5 text-purple-500" />
               Reinvestment Rate Sensitivity
             </CardTitle>
             <CardDescription>How different reinvestment assumptions affect MIRR</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="px-4 pb-4 space-y-4">
             {(() => {
               const reinvRates = [0, 3, 5, 7, 8, 10, 12, 15];
               const results = reinvRates.map(r => {
@@ -6372,7 +6363,7 @@ function SensitivityPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Sensitivity Analysis"
         description="Test how changes in key variables (cap rate, NOI, tax rates, interest rates) affect your net proceeds. This 'what-if' analysis reveals which factors have the biggest impact on your deal outcome."
@@ -6382,8 +6373,8 @@ function SensitivityPanel() {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-orange-500" />
             Sensitivity Analysis
           </CardTitle>
@@ -6391,7 +6382,7 @@ function SensitivityPanel() {
             NOI & Cap Rate sensitivity matrix
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="grid grid-cols-2 gap-4 max-w-md">
             <div>
               <Label>Base NOI</Label>
@@ -6406,11 +6397,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Value Sensitivity Matrix</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Value Sensitivity Matrix</CardTitle>
           <CardDescription>Property value at different NOI and Cap Rate combinations</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -6451,11 +6442,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Exit Timing Sensitivity</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Exit Timing Sensitivity</CardTitle>
           <CardDescription>Net proceeds at different hold periods (3% annual appreciation)</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -6487,11 +6478,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Tax Rate Scenario Matrix</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Tax Rate Scenario Matrix</CardTitle>
           <CardDescription>Impact of different tax rate environments on net proceeds</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -6524,11 +6515,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Leverage Impact Matrix</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Leverage Impact Matrix</CardTitle>
           <CardDescription>Returns at different LTV levels</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -6564,11 +6555,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Multi-Dimension Sensitivity Table</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Multi-Dimension Sensitivity Table</CardTitle>
           <CardDescription>Low / Base / High net proceeds across all sensitivity dimensions</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -6608,8 +6599,8 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-orange-500" />
             Sensitivity Ranking (Tornado)
             <InfoTooltip
@@ -6618,7 +6609,7 @@ function SensitivityPanel() {
           </CardTitle>
           <CardDescription>Dimensions ranked by absolute impact on net proceeds</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="space-y-3">
             {sortedByImpact.map((d, idx) => {
               const lowVal = Math.min(d.lowProceeds, d.highProceeds);
@@ -6688,11 +6679,11 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Best / Base / Worst Scenario Summary</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Best / Base / Worst Scenario Summary</CardTitle>
           <CardDescription>Range of outcomes under different market conditions</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           <div className="space-y-3">
             <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
               <div>
@@ -6726,7 +6717,7 @@ function SensitivityPanel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-3">
+          <div className="border-t pt-3 space-y-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risk Assessment</h4>
             {(() => {
               const riskLevel = varianceRange > 2000000 ? "High" : varianceRange > 500000 ? "Moderate" : "Low";
@@ -6748,7 +6739,7 @@ function SensitivityPanel() {
             </div>
           </div>
 
-          <div className="border-t pt-4 space-y-2">
+          <div className="border-t pt-3 space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Key Findings</h4>
             <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
               <li>Most impactful factor: <span className="font-medium text-foreground">{sortedByImpact[0]?.name || "N/A"}</span></li>
@@ -6760,14 +6751,14 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Target className="h-5 w-5 text-purple-500" />
             Probability-Weighted Expected Case
           </CardTitle>
           <CardDescription>Expected net proceeds weighted by scenario probability</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           {(() => {
             const scenarios = [
               { label: "Best Case", probability: 0.20, proceeds: bestProceeds, color: "text-green-600", bg: "bg-green-50" },
@@ -6828,8 +6819,8 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
             Correlation Analysis
             <InfoTooltip
@@ -6839,7 +6830,7 @@ function SensitivityPanel() {
           </CardTitle>
           <CardDescription>How key variables move together and affect scenario outcomes</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           {(() => {
             const correlations = [
               { pair: "Cap Rate vs Interest Rate", coefficient: 0.75, interpretation: "Strong Positive" },
@@ -6894,8 +6885,8 @@ function SensitivityPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <GitBranch className="h-5 w-5 text-teal-500" />
             Scenario Decision Tree
             <InfoTooltip
@@ -6904,7 +6895,7 @@ function SensitivityPanel() {
           </CardTitle>
           <CardDescription>Branching outcome analysis with joint probabilities</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="px-4 pb-4 space-y-4">
           {(() => {
             const branches = [
               {
@@ -7019,14 +7010,14 @@ function SensitivityPanel() {
       ]} />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Save className="h-5 w-5 text-primary" />
             Save Current Analysis
           </CardTitle>
           <CardDescription>Save the current sensitivity configuration as a named scenario</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="px-4 pb-4 space-y-3">
           {isSaving ? (
             <div className="flex items-center gap-2">
               <Input
@@ -7135,7 +7126,7 @@ function CrossStrategyComparisonPanel() {
   const bestScoringStrategy = strategyWeightedTotals.reduce((best, s) => s.weightedTotal > best.weightedTotal ? s : best, strategyWeightedTotals[0]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Cross-Strategy Comparison"
         description="Side-by-side comparison of all exit strategies on key dimensions: net proceeds, effective tax rate, liquidity timeline, and risk profile. Includes time-value adjusted (NPV) comparison and after-tax IRR estimates."
@@ -7144,14 +7135,14 @@ function CrossStrategyComparisonPanel() {
         riskLevel="Low"
       />
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Target className="h-5 w-5 text-teal-500" />
             Cross-Strategy Comparison
           </CardTitle>
           <CardDescription>Side-by-side comparison of all exit strategies using current master inputs</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -7201,11 +7192,11 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Opportunity Cost Analysis</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Opportunity Cost Analysis</CardTitle>
           <CardDescription>Cost of choosing each strategy vs. the highest-return option ({bestStrategy.name})</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="px-4 pb-4 space-y-3">
           {strategies.map((s, idx) => {
             const oppCost = bestStrategy.netProceeds - s.netProceeds;
             if (s.name === bestStrategy.name) {
@@ -7227,8 +7218,8 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-teal-500" />
             Weighted Decision Matrix
           </CardTitle>
@@ -7241,7 +7232,7 @@ function CrossStrategyComparisonPanel() {
             )}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -7316,11 +7307,11 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Key Tradeoffs</CardTitle>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base">Key Tradeoffs</CardTitle>
           <CardDescription>Strategic considerations for each approach</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="px-4 pb-4 space-y-3">
           <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
             <span className="font-semibold">Highest Immediate Cash</span>
             <span className="num font-bold text-green-600">Cash Sale</span>
@@ -7341,14 +7332,14 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Clock className="h-5 w-5 text-indigo-500" />
             Time-Value NPV Comparison
           </CardTitle>
           <CardDescription>Net present value of each strategy's proceeds discounted at 8% for timing differences</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const discountRate = 0.08;
             const sfAnnualPayment = sfMonthlyPmt * 12;
@@ -7412,14 +7403,14 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <Percent className="h-5 w-5 text-emerald-500" />
             After-Tax IRR Estimates
           </CardTitle>
           <CardDescription>Estimated internal rate of return for each strategy after taxes</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const costBasis = masterInputs.costBasis;
             const holdingPeriod = masterInputs.holdingPeriod || 1;
@@ -7477,14 +7468,14 @@ function CrossStrategyComparisonPanel() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-amber-500" />
             Tax-Equivalent Yield Comparison
           </CardTitle>
           <CardDescription>Pre-tax yield required to match each strategy's after-tax proceeds</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const costBasis = masterInputs.costBasis || 1;
 
@@ -7710,7 +7701,7 @@ function AdvisorInsightsPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyOverview
         title="Advisor Insights & Risk Intelligence"
         description="AI-powered analysis combining Monte Carlo simulations, estate planning considerations, tax exclusion eligibility checks, and opportunity zone analysis. Provides a comprehensive advisory view of your exit transaction."
@@ -7720,10 +7711,10 @@ function AdvisorInsightsPanel() {
       />
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
                 <Brain className="h-5 w-5 text-pink-500" />
                 Advisor Insights
               </CardTitle>
@@ -7735,7 +7726,7 @@ function AdvisorInsightsPanel() {
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-muted/40 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground mb-1">Sale Price</p>
@@ -7757,16 +7748,16 @@ function AdvisorInsightsPanel() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-emerald-500" />
               Tax Optimization Strategies
             </CardTitle>
             <CardDescription className="text-xs">Potential savings calculated from your inputs</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-4 pb-4 space-y-3">
             {strategies.map((s, i) => (
               <div key={i} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -7799,14 +7790,14 @@ function AdvisorInsightsPanel() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="px-4 py-3">
             <CardTitle className="text-base flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-500" />
               Risk Assessment
             </CardTitle>
             <CardDescription className="text-xs">Key risk factors for this transaction</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-4 pb-4 space-y-3">
             {risks.map((r, i) => (
               <div key={i} className="flex items-center gap-3 border rounded-lg p-3">
                 <div className="shrink-0">
@@ -7826,14 +7817,14 @@ function AdvisorInsightsPanel() {
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-blue-500" />
             Action Items
           </CardTitle>
           <CardDescription className="text-xs">Prioritized recommended actions for this exit</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="space-y-2">
             {actionItems.map((item, idx) => (
               <div
@@ -7861,14 +7852,14 @@ function AdvisorInsightsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <BarChart2 className="h-4 w-4 text-indigo-500" />
             Peer Benchmarking
           </CardTitle>
           <CardDescription className="text-xs">How this deal compares to typical marina transactions</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -7909,7 +7900,7 @@ function AdvisorInsightsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-purple-500" />
             Monte Carlo
@@ -7921,7 +7912,7 @@ function AdvisorInsightsPanel() {
           </CardTitle>
           <CardDescription className="text-xs">2,000-iteration simulation of net proceeds with variable inputs</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const iterations = 2000;
             const bins = 15;
@@ -8050,7 +8041,7 @@ function AdvisorInsightsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Landmark className="h-4 w-4 text-teal-500" />
             Estate Tax
@@ -8062,7 +8053,7 @@ function AdvisorInsightsPanel() {
           </CardTitle>
           <CardDescription className="text-xs">Estate tax impact and planning strategies at current 2025 rates</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const exemptionPerPerson = 13_610_000;
             const exemptionCouple = exemptionPerPerson * 2;
@@ -8188,7 +8179,7 @@ function AdvisorInsightsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Shield className="h-4 w-4 text-blue-500" />
             QSBS
@@ -8200,7 +8191,7 @@ function AdvisorInsightsPanel() {
           </CardTitle>
           <CardDescription className="text-xs">Qualified Small Business Stock exclusion eligibility assessment</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const qsbsRequirements = [
               {
@@ -8301,7 +8292,7 @@ function AdvisorInsightsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 py-3">
           <CardTitle className="text-base flex items-center gap-2">
             <MapPinned className="h-4 w-4 text-emerald-500" />
             QOZ
@@ -8312,7 +8303,7 @@ function AdvisorInsightsPanel() {
           </CardTitle>
           <CardDescription className="text-xs">Qualified Opportunity Zone milestones, deadlines, and investment comparison</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {(() => {
             const gain = baseline.capitalGain;
             const gainTax = baseline.totalTax;
