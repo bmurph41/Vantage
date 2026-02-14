@@ -11,9 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -29,15 +27,20 @@ import {
 import {
   Check,
   X,
-  AlertTriangle,
   MapPin,
   DollarSign,
-  Calendar,
   Building,
   GitMerge,
   Trash2,
   Edit2,
   Save,
+  Anchor,
+  FileText,
+  Handshake,
+  Waves,
+  CalendarDays,
+  Hash,
+  BarChart3,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -110,6 +113,43 @@ interface PendingPropertyDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function SectionHeader({ icon: Icon, title, accent = "slate" }: { icon: any; title: string; accent?: string }) {
+  const accentMap: Record<string, string> = {
+    blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+    emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+    amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+    slate: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+  };
+  const borderMap: Record<string, string> = {
+    blue: "border-l-blue-500",
+    emerald: "border-l-emerald-500",
+    amber: "border-l-amber-500",
+    purple: "border-l-purple-500",
+    slate: "border-l-slate-400",
+  };
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${borderMap[accent] || borderMap.slate} bg-slate-50/50 dark:bg-slate-800/30 rounded-t-lg`}>
+      <div className={`p-1 rounded-md ${accentMap[accent] || accentMap.slate}`}>
+        <Icon className="w-3.5 h-3.5" />
+      </div>
+      <h4 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
+    </div>
+  );
+}
+
+function FieldDisplay({ label, value, suffix }: { label: string; value: any; suffix?: string }) {
+  const displayVal = value === null || value === undefined || value === '' ? 'N/A' : String(value);
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-900 dark:text-slate-100">
+        {displayVal}{suffix && displayVal !== 'N/A' ? suffix : ''}
+      </div>
+    </div>
+  );
+}
+
 export function PendingPropertyDetailDialog({
   pending,
   open,
@@ -123,7 +163,6 @@ export function PendingPropertyDetailDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch ALL potential duplicates with similarity scores
   const { data: duplicateData, isLoading: duplicatesLoading } = useQuery<{
     pendingProperty: PendingProperty;
     totalMatches: number;
@@ -133,7 +172,6 @@ export function PendingPropertyDetailDialog({
     enabled: !!pending?.id && open,
   });
 
-  // Fetch sales comp details
   const { data: comp } = useQuery<SalesComp>({
     queryKey: ['/api/sales-comps', pending?.compId],
     enabled: !!pending?.compId && open,
@@ -221,6 +259,8 @@ export function PendingPropertyDetailDialog({
   const mediumConfidenceMatches = allMatches.filter(m => m.matchDetails.overallConfidence === 'medium');
   const lowConfidenceMatches = allMatches.filter(m => m.matchDetails.overallConfidence === 'low');
 
+  const hasCompOrigin = !!pending.compId;
+
   const getConfidenceBadgeVariant = (confidence: 'high' | 'medium' | 'low') => {
     switch (confidence) {
       case 'high': return 'destructive';
@@ -235,18 +275,6 @@ export function PendingPropertyDetailDialog({
       case 'medium': return 'text-yellow-600';
       case 'low': return 'text-blue-600';
     }
-  };
-
-  const formatCurrencyDisplay = (amount: number | null | undefined) => {
-    if (!amount) return 'N/A';
-    return formatCurrency(amount);
-  };
-
-  const formatSaleDate = (month: number | undefined, year: number | undefined) => {
-    if (!year) return 'N/A';
-    if (!month) return year.toString();
-    const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'short' });
-    return `${monthName} ${year}`;
   };
 
   const handleSaveEdit = () => {
@@ -273,38 +301,27 @@ export function PendingPropertyDetailDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              {currentData.marinaName}
-            </DialogTitle>
-            <DialogDescription>
-              Review property details, manage duplicates, and make decisions
-            </DialogDescription>
-          </DialogHeader>
-
-          <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details" data-testid="tab-details">
-                Details
-              </TabsTrigger>
-              <TabsTrigger value="duplicates" data-testid="tab-duplicates">
-                <div className="flex items-center gap-2">
-                  Duplicates
-                  {duplicatesLoading ? (
-                    <Badge variant="secondary" className="ml-1">...</Badge>
-                  ) : allMatches.length > 0 ? (
-                    <Badge variant="destructive" className="ml-1">
-                      {allMatches.length}
-                    </Badge>
-                  ) : null}
+          <DialogHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/50">
+                  <Building className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="details" className="flex-1 overflow-y-auto mt-4">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold">Property Information</h3>
+                <div>
+                  <DialogTitle className="text-lg">{currentData.marinaName}</DialogTitle>
+                  <DialogDescription className="text-xs mt-0.5">
+                    {currentData.city && currentData.state
+                      ? `${currentData.city}, ${currentData.state}`
+                      : 'Review property details, manage duplicates, and make decisions'}
+                    {hasCompOrigin && (
+                      <Badge variant="outline" className="ml-2 text-[10px] py-0 px-1.5 border-amber-300 text-amber-700 dark:text-amber-400">
+                        From Sales Comp
+                      </Badge>
+                    )}
+                  </DialogDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 {!isEditing ? (
                   <Button
                     variant="outline"
@@ -312,13 +329,13 @@ export function PendingPropertyDetailDialog({
                     onClick={() => setIsEditing(true)}
                     data-testid="button-edit"
                   >
-                    <Edit2 className="h-4 w-4 mr-2" />
+                    <Edit2 className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
+                  <>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       onClick={() => {
                         setIsEditing(false);
@@ -333,27 +350,46 @@ export function PendingPropertyDetailDialog({
                       disabled={updateMutation.isPending}
                       data-testid="button-save"
                     >
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save className="h-3.5 w-3.5 mr-1.5" />
                       Save
                     </Button>
-                  </div>
+                  </>
                 )}
               </div>
+            </div>
+          </DialogHeader>
 
-              <div className="grid grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-6">
-                  {/* Identity Section */}
-                  <Card>
-                    <div className="p-4 border-b border-border">
-                      <h4 className="font-semibold">Identity</h4>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="marinaName">Marina Name *</Label>
+          <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details" data-testid="tab-details">
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                Details
+              </TabsTrigger>
+              <TabsTrigger value="duplicates" data-testid="tab-duplicates">
+                <div className="flex items-center gap-1.5">
+                  <GitMerge className="h-3.5 w-3.5" />
+                  Duplicates
+                  {duplicatesLoading ? (
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">...</Badge>
+                  ) : allMatches.length > 0 ? (
+                    <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
+                      {allMatches.length}
+                    </Badge>
+                  ) : null}
+                </div>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="flex-1 overflow-y-auto mt-3">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                    <SectionHeader icon={Building} title="Identity" accent="blue" />
+                    <div className="p-4 space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Marina Name *</Label>
                         {isEditing ? (
                           <Input
-                            id="marinaName"
                             value={currentData.marinaName}
                             onChange={(e) => setEditedData({ ...editedData, marinaName: e.target.value })}
                             placeholder="Enter marina name..."
@@ -361,18 +397,18 @@ export function PendingPropertyDetailDialog({
                             data-testid="input-marinaName"
                           />
                         ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.marinaName}</div>
+                          <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium">{currentData.marinaName}</div>
                         )}
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         {isEditing ? (
                           <AddressInput
                             value={currentData.address || ''}
                             onChange={(value) => setEditedData({ ...editedData, address: value })}
                             onAddressSelect={(components: AddressComponents) => {
-                              setEditedData({ 
-                                ...editedData, 
+                              setEditedData({
+                                ...editedData,
                                 address: components.streetAddress || components.fullAddress || '',
                                 city: components.city || editedData.city,
                                 state: components.state || editedData.state,
@@ -388,19 +424,15 @@ export function PendingPropertyDetailDialog({
                             testId="input-address"
                           />
                         ) : (
-                          <>
-                            <Label htmlFor="address">Address</Label>
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.address || 'N/A'}</div>
-                          </>
+                          <FieldDisplay label="Address" value={currentData.address} />
                         )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="city">City</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">City</Label>
                           {isEditing ? (
                             <Input
-                              id="city"
                               value={currentData.city || ''}
                               onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
                               placeholder="San Diego"
@@ -408,15 +440,13 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-city"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.city || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.city || 'N/A'}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="state">State</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">State</Label>
                           {isEditing ? (
                             <Input
-                              id="state"
                               value={currentData.state || ''}
                               onChange={(e) => setEditedData({ ...editedData, state: e.target.value })}
                               placeholder="CA"
@@ -424,15 +454,13 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-state"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.state || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.state || 'N/A'}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="zip">Zip</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Zip</Label>
                           {isEditing ? (
                             <Input
-                              id="zip"
                               value={(editedData.compMetadata as any)?.zip || currentData.compMetadata?.zip || ''}
                               onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, zip: e.target.value } })}
                               placeholder="92101"
@@ -440,22 +468,19 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-zip"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.zip || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.zip || 'N/A'}</div>
                           )}
                         </div>
                       </div>
                     </div>
-                  </Card>
+                  </div>
 
-                  {/* Physical Characteristics */}
-                  <Card>
-                    <div className="p-4 border-b border-border">
-                      <h4 className="font-semibold">Physical Characteristics</h4>
-                    </div>
-                    <div className="p-4 space-y-4">
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                    <SectionHeader icon={Anchor} title="Physical Characteristics" accent="emerald" />
+                    <div className="p-4 space-y-3">
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Wet Slips</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Wet Slips</Label>
                           {isEditing ? (
                             <Input
                               type="number"
@@ -466,12 +491,11 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-wetSlips"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.wetSlips || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.wetSlips || 'N/A'}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          <Label>Dry Racks</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Dry Racks</Label>
                           {isEditing ? (
                             <Input
                               type="number"
@@ -482,14 +506,14 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-dryRacks"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.dryRacks || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.dryRacks || 'N/A'}</div>
                           )}
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Acres</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Acres</Label>
                           {isEditing ? (
                             <Input
                               type="number"
@@ -501,12 +525,11 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-acres"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.acres || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.acres || 'N/A'}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          <Label>Year Built</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Year Built</Label>
                           {isEditing ? (
                             <Input
                               type="number"
@@ -517,263 +540,251 @@ export function PendingPropertyDetailDialog({
                               data-testid="input-yearBuilt"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.yearBuilt || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.yearBuilt || 'N/A'}</div>
                           )}
                         </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Occupancy (%)</Label>
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={(editedData.compMetadata as any)?.occupancy || currentData.compMetadata?.occupancy || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, occupancy: parseInt(e.target.value) || undefined } })}
-                            placeholder="95"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-occupancy"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.occupancy ? `${currentData.compMetadata.occupancy}%` : 'N/A'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Body of Water</Label>
-                        {isEditing ? (
-                          <Input
-                            value={(editedData.compMetadata as any)?.bodyOfWater || currentData.compMetadata?.bodyOfWater || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, bodyOfWater: e.target.value } })}
-                            placeholder="Pacific Ocean"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-bodyOfWater"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.bodyOfWater || 'N/A'}</div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Right Column */}
-                <div className="space-y-6">
-                  {/* Financial Information */}
-                  <Card>
-                    <div className="p-4 border-b border-border">
-                      <h4 className="font-semibold">Financial Information</h4>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="salePrice">Sale Price</Label>
-                        {isEditing ? (
-                          <Input
-                            id="salePrice"
-                            type="number"
-                            value={currentData.salePrice || ''}
-                            onChange={(e) => setEditedData({ ...editedData, salePrice: parseInt(e.target.value) || null })}
-                            placeholder="5000000"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-salePrice"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.salePrice)}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="listPrice">List Price</Label>
-                        {isEditing ? (
-                          <Input
-                            id="listPrice"
-                            type="number"
-                            value={(editedData.compMetadata as any)?.listPrice || currentData.compMetadata?.listPrice || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, listPrice: parseInt(e.target.value) || undefined } })}
-                            placeholder="5500000"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-listPrice"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.compMetadata?.listPrice)}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="noi">NOI</Label>
-                        {isEditing ? (
-                          <Input
-                            id="noi"
-                            type="number"
-                            value={(editedData.compMetadata as any)?.noi || currentData.compMetadata?.noi || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, noi: parseInt(e.target.value) || undefined } })}
-                            placeholder="450000"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-noi"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{formatCurrency(currentData.compMetadata?.noi)}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="capRate">Cap Rate (%)</Label>
-                        {isEditing ? (
-                          <Input
-                            id="capRate"
-                            type="number"
-                            step="0.01"
-                            value={(editedData.compMetadata as any)?.capRate || currentData.compMetadata?.capRate || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, capRate: parseFloat(e.target.value) || undefined } })}
-                            placeholder="9.0"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-capRate"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.capRate ? `${currentData.compMetadata.capRate}%` : 'N/A'}</div>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Sale Month</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Occupancy (%)</Label>
                           {isEditing ? (
                             <Input
                               type="number"
-                              min="1"
-                              max="12"
-                              value={(editedData.compMetadata as any)?.saleMonth || currentData.compMetadata?.saleMonth || ''}
-                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleMonth: parseInt(e.target.value) || undefined } })}
-                              placeholder="6"
+                              min="0"
+                              max="100"
+                              value={(editedData.compMetadata as any)?.occupancy || currentData.compMetadata?.occupancy || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, occupancy: parseInt(e.target.value) || undefined } })}
+                              placeholder="95"
                               className="bg-white dark:bg-slate-900"
-                              data-testid="input-saleMonth"
+                              data-testid="input-occupancy"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleMonth || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.occupancy ? `${currentData.compMetadata.occupancy}%` : 'N/A'}</div>
                           )}
                         </div>
-
-                        <div className="space-y-2">
-                          <Label>Sale Year</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Body of Water</Label>
                           {isEditing ? (
                             <Input
-                              type="number"
-                              value={(editedData.compMetadata as any)?.saleYear || currentData.compMetadata?.saleYear || ''}
-                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleYear: parseInt(e.target.value) || undefined } })}
-                              placeholder="2023"
+                              value={(editedData.compMetadata as any)?.bodyOfWater || currentData.compMetadata?.bodyOfWater || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, bodyOfWater: e.target.value } })}
+                              placeholder="Pacific Ocean"
                               className="bg-white dark:bg-slate-900"
-                              data-testid="input-saleYear"
+                              data-testid="input-bodyOfWater"
                             />
                           ) : (
-                            <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleYear || 'N/A'}</div>
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.bodyOfWater || 'N/A'}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {hasCompOrigin && (
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                      <SectionHeader icon={DollarSign} title="Financial Information" accent="amber" />
+                      <div className="p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Sale Price</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={currentData.salePrice || ''}
+                                onChange={(e) => setEditedData({ ...editedData, salePrice: parseInt(e.target.value) || null })}
+                                placeholder="5,000,000"
+                                className="bg-white dark:bg-slate-900"
+                                data-testid="input-salePrice"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium">{formatCurrency(currentData.salePrice)}</div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">List Price</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={(editedData.compMetadata as any)?.listPrice || currentData.compMetadata?.listPrice || ''}
+                                onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, listPrice: parseInt(e.target.value) || undefined } })}
+                                placeholder="5,500,000"
+                                className="bg-white dark:bg-slate-900"
+                                data-testid="input-listPrice"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{formatCurrency(currentData.compMetadata?.listPrice)}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">NOI</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={(editedData.compMetadata as any)?.noi || currentData.compMetadata?.noi || ''}
+                                onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, noi: parseInt(e.target.value) || undefined } })}
+                                placeholder="450,000"
+                                className="bg-white dark:bg-slate-900"
+                                data-testid="input-noi"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{formatCurrency(currentData.compMetadata?.noi)}</div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Cap Rate (%)</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={(editedData.compMetadata as any)?.capRate || currentData.compMetadata?.capRate || ''}
+                                onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, capRate: parseFloat(e.target.value) || undefined } })}
+                                placeholder="9.0"
+                                className="bg-white dark:bg-slate-900"
+                                data-testid="input-capRate"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.capRate ? `${currentData.compMetadata.capRate}%` : 'N/A'}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Sale Date</Label>
+                            {isEditing ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="12"
+                                  value={(editedData.compMetadata as any)?.saleMonth || currentData.compMetadata?.saleMonth || ''}
+                                  onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleMonth: parseInt(e.target.value) || undefined } })}
+                                  placeholder="Mo"
+                                  className="bg-white dark:bg-slate-900"
+                                  data-testid="input-saleMonth"
+                                />
+                                <Input
+                                  type="number"
+                                  value={(editedData.compMetadata as any)?.saleYear || currentData.compMetadata?.saleYear || ''}
+                                  onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleYear: parseInt(e.target.value) || undefined } })}
+                                  placeholder="Year"
+                                  className="bg-white dark:bg-slate-900"
+                                  data-testid="input-saleYear"
+                                />
+                              </div>
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">
+                                {currentData.compMetadata?.saleYear
+                                  ? `${currentData.compMetadata?.saleMonth ? new Date(currentData.compMetadata.saleYear, (currentData.compMetadata.saleMonth || 1) - 1).toLocaleString('default', { month: 'short' }) + ' ' : ''}${currentData.compMetadata.saleYear}`
+                                  : 'N/A'}
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Days on Market</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                value={(editedData.compMetadata as any)?.daysOnMarket || currentData.compMetadata?.daysOnMarket || ''}
+                                onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, daysOnMarket: parseInt(e.target.value) || undefined } })}
+                                placeholder="120"
+                                className="bg-white dark:bg-slate-900"
+                                data-testid="input-daysOnMarket"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.daysOnMarket || 'N/A'}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                    <SectionHeader icon={Handshake} title="Transaction Details" accent="purple" />
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Sale Condition</Label>
+                          {isEditing ? (
+                            <Input
+                              value={(editedData.compMetadata as any)?.saleCondition || currentData.compMetadata?.saleCondition || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleCondition: e.target.value } })}
+                              placeholder="As-is"
+                              className="bg-white dark:bg-slate-900"
+                              data-testid="input-saleCondition"
+                            />
+                          ) : (
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.saleCondition || 'N/A'}</div>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Broker</Label>
+                          {isEditing ? (
+                            <Input
+                              value={(editedData.compMetadata as any)?.broker || currentData.compMetadata?.broker || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, broker: e.target.value } })}
+                              placeholder="ABC Realty"
+                              className="bg-white dark:bg-slate-900"
+                              data-testid="input-broker"
+                            />
+                          ) : (
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.broker || 'N/A'}</div>
                           )}
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="daysOnMarket">Days on Market</Label>
-                        {isEditing ? (
-                          <Input
-                            id="daysOnMarket"
-                            type="number"
-                            value={(editedData.compMetadata as any)?.daysOnMarket || currentData.compMetadata?.daysOnMarket || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, daysOnMarket: parseInt(e.target.value) || undefined } })}
-                            placeholder="120"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-daysOnMarket"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.daysOnMarket || 'N/A'}</div>
-                        )}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Seller</Label>
+                          {isEditing ? (
+                            <Input
+                              value={(editedData.compMetadata as any)?.seller || currentData.compMetadata?.seller || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, seller: e.target.value } })}
+                              placeholder="John Doe"
+                              className="bg-white dark:bg-slate-900"
+                              data-testid="input-seller"
+                            />
+                          ) : (
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.seller || 'N/A'}</div>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Buyer</Label>
+                          {isEditing ? (
+                            <Input
+                              value={(editedData.compMetadata as any)?.buyer || currentData.compMetadata?.buyer || ''}
+                              onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, buyer: e.target.value } })}
+                              placeholder="XYZ Corp"
+                              className="bg-white dark:bg-slate-900"
+                              data-testid="input-buyer"
+                            />
+                          ) : (
+                            <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{currentData.compMetadata?.buyer || 'N/A'}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </Card>
-
-                  {/* Transaction Details */}
-                  <Card>
-                    <div className="p-4 border-b border-border">
-                      <h4 className="font-semibold">Transaction Details</h4>
-                    </div>
-                    <div className="p-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="saleCondition">Sale Condition</Label>
-                        {isEditing ? (
-                          <Input
-                            id="saleCondition"
-                            value={(editedData.compMetadata as any)?.saleCondition || currentData.compMetadata?.saleCondition || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, saleCondition: e.target.value } })}
-                            placeholder="As-is"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-saleCondition"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.saleCondition || 'N/A'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="broker">Broker</Label>
-                        {isEditing ? (
-                          <Input
-                            id="broker"
-                            value={(editedData.compMetadata as any)?.broker || currentData.compMetadata?.broker || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, broker: e.target.value } })}
-                            placeholder="ABC Realty"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-broker"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.broker || 'N/A'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="seller">Seller</Label>
-                        {isEditing ? (
-                          <Input
-                            id="seller"
-                            value={(editedData.compMetadata as any)?.seller || currentData.compMetadata?.seller || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, seller: e.target.value } })}
-                            placeholder="John Doe"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-seller"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.seller || 'N/A'}</div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="buyer">Buyer</Label>
-                        {isEditing ? (
-                          <Input
-                            id="buyer"
-                            value={(editedData.compMetadata as any)?.buyer || currentData.compMetadata?.buyer || ''}
-                            onChange={(e) => setEditedData({ ...editedData, compMetadata: { ...currentData.compMetadata, buyer: e.target.value } })}
-                            placeholder="XYZ Corp"
-                            className="bg-white dark:bg-slate-900"
-                            data-testid="input-buyer"
-                          />
-                        ) : (
-                          <div className="p-2 bg-muted rounded text-sm">{currentData.compMetadata?.buyer || 'N/A'}</div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
+                  </div>
                 </div>
               </div>
 
-              <Separator className="my-6" />
-
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => rejectMutation.mutate(pending.id)}
                   disabled={rejectMutation.isPending}
+                  className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
                   data-testid="button-reject-detail"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-3.5 w-3.5 mr-1.5" />
                   Remove
                 </Button>
                 <Button
@@ -781,13 +792,13 @@ export function PendingPropertyDetailDialog({
                   disabled={acceptMutation.isPending}
                   data-testid="button-accept-detail"
                 >
-                  <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-3.5 w-3.5 mr-1.5" />
                   Accept as New Property
                 </Button>
               </div>
             </TabsContent>
 
-            <TabsContent value="duplicates" className="flex-1 overflow-hidden flex flex-col mt-4">
+            <TabsContent value="duplicates" className="flex-1 overflow-hidden flex flex-col mt-3">
               {duplicatesLoading ? (
                 <div className="flex items-center justify-center h-64 text-muted-foreground">
                   Loading duplicate matches...
@@ -800,23 +811,23 @@ export function PendingPropertyDetailDialog({
                 <div className="flex-1 overflow-hidden flex flex-col space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold">All Potential Duplicates ({allMatches.length})</h3>
-                      <p className="text-sm text-muted-foreground">
+                      <h3 className="text-base font-semibold">All Potential Duplicates ({allMatches.length})</h3>
+                      <p className="text-xs text-muted-foreground">
                         Every property that could be a duplicate, sorted by similarity
                       </p>
                       <div className="flex gap-2 mt-2">
                         {highConfidenceMatches.length > 0 && (
-                          <Badge variant="destructive" className="text-xs">
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                             {highConfidenceMatches.length} High Confidence
                           </Badge>
                         )}
                         {mediumConfidenceMatches.length > 0 && (
-                          <Badge variant="default" className="text-xs">
+                          <Badge variant="default" className="text-[10px] px-1.5 py-0">
                             {mediumConfidenceMatches.length} Medium
                           </Badge>
                         )}
                         {lowConfidenceMatches.length > 0 && (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                             {lowConfidenceMatches.length} Low
                           </Badge>
                         )}
@@ -824,11 +835,12 @@ export function PendingPropertyDetailDialog({
                     </div>
                     {selectedDuplicateId && (
                       <Button
+                        size="sm"
                         onClick={handleMerge}
                         disabled={mergeMutation.isPending}
                         data-testid="button-merge"
                       >
-                        <GitMerge className="h-4 w-4 mr-2" />
+                        <GitMerge className="h-3.5 w-3.5 mr-1.5" />
                         Merge with Selected
                       </Button>
                     )}
@@ -853,12 +865,12 @@ export function PendingPropertyDetailDialog({
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <h4 className="font-medium">{match.property.title}</h4>
-                                <Badge variant="secondary">{match.property.status}</Badge>
-                                <Badge variant={getConfidenceBadgeVariant(match.matchDetails.overallConfidence)}>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{match.property.status}</Badge>
+                                <Badge variant={getConfidenceBadgeVariant(match.matchDetails.overallConfidence)} className="text-[10px] px-1.5 py-0">
                                   {match.similarityScore}% Match
                                 </Badge>
                                 {selectedDuplicateId === match.property.id && (
-                                  <Badge variant="default">Selected</Badge>
+                                  <Badge variant="default" className="text-[10px] px-1.5 py-0">Selected</Badge>
                                 )}
                               </div>
                               <div className="space-y-1 text-sm text-muted-foreground">
@@ -869,7 +881,7 @@ export function PendingPropertyDetailDialog({
                                   </div>
                                 )}
                                 {match.property.city && match.property.state && (
-                                  <div>Location: {match.property.city}, {match.property.state}</div>
+                                  <div className="text-xs">Location: {match.property.city}, {match.property.state}</div>
                                 )}
                                 {match.property.listingPrice && (
                                   <div className="flex items-center gap-1">
@@ -881,26 +893,25 @@ export function PendingPropertyDetailDialog({
                             </div>
                           </div>
 
-                          {/* Similarity breakdown */}
                           <div className="space-y-2 border-t pt-3 mt-3">
-                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                               Match Analysis
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-xs">
-                              <div className="space-y-1">
+                              <div className="space-y-0.5">
                                 <div className="text-muted-foreground">Name</div>
                                 <div className={`font-semibold ${match.matchDetails.nameMatch >= 80 ? 'text-green-600' : match.matchDetails.nameMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
                                   {match.matchDetails.nameMatch}%
                                 </div>
                               </div>
-                              <div className="space-y-1">
+                              <div className="space-y-0.5">
                                 <div className="text-muted-foreground">Location</div>
                                 <div className={`font-semibold ${match.matchDetails.locationMatch >= 80 ? 'text-green-600' : match.matchDetails.locationMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
                                   {match.matchDetails.locationMatch}%
                                 </div>
                               </div>
                               {match.matchDetails.priceMatch !== undefined && (
-                                <div className="space-y-1">
+                                <div className="space-y-0.5">
                                   <div className="text-muted-foreground">Price</div>
                                   <div className={`font-semibold ${match.matchDetails.priceMatch >= 80 ? 'text-green-600' : match.matchDetails.priceMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>
                                     {match.matchDetails.priceMatch}%
@@ -909,16 +920,14 @@ export function PendingPropertyDetailDialog({
                               )}
                             </div>
 
-                            {/* Match reasons */}
                             {match.matchReasons.length > 0 && (
-                              <div className="mt-2">
+                              <div className="mt-1">
                                 <div className="text-xs text-muted-foreground">
                                   {match.matchReasons.join(' • ')}
                                 </div>
                               </div>
                             )}
 
-                            {/* Explanation */}
                             <div className={`text-xs ${getConfidenceColor(match.matchDetails.overallConfidence)} bg-opacity-10 p-2 rounded`}>
                               {match.explanation}
                             </div>
@@ -948,7 +957,7 @@ export function PendingPropertyDetailDialog({
                         }}
                         data-testid="button-delete-comp"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                         Delete Comp
                       </Button>
                     </div>
