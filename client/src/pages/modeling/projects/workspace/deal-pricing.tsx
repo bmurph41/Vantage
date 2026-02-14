@@ -44,10 +44,15 @@ import {
   Plus,
   Calendar,
   BarChart3,
+  Brain,
+  ThumbsUp,
+  ThumbsDown,
+  AlertCircle as AlertCircleIcon,
 } from 'lucide-react';
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import type { ProjectConfig } from '@/types/modeling';
 import debounce from 'lodash.debounce';
+import { computeDealSignal, getSignalBadgeProps, type DealSignalResult } from '@/lib/dealSignal';
 import YearSelector from '@/components/modeling/YearSelector';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
@@ -1209,6 +1214,81 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </CardContent>
         </Card>
       )}
+
+      {(() => {
+        const dealSignal = computeDealSignal({
+          irr: pricingData?.fromPurchasePrice?.irr ?? null,
+          capRate: parsePercentInput(goingInCapRate) || null,
+          equityMultiple: pricingData?.fromPurchasePrice?.equityMultiple ?? null,
+          cashOnCash: pricingData?.fromPurchasePrice?.averageCashOnCash ?? null,
+          purchasePrice: parseCurrencyInput(manualPurchasePrice) || null,
+          exitValue: pricingData?.fromPurchasePrice?.exitValue ?? null,
+          totalProfit: pricingData?.fromPurchasePrice?.totalProfit ?? null,
+          noiGrowthRate: parsePercentInput(revenueGrowthRate) > 0 || parsePercentInput(expenseGrowthRate) > 0 ? (parsePercentInput(revenueGrowthRate) - parsePercentInput(expenseGrowthRate)) : null,
+        });
+        const signalBadge = getSignalBadgeProps(dealSignal.signal);
+        const SignalIcon = dealSignal.signal === 'Buy' ? ThumbsUp : dealSignal.signal === 'Pass' ? ThumbsDown : AlertCircleIcon;
+
+        return (
+          <Card className={cn("border overflow-hidden", dealSignal.borderColor)} data-testid="card-deal-signal">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-indigo-600" />
+                  AI Deal Signal
+                </CardTitle>
+                <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border", signalBadge.className)} data-testid="badge-deal-signal">
+                  <SignalIcon className="h-3.5 w-3.5" />
+                  {signalBadge.label}
+                </span>
+              </div>
+              <CardDescription>
+                Institutional-grade recommendation based on current pricing assumptions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Deal Quality Score</span>
+                    <span className="font-mono font-semibold">{dealSignal.score}/100</span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        dealSignal.score >= 70 ? "bg-green-500" : dealSignal.score >= 50 ? "bg-amber-500" : "bg-red-500"
+                      )}
+                      style={{ width: `${dealSignal.score}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {dealSignal.reasons.length > 0 && (
+                <div className={cn("rounded-lg p-3 space-y-1.5", dealSignal.bgColor)}>
+                  <p className={cn("text-xs font-semibold uppercase tracking-wider", dealSignal.color)}>Key Factors</p>
+                  {dealSignal.reasons.map((reason, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <span className={cn("mt-0.5 flex-shrink-0 text-xs", dealSignal.color)}>
+                        {dealSignal.signal === 'Buy' ? '✓' : dealSignal.signal === 'Pass' ? '✗' : '•'}
+                      </span>
+                      <span className="text-foreground/80">{reason}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground italic">
+                Based on {parsePercentInput(goingInCapRate) > 0 ? `${goingInCapRate}% going-in cap` : 'current inputs'}
+                {pricingData?.fromPurchasePrice?.irr != null ? `, ${formatPercent(pricingData.fromPurchasePrice.irr)} IRR` : ''}
+                {pricingData?.fromPurchasePrice?.equityMultiple != null ? `, ${formatMultiple(pricingData.fromPurchasePrice.equityMultiple)} equity multiple` : ''}
+                . Adjust pricing inputs above to update this recommendation.
+              </p>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
     </div>
   );

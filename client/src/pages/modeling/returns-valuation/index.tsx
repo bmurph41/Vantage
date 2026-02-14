@@ -21,6 +21,7 @@ import {
   Building2,
   Percent,
 } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface ProjectSnapshot {
   indicatedValue: number | null;
@@ -218,7 +219,16 @@ export default function ReturnsValuationPage() {
                     <TableHead>Location</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Purchase Price</TableHead>
-                    <TableHead className="text-right">Indicated Value</TableHead>
+                    <TableHead className="text-right">
+                      <span className="inline-flex items-center gap-1">
+                        Indicated Value
+                        <InfoTooltip 
+                          content="The model's current valuation estimate based on NOI, cap rate, or DCF analysis from the latest snapshot. Unlike Purchase Price (what you paid or plan to pay), Indicated Value reflects what the property is worth today according to your financial model."
+                          tip="When Indicated Value exceeds Purchase Price, it signals value creation in your portfolio."
+                          side="bottom"
+                        />
+                      </span>
+                    </TableHead>
                     <TableHead className="text-right">NOI</TableHead>
                     <TableHead className="text-right">Cap Rate</TableHead>
                     <TableHead className="text-right">IRR</TableHead>

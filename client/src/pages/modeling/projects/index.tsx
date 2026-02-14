@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'wouter';
@@ -28,6 +28,7 @@ import ModelingAnalytics from './analytics';
 import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector';
 import { ModelingEmptyState } from '@/components/ui/_primitives/enhanced-empty-state';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { computeDealSignal, getSignalBadgeProps } from '@/lib/dealSignal';
 
 type ModelingProject = {
   id: string;
@@ -338,6 +339,12 @@ export default function ModelingProjectsPage() {
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Hist. {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr. 1 {metricLabel}</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Status</TableHead>
+                      <TableHead className="font-bold text-foreground text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1">
+                          <Brain className="h-3.5 w-3.5 text-indigo-500" />
+                          AI Signal
+                        </span>
+                      </TableHead>
                       <TableHead className="font-bold text-foreground whitespace-nowrap">Created</TableHead>
                       <TableHead className="font-bold text-foreground text-center">Actions</TableHead>
                     </TableRow>
@@ -377,6 +384,36 @@ export default function ModelingProjectsPage() {
                             >
                               {formatOutcome(project.dealOutcome)}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-center whitespace-nowrap pb-0">
+                            {(() => {
+                              const signal = computeDealSignal({
+                                irr: project.irr,
+                                capRate: project.year1CapRate,
+                                purchasePrice: project.purchasePrice,
+                              });
+                              const badge = getSignalBadgeProps(signal.signal);
+                              return signal.score === 0 ? (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              ) : (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badge.className}`} data-testid={`badge-signal-${project.id}`}>
+                                        <Brain className="h-3 w-3" />
+                                        {badge.label}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="max-w-xs">
+                                      <p className="font-semibold text-xs mb-1">Score: {signal.score}/100</p>
+                                      {signal.reasons.slice(0, 2).map((r, i) => (
+                                        <p key={i} className="text-xs text-muted-foreground">• {r}</p>
+                                      ))}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="pb-0 whitespace-nowrap" rowSpan={2}>
                             <div className="font-medium text-sm">{project.createdByName || '-'}</div>
@@ -426,6 +463,7 @@ export default function ModelingProjectsPage() {
                               </span>
                             ) : '\u00A0'}
                           </td>
+                          <td className="px-4 pt-0 pb-2"></td>
                           <td className="px-4 pt-0 pb-2"></td>
                         </tr>
                       </Fragment>
