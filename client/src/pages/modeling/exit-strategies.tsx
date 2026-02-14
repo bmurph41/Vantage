@@ -51,6 +51,7 @@ import {
   MapPinned,
   Users,
   CheckCircle2,
+  AlertCircle,
   Building,
   Star,
   ArrowUp,
@@ -4001,6 +4002,7 @@ export function EarnoutPanel() {
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                 <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
                 Clawback & Indemnity Provisions
+                <InfoTooltip content="In earnout structures, clawback provisions allow the buyer to recover earnout payments if performance metrics were artificially inflated, or if representations and warranties are breached. Different from waterfall clawback — here the buyer claws back from the seller." tip="Unlike waterfall clawback (GP returning promote to LPs), earnout clawback protects the buyer against overpayment for inflated performance. Negotiate clear metric definitions and independent audit rights." />
               </h4>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -4015,17 +4017,26 @@ export function EarnoutPanel() {
                 <div className="border rounded-lg p-4 space-y-3 bg-red-50/30">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-xs">Clawback %</Label>
+                      <Label className="text-xs flex items-center gap-1">
+                        Clawback %
+                        <InfoTooltip content="The percentage of the expected earnout that could be clawed back by the buyer if performance metrics are restated or reps/warranties are breached. Typical range: 15-50%." tip="Higher clawback percentages protect the buyer but may make the earnout less attractive to the seller. Consider escrowing this amount." />
+                      </Label>
                       <PercentInput value={clawbackPercent} onChange={setClawbackPercent} />
                       <span className="text-[10px] text-muted-foreground">% of earnout subject to clawback</span>
                     </div>
                     <div>
-                      <Label className="text-xs">Indemnity Cap %</Label>
+                      <Label className="text-xs flex items-center gap-1">
+                        Indemnity Cap %
+                        <InfoTooltip content="Maximum total indemnification exposure as a percentage of total deal consideration (base price + earnout). Caps the seller's maximum liability for breaches of reps/warranties." tip="Standard caps range from 10-50% of total consideration. 'Fundamental' reps (title, authority) are often uncapped or capped at 100%." />
+                      </Label>
                       <PercentInput value={indemnityCapPercent} onChange={setIndemnityCapPercent} />
                       <span className="text-[10px] text-muted-foreground">Max % of total consideration</span>
                     </div>
                     <div>
-                      <Label className="text-xs">Survival Period (months)</Label>
+                      <Label className="text-xs flex items-center gap-1">
+                        Survival Period (months)
+                        <InfoTooltip content="How long after closing the buyer can make indemnification claims for breaches of representations and warranties. Standard: 12-24 months for general reps, 36-60 months for tax reps." tip="Shorter survival periods favor the seller. Negotiate carefully — a 12-month period may be too short for the buyer to discover performance issues in a seasonal marina business." />
+                      </Label>
                       <Input
                         type="number"
                         value={survivalPeriod}
@@ -4036,15 +4047,24 @@ export function EarnoutPanel() {
                   </div>
                   <div className="space-y-2 pt-2 border-t">
                     <div className="flex justify-between py-1.5 border-b">
-                      <span className="text-muted-foreground text-sm">Clawback Exposure</span>
+                      <span className="text-muted-foreground text-sm flex items-center gap-1">
+                        Clawback Exposure
+                        <InfoTooltip content="The maximum amount the buyer could claw back from earnout payments. Equals the expected earnout multiplied by the clawback percentage." />
+                      </span>
                       <span className="num font-medium text-red-600">{formatCurrency(clawbackExposure)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b">
-                      <span className="text-muted-foreground text-sm">Indemnity Cap Amount</span>
+                      <span className="text-muted-foreground text-sm flex items-center gap-1">
+                        Indemnity Cap Amount
+                        <InfoTooltip content="The absolute dollar cap on the seller's total indemnification liability. Calculated as the indemnity cap percentage applied to total deal consideration (base price + expected earnout)." />
+                      </span>
                       <span className="num font-medium text-red-600">{formatCurrency(indemnityCapAmount)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b">
-                      <span className="text-muted-foreground text-sm">Net At-Risk Amount</span>
+                      <span className="text-muted-foreground text-sm flex items-center gap-1">
+                        Net At-Risk Amount
+                        <InfoTooltip content="The lesser of clawback exposure and indemnity cap. This is the realistic maximum amount the seller could lose, considering both the clawback provision and the indemnity cap." />
+                      </span>
                       <span className="num font-semibold text-red-600">{formatCurrency(netAtRisk)}</span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b">
@@ -4052,7 +4072,10 @@ export function EarnoutPanel() {
                       <span className="num font-medium">{survivalPeriod} months</span>
                     </div>
                     <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
-                      <span className="font-semibold text-sm">Risk-Adjusted Net Earnout</span>
+                      <span className="font-semibold text-sm flex items-center gap-1">
+                        Risk-Adjusted Net Earnout
+                        <InfoTooltip content="The expected earnout minus the net at-risk amount. Represents the most conservative estimate of what the seller will actually receive from the earnout after accounting for clawback and indemnity risks." />
+                      </span>
                       <span className={`num font-semibold ${riskAdjustedNetEarnout >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatCurrency(riskAdjustedNetEarnout)}
                       </span>
@@ -4354,6 +4377,22 @@ interface HurdleResult {
   capitalAccountEnd: number;
 }
 
+interface ClawbackAnalysis {
+  lpTargetReturn: number;
+  lpActualReturn: number;
+  lpShortfall: number;
+  gpTotalPromote: number;
+  clawbackAmount: number;
+  gpNetPromoteAfterClawback: number;
+  escrowHeld: number;
+  escrowReleased: number;
+  escrowDeficit: number;
+  afterTaxClawback: number;
+  isTriggered: boolean;
+  testMethod: 'fund_level' | 'deal_by_deal';
+  compoundingMethod: 'simple' | 'compound';
+}
+
 interface PromoteWaterfallResult {
   hurdleResults: HurdleResult[];
   lpDistPerYear: number[];
@@ -4367,6 +4406,7 @@ interface PromoteWaterfallResult {
   gpCatchupAmount: number;
   lpLookbackDeficiency: number;
   lpLookbackClawback: number;
+  clawback: ClawbackAnalysis;
 }
 
 function solveIRR(cashFlows: number[]): number {
@@ -4399,11 +4439,19 @@ function computeIRRGatedWaterfall(params: {
   dealCashFlows: number[];
   hurdles: PromoteHurdleDef[];
   includeGPCatchup?: boolean;
+  clawbackConfig?: {
+    escrowPercent: number;
+    compoundingMethod: 'simple' | 'compound';
+    afterTax: boolean;
+    gpMarginalTaxRate: number;
+    testMethod: 'fund_level' | 'deal_by_deal';
+  };
 }): PromoteWaterfallResult {
-  const { lpEquity, gpEquity, dealCashFlows, hurdles, includeGPCatchup = false } = params;
+  const { lpEquity, gpEquity, dealCashFlows, hurdles, includeGPCatchup = false, clawbackConfig } = params;
   const totalEquity = lpEquity + gpEquity;
+  const emptyClawback: ClawbackAnalysis = { lpTargetReturn: 0, lpActualReturn: 0, lpShortfall: 0, gpTotalPromote: 0, clawbackAmount: 0, gpNetPromoteAfterClawback: 0, escrowHeld: 0, escrowReleased: 0, escrowDeficit: 0, afterTaxClawback: 0, isTriggered: false, testMethod: 'fund_level', compoundingMethod: 'simple' };
   if (totalEquity <= 0 || dealCashFlows.length < 2) {
-    return { hurdleResults: [], lpDistPerYear: [], gpDistPerYear: [], lpTotal: 0, gpTotal: 0, totalPromoteEarned: 0, lpIRR: 0, gpIRR: 0, dealIRR: 0 };
+    return { hurdleResults: [], lpDistPerYear: [], gpDistPerYear: [], lpTotal: 0, gpTotal: 0, totalPromoteEarned: 0, lpIRR: 0, gpIRR: 0, dealIRR: 0, gpCatchupAmount: 0, lpLookbackDeficiency: 0, lpLookbackClawback: 0, clawback: emptyClawback };
   }
 
   const lpPct = lpEquity / totalEquity;
@@ -4593,11 +4641,39 @@ function computeIRRGatedWaterfall(params: {
   const dealIRR = solveIRR(dealCashFlows) * 100;
 
   const lpTargetPrefRate = hurdleResults.length > 0 ? (hurdleResults[0].irrHurdle / 100) : 0;
-  const lpTargetReturn = lpEquity * (1 + lpTargetPrefRate * yearCount);
+  const compMethod = clawbackConfig?.compoundingMethod || 'simple';
+  const lpTargetReturn = compMethod === 'compound'
+    ? lpEquity * Math.pow(1 + lpTargetPrefRate, yearCount)
+    : lpEquity * (1 + lpTargetPrefRate * yearCount);
   const lpLookbackDeficiency = Math.max(0, lpTargetReturn - lpTotal);
   const lpLookbackClawback = Math.min(lpLookbackDeficiency, totalPromoteEarned);
 
-  return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR, gpCatchupAmount, lpLookbackDeficiency, lpLookbackClawback };
+  const escrowPct = (clawbackConfig?.escrowPercent ?? 0) / 100;
+  const escrowHeld = totalPromoteEarned * escrowPct;
+  const clawbackGross = lpLookbackClawback;
+  const gpTaxRate = clawbackConfig?.gpMarginalTaxRate ?? 0;
+  const afterTaxClawback = clawbackConfig?.afterTax ? clawbackGross * (1 - gpTaxRate / 100) : clawbackGross;
+  const isTriggered = lpLookbackDeficiency > 0 && totalPromoteEarned > 0;
+  const escrowReleased = isTriggered ? 0 : escrowHeld;
+  const escrowDeficit = isTriggered ? Math.max(0, afterTaxClawback - escrowHeld) : 0;
+
+  const clawback: ClawbackAnalysis = {
+    lpTargetReturn,
+    lpActualReturn: lpTotal,
+    lpShortfall: lpLookbackDeficiency,
+    gpTotalPromote: totalPromoteEarned,
+    clawbackAmount: clawbackGross,
+    gpNetPromoteAfterClawback: Math.max(0, totalPromoteEarned - afterTaxClawback),
+    escrowHeld,
+    escrowReleased,
+    escrowDeficit,
+    afterTaxClawback,
+    isTriggered,
+    testMethod: clawbackConfig?.testMethod || 'fund_level',
+    compoundingMethod: compMethod,
+  };
+
+  return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR, gpCatchupAmount, lpLookbackDeficiency, lpLookbackClawback, clawback };
 }
 
 export function WaterfallPanel() {
@@ -4623,6 +4699,12 @@ export function WaterfallPanel() {
     { label: "Hurdle 4", irrHurdle: "0", sponsorPromote: "45" },
   ]);
   const [includeGPCatchup, setIncludeGPCatchup] = useState(false);
+  const [enableClawback, setEnableClawback] = useState(true);
+  const [clawbackEscrowPct, setClawbackEscrowPct] = useState<string>("100");
+  const [clawbackCompounding, setClawbackCompounding] = useState<'simple' | 'compound'>('compound');
+  const [clawbackAfterTax, setClawbackAfterTax] = useState(false);
+  const [gpMarginalTaxRate, setGpMarginalTaxRate] = useState<string>("37");
+  const [clawbackTestMethod, setClawbackTestMethod] = useState<'fund_level' | 'deal_by_deal'>('fund_level');
 
   const adjustedCashFlows = (() => {
     const cfs = [...annualCashFlows];
@@ -4693,6 +4775,13 @@ export function WaterfallPanel() {
       dealCashFlows: totalCashFlows,
       hurdles: promoteHurdles,
       includeGPCatchup,
+      clawbackConfig: enableClawback ? {
+        escrowPercent: parseFloat(clawbackEscrowPct) || 0,
+        compoundingMethod: clawbackCompounding,
+        afterTax: clawbackAfterTax,
+        gpMarginalTaxRate: parseFloat(gpMarginalTaxRate) || 37,
+        testMethod: clawbackTestMethod,
+      } : undefined,
     });
     hurdleResults = waterfallResult.hurdleResults;
     lpDistPerYear = waterfallResult.lpDistPerYear;
@@ -4704,7 +4793,17 @@ export function WaterfallPanel() {
     gpIRR = waterfallResult.gpIRR;
     dealIRR = waterfallResult.dealIRR;
     gpCatchup = waterfallResult.gpCatchupAmount;
-  } else {
+  }
+
+  const clawbackResult: ClawbackAnalysis | null = useIRRPromote && totalCapital > 0 && enableClawback
+    ? computeIRRGatedWaterfall({
+        lpEquity: lpCap, gpEquity: gpCap, dealCashFlows: totalCashFlows,
+        hurdles: promoteHurdles, includeGPCatchup,
+        clawbackConfig: { escrowPercent: parseFloat(clawbackEscrowPct) || 0, compoundingMethod: clawbackCompounding, afterTax: clawbackAfterTax, gpMarginalTaxRate: parseFloat(gpMarginalTaxRate) || 37, testMethod: clawbackTestMethod },
+      }).clawback
+    : null;
+
+  if (!useIRRPromote || totalCapital <= 0) {
     gpCatchup = gpCap > 0 ? Math.min(Math.max(0, afterPrefAndReturn), lpPref * (carryRate / (1 - carryRate))) : 0;
     afterCatchup = Math.max(0, afterPrefAndReturn - gpCatchup);
     gpCarry = afterCatchup > 0 ? afterCatchup * carryRate : 0;
@@ -4749,10 +4848,12 @@ export function WaterfallPanel() {
   const gpAfterTax = gpTotal * (1 - blendedGPTaxRate);
   const gpPromotePercent = gpCap > 0 ? (totalPromoteEarned / gpCap) * 100 : 0;
   const prefHurdle = 1 + prefRate * holdYears;
-  const hasClawback = dealMOIC < prefHurdle;
-  const clawbackAmount = hasClawback ? totalPromoteEarned : 0;
+  const hasClawbackSimple = dealMOIC < prefHurdle;
+  const clawbackAmountSimple = hasClawbackSimple ? totalPromoteEarned : 0;
   const gpEscrowAmount = totalPromoteEarned;
   const lpReleaseCondition = lpCap + lpPref;
+  const hasClawback = clawbackResult ? clawbackResult.isTriggered : hasClawbackSimple;
+  const clawbackAmount = clawbackResult ? clawbackResult.clawbackAmount : clawbackAmountSimple;
 
   const addHurdle = () => {
     if (promoteHurdles.length < 6) {
@@ -4944,8 +5045,72 @@ export function WaterfallPanel() {
                       onChange={(e) => setIncludeGPCatchup(e.target.checked)}
                       className="h-3.5 w-3.5"
                     />
-                    <span className="text-xs">Include GP Catchup</span>
+                    <span className="text-xs flex items-center gap-1">
+                      Include GP Catchup
+                      <InfoTooltip content="After LPs receive their preferred return, the GP receives 100% of distributions until they 'catch up' to their target profit share. Ensures the GP receives their full carried interest on a pari passu basis." />
+                    </span>
                   </label>
+                </div>
+
+                <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="enable-clawback" checked={enableClawback} onChange={(e) => setEnableClawback(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                    <Label htmlFor="enable-clawback" className="text-xs font-semibold cursor-pointer flex items-center gap-1">
+                      Clawback & Escrow Provisions
+                      <InfoTooltip content="A clawback provision allows LPs to recover excess promote distributions paid to the GP if the investment fails to meet return thresholds by the end of the fund lifecycle. Industry standard for institutional-quality fund structures." tip="ILPA (Institutional Limited Partners Association) recommends clawback provisions in all fund agreements. European waterfalls naturally reduce clawback risk since GP doesn't receive carry until LP capital + pref is fully returned." />
+                    </Label>
+                  </div>
+                  {enableClawback && (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-[10px] flex items-center gap-1">
+                            Escrow % of Promote
+                            <InfoTooltip content="Percentage of GP promote distributions held in escrow until fund liquidation. Protects LPs by ensuring funds are available if clawback is triggered." tip="Market practice varies widely: 42% of funds escrow nothing, while 25% escrow 100%. Larger funds typically escrow 50-100%." />
+                          </Label>
+                          <PercentInput value={clawbackEscrowPct} onChange={setClawbackEscrowPct} />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] flex items-center gap-1">
+                            Test Method
+                            <InfoTooltip content="Fund-level: Clawback tested at fund termination against aggregate returns. Deal-by-deal: Tested after each deal exit — higher clawback risk for GPs in American waterfalls." />
+                          </Label>
+                          <select value={clawbackTestMethod} onChange={(e) => setClawbackTestMethod(e.target.value as 'fund_level' | 'deal_by_deal')} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm">
+                            <option value="fund_level">Fund-Level</option>
+                            <option value="deal_by_deal">Deal-by-Deal</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] flex items-center gap-1">
+                            Pref Compounding
+                            <InfoTooltip content="Simple: Preferred return = Capital × Rate × Years. Compound: Preferred return = Capital × (1 + Rate)^Years. Compound is more LP-favorable and is the institutional standard." />
+                          </Label>
+                          <select value={clawbackCompounding} onChange={(e) => setClawbackCompounding(e.target.value as 'simple' | 'compound')} className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm">
+                            <option value="compound">Compound (ILPA)</option>
+                            <option value="simple">Simple</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="flex items-center gap-1.5 cursor-pointer mt-4">
+                            <input type="checkbox" checked={clawbackAfterTax} onChange={(e) => setClawbackAfterTax(e.target.checked)} className="h-3.5 w-3.5" />
+                            <span className="text-[10px] flex items-center gap-1">
+                              After-Tax Clawback
+                              <InfoTooltip content="If enabled, GP repays clawback on an after-tax basis, accounting for taxes already paid on distributed promote. ILPA recommends gross-up (full repayment), but many GPs negotiate after-tax treatment." tip="After-tax clawback is controversial. GPs argue they've already paid income tax on distributed carry. LPs prefer gross-up to ensure full recovery." />
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                      {clawbackAfterTax && (
+                        <div className="w-1/2">
+                          <Label className="text-[10px] flex items-center gap-1">
+                            GP Marginal Tax Rate
+                            <InfoTooltip content="The GP's marginal income tax rate used to calculate after-tax clawback. Carried interest is typically taxed at long-term capital gains rates (20%) for holding periods over 3 years, or ordinary income rates (37%) for shorter holds." />
+                          </Label>
+                          <PercentInput value={gpMarginalTaxRate} onChange={setGpMarginalTaxRate} />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -5161,26 +5326,35 @@ export function WaterfallPanel() {
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-amber-600 flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5" />
                   European Waterfall — Escrow
+                  <InfoTooltip content="In a European waterfall, the GP does not receive any carry until all LP capital + preferred return has been returned across the entire fund. This structure naturally protects LPs, making clawback provisions less critical (but still recommended)." />
                 </h4>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-amber-800">GP Escrow Amount</span>
+                    <span className="text-sm text-amber-800 flex items-center gap-1">
+                      GP Escrow Amount
+                      <InfoTooltip content="Total promote held in escrow until the fund's liquidation event. In a European waterfall, all GP carry is effectively escrowed until LPs are made whole." />
+                    </span>
                     <span className="num font-semibold text-amber-700">{formatCurrency(gpEscrowAmount)}</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-amber-800">Release Condition</span>
+                    <span className="text-sm text-amber-800 flex items-center gap-1">
+                      Release Condition
+                      <InfoTooltip content="The minimum amount LPs must receive before the GP's escrowed carry is released. Equals LP's total capital contribution plus their preferred return." />
+                    </span>
                     <span className="text-xs font-medium text-amber-700">LP receives {formatCurrency(lpReleaseCondition)}</span>
                   </div>
-                  <p className="text-xs text-amber-700 italic">GP carry held in escrow until full LP pref + capital is returned.</p>
-                  <p className="text-xs text-amber-700 italic">Clawback risk is lower in European waterfalls.</p>
-                  <p className="text-xs text-amber-600 mt-1">GP receives carry later, potentially years after distributions begin.</p>
+                  <p className="text-xs text-amber-700 italic">GP carry held in escrow until full LP pref + capital is returned. Clawback risk is naturally lower.</p>
                 </div>
               </div>
             )}
 
             {waterfallType === 'american' && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
-                <p className="text-xs text-green-700">No escrow — GP receives carry as each deal distributes.</p>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3 space-y-1">
+                <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                  American Waterfall — Deal-by-Deal Carry
+                  <InfoTooltip content="In an American waterfall, the GP receives carry as each deal distributes. This is more GP-friendly but creates higher clawback risk — the GP may need to return early carry if later deals underperform. Clawback and escrow provisions are essential." />
+                </p>
+                <p className="text-xs text-green-600">GP receives carry as each deal distributes. Clawback provisions protect LPs if aggregate performance falls short.</p>
               </div>
             )}
 
@@ -5293,24 +5467,38 @@ export function WaterfallPanel() {
           </div>
 
           <div className="border-t pt-3 space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GP Promote Economics</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+              GP Promote Economics
+              <InfoTooltip content="The promote (carried interest) is the GP's share of profits above the preferred return hurdle. This section shows total promote earned, clawback exposure, and net GP economics." />
+            </h4>
             <div className="flex justify-between py-1.5 border-b">
               <span className="text-muted-foreground text-sm">Promote as % of GP Capital</span>
               <span className="num font-semibold">{gpPromotePercent.toFixed(1)}%</span>
             </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm flex items-center gap-1">
+                Total Promote Earned
+                <InfoTooltip content="The cumulative promote (carried interest) distributions received by the GP across all waterfall tiers, before any clawback adjustments." />
+              </span>
+              <span className="num font-semibold text-cyan-600">{formatCurrency(totalPromoteEarned)}</span>
+            </div>
             {hasClawback && (
               <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
                 <span className="font-semibold text-red-700 flex items-center gap-1">
-                  Clawback Exposure
-                  <InfoTooltip
-                    content="A protection mechanism that requires the GP to return excess distributions if, at the end of the fund's life, they've received more than their agreed share of total profits."
-                  />
+                  Gross Clawback Exposure
+                  <InfoTooltip content="The amount the GP may need to return to LPs if the investment underperforms. Calculated as the lesser of: (1) the LP's shortfall from their target return, or (2) the total promote the GP has received." tip="In American waterfalls, clawback risk is higher because the GP receives promote on a deal-by-deal basis before the fund's aggregate performance is known." />
                 </span>
                 <span className="num font-bold text-red-600">{formatCurrency(clawbackAmount)}</span>
               </div>
             )}
-            {hasClawback && (
-              <p className="text-xs text-red-600 italic">Deal MOIC ({dealMOIC.toFixed(2)}x) is below pref hurdle ({prefHurdle.toFixed(2)}x). GP must return carry if deal doesn't achieve pref.</p>
+            {!hasClawback && totalPromoteEarned > 0 && (
+              <div className="flex justify-between py-2 bg-green-50 rounded-lg px-3">
+                <span className="text-sm font-medium text-green-700 flex items-center gap-1">
+                  No Clawback Triggered
+                  <InfoTooltip content="LP preferred return has been fully satisfied. The GP retains all promote distributions. Escrow (if any) would be released to the GP." />
+                </span>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              </div>
             )}
           </div>
 
@@ -5319,6 +5507,7 @@ export function WaterfallPanel() {
               <h4 className="text-xs font-semibold uppercase tracking-wide text-purple-600 flex items-center gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 GP Catchup Provision
+                <InfoTooltip content="After LPs receive their preferred return, the GP receives 100% of distributions until the GP 'catches up' to their target profit share. This ensures the GP's carried interest is calculated on the full profit, not just the excess above the preferred return." tip="Example: With an 8% pref and 20% carry, after LP gets 8%, the GP receives 100% of the next distributions until the GP has received 20% of total profits — then remaining profits split 80/20." />
               </h4>
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
                 <div className="flex justify-between py-1">
@@ -5330,37 +5519,139 @@ export function WaterfallPanel() {
             </div>
           )}
 
-          {useIRRPromote && (
+          {enableClawback && (
             <div className="border-t pt-3 space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-600 flex items-center gap-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-red-600 flex items-center gap-1.5">
                 <Shield className="h-3.5 w-3.5" />
-                LP Lookback Provision
+                Clawback & Lookback Analysis
+                <InfoTooltip content="A comprehensive clawback analysis comparing LP target returns (capital + compounded preferred return) against actual distributions. If LPs are short, the GP must return promote up to the shortfall amount. Escrow accounts hold GP carry to ensure funds are available." />
               </h4>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-                <div className="flex justify-between py-1">
-                  <span className="text-sm text-blue-800">LP Target Return</span>
-                  <span className="num font-semibold text-blue-700">{formatCurrency(lpCap * (1 + prefRate * holdYears))}</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-sm text-blue-800">LP Actual Return</span>
-                  <span className="num font-semibold text-blue-700">{formatCurrency(lpTotal)}</span>
-                </div>
-                {lpTotal < lpCap * (1 + prefRate * holdYears) ? (
-                  <>
-                    <div className="flex justify-between py-1 bg-red-50 rounded px-2">
-                      <span className="text-sm text-red-800 font-medium">LP Deficiency</span>
-                      <span className="num font-bold text-red-600">{formatCurrency(lpCap * (1 + prefRate * holdYears) - lpTotal)}</span>
+
+              {clawbackResult ? (
+                <div className="bg-red-50/50 border border-red-200 rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        LP Target Return
+                        <InfoTooltip content={clawbackResult.compoundingMethod === 'compound' ? `Capital × (1 + Pref Rate)^Years = ${formatCurrency(clawbackResult.lpTargetReturn)}. Uses compound interest per ILPA institutional standards.` : `Capital × (1 + Rate × Years) = ${formatCurrency(clawbackResult.lpTargetReturn)}. Simple interest calculation.`} />
+                      </span>
+                      <span className="num font-semibold">{formatCurrency(clawbackResult.lpTargetReturn)}</span>
                     </div>
                     <div className="flex justify-between py-1">
-                      <span className="text-sm text-blue-800">Clawback from GP Promote</span>
-                      <span className="num font-semibold text-red-600">{formatCurrency(Math.min(lpCap * (1 + prefRate * holdYears) - lpTotal, totalPromoteEarned))}</span>
+                      <span className="text-sm text-muted-foreground">LP Actual Distributions</span>
+                      <span className="num font-semibold">{formatCurrency(clawbackResult.lpActualReturn)}</span>
                     </div>
-                    <p className="text-xs text-red-600 italic">LP lookback triggered — GP must return promote until LP preferred return is fully satisfied.</p>
-                  </>
-                ) : (
-                  <p className="text-xs text-green-600 italic">LP preferred return met — no lookback clawback required.</p>
-                )}
-              </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        LP Shortfall
+                        <InfoTooltip content="The difference between what the LP was entitled to receive (capital + preferred return) and what they actually received. A positive shortfall triggers the clawback." />
+                      </span>
+                      <span className={`num font-semibold ${clawbackResult.lpShortfall > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {clawbackResult.lpShortfall > 0 ? formatCurrency(clawbackResult.lpShortfall) : 'None'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-muted-foreground">GP Promote Received</span>
+                      <span className="num font-semibold">{formatCurrency(clawbackResult.gpTotalPromote)}</span>
+                    </div>
+                  </div>
+
+                  {clawbackResult.isTriggered ? (
+                    <div className="space-y-2 pt-2 border-t border-red-200">
+                      <div className="flex items-center gap-2 text-red-700">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-semibold">Clawback Triggered</span>
+                        <Badge variant="outline" className="text-[10px] border-red-300 text-red-600">
+                          {clawbackResult.testMethod === 'fund_level' ? 'Fund-Level Test' : 'Deal-by-Deal Test'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between py-1.5 bg-red-100 rounded px-3">
+                        <span className="text-sm font-medium text-red-800 flex items-center gap-1">
+                          Gross Clawback Amount
+                          <InfoTooltip content="The lesser of: (1) LP shortfall from target return, or (2) total GP promote received. The GP cannot be required to return more promote than they earned." />
+                        </span>
+                        <span className="num font-bold text-red-700">{formatCurrency(clawbackResult.clawbackAmount)}</span>
+                      </div>
+                      {clawbackAfterTax && (
+                        <div className="flex justify-between py-1.5 bg-orange-50 rounded px-3">
+                          <span className="text-sm text-orange-800 flex items-center gap-1">
+                            After-Tax Clawback ({gpMarginalTaxRate}% rate)
+                            <InfoTooltip content="GP repays on an after-tax basis — the clawback is reduced by the GP's marginal tax rate since they already paid taxes on the originally distributed promote. Controversial: ILPA recommends gross-up (full repayment) to protect LPs." />
+                          </span>
+                          <span className="num font-semibold text-orange-700">{formatCurrency(clawbackResult.afterTaxClawback)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-1.5">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          Escrow Held ({clawbackEscrowPct}% of promote)
+                          <InfoTooltip content="Amount of GP promote held in a segregated escrow account. If the clawback is triggered, this amount is used first before requiring the GP to return additional funds out of pocket." />
+                        </span>
+                        <span className="num font-semibold text-amber-600">{formatCurrency(clawbackResult.escrowHeld)}</span>
+                      </div>
+                      {clawbackResult.escrowDeficit > 0 && (
+                        <div className="flex justify-between py-1.5 bg-red-50 border border-red-200 rounded px-3">
+                          <span className="text-sm font-medium text-red-800 flex items-center gap-1">
+                            GP Out-of-Pocket Shortfall
+                            <InfoTooltip content="If the escrow doesn't fully cover the clawback, the GP must pay the remaining amount from personal or entity funds. This creates a personal guarantee risk for GP principals." tip="Negotiate personal guarantees from GP principals and a short contribution window (e.g., 90 days) to mitigate collection risk." />
+                          </span>
+                          <span className="num font-bold text-red-700">{formatCurrency(clawbackResult.escrowDeficit)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-1.5 border-t pt-2">
+                        <span className="text-sm font-semibold flex items-center gap-1">
+                          GP Net Promote After Clawback
+                          <InfoTooltip content="The GP's final promote after all clawback obligations are satisfied. This is what the GP actually keeps from the deal." />
+                        </span>
+                        <span className={`num font-bold ${clawbackResult.gpNetPromoteAfterClawback > 0 ? 'text-cyan-600' : 'text-red-600'}`}>
+                          {formatCurrency(clawbackResult.gpNetPromoteAfterClawback)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-2 border-t border-green-200">
+                      <div className="flex items-center gap-2 bg-green-50 rounded-lg p-3">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <div>
+                          <span className="text-sm font-medium text-green-700">No Clawback Required</span>
+                          <p className="text-xs text-green-600">LP preferred return fully satisfied. GP retains all {formatCurrency(clawbackResult.gpTotalPromote)} in promote.</p>
+                        </div>
+                      </div>
+                      {clawbackResult.escrowHeld > 0 && (
+                        <div className="flex justify-between py-1.5 mt-2">
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            Escrow Released to GP
+                            <InfoTooltip content="Since no clawback was triggered, all escrowed promote distributions are released back to the GP." />
+                          </span>
+                          <span className="num font-semibold text-green-600">{formatCurrency(clawbackResult.escrowHeld)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-muted/20 border rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">LP Target (Capital + Pref)</span>
+                    <span className="num font-semibold">{formatCurrency(lpCap + lpPref)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">LP Total Distributions</span>
+                    <span className="num font-semibold">{formatCurrency(lpTotal)}</span>
+                  </div>
+                  {hasClawback ? (
+                    <>
+                      <div className="flex justify-between py-1.5 bg-red-50 rounded px-3">
+                        <span className="text-sm font-medium text-red-800">Clawback Exposure</span>
+                        <span className="num font-bold text-red-700">{formatCurrency(clawbackAmount)}</span>
+                      </div>
+                      <p className="text-xs text-red-600 italic">Deal MOIC ({dealMOIC.toFixed(2)}x) below pref hurdle ({prefHurdle.toFixed(2)}x). GP must return carry.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-green-600 italic">LP preferred return met — no clawback required.</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Enable IRR-Based Promote Structure for full clawback modeling with escrow, compounding, and after-tax analysis.</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -5397,8 +5688,18 @@ export function WaterfallPanel() {
                 </tr>
                 <tr className="border-b">
                   <td className="p-2 text-muted-foreground">LP Protection</td>
-                  <td className={`p-2 text-center ${waterfallType === 'american' ? 'bg-cyan-50 font-medium' : ''}`}>Lower (clawback)</td>
-                  <td className={`p-2 text-center ${waterfallType === 'european' ? 'bg-cyan-50 font-medium' : ''}`}>Higher (escrow)</td>
+                  <td className={`p-2 text-center ${waterfallType === 'american' ? 'bg-cyan-50 font-medium' : ''}`}>Lower (clawback-dependent)</td>
+                  <td className={`p-2 text-center ${waterfallType === 'european' ? 'bg-cyan-50 font-medium' : ''}`}>Higher (natural escrow)</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground flex items-center gap-1">Clawback Risk <InfoTooltip content="The likelihood that the GP will need to return carry distributions. American waterfalls create higher risk because carry is distributed before fund-level performance is known." /></td>
+                  <td className={`p-2 text-center ${waterfallType === 'american' ? 'bg-cyan-50 font-medium text-red-600' : ''}`}>High</td>
+                  <td className={`p-2 text-center ${waterfallType === 'european' ? 'bg-cyan-50 font-medium text-green-600' : ''}`}>Low</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground flex items-center gap-1">Escrow Required <InfoTooltip content="Whether GP carry should be held in escrow. American waterfalls typically require 50-100% escrow to protect LPs. European waterfalls have built-in protection." /></td>
+                  <td className={`p-2 text-center ${waterfallType === 'american' ? 'bg-cyan-50 font-medium' : ''}`}>Recommended (50-100%)</td>
+                  <td className={`p-2 text-center ${waterfallType === 'european' ? 'bg-cyan-50 font-medium' : ''}`}>Typically not needed</td>
                 </tr>
                 <tr className="border-b">
                   <td className="p-2 text-muted-foreground">Common For</td>
