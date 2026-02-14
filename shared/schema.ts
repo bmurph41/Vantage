@@ -24276,3 +24276,98 @@ export const insertLoanBalanceTimelineSchema = createInsertSchema(loanBalanceTim
 });
 export type LoanBalanceTimelineEntry = typeof loanBalanceTimeline.$inferSelect;
 export type InsertLoanBalanceTimelineEntry = z.infer<typeof insertLoanBalanceTimelineSchema>;
+// ============================================================
+// EXIT STRATEGY STUDIO V2 — Schema Additions
+// ============================================================
+
+export const exitStudioAssetClassEnum = pgEnum("exit_studio_asset_class", [
+  "marina", "golf", "multifamily", "retail", "office", "mob",
+  "str", "hotel", "sfr", "duplex", "mall", "industrial",
+  "data_center", "business",
+]);
+
+export const exitStudioStatusEnum = pgEnum("exit_studio_status", [
+  "draft", "final", "locked",
+]);
+
+export const exitStudioEventTypeEnum = pgEnum("exit_studio_event_type", [
+  "create", "update_inputs", "recompute", "export",
+  "lock", "unlock", "compare", "allocation_recompute", "migration",
+]);
+
+export const exitScenarioResultsV2 = pgTable('exit_scenario_results_v2', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  scenarioId: varchar('scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  computedAt: timestamp('computed_at').defaultNow().notNull(),
+  inputsChecksum: text('inputs_checksum').notNull(),
+  outputsJson: jsonb('outputs_json').notNull(),
+  engineVersion: text('engine_version').notNull(),
+}, (table) => ({
+  scenarioChecksumIdx: uniqueIndex('exit_results_v2_scenario_checksum_idx')
+    .on(table.scenarioId, table.inputsChecksum, table.engineVersion),
+  scenarioIdx: index('exit_results_v2_scenario_idx').on(table.scenarioId),
+}));
+
+export const exitScenarioEvents = pgTable('exit_scenario_events', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  scenarioId: varchar('scenario_id').notNull().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  eventType: exitStudioEventTypeEnum('event_type').notNull(),
+  payloadJson: jsonb('payload_json'),
+  userId: varchar('user_id').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  scenarioIdx: index('exit_events_scenario_idx').on(table.scenarioId),
+  eventTypeIdx: index('exit_events_type_idx').on(table.eventType),
+  createdAtIdx: index('exit_events_created_idx').on(table.createdAt),
+}));
+
+export const exitScenarioKpis = pgTable('exit_scenario_kpis', {
+  scenarioId: varchar('scenario_id').primaryKey().references(() => exitScenarios.id, { onDelete: 'cascade' }),
+  computedAt: timestamp('computed_at').defaultNow().notNull(),
+  salePrice: decimal('sale_price', { precision: 18, scale: 2 }),
+  amountRealized: decimal('amount_realized', { precision: 18, scale: 2 }),
+  adjustedBasis: decimal('adjusted_basis', { precision: 18, scale: 2 }),
+  realizedGain: decimal('realized_gain', { precision: 18, scale: 2 }),
+  recognizedGain: decimal('recognized_gain', { precision: 18, scale: 2 }),
+  deferredGain: decimal('deferred_gain', { precision: 18, scale: 2 }),
+  bootTotal: decimal('boot_total', { precision: 18, scale: 2 }),
+  bootCash: decimal('boot_cash', { precision: 18, scale: 2 }),
+  bootMortgage: decimal('boot_mortgage', { precision: 18, scale: 2 }),
+  bootNonLikeKind: decimal('boot_non_like_kind', { precision: 18, scale: 2 }),
+  taxTotal: decimal('tax_total', { precision: 18, scale: 2 }),
+  taxFederal: decimal('tax_federal', { precision: 18, scale: 2 }),
+  taxState: decimal('tax_state', { precision: 18, scale: 2 }),
+  taxNiit: decimal('tax_niit', { precision: 18, scale: 2 }),
+  afterTaxCashNow: decimal('after_tax_cash_now', { precision: 18, scale: 2 }),
+  afterTaxCashTotal: decimal('after_tax_cash_total', { precision: 18, scale: 2 }),
+  afterTaxNpv: decimal('after_tax_npv', { precision: 18, scale: 2 }),
+  lpIrr: decimal('lp_irr', { precision: 10, scale: 6 }),
+  gpIrr: decimal('gp_irr', { precision: 10, scale: 6 }),
+  lpEquityMultiple: decimal('lp_equity_multiple', { precision: 10, scale: 4 }),
+  gpEquityMultiple: decimal('gp_equity_multiple', { precision: 10, scale: 4 }),
+  promoteEarned: decimal('promote_earned', { precision: 18, scale: 2 }),
+  strategiesActive: jsonb('strategies_active'),
+  hasRecaptureExposure: boolean('has_recapture_exposure').default(false),
+  hasTradeDown: boolean('has_trade_down').default(false),
+  advisorReviewRequired: boolean('advisor_review_required').default(false),
+  assetClass: text('asset_class'),
+}, (table) => ({
+  assetClassIdx: index('exit_kpis_asset_class_idx').on(table.assetClass),
+  salePriceIdx: index('exit_kpis_sale_price_idx').on(table.salePrice),
+  afterTaxIdx: index('exit_kpis_after_tax_idx').on(table.afterTaxCashNow),
+}));
+
+export const assetClassAssumptionSets = pgTable('asset_class_assumption_sets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').references(() => organizations.id),
+  assetClass: text('asset_class').notNull(),
+  name: text('name').notNull(),
+  assumptionsJson: jsonb('assumptions_json').notNull(),
+  sourceNotes: text('source_notes'),
+  isDefault: boolean('is_default').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  assetClassIdx: index('assumption_sets_asset_class_idx').on(table.assetClass),
+  orgIdx: index('assumption_sets_org_idx').on(table.orgId),
+}));

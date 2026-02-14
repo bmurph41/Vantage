@@ -14,3 +14,6 @@ export * from './seller-financing-engine';
 export * from './earnout-engine';
 export * from './waterfall-engine-v2';
 export * from './exit-scenario-engine';
+export * from './types';
+export { runExitScenarioV2, ENGINE_VERSION } from './orchestrator-v2';
+export * from './adapters';

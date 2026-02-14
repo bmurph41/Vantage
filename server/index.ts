@@ -26,6 +26,7 @@ import { workspaceRouter } from './routes/workspace-routes';
 import { ddChecklistRouter } from "./routes/dd-checklist-routes";
 import healthRoutes from './routes/health';
 import { deprecationWarning } from './routes/api-versioning';
+import { exitStudioRouter } from './routes/exit-studio-routes';
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -72,6 +73,7 @@ app.use('/api', deprecationWarning('2027-06-01'));
     app.use('/api/wizard-drafts', wizardDraftsRouter);
 app.use(ddChecklistRouter);
     app.use(workspaceRouter);
+    app.use(exitStudioRouter);
 
     // Initialize DockTalk storage and register routes
     const dockTalkStorage = new DockTalkStorage();

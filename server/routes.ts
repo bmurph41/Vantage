@@ -253,6 +253,7 @@ import multer from "multer";
 import { validateFileUpload } from "./middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
+import { exitStudioRouter } from './routes/exit-studio-routes';
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
