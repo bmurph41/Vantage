@@ -270,6 +270,7 @@ const ExitDSTAnalysis = lazy(() => import("@/pages/modeling/exit/DSTAnalysis"));
 const ExitSellerFinancing = lazy(() => import("@/pages/modeling/exit/SellerFinancing"));
 const ExitEarnout = lazy(() => import("@/pages/modeling/exit/Earnout"));
 const ExitWaterfall = lazy(() => import("@/pages/modeling/exit/Waterfall"));
+const ExitReconciliation = lazy(() => import("@/pages/dev/exit-reconciliation"));
 const ExitIRRCalculator = lazy(() => import("@/pages/modeling/exit/IRRCalculator"));
 const ExitSensitivity = lazy(() => import("@/pages/modeling/exit/Sensitivity"));
 const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
@@ -2005,6 +2006,13 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <ExitWaterfall {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/dev/exit-reconciliation">
+        {() => (
+          <UnifiedLayout>
+            <ExitReconciliation />
           </UnifiedLayout>
         )}
       </Route>
