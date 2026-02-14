@@ -41,6 +41,9 @@ import {
   CalendarDays,
   Hash,
   BarChart3,
+  Link2,
+  User,
+  Building2,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +54,7 @@ type PendingProperty = {
   id: string;
   orgId: string;
   compId: string;
+  sourceId?: string | null;
   marinaName: string;
   city: string | null;
   state: string | null;
@@ -64,6 +68,7 @@ type PendingProperty = {
     dryRacks?: number;
     bodyOfWater?: string;
   };
+  sourceMetadata?: Record<string, any>;
   suggestedDuplicates: string[];
   createdBy: string;
   reviewedBy: string | null;
@@ -175,6 +180,16 @@ export function PendingPropertyDetailDialog({
   const { data: comp } = useQuery<SalesComp>({
     queryKey: ['/api/sales-comps', pending?.compId],
     enabled: !!pending?.compId && open,
+  });
+
+  const { data: relatedContacts = [] } = useQuery<any[]>({
+    queryKey: ['/api/crm/pending-contacts'],
+    enabled: open,
+  });
+
+  const { data: relatedCompanies = [] } = useQuery<any[]>({
+    queryKey: ['/api/crm/pending-companies'],
+    enabled: open,
   });
 
   const updateMutation = useMutation({
@@ -772,6 +787,56 @@ export function PendingPropertyDetailDialog({
                       </div>
                     </div>
                   </div>
+
+                  {(() => {
+                    const matchingContacts = relatedContacts.filter((c: any) => {
+                      if (!c || c.status !== 'pending') return false;
+                      if (pending.sourceId && c.sourceId === pending.sourceId) return true;
+                      const meta = (c.sourceMetadata || {}) as Record<string, any>;
+                      if (meta.marina && pending.marinaName && meta.marina.toLowerCase().includes(pending.marinaName.toLowerCase())) return true;
+                      return false;
+                    });
+                    const matchingCompanies = relatedCompanies.filter((c: any) => {
+                      if (!c || c.status !== 'pending') return false;
+                      if (pending.sourceId && c.sourceId === pending.sourceId) return true;
+                      const meta = (c.sourceMetadata || {}) as Record<string, any>;
+                      if (meta.marina && pending.marinaName && meta.marina.toLowerCase().includes(pending.marinaName.toLowerCase())) return true;
+                      return false;
+                    });
+                    const hasRelated = matchingContacts.length > 0 || matchingCompanies.length > 0;
+                    if (!hasRelated) return null;
+                    return (
+                      <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                        <SectionHeader icon={Link2} title="Related Pending Items" accent="purple" />
+                        <div className="p-4 space-y-3">
+                          {matchingContacts.length > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Pending Contacts</Label>
+                              {matchingContacts.map((c: any) => (
+                                <div key={c.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
+                                  <User className="w-3.5 h-3.5 text-blue-500" />
+                                  <span className="text-sm flex-1 truncate">{c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed'}</span>
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{c.status}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {matchingCompanies.length > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Pending Companies</Label>
+                              {matchingCompanies.map((c: any) => (
+                                <div key={c.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md">
+                                  <Building2 className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="text-sm flex-1 truncate">{c.name}</span>
+                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5">{c.status}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
