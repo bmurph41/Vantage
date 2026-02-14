@@ -3191,106 +3191,368 @@ function EarnoutPanel() {
   );
 }
 
+interface PromoteHurdleDef {
+  label: string;
+  irrHurdle: string;
+  sponsorPromote: string;
+}
+
+interface HurdleResult {
+  label: string;
+  irrHurdle: number;
+  sponsorPromote: number;
+  lpDistributed: number;
+  gpDistributed: number;
+  promoteEarned: number;
+  lpIRRAtHurdle: number;
+  capitalAccountStart: number;
+  requiredReturnTotal: number;
+  capitalAccountEnd: number;
+}
+
+interface PromoteWaterfallResult {
+  hurdleResults: HurdleResult[];
+  lpDistPerYear: number[];
+  gpDistPerYear: number[];
+  lpTotal: number;
+  gpTotal: number;
+  totalPromoteEarned: number;
+  lpIRR: number;
+  gpIRR: number;
+  dealIRR: number;
+}
+
+function solveIRR(cashFlows: number[]): number {
+  if (cashFlows.length < 2) return 0;
+  const hasPositive = cashFlows.some(v => v > 0);
+  const hasNegative = cashFlows.some(v => v < 0);
+  if (!hasPositive || !hasNegative) return 0;
+  let rate = 0.1;
+  for (let iter = 0; iter < 300; iter++) {
+    let npv = 0, dnpv = 0;
+    for (let t = 0; t < cashFlows.length; t++) {
+      const disc = Math.pow(1 + rate, t);
+      if (disc === 0) break;
+      npv += cashFlows[t] / disc;
+      dnpv -= t * cashFlows[t] / (disc * (1 + rate));
+    }
+    if (Math.abs(npv) < 0.01) break;
+    if (Math.abs(dnpv) < 1e-10) break;
+    const newRate = rate - npv / dnpv;
+    if (newRate < -0.99) rate = -0.99;
+    else if (newRate > 10) rate = 10;
+    else rate = newRate;
+  }
+  return isFinite(rate) ? rate : 0;
+}
+
+function computeIRRGatedWaterfall(params: {
+  lpEquity: number;
+  gpEquity: number;
+  dealCashFlows: number[];
+  hurdles: PromoteHurdleDef[];
+  includeGPCatchup?: boolean;
+}): PromoteWaterfallResult {
+  const { lpEquity, gpEquity, dealCashFlows, hurdles, includeGPCatchup = false } = params;
+  const totalEquity = lpEquity + gpEquity;
+  if (totalEquity <= 0 || dealCashFlows.length < 2) {
+    return { hurdleResults: [], lpDistPerYear: [], gpDistPerYear: [], lpTotal: 0, gpTotal: 0, totalPromoteEarned: 0, lpIRR: 0, gpIRR: 0, dealIRR: 0 };
+  }
+
+  const lpPct = lpEquity / totalEquity;
+  const gpPct = gpEquity / totalEquity;
+  const yearCount = dealCashFlows.length - 1;
+  const distributablePerYear = dealCashFlows.slice(1).map(v => Math.max(0, v));
+  const lpDistPerYear = new Array(yearCount).fill(0);
+  const gpDistPerYear = new Array(yearCount).fill(0);
+  const hurdleResults: HurdleResult[] = [];
+  const remainingCFs = [...distributablePerYear];
+
+  const sortedHurdles = [...hurdles].sort((a, b) => {
+    const aRate = parseFloat(a.irrHurdle) || 0;
+    const bRate = parseFloat(b.irrHurdle) || 0;
+    if (aRate === 0 && bRate !== 0) return 1;
+    if (bRate === 0 && aRate !== 0) return -1;
+    return aRate - bRate;
+  });
+
+  for (let h = 0; h < sortedHurdles.length; h++) {
+    const hurdle = sortedHurdles[h];
+    const hurdleRate = parseFloat(hurdle.irrHurdle) / 100 || 0;
+    const promoteRate = parseFloat(hurdle.sponsorPromote) / 100 || 0;
+    const isLastTier = h === sortedHurdles.length - 1;
+    const isCatchAll = hurdleRate === 0 && isLastTier;
+
+    let lpDistThisHurdle = 0;
+    let gpDistThisHurdle = 0;
+    let capitalAccountStart = lpEquity;
+    let capitalAccountEnd = lpEquity;
+    let requiredReturnTotal = 0;
+
+    if (isCatchAll) {
+      capitalAccountStart = 0;
+      capitalAccountEnd = 0;
+      for (let y = 0; y < yearCount; y++) {
+        const avail = Math.max(0, remainingCFs[y]);
+        if (avail <= 0) continue;
+        const lpAmt = avail * (1 - promoteRate);
+        const gpAmt = avail * promoteRate;
+        lpDistPerYear[y] += lpAmt;
+        gpDistPerYear[y] += gpAmt;
+        lpDistThisHurdle += lpAmt;
+        gpDistThisHurdle += gpAmt;
+        remainingCFs[y] = 0;
+      }
+    } else {
+      const nextHurdleRate = h < sortedHurdles.length - 1
+        ? (parseFloat(sortedHurdles[h + 1].irrHurdle) / 100 || 0)
+        : Infinity;
+
+      const testIRRAtTotalDist = (yearIdx: number, totalDist: number, lpShareOfDist: number): number => {
+        const testFlows = [-lpEquity, ...lpDistPerYear];
+        testFlows[yearIdx + 1] += totalDist * lpShareOfDist;
+        return solveIRR(testFlows);
+      };
+
+      const distributeAmount = (yearIdx: number, totalAmt: number, lpShare: number) => {
+        const lpAmt = totalAmt * lpShare;
+        const gpAmt = totalAmt - lpAmt;
+        lpDistPerYear[yearIdx] += lpAmt;
+        gpDistPerYear[yearIdx] += gpAmt;
+        lpDistThisHurdle += lpAmt;
+        gpDistThisHurdle += gpAmt;
+      };
+
+      for (let y = 0; y < yearCount; y++) {
+        let avail = Math.max(0, remainingCFs[y]);
+        if (avail <= 0) continue;
+
+        const currentLPIRR = solveIRR([-lpEquity, ...lpDistPerYear]);
+
+        if (!isLastTier && currentLPIRR >= nextHurdleRate - 0.0001) {
+          break;
+        }
+
+        if (currentLPIRR < hurdleRate - 0.0001 && promoteRate > 0) {
+          const irrIfAllProRata = testIRRAtTotalDist(y, avail, lpPct);
+
+          if (irrIfAllProRata < hurdleRate - 0.0001) {
+            distributeAmount(y, avail, lpPct);
+            remainingCFs[y] = 0;
+            continue;
+          }
+
+          let lo = 0, hi = avail;
+          for (let bs = 0; bs < 50; bs++) {
+            const mid = (lo + hi) / 2;
+            if (testIRRAtTotalDist(y, mid, lpPct) < hurdleRate - 0.0001) lo = mid;
+            else hi = mid;
+          }
+
+          if (lo > 0.01) {
+            distributeAmount(y, lo, lpPct);
+            avail -= lo;
+            remainingCFs[y] -= lo;
+            if (remainingCFs[y] < 0.01) { remainingCFs[y] = 0; avail = 0; continue; }
+          }
+        }
+
+        if (avail <= 0.01) continue;
+
+        const splitLP = promoteRate === 0 ? lpPct : (1 - promoteRate);
+
+        if (!isLastTier) {
+          const irrIfAllAtSplit = testIRRAtTotalDist(y, avail, splitLP);
+
+          if (irrIfAllAtSplit >= nextHurdleRate - 0.0001) {
+            let lo = 0, hi = avail;
+            for (let bs = 0; bs < 50; bs++) {
+              const mid = (lo + hi) / 2;
+              if (testIRRAtTotalDist(y, mid, splitLP) < nextHurdleRate - 0.0001) lo = mid;
+              else hi = mid;
+            }
+            if (lo > 0.01) {
+              distributeAmount(y, lo, splitLP);
+              remainingCFs[y] -= lo;
+              if (remainingCFs[y] < 0.01) remainingCFs[y] = 0;
+            }
+            continue;
+          }
+        }
+
+        distributeAmount(y, avail, splitLP);
+        remainingCFs[y] = 0;
+      }
+
+      capitalAccountEnd = Math.max(0, lpEquity - lpDistPerYear.reduce((s, v) => s + v, 0));
+      requiredReturnTotal = lpEquity * hurdleRate * yearCount;
+    }
+
+    const lpFlowsSoFar = [-lpEquity, ...lpDistPerYear];
+    const lpIRRAtHurdle = solveIRR(lpFlowsSoFar) * 100;
+    const gpProRata = lpDistThisHurdle * (gpPct / (lpPct || 1));
+    const promoteEarned = Math.max(0, gpDistThisHurdle - gpProRata);
+
+    hurdleResults.push({
+      label: hurdle.label,
+      irrHurdle: parseFloat(hurdle.irrHurdle) || 0,
+      sponsorPromote: parseFloat(hurdle.sponsorPromote) || 0,
+      lpDistributed: lpDistThisHurdle,
+      gpDistributed: gpDistThisHurdle,
+      promoteEarned,
+      lpIRRAtHurdle,
+      capitalAccountStart,
+      requiredReturnTotal,
+      capitalAccountEnd,
+    });
+  }
+
+  const lpTotal = lpDistPerYear.reduce((s, v) => s + v, 0);
+  const gpTotal = gpDistPerYear.reduce((s, v) => s + v, 0);
+  const totalPromoteEarned = hurdleResults.reduce((s, h) => s + h.promoteEarned, 0);
+  const lpFlows = [-lpEquity, ...lpDistPerYear];
+  const gpFlows = [-gpEquity, ...gpDistPerYear];
+  const lpIRR = solveIRR(lpFlows) * 100;
+  const gpIRR = solveIRR(gpFlows) * 100;
+  const dealIRR = solveIRR(dealCashFlows) * 100;
+
+  return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR };
+}
+
 function WaterfallPanel() {
   const { masterInputs } = useExitStrategiesStore();
-  const [totalDistribution, setTotalDistribution] = useState<string>("10000000");
   const [lpCapital, setLpCapital] = useState<string>("8000000");
   const [gpCapital, setGpCapital] = useState<string>("2000000");
   const [preferredReturn, setPreferredReturn] = useState<string>("8");
   const [carriedInterest, setCarriedInterest] = useState<string>("20");
   const [managementFee, setManagementFee] = useState<string>("1.5");
-  const [useMultiTier, setUseMultiTier] = useState(false);
-  const [promoteTiers, setPromoteTiers] = useState<Array<{
-    returnHurdle: string;
-    carryRate: string;
-  }>>([
-    { returnHurdle: "8", carryRate: "20" },
-    { returnHurdle: "15", carryRate: "30" },
-    { returnHurdle: "20", carryRate: "40" },
-  ]);
   const [waterfallType, setWaterfallType] = useState<'american' | 'european'>('american');
 
-  const totalDistRaw = parseFloat(totalDistribution) || 0;
+  const holdYears = masterInputs.holdingPeriod || 5;
+  const [annualCashFlows, setAnnualCashFlows] = useState<string[]>(
+    Array(holdYears).fill("200000")
+  );
+  const [exitProceeds, setExitProceeds] = useState<string>("12000000");
+
+  const [useIRRPromote, setUseIRRPromote] = useState(false);
+  const [promoteHurdles, setPromoteHurdles] = useState<PromoteHurdleDef[]>([
+    { label: "Preferred Return", irrHurdle: "8", sponsorPromote: "0" },
+    { label: "Hurdle 2", irrHurdle: "9", sponsorPromote: "13" },
+    { label: "Hurdle 3", irrHurdle: "22", sponsorPromote: "45" },
+    { label: "Hurdle 4", irrHurdle: "0", sponsorPromote: "45" },
+  ]);
+  const [includeGPCatchup, setIncludeGPCatchup] = useState(false);
+
+  const adjustedCashFlows = (() => {
+    const cfs = [...annualCashFlows];
+    while (cfs.length < holdYears) cfs.push("200000");
+    while (cfs.length > holdYears) cfs.pop();
+    return cfs;
+  })();
+
+  const updateCashFlow = (index: number, value: string) => {
+    setAnnualCashFlows(prev => {
+      const next = [...prev];
+      while (next.length < holdYears) next.push("200000");
+      next[index] = value;
+      return next;
+    });
+  };
+
   const lpCap = parseFloat(lpCapital) || 0;
   const gpCap = parseFloat(gpCapital) || 0;
   const totalCapital = lpCap + gpCap;
   const prefRate = parseFloat(preferredReturn) / 100 || 0;
   const carryRate = parseFloat(carriedInterest) / 100 || 0;
-  const mgmtFeeAmount = totalCapital * (parseFloat(managementFee) / 100 || 0) * masterInputs.holdingPeriod;
+  const mgmtFeeRate = parseFloat(managementFee) / 100 || 0;
+  const mgmtFeeAmount = totalCapital * mgmtFeeRate * holdYears;
+  const exitProceedsVal = parseFloat(exitProceeds) || 0;
+
+  const lpPct = totalCapital > 0 ? lpCap / totalCapital : 0;
+  const gpPct = totalCapital > 0 ? gpCap / totalCapital : 0;
+
+  const yearlyOperating = adjustedCashFlows.map(cf => parseFloat(cf) || 0);
+  const totalOperating = yearlyOperating.reduce((s, v) => s + v, 0);
+  const totalDistRaw = totalOperating + exitProceedsVal;
   const totalDist = totalDistRaw - mgmtFeeAmount;
 
-  const lpPref = lpCap * prefRate * masterInputs.holdingPeriod;
-  const gpPref = gpCap * prefRate * masterInputs.holdingPeriod;
-  const totalPref = lpPref + gpPref;
-  const afterPrefAndReturn = totalDist - totalPref - totalCapital;
+  const totalCashFlows: number[] = [
+    -totalCapital,
+    ...yearlyOperating.map((cf, i) => {
+      const yearCF = cf - (totalCapital * mgmtFeeRate);
+      if (i === yearlyOperating.length - 1) return yearCF + exitProceedsVal;
+      return yearCF;
+    }),
+  ];
+
+  const lpPref = lpCap * prefRate * holdYears;
+  const gpPref = gpCap * prefRate * holdYears;
+  const afterPrefAndReturn = totalDist - (lpPref + gpPref) - totalCapital;
 
   let gpCatchup = 0;
   let afterCatchup = 0;
   let gpCarry = 0;
   let lpProfit = 0;
-  let tierBreakdown: Array<{ label: string; hurdlePct: number; carryPct: number; profit: number; gpShare: number; lpShare: number }> = [];
-  let blendedCarryRate = 0;
 
-  if (useMultiTier && promoteTiers.length > 0) {
-    const remaining = Math.max(0, afterPrefAndReturn);
-    let allocated = 0;
-    let totalGpFromTiers = 0;
-    let totalLpFromTiers = 0;
+  let lpTotal = 0;
+  let gpTotal = 0;
+  let totalPromoteEarned = 0;
 
-    for (let i = 0; i < promoteTiers.length; i++) {
-      const hurdle = parseFloat(promoteTiers[i].returnHurdle) / 100 || 0;
-      const carry = parseFloat(promoteTiers[i].carryRate) / 100 || 0;
-      const prevHurdle = i > 0 ? (parseFloat(promoteTiers[i - 1].returnHurdle) / 100 || 0) : 0;
+  let hurdleResults: HurdleResult[] = [];
+  let lpDistPerYear: number[] = [];
+  let gpDistPerYear: number[] = [];
+  let dealIRR = 0;
+  let lpIRR = 0;
+  let gpIRR = 0;
 
-      const tierCeiling = totalCapital * hurdle;
-      const prevCeiling = totalCapital * prevHurdle;
-      const tierSize = tierCeiling - prevCeiling;
-
-      const isLastTier = i === promoteTiers.length - 1;
-      const availableForTier = remaining - allocated;
-
-      let tierProfit: number;
-      if (isLastTier) {
-        tierProfit = Math.max(0, availableForTier);
-      } else {
-        tierProfit = Math.max(0, Math.min(tierSize, availableForTier));
-      }
-
-      const gpShare = tierProfit * carry;
-      const lpShare = tierProfit - gpShare;
-
-      tierBreakdown.push({
-        label: isLastTier ? `Above ${(prevHurdle * 100).toFixed(0)}% MOIC` : `${(prevHurdle * 100).toFixed(0)}%–${(hurdle * 100).toFixed(0)}% MOIC`,
-        hurdlePct: hurdle * 100,
-        carryPct: carry * 100,
-        profit: tierProfit,
-        gpShare,
-        lpShare,
-      });
-
-      totalGpFromTiers += gpShare;
-      totalLpFromTiers += lpShare;
-      allocated += tierProfit;
-    }
-
-    gpCarry = totalGpFromTiers;
-    lpProfit = totalLpFromTiers;
-    gpCatchup = 0;
-    afterCatchup = remaining;
-    blendedCarryRate = remaining > 0 ? (totalGpFromTiers / remaining) * 100 : 0;
+  if (useIRRPromote && totalCapital > 0) {
+    const waterfallResult = computeIRRGatedWaterfall({
+      lpEquity: lpCap,
+      gpEquity: gpCap,
+      dealCashFlows: totalCashFlows,
+      hurdles: promoteHurdles,
+      includeGPCatchup,
+    });
+    hurdleResults = waterfallResult.hurdleResults;
+    lpDistPerYear = waterfallResult.lpDistPerYear;
+    gpDistPerYear = waterfallResult.gpDistPerYear;
+    lpTotal = waterfallResult.lpTotal;
+    gpTotal = waterfallResult.gpTotal;
+    totalPromoteEarned = waterfallResult.totalPromoteEarned;
+    lpIRR = waterfallResult.lpIRR;
+    gpIRR = waterfallResult.gpIRR;
+    dealIRR = waterfallResult.dealIRR;
   } else {
     gpCatchup = gpCap > 0 ? Math.min(Math.max(0, afterPrefAndReturn), lpPref * (carryRate / (1 - carryRate))) : 0;
     afterCatchup = Math.max(0, afterPrefAndReturn - gpCatchup);
     gpCarry = afterCatchup > 0 ? afterCatchup * carryRate : 0;
     lpProfit = afterCatchup > 0 ? afterCatchup - gpCarry : 0;
+
+    lpTotal = lpCap + lpPref + lpProfit;
+    gpTotal = gpCap + gpPref + gpCatchup + gpCarry;
+    totalPromoteEarned = gpCatchup + gpCarry;
+
+    lpDistPerYear = yearlyOperating.map((cf, i) => {
+      const netCF = cf - (totalCapital * mgmtFeeRate);
+      const yearCF = i === yearlyOperating.length - 1 ? netCF + exitProceedsVal : netCF;
+      return Math.max(0, yearCF) * (lpTotal / (lpTotal + gpTotal || 1));
+    });
+    gpDistPerYear = yearlyOperating.map((cf, i) => {
+      const netCF = cf - (totalCapital * mgmtFeeRate);
+      const yearCF = i === yearlyOperating.length - 1 ? netCF + exitProceedsVal : netCF;
+      return Math.max(0, yearCF) * (gpTotal / (lpTotal + gpTotal || 1));
+    });
+
+    const lpFlows = [-lpCap, ...lpDistPerYear];
+    const gpFlows = [-gpCap, ...gpDistPerYear];
+    lpIRR = solveIRR(lpFlows) * 100;
+    gpIRR = solveIRR(gpFlows) * 100;
+    dealIRR = solveIRR(totalCashFlows) * 100;
   }
 
-  const lpTotal = lpCap + lpPref + lpProfit;
-  const gpTotal = gpCap + gpPref + gpCatchup + gpCarry;
   const lpMOIC = lpCap > 0 ? lpTotal / lpCap : 0;
   const gpMOIC = gpCap > 0 ? gpTotal / gpCap : 0;
   const dealMOIC = totalCapital > 0 ? totalDist / totalCapital : 0;
-  const lpIRR = lpCap > 0 && masterInputs.holdingPeriod > 0 ? (Math.pow(lpTotal / lpCap, 1 / masterInputs.holdingPeriod) - 1) * 100 : 0;
 
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
   const lpLTCG = lpTotal * 0.60;
@@ -3303,29 +3565,32 @@ function WaterfallPanel() {
   const blendedGPTaxRate = (0.60 * 0.20) + (0.15 * 0.25) + (0.25 * combinedRate);
   const lpAfterTax = lpTotal * (1 - blendedLPTaxRate);
   const gpAfterTax = gpTotal * (1 - blendedGPTaxRate);
-  const gpPromotePercent = (gpCatchup + gpCarry) / (gpCap > 0 ? gpCap : 1) * 100;
-  const prefHurdle = 1 + prefRate * masterInputs.holdingPeriod;
+  const gpPromotePercent = gpCap > 0 ? (totalPromoteEarned / gpCap) * 100 : 0;
+  const prefHurdle = 1 + prefRate * holdYears;
   const hasClawback = dealMOIC < prefHurdle;
-  const clawbackAmount = hasClawback ? gpCatchup + gpCarry : 0;
-
-  const gpEscrowAmount = gpCatchup + gpCarry;
+  const clawbackAmount = hasClawback ? totalPromoteEarned : 0;
+  const gpEscrowAmount = totalPromoteEarned;
   const lpReleaseCondition = lpCap + lpPref;
 
-  const addTier = () => {
-    if (promoteTiers.length < 5) {
-      const lastHurdle = parseFloat(promoteTiers[promoteTiers.length - 1]?.returnHurdle || "20") + 10;
-      setPromoteTiers([...promoteTiers, { returnHurdle: lastHurdle.toString(), carryRate: "50" }]);
+  const addHurdle = () => {
+    if (promoteHurdles.length < 6) {
+      const lastIRR = parseFloat(promoteHurdles[promoteHurdles.length - 1]?.irrHurdle || "20");
+      setPromoteHurdles([...promoteHurdles, {
+        label: `Hurdle ${promoteHurdles.length + 1}`,
+        irrHurdle: (lastIRR + 5).toString(),
+        sponsorPromote: "50",
+      }]);
     }
   };
 
-  const removeTier = (index: number) => {
-    if (promoteTiers.length > 1) {
-      setPromoteTiers(promoteTiers.filter((_, i) => i !== index));
+  const removeHurdle = (index: number) => {
+    if (promoteHurdles.length > 2) {
+      setPromoteHurdles(promoteHurdles.filter((_, i) => i !== index));
     }
   };
 
-  const updateTier = (index: number, field: 'returnHurdle' | 'carryRate', value: string) => {
-    setPromoteTiers(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
+  const updateHurdle = (index: number, field: 'label' | 'irrHurdle' | 'sponsorPromote', value: string) => {
+    setPromoteHurdles(prev => prev.map((h, i) => i === index ? { ...h, [field]: value } : h));
   };
 
   return (
@@ -3337,14 +3602,10 @@ function WaterfallPanel() {
               <BarChart3 className="h-5 w-5 text-cyan-500" />
               Waterfall Analysis
             </CardTitle>
-            <CardDescription>GP/LP fund distribution with preferred return and carry</CardDescription>
+            <CardDescription>GP/LP fund distribution with IRR-based promote hurdles</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs">Total Distribution</Label>
-                <CurrencyInput value={totalDistribution} onChange={setTotalDistribution} />
-              </div>
               <div>
                 <Label className="text-xs">LP Capital</Label>
                 <CurrencyInput value={lpCapital} onChange={setLpCapital} />
@@ -3357,7 +3618,7 @@ function WaterfallPanel() {
                 <Label className="text-xs">Preferred Return</Label>
                 <PercentInput value={preferredReturn} onChange={setPreferredReturn} />
               </div>
-              {!useMultiTier && (
+              {!useIRRPromote && (
                 <div>
                   <Label className="text-xs">Carried Interest</Label>
                   <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
@@ -3367,56 +3628,98 @@ function WaterfallPanel() {
                 <Label className="text-xs">Management Fee (%)</Label>
                 <PercentInput value={managementFee} onChange={setManagementFee} />
               </div>
+              <div>
+                <Label className="text-xs">Exit Proceeds</Label>
+                <CurrencyInput value={exitProceeds} onChange={setExitProceeds} />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-xs font-semibold">Annual Operating Cash Flows</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {adjustedCashFlows.map((cf, i) => (
+                  <div key={i}>
+                    <Label className="text-[10px] text-muted-foreground">Year {i + 1}</Label>
+                    <CurrencyInput value={cf} onChange={(v) => updateCashFlow(i, v)} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                <span>Total Operating CF</span>
+                <span className="font-medium">{formatCurrency(totalOperating)}</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Total Distribution (Operating + Exit)</span>
+                <span className="font-medium">{formatCurrency(totalDistRaw)}</span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 py-2 border-t border-b">
               <input
                 type="checkbox"
-                id="multi-tier-toggle"
-                checked={useMultiTier}
-                onChange={(e) => setUseMultiTier(e.target.checked)}
+                id="irr-promote-toggle"
+                checked={useIRRPromote}
+                onChange={(e) => setUseIRRPromote(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300"
               />
-              <Label htmlFor="multi-tier-toggle" className="text-xs font-medium cursor-pointer">Multi-Tier Promote</Label>
+              <Label htmlFor="irr-promote-toggle" className="text-xs font-medium cursor-pointer">IRR-Based Promote Structure</Label>
+              {useIRRPromote && (
+                <Badge variant="secondary" className="text-[10px] ml-auto">XIRR Method</Badge>
+              )}
             </div>
 
-            {useMultiTier && (
+            {useIRRPromote && (
               <div className="space-y-3">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
-                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Tier</th>
-                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Return Hurdle %</th>
-                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">GP Carry %</th>
+                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Hurdle</th>
+                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">IRR Target (%)</th>
+                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Sponsor Promote (%)</th>
+                        <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Notes</th>
                         <th className="p-1.5 w-8"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {promoteTiers.map((tier, i) => (
+                      {promoteHurdles.map((hurdle, i) => (
                         <tr key={i} className="border-b">
-                          <td className="p-1.5 text-xs font-medium text-muted-foreground">Tier {i + 1}</td>
                           <td className="p-1.5">
                             <Input
-                              type="number"
-                              value={tier.returnHurdle}
-                              onChange={(e) => updateTier(i, 'returnHurdle', e.target.value)}
-                              className="h-7 text-xs w-20"
-                              step="1"
+                              value={hurdle.label}
+                              onChange={(e) => updateHurdle(i, 'label', e.target.value)}
+                              className="h-7 text-xs w-28"
                             />
                           </td>
                           <td className="p-1.5">
                             <Input
                               type="number"
-                              value={tier.carryRate}
-                              onChange={(e) => updateTier(i, 'carryRate', e.target.value)}
+                              value={hurdle.irrHurdle}
+                              onChange={(e) => updateHurdle(i, 'irrHurdle', e.target.value)}
                               className="h-7 text-xs w-20"
-                              step="1"
+                              step="0.5"
                             />
                           </td>
                           <td className="p-1.5">
-                            {promoteTiers.length > 1 && (
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeTier(i)}>
+                            <Input
+                              type="number"
+                              value={hurdle.sponsorPromote}
+                              onChange={(e) => updateHurdle(i, 'sponsorPromote', e.target.value)}
+                              className="h-7 text-xs w-20"
+                              step="1"
+                              disabled={i === 0}
+                            />
+                          </td>
+                          <td className="p-1.5 text-xs text-muted-foreground">
+                            {i === 0
+                              ? "Pref pro-rata to LP/Sponsor"
+                              : parseFloat(hurdle.irrHurdle) === 0
+                                ? "Catch-all above prior hurdle"
+                                : `Sponsor earns ${hurdle.sponsorPromote}% promote`}
+                          </td>
+                          <td className="p-1.5">
+                            {i > 1 && promoteHurdles.length > 2 && (
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeHurdle(i)}>
                                 <Minus className="h-3 w-3 text-red-500" />
                               </Button>
                             )}
@@ -3426,12 +3729,23 @@ function WaterfallPanel() {
                     </tbody>
                   </table>
                 </div>
-                {promoteTiers.length < 5 && (
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addTier}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Tier
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {promoteHurdles.length < 6 && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addHurdle}>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Hurdle
+                    </Button>
+                  )}
+                  <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeGPCatchup}
+                      onChange={(e) => setIncludeGPCatchup(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="text-xs">Include GP Catchup</span>
+                  </label>
+                </div>
               </div>
             )}
 
@@ -3472,14 +3786,22 @@ function WaterfallPanel() {
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground text-sm">Hold Period</span>
-                <span className="num font-medium">{masterInputs.holdingPeriod} years</span>
+                <span className="num font-medium">{holdYears} years</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground text-sm">Total Equity</span>
                 <span className="num font-medium">{formatCurrency(totalCapital)}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-muted-foreground text-sm">Management Fee ({managementFee}% x {masterInputs.holdingPeriod} yrs)</span>
+                <span className="text-muted-foreground text-sm">LP Ownership ({(lpPct * 100).toFixed(1)}%)</span>
+                <span className="num font-medium">{formatCurrency(lpCap)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">GP/Sponsor Ownership ({(gpPct * 100).toFixed(1)}%)</span>
+                <span className="num font-medium">{formatCurrency(gpCap)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Management Fee ({managementFee}% x {holdYears} yrs)</span>
                 <span className="num font-medium text-red-600">-{formatCurrency(mgmtFeeAmount)}</span>
               </div>
               <div className="flex justify-between py-1">
@@ -3493,59 +3815,100 @@ function WaterfallPanel() {
         <Card>
           <CardHeader>
             <CardTitle>Distribution Waterfall</CardTitle>
-            <CardDescription>Step-by-step allocation of proceeds</CardDescription>
+            <CardDescription>
+              {useIRRPromote ? "IRR-based capital account methodology" : "Step-by-step allocation of proceeds"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1: Preferred Return</h4>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">LP Preferred ({preferredReturn}% x {masterInputs.holdingPeriod} yrs)</span>
-                <span className="num font-medium">{formatCurrency(lpPref)}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">GP Preferred ({preferredReturn}% x {masterInputs.holdingPeriod} yrs)</span>
-                <span className="num font-medium">{formatCurrency(gpPref)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2: Return of Capital</h4>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">LP Capital Return</span>
-                <span className="num font-medium">{formatCurrency(lpCap)}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">GP Capital Return</span>
-                <span className="num font-medium">{formatCurrency(gpCap)}</span>
-              </div>
-            </div>
-
-            {useMultiTier ? (
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3: Multi-Tier Profit Split</h4>
-                {tierBreakdown.map((tier, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between py-1 bg-muted/20 rounded px-2">
-                      <span className="text-xs font-semibold text-muted-foreground">Tier {i + 1}: {tier.label} — GP {tier.carryPct.toFixed(0)}%</span>
-                      <span className="num text-xs font-medium">{formatCurrency(tier.profit)}</span>
+            {useIRRPromote ? (
+              <div className="space-y-4">
+                {hurdleResults.map((hr, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Step {i + 1}: {hr.label}
+                        {hr.irrHurdle > 0 ? ` (${hr.irrHurdle}% IRR)` : " (Catch-All)"}
+                      </h4>
+                      {hr.sponsorPromote > 0 && (
+                        <Badge variant="outline" className="text-[10px]">{hr.sponsorPromote}% Promote</Badge>
+                      )}
                     </div>
-                    <div className="flex justify-between py-1 pl-4 border-b">
-                      <span className="text-muted-foreground text-xs">GP Share ({tier.carryPct.toFixed(0)}%)</span>
-                      <span className="num text-xs font-medium">{formatCurrency(tier.gpShare)}</span>
+
+                    {hr.irrHurdle > 0 && (
+                      <div className="bg-muted/20 rounded p-2 space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">LP Capital Account Start</span>
+                          <span className="num">{formatCurrency(hr.capitalAccountStart)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Required Return (accrued)</span>
+                          <span className="num">{formatCurrency(hr.requiredReturnTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">LP Distributions (this tier)</span>
+                          <span className="num text-green-600">{formatCurrency(hr.lpDistributed)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">Capital Account End</span>
+                          <span className="num">{formatCurrency(hr.capitalAccountEnd)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between py-1.5 border-b">
+                      <span className="text-muted-foreground text-sm">LP Distributions</span>
+                      <span className="num font-medium text-green-600">{formatCurrency(hr.lpDistributed)}</span>
                     </div>
-                    <div className="flex justify-between py-1 pl-4 border-b">
-                      <span className="text-muted-foreground text-xs">LP Share ({(100 - tier.carryPct).toFixed(0)}%)</span>
-                      <span className="num text-xs font-medium text-green-600">{formatCurrency(tier.lpShare)}</span>
+                    <div className="flex justify-between py-1.5 border-b">
+                      <span className="text-muted-foreground text-sm">GP/Sponsor Distributions</span>
+                      <span className="num font-medium">{formatCurrency(hr.gpDistributed)}</span>
+                    </div>
+                    {hr.promoteEarned > 0 && (
+                      <div className="flex justify-between py-1.5 border-b">
+                        <span className="text-muted-foreground text-sm italic">Sponsor Promote Earned</span>
+                        <span className="num font-medium text-cyan-600">{formatCurrency(hr.promoteEarned)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-1 bg-muted/10 rounded px-2">
+                      <span className="text-xs text-muted-foreground">Cumulative LP IRR at this step</span>
+                      <span className="num text-xs font-semibold">{hr.lpIRRAtHurdle.toFixed(2)}%</span>
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-between py-2 bg-cyan-50 rounded-lg px-3 mt-2">
-                  <span className="font-semibold text-sm">GP Weighted Blended Carry</span>
-                  <span className="num font-bold text-cyan-600">{blendedCarryRate.toFixed(1)}%</span>
+
+                <div className="border-t pt-3">
+                  <div className="flex justify-between py-2 bg-cyan-50 rounded-lg px-3">
+                    <span className="font-semibold text-sm">Total Sponsor Promote</span>
+                    <span className="num font-bold text-cyan-600">{formatCurrency(totalPromoteEarned)}</span>
+                  </div>
                 </div>
               </div>
             ) : (
               <>
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1: Preferred Return</h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">LP Preferred ({preferredReturn}% x {holdYears} yrs)</span>
+                    <span className="num font-medium">{formatCurrency(lpPref)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">GP Preferred ({preferredReturn}% x {holdYears} yrs)</span>
+                    <span className="num font-medium">{formatCurrency(gpPref)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2: Return of Capital</h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">LP Capital Return</span>
+                    <span className="num font-medium">{formatCurrency(lpCap)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">GP Capital Return</span>
+                    <span className="num font-medium">{formatCurrency(gpCap)}</span>
+                  </div>
+                </div>
+
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2.5: GP Catchup</h4>
                   <div className="flex justify-between py-1.5 border-b">
@@ -3607,13 +3970,19 @@ function WaterfallPanel() {
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Returns Summary</h4>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">LP Total Received</span>
+                <span className="text-muted-foreground text-sm">LP Total Distributions</span>
                 <span className="num font-semibold text-green-600">{formatCurrency(lpTotal)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">GP Total Received</span>
+                <span className="text-muted-foreground text-sm">GP Total Distributions (incl. promote)</span>
                 <span className="num font-semibold">{formatCurrency(gpTotal)}</span>
               </div>
+              {totalPromoteEarned > 0 && (
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm italic">Sponsor Promote Total</span>
+                  <span className="num font-semibold text-cyan-600">{formatCurrency(totalPromoteEarned)}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">LP MOIC</span>
                 <span className="num font-semibold">{lpMOIC.toFixed(2)}x</span>
@@ -3627,8 +3996,16 @@ function WaterfallPanel() {
                 <span className="num font-semibold">{dealMOIC.toFixed(2)}x</span>
               </div>
               <div className="flex justify-between py-2.5 bg-cyan-50 rounded-lg px-3">
-                <span className="font-semibold">LP Est. IRR</span>
-                <span className="num font-bold text-cyan-600">{lpIRR.toFixed(1)}%</span>
+                <span className="font-semibold">LP IRR (XIRR)</span>
+                <span className="num font-bold text-cyan-600">{lpIRR.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-muted/30 rounded-lg px-3">
+                <span className="font-semibold">GP IRR (XIRR)</span>
+                <span className="num font-bold">{gpIRR.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-muted/30 rounded-lg px-3">
+                <span className="font-semibold">Deal-Level IRR</span>
+                <span className="num font-bold">{dealIRR.toFixed(2)}%</span>
               </div>
             </div>
           </CardContent>
@@ -3750,6 +4127,7 @@ function WaterfallPanel() {
   );
 }
 
+
 function IRRCalculatorPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const [initialInvestment, setInitialInvestment] = useState<string>("1000000");
@@ -3761,6 +4139,17 @@ function IRRCalculatorPanel() {
   const [showLevered, setShowLevered] = useState(true);
   const [useMonthly, setUseMonthly] = useState(false);
   const [annualDebtService, setAnnualDebtService] = useState<string>("0");
+  const [showPromoteAnalysis, setShowPromoteAnalysis] = useState(false);
+  const [lpEquityPct, setLpEquityPct] = useState<string>("80");
+  const [irrPromoteHurdles, setIrrPromoteHurdles] = useState<Array<{
+    label: string;
+    irrHurdle: string;
+    sponsorPromote: string;
+  }>>([
+    { label: "Pref Return", irrHurdle: "8", sponsorPromote: "0" },
+    { label: "Hurdle 2", irrHurdle: "12", sponsorPromote: "20" },
+    { label: "Hurdle 3", irrHurdle: "18", sponsorPromote: "30" },
+  ]);
 
   const handleYearCountChange = (newCount: number) => {
     const clamped = Math.max(1, Math.min(10, newCount));
@@ -4170,6 +4559,166 @@ function IRRCalculatorPanel() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-purple-500" />
+            Promote & IRR Analysis
+          </CardTitle>
+          <CardDescription>See how IRR-based promote hurdles affect LP vs GP/Sponsor returns using your cash flows above</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b">
+            <input
+              type="checkbox"
+              id="promote-analysis-toggle"
+              checked={showPromoteAnalysis}
+              onChange={(e) => setShowPromoteAnalysis(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="promote-analysis-toggle" className="text-xs font-medium cursor-pointer">Enable Promote Analysis on These Cash Flows</Label>
+            {showPromoteAnalysis && (
+              <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 ml-auto">XIRR Method</Badge>
+            )}
+          </div>
+
+          {showPromoteAnalysis && (() => {
+            const lpPctVal = Math.min(99, Math.max(1, parseFloat(lpEquityPct) || 80)) / 100;
+            const gpPctVal = 1 - lpPctVal;
+            const lpInvest = activeInvest * lpPctVal;
+            const gpInvest = activeInvest * gpPctVal;
+
+            const promoteResult = computeIRRGatedWaterfall({
+              lpEquity: lpInvest,
+              gpEquity: gpInvest,
+              dealCashFlows: activeFlows,
+              hurdles: irrPromoteHurdles,
+            });
+
+            const hurdleDetails = promoteResult.hurdleResults;
+            const totalLPDist = promoteResult.lpTotal;
+            const totalGPDist = promoteResult.gpTotal;
+            const totalPromote = promoteResult.totalPromoteEarned;
+            const lpMOIC = lpInvest > 0 ? totalLPDist / lpInvest : 0;
+            const gpMOIC = gpInvest > 0 ? totalGPDist / gpInvest : 0;
+            const finalLpIRR = promoteResult.lpIRR;
+            const finalGpIRR = promoteResult.gpIRR;
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs">LP Equity %</Label>
+                    <PercentInput value={lpEquityPct} onChange={setLpEquityPct} />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">GP/Sponsor: {(100 - (parseFloat(lpEquityPct) || 80)).toFixed(0)}%</p>
+                  </div>
+                  <div className="text-xs space-y-1 bg-muted/30 rounded-lg p-3">
+                    <div className="flex justify-between"><span className="text-muted-foreground">LP Equity</span><span className="num font-medium">{formatCurrency(lpInvest)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">GP Equity</span><span className="num font-medium">{formatCurrency(gpInvest)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Deal-Level IRR</span><span className="num font-medium">{isFinite(irr) ? irr.toFixed(2) : '—'}%</span></div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">IRR Promote Hurdles</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Tier</th>
+                          <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">IRR Target %</th>
+                          <th className="p-1.5 text-left text-xs font-semibold text-muted-foreground">Sponsor Promote %</th>
+                          <th className="p-1.5 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {irrPromoteHurdles.map((h, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="p-1.5">
+                              <Input type="text" value={h.label} onChange={(e) => setIrrPromoteHurdles(prev => prev.map((x, j) => j === i ? {...x, label: e.target.value} : x))} className="h-7 text-xs w-24" />
+                            </td>
+                            <td className="p-1.5">
+                              <Input type="number" value={h.irrHurdle} onChange={(e) => setIrrPromoteHurdles(prev => prev.map((x, j) => j === i ? {...x, irrHurdle: e.target.value} : x))} className="h-7 text-xs w-20" step="1" />
+                            </td>
+                            <td className="p-1.5">
+                              <Input type="number" value={h.sponsorPromote} onChange={(e) => setIrrPromoteHurdles(prev => prev.map((x, j) => j === i ? {...x, sponsorPromote: e.target.value} : x))} className="h-7 text-xs w-20" step="1" />
+                            </td>
+                            <td className="p-1.5">
+                              {irrPromoteHurdles.length > 1 && (
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIrrPromoteHurdles(prev => prev.filter((_, j) => j !== i))}>
+                                  <Minus className="h-3 w-3 text-red-500" />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {irrPromoteHurdles.length < 5 && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIrrPromoteHurdles(prev => [...prev, { label: `Hurdle ${prev.length + 1}`, irrHurdle: "25", sponsorPromote: "40" }])}>
+                      <Plus className="h-3 w-3 mr-1" /> Add Hurdle
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3 border-t pt-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Waterfall Distribution by Hurdle</h4>
+                  {hurdleDetails.map((hd, i) => (
+                    <div key={i} className="space-y-1">
+                      <div className="flex justify-between py-1 bg-muted/20 rounded px-2">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          {hd.label}: {hd.irrHurdle > 0 ? `${hd.irrHurdle}% IRR` : 'Catch-All'} — Sponsor {hd.sponsorPromote.toFixed(0)}%
+                        </span>
+                        <span className="num text-xs font-medium">{formatCurrency(hd.lpDistributed + hd.gpDistributed)}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 pl-4 text-xs">
+                        <span className="text-muted-foreground">LP Share</span>
+                        <span className="num font-medium text-green-600">{formatCurrency(hd.lpDistributed)}</span>
+                      </div>
+                      <div className="flex justify-between py-0.5 pl-4 text-xs">
+                        <span className="text-muted-foreground">GP/Sponsor Share</span>
+                        <span className="num font-medium">{formatCurrency(hd.gpDistributed)}</span>
+                      </div>
+                      {hd.promoteEarned > 0 && (
+                        <div className="flex justify-between py-0.5 pl-4 text-xs">
+                          <span className="text-purple-600 italic">Promote Earned</span>
+                          <span className="num font-medium text-purple-600">{formatCurrency(hd.promoteEarned)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-0.5 pl-4 text-xs border-b">
+                        <span className="text-muted-foreground">LP IRR at Step</span>
+                        <span className="num font-medium">{isFinite(hd.lpIRRAtHurdle) && Math.abs(hd.lpIRRAtHurdle) < 1000 ? hd.lpIRRAtHurdle.toFixed(2) : '—'}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">LP vs GP/Sponsor Returns</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-green-50 rounded-lg p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-green-700">LP (Investor)</p>
+                      <div className="flex justify-between text-xs"><span className="text-green-600">Total Distributions</span><span className="num font-semibold">{formatCurrency(totalLPDist)}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-green-600">MOIC</span><span className="num font-semibold">{lpMOIC.toFixed(2)}x</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-green-600">IRR (XIRR)</span><span className="num font-bold">{isFinite(finalLpIRR) && Math.abs(finalLpIRR) < 1000 ? finalLpIRR.toFixed(2) : '—'}%</span></div>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-purple-700">GP/Sponsor</p>
+                      <div className="flex justify-between text-xs"><span className="text-purple-600">Total Distributions</span><span className="num font-semibold">{formatCurrency(totalGPDist)}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-purple-600">Promote Earned</span><span className="num font-semibold">{formatCurrency(totalPromote)}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-purple-600">MOIC</span><span className="num font-semibold">{gpMOIC.toFixed(2)}x</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-purple-600">IRR (XIRR)</span><span className="num font-bold">{isFinite(finalGpIRR) && Math.abs(finalGpIRR) < 1000 ? finalGpIRR.toFixed(2) : '—'}%</span></div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic">Promote allows the sponsor to earn a disproportionate share of returns above each IRR hurdle, incentivizing performance above the preferred return.</p>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
     </div>
   );
 }
