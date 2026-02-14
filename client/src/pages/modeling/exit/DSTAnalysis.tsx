@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, Landmark, ChevronRight, Download, Plus, Trash2, Building, DollarSign, AlertTriangle, TrendingUp, PieChart, Percent, Calculator, Info } from "lucide-react";
+import { ArrowLeft, Landmark, ChevronRight, Download, Plus, Trash2, Building, DollarSign, AlertTriangle, TrendingUp, PieChart, Percent, Calculator, Info, Clock, ArrowRight, Shield, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ModelingProject } from "@shared/schema";
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
@@ -842,6 +842,301 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
           </TabsContent>
         </Tabs>
         <ExitProForma config={proFormaConfig} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Secondary Market Liquidity Analysis
+            </CardTitle>
+            <CardDescription>Estimated proceeds if DST interests are sold on the secondary market</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Typical Discount to NAV</p>
+                <p className="text-xl font-bold">15–30%</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Average Time to Sell</p>
+                <p className="text-xl font-bold">6–18 months</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Broker Fee (Secondary)</p>
+                <p className="text-xl font-bold">5–7%</p>
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Scenario</TableHead>
+                  <TableHead className="text-right">Discount to NAV</TableHead>
+                  <TableHead className="text-right">Gross Market Value</TableHead>
+                  <TableHead className="text-right">Broker Fee (6%)</TableHead>
+                  <TableHead className="text-right">Net Proceeds</TableHead>
+                  <TableHead className="text-right">Loss vs. NAV</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[
+                  { label: "Optimistic", discount: 0.15 },
+                  { label: "Base", discount: 0.22 },
+                  { label: "Stress", discount: 0.30 },
+                ].map((scenario) => {
+                  const grossValue = investmentAmount * (1 - scenario.discount);
+                  const brokerFee = grossValue * 0.06;
+                  const netProceeds = grossValue - brokerFee;
+                  const lossVsNav = investmentAmount - netProceeds;
+                  return (
+                    <TableRow key={scenario.label}>
+                      <TableCell className="font-medium">
+                        <Badge variant="outline" className={
+                          scenario.label === "Optimistic" ? "text-green-600 border-green-600" :
+                          scenario.label === "Base" ? "text-yellow-600 border-yellow-600" :
+                          "text-red-600 border-red-600"
+                        }>
+                          {scenario.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="num text-right">{(scenario.discount * 100).toFixed(0)}%</TableCell>
+                      <TableCell className="num text-right">${grossValue.toLocaleString()}</TableCell>
+                      <TableCell className="num text-right text-red-500">${brokerFee.toLocaleString()}</TableCell>
+                      <TableCell className="num text-right font-semibold">${netProceeds.toLocaleString()}</TableCell>
+                      <TableCell className="num text-right text-red-500">-${lossVsNav.toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <div className="p-4 border rounded-lg">
+              <h4 className="font-medium mb-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                Secondary Market Limitations
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>DST secondary market is highly illiquid with limited buyers</li>
+                <li>Actual discounts may exceed modeled scenarios depending on market conditions</li>
+                <li>No guarantee of finding a buyer within the estimated timeframe</li>
+                <li>Broker fees on secondary transactions are higher than traditional real estate</li>
+                <li>Transfer restrictions in DST operating agreements may limit resale options</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowRight className="h-5 w-5" />
+              DST-to-UPREIT Conversion (721 Exchange)
+            </CardTitle>
+            <CardDescription>Section 721 exchange pathway from DST interests to REIT shares</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { label: "DST Maturity", sublabel: "Illiquid", color: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" },
+                { label: "721 Exchange", sublabel: "No Tax Event", color: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" },
+                { label: "OP Units", sublabel: "Semi-Liquid", color: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" },
+                { label: "REIT Shares", sublabel: "Liquid (after lock-up)", color: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" },
+              ].map((step, idx) => (
+                <div key={step.label} className="flex items-center gap-2">
+                  <div className={`px-4 py-3 rounded-lg text-center ${step.color}`}>
+                    <p className="font-semibold text-sm">{step.label}</p>
+                    <p className="text-xs">{step.sublabel}</p>
+                  </div>
+                  {idx < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              ))}
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Estimated OP Unit Value (at NAV)</p>
+                <p className="num text-xl font-bold">${investmentAmount.toLocaleString()}</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Typical REIT Lock-up Period</p>
+                <p className="text-xl font-bold">12–24 months</p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">REIT Dividend Yield (est.)</p>
+                <p className="num text-xl font-bold text-green-600">{portfolioSummary.blendedCashOnCash.toFixed(2)}%</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 border rounded-lg space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Conversion Timeline
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {dstOptions.map(dst => (
+                    <div key={dst.id} className="flex justify-between">
+                      <span className="text-muted-foreground">{dst.name}</span>
+                      <span className="num font-medium">Matures Year {dst.holdPeriod} → 721 eligible</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 border rounded-lg space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Tax Impact
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                    <span>721 Exchange (DST → OP Units)</span>
+                    <Badge variant="outline" className="text-green-600 border-green-600">No Tax Event</Badge>
+                  </div>
+                  <div className="flex justify-between p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                    <span>OP Units → REIT Shares</span>
+                    <Badge variant="outline" className="text-green-600 border-green-600">Tax Deferred</Badge>
+                  </div>
+                  <div className="flex justify-between p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                    <span>REIT Shares Sold</span>
+                    <Badge variant="outline" className="text-yellow-600 border-yellow-600">Capital Gains Due</Badge>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <span className="text-muted-foreground">Estimated deferred gain</span>
+                    <span className="num font-semibold">${exchangeGain.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Estimated tax at sale</span>
+                    <span className="num font-semibold text-red-500">${(exchangeGain * (federalTaxRate + stateTaxRate) / 100).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Refinancing Risk Model
+            </CardTitle>
+            <CardDescription>Impact of interest rate changes on DST debt service at maturity</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {(() => {
+              const baseRate = 5.0;
+              const weightedLTV = totalAllocation > 0
+                ? dstOptions.reduce((sum, dst) => sum + (dst.ltv * dst.allocation / totalAllocation), 0)
+                : 45;
+              const totalDebt = dstOptions.reduce((sum, dst) => {
+                const alloc = investmentAmount * (dst.allocation / 100);
+                return sum + (dst.ltv > 0 ? alloc * (dst.ltv / (100 - dst.ltv)) : 0);
+              }, 0);
+              const totalPropertyValue = dstOptions.reduce((sum, dst) => {
+                const alloc = investmentAmount * (dst.allocation / 100);
+                return sum + (dst.ltv < 100 ? alloc / (1 - dst.ltv / 100) : alloc);
+              }, 0);
+              const totalNOI = portfolioSummary.totalAnnualCashFlow + (totalDebt * baseRate / 100);
+
+              const scenarios = [
+                { label: "Current Rate", rateAdj: 0 },
+                { label: "+1.0%", rateAdj: 1.0 },
+                { label: "+2.0%", rateAdj: 2.0 },
+                { label: "+3.0%", rateAdj: 3.0 },
+              ];
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Total DST Debt</p>
+                      <p className="num text-xl font-bold">${totalDebt.toLocaleString()}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Weighted Avg LTV</p>
+                      <p className="num text-xl font-bold">{weightedLTV.toFixed(1)}%</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Current Base Rate</p>
+                      <p className="num text-xl font-bold">{baseRate.toFixed(1)}%</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">Estimated NOI</p>
+                      <p className="num text-xl font-bold">${totalNOI.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Scenario</TableHead>
+                        <TableHead className="text-right">Interest Rate</TableHead>
+                        <TableHead className="text-right">Annual Debt Service</TableHead>
+                        <TableHead className="text-right">Cash Flow Impact</TableHead>
+                        <TableHead className="text-right">Breakeven Occupancy</TableHead>
+                        <TableHead className="text-right">DSCR</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scenarios.map((scenario) => {
+                        const newRate = baseRate + scenario.rateAdj;
+                        const annualDebtService = totalDebt * (newRate / 100);
+                        const currentDebtService = totalDebt * (baseRate / 100);
+                        const cashFlowImpact = -(annualDebtService - currentDebtService);
+                        const breakEvenOccupancy = totalNOI > 0
+                          ? (annualDebtService / totalNOI) * 100
+                          : 0;
+                        const dscr = annualDebtService > 0 ? totalNOI / annualDebtService : 0;
+
+                        return (
+                          <TableRow key={scenario.label}>
+                            <TableCell className="font-medium">{scenario.label}</TableCell>
+                            <TableCell className="num text-right">{newRate.toFixed(1)}%</TableCell>
+                            <TableCell className="num text-right">${annualDebtService.toLocaleString()}</TableCell>
+                            <TableCell className={`num text-right ${cashFlowImpact < 0 ? 'text-red-500' : ''}`}>
+                              {cashFlowImpact === 0 ? '—' : `${cashFlowImpact < 0 ? '-' : '+'}$${Math.abs(cashFlowImpact).toLocaleString()}`}
+                            </TableCell>
+                            <TableCell className="num text-right">{breakEvenOccupancy.toFixed(1)}%</TableCell>
+                            <TableCell className={`num text-right font-semibold ${dscr < 1.25 ? 'text-red-500' : 'text-green-600'}`}>
+                              {dscr.toFixed(2)}x
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {dscr < 1.25 ? (
+                                <Badge variant="outline" className="text-red-600 border-red-600">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Below 1.25x
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-green-600 border-green-600">Adequate</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      Balloon Payment & Refinancing Risk
+                    </h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>DST loans typically have fixed terms of 7–10 years with balloon payments at maturity</li>
+                      <li>Balloon payment of ${totalDebt.toLocaleString()} will be due at loan maturity</li>
+                      <li>DSTs cannot refinance debt — if the loan matures, the property must be sold or the DST dissolved</li>
+                      <li>Rising interest rates at maturity may reduce property values and exit proceeds</li>
+                      <li>DSCR below 1.25x indicates elevated risk of cash flow shortfall</li>
+                    </ul>
+                  </div>
+                </>
+              );
+            })()}
+          </CardContent>
+        </Card>
       </div>
     </TooltipProvider>
   );

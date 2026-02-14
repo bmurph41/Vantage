@@ -459,6 +459,65 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
   const riskAdjustedValue = npvOfNote - expectedLoss;
 
   const [comparisonScenarios, setComparisonScenarios] = useState<ComparisonScenario[]>([]);
+  const [psaSpeed, setPsaSpeed] = useState(100);
+
+  const psaAnalysis = useMemo(() => {
+    const calcScenario = (speed: number) => {
+      const monthlyRate = inputs.interestRate / 100 / 12;
+      const totalMonths = inputs.termYears * 12;
+      let balance = loanAmount;
+      let cumulativePrepayment = 0;
+      let totalInterestReceived = 0;
+      let weightedPrincipalTime = 0;
+      let totalPrincipalReceived = 0;
+      const yearlyData: { year: number; avgCpr: number; cumulativePrepayment: number; remainingBalance: number; fullPrepayProb: number }[] = [];
+
+      for (let yr = 1; yr <= inputs.termYears; yr++) {
+        let yearCprSum = 0;
+        for (let m = 1; m <= 12; m++) {
+          const monthNum = (yr - 1) * 12 + m;
+          if (monthNum > totalMonths) break;
+          const cpr = Math.min(monthNum / 30, 1) * 0.06 * (speed / 100);
+          const smm = 1 - Math.pow(1 - cpr, 1 / 12);
+          yearCprSum += cpr;
+          const interest = balance * monthlyRate;
+          totalInterestReceived += interest;
+          const scheduledPrincipal = monthlyRate > 0
+            ? (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1)) - interest
+            : loanAmount / totalMonths;
+          const prepayment = balance * smm;
+          const actualPrincipal = Math.min(scheduledPrincipal + prepayment, balance);
+          cumulativePrepayment += Math.max(0, actualPrincipal - Math.max(scheduledPrincipal, 0));
+          weightedPrincipalTime += actualPrincipal * (monthNum / 12);
+          totalPrincipalReceived += actualPrincipal;
+          balance = Math.max(0, balance - actualPrincipal);
+        }
+        const avgCpr = yearCprSum / 12;
+        const survivalProb = balance / loanAmount;
+        const fullPrepayProb = 1 - survivalProb;
+        yearlyData.push({
+          year: yr,
+          avgCpr,
+          cumulativePrepayment,
+          remainingBalance: balance,
+          fullPrepayProb,
+        });
+      }
+
+      const avgLife = totalPrincipalReceived > 0 ? weightedPrincipalTime / totalPrincipalReceived : inputs.termYears / 2;
+      const effectiveYield = loanAmount > 0 ? (totalInterestReceived / loanAmount / Math.max(avgLife, 0.1)) * 100 : 0;
+      const totalReturn = downPaymentAmount + totalPrincipalReceived + totalInterestReceived;
+
+      return { yearlyData, avgLife, totalInterestReceived, effectiveYield, totalReturn, speed };
+    };
+
+    return {
+      current: calcScenario(psaSpeed),
+      slow: calcScenario(50),
+      standard: calcScenario(100),
+      fast: calcScenario(200),
+    };
+  }, [psaSpeed, loanAmount, inputs.interestRate, inputs.termYears, downPaymentAmount]);
 
   const addCurrentAsScenario = useCallback(() => {
     const structureLabel = PAYMENT_STRUCTURES.find(s => s.value === paymentStructure)?.label || paymentStructure;
@@ -1409,6 +1468,144 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
             </TabsContent>
           )}
         </Tabs>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Prepayment Probability Curves (PSA/CPR Model)
+            </CardTitle>
+            <CardDescription>
+              PSA Standard Prepayment Model analysis with conditional prepayment rate curves
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>PSA Speed</Label>
+                  <span className="font-medium">{psaSpeed}%</span>
+                </div>
+                <Slider
+                  value={[psaSpeed]}
+                  onValueChange={([value]) => setPsaSpeed(value)}
+                  min={50}
+                  max={300}
+                  step={10}
+                />
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Loan Amount</p>
+                <p className="num font-semibold">${loanAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Interest Rate</p>
+                <p className="num font-semibold">{inputs.interestRate}%</p>
+              </div>
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Term</p>
+                <p className="num font-semibold">{inputs.termYears} years</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3">Yearly Prepayment Schedule ({psaSpeed}% PSA)</h4>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead className="text-right">Avg CPR</TableHead>
+                      <TableHead className="text-right">Cumulative Prepayment</TableHead>
+                      <TableHead className="text-right">Remaining Balance</TableHead>
+                      <TableHead className="text-right">Prob. of Full Prepayment</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {psaAnalysis.current.yearlyData.map((row) => (
+                      <TableRow key={row.year}>
+                        <TableCell>{row.year}</TableCell>
+                        <TableCell className="num text-right">{(row.avgCpr * 100).toFixed(2)}%</TableCell>
+                        <TableCell className="num text-right">${row.cumulativePrepayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                        <TableCell className="num text-right">${row.remainingBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                        <TableCell className="num text-right">{(row.fullPrepayProb * 100).toFixed(1)}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h4 className="font-medium mb-3">PSA Speed Scenario Comparison</h4>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Metric</TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>50% PSA</span>
+                          <Badge variant="outline" className="text-xs mt-1">Slow</Badge>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>100% PSA</span>
+                          <Badge variant="outline" className="text-xs mt-1">Standard</Badge>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>200% PSA</span>
+                          <Badge variant="outline" className="text-xs mt-1">Fast</Badge>
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Expected Average Life</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.slow.avgLife.toFixed(2)} yrs</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.standard.avgLife.toFixed(2)} yrs</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.fast.avgLife.toFixed(2)} yrs</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Total Interest Received</TableCell>
+                      <TableCell className="num text-center text-green-600">${psaAnalysis.slow.totalInterestReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                      <TableCell className="num text-center text-green-600">${psaAnalysis.standard.totalInterestReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                      <TableCell className="num text-center text-green-600">${psaAnalysis.fast.totalInterestReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Effective Yield</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.slow.effectiveYield.toFixed(2)}%</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.standard.effectiveYield.toFixed(2)}%</TableCell>
+                      <TableCell className="num text-center">{psaAnalysis.fast.effectiveYield.toFixed(2)}%</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Seller's Total Return</TableCell>
+                      <TableCell className="num text-center font-semibold text-blue-600">${psaAnalysis.slow.totalReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                      <TableCell className="num text-center font-semibold text-blue-600">${psaAnalysis.standard.totalReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                      <TableCell className="num text-center font-semibold text-blue-600">${psaAnalysis.fast.totalReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
+              <p className="font-medium text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Prepayment Speed Impact
+              </p>
+              <p className="text-muted-foreground">
+                Higher PSA speeds favor the seller by returning principal earlier, reducing credit risk exposure and shortening the weighted average life of the note. However, faster prepayment reduces total interest income. At {psaSpeed}% PSA, the expected average life is {psaAnalysis.current.avgLife.toFixed(1)} years with ${psaAnalysis.current.totalInterestReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })} in total interest versus ${psaAnalysis.slow.totalInterestReceived.toLocaleString(undefined, { maximumFractionDigits: 0 })} at 50% PSA — a difference of ${Math.abs(psaAnalysis.current.totalInterestReceived - psaAnalysis.slow.totalInterestReceived).toLocaleString(undefined, { maximumFractionDigits: 0 })}.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </TooltipProvider>
   );

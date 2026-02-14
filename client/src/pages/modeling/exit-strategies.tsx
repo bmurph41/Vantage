@@ -770,13 +770,56 @@ function TaxAndProceedsPanel() {
   const b = getCashSaleBaseline(masterInputs);
 
   const stateTaxOptions = [
-    { label: "Florida (0%)", value: 0 },
-    { label: "Texas (0%)", value: 0 },
+    { label: "Alabama (5.0%)", value: 5.0 },
+    { label: "Alaska (0%)", value: 0 },
+    { label: "Arizona (2.5%)", value: 2.5 },
+    { label: "Arkansas (4.4%)", value: 4.4 },
     { label: "California (13.3%)", value: 13.3 },
-    { label: "New York (10.9%)", value: 10.9 },
-    { label: "New Jersey (10.75%)", value: 10.75 },
+    { label: "Colorado (4.4%)", value: 4.4 },
+    { label: "Connecticut (6.99%)", value: 6.99 },
+    { label: "Delaware (6.6%)", value: 6.6 },
+    { label: "Florida (0%)", value: 0 },
+    { label: "Georgia (5.49%)", value: 5.49 },
+    { label: "Hawaii (7.25%)", value: 7.25 },
+    { label: "Idaho (5.8%)", value: 5.8 },
     { label: "Illinois (4.95%)", value: 4.95 },
-    { label: "Massachusetts (9%)", value: 9 },
+    { label: "Indiana (3.05%)", value: 3.05 },
+    { label: "Iowa (5.7%)", value: 5.7 },
+    { label: "Kansas (5.7%)", value: 5.7 },
+    { label: "Kentucky (4.0%)", value: 4.0 },
+    { label: "Louisiana (4.25%)", value: 4.25 },
+    { label: "Maine (7.15%)", value: 7.15 },
+    { label: "Maryland (5.75%)", value: 5.75 },
+    { label: "Massachusetts (9.0%)", value: 9.0 },
+    { label: "Michigan (4.25%)", value: 4.25 },
+    { label: "Minnesota (9.85%)", value: 9.85 },
+    { label: "Mississippi (5.0%)", value: 5.0 },
+    { label: "Missouri (4.95%)", value: 4.95 },
+    { label: "Montana (6.75%)", value: 6.75 },
+    { label: "Nebraska (6.64%)", value: 6.64 },
+    { label: "Nevada (0%)", value: 0 },
+    { label: "New Hampshire (4.0%)", value: 4.0 },
+    { label: "New Jersey (10.75%)", value: 10.75 },
+    { label: "New Mexico (5.9%)", value: 5.9 },
+    { label: "New York (10.9%)", value: 10.9 },
+    { label: "North Carolina (4.5%)", value: 4.5 },
+    { label: "North Dakota (2.5%)", value: 2.5 },
+    { label: "Ohio (3.5%)", value: 3.5 },
+    { label: "Oklahoma (4.75%)", value: 4.75 },
+    { label: "Oregon (9.9%)", value: 9.9 },
+    { label: "Pennsylvania (3.07%)", value: 3.07 },
+    { label: "Rhode Island (5.99%)", value: 5.99 },
+    { label: "South Carolina (6.4%)", value: 6.4 },
+    { label: "South Dakota (0%)", value: 0 },
+    { label: "Tennessee (0%)", value: 0 },
+    { label: "Texas (0%)", value: 0 },
+    { label: "Utah (4.65%)", value: 4.65 },
+    { label: "Vermont (8.75%)", value: 8.75 },
+    { label: "Virginia (5.75%)", value: 5.75 },
+    { label: "Washington (7.0%)", value: 7.0 },
+    { label: "West Virginia (6.5%)", value: 6.5 },
+    { label: "Wisconsin (7.65%)", value: 7.65 },
+    { label: "Wyoming (0%)", value: 0 },
   ];
 
   const matchedState = stateTaxOptions.find(s => s.value === masterInputs.stateTaxRate);
@@ -894,18 +937,64 @@ function TaxAndProceedsPanel() {
               </div>
             </div>
 
-            <div className="border-t pt-4 space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AMT Exposure Estimate</h4>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">AMT Preference Items (est.)</span>
-                <span className="num font-medium">{formatCurrency(masterInputs.depreciationTaken * 0.15)}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Tentative AMT (28%)</span>
-                <span className="num font-medium text-amber-600">{formatCurrency(masterInputs.depreciationTaken * 0.15 * 0.28)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground italic pt-1">AMT exposure is estimated. Consult a CPA for precise calculation.</p>
-            </div>
+            {(() => {
+              const agi = masterInputs.salePrice * 0.5;
+              const capitalGainForAMT = b.capitalGain;
+              const filingStatus = 'married' as const;
+              const exemption2025 = filingStatus === 'married' ? 133300 : 85700;
+              const phaseoutStart = filingStatus === 'married' ? 1218700 : 609350;
+              const phaseoutReduction = Math.max(0, agi - phaseoutStart) * 0.25;
+              const amtExemption = Math.max(0, exemption2025 - phaseoutReduction);
+              const amti = agi + capitalGainForAMT * 0.10 + masterInputs.depreciationTaken * 0.15;
+              const taxableAMTI = Math.max(0, amti - amtExemption);
+              const amtBracket = 232600;
+              const tentativeMinTax = taxableAMTI <= amtBracket
+                ? taxableAMTI * 0.26
+                : amtBracket * 0.26 + (taxableAMTI - amtBracket) * 0.28;
+              const regularTax = b.totalTax;
+              const amtOwed = Math.max(0, tentativeMinTax - regularTax);
+              const isExposed = amtOwed > 0;
+
+              return (
+                <div className="border-t pt-4 space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    Alternative Minimum Tax (AMT) Analysis
+                  </h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">AMT Exemption (2025)</span>
+                    <span className="num font-medium">{formatCurrency(amtExemption)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">AMT Preference Items</span>
+                    <span className="num font-medium">{formatCurrency(masterInputs.depreciationTaken * 0.15 + capitalGainForAMT * 0.10)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Alternative Minimum Taxable Income</span>
+                    <span className="num font-medium">{formatCurrency(taxableAMTI)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Tentative Minimum Tax</span>
+                    <span className="num font-medium text-amber-600">{formatCurrency(tentativeMinTax)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Regular Tax Liability</span>
+                    <span className="num font-medium">{formatCurrency(regularTax)}</span>
+                  </div>
+                  <div className={`flex justify-between py-2.5 rounded-lg px-3 ${isExposed ? 'bg-red-50' : 'bg-green-50'}`}>
+                    <span className="font-semibold">{isExposed ? 'AMT Owed (Additional)' : 'No AMT Exposure'}</span>
+                    <span className={`num font-bold ${isExposed ? 'text-red-600' : 'text-green-600'}`}>{isExposed ? formatCurrency(amtOwed) : '$0'}</span>
+                  </div>
+                  {isExposed && (
+                    <p className="text-xs text-red-600 italic">AMT triggered — consider timing strategies, installment sales, or charitable remainder trusts to manage AMT exposure.</p>
+                  )}
+                  {!isExposed && (
+                    <p className="text-xs text-green-600 italic">Regular tax exceeds tentative minimum tax — no additional AMT liability.</p>
+                  )}
+                  <p className="text-xs text-muted-foreground italic pt-1">AMT calculation uses estimated AGI and 2025 exemption levels. Consult a CPA for precise calculation.</p>
+                </div>
+              );
+            })()}
 
             {(() => {
               const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
@@ -1491,6 +1580,248 @@ function Exchange1031Panel() {
           </CardContent>
         </Card>
       </div>
+
+      {isReverseExchange && (() => {
+        const eatFee = 12500;
+        const parkingCostMonthly = 1500;
+        const parkingMonths = 6;
+        const totalParkingCosts = parkingCostMonthly * parkingMonths;
+        const additionalHoldingCosts = replacement * 0.005;
+        const totalReverseCosts = eatFee + totalParkingCosts + additionalHoldingCosts;
+        const standardCosts = effectiveExchCosts / 1.5;
+        const reversePremium = totalReverseCosts - standardCosts;
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-amber-500" />
+                Reverse Exchange (EAT) Analysis
+              </CardTitle>
+              <CardDescription>Exchange Accommodation Titleholder structure for buying before selling</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reverse Exchange Timeline</h4>
+                <div className="flex items-center gap-2 py-3">
+                  <div className="flex-1 text-center">
+                    <div className="bg-blue-100 rounded-lg p-3">
+                      <Building className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                      <p className="text-xs font-medium">Acquire Replacement</p>
+                      <p className="text-xs text-muted-foreground">Day 0</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 text-center">
+                    <div className="bg-amber-100 rounded-lg p-3">
+                      <Shield className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                      <p className="text-xs font-medium">Park with EAT</p>
+                      <p className="text-xs text-muted-foreground">Day 1–180</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 text-center">
+                    <div className="bg-green-100 rounded-lg p-3">
+                      <DollarSign className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                      <p className="text-xs font-medium">Sell Relinquished</p>
+                      <p className="text-xs text-muted-foreground">Within 180 Days</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional Costs</h4>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">EAT Fee</span>
+                  <span className="num font-medium text-red-600">{formatCurrency(eatFee)}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Parking Costs ({parkingMonths} months × {formatCurrency(parkingCostMonthly)}/mo)</span>
+                  <span className="num font-medium text-red-600">{formatCurrency(totalParkingCosts)}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Additional Holding Costs (insurance, taxes)</span>
+                  <span className="num font-medium text-red-600">{formatCurrency(additionalHoldingCosts)}</span>
+                </div>
+                <div className="flex justify-between py-2 bg-red-50 rounded-lg px-3">
+                  <span className="font-semibold text-sm">Total Reverse Exchange Costs</span>
+                  <span className="num font-bold text-red-600">{formatCurrency(totalReverseCosts)}</span>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Standard vs Reverse Comparison</h4>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Standard Exchange Costs</span>
+                  <span className="num font-medium">{formatCurrency(standardCosts)}</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Reverse Exchange Costs</span>
+                  <span className="num font-medium text-red-600">{formatCurrency(totalReverseCosts)}</span>
+                </div>
+                <div className="flex justify-between py-2 bg-amber-50 rounded-lg px-3">
+                  <span className="font-semibold text-sm">Reverse Exchange Premium</span>
+                  <span className="num font-bold text-amber-600">+{formatCurrency(reversePremium)}</span>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requirements Checklist</h4>
+                <div className="space-y-2">
+                  {[
+                    "Qualified Intermediary (QI) must be engaged before closing",
+                    "Exchange Accommodation Titleholder (EAT) entity established",
+                    "Qualified Exchange Accommodation Agreement (QEAA) executed",
+                    "EAT takes title to replacement property at closing",
+                    "Relinquished property must be sold within 180 days",
+                    "45-day identification period still applies for relinquished property",
+                    "Taxpayer cannot have actual or constructive receipt of funds",
+                    "Parking arrangement must have genuine economic substance",
+                  ].map((req, i) => (
+                    <div key={i} className="flex items-start gap-2 py-1">
+                      <CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                      <span className="text-sm text-muted-foreground">{req}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-indigo-500" />
+            Drop-and-Swap Entity Structuring
+          </CardTitle>
+          <CardDescription>Entity restructuring strategies for multi-member LLCs pursuing 1031 exchanges</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+            <p className="text-xs text-indigo-800">
+              <span className="font-semibold">Multi-Member LLC Strategy:</span> When a multi-member LLC owns property, individual members cannot directly do a 1031 exchange on partnership interests. A drop-and-swap restructures ownership so each member can independently pursue tax-deferred exchanges.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entity Structure Options</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground text-xs uppercase">Structure</th>
+                    <th className="text-left py-2 pr-4 font-medium text-muted-foreground text-xs uppercase">Ownership</th>
+                    <th className="text-center py-2 pr-4 font-medium text-muted-foreground text-xs uppercase">Complexity</th>
+                    <th className="text-center py-2 pr-4 font-medium text-muted-foreground text-xs uppercase">Tax Risk</th>
+                    <th className="text-right py-2 font-medium text-muted-foreground text-xs uppercase">Est. Legal Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b">
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">Direct 1031</div>
+                      <div className="text-xs text-muted-foreground">Simplest path, full deferral</div>
+                    </td>
+                    <td className="py-3 pr-4 text-sm">Single Owner</td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">Low</Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">Low</Badge>
+                    </td>
+                    <td className="py-3 text-right num font-medium">{formatCurrency(5000)}</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">TIC to 1031</div>
+                      <div className="text-xs text-muted-foreground">Each member exchanges separately</div>
+                    </td>
+                    <td className="py-3 pr-4 text-sm">Tenancy-in-Common</td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Med</Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Med</Badge>
+                    </td>
+                    <td className="py-3 text-right num font-medium">{formatCurrency(15000)}</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">Drop to LLC then 1031</div>
+                      <div className="text-xs text-muted-foreground">Drop property to single-member LLC, then exchange</div>
+                    </td>
+                    <td className="py-3 pr-4 text-sm">Single-Member LLC</td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Med</Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">High</Badge>
+                    </td>
+                    <td className="py-3 text-right num font-medium">{formatCurrency(25000)}</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-3 pr-4">
+                      <div className="font-medium">DST Drop</div>
+                      <div className="text-xs text-muted-foreground">Convert to DST interests for passive members</div>
+                    </td>
+                    <td className="py-3 pr-4 text-sm">DST Beneficial Interests</td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">High</Badge>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">Med</Badge>
+                    </td>
+                    <td className="py-3 text-right num font-medium">{formatCurrency(50000)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-amber-800 font-semibold">Holding Period Requirements</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  The IRS requires that any entity restructuring (drop or swap) be completed well in advance of the exchange — typically 12–24 months. Short holding periods between the drop and the exchange may be challenged as a step transaction, potentially disqualifying the 1031 exchange entirely.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cost Impact on This Exchange</h4>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Exchange Gain to Defer</span>
+              <span className="num font-medium text-green-600">{formatCurrency(deferredGain)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Tax Savings (vs Cash Sale)</span>
+              <span className="num font-medium text-green-600">{formatCurrency(taxSaved)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Direct 1031 Net Benefit</span>
+              <span className="num font-medium">{formatCurrency(taxSaved - 5000)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">TIC to 1031 Net Benefit</span>
+              <span className="num font-medium">{formatCurrency(taxSaved - 15000)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Drop to LLC Net Benefit</span>
+              <span className="num font-medium">{formatCurrency(taxSaved - 25000)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">DST Drop Net Benefit</span>
+              <span className="num font-medium">{formatCurrency(taxSaved - 50000)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -3187,6 +3518,265 @@ function EarnoutPanel() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-purple-500" />
+            EBITDA Bridge Analysis
+          </CardTitle>
+          <CardDescription>Understand how EBITDA components drive earnout achievement</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const ebitdaTarget = parseFloat(ebitdaThreshold) || 500000;
+            const revTarget = parseFloat(revenueTarget) || 2000000;
+            const bridgeItems = [
+              { label: 'Revenue Target', value: revTarget, isPositive: true },
+              { label: 'COGS (est. 35%)', value: -(revTarget * 0.35), isPositive: false },
+              { label: 'Gross Profit', value: revTarget * 0.65, isPositive: true },
+              { label: 'Operating Expenses (est.)', value: -(revTarget * 0.65 - ebitdaTarget), isPositive: false },
+              { label: 'EBITDA Target', value: ebitdaTarget, isPositive: true },
+            ];
+            const margin = revTarget > 0 ? (ebitdaTarget / revTarget * 100) : 0;
+            const gapToThreshold = ebitdaTarget - (ebitdaTarget * (parseFloat(tiers[0]?.threshold || '70') / 100));
+            return (
+              <div className="space-y-3">
+                {bridgeItems.map((item, i) => (
+                  <div key={i} className={`flex justify-between py-1.5 ${i === bridgeItems.length - 1 ? 'bg-muted/50 rounded px-2 font-semibold' : 'border-b'}`}>
+                    <span className={`text-sm ${item.isPositive ? '' : 'text-muted-foreground'}`}>{item.label}</span>
+                    <span className={`num font-medium ${item.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(Math.abs(item.value))}{item.value < 0 ? ' (-)' : ''}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Required EBITDA Margin</span>
+                  <span className="num font-medium">{margin.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Cushion Above Threshold Tier</span>
+                  <span className="num font-medium text-green-600">{formatCurrency(gapToThreshold)}</span>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              Acceleration & Change-of-Control
+            </CardTitle>
+            <CardDescription>Triggers that accelerate earnout payments</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              { trigger: 'Change of Control (Buyer resale)', impact: 'Full earnout accelerated at 100% payout', payout: maxEarnout, risk: 'Low' },
+              { trigger: 'IPO / SPAC Merger', impact: 'Earnout converted to stock at target valuation', payout: maxEarnout * 0.85, risk: 'Medium' },
+              { trigger: 'Material Breach by Buyer', impact: 'Remaining earnout paid in full plus damages', payout: maxEarnout * 1.15, risk: 'Medium' },
+              { trigger: 'Early Achievement (all targets met)', impact: 'Accelerated payout within 30 days', payout: maxEarnout, risk: 'Low' },
+            ].map((item, i) => (
+              <div key={i} className="border rounded-lg p-3 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">{item.trigger}</span>
+                  <Badge className={item.risk === 'Low' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}>{item.risk} Risk</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{item.impact}</p>
+                <div className="flex justify-between py-1">
+                  <span className="text-xs text-muted-foreground">Est. Payout</span>
+                  <span className="num text-xs font-medium">{formatCurrency(item.payout)}</span>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-red-500" />
+              Dispute Resolution Cost Model
+            </CardTitle>
+            <CardDescription>Estimated costs if earnout measurement is contested</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const disputeScenarios = [
+                { method: 'Negotiation', cost: maxEarnout * 0.02, timeline: '1-3 months', successRate: 65 },
+                { method: 'Mediation', cost: maxEarnout * 0.05, timeline: '3-6 months', successRate: 75 },
+                { method: 'Arbitration (AAA)', cost: maxEarnout * 0.08, timeline: '6-12 months', successRate: 85 },
+                { method: 'Litigation', cost: maxEarnout * 0.15, timeline: '12-24 months', successRate: 50 },
+              ];
+              const weightedCost = disputeScenarios.reduce((sum, s) => sum + s.cost * (1 - s.successRate / 100), 0) / disputeScenarios.length;
+              return (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-2 text-left text-xs font-semibold">Method</th>
+                          <th className="p-2 text-center text-xs font-semibold">Est. Cost</th>
+                          <th className="p-2 text-center text-xs font-semibold">Timeline</th>
+                          <th className="p-2 text-center text-xs font-semibold">Resolution %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {disputeScenarios.map((s, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="p-2 font-medium text-sm">{s.method}</td>
+                            <td className="p-2 text-center num">{formatCurrency(s.cost)}</td>
+                            <td className="p-2 text-center text-xs">{s.timeline}</td>
+                            <td className="p-2 text-center num">{s.successRate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                    <span className="font-semibold text-sm">Weighted Dispute Cost Provision</span>
+                    <span className="num font-semibold text-red-600">{formatCurrency(weightedCost)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">Include audit rights, independent accountant determination, and clear measurement periods to minimize dispute risk.</p>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart2 className="h-5 w-5 text-blue-500" />
+            Monte Carlo Earnout Simulation
+          </CardTitle>
+          <CardDescription>Probability distribution of earnout outcomes based on revenue and EBITDA volatility</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const iterations = 3000;
+            const revMean = parseFloat(revenueTarget) || 2000000;
+            const ebitdaMean = parseFloat(ebitdaThreshold) || 500000;
+            const revStdDev = revMean * 0.15;
+            const ebitdaStdDev = ebitdaMean * 0.20;
+            const results: number[] = [];
+            for (let i = 0; i < iterations; i++) {
+              const u1 = Math.random() || 0.001;
+              const u2 = Math.random() || 0.001;
+              const z1 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+              const z2 = Math.sqrt(-2 * Math.log(u1)) * Math.sin(2 * Math.PI * u2);
+              const simRev = revMean + revStdDev * z1;
+              const simEbitda = ebitdaMean + ebitdaStdDev * (0.7 * z1 + 0.714 * z2);
+              const revAchievement = simRev / revMean;
+              const ebitdaAchievement = simEbitda / ebitdaMean;
+              const achievement = Math.min(revAchievement, ebitdaAchievement);
+              let payout = 0;
+              if (useTiers && tiers.length > 0) {
+                for (const tier of tiers) {
+                  const threshold = parseFloat(tier.threshold) / 100 || 0;
+                  if (achievement >= threshold) {
+                    payout = maxEarnout * (parseFloat(tier.payoutPercent) / 100 || 0);
+                  }
+                }
+              } else {
+                payout = achievement >= 1 ? maxEarnout * prob : (achievement >= 0.7 ? maxEarnout * achievement * prob : 0);
+              }
+              results.push(Math.max(0, Math.min(payout, maxEarnout * 1.5)));
+            }
+            results.sort((a, b) => a - b);
+            const mean = results.reduce((s, v) => s + v, 0) / results.length;
+            const p10 = results[Math.floor(0.10 * results.length)];
+            const p25 = results[Math.floor(0.25 * results.length)];
+            const p50 = results[Math.floor(0.50 * results.length)];
+            const p75 = results[Math.floor(0.75 * results.length)];
+            const p90 = results[Math.floor(0.90 * results.length)];
+            const zeroCount = results.filter(v => v < 1).length;
+            const zeroProb = (zeroCount / results.length * 100);
+            const maxCount = results.filter(v => v >= maxEarnout * 0.95).length;
+            const maxProb = (maxCount / results.length * 100);
+
+            const binCount = 15;
+            const maxVal = Math.max(...results);
+            const binWidth = maxVal / binCount || 1;
+            const bins = Array.from({ length: binCount }, (_, b) => {
+              const start = b * binWidth;
+              const end = start + binWidth;
+              return { start, end, count: results.filter(v => v >= start && v < end).length };
+            });
+            const maxBinCount = Math.max(...bins.map(b => b.count), 1);
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-xs text-muted-foreground mb-1">Mean Payout</div>
+                    <div className="num font-bold text-lg text-green-600">{formatCurrency(mean)}</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-xs text-muted-foreground mb-1">Median (P50)</div>
+                    <div className="num font-bold text-lg">{formatCurrency(p50)}</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-xs text-muted-foreground mb-1">$0 Probability</div>
+                    <div className="num font-bold text-lg text-red-600">{zeroProb.toFixed(1)}%</div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Distribution ({iterations.toLocaleString()} simulations)</h4>
+                  {bins.map((bin, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground w-24 text-right num">{formatCurrency(bin.start)}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-blue-500"
+                          style={{ width: `${(bin.count / maxBinCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground w-10 num">{bin.count}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Percentile Summary</h4>
+                  <div className="grid grid-cols-5 gap-2 text-center">
+                    {[
+                      { label: 'P10', value: p10, color: 'text-red-600' },
+                      { label: 'P25', value: p25, color: 'text-amber-600' },
+                      { label: 'P50', value: p50, color: '' },
+                      { label: 'P75', value: p75, color: 'text-green-600' },
+                      { label: 'P90', value: p90, color: 'text-emerald-600' },
+                    ].map(p => (
+                      <div key={p.label} className="p-2 bg-muted/30 rounded">
+                        <div className="text-[10px] text-muted-foreground">{p.label}</div>
+                        <div className={`num text-xs font-semibold ${p.color}`}>{formatCurrency(p.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Probability of Maximum Earnout</span>
+                  <span className="num font-medium text-green-600">{maxProb.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between py-2 bg-indigo-50 rounded-lg px-3">
+                  <span className="font-semibold">Monte Carlo Expected Value</span>
+                  <span className="num font-bold text-indigo-600">{formatCurrency(mean)}</span>
+                </div>
+                <div className="flex justify-between py-1.5">
+                  <span className="text-muted-foreground text-sm">vs Simple Expected ({(prob * 100).toFixed(0)}% × Max)</span>
+                  <span className={`num font-medium ${mean >= expectedEarnout ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(mean - expectedEarnout)} ({mean >= expectedEarnout ? '+' : ''}{expectedEarnout > 0 ? ((mean - expectedEarnout) / expectedEarnout * 100).toFixed(1) : '0'}%)
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -3220,6 +3810,9 @@ interface PromoteWaterfallResult {
   lpIRR: number;
   gpIRR: number;
   dealIRR: number;
+  gpCatchupAmount: number;
+  lpLookbackDeficiency: number;
+  lpLookbackClawback: number;
 }
 
 function solveIRR(cashFlows: number[]): number {
@@ -3407,16 +4000,50 @@ function computeIRRGatedWaterfall(params: {
     });
   }
 
+  let gpCatchupAmount = 0;
+  if (includeGPCatchup && hurdleResults.length >= 2) {
+    const prefHurdle = hurdleResults[0];
+    const firstPromoteHurdle = hurdleResults[1];
+    if (prefHurdle && firstPromoteHurdle && firstPromoteHurdle.sponsorPromote > 0) {
+      const promoteRate = firstPromoteHurdle.sponsorPromote / 100;
+      const lpPrefDist = prefHurdle.lpDistributed;
+      const gpPrefDist = prefHurdle.gpDistributed;
+      const gpProRataShare = gpPct;
+      const gpProRataPref = lpPrefDist * (gpProRataShare / (lpPct || 1));
+      const gpDeficit = Math.max(0, gpProRataPref * (promoteRate / (1 - promoteRate)) - (gpPrefDist - gpProRataPref));
+      if (gpDeficit > 0) {
+        const totalRemaining = remainingCFs.reduce((s, v) => s + Math.max(0, v), 0);
+        gpCatchupAmount = Math.min(gpDeficit, totalRemaining);
+        if (gpCatchupAmount > 0.01) {
+          for (let y = 0; y < yearCount && gpCatchupAmount > 0.01; y++) {
+            const avail = Math.max(0, remainingCFs[y]);
+            if (avail <= 0) continue;
+            const take = Math.min(avail, gpCatchupAmount);
+            gpDistPerYear[y] += take;
+            remainingCFs[y] -= take;
+            gpCatchupAmount -= take;
+          }
+          gpCatchupAmount = Math.min(gpDeficit, totalRemaining);
+        }
+      }
+    }
+  }
+
   const lpTotal = lpDistPerYear.reduce((s, v) => s + v, 0);
   const gpTotal = gpDistPerYear.reduce((s, v) => s + v, 0);
-  const totalPromoteEarned = hurdleResults.reduce((s, h) => s + h.promoteEarned, 0);
+  const totalPromoteEarned = hurdleResults.reduce((s, h) => s + h.promoteEarned, 0) + gpCatchupAmount;
   const lpFlows = [-lpEquity, ...lpDistPerYear];
   const gpFlows = [-gpEquity, ...gpDistPerYear];
   const lpIRR = solveIRR(lpFlows) * 100;
   const gpIRR = solveIRR(gpFlows) * 100;
   const dealIRR = solveIRR(dealCashFlows) * 100;
 
-  return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR };
+  const lpTargetPrefRate = hurdleResults.length > 0 ? (hurdleResults[0].irrHurdle / 100) : 0;
+  const lpTargetReturn = lpEquity * (1 + lpTargetPrefRate * yearCount);
+  const lpLookbackDeficiency = Math.max(0, lpTargetReturn - lpTotal);
+  const lpLookbackClawback = Math.min(lpLookbackDeficiency, totalPromoteEarned);
+
+  return { hurdleResults, lpDistPerYear, gpDistPerYear, lpTotal, gpTotal, totalPromoteEarned, lpIRR, gpIRR, dealIRR, gpCatchupAmount, lpLookbackDeficiency, lpLookbackClawback };
 }
 
 function WaterfallPanel() {
@@ -3522,6 +4149,7 @@ function WaterfallPanel() {
     lpIRR = waterfallResult.lpIRR;
     gpIRR = waterfallResult.gpIRR;
     dealIRR = waterfallResult.dealIRR;
+    gpCatchup = waterfallResult.gpCatchupAmount;
   } else {
     gpCatchup = gpCap > 0 ? Math.min(Math.max(0, afterPrefAndReturn), lpPref * (carryRate / (1 - carryRate))) : 0;
     afterCatchup = Math.max(0, afterPrefAndReturn - gpCatchup);
@@ -4076,6 +4704,56 @@ function WaterfallPanel() {
               <p className="text-xs text-red-600 italic">Deal MOIC ({dealMOIC.toFixed(2)}x) is below pref hurdle ({prefHurdle.toFixed(2)}x). GP must return carry if deal doesn't achieve pref.</p>
             )}
           </div>
+
+          {useIRRPromote && includeGPCatchup && gpCatchup > 0 && (
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-purple-600 flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" />
+                GP Catchup Provision
+              </h4>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-purple-800">Catchup Amount</span>
+                  <span className="num font-semibold text-purple-700">{formatCurrency(gpCatchup)}</span>
+                </div>
+                <p className="text-xs text-purple-700 italic">After LP pref is met, GP receives 100% of distributions until GP has received its pro-rata share of promote.</p>
+              </div>
+            </div>
+          )}
+
+          {useIRRPromote && (
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-600 flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5" />
+                LP Lookback Provision
+              </h4>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-blue-800">LP Target Return</span>
+                  <span className="num font-semibold text-blue-700">{formatCurrency(lpCap * (1 + prefRate * holdYears))}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-blue-800">LP Actual Return</span>
+                  <span className="num font-semibold text-blue-700">{formatCurrency(lpTotal)}</span>
+                </div>
+                {lpTotal < lpCap * (1 + prefRate * holdYears) ? (
+                  <>
+                    <div className="flex justify-between py-1 bg-red-50 rounded px-2">
+                      <span className="text-sm text-red-800 font-medium">LP Deficiency</span>
+                      <span className="num font-bold text-red-600">{formatCurrency(lpCap * (1 + prefRate * holdYears) - lpTotal)}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-blue-800">Clawback from GP Promote</span>
+                      <span className="num font-semibold text-red-600">{formatCurrency(Math.min(lpCap * (1 + prefRate * holdYears) - lpTotal, totalPromoteEarned))}</span>
+                    </div>
+                    <p className="text-xs text-red-600 italic">LP lookback triggered — GP must return promote until LP preferred return is fully satisfied.</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-green-600 italic">LP preferred return met — no lookback clawback required.</p>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -4719,6 +5397,146 @@ function IRRCalculatorPanel() {
           })()}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-500" />
+              XIRR with Actual Dates
+            </CardTitle>
+            <CardDescription>Date-weighted internal rate of return using exact cash flow timing</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const today = new Date();
+              const xirrDates = [today];
+              const xirrCFs = [-activeInvest];
+              for (let y = 0; y < parsedCFs.length; y++) {
+                const cfDate = new Date(today);
+                cfDate.setFullYear(cfDate.getFullYear() + y + 1);
+                xirrDates.push(cfDate);
+                xirrCFs.push(y === parsedCFs.length - 1 ? parsedCFs[y] + exit : parsedCFs[y]);
+              }
+
+              const d0 = xirrDates[0].getTime();
+              const yearFracs = xirrDates.map(d => (d.getTime() - d0) / (365.25 * 24 * 60 * 60 * 1000));
+              let xirrRate = 0.1;
+              for (let iter = 0; iter < 300; iter++) {
+                let npvCalc = 0, dnpvCalc = 0;
+                for (let t = 0; t < xirrCFs.length; t++) {
+                  const disc2 = Math.pow(1 + xirrRate, yearFracs[t]);
+                  if (disc2 === 0 || !isFinite(disc2)) break;
+                  npvCalc += xirrCFs[t] / disc2;
+                  dnpvCalc -= yearFracs[t] * xirrCFs[t] / (disc2 * (1 + xirrRate));
+                }
+                if (Math.abs(npvCalc) < 0.01) break;
+                if (Math.abs(dnpvCalc) < 1e-10) break;
+                const newRate = xirrRate - npvCalc / dnpvCalc;
+                xirrRate = newRate < -0.99 ? -0.99 : newRate > 10 ? 10 : newRate;
+              }
+              const xirrResult = isFinite(xirrRate) ? xirrRate * 100 : 0;
+              const irrDiff = xirrResult - displayIRR;
+
+              return (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-2 text-left text-xs font-semibold">Date</th>
+                          <th className="p-2 text-center text-xs font-semibold">Year Frac</th>
+                          <th className="p-2 text-right text-xs font-semibold">Cash Flow</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xirrCFs.map((cf, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="p-2 text-xs">{xirrDates[i].toLocaleDateString()}</td>
+                            <td className="p-2 text-center text-xs num">{yearFracs[i].toFixed(3)}</td>
+                            <td className={`p-2 text-right num text-xs font-medium ${cf >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(cf)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
+                    <span className="font-semibold">XIRR (Date-Weighted)</span>
+                    <span className={`num font-bold ${xirrResult >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{isFinite(xirrResult) ? xirrResult.toFixed(2) : '—'}%</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">vs Standard IRR</span>
+                    <span className={`num font-medium ${irrDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>{irrDiff >= 0 ? '+' : ''}{irrDiff.toFixed(2)}pp</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">XIRR accounts for exact cash flow timing, providing a more accurate return measurement than periodic IRR when cash flows are irregular.</p>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCcw className="h-5 w-5 text-purple-500" />
+              Reinvestment Rate Sensitivity
+            </CardTitle>
+            <CardDescription>How different reinvestment assumptions affect MIRR</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(() => {
+              const reinvRates = [0, 3, 5, 7, 8, 10, 12, 15];
+              const results = reinvRates.map(r => {
+                const reinvDecimal = r / 100;
+                const finDecimal = financeRate / 100;
+                let fvPositive = 0;
+                let pvNegative = 0;
+                for (let t = 0; t < activeFlows.length; t++) {
+                  if (activeFlows[t] >= 0) {
+                    fvPositive += activeFlows[t] * Math.pow(1 + reinvDecimal, yearCount - t);
+                  } else {
+                    pvNegative += Math.abs(activeFlows[t]) / Math.pow(1 + finDecimal, t);
+                  }
+                }
+                const mirrResult = pvNegative > 0 && fvPositive > 0 && yearCount > 0
+                  ? (Math.pow(fvPositive / pvNegative, 1 / yearCount) - 1) * 100
+                  : 0;
+                return { rate: r, mirr: mirrResult, spread: mirrResult - displayIRR };
+              });
+
+              return (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-2 text-left text-xs font-semibold">Reinvest Rate</th>
+                          <th className="p-2 text-center text-xs font-semibold">MIRR</th>
+                          <th className="p-2 text-center text-xs font-semibold">vs IRR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map((r, i) => (
+                          <tr key={i} className={`border-b ${r.rate === reinvestmentRate ? 'bg-purple-50' : ''}`}>
+                            <td className="p-2 font-medium text-sm">{r.rate}%{r.rate === reinvestmentRate ? ' (current)' : ''}</td>
+                            <td className={`p-2 text-center num font-medium ${r.mirr >= target ? 'text-green-600' : 'text-red-600'}`}>{isFinite(r.mirr) ? r.mirr.toFixed(2) : '—'}%</td>
+                            <td className={`p-2 text-center num text-xs ${r.spread >= 0 ? 'text-green-600' : 'text-red-600'}`}>{r.spread >= 0 ? '+' : ''}{isFinite(r.spread) ? r.spread.toFixed(2) : '—'}pp</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">MIRR corrects for the unrealistic reinvestment assumption in standard IRR. Lower reinvestment rates produce more conservative but often more realistic return estimates.</p>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Finance Rate (cost of capital)</span>
+                    <span className="num font-medium">{financeRate.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -5271,6 +6089,253 @@ function SensitivityPanel() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-purple-500" />
+            Probability-Weighted Expected Case
+          </CardTitle>
+          <CardDescription>Expected net proceeds weighted by scenario probability</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const scenarios = [
+              { label: "Best Case", probability: 0.20, proceeds: bestProceeds, color: "text-green-600", bg: "bg-green-50" },
+              { label: "Base Case", probability: 0.60, proceeds: baseProceeds, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Worst Case", probability: 0.20, proceeds: worstProceeds, color: "text-red-600", bg: "bg-red-50" },
+            ];
+            const expectedValue = scenarios.reduce((sum, s) => sum + s.probability * s.proceeds, 0);
+            const diffFromBase = expectedValue - baseProceeds;
+            return (
+              <>
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scenario Contributions</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-3 py-2 font-medium">Scenario</th>
+                          <th className="text-right px-3 py-2 font-medium">Probability</th>
+                          <th className="text-right px-3 py-2 font-medium">Net Proceeds</th>
+                          <th className="text-right px-3 py-2 font-medium">Contribution</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scenarios.map((s) => (
+                          <tr key={s.label} className="border-t">
+                            <td className={`px-3 py-2 font-medium ${s.color}`}>{s.label}</td>
+                            <td className="px-3 py-2 text-right num">{(s.probability * 100).toFixed(0)}%</td>
+                            <td className="px-3 py-2 text-right num">{formatCurrency(s.proceeds)}</td>
+                            <td className="px-3 py-2 text-right num font-medium">{formatCurrency(s.probability * s.proceeds)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between py-2.5 bg-muted/50 rounded px-3">
+                    <span className="font-semibold">Expected Value (Probability-Weighted)</span>
+                    <span className="num font-bold text-primary">{formatCurrency(expectedValue)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Difference vs. Base Case</span>
+                    <span className={`num font-medium ${diffFromBase >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {diffFromBase >= 0 ? "+" : ""}{formatCurrency(diffFromBase)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Expected Value as % of Base</span>
+                    <span className="num font-medium">
+                      {baseProceeds !== 0 ? ((expectedValue / baseProceeds) * 100).toFixed(1) : "0.0"}%
+                    </span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
+            Correlation Analysis
+          </CardTitle>
+          <CardDescription>How key variables move together and affect scenario outcomes</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const correlations = [
+              { pair: "Cap Rate vs Interest Rate", coefficient: 0.75, interpretation: "Strong Positive" },
+              { pair: "Revenue vs NOI", coefficient: 0.85, interpretation: "Strong Positive" },
+              { pair: "Vacancy vs Cap Rate", coefficient: 0.40, interpretation: "Moderate Positive" },
+              { pair: "NOI vs Property Value", coefficient: 0.90, interpretation: "Very Strong Positive" },
+              { pair: "OpEx vs Revenue", coefficient: 0.60, interpretation: "Moderate Positive" },
+            ];
+            const getStrengthColor = (coeff: number) => {
+              if (coeff >= 0.8) return "text-green-700 bg-green-50";
+              if (coeff >= 0.6) return "text-blue-700 bg-blue-50";
+              return "text-amber-700 bg-amber-50";
+            };
+            return (
+              <>
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left px-3 py-2 font-medium">Variable Pair</th>
+                        <th className="text-center px-3 py-2 font-medium">Correlation</th>
+                        <th className="text-left px-3 py-2 font-medium">Interpretation</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {correlations.map((c) => (
+                        <tr key={c.pair} className="border-t">
+                          <td className="px-3 py-2 font-medium">{c.pair}</td>
+                          <td className="px-3 py-2 text-center">
+                            <Badge className={`${getStrengthColor(c.coefficient)} border-0`}>
+                              +{c.coefficient.toFixed(2)}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">{c.interpretation}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                  <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <span className="text-sm text-blue-800">
+                    Highly correlated variables (≥0.75) tend to move together, meaning adverse movements in one
+                    variable often compound with related variables. This increases tail-risk in worst-case scenarios
+                    and should be factored into stress testing.
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-teal-500" />
+            Scenario Decision Tree
+          </CardTitle>
+          <CardDescription>Branching outcome analysis with joint probabilities</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const branches = [
+              {
+                market: "Market Improves",
+                marketProb: 0.35,
+                noiEffect: "NOI +10%",
+                subOutcomes: [
+                  { name: "Strong Exit", prob: 0.60, proceeds: bestProceeds * 1.15 },
+                  { name: "Average Exit", prob: 0.40, proceeds: bestProceeds },
+                ],
+              },
+              {
+                market: "Market Stable",
+                marketProb: 0.45,
+                noiEffect: "NOI Flat",
+                subOutcomes: [
+                  { name: "Normal Exit", prob: 0.70, proceeds: baseProceeds },
+                  { name: "Delayed Exit", prob: 0.30, proceeds: baseProceeds * 0.95 },
+                ],
+              },
+              {
+                market: "Market Declines",
+                marketProb: 0.20,
+                noiEffect: "NOI -10%",
+                subOutcomes: [
+                  { name: "Orderly Exit", prob: 0.50, proceeds: worstProceeds },
+                  { name: "Distressed", prob: 0.50, proceeds: worstProceeds * 0.80 },
+                ],
+              },
+            ];
+
+            const allRows: Array<{ market: string; marketProb: number; noiEffect: string; subName: string; jointProb: number; proceeds: number }> = [];
+            branches.forEach((b) => {
+              b.subOutcomes.forEach((so) => {
+                allRows.push({
+                  market: b.market,
+                  marketProb: b.marketProb,
+                  noiEffect: b.noiEffect,
+                  subName: so.name,
+                  jointProb: b.marketProb * so.prob,
+                  proceeds: so.proceeds,
+                });
+              });
+            });
+
+            const treeExpectedValue = allRows.reduce((sum, r) => sum + r.jointProb * r.proceeds, 0);
+
+            const marketColors: Record<string, string> = {
+              "Market Improves": "text-green-600",
+              "Market Stable": "text-blue-600",
+              "Market Declines": "text-red-600",
+            };
+
+            return (
+              <>
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left px-3 py-2 font-medium">Branch</th>
+                        <th className="text-left px-3 py-2 font-medium">Sub-Outcome</th>
+                        <th className="text-right px-3 py-2 font-medium">Joint Prob.</th>
+                        <th className="text-right px-3 py-2 font-medium">Est. Proceeds</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allRows.map((r, idx) => {
+                        const isFirstInGroup = idx === 0 || allRows[idx - 1].market !== r.market;
+                        const groupSize = allRows.filter((ar) => ar.market === r.market).length;
+                        return (
+                          <tr key={`${r.market}-${r.subName}`} className="border-t">
+                            {isFirstInGroup && (
+                              <td className={`px-3 py-2 font-medium ${marketColors[r.market] || ""}`} rowSpan={groupSize}>
+                                <div>{r.market}</div>
+                                <div className="text-xs text-muted-foreground font-normal">{r.noiEffect} ({(r.marketProb * 100).toFixed(0)}%)</div>
+                              </td>
+                            )}
+                            <td className="px-3 py-2">{r.subName}</td>
+                            <td className="px-3 py-2 text-right num">{(r.jointProb * 100).toFixed(1)}%</td>
+                            <td className="px-3 py-2 text-right num font-medium">{formatCurrency(r.proceeds)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between py-2.5 bg-muted/50 rounded px-3">
+                    <span className="font-semibold">Decision Tree Expected Value</span>
+                    <span className="num font-bold text-primary">{formatCurrency(treeExpectedValue)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Difference vs. Base Case</span>
+                    <span className={`num font-medium ${treeExpectedValue - baseProceeds >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {treeExpectedValue - baseProceeds >= 0 ? "+" : ""}{formatCurrency(treeExpectedValue - baseProceeds)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Total Probability Check</span>
+                    <span className="num font-medium">{(allRows.reduce((s, r) => s + r.jointProb, 0) * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Save className="h-5 w-5 text-primary" />
             Save Current Analysis
           </CardTitle>
@@ -5639,6 +6704,200 @@ function CrossStrategyComparisonPanel() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-indigo-500" />
+            Time-Value NPV Comparison
+          </CardTitle>
+          <CardDescription>Net present value of each strategy's proceeds discounted at 8% for timing differences</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const discountRate = 0.08;
+            const sfAnnualPayment = sfMonthlyPmt * 12;
+            let sfNpvCalc = sfDown;
+            for (let y = 1; y <= 10; y++) {
+              sfNpvCalc += sfAnnualPayment / Math.pow(1 + discountRate, y);
+            }
+
+            const npvRows = [
+              { name: "Cash Sale", nominal: cashSaleNet, npv: cashSaleNet },
+              { name: "1031 Exchange", nominal: netBenefit1031, npv: netBenefit1031 / Math.pow(1 + discountRate, 0.5) },
+              { name: "DST", nominal: dstTotalReturn, npv: dstTotalReturn / Math.pow(1 + discountRate, 7) },
+              { name: "Seller Financing", nominal: sfNPV, npv: sfNpvCalc },
+              { name: "Earnout", nominal: earnoutNet, npv: earnoutBasePrice + earnoutPV },
+              { name: "Waterfall", nominal: wfLPTotal, npv: wfLPTotal / Math.pow(1 + discountRate, 5) },
+            ];
+
+            const bestNpv = npvRows.reduce((best, r) => r.npv > best.npv ? r : best, npvRows[0]);
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-2 text-left font-semibold">Strategy</th>
+                      <th className="p-2 text-right font-semibold">Nominal Proceeds</th>
+                      <th className="p-2 text-right font-semibold">NPV @8%</th>
+                      <th className="p-2 text-right font-semibold">Time Penalty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {npvRows.map((r) => {
+                      const penalty = r.nominal - r.npv;
+                      const isBest = r.name === bestNpv.name;
+                      return (
+                        <tr key={r.name} className={`border-b ${isBest ? 'bg-indigo-50 font-semibold' : ''}`}>
+                          <td className="p-2 font-medium">
+                            {r.name} {isBest && <Badge className="ml-1 text-xs bg-indigo-500">Best NPV</Badge>}
+                          </td>
+                          <td className="p-2 text-right num">{formatCurrency(r.nominal)}</td>
+                          <td className="p-2 text-right num text-indigo-600">{formatCurrency(r.npv)}</td>
+                          <td className="p-2 text-right num text-red-600">
+                            {penalty > 0 ? `-${formatCurrency(penalty)}` : formatCurrency(0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Percent className="h-5 w-5 text-emerald-500" />
+            After-Tax IRR Estimates
+          </CardTitle>
+          <CardDescription>Estimated internal rate of return for each strategy after taxes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const costBasis = masterInputs.costBasis;
+            const holdingPeriod = masterInputs.holdingPeriod || 1;
+
+            const cashIrr = costBasis > 0 ? ((cashSaleNet - costBasis) / costBasis / holdingPeriod) * 100 : 0;
+            const exchange1031Irr = costBasis > 0 ? ((netBenefit1031 - costBasis) / costBasis / holdingPeriod) * 100 : 0;
+            const dstIrr = costBasis > 0 && holdingPeriod > 0 ? ((Math.pow(dstTotalReturn / costBasis, 1 / Math.max(holdingPeriod, 1)) - 1) * 100) : 0;
+            const sfTotalReceived = sfDown + sfMonthlyPmt * 12 * 10;
+            const sfIrr = costBasis > 0 ? ((sfTotalReceived - sfTotalTax - costBasis) / costBasis / 10) * 100 : 0;
+            const earnoutIrr = costBasis > 0 ? ((earnoutNet - costBasis) / costBasis / earnoutYears) * 100 : 0;
+            const wfIrr = costBasis > 0 && holdingPeriod > 0 ? (((wfLPTotal - wfLPTax) - costBasis) / costBasis / holdingPeriod) * 100 : 0;
+
+            const irrRows = [
+              { name: "Cash Sale", irr: cashIrr, method: "Single-period gain" },
+              { name: "1031 Exchange", irr: exchange1031Irr, method: "Tax-deferred basis" },
+              { name: "DST", irr: dstIrr, method: "CAGR over hold period" },
+              { name: "Seller Financing", irr: sfIrr, method: "Installment method" },
+              { name: "Earnout", irr: earnoutIrr, method: "Probability-weighted" },
+              { name: "Waterfall", irr: wfIrr, method: "Fund structure net" },
+            ];
+
+            const bestIrr = irrRows.reduce((best, r) => r.irr > best.irr ? r : best, irrRows[0]);
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-2 text-left font-semibold">Strategy</th>
+                      <th className="p-2 text-right font-semibold">After-Tax IRR</th>
+                      <th className="p-2 text-left font-semibold">Method</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {irrRows.map((r) => {
+                      const isBest = r.name === bestIrr.name;
+                      return (
+                        <tr key={r.name} className={`border-b ${isBest ? 'bg-emerald-50 font-semibold' : ''}`}>
+                          <td className="p-2 font-medium">
+                            {r.name} {isBest && <Badge className="ml-1 text-xs bg-emerald-500">Best IRR</Badge>}
+                          </td>
+                          <td className={`p-2 text-right num ${r.irr >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {r.irr.toFixed(2)}%
+                          </td>
+                          <td className="p-2 text-muted-foreground text-xs">{r.method}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-amber-500" />
+            Tax-Equivalent Yield Comparison
+          </CardTitle>
+          <CardDescription>Pre-tax yield required to match each strategy's after-tax proceeds</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const costBasis = masterInputs.costBasis || 1;
+
+            const teyRows = strategies.map((s) => {
+              const afterTaxReturn = s.netProceeds - costBasis;
+              const afterTaxYield = costBasis > 0 ? (afterTaxReturn / costBasis) * 100 : 0;
+              const effectiveRate = s.effRate / 100;
+              const taxEquivYield = effectiveRate < 1 ? afterTaxYield / (1 - effectiveRate) : afterTaxYield;
+              return {
+                name: s.name,
+                afterTaxReturn,
+                afterTaxYield,
+                effectiveRate: s.effRate,
+                taxEquivYield,
+              };
+            });
+
+            const bestTey = teyRows.reduce((best, r) => r.taxEquivYield > best.taxEquivYield ? r : best, teyRows[0]);
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-2 text-left font-semibold">Strategy</th>
+                      <th className="p-2 text-right font-semibold">After-Tax Return</th>
+                      <th className="p-2 text-right font-semibold">After-Tax Yield</th>
+                      <th className="p-2 text-right font-semibold">Eff. Tax Rate</th>
+                      <th className="p-2 text-right font-semibold">Tax-Equiv. Yield</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teyRows.map((r) => {
+                      const isBest = r.name === bestTey.name;
+                      return (
+                        <tr key={r.name} className={`border-b ${isBest ? 'bg-amber-50 font-semibold' : ''}`}>
+                          <td className="p-2 font-medium">
+                            {r.name} {isBest && <Badge className="ml-1 text-xs bg-amber-500">Best TEY</Badge>}
+                          </td>
+                          <td className={`p-2 text-right num ${r.afterTaxReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(r.afterTaxReturn)}
+                          </td>
+                          <td className="p-2 text-right num">{r.afterTaxYield.toFixed(2)}%</td>
+                          <td className="p-2 text-right num">{r.effectiveRate.toFixed(1)}%</td>
+                          <td className="p-2 text-right num text-amber-600 font-medium">{r.taxEquivYield.toFixed(2)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -5990,6 +7249,550 @@ function AdvisorInsightsPanel() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-purple-500" />
+            Monte Carlo Risk Simulation
+          </CardTitle>
+          <CardDescription className="text-xs">2,000-iteration simulation of net proceeds with variable inputs</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const iterations = 2000;
+            const bins = 15;
+            const saleStdDev = masterInputs.salePrice * 0.15;
+            const capRateStdDev = 0.01;
+            const taxScenarios = [
+              { weight: 0.3, fedRate: masterInputs.federalTaxRate / 100, stateRate: masterInputs.stateTaxRate / 100 },
+              { weight: 0.5, fedRate: (masterInputs.federalTaxRate + 2) / 100, stateRate: masterInputs.stateTaxRate / 100 },
+              { weight: 0.2, fedRate: (masterInputs.federalTaxRate - 2) / 100, stateRate: masterInputs.stateTaxRate / 100 },
+            ];
+
+            let seed = Math.abs(masterInputs.salePrice * 7 + masterInputs.costBasis * 13 + masterInputs.holdingPeriod * 31) + 1;
+            const seededRandom = () => {
+              seed = (seed * 16807 + 0) % 2147483647;
+              return seed / 2147483647;
+            };
+            const boxMuller = () => {
+              const u1 = seededRandom();
+              const u2 = seededRandom();
+              return Math.sqrt(-2 * Math.log(u1 || 0.0001)) * Math.cos(2 * Math.PI * u2);
+            };
+
+            const results: number[] = [];
+            for (let i = 0; i < iterations; i++) {
+              const simSalePrice = masterInputs.salePrice + boxMuller() * saleStdDev;
+              const simCapRateShift = boxMuller() * capRateStdDev;
+              const simAdjustedSalePrice = simSalePrice * (1 - simCapRateShift / 0.07);
+              const scenarioRoll = seededRandom();
+              let cumWeight = 0;
+              let chosenScenario = taxScenarios[0];
+              for (const sc of taxScenarios) {
+                cumWeight += sc.weight;
+                if (scenarioRoll <= cumWeight) { chosenScenario = sc; break; }
+              }
+              const simAdjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
+              const simGain = simAdjustedSalePrice - simAdjustedBasis;
+              const simDepRecapture = Math.min(masterInputs.depreciationTaken, Math.max(0, simGain)) * 0.25;
+              const simLTGain = Math.max(0, simGain - masterInputs.depreciationTaken);
+              const simFedTax = simLTGain * chosenScenario.fedRate;
+              const simStateTax = simLTGain * chosenScenario.stateRate;
+              const simNIIT = simLTGain > 250000 ? simLTGain * 0.038 : 0;
+              const simTotalTax = simFedTax + simStateTax + simDepRecapture + simNIIT;
+              const simBrokerCost = simAdjustedSalePrice * (masterInputs.brokerFeePercent / 100);
+              const simNetSale = simAdjustedSalePrice - simBrokerCost - masterInputs.closingCosts;
+              const simNetCash = simNetSale - masterInputs.currentDebtBalance - simTotalTax;
+              results.push(simNetCash);
+            }
+
+            results.sort((a, b) => a - b);
+            const mean = results.reduce((s, v) => s + v, 0) / iterations;
+            const p5 = results[Math.floor(iterations * 0.05)];
+            const p10 = results[Math.floor(iterations * 0.10)];
+            const p50 = results[Math.floor(iterations * 0.50)];
+            const p90 = results[Math.floor(iterations * 0.90)];
+            const probBelowDebt = results.filter(v => v < 0).length / iterations;
+            const valueAtRisk = p5 - baseline.netCashProceeds;
+
+            const minVal = results[0];
+            const maxVal = results[results.length - 1];
+            const binWidth = (maxVal - minVal) / bins || 1;
+            const histogram = Array.from({ length: bins }, () => 0);
+            results.forEach(v => {
+              const idx = Math.min(Math.floor((v - minVal) / binWidth), bins - 1);
+              histogram[idx]++;
+            });
+            const maxBin = Math.max(...histogram);
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Mean</p>
+                    <p className="text-sm font-bold">{formatCurrency(mean)}</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">P10 (Downside)</p>
+                    <p className="text-sm font-bold text-red-600">{formatCurrency(p10)}</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">P50 (Median)</p>
+                    <p className="text-sm font-bold">{formatCurrency(p50)}</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">P90 (Upside)</p>
+                    <p className="text-sm font-bold text-green-600">{formatCurrency(p90)}</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">P(Proceeds &lt; Debt)</p>
+                    <p className={`text-sm font-bold ${probBelowDebt > 0.1 ? "text-red-600" : "text-green-600"}`}>{(probBelowDebt * 100).toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Value at Risk (P5)</p>
+                    <p className={`text-sm font-bold ${valueAtRisk < 0 ? "text-red-600" : "text-green-600"}`}>{formatCurrency(valueAtRisk)}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Distribution of Net Proceeds ({iterations.toLocaleString()} iterations)</p>
+                  <div className="space-y-1">
+                    {histogram.map((count, idx) => {
+                      const binStart = minVal + idx * binWidth;
+                      const widthPct = maxBin > 0 ? (count / maxBin) * 100 : 0;
+                      return (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground w-24 text-right shrink-0 num">{formatCurrency(binStart)}</span>
+                          <div className="flex-1 h-4 bg-muted/30 rounded overflow-hidden">
+                            <div
+                              className="h-full bg-purple-500/70 rounded"
+                              style={{ width: `${widthPct}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground w-8 num">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Landmark className="h-4 w-4 text-teal-500" />
+            Estate Planning Integration
+          </CardTitle>
+          <CardDescription className="text-xs">Estate tax impact and planning strategies at current 2025 rates</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const exemptionPerPerson = 13_610_000;
+            const exemptionCouple = exemptionPerPerson * 2;
+            const estateTaxRate = 0.40;
+            const estateValue = masterInputs.salePrice + baseline.netCashProceeds;
+            const aboveExemptionSingle = Math.max(0, estateValue - exemptionPerPerson);
+            const aboveExemptionCouple = Math.max(0, estateValue - exemptionCouple);
+            const estateTaxSingle = aboveExemptionSingle * estateTaxRate;
+            const isAboveExemption = estateValue > exemptionPerPerson;
+
+            const hurdleRate = 0.052;
+            const gratSavings = Math.max(0, estateValue * 0.08 - estateValue * hurdleRate) * estateTaxRate * masterInputs.holdingPeriod;
+            const flpDiscountLow = 0.25;
+            const flpDiscountHigh = 0.40;
+            const flpSavingsLow = estateValue * flpDiscountLow * estateTaxRate;
+            const flpSavingsHigh = estateValue * flpDiscountHigh * estateTaxRate;
+            const crtDeduction = baseline.capitalGain * 0.30;
+            const crtSavings = crtDeduction * (masterInputs.federalTaxRate / 100) + crtDeduction * estateTaxRate;
+            const ilitCoverage = estateTaxSingle;
+
+            const estatePlanStrategies = [
+              {
+                name: "GRAT (Grantor Retained Annuity Trust)",
+                description: "Transfer growth above hurdle rate tax-free to beneficiaries",
+                savings: gratSavings,
+                savingsHigh: undefined as number | undefined,
+                complexity: 4,
+                minAsset: 5_000_000,
+              },
+              {
+                name: "FLP/LLC Discount",
+                description: "25-40% valuation discount for lack of marketability and control",
+                savings: flpSavingsLow,
+                savingsHigh: flpSavingsHigh,
+                complexity: 3,
+                minAsset: 2_000_000,
+              },
+              {
+                name: "CRT (Charitable Remainder Trust)",
+                description: "Income stream for life + charitable deduction reduces taxable estate",
+                savings: crtSavings,
+                savingsHigh: undefined as number | undefined,
+                complexity: 5,
+                minAsset: 1_000_000,
+              },
+              {
+                name: "ILIT (Irrevocable Life Insurance Trust)",
+                description: "Estate liquidity via life insurance without increasing taxable estate",
+                savings: ilitCoverage * 0.03,
+                savingsHigh: undefined as number | undefined,
+                complexity: 3,
+                minAsset: 3_000_000,
+              },
+            ];
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={`rounded-lg p-3 text-center ${isAboveExemption ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
+                    <p className="text-xs text-muted-foreground mb-1">Estate vs. Exemption (Single)</p>
+                    <p className={`text-sm font-bold ${isAboveExemption ? "text-red-600" : "text-green-600"}`}>
+                      {isAboveExemption ? "Above" : "Below"} — {formatCurrency(exemptionPerPerson)}
+                    </p>
+                    {isAboveExemption && <p className="text-xs text-red-500 mt-1">Exposure: {formatCurrency(aboveExemptionSingle)}</p>}
+                  </div>
+                  <div className={`rounded-lg p-3 text-center ${estateValue > exemptionCouple ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
+                    <p className="text-xs text-muted-foreground mb-1">Estate vs. Exemption (Couple)</p>
+                    <p className={`text-sm font-bold ${estateValue > exemptionCouple ? "text-red-600" : "text-green-600"}`}>
+                      {estateValue > exemptionCouple ? "Above" : "Below"} — {formatCurrency(exemptionCouple)}
+                    </p>
+                    {estateValue > exemptionCouple && <p className="text-xs text-red-500 mt-1">Exposure: {formatCurrency(aboveExemptionCouple)}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2">
+                  <span className="text-sm font-medium">Estimated Estate Value</span>
+                  <span className="text-sm font-bold">{formatCurrency(estateValue)}</span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2">
+                  <span className="text-sm font-medium">Potential Estate Tax (Single, 40%)</span>
+                  <span className="text-sm font-bold text-red-600">{formatCurrency(estateTaxSingle)}</span>
+                </div>
+                <div className="space-y-3">
+                  {estatePlanStrategies.map((s, i) => (
+                    <div key={i} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-semibold">{s.name}</h4>
+                        <Badge variant="secondary" className="text-xs whitespace-nowrap shrink-0">
+                          {s.savingsHigh ? `${formatCurrency(s.savings)} – ${formatCurrency(s.savingsHigh)}` : formatCurrency(s.savings)} est. savings
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{s.description}</p>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Complexity:</span>
+                          <span className="flex">
+                            {Array.from({ length: 5 }, (_, si) => (
+                              <Star key={si} className={`h-3 w-3 ${si < s.complexity ? "text-amber-400 fill-amber-400" : "text-gray-300"}`} />
+                            ))}
+                          </span>
+                        </div>
+                        <span className="text-muted-foreground">Min: {formatCurrency(s.minAsset)}</span>
+                      </div>
+                      {estateValue < s.minAsset && (
+                        <div className="flex items-center gap-1 text-xs text-amber-600">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>Estate value below minimum threshold for this strategy</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Shield className="h-4 w-4 text-blue-500" />
+            QSBS Exclusion Check (Section 1202)
+          </CardTitle>
+          <CardDescription className="text-xs">Qualified Small Business Stock exclusion eligibility assessment</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const qsbsRequirements = [
+              {
+                name: "C-Corporation Structure",
+                eligible: false,
+                detail: "Most marinas operate as LLCs or S-Corps — C-Corp required for QSBS",
+              },
+              {
+                name: "Gross Assets < $50M at Stock Issuance",
+                eligible: masterInputs.costBasis < 50_000_000,
+                detail: masterInputs.costBasis < 50_000_000
+                  ? `Cost basis of ${formatCurrency(masterInputs.costBasis)} is below $50M threshold`
+                  : `Cost basis of ${formatCurrency(masterInputs.costBasis)} exceeds $50M threshold`,
+              },
+              {
+                name: "Held for 5+ Years",
+                eligible: masterInputs.holdingPeriod >= 5,
+                detail: masterInputs.holdingPeriod >= 5
+                  ? `${masterInputs.holdingPeriod}-year hold meets 5-year requirement`
+                  : `${masterInputs.holdingPeriod}-year hold does not meet 5-year minimum`,
+              },
+              {
+                name: "Active Business (Not Real Estate)",
+                eligible: false,
+                detail: "Marina operations with significant real estate typically disqualify under Section 1202",
+              },
+            ];
+
+            const allEligible = qsbsRequirements.every(r => r.eligible);
+            const eligibleCount = qsbsRequirements.filter(r => r.eligible).length;
+            const maxExclusion = Math.min(10_000_000, masterInputs.costBasis * 10);
+            const potentialSavings = maxExclusion * (masterInputs.federalTaxRate / 100);
+
+            return (
+              <div className="space-y-4">
+                <div className={`rounded-lg p-3 flex items-center gap-3 ${allEligible ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}>
+                  {allEligible ? (
+                    <ShieldCheck className="h-5 w-5 text-green-600 shrink-0" />
+                  ) : (
+                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+                  )}
+                  <div>
+                    <p className={`text-sm font-semibold ${allEligible ? "text-green-700" : "text-amber-700"}`}>
+                      {allEligible ? "Potentially Eligible for QSBS Exclusion" : `Likely Not Eligible (${eligibleCount}/${qsbsRequirements.length} criteria met)`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {allEligible
+                        ? "All requirements appear to be met — consult tax advisor for confirmation"
+                        : "Most marina businesses do not qualify due to entity structure and real estate classification"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {qsbsRequirements.map((r, i) => (
+                    <div key={i} className="flex items-start gap-3 border rounded-lg p-3">
+                      <div className="shrink-0 mt-0.5">
+                        {r.eligible ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <X className="h-4 w-4 text-red-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-sm font-medium">{r.name}</h4>
+                          <Badge className={`text-xs shrink-0 ${r.eligible ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {r.eligible ? "Eligible" : "Not Eligible"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{r.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">If Eligible — Potential Exclusion</h4>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Max Exclusion (lesser of $10M or 10× basis)</span>
+                    <span className="num font-medium">{formatCurrency(maxExclusion)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Potential Federal Tax Savings</span>
+                    <span className="num font-medium text-green-600">{formatCurrency(potentialSavings)}</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                  <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <span className="text-sm text-blue-800">
+                    QSBS exclusion under Section 1202 allows up to 100% exclusion of gain on qualified small business stock.
+                    While most marina businesses do not qualify due to C-Corp requirements and real estate classification,
+                    it is worth reviewing with a tax advisor if the business has been restructured or has minimal real estate holdings.
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPinned className="h-4 w-4 text-emerald-500" />
+            QOZ Investment Timeline
+          </CardTitle>
+          <CardDescription className="text-xs">Qualified Opportunity Zone milestones, deadlines, and investment comparison</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const gain = baseline.capitalGain;
+            const gainTax = baseline.totalTax;
+            const returnRate = 0.08;
+            const qozHoldYears = 10;
+            const stepUp5Deadline = new Date("2026-12-31");
+            const today = new Date();
+            const stepUp5Passed = today > stepUp5Deadline;
+
+            const milestones = [
+              {
+                label: "Day 0",
+                title: "Sale Closes",
+                description: "Capital gain of " + formatCurrency(gain) + " recognized",
+                passed: false,
+                warning: false,
+              },
+              {
+                label: "Day 180",
+                title: "QOZ Investment Deadline",
+                description: "Capital gain must be invested in a Qualified Opportunity Fund",
+                passed: false,
+                warning: false,
+              },
+              {
+                label: "Year 5",
+                title: "10% Basis Step-Up",
+                description: stepUp5Passed
+                  ? "Deadline passed — investment must have been made before 12/31/2026"
+                  : "10% of deferred gain excluded from taxation if invested before 12/31/2026",
+                passed: stepUp5Passed,
+                warning: stepUp5Passed,
+              },
+              {
+                label: "Year 7",
+                title: "15% Basis Step-Up",
+                description: "Deadline has passed for most investors — required investment before 12/31/2019",
+                passed: true,
+                warning: true,
+              },
+              {
+                label: "Year 10+",
+                title: "Full Appreciation Exclusion",
+                description: "All appreciation on QOZ investment becomes tax-free if held 10+ years",
+                passed: false,
+                warning: false,
+              },
+            ];
+
+            const basisStepUp = stepUp5Passed ? 0 : gain * 0.10;
+            const deferredTaxSavings = basisStepUp * (masterInputs.federalTaxRate / 100 + masterInputs.stateTaxRate / 100);
+
+            const qozInvestment = gain;
+            const qozFutureValue = qozInvestment * Math.pow(1 + returnRate, qozHoldYears);
+            const qozAppreciation = qozFutureValue - qozInvestment;
+            const qozNetValue = qozFutureValue;
+
+            const regularAfterTax = gain - gainTax;
+            const regularFutureValue = regularAfterTax * Math.pow(1 + returnRate, qozHoldYears);
+            const regularAppreciation = regularFutureValue - regularAfterTax;
+            const regularCapGainsTax = regularAppreciation * (masterInputs.federalTaxRate / 100 + masterInputs.stateTaxRate / 100);
+            const regularNetValue = regularFutureValue - regularCapGainsTax;
+            const qozAdvantage = qozNetValue - regularNetValue;
+
+            return (
+              <div className="space-y-4">
+                <div className="space-y-0">
+                  {milestones.map((m, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                          m.warning ? "bg-amber-100 text-amber-700 border-2 border-amber-300" :
+                          m.passed ? "bg-muted text-muted-foreground border-2 border-muted" :
+                          "bg-emerald-100 text-emerald-700 border-2 border-emerald-300"
+                        }`}>
+                          {i + 1}
+                        </div>
+                        {i < milestones.length - 1 && (
+                          <div className="w-0.5 h-8 bg-muted" />
+                        )}
+                      </div>
+                      <div className={`pb-4 ${m.passed ? "opacity-60" : ""}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-muted-foreground">{m.label}</span>
+                          <span className="text-sm font-semibold">{m.title}</span>
+                          {m.warning && (
+                            <Badge className="text-[10px] bg-amber-100 text-amber-700 px-1.5">Deadline Passed</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{m.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estimated QOZ Benefit</h4>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Capital Gain Available for QOZ</span>
+                    <span className="num font-medium">{formatCurrency(gain)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Basis Step-Up Savings ({stepUp5Passed ? "expired" : "10%"})</span>
+                    <span className={`num font-medium ${deferredTaxSavings > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                      {deferredTaxSavings > 0 ? formatCurrency(deferredTaxSavings) : "N/A — deadline passed"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Tax-Free Appreciation (10yr @ {(returnRate * 100).toFixed(0)}%)</span>
+                    <span className="num font-medium text-green-600">{formatCurrency(qozAppreciation)}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">QOZ vs. Regular Investment ({qozHoldYears}-Year Comparison at {(returnRate * 100).toFixed(0)}% Return)</h4>
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-3 py-2 font-medium"></th>
+                          <th className="text-right px-3 py-2 font-medium">QOZ Fund</th>
+                          <th className="text-right px-3 py-2 font-medium">Regular Investment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t">
+                          <td className="px-3 py-2 text-muted-foreground">Initial Investment</td>
+                          <td className="px-3 py-2 text-right num">{formatCurrency(qozInvestment)}</td>
+                          <td className="px-3 py-2 text-right num">{formatCurrency(regularAfterTax)}</td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-3 py-2 text-muted-foreground">Future Value ({qozHoldYears} yrs)</td>
+                          <td className="px-3 py-2 text-right num">{formatCurrency(qozFutureValue)}</td>
+                          <td className="px-3 py-2 text-right num">{formatCurrency(regularFutureValue)}</td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="px-3 py-2 text-muted-foreground">Tax on Gains</td>
+                          <td className="px-3 py-2 text-right num text-green-600">$0 (tax-free)</td>
+                          <td className="px-3 py-2 text-right num text-red-600">{formatCurrency(regularCapGainsTax)}</td>
+                        </tr>
+                        <tr className="border-t bg-muted/30 font-semibold">
+                          <td className="px-3 py-2">Net After-Tax Value</td>
+                          <td className="px-3 py-2 text-right num text-green-600">{formatCurrency(qozNetValue)}</td>
+                          <td className="px-3 py-2 text-right num">{formatCurrency(regularNetValue)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-between py-2.5 bg-emerald-50 rounded-lg px-3 mt-3">
+                    <span className="font-semibold text-emerald-700">QOZ Advantage</span>
+                    <span className="num font-bold text-emerald-600">{formatCurrency(qozAdvantage)}</span>
+                  </div>
+                </div>
+
+                {stepUp5Passed && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span className="text-sm text-amber-800">
+                      The 10% basis step-up benefit required investment before 12/31/2026, and the 15% step-up deadline
+                      has already passed. However, the primary QOZ benefit — tax-free appreciation after 10 years — remains
+                      available for new investments. The original deferred gain will still be taxed in 2026.
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
