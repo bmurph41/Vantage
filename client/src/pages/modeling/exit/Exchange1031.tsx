@@ -17,6 +17,7 @@ import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 import { runExitScenario } from "@shared/exit/exit-scenario-engine";
 import type { ExitScenarioInput, ExitScenarioResult } from "@shared/exit/exit-scenario-engine";
 import { ExchangeBreakdownPanel } from "@/components/exit-strategies/BreakdownCards";
+import { ExitProForma, buildExitProFormaRows } from "@/components/exit-strategies/ExitProForma";
 
 interface Exchange1031Props {
   projectId: string;
@@ -106,6 +107,12 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
     { id: '6', name: 'Closing Deadline (180 days)', dueDate: new Date('2026-06-30'), status: 'pending' },
   ]);
 
+  const [opAssumptions, setOpAssumptions] = useState({
+    monthlyNOI: 100000,
+    noiGrowthRate: 3,
+    monthlyDebtService: 40000,
+  });
+
   const adjustedBasis = inputs.relinquishedBasis - inputs.accumulatedDepreciation;
   const relinquishedEquity = inputs.relinquishedValue - inputs.existingDebt;
   
@@ -193,6 +200,38 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
       return null;
     }
   }, [masterInputs, replacementProperties, exchangeOnlyInputs.qiFees]);
+
+  const proFormaConfig = useMemo(() => {
+    const taxOnBoot = taxableGain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100);
+    const { rows, lineItems } = buildExitProFormaRows({
+      holdPeriodYears: masterInputs.holdingPeriod,
+      monthlyNOI: opAssumptions.monthlyNOI,
+      noiGrowthRate: opAssumptions.noiGrowthRate,
+      monthlyDebtService: opAssumptions.monthlyDebtService,
+      exitProceeds: inputs.relinquishedValue,
+      exitCosts: totalExchangeCosts + inputs.closingCosts,
+      exitTax: taxOnBoot,
+      debtPayoff: inputs.existingDebt,
+      strategySpecificExit: {
+        "Tax Deferred": deferredGain > 0 ? deferredGain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100) : 0,
+      },
+    });
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Cash Flow"] || 0), 0);
+
+    return {
+      strategyName: "1031 Exchange",
+      holdPeriodYears: masterInputs.holdingPeriod,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Cash Flow", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Deferred Gain", value: `$${Math.round(deferredGain).toLocaleString()}` },
+        { label: "Boot Taxable", value: `$${Math.round(totalBoot).toLocaleString()}` },
+        { label: "Tax Savings", value: `$${Math.round(deferredGain * ((masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100)).toLocaleString()}`, deltaDirection: "up" as const, delta: "vs cash sale" },
+      ],
+    };
+  }, [inputs, masterInputs, opAssumptions, totalExchangeCosts, taxableGain, deferredGain, totalBoot]);
 
   const addReplacementProperty = () => {
     setReplacementProperties([...replacementProperties, {
@@ -787,6 +826,31 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
           )}
         </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operating Assumptions</CardTitle>
+          <CardDescription>Inputs for the monthly pro forma projection</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Monthly NOI ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyNOI} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyNOI: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>NOI Growth Rate (%)</Label>
+              <Input type="number" step="0.1" value={opAssumptions.noiGrowthRate} onChange={(e) => setOpAssumptions({ ...opAssumptions, noiGrowthRate: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Monthly Debt Service ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyDebtService} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyDebtService: Number(e.target.value) })} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ExitProForma config={proFormaConfig} />
     </div>
   );
 }

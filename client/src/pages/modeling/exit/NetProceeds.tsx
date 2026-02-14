@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, DollarSign, ChevronRight, Download } from "lucide-react";
 import type { ModelingProject } from "@shared/schema";
+import { ExitProForma, buildExitProFormaRows } from "@/components/exit-strategies/ExitProForma";
 
 interface NetProceedsProps {
   projectId: string;
@@ -35,6 +36,13 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
     taxLiability: 400000
   });
 
+  const [opAssumptions, setOpAssumptions] = useState({
+    monthlyNOI: 100000,
+    noiGrowthRate: 3,
+    monthlyDebtService: 40000,
+    holdPeriodYears: 5,
+  });
+
   const brokerFee = inputs.grossSalePrice * (inputs.brokerCommission / 100);
   const transferTaxAmount = inputs.grossSalePrice * (inputs.transferTax / 100);
   const prepaymentAmount = inputs.outstandingDebt * (inputs.prepaymentPenalty / 100);
@@ -48,6 +56,35 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
   const purchasePrice = Number(project?.purchasePrice) || 0;
   const totalProfit = netProceedsAfterTax - (purchasePrice - inputs.outstandingDebt);
   const roi = purchasePrice > 0 ? (totalProfit / (purchasePrice - inputs.outstandingDebt)) * 100 : 0;
+
+  const proFormaConfig = useMemo(() => {
+    const { rows, lineItems } = buildExitProFormaRows({
+      holdPeriodYears: opAssumptions.holdPeriodYears,
+      monthlyNOI: opAssumptions.monthlyNOI,
+      noiGrowthRate: opAssumptions.noiGrowthRate,
+      monthlyDebtService: opAssumptions.monthlyDebtService,
+      exitProceeds: inputs.grossSalePrice,
+      exitCosts: totalClosingCosts,
+      exitTax: inputs.taxLiability,
+      debtPayoff: totalDebtPayoff,
+    });
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Cash Flow"] || 0), 0);
+    const avgMonthlyCF = rows.length > 0 ? totalCF / rows.length : 0;
+
+    return {
+      strategyName: "Net Proceeds",
+      holdPeriodYears: opAssumptions.holdPeriodYears,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Cash Flow", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Avg Monthly CF", value: `$${Math.round(avgMonthlyCF).toLocaleString()}` },
+        { label: "Net After Tax", value: `$${Math.round(netProceedsAfterTax).toLocaleString()}` },
+        { label: "Total ROI", value: `${roi.toFixed(1)}%` },
+      ],
+    };
+  }, [inputs, opAssumptions, totalClosingCosts, totalDebtPayoff, netProceedsAfterTax, roi]);
 
   return (
     <div className="p-6 space-y-6">
@@ -271,6 +308,35 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operating Assumptions</CardTitle>
+          <CardDescription>Inputs for the monthly pro forma projection</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Monthly NOI ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyNOI} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyNOI: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>NOI Growth Rate (%)</Label>
+              <Input type="number" step="0.1" value={opAssumptions.noiGrowthRate} onChange={(e) => setOpAssumptions({ ...opAssumptions, noiGrowthRate: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Monthly Debt Service ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyDebtService} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyDebtService: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Hold Period (Years)</Label>
+              <Input type="number" value={opAssumptions.holdPeriodYears} onChange={(e) => setOpAssumptions({ ...opAssumptions, holdPeriodYears: Number(e.target.value) })} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ExitProForma config={proFormaConfig} />
     </div>
   );
 }

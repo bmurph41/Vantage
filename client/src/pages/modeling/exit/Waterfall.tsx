@@ -61,6 +61,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { ModelingProject } from "@shared/schema";
+import { ExitProForma, type ProFormaCashFlowRow, type ProFormaLineItem } from "@/components/exit-strategies/ExitProForma";
 
 interface WaterfallProps {
   projectId: string;
@@ -470,6 +471,66 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
 
   const lpMOIC = lpContribution > 0 ? calculateWaterfall.lpTotal / lpContribution : 0;
   const gpMOIC = gpContribution > 0 ? calculateWaterfall.gpTotal / gpContribution : 0;
+
+  const proFormaConfig = useMemo(() => {
+    const holdPeriodYears = inputs.holdingPeriodYears || 5;
+    const totalMonths = holdPeriodYears * 12;
+    const rows: ProFormaCashFlowRow[] = [];
+
+    const annualCashOnCash = totalContributed * (inputs.preferredReturn / 100);
+    const monthlyDistribution = annualCashOnCash / 12;
+
+    const firstTier = tiers[0];
+    const lpPct = firstTier ? firstTier.lpSplit / 100 : 0.8;
+    const gpPct = 1 - lpPct;
+
+    for (let m = 1; m <= totalMonths; m++) {
+      const year = Math.ceil(m / 12);
+      const month = ((m - 1) % 12) + 1;
+      const isExitMonth = m === totalMonths;
+
+      const values: Record<string, number> = {
+        "LP Distribution": monthlyDistribution * lpPct,
+        "GP Promote": monthlyDistribution * gpPct,
+        "Total Distribution": monthlyDistribution,
+      };
+
+      if (isExitMonth) {
+        const exitProceeds = inputs.totalDistribution;
+        const gain = Math.max(0, exitProceeds - totalContributed);
+        values["Exit - LP Share"] = gain * lpPct;
+        values["Exit - GP Share"] = gain * gpPct;
+        values["Return of Capital"] = totalContributed;
+        values["Total Distribution"] += exitProceeds;
+      }
+
+      rows.push({ period: m, year, month, values, isExitMonth });
+    }
+
+    const lineItems: ProFormaLineItem[] = [
+      { label: "LP Distribution" },
+      { label: "GP Promote" },
+      { label: "Exit - LP Share" },
+      { label: "Exit - GP Share" },
+      { label: "Return of Capital" },
+      { label: "Total Distribution", isSubtotal: true, isBold: true },
+    ];
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Distribution"] || 0), 0);
+
+    return {
+      strategyName: "Waterfall Distribution",
+      holdPeriodYears,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Distributions", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Total Capital", value: `$${Math.round(totalContributed).toLocaleString()}` },
+        { label: "LP Split", value: `${(lpPct * 100).toFixed(0)}%` },
+        { label: "GP Promote", value: `${(gpPct * 100).toFixed(0)}%` },
+      ],
+    };
+  }, [investors, tiers, inputs.holdingPeriodYears, inputs.preferredReturn, inputs.totalDistribution, totalContributed]);
 
   return (
     <TooltipProvider>
@@ -1598,6 +1659,8 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <ExitProForma config={proFormaConfig} />
       </div>
     </TooltipProvider>
   );

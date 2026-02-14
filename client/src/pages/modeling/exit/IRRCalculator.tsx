@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExitProForma, type ProFormaCashFlowRow, type ProFormaLineItem } from "@/components/exit-strategies/ExitProForma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,6 +90,60 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
     const returned = cashFlows.filter(cf => cf.amount > 0).reduce((sum, cf) => sum + cf.amount, 0);
     return invested > 0 ? returned / invested : 0;
   };
+
+  const proFormaConfig = useMemo(() => {
+    const sorted = [...cashFlows].sort((a, b) => a.year - b.year);
+    if (sorted.length < 2) return null;
+    const maxYear = Math.max(...sorted.map(cf => cf.year));
+    const totalMonths = maxYear * 12;
+    const rows: ProFormaCashFlowRow[] = [];
+
+    const cfByYear = new Map<number, number>();
+    for (const cf of sorted) {
+      cfByYear.set(cf.year, (cfByYear.get(cf.year) || 0) + cf.amount);
+    }
+
+    for (let m = 1; m <= totalMonths; m++) {
+      const year = Math.ceil(m / 12);
+      const month = ((m - 1) % 12) + 1;
+      const annualCF = cfByYear.get(year) || 0;
+      const monthlyCF = annualCF / 12;
+
+      const values: Record<string, number> = {
+        "Cash Flow": monthlyCF,
+      };
+
+      rows.push({ period: m, year, month, values, isExitMonth: m === totalMonths });
+    }
+
+    if (cfByYear.has(0)) {
+      rows.unshift({
+        period: 0, year: 0, month: 0,
+        values: { "Cash Flow": cfByYear.get(0) || 0 },
+        isExitMonth: false,
+      });
+    }
+
+    const lineItems: ProFormaLineItem[] = [
+      { label: "Cash Flow", isSubtotal: true, isBold: true },
+    ];
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Cash Flow"] || 0), 0);
+    const irr = calculateIRR();
+
+    return {
+      strategyName: "IRR Analysis",
+      holdPeriodYears: maxYear,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Cash Flow", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "IRR", value: `${irr.toFixed(2)}%` },
+        { label: "Hold Period", value: `${maxYear} years` },
+        { label: "Initial Investment", value: `$${Math.abs(cfByYear.get(0) || 0).toLocaleString()}` },
+      ],
+    };
+  }, [cashFlows]);
 
   const irr = calculateIRR();
   const npv8 = calculateNPV(8);
@@ -300,6 +355,8 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
           </CardContent>
         </Card>
       </div>
+
+      {proFormaConfig && <ExitProForma config={proFormaConfig} />}
     </div>
   );
 }

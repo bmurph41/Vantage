@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Calculator, ChevronRight, Download } from "lucide-react";
 import type { ModelingProject } from "@shared/schema";
+import { ExitProForma, buildExitProFormaRows } from "@/components/exit-strategies/ExitProForma";
 
 interface TaxCalculatorProps {
   projectId: string;
@@ -34,6 +35,13 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
     holdingPeriodYears: 5
   });
 
+  const [opAssumptions, setOpAssumptions] = useState({
+    monthlyNOI: 100000,
+    noiGrowthRate: 3,
+    monthlyDebtService: 40000,
+    outstandingDebt: 6000000,
+  });
+
   const adjustedBasis = inputs.originalBasis - inputs.accumulatedDepreciation;
   const netSalePrice = inputs.salePrice - inputs.sellingCosts;
   const totalGain = netSalePrice - adjustedBasis;
@@ -48,6 +56,35 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
   const totalTax = deprecRecaptureTax + federalCapGainsTax + stateCapGainsTax + niitTax;
   const netProceeds = netSalePrice - totalTax;
   const effectiveRate = totalGain > 0 ? (totalTax / totalGain) * 100 : 0;
+
+  const proFormaConfig = useMemo(() => {
+    const { rows, lineItems } = buildExitProFormaRows({
+      holdPeriodYears: inputs.holdingPeriodYears,
+      monthlyNOI: opAssumptions.monthlyNOI,
+      noiGrowthRate: opAssumptions.noiGrowthRate,
+      monthlyDebtService: opAssumptions.monthlyDebtService,
+      exitProceeds: inputs.salePrice,
+      exitCosts: inputs.sellingCosts,
+      exitTax: totalTax,
+      debtPayoff: opAssumptions.outstandingDebt,
+    });
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Cash Flow"] || 0), 0);
+    const avgMonthlyCF = rows.length > 0 ? totalCF / rows.length : 0;
+
+    return {
+      strategyName: "Cash Sale",
+      holdPeriodYears: inputs.holdingPeriodYears,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Cash Flow", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Avg Monthly CF", value: `$${Math.round(avgMonthlyCF).toLocaleString()}` },
+        { label: "Total Tax", value: `$${Math.round(totalTax).toLocaleString()}` },
+        { label: "Net Proceeds", value: `$${Math.round(netProceeds).toLocaleString()}` },
+      ],
+    };
+  }, [inputs, opAssumptions, totalTax, netProceeds]);
 
   return (
     <div className="p-6 space-y-6">
@@ -249,6 +286,35 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operating Assumptions</CardTitle>
+          <CardDescription>Inputs for the monthly pro forma projection</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Monthly NOI ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyNOI} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyNOI: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>NOI Growth Rate (%)</Label>
+              <Input type="number" step="0.1" value={opAssumptions.noiGrowthRate} onChange={(e) => setOpAssumptions({ ...opAssumptions, noiGrowthRate: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Monthly Debt Service ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyDebtService} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyDebtService: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Outstanding Debt ($)</Label>
+              <Input type="number" value={opAssumptions.outstandingDebt} onChange={(e) => setOpAssumptions({ ...opAssumptions, outstandingDebt: Number(e.target.value) })} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ExitProForma config={proFormaConfig} />
     </div>
   );
 }

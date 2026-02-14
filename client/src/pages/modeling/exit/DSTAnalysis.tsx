@@ -17,6 +17,7 @@ import { ArrowLeft, Landmark, ChevronRight, Download, Plus, Trash2, Building, Do
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ModelingProject } from "@shared/schema";
 import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
+import { ExitProForma, type ProFormaCashFlowRow, type ProFormaLineItem } from "@/components/exit-strategies/ExitProForma";
 
 interface DSTAnalysisProps {
   projectId: string;
@@ -246,6 +247,62 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
       unallocated: investmentAmount - totalAllocated,
     };
   }, [dstOptions, investmentAmount, exchangeGain, federalTaxRate, stateTaxRate, include1031, totalAllocation]);
+
+  const proFormaConfig = useMemo(() => {
+    const maxHoldPeriod = Math.max(...dstOptions.map(d => d.holdPeriod), 1);
+    const totalMonths = maxHoldPeriod * 12;
+    const rows: ProFormaCashFlowRow[] = [];
+
+    for (let m = 1; m <= totalMonths; m++) {
+      const year = Math.ceil(m / 12);
+      const month = ((m - 1) % 12) + 1;
+      const values: Record<string, number> = {};
+
+      let totalDistribution = 0;
+      for (const dst of dstOptions) {
+        const alloc = investmentAmount * (dst.allocation / 100);
+        const monthlyDist = alloc * (dst.cashOnCash / 100) / 12;
+        const isActive = year <= dst.holdPeriod;
+        const dstCF = isActive ? monthlyDist : 0;
+        values[dst.name] = dstCF;
+        totalDistribution += dstCF;
+
+        if (year === dst.holdPeriod && month === 12) {
+          const appreciationMultiple = Math.pow(1 + dst.projectedAppreciation / 100, dst.holdPeriod);
+          const exitValue = alloc * appreciationMultiple;
+          const totalFeePercent = dst.sponsorFees.dispositionFee;
+          const dispositionFee = alloc * (totalFeePercent / 100);
+          values[`${dst.name} Exit`] = exitValue - alloc - dispositionFee;
+          totalDistribution += exitValue - alloc - dispositionFee;
+        }
+      }
+
+      values["Total Distributions"] = totalDistribution;
+      rows.push({ period: m, year, month, values, isExitMonth: m === totalMonths });
+    }
+
+    const lineItems: ProFormaLineItem[] = [
+      ...dstOptions.map(d => ({ label: d.name })),
+      ...dstOptions.map(d => ({ label: `${d.name} Exit` })),
+      { label: "Total Distributions", isSubtotal: true, isBold: true },
+    ];
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Distributions"] || 0), 0);
+    const avgMonthlyCF = rows.length > 0 ? totalCF / rows.length : 0;
+
+    return {
+      strategyName: "DST Portfolio",
+      holdPeriodYears: maxHoldPeriod,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Distributions", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Avg Monthly CF", value: `$${Math.round(avgMonthlyCF).toLocaleString()}` },
+        { label: "Annual CF", value: `$${Math.round(portfolioSummary.totalAnnualCashFlow).toLocaleString()}` },
+        { label: "Tax Savings", value: `$${Math.round(portfolioSummary.taxSavings).toLocaleString()}`, deltaDirection: "up" as const, delta: "deferred" },
+      ],
+    };
+  }, [dstOptions, investmentAmount, portfolioSummary]);
 
   const getRiskBadge = (rating: DSTOption['riskRating']) => {
     switch(rating) {
@@ -783,6 +840,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
             </div>
           </TabsContent>
         </Tabs>
+        <ExitProForma config={proFormaConfig} />
       </div>
     </TooltipProvider>
   );

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExitProForma, type ProFormaCashFlowRow, type ProFormaLineItem } from "@/components/exit-strategies/ExitProForma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,13 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const [basePrice, setBasePrice] = useState(project?.purchasePrice ? Number(project.purchasePrice) : 8000000);
+  const [opAssumptions, setOpAssumptions] = useState({
+    monthlyNOI: 80000,
+    noiGrowthRate: 3,
+    monthlyDebtService: 35000,
+    holdPeriodYears: 5,
+    outstandingDebt: 5000000,
+  });
   const [earnouts, setEarnouts] = useState([
     { id: 1, name: "Year 1 EBITDA Target", targetAmount: 1000000, metric: "EBITDA", threshold: 1500000, probability: 80 },
     { id: 2, name: "Year 2 Revenue Target", targetAmount: 500000, metric: "Revenue", threshold: 5000000, probability: 60 },
@@ -54,6 +62,71 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
   const totalMaxEarnout = earnouts.reduce((sum, e) => sum + e.targetAmount, 0);
   const probabilityWeightedEarnout = earnouts.reduce((sum, e) => sum + (e.targetAmount * (e.probability / 100)), 0);
   const totalExpectedValue = basePrice + probabilityWeightedEarnout;
+
+  const proFormaConfig = useMemo(() => {
+    const totalMonths = opAssumptions.holdPeriodYears * 12;
+    const rows: ProFormaCashFlowRow[] = [];
+    const monthlyGrowth = Math.pow(1 + opAssumptions.noiGrowthRate / 100, 1 / 12);
+
+    for (let m = 1; m <= totalMonths; m++) {
+      const year = Math.ceil(m / 12);
+      const month = ((m - 1) % 12) + 1;
+      const noi = opAssumptions.monthlyNOI * Math.pow(monthlyGrowth, m - 1);
+      const debtSvc = opAssumptions.monthlyDebtService;
+      const netOpCF = noi - debtSvc;
+      const isExitMonth = m === totalMonths;
+
+      const values: Record<string, number> = {
+        "NOI": noi,
+        "Debt Service": -debtSvc,
+        "Net Operating CF": netOpCF,
+      };
+
+      let earnoutCF = 0;
+      if (month === 12) {
+        for (const e of earnouts) {
+          if (year <= opAssumptions.holdPeriodYears) {
+            const weightedPmt = (e.targetAmount * (e.probability / 100)) / opAssumptions.holdPeriodYears;
+            earnoutCF += weightedPmt;
+          }
+        }
+      }
+      values["Earnout Payments"] = earnoutCF;
+
+      if (isExitMonth) {
+        values["Sale Proceeds"] = basePrice;
+        values["Debt Payoff"] = -opAssumptions.outstandingDebt;
+      }
+
+      values["Total Cash Flow"] = netOpCF + earnoutCF + (isExitMonth ? basePrice - opAssumptions.outstandingDebt : 0);
+      rows.push({ period: m, year, month, values, isExitMonth });
+    }
+
+    const lineItems: ProFormaLineItem[] = [
+      { label: "NOI" },
+      { label: "Debt Service" },
+      { label: "Net Operating CF", isBold: true },
+      { label: "Earnout Payments" },
+      { label: "Sale Proceeds" },
+      { label: "Debt Payoff" },
+      { label: "Total Cash Flow", isSubtotal: true, isBold: true },
+    ];
+
+    const totalCF = rows.reduce((s, r) => s + (r.values["Total Cash Flow"] || 0), 0);
+
+    return {
+      strategyName: "Earnout",
+      holdPeriodYears: opAssumptions.holdPeriodYears,
+      lineItems,
+      rows,
+      summaryMetrics: [
+        { label: "Total Cash Flow", value: `$${Math.round(totalCF).toLocaleString()}` },
+        { label: "Base Price", value: `$${basePrice.toLocaleString()}` },
+        { label: "Expected Earnout", value: `$${Math.round(probabilityWeightedEarnout).toLocaleString()}` },
+        { label: "Total Value", value: `$${Math.round(totalExpectedValue).toLocaleString()}` },
+      ],
+    };
+  }, [opAssumptions, earnouts, basePrice, probabilityWeightedEarnout, totalExpectedValue]);
 
   return (
     <div className="p-6 space-y-6">
@@ -260,6 +333,39 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Operating Assumptions</CardTitle>
+          <CardDescription>Inputs for the monthly pro forma projection</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <Label>Monthly NOI ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyNOI} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyNOI: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>NOI Growth (%)</Label>
+              <Input type="number" step="0.1" value={opAssumptions.noiGrowthRate} onChange={(e) => setOpAssumptions({ ...opAssumptions, noiGrowthRate: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Debt Service ($)</Label>
+              <Input type="number" value={opAssumptions.monthlyDebtService} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyDebtService: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Hold Period (yrs)</Label>
+              <Input type="number" value={opAssumptions.holdPeriodYears} onChange={(e) => setOpAssumptions({ ...opAssumptions, holdPeriodYears: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Outstanding Debt ($)</Label>
+              <Input type="number" value={opAssumptions.outstandingDebt} onChange={(e) => setOpAssumptions({ ...opAssumptions, outstandingDebt: Number(e.target.value) })} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ExitProForma config={proFormaConfig} />
     </div>
   );
 }
