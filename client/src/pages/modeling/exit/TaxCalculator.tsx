@@ -227,60 +227,60 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Net Sale Price</span>
-                <span className="font-medium" data-testid="text-net-sale-price">
+                <span className="num font-medium" data-testid="text-net-sale-price">
                   ${netSalePrice.toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Adjusted Basis</span>
-                <span className="font-medium">${adjustedBasis.toLocaleString()}</span>
+                <span className="num font-medium">${adjustedBasis.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Gain</span>
-                <span className="font-medium text-green-600">${totalGain.toLocaleString()}</span>
+                <span className="num font-medium text-green-600">${totalGain.toLocaleString()}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Depreciation Recapture</span>
-                <span className="font-medium">${deprecRecapture.toLocaleString()}</span>
+                <span className="num font-medium">${deprecRecapture.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Capital Gain</span>
-                <span className="font-medium">${capitalGain.toLocaleString()}</span>
+                <span className="num font-medium">${capitalGain.toLocaleString()}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Depreciation Recapture Tax</span>
-                <span className="font-medium text-red-500">${deprecRecaptureTax.toLocaleString()}</span>
+                <span className="num font-medium text-red-500">${deprecRecaptureTax.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Federal Capital Gains Tax</span>
-                <span className="font-medium text-red-500">${federalCapGainsTax.toLocaleString()}</span>
+                <span className="num font-medium text-red-500">${federalCapGainsTax.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">State Capital Gains Tax</span>
-                <span className="font-medium text-red-500">${stateCapGainsTax.toLocaleString()}</span>
+                <span className="num font-medium text-red-500">${stateCapGainsTax.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">NIIT Tax</span>
-                <span className="font-medium text-red-500">${niitTax.toLocaleString()}</span>
+                <span className="num font-medium text-red-500">${niitTax.toLocaleString()}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg">
                 <span className="font-semibold">Total Tax Liability</span>
-                <span className="font-bold text-red-600" data-testid="text-total-tax">
+                <span className="num font-bold text-red-600" data-testid="text-total-tax">
                   ${totalTax.toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between text-lg">
                 <span className="font-semibold">Net Proceeds After Tax</span>
-                <span className="font-bold text-green-600" data-testid="text-net-proceeds">
+                <span className="num font-bold text-green-600" data-testid="text-net-proceeds">
                   ${netProceeds.toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Effective Tax Rate</span>
-                <span className="font-medium">{effectiveRate.toFixed(2)}%</span>
+                <span className="num font-medium">{effectiveRate.toFixed(2)}%</span>
               </div>
             </div>
           </CardContent>

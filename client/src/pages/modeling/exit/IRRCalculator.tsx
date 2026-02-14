@@ -187,7 +187,7 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">IRR</p>
-            <p className="text-2xl font-bold text-green-600" data-testid="text-irr">
+            <p className="num text-2xl font-bold text-green-600" data-testid="text-irr">
               {irr.toFixed(2)}%
             </p>
           </CardContent>
@@ -195,7 +195,7 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">MOIC</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="num text-2xl font-bold text-blue-600">
               {moic.toFixed(2)}x
             </p>
           </CardContent>
@@ -203,7 +203,7 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Invested</p>
-            <p className="text-2xl font-bold">
+            <p className="num text-2xl font-bold">
               ${totalInvested.toLocaleString()}
             </p>
           </CardContent>
@@ -211,7 +211,7 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Returned</p>
-            <p className="text-2xl font-bold">
+            <p className="num text-2xl font-bold">
               ${totalReturned.toLocaleString()}
             </p>
           </CardContent>
@@ -219,7 +219,7 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Profit</p>
-            <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`num text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               ${totalProfit.toLocaleString()}
             </p>
           </CardContent>
@@ -298,19 +298,19 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">NPV @ 8%</span>
-                    <span className={`font-medium ${npv8 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`num font-medium ${npv8 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ${npv8.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">NPV @ 10%</span>
-                    <span className={`font-medium ${npv10 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`num font-medium ${npv10 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ${npv10.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">NPV @ 12%</span>
-                    <span className={`font-medium ${npv12 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`num font-medium ${npv12 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ${npv12.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                   </div>
@@ -324,19 +324,19 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Internal Rate of Return (IRR)</span>
-                    <span className="font-medium text-green-600">{irr.toFixed(2)}%</span>
+                    <span className="num font-medium text-green-600">{irr.toFixed(2)}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Multiple on Invested Capital (MOIC)</span>
-                    <span className="font-medium">{moic.toFixed(2)}x</span>
+                    <span className="num font-medium">{moic.toFixed(2)}x</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Holding Period</span>
-                    <span className="font-medium">{Math.max(...cashFlows.map(cf => cf.year))} years</span>
+                    <span className="num font-medium">{Math.max(...cashFlows.map(cf => cf.year))} years</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Equity Multiple</span>
-                    <span className="font-medium">{moic.toFixed(2)}x</span>
+                    <span className="num font-medium">{moic.toFixed(2)}x</span>
                   </div>
                 </div>
               </div>

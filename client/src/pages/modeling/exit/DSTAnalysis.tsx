@@ -349,7 +349,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm">Investment</span>
               </div>
-              <p className="text-2xl font-bold">${(investmentAmount / 1000000).toFixed(2)}M</p>
+              <p className="num text-2xl font-bold">${(investmentAmount / 1000000).toFixed(2)}M</p>
             </CardContent>
           </Card>
           <Card>
@@ -358,7 +358,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">Annual Income</span>
               </div>
-              <p className="text-2xl font-bold text-green-600">${portfolioSummary.totalAnnualCashFlow.toLocaleString()}</p>
+              <p className="num text-2xl font-bold text-green-600">${portfolioSummary.totalAnnualCashFlow.toLocaleString()}</p>
             </CardContent>
           </Card>
           <Card>
@@ -367,7 +367,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <Percent className="h-4 w-4" />
                 <span className="text-sm">Blended Yield</span>
               </div>
-              <p className="text-2xl font-bold">{portfolioSummary.blendedCashOnCash.toFixed(2)}%</p>
+              <p className="num text-2xl font-bold">{portfolioSummary.blendedCashOnCash.toFixed(2)}%</p>
             </CardContent>
           </Card>
           <Card>
@@ -376,7 +376,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <Calculator className="h-4 w-4" />
                 <span className="text-sm">Tax Savings</span>
               </div>
-              <p className="text-2xl font-bold text-blue-600">${(portfolioSummary.taxSavings / 1000).toFixed(0)}K</p>
+              <p className="num text-2xl font-bold text-blue-600">${(portfolioSummary.taxSavings / 1000).toFixed(0)}K</p>
             </CardContent>
           </Card>
           <Card>
@@ -385,7 +385,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <PieChart className="h-4 w-4" />
                 <span className="text-sm">Allocated</span>
               </div>
-              <p className="text-2xl font-bold">{totalAllocation}%</p>
+              <p className="num text-2xl font-bold">{totalAllocation}%</p>
               {totalAllocation !== 100 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {totalAllocation < 100 ? `${100 - totalAllocation}% unallocated` : 'Over-allocated'}
@@ -547,19 +547,19 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-muted p-3 rounded">
                             <div>
                               <p className="text-muted-foreground">Amount Allocated</p>
-                              <p className="font-semibold">${returns.allocationAmount.toLocaleString()}</p>
+                              <p className="num font-semibold">${returns.allocationAmount.toLocaleString()}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Annual Cash Flow</p>
-                              <p className="font-semibold text-green-600">${returns.annualCashFlow.toLocaleString()}</p>
+                              <p className="num font-semibold text-green-600">${returns.annualCashFlow.toLocaleString()}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Total Fees</p>
-                              <p className="font-semibold text-red-500">${returns.totalFeeAmount.toLocaleString()}</p>
+                              <p className="num font-semibold text-red-500">${returns.totalFeeAmount.toLocaleString()}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Net IRR</p>
-                              <p className="font-semibold text-blue-600">{returns.irr.toFixed(2)}%</p>
+                              <p className="num font-semibold text-blue-600">{returns.irr.toFixed(2)}%</p>
                             </div>
                           </div>
                         </div>
@@ -657,7 +657,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                               className="w-20 text-right"
                             />
                           </TableCell>
-                          <TableCell className="text-right font-bold text-red-500">
+                          <TableCell className="num text-right font-bold text-red-500">
                             {totalFees.toFixed(2)}%
                           </TableCell>
                         </TableRow>
@@ -670,15 +670,15 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Fees (All DSTs)</p>
-                      <p className="text-xl font-bold text-red-500">${portfolioSummary.totalFees.toLocaleString()}</p>
+                      <p className="num text-xl font-bold text-red-500">${portfolioSummary.totalFees.toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Fees as % of Investment</p>
-                      <p className="text-xl font-bold">{((portfolioSummary.totalFees / investmentAmount) * 100).toFixed(2)}%</p>
+                      <p className="num text-xl font-bold">{((portfolioSummary.totalFees / investmentAmount) * 100).toFixed(2)}%</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Net Investment After Fees</p>
-                      <p className="text-xl font-bold">${(investmentAmount - portfolioSummary.totalFees).toLocaleString()}</p>
+                      <p className="num text-xl font-bold">${(investmentAmount - portfolioSummary.totalFees).toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
@@ -717,11 +717,11 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                       return (
                         <TableRow key={interest.dstId}>
                           <TableCell className="font-medium">{dst.name}</TableCell>
-                          <TableCell className="text-right">${interest.investmentAmount.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{interest.ownershipPercent.toFixed(4)}%</TableCell>
-                          <TableCell className="text-right text-green-600">${interest.annualDistribution.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">${interest.depreciationPassthrough.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-blue-600">${taxShelteredIncome.toLocaleString()}</TableCell>
+                          <TableCell className="num text-right">${interest.investmentAmount.toLocaleString()}</TableCell>
+                          <TableCell className="num text-right">{interest.ownershipPercent.toFixed(4)}%</TableCell>
+                          <TableCell className="num text-right text-green-600">${interest.annualDistribution.toLocaleString()}</TableCell>
+                          <TableCell className="num text-right">${interest.depreciationPassthrough.toLocaleString()}</TableCell>
+                          <TableCell className="num text-right text-blue-600">${taxShelteredIncome.toLocaleString()}</TableCell>
                         </TableRow>
                       );
                     })}
@@ -731,19 +731,19 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <div className="mt-6 grid grid-cols-3 gap-4">
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">Total Annual Distributions</p>
-                    <p className="text-xl font-bold text-green-600">
+                    <p className="num text-xl font-bold text-green-600">
                       ${fractionalInterests.reduce((sum, i) => sum + i.annualDistribution, 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">Total Depreciation Pass-through</p>
-                    <p className="text-xl font-bold">
+                    <p className="num text-xl font-bold">
                       ${fractionalInterests.reduce((sum, i) => sum + i.depreciationPassthrough, 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">Effective Tax-Sheltered</p>
-                    <p className="text-xl font-bold text-blue-600">
+                    <p className="num text-xl font-bold text-blue-600">
                       ${fractionalInterests.reduce((sum, i) => sum + Math.min(i.annualDistribution, i.depreciationPassthrough), 0).toLocaleString()}
                     </p>
                   </div>
@@ -792,11 +792,11 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Combined Tax Rate</span>
-                      <span className="font-bold">{(federalTaxRate + stateTaxRate).toFixed(1)}%</span>
+                      <span className="num font-bold">{(federalTaxRate + stateTaxRate).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Exchange Gain Being Deferred</span>
-                      <span className="font-medium">${exchangeGain.toLocaleString()}</span>
+                      <span className="num font-medium">${exchangeGain.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -811,16 +811,16 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                   <div className="space-y-3">
                     <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <span>Federal Tax Avoided</span>
-                      <span className="font-bold text-green-600">${(exchangeGain * federalTaxRate / 100).toLocaleString()}</span>
+                      <span className="num font-bold text-green-600">${(exchangeGain * federalTaxRate / 100).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <span>State Tax Avoided</span>
-                      <span className="font-bold text-green-600">${(exchangeGain * stateTaxRate / 100).toLocaleString()}</span>
+                      <span className="num font-bold text-green-600">${(exchangeGain * stateTaxRate / 100).toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <span className="font-semibold">Total Tax Savings</span>
-                      <span className="font-bold text-xl text-blue-600">${portfolioSummary.taxSavings.toLocaleString()}</span>
+                      <span className="num font-bold text-xl text-blue-600">${portfolioSummary.taxSavings.toLocaleString()}</span>
                     </div>
                   </div>
 

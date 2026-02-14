@@ -579,7 +579,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm">Note Value</span>
               </div>
-              <p className="text-2xl font-bold">${(loanAmount / 1000000).toFixed(2)}M</p>
+              <p className="num text-2xl font-bold">${(loanAmount / 1000000).toFixed(2)}M</p>
             </CardContent>
           </Card>
           <Card>
@@ -588,7 +588,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                 <Percent className="h-4 w-4" />
                 <span className="text-sm">Monthly Pmt</span>
               </div>
-              <p className="text-2xl font-bold">${monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+              <p className="num text-2xl font-bold">${monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
             </CardContent>
           </Card>
           <Card>
@@ -597,7 +597,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">Total Interest</span>
               </div>
-              <p className="text-2xl font-bold text-green-600">${(totalInterest / 1000).toFixed(0)}K</p>
+              <p className="num text-2xl font-bold text-green-600">${(totalInterest / 1000).toFixed(0)}K</p>
             </CardContent>
           </Card>
           <Card>
@@ -606,7 +606,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                 <Calculator className="h-4 w-4" />
                 <span className="text-sm">NPV of Note</span>
               </div>
-              <p className="text-2xl font-bold text-blue-600">${(npvOfNote / 1000000).toFixed(2)}M</p>
+              <p className="num text-2xl font-bold text-blue-600">${(npvOfNote / 1000000).toFixed(2)}M</p>
             </CardContent>
           </Card>
           <Card>
@@ -615,7 +615,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                 <Shield className="h-4 w-4" />
                 <span className="text-sm">Balloon Payment</span>
               </div>
-              <p className="text-2xl font-bold">${balloonBalance > 0 ? (balloonBalance / 1000000).toFixed(2) + 'M' : 'None'}</p>
+              <p className="num text-2xl font-bold">${balloonBalance > 0 ? (balloonBalance / 1000000).toFixed(2) + 'M' : 'None'}</p>
             </CardContent>
           </Card>
         </div>
@@ -788,15 +788,15 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Sale Price</span>
-                      <span className="font-medium">${inputs.salePrice.toLocaleString()}</span>
+                      <span className="num font-medium">${inputs.salePrice.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Down Payment</span>
-                      <span className="font-medium text-green-600">${downPaymentAmount.toLocaleString()}</span>
+                      <span className="num font-medium text-green-600">${downPaymentAmount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Note Amount</span>
-                      <span className="font-medium">${loanAmount.toLocaleString()}</span>
+                      <span className="num font-medium">${loanAmount.toLocaleString()}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
@@ -805,36 +805,36 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total Gain</span>
-                      <span className="font-medium">${totalGain.toLocaleString()}</span>
+                      <span className="num font-medium">${totalGain.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Gross Profit Ratio</span>
-                      <span className="font-medium">{(grossProfitRatio * 100).toFixed(2)}%</span>
+                      <span className="num font-medium">{(grossProfitRatio * 100).toFixed(2)}%</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Monthly Payment</span>
-                      <span className="font-medium" data-testid="text-monthly-payment">
+                      <span className="num font-medium" data-testid="text-monthly-payment">
                         ${monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         {paymentStructure === 'graduated' && <span className="text-xs text-muted-foreground ml-1">(starting)</span>}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Annual Payment</span>
-                      <span className="font-medium">
+                      <span className="num font-medium">
                         ${annualPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total Interest</span>
-                      <span className="font-medium text-green-600">
+                      <span className="num font-medium text-green-600">
                         ${totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                     {balloonBalance > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Balloon Payment</span>
-                        <span className="font-medium text-amber-600">
+                        <span className="num font-medium text-amber-600">
                           ${balloonBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       </div>
@@ -929,28 +929,28 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                                 {row.isInterestOnly && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">IO</Badge>}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="num text-right">
                               ${row.beginningBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="num text-right">
                               ${row.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right text-green-600">
+                            <TableCell className="num text-right text-green-600">
                               ${row.totalPrincipal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right text-blue-600">
+                            <TableCell className="num text-right text-blue-600">
                               ${row.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right font-medium">
+                            <TableCell className="num text-right font-medium">
                               ${row.endingBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="num text-right">
                               ${row.taxableGainRecognized.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right text-red-500">
+                            <TableCell className="num text-right text-red-500">
                               ${row.taxDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
+                            <TableCell className="num text-right font-medium text-green-600">
                               ${row.netCashFlow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
                           </TableRow>
@@ -958,23 +958,23 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                         <TableRow className="font-bold border-t-2">
                           <TableCell>Total</TableCell>
                           <TableCell />
-                          <TableCell className="text-right">
+                          <TableCell className="num text-right">
                             ${annualSchedule.reduce((s, r) => s + r.totalPayment, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
-                          <TableCell className="text-right text-green-600">
+                          <TableCell className="num text-right text-green-600">
                             ${annualSchedule.reduce((s, r) => s + r.totalPrincipal, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
-                          <TableCell className="text-right text-blue-600">
+                          <TableCell className="num text-right text-blue-600">
                             ${annualSchedule.reduce((s, r) => s + r.totalInterest, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
                           <TableCell />
-                          <TableCell className="text-right">
+                          <TableCell className="num text-right">
                             ${annualSchedule.reduce((s, r) => s + r.taxableGainRecognized, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
-                          <TableCell className="text-right text-red-500">
+                          <TableCell className="num text-right text-red-500">
                             ${totalTaxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
-                          <TableCell className="text-right text-green-600">
+                          <TableCell className="num text-right text-green-600">
                             ${annualSchedule.reduce((s, r) => s + r.netCashFlow, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </TableCell>
                         </TableRow>
@@ -1006,19 +1006,19 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                               </div>
                             </TableCell>
                             <TableCell className="text-right">{row.year}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="num text-right">
                               ${row.beginningBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="num text-right">
                               ${row.payment.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right text-green-600">
+                            <TableCell className="num text-right text-green-600">
                               ${row.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right text-blue-600">
+                            <TableCell className="num text-right text-blue-600">
                               ${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            <TableCell className="text-right font-medium">
+                            <TableCell className="num text-right font-medium">
                               ${row.endingBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
                           </TableRow>
@@ -1107,7 +1107,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                       <h4 className="font-medium mb-3">Outright Sale (Year 0 Tax)</h4>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Capital Gains Tax on Full Gain</span>
-                        <span className="font-medium text-red-500">
+                        <span className="num font-medium text-red-500">
                           ${(totalGain * combinedCapitalGainsRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </span>
                       </div>
@@ -1118,13 +1118,13 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Year 0 Tax (Down Payment)</span>
-                          <span className="font-medium">
+                          <span className="num font-medium">
                             ${annualSchedule[0]?.taxDue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Total Tax Over Term</span>
-                          <span className="font-medium">
+                          <span className="num font-medium">
                             ${totalTaxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </span>
                         </div>
@@ -1135,7 +1135,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
 
                     <div className="flex justify-between items-center">
                       <span className="font-semibold">Tax Timing Benefit</span>
-                      <span className="font-bold text-green-600">
+                      <span className="num font-bold text-green-600">
                         Defer ${((totalGain * combinedCapitalGainsRate) - (annualSchedule[0]?.taxDue || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })} in Year 0
                       </span>
                     </div>
@@ -1270,22 +1270,22 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Note Face Value</span>
-                      <span className="font-medium">${loanAmount.toLocaleString()}</span>
+                      <span className="num font-medium">${loanAmount.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">NPV (8% discount)</span>
-                      <span className="font-medium">${npvOfNote.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <span className="num font-medium">${npvOfNote.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Expected Loss</span>
-                      <span className="font-medium text-red-500">
+                      <span className="num font-medium text-red-500">
                         -${expectedLoss.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
                       <span className="font-semibold">Risk-Adjusted Value</span>
-                      <span className="font-bold text-blue-600">
+                      <span className="num font-bold text-blue-600">
                         ${riskAdjustedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     </div>

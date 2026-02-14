@@ -162,7 +162,7 @@ export function ExitProForma({ config }: { config: ExitProFormaConfig }) {
             {config.summaryMetrics.map((m, i) => (
               <div key={i} className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-xs text-muted-foreground">{m.label}</p>
-                <p className="text-lg font-bold">{m.value}</p>
+                <p className="num text-lg font-bold">{m.value}</p>
                 {m.delta && (
                   <div className={`flex items-center gap-1 text-xs ${m.deltaDirection === 'up' ? 'text-green-600' : 'text-red-600'}`}>
                     {m.deltaDirection === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -206,13 +206,13 @@ export function ExitProForma({ config }: { config: ExitProFormaConfig }) {
                       return (
                         <TableCell
                           key={li.label}
-                          className={`text-right tabular-nums ${li.isBold || li.isSubtotal ? "font-semibold" : ""} ${val < 0 ? "text-red-600" : ""}`}
+                          className={`text-right num ${li.isBold || li.isSubtotal ? "font-semibold" : ""} ${val < 0 ? "text-red-600" : ""}`}
                         >
                           {fmtCurrency(val)}
                         </TableCell>
                       );
                     })}
-                    <TableCell className={`text-right font-semibold tabular-nums ${(annualCumulativeCF[idx] || 0) < 0 ? "text-red-600" : "text-green-600"}`}>
+                    <TableCell className={`text-right font-semibold num ${(annualCumulativeCF[idx] || 0) < 0 ? "text-red-600" : "text-green-600"}`}>
                       {fmtCurrency(annualCumulativeCF[idx] || 0)}
                     </TableCell>
                   </TableRow>
@@ -222,12 +222,12 @@ export function ExitProForma({ config }: { config: ExitProFormaConfig }) {
                   {config.lineItems.map((li) => {
                     const val = totalsByLine[li.label] || 0;
                     return (
-                      <TableCell key={li.label} className={`text-right tabular-nums ${val < 0 ? "text-red-600" : ""}`}>
+                      <TableCell key={li.label} className={`text-right num ${val < 0 ? "text-red-600" : ""}`}>
                         {fmtCurrency(val)}
                       </TableCell>
                     );
                   })}
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right num">
                     {fmtCurrency(cumulativeCF[cumulativeCF.length - 1] || 0)}
                   </TableCell>
                 </TableRow>
@@ -257,13 +257,13 @@ export function ExitProForma({ config }: { config: ExitProFormaConfig }) {
                       return (
                         <TableCell
                           key={li.label}
-                          className={`text-right text-sm tabular-nums ${li.isBold || li.isSubtotal ? "font-semibold" : ""} ${val < 0 ? "text-red-600" : ""}`}
+                          className={`text-right text-sm num ${li.isBold || li.isSubtotal ? "font-semibold" : ""} ${val < 0 ? "text-red-600" : ""}`}
                         >
                           {fmtCurrency(val)}
                         </TableCell>
                       );
                     })}
-                    <TableCell className={`text-right text-sm font-semibold tabular-nums ${(cumulativeCF[idx] || 0) < 0 ? "text-red-600" : "text-green-600"}`}>
+                    <TableCell className={`text-right text-sm font-semibold num ${(cumulativeCF[idx] || 0) < 0 ? "text-red-600" : "text-green-600"}`}>
                       {fmtCurrency(cumulativeCF[idx] || 0)}
                     </TableCell>
                   </TableRow>

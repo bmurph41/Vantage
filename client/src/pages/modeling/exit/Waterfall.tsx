@@ -593,7 +593,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm">Total Distribution</span>
               </div>
-              <p className="text-2xl font-bold">{formatCurrency(inputs.totalDistribution)}</p>
+              <p className="num text-2xl font-bold">{formatCurrency(inputs.totalDistribution)}</p>
             </CardContent>
           </Card>
           <Card>
@@ -602,7 +602,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">LP MOIC</span>
               </div>
-              <p className="text-2xl font-bold text-green-600">{lpMOIC.toFixed(2)}x</p>
+              <p className="num text-2xl font-bold text-green-600">{lpMOIC.toFixed(2)}x</p>
             </CardContent>
           </Card>
           <Card>
@@ -611,7 +611,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-sm">GP MOIC</span>
               </div>
-              <p className="text-2xl font-bold text-purple-600">{gpMOIC.toFixed(2)}x</p>
+              <p className="num text-2xl font-bold text-purple-600">{gpMOIC.toFixed(2)}x</p>
             </CardContent>
           </Card>
           <Card>
@@ -620,7 +620,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <Layers className="h-4 w-4" />
                 <span className="text-sm">Promote Tiers</span>
               </div>
-              <p className="text-2xl font-bold">{tiers.length}</p>
+              <p className="num text-2xl font-bold">{tiers.length}</p>
             </CardContent>
           </Card>
         </div>
@@ -1062,17 +1062,17 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">Total Contributed</p>
-                    <p className="text-xl font-bold">{formatCurrency(totalContributed)}</p>
+                    <p className="num text-xl font-bold">{formatCurrency(totalContributed)}</p>
                   </div>
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <p className="text-sm text-muted-foreground">LP Capital</p>
-                    <p className="text-xl font-bold text-blue-600">{formatCurrency(lpContribution)}</p>
-                    <p className="text-xs text-muted-foreground">{((lpContribution / totalContributed) * 100).toFixed(1)}% of total</p>
+                    <p className="num text-xl font-bold text-blue-600">{formatCurrency(lpContribution)}</p>
+                    <p className="num text-xs text-muted-foreground">{((lpContribution / totalContributed) * 100).toFixed(1)}% of total</p>
                   </div>
                   <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                     <p className="text-sm text-muted-foreground">GP Capital</p>
-                    <p className="text-xl font-bold text-purple-600">{formatCurrency(gpContribution)}</p>
-                    <p className="text-xs text-muted-foreground">{((gpContribution / totalContributed) * 100).toFixed(1)}% of total</p>
+                    <p className="num text-xl font-bold text-purple-600">{formatCurrency(gpContribution)}</p>
+                    <p className="num text-xs text-muted-foreground">{((gpContribution / totalContributed) * 100).toFixed(1)}% of total</p>
                   </div>
                 </div>
               </CardContent>
@@ -1100,20 +1100,20 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Co-Investment</span>
-                    <span className="font-medium">{formatCurrency(gpContribution)} ({((gpContribution / totalContributed) * 100).toFixed(1)}%)</span>
+                    <span className="num font-medium">{formatCurrency(gpContribution)} ({((gpContribution / totalContributed) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Promote (at Pref)</span>
-                    <span className="font-medium">{tiers[0]?.gpSplit || 20}% of profits</span>
+                    <span className="num font-medium">{tiers[0]?.gpSplit || 20}% of profits</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Catch-Up</span>
-                    <span className="font-medium">{inputs.gpCatchUpPercentage}%</span>
+                    <span className="num font-medium">{inputs.gpCatchUpPercentage}%</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-sm font-medium">
                     <span>Projected Returns</span>
-                    <span className="text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</span>
+                    <span className="num text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1128,20 +1128,20 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total LP Capital</span>
-                    <span className="font-medium">{formatCurrency(lpContribution)} ({((lpContribution / totalContributed) * 100).toFixed(1)}%)</span>
+                    <span className="num font-medium">{formatCurrency(lpContribution)} ({((lpContribution / totalContributed) * 100).toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Preferred Return</span>
-                    <span className="font-medium">{inputs.preferredReturn}% IRR</span>
+                    <span className="num font-medium">{inputs.preferredReturn}% IRR</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Profit Split</span>
-                    <span className="font-medium">{tiers[0]?.lpSplit || 80}%</span>
+                    <span className="num font-medium">{tiers[0]?.lpSplit || 80}%</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-sm font-medium">
                     <span>Projected Returns</span>
-                    <span className="text-green-600">{formatCurrency(calculateWaterfall.lpTotal)}</span>
+                    <span className="num text-green-600">{formatCurrency(calculateWaterfall.lpTotal)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1177,10 +1177,10 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                                 {investor.isGP ? 'GP' : 'LP'}
                               </Badge>
                             </td>
-                            <td className="text-right py-3 px-4">{formatCurrency(investor.contribution)}</td>
-                            <td className="text-right py-3 px-4">{ownership.toFixed(1)}%</td>
-                            <td className="text-right py-3 px-4">{investor.isGP ? '—' : `${inputs.preferredReturn}%`}</td>
-                            <td className="text-right py-3 px-4">
+                            <td className="num text-right py-3 px-4">{formatCurrency(investor.contribution)}</td>
+                            <td className="num text-right py-3 px-4">{ownership.toFixed(1)}%</td>
+                            <td className="num text-right py-3 px-4">{investor.isGP ? '—' : `${inputs.preferredReturn}%`}</td>
+                            <td className="num text-right py-3 px-4">
                               <span className="text-green-600 font-medium">{projMoic.toFixed(2)}x</span>
                             </td>
                             <td className="text-center py-3 px-4">
@@ -1219,25 +1219,25 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                 <div className="grid gap-4 md:grid-cols-4 mb-6">
                   <Card className="bg-blue-500/10 border-blue-500/20">
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-blue-600">{formatCurrency(inputs.totalDistribution)}</div>
+                      <div className="num text-2xl font-bold text-blue-600">{formatCurrency(inputs.totalDistribution)}</div>
                       <div className="text-xs text-muted-foreground">Total Proceeds</div>
                     </CardContent>
                   </Card>
                   <Card className="bg-green-500/10 border-green-500/20">
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-green-600">{formatCurrency(inputs.totalDistribution - totalContributed)}</div>
+                      <div className="num text-2xl font-bold text-green-600">{formatCurrency(inputs.totalDistribution - totalContributed)}</div>
                       <div className="text-xs text-muted-foreground">Total Profit</div>
                     </CardContent>
                   </Card>
                   <Card className="bg-purple-500/10 border-purple-500/20">
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-purple-600">{(((inputs.totalDistribution / totalContributed) - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</div>
+                      <div className="num text-2xl font-bold text-purple-600">{(((inputs.totalDistribution / totalContributed) - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</div>
                       <div className="text-xs text-muted-foreground">Fund IRR</div>
                     </CardContent>
                   </Card>
                   <Card className="bg-orange-500/10 border-orange-500/20">
                     <CardContent className="pt-4 text-center">
-                      <div className="text-2xl font-bold text-orange-600">{(inputs.totalDistribution / totalContributed).toFixed(2)}x</div>
+                      <div className="num text-2xl font-bold text-orange-600">{(inputs.totalDistribution / totalContributed).toFixed(2)}x</div>
                       <div className="text-xs text-muted-foreground">Equity Multiple</div>
                     </CardContent>
                   </Card>
@@ -1260,39 +1260,39 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                         <tr className="bg-blue-500/5">
                           <td className="py-3 px-4"><Badge variant="outline">Tier 1</Badge></td>
                           <td className="py-3 px-4">Return of Capital</td>
-                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.returnOfCapital)}</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (lpContribution / totalContributed))}</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</td>
+                          <td className="num py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.returnOfCapital)}</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (lpContribution / totalContributed))}</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</td>
                         </tr>
                         <tr className="bg-green-500/5">
                           <td className="py-3 px-4"><Badge variant="outline">Tier 2</Badge></td>
                           <td className="py-3 px-4">Preferred Return ({inputs.preferredReturn}% IRR)</td>
-                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.preferredReturn)}</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (lpContribution / totalContributed))}</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (gpContribution / totalContributed))}</td>
+                          <td className="num py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.preferredReturn)}</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (lpContribution / totalContributed))}</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.preferredReturn * (gpContribution / totalContributed))}</td>
                         </tr>
                         <tr className="bg-orange-500/5">
                           <td className="py-3 px-4"><Badge variant="outline">Tier 3</Badge></td>
                           <td className="py-3 px-4">GP Catch-Up ({inputs.gpCatchUpPercentage}%)</td>
-                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
-                          <td className="py-3 px-4 text-right">$0</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
+                          <td className="num py-3 px-4 text-right font-medium">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
+                          <td className="num py-3 px-4 text-right">$0</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.gpCatchUp)}</td>
                         </tr>
                         {calculateWaterfall.tierDistributions.map((tierDist, idx) => (
                           <tr key={idx} className="bg-purple-500/5">
                             <td className="py-3 px-4"><Badge variant="outline">Tier {4 + idx}</Badge></td>
                             <td className="py-3 px-4">{tierDist.tier.name} ({tierDist.tier.lpSplit}/{tierDist.tier.gpSplit})</td>
-                            <td className="py-3 px-4 text-right font-medium">{formatCurrency(tierDist.lpAmount + tierDist.gpAmount)}</td>
-                            <td className="py-3 px-4 text-right">{formatCurrency(tierDist.lpAmount)}</td>
-                            <td className="py-3 px-4 text-right">{formatCurrency(tierDist.gpAmount)}</td>
+                            <td className="num py-3 px-4 text-right font-medium">{formatCurrency(tierDist.lpAmount + tierDist.gpAmount)}</td>
+                            <td className="num py-3 px-4 text-right">{formatCurrency(tierDist.lpAmount)}</td>
+                            <td className="num py-3 px-4 text-right">{formatCurrency(tierDist.gpAmount)}</td>
                           </tr>
                         ))}
                         <tr className="font-bold border-t-2">
                           <td className="py-3 px-4"></td>
                           <td className="py-3 px-4">Total Distributions</td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(calculateWaterfall.lpTotal + calculateWaterfall.gpTotal)}</td>
-                          <td className="py-3 px-4 text-right text-blue-600">{formatCurrency(calculateWaterfall.lpTotal)}</td>
-                          <td className="py-3 px-4 text-right text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</td>
+                          <td className="num py-3 px-4 text-right">{formatCurrency(calculateWaterfall.lpTotal + calculateWaterfall.gpTotal)}</td>
+                          <td className="num py-3 px-4 text-right text-blue-600">{formatCurrency(calculateWaterfall.lpTotal)}</td>
+                          <td className="num py-3 px-4 text-right text-green-600">{formatCurrency(calculateWaterfall.gpTotal)}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1309,24 +1309,24 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                     <CardContent className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Capital Invested</span>
-                        <span>{formatCurrency(lpContribution)}</span>
+                        <span className="num">{formatCurrency(lpContribution)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Distributions</span>
-                        <span>{formatCurrency(calculateWaterfall.lpTotal)}</span>
+                        <span className="num">{formatCurrency(calculateWaterfall.lpTotal)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Net Profit</span>
-                        <span className="text-green-600">{formatCurrency(calculateWaterfall.lpTotal - lpContribution)}</span>
+                        <span className="num text-green-600">{formatCurrency(calculateWaterfall.lpTotal - lpContribution)}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-medium">
                         <span>LP IRR</span>
-                        <span className="text-green-600">{((lpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
+                        <span className="num text-green-600">{((lpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between font-medium">
                         <span>LP Multiple</span>
-                        <span className="text-green-600">{lpMOIC.toFixed(2)}x</span>
+                        <span className="num text-green-600">{lpMOIC.toFixed(2)}x</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1337,24 +1337,24 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                     <CardContent className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Capital Invested</span>
-                        <span>{formatCurrency(gpContribution)}</span>
+                        <span className="num">{formatCurrency(gpContribution)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Co-Invest Return</span>
-                        <span>{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</span>
+                        <span className="num">{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Promote (Carry)</span>
-                        <span className="text-green-600">{formatCurrency(calculateWaterfall.gpCatchUp + calculateWaterfall.tierDistributions.reduce((sum, t) => sum + t.gpAmount, 0))}</span>
+                        <span className="num text-green-600">{formatCurrency(calculateWaterfall.gpCatchUp + calculateWaterfall.tierDistributions.reduce((sum, t) => sum + t.gpAmount, 0))}</span>
                       </div>
                       <Separator />
                       <div className="flex justify-between font-medium">
                         <span>GP IRR</span>
-                        <span className="text-green-600">{((gpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
+                        <span className="num text-green-600">{((gpMOIC - 1) * 100 / inputs.holdingPeriodYears).toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between font-medium">
                         <span>GP Multiple</span>
-                        <span className="text-green-600">{gpMOIC.toFixed(2)}x</span>
+                        <span className="num text-green-600">{gpMOIC.toFixed(2)}x</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1374,19 +1374,19 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                   <div className="grid grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
                     <div>
                       <p className="text-sm text-muted-foreground">1. Return of Capital</p>
-                      <p className="text-xl font-bold">{formatCurrency(calculateWaterfall.returnOfCapital)}</p>
+                      <p className="num text-xl font-bold">{formatCurrency(calculateWaterfall.returnOfCapital)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">2. Preferred Return ({inputs.preferredReturn}%)</p>
-                      <p className="text-xl font-bold">{formatCurrency(calculateWaterfall.preferredReturn)}</p>
+                      <p className="num text-xl font-bold">{formatCurrency(calculateWaterfall.preferredReturn)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">3. GP Catch-up</p>
-                      <p className="text-xl font-bold text-purple-600">{formatCurrency(calculateWaterfall.gpCatchUp)}</p>
+                      <p className="num text-xl font-bold text-purple-600">{formatCurrency(calculateWaterfall.gpCatchUp)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">4. Promote Split</p>
-                      <p className="text-xl font-bold text-green-600">
+                      <p className="num text-xl font-bold text-green-600">
                         {formatCurrency(calculateWaterfall.tierDistributions.reduce((sum, td) => sum + td.lpAmount + td.gpAmount, 0))}
                       </p>
                     </div>
@@ -1415,11 +1415,11 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                               <div className="flex items-center gap-6">
                                 <div className="text-right">
                                   <p className="text-xs text-muted-foreground">LP ({td.tier.lpSplit}%)</p>
-                                  <p className="font-medium text-blue-600">{formatCurrency(td.lpAmount)}</p>
+                                  <p className="num font-medium text-blue-600">{formatCurrency(td.lpAmount)}</p>
                                 </div>
                                 <div className="text-right">
                                   <p className="text-xs text-muted-foreground">GP ({td.tier.gpSplit}%)</p>
-                                  <p className="font-medium text-purple-600">{formatCurrency(td.gpAmount)}</p>
+                                  <p className="num font-medium text-purple-600">{formatCurrency(td.gpAmount)}</p>
                                 </div>
                               </div>
                             </div>
@@ -1440,24 +1440,24 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Capital Returned</span>
-                          <span>{formatCurrency(calculateWaterfall.returnOfCapital * (lpContribution / totalContributed))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.returnOfCapital * (lpContribution / totalContributed))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Preferred Return</span>
-                          <span>{formatCurrency(calculateWaterfall.preferredReturn * (lpContribution / totalContributed))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.preferredReturn * (lpContribution / totalContributed))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Profit Share</span>
-                          <span>{formatCurrency(calculateWaterfall.tierDistributions.reduce((sum, td) => sum + td.lpAmount, 0))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.tierDistributions.reduce((sum, td) => sum + td.lpAmount, 0))}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-semibold">
                           <span>Total LP Distribution</span>
-                          <span className="text-green-600" data-testid="text-lp-total">{formatCurrency(calculateWaterfall.lpTotal)}</span>
+                          <span className="num text-green-600" data-testid="text-lp-total">{formatCurrency(calculateWaterfall.lpTotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">LP MOIC</span>
-                          <span className="font-medium">{lpMOIC.toFixed(2)}x</span>
+                          <span className="num font-medium">{lpMOIC.toFixed(2)}x</span>
                         </div>
                       </div>
                     </div>
@@ -1470,28 +1470,28 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Capital Returned</span>
-                          <span>{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.returnOfCapital * (gpContribution / totalContributed))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Preferred Return</span>
-                          <span>{formatCurrency(calculateWaterfall.preferredReturn * (gpContribution / totalContributed))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.preferredReturn * (gpContribution / totalContributed))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Catch-up</span>
-                          <span>{formatCurrency(calculateWaterfall.gpCatchUp)}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.gpCatchUp)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Carried Interest</span>
-                          <span>{formatCurrency(calculateWaterfall.tierDistributions.reduce((sum, td) => sum + td.gpAmount, 0))}</span>
+                          <span className="num">{formatCurrency(calculateWaterfall.tierDistributions.reduce((sum, td) => sum + td.gpAmount, 0))}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-semibold">
                           <span>Total GP Distribution</span>
-                          <span className="text-purple-600" data-testid="text-gp-total">{formatCurrency(calculateWaterfall.gpTotal)}</span>
+                          <span className="num text-purple-600" data-testid="text-gp-total">{formatCurrency(calculateWaterfall.gpTotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">GP MOIC</span>
-                          <span className="font-medium">{gpMOIC.toFixed(2)}x</span>
+                          <span className="num font-medium">{gpMOIC.toFixed(2)}x</span>
                         </div>
                       </div>
                     </div>
@@ -1559,20 +1559,20 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                                 )}
                               </div>
                             </td>
-                            <td className="text-right py-3 px-4">{formatCurrency(scenarioDistribution)}</td>
-                            <td className="text-right py-3 px-4 text-blue-600">{formatCurrency(result.lpTotal)}</td>
-                            <td className="text-right py-3 px-4">
+                            <td className="num text-right py-3 px-4">{formatCurrency(scenarioDistribution)}</td>
+                            <td className="num text-right py-3 px-4 text-blue-600">{formatCurrency(result.lpTotal)}</td>
+                            <td className="num text-right py-3 px-4">
                               <span className={lpMoic >= 1 ? 'text-green-600' : 'text-red-600'}>
                                 {lpMoic.toFixed(2)}x
                               </span>
                             </td>
-                            <td className="text-right py-3 px-4 text-purple-600">{formatCurrency(result.gpTotal)}</td>
-                            <td className="text-right py-3 px-4">
+                            <td className="num text-right py-3 px-4 text-purple-600">{formatCurrency(result.gpTotal)}</td>
+                            <td className="num text-right py-3 px-4">
                               <span className={gpMoic >= 1 ? 'text-green-600' : 'text-red-600'}>
                                 {gpMoic.toFixed(2)}x
                               </span>
                             </td>
-                            <td className="text-right py-3 px-4">{gpPercent.toFixed(1)}%</td>
+                            <td className="num text-right py-3 px-4">{gpPercent.toFixed(1)}%</td>
                           </tr>
                         );
                       })}
@@ -1632,14 +1632,14 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
                                 {preset.isEuropean ? 'European' : 'American'}
                               </Badge>
                             </td>
-                            <td className="text-right py-3 px-4">{preset.preferredReturn}%</td>
-                            <td className="text-right py-3 px-4">{preset.tiers.length}</td>
-                            <td className="text-right py-3 px-4">
+                            <td className="num text-right py-3 px-4">{preset.preferredReturn}%</td>
+                            <td className="num text-right py-3 px-4">{preset.tiers.length}</td>
+                            <td className="num text-right py-3 px-4">
                               <span className={presetLpMoic >= lpMOIC ? 'text-green-600' : 'text-orange-600'}>
                                 {presetLpMoic.toFixed(2)}x
                               </span>
                             </td>
-                            <td className="text-right py-3 px-4">
+                            <td className="num text-right py-3 px-4">
                               <span className={presetGpMoic >= gpMOIC ? 'text-green-600' : 'text-orange-600'}>
                                 {presetGpMoic.toFixed(2)}x
                               </span>

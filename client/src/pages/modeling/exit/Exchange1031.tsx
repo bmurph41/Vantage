@@ -291,7 +291,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                 <Calendar className="h-5 w-5 text-orange-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">45-Day ID</p>
-                  <p className="text-xl font-bold">{inputs.daysIdentified} / 45</p>
+                  <p className="num text-xl font-bold">{inputs.daysIdentified} / 45</p>
                 </div>
               </div>
               {inputs.daysIdentified <= 45 ? (
@@ -311,7 +311,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                 <Calendar className="h-5 w-5 text-blue-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">180-Day Close</p>
-                  <p className="text-xl font-bold">{inputs.daysClosed} / 180</p>
+                  <p className="num text-xl font-bold">{inputs.daysClosed} / 180</p>
                 </div>
               </div>
               {inputs.daysClosed <= 180 ? (
@@ -330,7 +330,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               <Building className="h-5 w-5 text-purple-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Properties ID'd</p>
-                <p className="text-xl font-bold">{identifiedCount}</p>
+                <p className="num text-xl font-bold">{identifiedCount}</p>
               </div>
             </div>
             <div className="mt-2">
@@ -351,7 +351,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               <DollarSign className="h-5 w-5 text-green-500" />
               <div>
                 <p className="text-sm text-muted-foreground">Deferred Gain</p>
-                <p className="text-xl font-bold text-green-600">${(deferredGain / 1000000).toFixed(2)}M</p>
+                <p className="num text-xl font-bold text-green-600">${(deferredGain / 1000000).toFixed(2)}M</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -447,7 +447,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                           className="w-28 text-right"
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="num text-right font-medium">
                         ${(property.value - property.newDebt).toLocaleString()}
                       </TableCell>
                       <TableCell>
@@ -484,15 +484,15 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Total Replacement Value</p>
-                    <p className="font-bold text-lg">${totalReplacementValue.toLocaleString()}</p>
+                    <p className="num font-bold text-lg">${totalReplacementValue.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Total New Debt</p>
-                    <p className="font-bold text-lg">${totalReplacementDebt.toLocaleString()}</p>
+                    <p className="num font-bold text-lg">${totalReplacementDebt.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Total Equity Required</p>
-                    <p className="font-bold text-lg">${replacementEquity.toLocaleString()}</p>
+                    <p className="num font-bold text-lg">${replacementEquity.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -588,30 +588,30 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                   <h4 className="font-medium text-sm">Equity Comparison</h4>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Relinquished Equity</span>
-                    <span className="font-medium">${relinquishedEquity.toLocaleString()}</span>
+                    <span className="num font-medium">${relinquishedEquity.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Replacement Equity</span>
-                    <span className="font-medium">${replacementEquity.toLocaleString()}</span>
+                    <span className="num font-medium">${replacementEquity.toLocaleString()}</span>
                   </div>
                   <Separator />
                   
                   <h4 className="font-medium text-sm">Boot Analysis</h4>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cash Boot</span>
-                    <span className={`font-medium ${bootCash > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <span className={`num font-medium ${bootCash > 0 ? 'text-red-500' : 'text-green-500'}`}>
                       ${bootCash.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Mortgage Boot</span>
-                    <span className={`font-medium ${bootDebt > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <span className={`num font-medium ${bootDebt > 0 ? 'text-red-500' : 'text-green-500'}`}>
                       ${bootDebt.toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-semibold">Total Boot (Taxable)</span>
-                    <span className={`font-bold ${totalBoot > 0 ? 'text-red-500' : 'text-green-500'}`} data-testid="text-total-boot">
+                    <span className={`num font-bold ${totalBoot > 0 ? 'text-red-500' : 'text-green-500'}`} data-testid="text-total-boot">
                       ${totalBoot.toLocaleString()}
                     </span>
                   </div>
@@ -620,21 +620,21 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                   <h4 className="font-medium text-sm">Gain Analysis</h4>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Realized Gain</span>
-                    <span className="font-medium">${(inputs.relinquishedValue - adjustedBasis).toLocaleString()}</span>
+                    <span className="num font-medium">${(inputs.relinquishedValue - adjustedBasis).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Deferred Gain</span>
-                    <span className="font-medium text-green-600">${deferredGain.toLocaleString()}</span>
+                    <span className="num font-medium text-green-600">${deferredGain.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Recognized Gain (Taxable)</span>
-                    <span className="font-medium text-red-500">${taxableGain.toLocaleString()}</span>
+                    <span className="num font-medium text-red-500">${taxableGain.toLocaleString()}</span>
                   </div>
                   <Separator />
                   
                   <div className="flex justify-between">
                     <span className="font-semibold">New Basis in Replacement</span>
-                    <span className="font-bold" data-testid="text-new-basis">
+                    <span className="num font-bold" data-testid="text-new-basis">
                       ${newBasis.toLocaleString()}
                     </span>
                   </div>
@@ -730,7 +730,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               <div className="p-4 bg-muted rounded-lg">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Total Exchange Costs</span>
-                  <span className="text-xl font-bold">${totalExchangeCosts.toLocaleString()}</span>
+                  <span className="num text-xl font-bold">${totalExchangeCosts.toLocaleString()}</span>
                 </div>
               </div>
             </CardContent>

@@ -160,7 +160,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Base Purchase Price</p>
-            <p className="text-2xl font-bold" data-testid="text-base-price">
+            <p className="num text-2xl font-bold" data-testid="text-base-price">
               ${basePrice.toLocaleString()}
             </p>
           </CardContent>
@@ -168,7 +168,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Max Total Earnout</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="num text-2xl font-bold text-blue-600">
               ${totalMaxEarnout.toLocaleString()}
             </p>
           </CardContent>
@@ -176,7 +176,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Probability-Weighted</p>
-            <p className="text-2xl font-bold text-purple-600">
+            <p className="num text-2xl font-bold text-purple-600">
               ${probabilityWeightedEarnout.toLocaleString()}
             </p>
           </CardContent>
@@ -184,7 +184,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Expected Total Value</p>
-            <p className="text-2xl font-bold text-green-600" data-testid="text-expected-value">
+            <p className="num text-2xl font-bold text-green-600" data-testid="text-expected-value">
               ${totalExpectedValue.toLocaleString()}
             </p>
           </CardContent>
@@ -284,7 +284,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
                 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Expected Value</span>
-                  <span className="font-medium text-purple-600">
+                  <span className="num font-medium text-purple-600">
                     ${(earnout.targetAmount * (earnout.probability / 100)).toLocaleString()}
                   </span>
                 </div>
@@ -313,18 +313,18 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
                 {earnouts.map((earnout) => (
                   <tr key={earnout.id} className="border-b">
                     <td className="py-2 px-4">{earnout.name}</td>
-                    <td className="text-right py-2 px-4">${earnout.targetAmount.toLocaleString()}</td>
-                    <td className="text-right py-2 px-4">{earnout.probability}%</td>
-                    <td className="text-right py-2 px-4 text-purple-600">
+                    <td className="num text-right py-2 px-4">${earnout.targetAmount.toLocaleString()}</td>
+                    <td className="num text-right py-2 px-4">{earnout.probability}%</td>
+                    <td className="num text-right py-2 px-4 text-purple-600">
                       ${(earnout.targetAmount * (earnout.probability / 100)).toLocaleString()}
                     </td>
                   </tr>
                 ))}
                 <tr className="font-semibold bg-muted">
                   <td className="py-2 px-4">Total</td>
-                  <td className="text-right py-2 px-4">${totalMaxEarnout.toLocaleString()}</td>
+                  <td className="num text-right py-2 px-4">${totalMaxEarnout.toLocaleString()}</td>
                   <td className="text-right py-2 px-4">-</td>
-                  <td className="text-right py-2 px-4 text-purple-600">
+                  <td className="num text-right py-2 px-4 text-purple-600">
                     ${probabilityWeightedEarnout.toLocaleString()}
                   </td>
                 </tr>

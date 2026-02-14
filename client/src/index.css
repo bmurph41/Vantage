@@ -500,6 +500,12 @@
     letter-spacing: -0.02em;
   }
 
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
   .stat-label {
     @apply text-sm text-muted-foreground;
   }

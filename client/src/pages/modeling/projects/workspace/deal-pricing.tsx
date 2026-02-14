@@ -900,25 +900,25 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <p className="text-xs text-muted-foreground">IRR</p>
-                    <p className="text-xl font-bold text-green-600" data-testid="text-price-irr">
+                    <p className="num text-xl font-bold text-green-600" data-testid="text-price-irr">
                       {formatPercent(pricingData.fromPurchasePrice.irr)}
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <p className="text-xs text-muted-foreground">Year 1 Cap Rate</p>
-                    <p className="text-xl font-bold text-blue-600" data-testid="text-price-cap-rate">
+                    <p className="num text-xl font-bold text-blue-600" data-testid="text-price-cap-rate">
                       {formatPercent(pricingData.fromPurchasePrice.year1CapRate)}
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
                     <p className="text-xs text-muted-foreground">Equity Multiple</p>
-                    <p className="text-xl font-bold text-purple-600">
+                    <p className="num text-xl font-bold text-purple-600">
                       {formatMultiple(pricingData.fromPurchasePrice.equityMultiple)}
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
                     <p className="text-xs text-muted-foreground">Avg Cash-on-Cash</p>
-                    <p className="text-xl font-bold text-orange-600">
+                    <p className="num text-xl font-bold text-orange-600">
                       {formatPercent(pricingData.fromPurchasePrice.averageCashOnCash)}
                     </p>
                   </div>
@@ -926,11 +926,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div className="flex justify-between text-sm pt-2 border-t">
                   <div>
                     <span className="text-muted-foreground">Exit Value: </span>
-                    <span className="font-medium">{formatCurrency(pricingData.fromPurchasePrice.exitValue)}</span>
+                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.exitValue)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Profit: </span>
-                    <span className="font-medium text-green-600">{formatCurrency(pricingData.fromPurchasePrice.totalProfit)}</span>
+                    <span className="num font-medium text-green-600">{formatCurrency(pricingData.fromPurchasePrice.totalProfit)}</span>
                   </div>
                 </div>
                 <Button 
@@ -991,7 +991,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-600">Max Purchase Price</span>
                   </div>
-                  <p className="text-2xl font-bold" data-testid="text-irr-price">
+                  <p className="num text-2xl font-bold" data-testid="text-irr-price">
                     {formatCurrency(pricingData.fromTargetIRR.purchasePrice)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1001,11 +1001,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Year 1 Cap Rate: </span>
-                    <span className="font-medium">{formatPercent(pricingData.fromTargetIRR.year1CapRate)}</span>
+                    <span className="num font-medium">{formatPercent(pricingData.fromTargetIRR.year1CapRate)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Equity Multiple: </span>
-                    <span className="font-medium">{formatMultiple(pricingData.fromTargetIRR.equityMultiple)}</span>
+                    <span className="num font-medium">{formatMultiple(pricingData.fromTargetIRR.equityMultiple)}</span>
                   </div>
                 </div>
                 <Button 
@@ -1067,7 +1067,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     <span className="text-sm font-medium text-blue-600">Implied Purchase Price</span>
                   </div>
-                  <p className="text-2xl font-bold" data-testid="text-cap-price">
+                  <p className="num text-2xl font-bold" data-testid="text-cap-price">
                     {formatCurrency(pricingData.fromGoingInCapRate.purchasePrice)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1077,11 +1077,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">IRR: </span>
-                    <span className="font-medium text-green-600">{formatPercent(pricingData.fromGoingInCapRate.irr)}</span>
+                    <span className="num font-medium text-green-600">{formatPercent(pricingData.fromGoingInCapRate.irr)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Equity Multiple: </span>
-                    <span className="font-medium">{formatMultiple(pricingData.fromGoingInCapRate.equityMultiple)}</span>
+                    <span className="num font-medium">{formatMultiple(pricingData.fromGoingInCapRate.equityMultiple)}</span>
                   </div>
                 </div>
                 <Button 
@@ -1151,7 +1151,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <CheckCircle2 className="h-4 w-4 text-purple-600" />
                     <span className="text-sm font-medium text-purple-600">Implied Purchase Price</span>
                   </div>
-                  <p className="text-2xl font-bold" data-testid="text-year-cap-price">
+                  <p className="num text-2xl font-bold" data-testid="text-year-cap-price">
                     {formatCurrency(pricingData.fromTargetYearCapRate.purchasePrice)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1161,11 +1161,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Year 1 Cap: </span>
-                    <span className="font-medium">{formatPercent(pricingData.fromTargetYearCapRate.year1CapRate)}</span>
+                    <span className="num font-medium">{formatPercent(pricingData.fromTargetYearCapRate.year1CapRate)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">IRR: </span>
-                    <span className="font-medium text-green-600">{formatPercent(pricingData.fromTargetYearCapRate.irr)}</span>
+                    <span className="num font-medium text-green-600">{formatPercent(pricingData.fromTargetYearCapRate.irr)}</span>
                   </div>
                 </div>
                 <Button 
@@ -1202,7 +1202,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               {pricingData.noiProjections.map((noi, index) => (
                 <div key={index} className="text-center p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground mb-1">Year {index + 1}</p>
-                  <p className="font-semibold">{formatCurrency(noi)}</p>
+                  <p className="num font-semibold">{formatCurrency(noi)}</p>
                 </div>
               ))}
             </div>
