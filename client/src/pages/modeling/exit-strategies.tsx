@@ -465,14 +465,16 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
             <div className="flex-1 space-y-2">
               <h3 className="text-lg font-semibold">{recommended.name}</h3>
               <p className="text-sm text-muted-foreground">{recommendedReason}</p>
-              {recommendedSavings > 0 && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-700">
-                    <DollarSign className="h-3 w-3 mr-1" />
-                    Est. Tax Savings: {formatCurrency(recommendedSavings)}
-                  </Badge>
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  Est. Net Proceeds: {formatCurrency(recommended.netProceeds)}
+                </Badge>
+                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  Est. Tax Savings: {formatCurrency(recommendedSavings)}
+                </Badge>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
