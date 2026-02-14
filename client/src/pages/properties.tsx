@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, AlertTriangle, CheckCircle } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
@@ -15,8 +15,10 @@ import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
+import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const toTitleCase = (str: string) => 
   str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -69,6 +71,37 @@ const statusColors: Record<string, string> = {
   off_market: 'bg-red-100 text-red-800'
 };
 
+function findDuplicateGroups(properties: Property[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  for (let i = 0; i < properties.length; i++) {
+    for (let j = i + 1; j < properties.length; j++) {
+      const a = properties[i];
+      const b = properties[j];
+      const nameA = normalize(a.title);
+      const nameB = normalize(b.title);
+      if (!nameA || !nameB) continue;
+      const nameMatch = nameA.includes(nameB) || nameB.includes(nameA);
+      if (!nameMatch) continue;
+
+      const addrA = normalize(a.address || '');
+      const addrB = normalize(b.address || '');
+      const bothHaveAddress = addrA.length > 0 && addrB.length > 0;
+      const locationMatch = !bothHaveAddress || addrA.includes(addrB) || addrB.includes(addrA);
+
+      if (nameMatch && locationMatch) {
+        const key = nameA < nameB ? nameA : nameB;
+        if (!groups.has(key)) groups.set(key, []);
+        const group = groups.get(key)!;
+        if (!group.includes(a.id)) group.push(a.id);
+        if (!group.includes(b.id)) group.push(b.id);
+      }
+    }
+  }
+  return groups;
+}
+
 export default function Properties() {
   const [, setLocation] = useLocation();
   const searchString = typeof window !== 'undefined' ? window.location.search : '';
@@ -80,6 +113,9 @@ export default function Properties() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [showPortfolioWizard, setShowPortfolioWizard] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatusValue, setBulkStatusValue] = useState<string>('');
+  const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
 
   // HubSpot-style: Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -91,6 +127,51 @@ export default function Properties() {
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
   });
+
+  const duplicateGroups = useMemo(() => findDuplicateGroups(properties), [properties]);
+  const duplicateIds = useMemo(() => {
+    const ids = new Set<string>();
+    duplicateGroups.forEach(group => group.forEach(id => ids.add(id)));
+    return ids;
+  }, [duplicateGroups]);
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => apiRequest('POST', '/api/properties/bulk/delete', { ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      toast({ title: `Successfully deleted ${selectedIds.size} property(ies)` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk delete properties", variant: "destructive" });
+    },
+  });
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) =>
+      apiRequest('POST', '/api/properties/bulk/update-status', { ids, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      toast({ title: `Updated status for ${selectedIds.size} property(ies)` });
+      setSelectedIds(new Set());
+      setShowBulkStatusDialog(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    },
+  });
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Are you sure you want to delete ${selectedIds.size} property(ies)? This cannot be undone.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
+  const handleBulkStatusChange = () => {
+    if (selectedIds.size === 0 || !bulkStatusValue) return;
+    bulkStatusMutation.mutate({ ids: Array.from(selectedIds), status: bulkStatusValue });
+  };
 
   useEffect(() => {
     if (properties.length > 0 && searchString) {
@@ -216,12 +297,20 @@ export default function Properties() {
             {getPropertyIcon(property.type)}
           </div>
           <div className="min-w-0">
-            <button
-              onClick={(e) => handleNameClick(e, property)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
-            >
-              {property.title}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => handleNameClick(e, property)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+              >
+                {property.title}
+              </button>
+              {duplicateIds.has(property.id) && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-700 border-amber-300 flex-shrink-0">
+                  <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />
+                  Duplicate
+                </Badge>
+              )}
+            </div>
             <div className="text-xs text-gray-500 truncate">{getSpecificationSummary(property)}</div>
           </div>
         </div>
@@ -384,6 +473,32 @@ export default function Properties() {
           </Card>
         </div>
 
+        {duplicateIds.size > 0 && (
+          <div className="mx-4 mb-0">
+            <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {duplicateIds.size} potential duplicate{duplicateIds.size !== 1 ? 's' : ''} detected
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Properties with similar names are flagged. Select duplicates and delete, or review individually.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                onClick={() => {
+                  setSelectedIds(new Set(duplicateIds));
+                }}
+              >
+                Select All Duplicates
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto">
           <CrmDataTable
             data={filteredProperties}
@@ -392,6 +507,8 @@ export default function Properties() {
             selectedId={drawerPropertyId}
             onRowClick={handleRowClick}
             getRowId={(p) => p.id}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
             emptyState={{
               title: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' ? 'No properties found' : 'No properties yet',
               description: searchTerm || typeFilter !== 'all' || statusFilter !== 'all' 
@@ -419,6 +536,52 @@ export default function Properties() {
         open={isCreateWizardOpen}
         onOpenChange={setIsCreateWizardOpen}
       />
+
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        itemLabel="property"
+        onClearSelection={() => setSelectedIds(new Set())}
+        actions={[
+          {
+            label: "Change Status",
+            icon: <CheckCircle className="h-3.5 w-3.5" />,
+            onClick: () => setShowBulkStatusDialog(true),
+          },
+          {
+            label: `Delete${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`,
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            variant: "destructive",
+            onClick: handleBulkDelete,
+            disabled: bulkDeleteMutation.isPending,
+          },
+        ]}
+      />
+
+      <Dialog open={showBulkStatusDialog} onOpenChange={setShowBulkStatusDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Status</DialogTitle>
+            <DialogDescription>
+              Update the status of {selectedIds.size} selected property(ies).
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
+            <SelectTrigger><SelectValue placeholder="Select new status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="under_contract">Under Contract</SelectItem>
+              <SelectItem value="sold">Sold</SelectItem>
+              <SelectItem value="off_market">Off Market</SelectItem>
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkStatusDialog(false)}>Cancel</Button>
+            <Button onClick={handleBulkStatusChange} disabled={!bulkStatusValue || bulkStatusMutation.isPending}>
+              Update {selectedIds.size} Property(ies)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmPageShell>
   );
 }

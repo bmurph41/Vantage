@@ -10518,14 +10518,40 @@ Current context: Project ${req.params.projectId}`;
       if (!orgId) {
         return res.status(400).json({ error: "Organization ID is required" });
       }
+      const title = req.body.title || req.body.name || '';
       const propertyData = {
         ...req.body,
-        title: req.body.title || req.body.name || '',
+        title,
         type: req.body.type || req.body.propertyType || 'marina',
         status: req.body.status || 'available',
         ownerId: req.user.id,
         orgId,
       };
+
+      if (title && !req.body.skipDuplicateCheck) {
+        const existingProperties = await storage.getCrmPropertiesForOrg(orgId);
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normalizedTitle = normalize(title);
+        const incomingAddr = normalize(req.body.address || '');
+        const duplicates = existingProperties.filter(p => {
+          const n = normalize(p.title || '');
+          if (!n || !normalizedTitle) return false;
+          const nameMatch = n.includes(normalizedTitle) || normalizedTitle.includes(n);
+          if (!nameMatch) return false;
+          const existingAddr = normalize((p as any).address || '');
+          const bothHaveAddr = incomingAddr.length > 0 && existingAddr.length > 0;
+          const locationMatch = !bothHaveAddr || existingAddr.includes(incomingAddr) || incomingAddr.includes(existingAddr);
+          return locationMatch;
+        });
+        if (duplicates.length > 0) {
+          return res.status(409).json({
+            error: "Potential duplicate detected",
+            duplicates: duplicates.map(d => ({ id: d.id, title: d.title, address: (d as any).address, status: d.status })),
+            message: `A property named "${duplicates[0].title}" already exists. Set skipDuplicateCheck=true to create anyway.`
+          });
+        }
+      }
+
       const property = await storage.createCrmProperty(propertyData);
       res.json(property);
     } catch (error: any) {
@@ -11486,6 +11512,25 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to bulk delete properties:", error);
       res.status(500).json({ error: "Failed to bulk delete properties" });
+    }
+  });
+
+  app.post("/api/properties/bulk/update-status", async (req: any, res) => {
+    try {
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "Invalid ids array" });
+      }
+      const validStatuses = ['available', 'under_contract', 'sold', 'off_market'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      
+      await Promise.all(ids.map(id => storage.updateCrmProperty(id, { status })));
+      res.json({ success: true, updated: ids.length });
+    } catch (error: any) {
+      console.error("Failed to bulk update property status:", error);
+      res.status(500).json({ error: "Failed to bulk update property status" });
     }
   });
   
