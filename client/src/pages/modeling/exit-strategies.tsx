@@ -827,11 +827,24 @@ function SharedInputsPanel() {
               </div>
               <div>
                 <Label className="text-xs">State Tax Rate</Label>
-                <PercentInput
-                  value={masterInputs.stateTaxRate.toString()}
-                  onChange={(v) => handleInputChange('stateTaxRate', v)}
-                  data-testid="master-state-rate"
-                />
+                <Select
+                  value={STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate)?.label || "custom"}
+                  onValueChange={(val) => {
+                    if (val === "custom") return;
+                    const opt = STATE_TAX_OPTIONS.find(s => s.label === val);
+                    if (opt) setMasterInput('stateTaxRate', opt.value);
+                  }}
+                >
+                  <SelectTrigger className="w-full h-9 text-sm mt-1">
+                    <SelectValue placeholder="Select state..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATE_TAX_OPTIONS.map((s) => (
+                      <SelectItem key={s.label} value={s.label}>{s.label}</SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom ({masterInputs.stateTaxRate}%)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Current Debt</Label>
@@ -1221,69 +1234,69 @@ export default function ExitStrategiesPage() {
   );
 }
 
+const STATE_TAX_OPTIONS = [
+  { label: "Alabama (5.0%)", value: 5.0 },
+  { label: "Alaska (0%)", value: 0 },
+  { label: "Arizona (2.5%)", value: 2.5 },
+  { label: "Arkansas (4.4%)", value: 4.4 },
+  { label: "California (13.3%)", value: 13.3 },
+  { label: "Colorado (4.4%)", value: 4.4 },
+  { label: "Connecticut (6.99%)", value: 6.99 },
+  { label: "Delaware (6.6%)", value: 6.6 },
+  { label: "Florida (0%)", value: 0 },
+  { label: "Georgia (5.49%)", value: 5.49 },
+  { label: "Hawaii (7.25%)", value: 7.25 },
+  { label: "Idaho (5.8%)", value: 5.8 },
+  { label: "Illinois (4.95%)", value: 4.95 },
+  { label: "Indiana (3.05%)", value: 3.05 },
+  { label: "Iowa (5.7%)", value: 5.7 },
+  { label: "Kansas (5.7%)", value: 5.7 },
+  { label: "Kentucky (4.0%)", value: 4.0 },
+  { label: "Louisiana (4.25%)", value: 4.25 },
+  { label: "Maine (7.15%)", value: 7.15 },
+  { label: "Maryland (5.75%)", value: 5.75 },
+  { label: "Massachusetts (9.0%)", value: 9.0 },
+  { label: "Michigan (4.25%)", value: 4.25 },
+  { label: "Minnesota (9.85%)", value: 9.85 },
+  { label: "Mississippi (5.0%)", value: 5.0 },
+  { label: "Missouri (4.95%)", value: 4.95 },
+  { label: "Montana (6.75%)", value: 6.75 },
+  { label: "Nebraska (6.64%)", value: 6.64 },
+  { label: "Nevada (0%)", value: 0 },
+  { label: "New Hampshire (4.0%)", value: 4.0 },
+  { label: "New Jersey (10.75%)", value: 10.75 },
+  { label: "New Mexico (5.9%)", value: 5.9 },
+  { label: "New York (10.9%)", value: 10.9 },
+  { label: "North Carolina (4.5%)", value: 4.5 },
+  { label: "North Dakota (2.5%)", value: 2.5 },
+  { label: "Ohio (3.5%)", value: 3.5 },
+  { label: "Oklahoma (4.75%)", value: 4.75 },
+  { label: "Oregon (9.9%)", value: 9.9 },
+  { label: "Pennsylvania (3.07%)", value: 3.07 },
+  { label: "Rhode Island (5.99%)", value: 5.99 },
+  { label: "South Carolina (6.4%)", value: 6.4 },
+  { label: "South Dakota (0%)", value: 0 },
+  { label: "Tennessee (0%)", value: 0 },
+  { label: "Texas (0%)", value: 0 },
+  { label: "Utah (4.65%)", value: 4.65 },
+  { label: "Vermont (8.75%)", value: 8.75 },
+  { label: "Virginia (5.75%)", value: 5.75 },
+  { label: "Washington (7.0%)", value: 7.0 },
+  { label: "West Virginia (6.5%)", value: 6.5 },
+  { label: "Wisconsin (7.65%)", value: 7.65 },
+  { label: "Wyoming (0%)", value: 0 },
+];
+
 function TaxAndProceedsPanel() {
   const { masterInputs, setMasterInput } = useExitStrategiesStore();
   const b = getCashSaleBaseline(masterInputs);
 
-  const stateTaxOptions = [
-    { label: "Alabama (5.0%)", value: 5.0 },
-    { label: "Alaska (0%)", value: 0 },
-    { label: "Arizona (2.5%)", value: 2.5 },
-    { label: "Arkansas (4.4%)", value: 4.4 },
-    { label: "California (13.3%)", value: 13.3 },
-    { label: "Colorado (4.4%)", value: 4.4 },
-    { label: "Connecticut (6.99%)", value: 6.99 },
-    { label: "Delaware (6.6%)", value: 6.6 },
-    { label: "Florida (0%)", value: 0 },
-    { label: "Georgia (5.49%)", value: 5.49 },
-    { label: "Hawaii (7.25%)", value: 7.25 },
-    { label: "Idaho (5.8%)", value: 5.8 },
-    { label: "Illinois (4.95%)", value: 4.95 },
-    { label: "Indiana (3.05%)", value: 3.05 },
-    { label: "Iowa (5.7%)", value: 5.7 },
-    { label: "Kansas (5.7%)", value: 5.7 },
-    { label: "Kentucky (4.0%)", value: 4.0 },
-    { label: "Louisiana (4.25%)", value: 4.25 },
-    { label: "Maine (7.15%)", value: 7.15 },
-    { label: "Maryland (5.75%)", value: 5.75 },
-    { label: "Massachusetts (9.0%)", value: 9.0 },
-    { label: "Michigan (4.25%)", value: 4.25 },
-    { label: "Minnesota (9.85%)", value: 9.85 },
-    { label: "Mississippi (5.0%)", value: 5.0 },
-    { label: "Missouri (4.95%)", value: 4.95 },
-    { label: "Montana (6.75%)", value: 6.75 },
-    { label: "Nebraska (6.64%)", value: 6.64 },
-    { label: "Nevada (0%)", value: 0 },
-    { label: "New Hampshire (4.0%)", value: 4.0 },
-    { label: "New Jersey (10.75%)", value: 10.75 },
-    { label: "New Mexico (5.9%)", value: 5.9 },
-    { label: "New York (10.9%)", value: 10.9 },
-    { label: "North Carolina (4.5%)", value: 4.5 },
-    { label: "North Dakota (2.5%)", value: 2.5 },
-    { label: "Ohio (3.5%)", value: 3.5 },
-    { label: "Oklahoma (4.75%)", value: 4.75 },
-    { label: "Oregon (9.9%)", value: 9.9 },
-    { label: "Pennsylvania (3.07%)", value: 3.07 },
-    { label: "Rhode Island (5.99%)", value: 5.99 },
-    { label: "South Carolina (6.4%)", value: 6.4 },
-    { label: "South Dakota (0%)", value: 0 },
-    { label: "Tennessee (0%)", value: 0 },
-    { label: "Texas (0%)", value: 0 },
-    { label: "Utah (4.65%)", value: 4.65 },
-    { label: "Vermont (8.75%)", value: 8.75 },
-    { label: "Virginia (5.75%)", value: 5.75 },
-    { label: "Washington (7.0%)", value: 7.0 },
-    { label: "West Virginia (6.5%)", value: 6.5 },
-    { label: "Wisconsin (7.65%)", value: 7.65 },
-    { label: "Wyoming (0%)", value: 0 },
-  ];
-
-  const matchedState = stateTaxOptions.find(s => s.value === masterInputs.stateTaxRate);
+  const matchedState = STATE_TAX_OPTIONS.find(s => s.value === masterInputs.stateTaxRate);
   const selectedStateKey = matchedState ? matchedState.label : "custom";
 
   const handleStateSelect = (val: string) => {
     if (val === "custom") return;
-    const opt = stateTaxOptions.find(s => s.label === val);
+    const opt = STATE_TAX_OPTIONS.find(s => s.label === val);
     if (opt) setMasterInput('stateTaxRate', opt.value);
   };
 
@@ -1310,7 +1323,7 @@ function TaxAndProceedsPanel() {
                   <SelectValue placeholder="Select state..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {stateTaxOptions.map((s) => (
+                  {STATE_TAX_OPTIONS.map((s) => (
                     <SelectItem key={s.label} value={s.label}>{s.label}</SelectItem>
                   ))}
                   <SelectItem value="custom">Custom ({masterInputs.stateTaxRate}%)</SelectItem>
