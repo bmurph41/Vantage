@@ -512,7 +512,12 @@ export function PendingPropertyDetailDialog({
                     <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
                       {allMatches.length}
                     </Badge>
-                  ) : null}
+                  ) : (
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <Check className="h-2.5 w-2.5 mr-0.5" />
+                      None
+                    </Badge>
+                  )}
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -1106,8 +1111,12 @@ export function PendingPropertyDetailDialog({
                   Loading duplicate matches...
                 </div>
               ) : allMatches.length === 0 ? (
-                <div className="flex items-center justify-center h-64 text-muted-foreground">
-                  No potential duplicates found
+                <div className="flex items-center justify-center h-64">
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 p-6 text-center bg-green-50/50 dark:bg-green-950/20 max-w-sm">
+                    <Check className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-medium text-green-800 dark:text-green-300 mb-1">No Match</p>
+                    <p className="text-sm text-muted-foreground">No duplicate properties found in your CRM. This appears to be a unique property.</p>
+                  </div>
                 </div>
               ) : (
                 <div className="flex-1 overflow-hidden flex flex-col space-y-4">

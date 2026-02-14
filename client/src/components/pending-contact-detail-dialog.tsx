@@ -118,21 +118,21 @@ export function PendingContactDetailDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: duplicateContacts = [], isLoading: duplicatesLoading } = useQuery<CrmContact[]>({
+  const { data: duplicateMatches = [], isLoading: duplicatesLoading } = useQuery<Array<{ contact: CrmContact; score: number }>>({
     queryKey: ['/api/crm/pending-contacts', pending?.id, 'duplicates'],
     queryFn: async () => {
       if (!pending?.id) return [];
       try {
         const response = await fetch(`/api/pending-contacts/${pending.id}/all-duplicates`);
         if (!response.ok) return [];
-        const matches = await response.json();
-        return matches.map((m: any) => m.contact);
+        return await response.json();
       } catch {
         return [];
       }
     },
     enabled: !!pending?.id && open,
   });
+  const duplicateContacts = duplicateMatches.map(m => m.contact);
 
   const { data: pendingCompanies = [] } = useQuery<any[]>({
     queryKey: ['/api/crm/pending-companies'],
@@ -349,7 +349,12 @@ export function PendingContactDetailDialog({
                     <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
                       {duplicateContacts.length}
                     </Badge>
-                  ) : null}
+                  ) : (
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <Check className="h-2.5 w-2.5 mr-0.5" />
+                      None
+                    </Badge>
+                  )}
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -773,9 +778,10 @@ export function PendingContactDetailDialog({
                     <div className="text-muted-foreground">Checking for duplicates...</div>
                   </div>
                 ) : duplicateContacts.length === 0 ? (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center bg-white dark:bg-slate-900">
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 p-6 text-center bg-green-50/50 dark:bg-green-950/20">
                     <Check className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No duplicate contacts found. This appears to be a unique contact.</p>
+                    <p className="font-medium text-green-800 dark:text-green-300 mb-1">No Match</p>
+                    <p className="text-sm text-muted-foreground">No duplicate contacts found in your CRM. This appears to be a unique contact.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -783,7 +789,7 @@ export function PendingContactDetailDialog({
                       The following existing contacts may be duplicates. You can merge this pending contact with an existing one.
                     </p>
 
-                    {duplicateContacts.map((dup) => (
+                    {duplicateMatches.map(({ contact: dup, score }) => (
                       <div
                         key={dup.id}
                         className={`cursor-pointer transition-all rounded-lg border p-4 ${selectedDuplicateId === dup.id ? 'ring-2 ring-primary border-primary' : 'border-slate-200 dark:border-slate-700 hover:border-muted-foreground/30'} bg-white dark:bg-slate-900`}
@@ -793,8 +799,11 @@ export function PendingContactDetailDialog({
                           <div className="flex items-center gap-3">
                             <User className="h-5 w-5 text-muted-foreground" />
                             <div>
-                              <div className="font-medium">
+                              <div className="font-medium flex items-center gap-2">
                                 {dup.firstName} {dup.lastName}
+                                <Badge variant={score >= 100 ? "destructive" : score >= 60 ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                                  {score >= 100 ? 'Exact' : score >= 60 ? 'Strong' : 'Partial'} Match
+                                </Badge>
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {dup.email || 'No email'} {dup.phone ? `| ${dup.phone}` : ''}

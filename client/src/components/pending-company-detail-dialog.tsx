@@ -111,21 +111,21 @@ export function PendingCompanyDetailDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: duplicateCompanies = [], isLoading: duplicatesLoading } = useQuery<CrmCompany[]>({
+  const { data: duplicateMatches = [], isLoading: duplicatesLoading } = useQuery<Array<{ company: CrmCompany; score: number; matchReasons?: string[] }>>({
     queryKey: ['/api/crm/pending-companies', pending?.id, 'duplicates'],
     queryFn: async () => {
       if (!pending?.id) return [];
       try {
         const response = await fetch(`/api/pending-companies/${pending.id}/all-duplicates`);
         if (!response.ok) return [];
-        const matches = await response.json();
-        return matches.map((m: any) => m.company);
+        return await response.json();
       } catch {
         return [];
       }
     },
     enabled: !!pending?.id && open,
   });
+  const duplicateCompanies = duplicateMatches.map(m => m.company);
 
   const { data: pendingContacts = [] } = useQuery<any[]>({
     queryKey: ['/api/crm/pending-contacts'],
@@ -331,7 +331,12 @@ export function PendingCompanyDetailDialog({
                     <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
                       {duplicateCompanies.length}
                     </Badge>
-                  ) : null}
+                  ) : (
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <Check className="h-2.5 w-2.5 mr-0.5" />
+                      None
+                    </Badge>
+                  )}
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -739,9 +744,10 @@ export function PendingCompanyDetailDialog({
                     <div className="text-muted-foreground">Checking for duplicates...</div>
                   </div>
                 ) : duplicateCompanies.length === 0 ? (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center bg-white dark:bg-slate-900">
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 p-6 text-center bg-green-50/50 dark:bg-green-950/20">
                     <Check className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No duplicate companies found. This appears to be a unique company.</p>
+                    <p className="font-medium text-green-800 dark:text-green-300 mb-1">No Match</p>
+                    <p className="text-sm text-muted-foreground">No duplicate companies found in your CRM. This appears to be a unique company.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -749,7 +755,7 @@ export function PendingCompanyDetailDialog({
                       The following existing companies may be duplicates. You can merge this pending company with an existing one.
                     </p>
 
-                    {duplicateCompanies.map((dup) => (
+                    {duplicateMatches.map(({ company: dup, score, matchReasons }) => (
                       <div
                         key={dup.id}
                         className={`cursor-pointer transition-all rounded-lg border p-4 ${selectedDuplicateId === dup.id ? 'ring-2 ring-primary border-primary' : 'border-slate-200 dark:border-slate-700 hover:border-muted-foreground/30'} bg-white dark:bg-slate-900`}
@@ -759,7 +765,12 @@ export function PendingCompanyDetailDialog({
                           <div className="flex items-center gap-3">
                             <Building2 className="h-5 w-5 text-muted-foreground" />
                             <div>
-                              <div className="font-medium">{dup.name}</div>
+                              <div className="font-medium flex items-center gap-2">
+                                {dup.name}
+                                <Badge variant={score >= 80 ? "destructive" : score >= 50 ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+                                  {score >= 80 ? 'Strong' : score >= 50 ? 'Moderate' : 'Partial'} ({Math.round(score)}%)
+                                </Badge>
+                              </div>
                               <div className="text-sm text-muted-foreground">
                                 {formatLocation(dup.city, dup.state) || 'No location'}
                                 {dup.phone ? ` | ${dup.phone}` : ''}
@@ -773,6 +784,13 @@ export function PendingCompanyDetailDialog({
                             </Badge>
                           )}
                         </div>
+                        {matchReasons && matchReasons.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {matchReasons.map((reason, i) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-muted-foreground">{reason}</span>
+                            ))}
+                          </div>
+                        )}
                         {dup.website && (
                           <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
                             <Globe className="h-3 w-3" />
