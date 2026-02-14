@@ -584,57 +584,6 @@ function TaxAndProceedsPanel() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-red-500" />
-            Sale & Tax Inputs
-          </CardTitle>
-          <CardDescription>
-            Values from Master Inputs panel
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 bg-muted/30 rounded-lg p-4">
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Sale Price</span>
-              <span className="font-medium">{formatCurrency(masterInputs.salePrice)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Cost Basis</span>
-              <span className="font-medium">{formatCurrency(masterInputs.costBasis)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Depreciation Taken</span>
-              <span className="font-medium">{formatCurrency(masterInputs.depreciationTaken)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Holding Period</span>
-              <span className="font-medium">{masterInputs.holdingPeriod} years</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Federal Rate / State Rate</span>
-              <span className="font-medium">{masterInputs.federalTaxRate}% / {masterInputs.stateTaxRate}%</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Loan Balance</span>
-              <span className="font-medium">{formatCurrency(masterInputs.currentDebtBalance)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Closing Costs</span>
-              <span className="font-medium">{formatCurrency(masterInputs.closingCosts)}</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-muted-foreground text-sm">Broker Fee</span>
-              <span className="font-medium">{masterInputs.brokerFeePercent}%</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Edit these values in the Master Inputs panel above
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Tax Breakdown</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
