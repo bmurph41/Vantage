@@ -7415,13 +7415,13 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const pendingContacts = await storage.getPendingContactsForOrg(orgId);
 
-      const allContacts = await storage.getContactsByOrg(orgId);
+      const allCrmContacts = await storage.getCrmContactsForOrg(orgId);
 
       const enrichedPending = pendingContacts.map((pending: any) => {
         const pendingFullName = pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim();
         if (!pendingFullName && !pending.email && !pending.phone) return pending;
 
-        const duplicates = allContacts.map(contact => {
+        const duplicates = allCrmContacts.map(contact => {
           let score = 0;
           const contactFullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 
@@ -7640,8 +7640,30 @@ Current context: Project ${req.params.projectId}`;
   // CRM Pending Properties
   app.get("/api/crm/pending-properties", async (req: any, res) => {
     try {
-      const pendingProperties = await storage.getPendingProperties(req.user.orgId, 'pending');
-      res.json(pendingProperties);
+      const orgId = req.user.orgId;
+      const pendingProperties = await storage.getPendingProperties(orgId, 'pending');
+      
+      const allProperties = await storage.getCrmPropertiesForOrg(orgId);
+      
+      const enrichedPending = pendingProperties.map((pending: any) => {
+        if (!pending.marinaName) return pending;
+        
+        const duplicates = findAllPotentialDuplicates(
+          pending.marinaName,
+          pending.city,
+          pending.state,
+          pending.salePrice,
+          allProperties as any,
+          30
+        );
+        
+        return {
+          ...pending,
+          suggestedDuplicates: duplicates.map(d => d.property.id),
+        };
+      });
+      
+      res.json(enrichedPending);
     } catch (error: any) {
       console.error("Failed to get pending properties:", error);
       res.status(500).json({ error: "Failed to retrieve pending properties" });
@@ -14830,7 +14852,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       // Get all properties for this organization
-      const allProperties = await storage.getPropertiesForOrg(orgId);
+      const allProperties = await storage.getCrmPropertiesForOrg(orgId);
 
       // Helper function to parse currency strings
       const parseCurrency = (value: string | number | null | undefined): number | null => {
@@ -15277,9 +15299,9 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ message: "Pending contact not found" });
       }
 
-      const allContacts = await storage.getContactsByOrg(orgId);
+      const allCrmContacts = await storage.getCrmContactsForOrg(orgId);
 
-      const similarityScores = allContacts.map(contact => {
+      const similarityScores = allCrmContacts.map(contact => {
         let score = 0;
         const pendingFullName = pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim();
         const contactFullName = contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
