@@ -19,7 +19,9 @@ import {
   Building2,
   DollarSign,
   Percent,
-  Layers
+  Layers,
+  Target,
+  LineChart
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
 import type { ProjectConfig, ProjectAssumptions } from '@/types/modeling';
@@ -54,10 +56,26 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     queryKey: ['/api/modeling/projects', project.id, 'assumptions'],
   });
 
+  const { data: proForma } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', project.id, 'pro-forma'],
+    enabled: !!project.id,
+  });
+
+  const { data: scenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', project.id, 'scenarios'],
+    enabled: !!project.id,
+  });
+
   const hasConfig = config?.holdPeriod && config?.seasonMonths?.length > 0;
   const hasUploads = uploads.length > 0;
   const hasCompletedUploads = uploads.some((u: any) => u.status === 'completed');
   const hasAssumptions = assumptions?.growthRates && Object.keys(assumptions.growthRates).length > 0;
+  const hasHistoricalData = hasCompletedUploads;
+  const hasProForma = proForma && (Array.isArray(proForma) ? proForma.length > 0 : proForma?.years?.length > 0 || proForma?.rows?.length > 0);
+  const hasScenarios = Array.isArray(scenarios) && scenarios.length > 0;
+  const hasMultipleScenarios = Array.isArray(scenarios) && scenarios.length >= 2;
+  const hasExitData = !!(project as any).exitYear || !!(project as any).exitCapRate;
+  const allDataReady = hasProForma && hasScenarios && hasExitData;
 
   const workflowSteps: WorkflowStep[] = [
     {
@@ -90,7 +108,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
       description: 'Verify categorized historical data by month',
       tab: 'historical',
       icon: <FileSpreadsheet className="h-5 w-5" />,
-      status: hasAssumptions ? 'in-progress' : 'pending',
+      status: hasHistoricalData ? 'complete' : hasAssumptions ? 'in-progress' : 'pending',
     },
     {
       id: 'proforma',
@@ -98,15 +116,39 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
       description: 'Project forward with growth assumptions applied',
       tab: 'proforma',
       icon: <BarChart3 className="h-5 w-5" />,
-      status: 'pending',
+      status: hasProForma ? 'complete' : hasAssumptions ? 'in-progress' : 'pending',
+    },
+    {
+      id: 'exit',
+      title: 'Exit Strategy Analysis',
+      description: 'Tax planning, 1031 exchange, seller financing, and more',
+      tab: 'exit',
+      icon: <Target className="h-5 w-5" />,
+      status: hasExitData ? 'complete' : hasProForma ? 'in-progress' : 'pending',
+    },
+    {
+      id: 'analysis',
+      title: 'Run Analysis',
+      description: 'Analytics, sensitivity, Monte Carlo, and chart comparisons',
+      tab: 'analytics',
+      icon: <LineChart className="h-5 w-5" />,
+      status: hasScenarios && hasProForma ? 'complete' : hasProForma ? 'in-progress' : 'pending',
+    },
+    {
+      id: 'scenarios',
+      title: 'Compare Scenarios',
+      description: 'Configure and compare base, upside, and downside cases',
+      tab: 'cases',
+      icon: <Layers className="h-5 w-5" />,
+      status: hasMultipleScenarios ? 'complete' : hasScenarios ? 'in-progress' : 'pending',
     },
     {
       id: 'summary',
-      title: 'Executive Summary',
-      description: 'Review scenarios and finalize analysis',
+      title: 'Executive Summary & Export',
+      description: 'Review final analysis and export your model',
       tab: 'summary',
       icon: <ClipboardList className="h-5 w-5" />,
-      status: 'pending',
+      status: allDataReady ? 'complete' : hasProForma ? 'in-progress' : 'pending',
     },
   ];
 
