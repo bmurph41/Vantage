@@ -164,7 +164,7 @@ function computeStrategies(masterInputs: MasterInputs, baseline: ReturnType<type
   const wfLPTotal = wfLPPref + wfRemaining * (1 - wfCarriedInterest);
   const wfLPTax = wfLPTotal > wfLPEquity ? (wfLPTotal - wfLPEquity) * combinedRate : 0;
 
-  return [
+  const strategies = [
     { name: "Cash Sale", netProceeds: cashSaleNet, totalTax: cashSaleTax, effRate: cashSaleEffRate, liquidity: "Immediate", risk: "Low", riskColor: "bg-green-100 text-green-800" },
     { name: "1031 Exchange", netProceeds: netBenefit1031, totalTax: 0, effRate: 0, liquidity: "45-180 days", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
     { name: "DST", netProceeds: dstTotalReturn, totalTax: 0, effRate: 0, liquidity: "7-10 years", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
@@ -172,9 +172,18 @@ function computeStrategies(masterInputs: MasterInputs, baseline: ReturnType<type
     { name: "Earnout", netProceeds: earnoutNet, totalTax: earnoutTax, effRate: earnoutGain > 0 ? (earnoutTax / earnoutGain) * 100 : 0, liquidity: "1-3 years", risk: "High", riskColor: "bg-red-100 text-red-800" },
     { name: "Waterfall", netProceeds: wfLPTotal, totalTax: wfLPTax, effRate: wfLPTotal > wfLPEquity ? ((wfLPTax / (wfLPTotal - wfLPEquity)) * 100) : 0, liquidity: "At fund exit", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
   ];
+
+  return {
+    strategies,
+    intermediates: {
+      cashSaleNet, netBenefit1031, dstTotalReturn, sfNPV, sfDown, sfMonthlyPmt, sfTotalTax,
+      earnoutNet, earnoutBasePrice, earnoutPV, earnoutYears, earnoutTax,
+      wfLPTotal, wfLPTax, wfLPEquity, combinedRate,
+    },
+  };
 }
 
-function getRecommendedStrategy(strategies: ReturnType<typeof computeStrategies>) {
+function getRecommendedStrategy(strategies: ReturnType<typeof computeStrategies>["strategies"]) {
   const weights = { "Net Proceeds": 0.30, "Tax Efficiency": 0.25, "Speed/Simplicity": 0.15, "Risk Level": 0.15, "Flexibility": 0.15 };
   const taxEfficiencyScores: Record<string, number> = { "Cash Sale": 3, "1031 Exchange": 9, "DST": 8, "Seller Financing": 6, "Earnout": 5, "Waterfall": 4 };
   const speedScores: Record<string, number> = { "Cash Sale": 10, "1031 Exchange": 5, "DST": 4, "Seller Financing": 6, "Earnout": 3, "Waterfall": 2 };
@@ -345,7 +354,7 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
 function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
-  const strategies = computeStrategies(masterInputs, baseline);
+  const { strategies } = computeStrategies(masterInputs, baseline);
   const recommended = getRecommendedStrategy(strategies);
 
   const strategyIconMap: Record<string, { id: string; icon: any; color: string }> = {
@@ -7041,7 +7050,11 @@ function CrossStrategyComparisonPanel() {
   const baseline = getCashSaleBaseline(masterInputs);
 
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
-  const strategies = computeStrategies(masterInputs, baseline);
+  const { strategies, intermediates: {
+    cashSaleNet, netBenefit1031, dstTotalReturn, sfNPV, sfDown, sfMonthlyPmt, sfTotalTax,
+    earnoutNet, earnoutBasePrice, earnoutPV, earnoutYears, earnoutTax,
+    wfLPTotal, wfLPTax, wfLPEquity,
+  } } = computeStrategies(masterInputs, baseline);
 
   const bestStrategy = strategies.reduce((best, s) => s.netProceeds > best.netProceeds ? s : best, strategies[0]);
 
