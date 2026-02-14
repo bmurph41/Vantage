@@ -96,6 +96,115 @@ function getCashSaleBaseline(m: MasterInputs) {
   return { adjustedBasis, capitalGain, depRecapture, longTermGain, federalTax, stateTax, niit, totalTax, brokerCost, closingCosts, netSaleProceeds, netCashProceeds, effectiveTaxRate };
 }
 
+function computeStrategies(masterInputs: MasterInputs, baseline: ReturnType<typeof getCashSaleBaseline>) {
+  const salePrice = masterInputs.salePrice;
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+
+  const cashSaleNet = baseline.netCashProceeds;
+  const cashSaleTax = baseline.totalTax;
+  const cashSaleEffRate = baseline.effectiveTaxRate;
+
+  const exchangeCosts = 25000;
+  const netBenefit1031 = baseline.netSaleProceeds - masterInputs.currentDebtBalance - exchangeCosts;
+
+  const sfDownPct = 0.20;
+  const sfRate = 0.06;
+  const sfTerm = 10;
+  const sfDown = salePrice * sfDownPct;
+  const sfLoan = salePrice - sfDown;
+  const sfMonthlyRate = sfRate / 12;
+  const sfMonths = sfTerm * 12;
+  const sfMonthlyPmt = sfMonthlyRate > 0 && sfMonths > 0 ? sfLoan * (sfMonthlyRate * Math.pow(1 + sfMonthlyRate, sfMonths)) / (Math.pow(1 + sfMonthlyRate, sfMonths) - 1) : 0;
+  const sfGain = salePrice - masterInputs.costBasis;
+  const sfGPR = salePrice > 0 ? sfGain / salePrice : 0;
+  const sfYear1TaxableGain = sfDown * sfGPR;
+  const sfYear1Tax = sfYear1TaxableGain * combinedRate;
+  const sfDisc = 0.08;
+  let sfNPV = sfDown;
+  for (let y = 1; y <= sfTerm; y++) {
+    sfNPV += (sfMonthlyPmt * 12) / Math.pow(1 + sfDisc, y);
+  }
+  const sfTotalTax = sfYear1Tax + (sfLoan / sfTerm) * sfGPR * combinedRate * sfTerm;
+
+  const earnoutBasePrice = salePrice * 0.8;
+  const earnoutContingent = salePrice * 0.2;
+  const earnoutProb = 0.6;
+  const earnoutYears = 3;
+  const earnoutDiscRate = 0.10;
+  const earnoutExpectedValue = earnoutBasePrice + earnoutContingent * earnoutProb;
+  const earnoutGain = earnoutExpectedValue - masterInputs.costBasis;
+  const earnoutTax = Math.max(0, earnoutGain) * combinedRate;
+  const earnoutExpectedEarnout = earnoutContingent * earnoutProb;
+  const earnoutPV = earnoutExpectedEarnout / Math.pow(1 + earnoutDiscRate, earnoutYears);
+  const earnoutNPVTotal = earnoutBasePrice + earnoutPV;
+  const earnoutNet = earnoutNPVTotal - earnoutTax - masterInputs.currentDebtBalance - masterInputs.closingCosts - salePrice * (masterInputs.brokerFeePercent / 100);
+
+  const dstSponsorFeeRate = 0.10;
+  const dstInvestment = baseline.netSaleProceeds - masterInputs.currentDebtBalance;
+  const dstDistRate = 0.055;
+  const dstApprecRate = 0.03;
+  const dstFee = dstInvestment * dstSponsorFeeRate;
+  const dstNetInvested = dstInvestment - dstFee;
+  const dstAnnualDist = dstNetInvested * dstDistRate;
+  const dstTotalDist = dstAnnualDist * masterInputs.holdingPeriod;
+  const dstExitValue = dstNetInvested * Math.pow(1 + dstApprecRate, masterInputs.holdingPeriod);
+  const dstExitFee = dstExitValue * 0.03;
+  const dstTotalReturn = dstTotalDist + dstExitValue - dstExitFee;
+
+  const wfTotalEquity = salePrice - masterInputs.currentDebtBalance;
+  const wfLPShare = 0.80;
+  const wfPrefRate = 0.08;
+  const wfCarriedInterest = 0.20;
+  const wfLPEquity = wfTotalEquity * wfLPShare;
+  const wfPrefReturn = wfLPEquity * wfPrefRate * masterInputs.holdingPeriod;
+  const wfExitProceeds = salePrice * Math.pow(1.03, masterInputs.holdingPeriod);
+  const wfDistributable = wfExitProceeds - masterInputs.currentDebtBalance;
+  const wfLPPref = Math.min(wfDistributable, wfLPEquity + wfPrefReturn);
+  const wfRemaining = Math.max(0, wfDistributable - wfLPPref);
+  const wfLPTotal = wfLPPref + wfRemaining * (1 - wfCarriedInterest);
+  const wfLPTax = wfLPTotal > wfLPEquity ? (wfLPTotal - wfLPEquity) * combinedRate : 0;
+
+  return [
+    { name: "Cash Sale", netProceeds: cashSaleNet, totalTax: cashSaleTax, effRate: cashSaleEffRate, liquidity: "Immediate", risk: "Low", riskColor: "bg-green-100 text-green-800" },
+    { name: "1031 Exchange", netProceeds: netBenefit1031, totalTax: 0, effRate: 0, liquidity: "45-180 days", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
+    { name: "DST", netProceeds: dstTotalReturn, totalTax: 0, effRate: 0, liquidity: "7-10 years", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
+    { name: "Seller Financing", netProceeds: sfNPV, totalTax: sfTotalTax, effRate: sfTotalTax > 0 && sfGain > 0 ? (sfTotalTax / sfGain) * 100 : 0, liquidity: "Over 10 years", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
+    { name: "Earnout", netProceeds: earnoutNet, totalTax: earnoutTax, effRate: earnoutGain > 0 ? (earnoutTax / earnoutGain) * 100 : 0, liquidity: "1-3 years", risk: "High", riskColor: "bg-red-100 text-red-800" },
+    { name: "Waterfall", netProceeds: wfLPTotal, totalTax: wfLPTax, effRate: wfLPTotal > wfLPEquity ? ((wfLPTax / (wfLPTotal - wfLPEquity)) * 100) : 0, liquidity: "At fund exit", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
+  ];
+}
+
+function getRecommendedStrategy(strategies: ReturnType<typeof computeStrategies>) {
+  const weights = { "Net Proceeds": 0.30, "Tax Efficiency": 0.25, "Speed/Simplicity": 0.15, "Risk Level": 0.15, "Flexibility": 0.15 };
+  const taxEfficiencyScores: Record<string, number> = { "Cash Sale": 3, "1031 Exchange": 9, "DST": 8, "Seller Financing": 6, "Earnout": 5, "Waterfall": 4 };
+  const speedScores: Record<string, number> = { "Cash Sale": 10, "1031 Exchange": 5, "DST": 4, "Seller Financing": 6, "Earnout": 3, "Waterfall": 2 };
+  const riskScores: Record<string, number> = { "Cash Sale": 9, "1031 Exchange": 5, "DST": 4, "Seller Financing": 6, "Earnout": 3, "Waterfall": 5 };
+  const flexScores: Record<string, number> = { "Cash Sale": 10, "1031 Exchange": 3, "DST": 4, "Seller Financing": 7, "Earnout": 6, "Waterfall": 5 };
+
+  const netProceedsValues = strategies.map(s => s.netProceeds);
+  const minNet = Math.min(...netProceedsValues);
+  const maxNet = Math.max(...netProceedsValues);
+  const netRange = maxNet - minNet;
+  const getNetProceedsScore = (val: number) => netRange === 0 ? 5 : 1 + ((val - minNet) / netRange) * 9;
+
+  const scored = strategies.map(s => {
+    const netScore = getNetProceedsScore(s.netProceeds);
+    const taxScore = taxEfficiencyScores[s.name] || 5;
+    const speedScore = speedScores[s.name] || 5;
+    const riskScore = riskScores[s.name] || 5;
+    const flexScore = flexScores[s.name] || 5;
+    const weightedTotal =
+      netScore * weights["Net Proceeds"] +
+      taxScore * weights["Tax Efficiency"] +
+      speedScore * weights["Speed/Simplicity"] +
+      riskScore * weights["Risk Level"] +
+      flexScore * weights["Flexibility"];
+    return { ...s, weightedTotal };
+  });
+
+  return scored.reduce((best, s) => s.weightedTotal > best.weightedTotal ? s : best, scored[0]);
+}
+
 function CashSaleBaselineCard({ baseline, label }: { baseline: ReturnType<typeof getCashSaleBaseline>; label?: string }) {
   return (
     <div className="bg-muted/30 rounded-lg p-4 space-y-2">
@@ -236,111 +345,36 @@ function PercentInput({ value, onChange, "data-testid": testId }: PercentInputPr
 function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
+  const strategies = computeStrategies(masterInputs, baseline);
+  const recommended = getRecommendedStrategy(strategies);
 
-  const getRecommendation = () => {
-    if (masterInputs.holdingPeriod >= 5 && baseline.capitalGain > 500000) {
-      return {
-        strategy: "1031 Exchange",
-        reason: "High capital gain with sufficient holding period makes tax deferral highly beneficial",
-        tab: "1031",
-        savings: baseline.totalTax,
-        icon: RefreshCcw,
-        color: "text-blue-500",
-      };
-    }
-    if (masterInputs.holdingPeriod > 15) {
-      return {
-        strategy: "DST Analysis",
-        reason: "Long holding period suggests passive income strategy may be optimal",
-        tab: "dst",
-        savings: baseline.totalTax * 0.85,
-        icon: Landmark,
-        color: "text-purple-500",
-      };
-    }
-    if (baseline.capitalGain < 200000) {
-      return {
-        strategy: "Cash Sale",
-        reason: "Lower capital gain reduces the tax burden, making a straightforward sale efficient",
-        tab: "tax-proceeds",
-        savings: 0,
-        icon: Calculator,
-        color: "text-red-500",
-      };
-    }
-    return {
-      strategy: "Cross-Strategy Comparison",
-      reason: "Multiple strategies may apply — review the comparison tool for a side-by-side analysis",
-      tab: "comparison",
-      savings: baseline.totalTax * 0.5,
-      icon: Target,
-      color: "text-teal-500",
-    };
+  const strategyIconMap: Record<string, { id: string; icon: any; color: string }> = {
+    "Cash Sale": { id: "tax-proceeds", icon: Calculator, color: "text-red-500" },
+    "1031 Exchange": { id: "1031", icon: RefreshCcw, color: "text-blue-500" },
+    "DST": { id: "dst", icon: Landmark, color: "text-purple-500" },
+    "Seller Financing": { id: "seller-financing", icon: HandCoins, color: "text-amber-500" },
+    "Earnout": { id: "earnout", icon: Award, color: "text-indigo-500" },
+    "Waterfall": { id: "waterfall", icon: BarChart3, color: "text-cyan-500" },
   };
 
-  const recommendation = getRecommendation();
+  const riskDisplayMap: Record<string, "Low" | "Moderate" | "High"> = {
+    "Low": "Low",
+    "Medium": "Moderate",
+    "Medium-High": "High",
+    "High": "High",
+  };
 
   const strategyEstimates = [
-    {
-      id: "tax-proceeds",
-      name: "Cash Sale",
-      icon: Calculator,
-      color: "text-red-500",
-      netProceeds: baseline.netCashProceeds,
-      taxRate: baseline.effectiveTaxRate,
-      risk: "Low" as const,
-      liquidity: "Immediate",
-    },
-    {
-      id: "1031",
-      name: "1031 Exchange",
-      icon: RefreshCcw,
-      color: "text-blue-500",
-      netProceeds: baseline.netSaleProceeds - 25000,
-      taxRate: 0,
-      risk: "Moderate" as const,
-      liquidity: "180 days",
-    },
-    {
-      id: "dst",
-      name: "DST Analysis",
-      icon: Landmark,
-      color: "text-purple-500",
-      netProceeds: baseline.netSaleProceeds * 0.95,
-      taxRate: 2,
-      risk: "Moderate" as const,
-      liquidity: "7-10 years",
-    },
-    {
-      id: "seller-financing",
-      name: "Seller Financing",
-      icon: HandCoins,
-      color: "text-amber-500",
-      netProceeds: baseline.netSaleProceeds * 1.15,
-      taxRate: baseline.effectiveTaxRate * 0.7,
-      risk: "Moderate" as const,
-      liquidity: "Term-based",
-    },
-    {
-      id: "earnout",
-      name: "Earnout",
-      icon: Award,
-      color: "text-indigo-500",
-      netProceeds: masterInputs.salePrice * 0.85 + masterInputs.salePrice * 0.15,
-      taxRate: baseline.effectiveTaxRate,
-      risk: "High" as const,
-      liquidity: "1-3 years",
-    },
-    {
-      id: "waterfall",
-      name: "Waterfall",
-      icon: BarChart3,
-      color: "text-cyan-500",
-      netProceeds: baseline.netCashProceeds * 0.80,
-      taxRate: baseline.effectiveTaxRate,
-      risk: "Moderate" as const,
-      liquidity: "5-7 years",
-    },
+    ...strategies.map(s => ({
+      id: strategyIconMap[s.name]?.id || "tax-proceeds",
+      name: s.name,
+      icon: strategyIconMap[s.name]?.icon || Calculator,
+      color: strategyIconMap[s.name]?.color || "text-gray-500",
+      netProceeds: s.netProceeds,
+      taxRate: s.effRate,
+      risk: riskDisplayMap[s.risk] || ("Moderate" as const),
+      liquidity: s.liquidity,
+    })),
     {
       id: "irr",
       name: "IRR Calculator",
@@ -383,6 +417,19 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
     },
   ];
 
+  const recommendedReasons: Record<string, string> = {
+    "Cash Sale": "Straightforward exit with immediate liquidity and lowest complexity",
+    "1031 Exchange": "Tax deferral through like-kind exchange maximizes reinvestment capital",
+    "DST": "Passive income with tax deferral — ideal for hands-off investors",
+    "Seller Financing": "Installment sale spreads tax burden and generates interest income",
+    "Earnout": "Contingent pricing captures upside from future business performance",
+    "Waterfall": "Structured distribution aligns investor and operator incentives",
+  };
+  const recommendedReason = recommendedReasons[recommended.name] || "This strategy scored highest across net proceeds, tax efficiency, risk, speed, and flexibility";
+  const RecommendedIcon = strategyIconMap[recommended.name]?.icon || Target;
+  const recommendedColor = strategyIconMap[recommended.name]?.color || "text-teal-500";
+  const recommendedSavings = Math.max(0, baseline.totalTax - recommended.totalTax);
+
   const riskColors = {
     Low: "bg-green-100 text-green-700",
     Moderate: "bg-amber-100 text-amber-700",
@@ -404,16 +451,16 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
         <CardContent>
           <div className="flex items-start gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200">
             <div className="rounded-full bg-white p-3 shadow-sm">
-              <recommendation.icon className={`h-6 w-6 ${recommendation.color}`} />
+              <RecommendedIcon className={`h-6 w-6 ${recommendedColor}`} />
             </div>
             <div className="flex-1 space-y-2">
-              <h3 className="text-lg font-semibold">{recommendation.strategy}</h3>
-              <p className="text-sm text-muted-foreground">{recommendation.reason}</p>
-              {recommendation.savings > 0 && (
+              <h3 className="text-lg font-semibold">{recommended.name}</h3>
+              <p className="text-sm text-muted-foreground">{recommendedReason}</p>
+              {recommendedSavings > 0 && (
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="bg-green-100 text-green-700">
                     <DollarSign className="h-3 w-3 mr-1" />
-                    Est. Tax Savings: {formatCurrency(recommendation.savings)}
+                    Est. Tax Savings: {formatCurrency(recommendedSavings)}
                   </Badge>
                 </div>
               )}
@@ -421,7 +468,7 @@ function SummaryDashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
                 variant="outline"
                 size="sm"
                 className="mt-2"
-                onClick={() => onNavigate(recommendation.tab)}
+                onClick={() => onNavigate(strategyIconMap[recommended.name]?.id || "comparison")}
               >
                 View Details
                 <ArrowRightLeft className="h-3.5 w-3.5 ml-1.5" />
@@ -6993,85 +7040,8 @@ function CrossStrategyComparisonPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const baseline = getCashSaleBaseline(masterInputs);
 
-  const salePrice = masterInputs.salePrice;
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
-
-  const cashSaleNet = baseline.netCashProceeds;
-  const cashSaleTax = baseline.totalTax;
-  const cashSaleEffRate = baseline.effectiveTaxRate;
-
-  const exchangeCosts = 25000;
-  const netBenefit1031 = baseline.netSaleProceeds - masterInputs.currentDebtBalance - exchangeCosts;
-  const tax1031 = 0;
-  const effRate1031 = 0;
-
-  const sfDownPct = 0.20;
-  const sfRate = 0.06;
-  const sfTerm = 10;
-  const sfDown = salePrice * sfDownPct;
-  const sfLoan = salePrice - sfDown;
-  const sfMonthlyRate = sfRate / 12;
-  const sfMonths = sfTerm * 12;
-  const sfMonthlyPmt = sfMonthlyRate > 0 && sfMonths > 0 ? sfLoan * (sfMonthlyRate * Math.pow(1 + sfMonthlyRate, sfMonths)) / (Math.pow(1 + sfMonthlyRate, sfMonths) - 1) : 0;
-  const sfGain = salePrice - masterInputs.costBasis;
-  const sfGPR = salePrice > 0 ? sfGain / salePrice : 0;
-  const sfYear1TaxableGain = sfDown * sfGPR;
-  const sfYear1Tax = sfYear1TaxableGain * combinedRate;
-  const sfDisc = 0.08;
-  let sfNPV = sfDown;
-  for (let y = 1; y <= sfTerm; y++) {
-    sfNPV += (sfMonthlyPmt * 12) / Math.pow(1 + sfDisc, y);
-  }
-  const sfTotalTax = sfYear1Tax + (sfLoan / sfTerm) * sfGPR * combinedRate * sfTerm;
-
-  const earnoutBasePrice = salePrice * 0.8;
-  const earnoutContingent = salePrice * 0.2;
-  const earnoutProb = 0.6;
-  const earnoutYears = 3;
-  const earnoutDiscRate = 0.10;
-  const earnoutExpectedValue = earnoutBasePrice + earnoutContingent * earnoutProb;
-  const earnoutGain = earnoutExpectedValue - masterInputs.costBasis;
-  const earnoutTax = Math.max(0, earnoutGain) * combinedRate;
-  const earnoutExpectedEarnout = earnoutContingent * earnoutProb;
-  const earnoutPV = earnoutExpectedEarnout / Math.pow(1 + earnoutDiscRate, earnoutYears);
-  const earnoutNPVTotal = earnoutBasePrice + earnoutPV;
-  const earnoutNet = earnoutNPVTotal - earnoutTax - masterInputs.currentDebtBalance - masterInputs.closingCosts - salePrice * (masterInputs.brokerFeePercent / 100);
-
-  const dstSponsorFeeRate = 0.10;
-  const dstInvestment = baseline.netSaleProceeds - masterInputs.currentDebtBalance;
-  const dstDistRate = 0.055;
-  const dstApprecRate = 0.03;
-  const dstFee = dstInvestment * dstSponsorFeeRate;
-  const dstNetInvested = dstInvestment - dstFee;
-  const dstAnnualDist = dstNetInvested * dstDistRate;
-  const dstTotalDist = dstAnnualDist * masterInputs.holdingPeriod;
-  const dstExitValue = dstNetInvested * Math.pow(1 + dstApprecRate, masterInputs.holdingPeriod);
-  const dstExitFee = dstExitValue * 0.03;
-  const dstTotalReturn = dstTotalDist + dstExitValue - dstExitFee;
-  const dstDeferredTax = baseline.totalTax;
-
-  const wfTotalEquity = salePrice - masterInputs.currentDebtBalance;
-  const wfLPShare = 0.80;
-  const wfPrefRate = 0.08;
-  const wfCarriedInterest = 0.20;
-  const wfLPEquity = wfTotalEquity * wfLPShare;
-  const wfPrefReturn = wfLPEquity * wfPrefRate * masterInputs.holdingPeriod;
-  const wfExitProceeds = salePrice * Math.pow(1.03, masterInputs.holdingPeriod);
-  const wfDistributable = wfExitProceeds - masterInputs.currentDebtBalance;
-  const wfLPPref = Math.min(wfDistributable, wfLPEquity + wfPrefReturn);
-  const wfRemaining = Math.max(0, wfDistributable - wfLPPref);
-  const wfGPCarry = wfRemaining * wfCarriedInterest;
-  const wfLPTotal = wfLPPref + wfRemaining * (1 - wfCarriedInterest);
-  const wfLPTax = wfLPTotal > wfLPEquity ? (wfLPTotal - wfLPEquity) * combinedRate : 0;
-
-  const strategies = [
-    { name: "Cash Sale", netProceeds: cashSaleNet, totalTax: cashSaleTax, effRate: cashSaleEffRate, liquidity: "Immediate", risk: "Low", riskColor: "bg-green-100 text-green-800" },
-    { name: "1031 Exchange", netProceeds: netBenefit1031, totalTax: tax1031, effRate: effRate1031, liquidity: "45-180 days", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
-    { name: "DST", netProceeds: dstTotalReturn, totalTax: 0, effRate: 0, liquidity: "7-10 years", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
-    { name: "Seller Financing", netProceeds: sfNPV, totalTax: sfTotalTax, effRate: sfTotalTax > 0 && sfGain > 0 ? (sfTotalTax / sfGain) * 100 : 0, liquidity: "Over 10 years", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
-    { name: "Earnout", netProceeds: earnoutNet, totalTax: earnoutTax, effRate: earnoutGain > 0 ? (earnoutTax / earnoutGain) * 100 : 0, liquidity: "1-3 years", risk: "High", riskColor: "bg-red-100 text-red-800" },
-    { name: "Waterfall", netProceeds: wfLPTotal, totalTax: wfLPTax, effRate: wfLPTotal > wfLPEquity ? ((wfLPTax / (wfLPTotal - wfLPEquity)) * 100) : 0, liquidity: "At fund exit", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
-  ];
+  const strategies = computeStrategies(masterInputs, baseline);
 
   const bestStrategy = strategies.reduce((best, s) => s.netProceeds > best.netProceeds ? s : best, strategies[0]);
 
