@@ -370,6 +370,15 @@ const exitTools = [
     bgColor: "bg-orange-50"
   },
   { 
+    id: "comparison", 
+    name: "Strategy Comparison", 
+    shortName: "Compare",
+    description: "Side-by-side strategy comparison", 
+    icon: Target,
+    color: "text-teal-500",
+    bgColor: "bg-teal-50"
+  },
+  { 
     id: "ai-insights", 
     name: "AI Insights", 
     shortName: "AI",
@@ -584,6 +593,10 @@ export default function ExitStrategiesPage() {
             <SensitivityPanel />
           </TabsContent>
 
+          <TabsContent value="comparison" className="mt-6">
+            <CrossStrategyComparisonPanel />
+          </TabsContent>
+
           <TabsContent value="ai-insights" className="mt-6">
             <AIInsightsPanel />
           </TabsContent>
@@ -669,6 +682,37 @@ function TaxAndProceedsPanel() {
                 <span className="num font-medium">{b.effectiveTaxRate.toFixed(1)}%</span>
               </div>
             </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Section 1250/1231 Breakdown</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Unrecaptured §1250 Gain (25%)</span>
+                <span className="num font-medium">{formatCurrency(Math.min(masterInputs.depreciationTaken, Math.max(0, b.capitalGain)))}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">§1231 Long-Term Gain</span>
+                <span className="num font-medium text-green-600">{formatCurrency(Math.max(0, b.capitalGain - masterInputs.depreciationTaken))}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">NIIT Threshold ($250K)</span>
+                <span className={`num font-medium ${b.capitalGain > 250000 ? 'text-red-600' : 'text-green-600'}`}>
+                  {b.capitalGain > 250000 ? 'Triggered — NIIT applies' : 'Below threshold'}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">AMT Exposure Estimate</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">AMT Preference Items (est.)</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.depreciationTaken * 0.15)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Tentative AMT (28%)</span>
+                <span className="num font-medium text-amber-600">{formatCurrency(masterInputs.depreciationTaken * 0.15 * 0.28)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground italic pt-1">AMT exposure is estimated. Consult a CPA for precise calculation.</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -729,6 +773,41 @@ function TaxAndProceedsPanel() {
                 <span className="num font-medium text-green-600">{b.adjustedBasis > 0 ? ((b.netCashProceeds / b.adjustedBasis - 1) * 100).toFixed(1) : 0}%</span>
               </div>
             </div>
+
+            {(() => {
+              const equityInvested = masterInputs.costBasis - masterInputs.currentDebtBalance + masterInputs.capitalImprovements;
+              const proceedsPercent = equityInvested > 0 ? (b.netCashProceeds / equityInvested) * 100 : 0;
+              const annualizedROE = equityInvested > 0 && masterInputs.holdingPeriod > 0
+                ? (Math.pow(b.netCashProceeds / equityInvested, 1 / masterInputs.holdingPeriod) - 1) * 100
+                : 0;
+              const friction = b.brokerCost + b.closingCosts + b.totalTax;
+              const frictionPercent = masterInputs.salePrice > 0 ? (friction / masterInputs.salePrice) * 100 : 0;
+              return (
+                <div className="border-t pt-4 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Return on Equity</h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Equity Invested</span>
+                    <span className="num font-medium">{formatCurrency(equityInvested)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Net Proceeds as % of Equity</span>
+                    <span className="num font-medium text-green-600">{proceedsPercent.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Annualized ROE</span>
+                    <span className={`num font-medium ${annualizedROE >= 0 ? 'text-green-600' : 'text-red-600'}`}>{isFinite(annualizedROE) ? annualizedROE.toFixed(1) : '—'}%</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Total Transaction Friction</span>
+                    <span className="num font-medium text-red-600">{formatCurrency(friction)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Friction as % of Sale Price</span>
+                    <span className="num font-medium text-red-600">{frictionPercent.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -860,15 +939,78 @@ function Exchange1031Panel() {
               </div>
             </div>
 
+            {(() => {
+              const saleDate = masterInputs.acquisitionDate 
+                ? new Date(new Date(masterInputs.acquisitionDate).getTime() + masterInputs.holdingPeriod * 365.25 * 24 * 60 * 60 * 1000)
+                : new Date();
+              const saleDateStr = saleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              const idDeadline = new Date(saleDate);
+              idDeadline.setDate(idDeadline.getDate() + 45);
+              const closingDeadline = new Date(saleDate);
+              closingDeadline.setDate(closingDeadline.getDate() + 180);
+              const taxReturnYear = saleDate.getFullYear() + 1;
+              const taxReturnDeadline = new Date(taxReturnYear, 3, 15);
+              return (
+                <div className="border-t pt-4 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline Calculator</h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Assumed Sale Date</span>
+                    <span className="num font-medium">{saleDateStr}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">ID Deadline (Day 45)</span>
+                    <span className="num font-medium text-amber-600">{idDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Closing Deadline (Day 180)</span>
+                    <span className="num font-medium text-amber-600">{closingDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Tax Return Deadline</span>
+                    <span className="num font-medium">{taxReturnDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="border-t pt-4 space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deadlines</h4>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground text-sm">Property Identification</span>
-                <span className="num font-medium">45 days</span>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Identification Rules</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">3-Property Rule</span>
+                <span className="text-sm font-medium">Identify up to 3 properties regardless of value</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground text-sm">Exchange Closing</span>
-                <span className="num font-medium">180 days</span>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">200% Rule</span>
+                <span className="text-sm font-medium">Any number if combined FMV ≤ {formatCurrency(relinquishedValue * 2)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">95% Rule</span>
+                <span className="text-sm font-medium">Acquire ≥ 95% of identified properties' value</span>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Debt Replacement</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Relinquished Debt</span>
+                <span className="num font-medium">{formatCurrency(masterInputs.currentDebtBalance)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Required Replacement Debt</span>
+                <span className="num font-medium">≥ {formatCurrency(masterInputs.currentDebtBalance)}</span>
+              </div>
+              {replacement < relinquishedValue && (
+                <div className="bg-amber-50 rounded-lg px-3 py-2">
+                  <span className="text-amber-700 text-sm font-medium">⚠ Mortgage Boot Risk: Replacement value below relinquished value creates taxable boot</span>
+                </div>
+              )}
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Depreciation Reset</span>
+                <span className="num font-medium">New basis: {formatCurrency(newBasis)} over 27.5 years</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Annual Depreciation Deduction</span>
+                <span className="num font-medium text-green-600">{formatCurrency(newBasis * 0.8 / 27.5)}</span>
               </div>
             </div>
           </CardContent>
@@ -912,6 +1054,12 @@ function DSTAnalysisPanel() {
             <CardDescription>Delaware Statutory Trust investment via 1031 exchange</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-amber-800">
+                <span className="font-semibold">⚠ Accredited Investors Only:</span> DST investments require accredited investor status. Minimum investment typically $100,000–$250,000. These are illiquid securities with 7–10 year hold periods.
+              </p>
+            </div>
+
             <div className="space-y-2 bg-muted/30 rounded-lg p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Investment Basis</h4>
               <div className="flex justify-between py-1">
@@ -951,6 +1099,39 @@ function DSTAnalysisPanel() {
               </div>
             </div>
 
+            {(() => {
+              const acquisitionFee = investmentAmount * 0.02;
+              const assetMgmtFee = investmentAmount * 0.015 * masterInputs.holdingPeriod;
+              const dispFee = exitFee;
+              const totalFees = acquisitionFee + assetMgmtFee + dispFee;
+              const feeDragPercent = investmentAmount > 0 ? (totalFees / investmentAmount) * 100 : 0;
+              return (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sponsor Fee Breakdown</h4>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Acquisition Fee (typically 1-3%)</span>
+                    <span className="num font-medium text-red-600">{formatCurrency(acquisitionFee)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Asset Management Fee (1-2% annually)</span>
+                    <span className="num font-medium text-red-600">{formatCurrency(assetMgmtFee)}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b">
+                    <span className="text-muted-foreground text-sm">Disposition Fee</span>
+                    <span className="num font-medium text-red-600">{formatCurrency(dispFee)}</span>
+                  </div>
+                  <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                    <span className="font-semibold text-sm">Total Fee Drag</span>
+                    <span className="num font-semibold text-red-600">{formatCurrency(totalFees)}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground text-sm">Fee Drag as % of Investment</span>
+                    <span className="num font-medium text-red-600">{feeDragPercent.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <CashSaleBaselineCard baseline={baseline} />
           </CardContent>
         </Card>
@@ -986,6 +1167,26 @@ function DSTAnalysisPanel() {
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Total Distributions ({masterInputs.holdingPeriod} yrs)</span>
                 <span className="num font-medium text-green-600">{formatCurrency(totalDistributions)}</span>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Character of Distributions</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Return of Capital (est. 40-60%)</span>
+                <span className="num font-medium text-green-600">{formatCurrency(annualDistribution * 0.5)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Ordinary Income (est. 30-40%)</span>
+                <span className="num font-medium">{formatCurrency(annualDistribution * 0.35)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Capital Gain (est. 10-20%)</span>
+                <span className="num font-medium">{formatCurrency(annualDistribution * 0.15)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Annual Depreciation Shelter</span>
+                <span className="num font-medium text-green-600">{formatCurrency(masterInputs.holdingPeriod > 0 ? depreciationBenefit / masterInputs.holdingPeriod : 0)}</span>
               </div>
             </div>
 
@@ -1027,6 +1228,59 @@ function DSTAnalysisPanel() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Exit Strategy Comparison</CardTitle>
+          <CardDescription>Side-by-side comparison of cash sale, direct 1031, and DST</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left font-semibold">Metric</th>
+                  <th className="p-2 text-center font-semibold">Cash Sale</th>
+                  <th className="p-2 text-center font-semibold">Direct 1031</th>
+                  <th className="p-2 text-center font-semibold">DST</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground">Tax Due at Close</td>
+                  <td className="p-2 text-center num text-red-600">{formatCurrency(baseline.totalTax)}</td>
+                  <td className="p-2 text-center text-green-600">$0 (deferred)</td>
+                  <td className="p-2 text-center text-green-600">$0 (deferred)</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground">Annual Income</td>
+                  <td className="p-2 text-center">$0</td>
+                  <td className="p-2 text-center">Varies</td>
+                  <td className="p-2 text-center num text-green-600">{formatCurrency(annualDistribution)}</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground">Liquidity</td>
+                  <td className="p-2 text-center text-green-600">Immediate</td>
+                  <td className="p-2 text-center text-amber-600">Tied to property</td>
+                  <td className="p-2 text-center text-red-600">7–10 year hold</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground">Management Required</td>
+                  <td className="p-2 text-center">None</td>
+                  <td className="p-2 text-center">Active or hire PM</td>
+                  <td className="p-2 text-center text-green-600">Passive (sponsor managed)</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="p-2 text-muted-foreground">1031 Eligible at Exit</td>
+                  <td className="p-2 text-center text-muted-foreground">N/A</td>
+                  <td className="p-2 text-center text-green-600">Yes</td>
+                  <td className="p-2 text-center text-green-600">Yes (via UPREIT)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1038,33 +1292,87 @@ function SellerFinancingPanel() {
   const [interestRate, setInterestRate] = useState<string>("6");
   const [term, setTerm] = useState<string>("10");
   const [discountRate, setDiscountRate] = useState<string>("8");
+  const [hasBalloon, setHasBalloon] = useState(false);
+  const [balloonYear, setBalloonYear] = useState<string>("5");
 
   const salePrice = masterInputs.salePrice;
   const downPayment = salePrice * (parseFloat(downPaymentPercent) / 100 || 0);
   const loanAmount = salePrice - downPayment;
-  const monthlyRate = (parseFloat(interestRate) / 100 || 0) / 12;
-  const months = (parseFloat(term) || 0) * 12;
-  const monthlyPayment = monthlyRate > 0 && months > 0 ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) : 0;
-  const totalPayments = monthlyPayment * months;
-  const totalInterest = totalPayments - loanAmount;
-  const totalCashReceived = downPayment + totalPayments;
+  const annualRate = parseFloat(interestRate) / 100 || 0;
+  const monthlyRate = annualRate / 12;
+  const termYears = parseFloat(term) || 0;
+  const months = termYears * 12;
+  const balloonYr = Math.min(parseFloat(balloonYear) || 5, termYears);
+
+  let monthlyPayment: number;
+  let totalPayments: number;
+  let totalInterest: number;
+  let totalCashReceived: number;
+
+  if (hasBalloon && balloonYr > 0 && balloonYr < termYears) {
+    const interestOnlyMonthly = loanAmount * monthlyRate;
+    const balloonMonths = balloonYr * 12;
+    totalPayments = interestOnlyMonthly * balloonMonths + loanAmount;
+    totalInterest = interestOnlyMonthly * balloonMonths;
+    monthlyPayment = interestOnlyMonthly;
+    totalCashReceived = downPayment + totalPayments;
+  } else {
+    monthlyPayment = monthlyRate > 0 && months > 0 ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1) : 0;
+    totalPayments = monthlyPayment * months;
+    totalInterest = totalPayments - loanAmount;
+    totalCashReceived = downPayment + totalPayments;
+  }
 
   const gain = salePrice - masterInputs.costBasis;
   const grossProfitRatio = salePrice > 0 ? gain / salePrice : 0;
   const year1TaxableGain = downPayment * grossProfitRatio;
-  const annualPrincipal = months > 0 ? loanAmount / (parseFloat(term) || 1) : 0;
+  const annualPrincipal = months > 0 ? loanAmount / (termYears || 1) : 0;
   const annualTaxableGain = annualPrincipal * grossProfitRatio;
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
   const year1Tax = year1TaxableGain * combinedRate;
   const annualTax = annualTaxableGain * combinedRate;
-  const totalInstallmentTax = year1Tax + annualTax * (parseFloat(term) || 0);
+  const totalInstallmentTax = year1Tax + annualTax * termYears;
   const taxDeferral = baseline.totalTax - year1Tax;
 
   const disc = parseFloat(discountRate) / 100 || 0;
   let npv = downPayment;
-  for (let y = 1; y <= (parseFloat(term) || 0); y++) {
-    npv += (monthlyPayment * 12) / Math.pow(1 + disc, y);
+  if (hasBalloon && balloonYr > 0 && balloonYr < termYears) {
+    for (let y = 1; y <= balloonYr; y++) {
+      npv += (monthlyPayment * 12) / Math.pow(1 + disc, y);
+    }
+    npv += loanAmount / Math.pow(1 + disc, balloonYr);
+  } else {
+    for (let y = 1; y <= termYears; y++) {
+      npv += (monthlyPayment * 12) / Math.pow(1 + disc, y);
+    }
   }
+
+  const amortSchedule: Array<{ year: number; principal: number; interest: number; balance: number }> = [];
+  if (!hasBalloon || balloonYr >= termYears) {
+    let balance = loanAmount;
+    const annualPayment = monthlyPayment * 12;
+    for (let y = 1; y <= Math.min(5, termYears); y++) {
+      const yearInterest = balance * annualRate;
+      const yearPrincipal = annualPayment - yearInterest;
+      balance = Math.max(0, balance - yearPrincipal);
+      amortSchedule.push({ year: y, principal: yearPrincipal, interest: yearInterest, balance });
+    }
+  } else {
+    let balance = loanAmount;
+    for (let y = 1; y <= Math.min(5, balloonYr); y++) {
+      const yearInterest = balance * annualRate;
+      amortSchedule.push({ year: y, principal: 0, interest: yearInterest, balance });
+    }
+    if (balloonYr <= 5) {
+      amortSchedule.push({ year: balloonYr, principal: loanAmount, interest: 0, balance: 0 });
+    }
+  }
+
+  const ltv = salePrice > 0 ? (loanAmount / salePrice) * 100 : 0;
+  const prepaymentPenalty = loanAmount * 0.02;
+  const sellerFinTotalTax = totalInstallmentTax + totalInterest * combinedRate;
+  const npvAdvantage = npv - baseline.netCashProceeds;
+  const sellerFinWins = npvAdvantage >= 0;
 
   return (
     <div className="space-y-6">
@@ -1115,6 +1423,28 @@ function SellerFinancingPanel() {
                 <Label className="text-xs">Discount Rate (NPV)</Label>
                 <PercentInput value={discountRate} onChange={setDiscountRate} />
               </div>
+              <div className="col-span-2 flex items-center gap-3 py-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasBalloon}
+                    onChange={(e) => setHasBalloon(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium">Balloon Payment</span>
+                </label>
+                {hasBalloon && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Balloon Year</Label>
+                    <Input
+                      type="number"
+                      value={balloonYear}
+                      onChange={(e) => setBalloonYear(e.target.value)}
+                      className="w-20"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <CashSaleBaselineCard baseline={baseline} />
@@ -1138,9 +1468,15 @@ function SellerFinancingPanel() {
                 <span className="num font-medium">{formatCurrency(loanAmount)}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
-                <span className="text-muted-foreground text-sm">Monthly Payment</span>
+                <span className="text-muted-foreground text-sm">Monthly Payment{hasBalloon ? " (Interest Only)" : ""}</span>
                 <span className="num font-medium text-green-600">{formatCurrency(monthlyPayment)}</span>
               </div>
+              {hasBalloon && (
+                <div className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Balloon Due (Year {balloonYear})</span>
+                  <span className="num font-medium text-amber-600">{formatCurrency(loanAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Total Interest Income</span>
                 <span className="num font-medium text-green-600">{formatCurrency(totalInterest)}</span>
@@ -1149,6 +1485,16 @@ function SellerFinancingPanel() {
                 <span className="font-semibold text-sm">Total Cash Received</span>
                 <span className="num font-semibold text-green-600">{formatCurrency(totalCashReceived)}</span>
               </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amortization Summary</h4>
+              {amortSchedule.map((row) => (
+                <div key={row.year} className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Year {row.year}: Principal / Interest</span>
+                  <span className="num font-medium">{formatCurrency(row.principal)} / {formatCurrency(row.interest)}</span>
+                </div>
+              ))}
             </div>
 
             <div className="border-t pt-4 space-y-3">
@@ -1190,9 +1536,69 @@ function SellerFinancingPanel() {
                 <span className="num font-medium text-green-600">{formatCurrency(totalCashReceived - salePrice)}</span>
               </div>
             </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risk Assessment</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Loan-to-Value (LTV)</span>
+                <span className="flex items-center gap-2">
+                  <span className="num font-medium">{ltv.toFixed(1)}%</span>
+                  <Badge className={ltv < 70 ? 'bg-green-100 text-green-700' : ltv <= 80 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}>
+                    {ltv < 70 ? 'Low Risk' : ltv <= 80 ? 'Moderate' : 'High Risk'}
+                  </Badge>
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Default Risk</span>
+                <span className="text-sm">Seller retains 1st lien position on property</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Prepayment Penalty (est.)</span>
+                <span className="num font-medium">{formatCurrency(prepaymentPenalty)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground italic">Interest income taxed as ordinary income at marginal rate (up to 37% federal)</p>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Total Tax Comparison</CardTitle>
+          <CardDescription>Cash sale vs seller financing tax analysis</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Cash Sale: Total Tax</span>
+              <span className="num font-medium text-red-600">{formatCurrency(baseline.totalTax)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Cash Sale: Year 1 Tax</span>
+              <span className="num font-medium text-red-600">{formatCurrency(baseline.totalTax)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Seller Financing: Total Tax (incl. interest income)</span>
+              <span className="num font-medium text-red-600">{formatCurrency(sellerFinTotalTax)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Seller Financing: Year 1 Tax</span>
+              <span className="num font-medium text-amber-600">{formatCurrency(year1Tax)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+              <span className="font-semibold">Year 1 Tax Deferral</span>
+              <span className="num font-bold text-green-600">{formatCurrency(taxDeferral)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 rounded-lg px-3" style={{ backgroundColor: sellerFinWins ? 'rgb(240 253 244)' : 'rgb(254 242 242)' }}>
+              <span className="font-semibold">NPV Advantage/(Disadvantage)</span>
+              <span className={`num font-bold ${sellerFinWins ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(npvAdvantage)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground italic">
+              {sellerFinWins ? "Seller financing produces higher NPV — favorable for the seller when accounting for time value of money." : "Cash sale produces higher NPV — seller financing may not compensate for the time value and risk."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1205,6 +1611,9 @@ function EarnoutPanel() {
   const [probability, setProbability] = useState<string>("60");
   const [earnoutYears, setEarnoutYears] = useState<string>("3");
   const [discountRate, setDiscountRate] = useState<string>("10");
+  const [revenueTarget, setRevenueTarget] = useState<string>("2000000");
+  const [ebitdaThreshold, setEbitdaThreshold] = useState<string>("500000");
+  const [escrowPercent, setEscrowPercent] = useState<string>("10");
 
   const base = parseFloat(basePrice) || 0;
   const maxEarnout = parseFloat(earnoutMax) || 0;
@@ -1215,6 +1624,7 @@ function EarnoutPanel() {
   const expectedEarnout = maxEarnout * prob;
   const totalExpected = base + expectedEarnout;
   const maxValue = base + maxEarnout;
+  const escrowAmount = maxEarnout * (parseFloat(escrowPercent) / 100 || 0);
 
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
   const baseTax = base > masterInputs.costBasis ? (base - masterInputs.costBasis) * combinedRate : 0;
@@ -1227,6 +1637,19 @@ function EarnoutPanel() {
   const riskAdjustedTotal = base + pvEarnout;
   const guaranteedDiscount = masterInputs.salePrice - base;
   const riskPremium = maxEarnout > 0 ? ((maxEarnout - expectedEarnout) / maxEarnout * 100) : 0;
+
+  const annualEarnoutPayment = years > 0 ? expectedEarnout / years : 0;
+  const earnoutSchedule: Array<{ year: number; payment: number; pv: number }> = [];
+  let totalPV = 0;
+  for (let y = 1; y <= years; y++) {
+    const pv = annualEarnoutPayment / Math.pow(1 + disc, y);
+    totalPV += pv;
+    earnoutSchedule.push({ year: y, payment: annualEarnoutPayment, pv });
+  }
+
+  const ordinaryComponent = earnoutTax * 0.4;
+  const capitalGainComponent = earnoutTax * 0.6;
+  const workingCapitalAdj = base * 0.03;
 
   return (
     <div className="space-y-6">
@@ -1263,6 +1686,29 @@ function EarnoutPanel() {
               </div>
             </div>
 
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Milestone Structure</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs">Revenue Target</Label>
+                  <CurrencyInput value={revenueTarget} onChange={setRevenueTarget} />
+                </div>
+                <div>
+                  <Label className="text-xs">EBITDA Threshold</Label>
+                  <CurrencyInput value={ebitdaThreshold} onChange={setEbitdaThreshold} />
+                </div>
+                <div>
+                  <Label className="text-xs">Escrow Holdback %</Label>
+                  <PercentInput value={escrowPercent} onChange={setEscrowPercent} />
+                </div>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Escrow Amount</span>
+                <span className="num font-medium">{formatCurrency(escrowAmount)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground italic">Milestone-based payout: earnout payments contingent on achieving revenue and EBITDA targets during the measurement period.</p>
+            </div>
+
             <CashSaleBaselineCard baseline={baseline} />
           </CardContent>
         </Card>
@@ -1294,6 +1740,20 @@ function EarnoutPanel() {
             </div>
 
             <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Year-by-Year Earnout Schedule</h4>
+              {earnoutSchedule.map((row) => (
+                <div key={row.year} className="flex justify-between py-1.5 border-b">
+                  <span className="text-muted-foreground text-sm">Year {row.year}: Payment / PV</span>
+                  <span className="num font-medium">{formatCurrency(row.payment)} / {formatCurrency(row.pv)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
+                <span className="font-semibold text-sm">Total PV of Earnout</span>
+                <span className="num font-semibold">{formatCurrency(totalPV)}</span>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Analysis</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Tax on Base Price</span>
@@ -1310,6 +1770,26 @@ function EarnoutPanel() {
               <div className="flex justify-between py-2 bg-muted/50 rounded px-2">
                 <span className="font-semibold text-sm">Net Expected Proceeds</span>
                 <span className="num font-semibold text-green-600">{formatCurrency(netExpectedProceeds)}</span>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tax Timing</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Treatment</span>
+                <span className="text-sm">Closed Transaction (taxed when received)</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Open Transaction Alternative</span>
+                <span className="text-sm italic">Defer until basis recovered (consult CPA)</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Ordinary Income Component (est. 40%)</span>
+                <span className="num font-medium text-red-600">{formatCurrency(ordinaryComponent)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Capital Gain Component (est. 60%)</span>
+                <span className="num font-medium text-amber-600">{formatCurrency(capitalGainComponent)}</span>
               </div>
             </div>
 
@@ -1332,6 +1812,23 @@ function EarnoutPanel() {
                 <span className={`num font-bold ${netExpectedProceeds >= baseline.netCashProceeds ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(netExpectedProceeds - baseline.netCashProceeds)}</span>
               </div>
             </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seller Risk Scorecard</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Buyer Default Risk</span>
+                <Badge className="bg-amber-100 text-amber-700">Medium</Badge>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Metric Manipulation Risk</span>
+                <Badge className="bg-orange-100 text-orange-700">Medium-High</Badge>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Working Capital Adjustment</span>
+                <span className="num font-medium">{formatCurrency(workingCapitalAdj)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground italic">Consider escrow, holdback, and audit rights to mitigate earnout risks</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -1346,26 +1843,49 @@ function WaterfallPanel() {
   const [gpCapital, setGpCapital] = useState<string>("2000000");
   const [preferredReturn, setPreferredReturn] = useState<string>("8");
   const [carriedInterest, setCarriedInterest] = useState<string>("20");
+  const [managementFee, setManagementFee] = useState<string>("1.5");
 
-  const totalDist = parseFloat(totalDistribution) || 0;
+  const totalDistRaw = parseFloat(totalDistribution) || 0;
   const lpCap = parseFloat(lpCapital) || 0;
   const gpCap = parseFloat(gpCapital) || 0;
   const totalCapital = lpCap + gpCap;
   const prefRate = parseFloat(preferredReturn) / 100 || 0;
   const carryRate = parseFloat(carriedInterest) / 100 || 0;
+  const mgmtFeeAmount = totalCapital * (parseFloat(managementFee) / 100 || 0) * masterInputs.holdingPeriod;
+  const totalDist = totalDistRaw - mgmtFeeAmount;
 
   const lpPref = lpCap * prefRate * masterInputs.holdingPeriod;
   const gpPref = gpCap * prefRate * masterInputs.holdingPeriod;
   const totalPref = lpPref + gpPref;
   const afterPrefAndReturn = totalDist - totalPref - totalCapital;
-  const gpCarry = afterPrefAndReturn > 0 ? afterPrefAndReturn * carryRate : 0;
-  const lpProfit = afterPrefAndReturn > 0 ? afterPrefAndReturn - gpCarry : 0;
+
+  const gpCatchup = gpCap > 0 ? Math.min(Math.max(0, afterPrefAndReturn), lpPref * (carryRate / (1 - carryRate))) : 0;
+  const afterCatchup = Math.max(0, afterPrefAndReturn - gpCatchup);
+
+  const gpCarry = afterCatchup > 0 ? afterCatchup * carryRate : 0;
+  const lpProfit = afterCatchup > 0 ? afterCatchup - gpCarry : 0;
   const lpTotal = lpCap + lpPref + lpProfit;
-  const gpTotal = gpCap + gpPref + gpCarry;
+  const gpTotal = gpCap + gpPref + gpCatchup + gpCarry;
   const lpMOIC = lpCap > 0 ? lpTotal / lpCap : 0;
   const gpMOIC = gpCap > 0 ? gpTotal / gpCap : 0;
   const dealMOIC = totalCapital > 0 ? totalDist / totalCapital : 0;
   const lpIRR = lpCap > 0 && masterInputs.holdingPeriod > 0 ? (Math.pow(lpTotal / lpCap, 1 / masterInputs.holdingPeriod) - 1) * 100 : 0;
+
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+  const lpLTCG = lpTotal * 0.60;
+  const lpDepRecapture = lpTotal * 0.15;
+  const lpOrdinary = lpTotal * 0.25;
+  const gpLTCG = gpTotal * 0.60;
+  const gpDepRecapture = gpTotal * 0.15;
+  const gpOrdinary = gpTotal * 0.25;
+  const blendedLPTaxRate = (0.60 * 0.20) + (0.15 * 0.25) + (0.25 * combinedRate);
+  const blendedGPTaxRate = (0.60 * 0.20) + (0.15 * 0.25) + (0.25 * combinedRate);
+  const lpAfterTax = lpTotal * (1 - blendedLPTaxRate);
+  const gpAfterTax = gpTotal * (1 - blendedGPTaxRate);
+  const gpPromotePercent = (gpCatchup + gpCarry) / (gpCap > 0 ? gpCap : 1) * 100;
+  const prefHurdle = 1 + prefRate * masterInputs.holdingPeriod;
+  const hasClawback = dealMOIC < prefHurdle;
+  const clawbackAmount = hasClawback ? gpCatchup + gpCarry : 0;
 
   return (
     <div className="space-y-6">
@@ -1400,6 +1920,10 @@ function WaterfallPanel() {
                 <Label className="text-xs">Carried Interest</Label>
                 <PercentInput value={carriedInterest} onChange={setCarriedInterest} />
               </div>
+              <div>
+                <Label className="text-xs">Management Fee (%)</Label>
+                <PercentInput value={managementFee} onChange={setManagementFee} />
+              </div>
             </div>
 
             <div className="bg-muted/30 rounded-lg p-4 space-y-2">
@@ -1415,6 +1939,14 @@ function WaterfallPanel() {
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground text-sm">Total Equity</span>
                 <span className="num font-medium">{formatCurrency(totalCapital)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Management Fee ({managementFee}% x {masterInputs.holdingPeriod} yrs)</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(mgmtFeeAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-muted-foreground text-sm">Net Distributable</span>
+                <span className="num font-medium">{formatCurrency(totalDist)}</span>
               </div>
             </div>
           </CardContent>
@@ -1451,10 +1983,22 @@ function WaterfallPanel() {
             </div>
 
             <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2.5: GP Catchup</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">GP Catchup Amount</span>
+                <span className="num font-medium">{formatCurrency(gpCatchup)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Catchup Remaining for Profit Split</span>
+                <span className="num font-medium">{formatCurrency(afterCatchup)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3: Profit Split</h4>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Remaining Profit</span>
-                <span className="num font-medium">{formatCurrency(Math.max(0, afterPrefAndReturn))}</span>
+                <span className="num font-medium">{formatCurrency(Math.max(0, afterCatchup))}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">GP Carried Interest ({carriedInterest}%)</span>
@@ -1496,6 +2040,73 @@ function WaterfallPanel() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Character Allocation</CardTitle>
+          <CardDescription>Estimated tax treatment and after-tax returns</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">LP Tax Character</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Long-Term Capital Gain (est. 60%)</span>
+                <span className="num font-medium">{formatCurrency(lpLTCG)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Depreciation Recapture (est. 15%, taxed at 25%)</span>
+                <span className="num font-medium">{formatCurrency(lpDepRecapture)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Ordinary Income (est. 25%)</span>
+                <span className="num font-medium">{formatCurrency(lpOrdinary)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+                <span className="font-semibold">LP After-Tax Return</span>
+                <span className="num font-bold text-green-600">{formatCurrency(lpAfterTax)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GP Tax Character</h4>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Long-Term Capital Gain (est. 60%)</span>
+                <span className="num font-medium">{formatCurrency(gpLTCG)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Depreciation Recapture (est. 15%, taxed at 25%)</span>
+                <span className="num font-medium">{formatCurrency(gpDepRecapture)}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">Ordinary Income (est. 25%)</span>
+                <span className="num font-medium">{formatCurrency(gpOrdinary)}</span>
+              </div>
+              <div className="flex justify-between py-2.5 bg-cyan-50 rounded-lg px-3">
+                <span className="font-semibold">GP After-Tax Return</span>
+                <span className="num font-bold text-cyan-600">{formatCurrency(gpAfterTax)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GP Promote Economics</h4>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Promote as % of GP Capital</span>
+              <span className="num font-semibold">{gpPromotePercent.toFixed(1)}%</span>
+            </div>
+            {hasClawback && (
+              <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
+                <span className="font-semibold text-red-700">Clawback Exposure</span>
+                <span className="num font-bold text-red-600">{formatCurrency(clawbackAmount)}</span>
+              </div>
+            )}
+            {hasClawback && (
+              <p className="text-xs text-red-600 italic">Deal MOIC ({dealMOIC.toFixed(2)}x) is below pref hurdle ({prefHurdle.toFixed(2)}x). GP must return carry if deal doesn't achieve pref.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1503,65 +2114,98 @@ function WaterfallPanel() {
 function IRRCalculatorPanel() {
   const { masterInputs } = useExitStrategiesStore();
   const [initialInvestment, setInitialInvestment] = useState<string>("1000000");
-  const [year1, setYear1] = useState<string>("100000");
-  const [year2, setYear2] = useState<string>("150000");
-  const [year3, setYear3] = useState<string>("200000");
+  const [yearCount, setYearCount] = useState(5);
+  const [cashFlows, setCashFlows] = useState<string[]>(Array(5).fill("100000"));
   const [exitValue, setExitValue] = useState<string>("1500000");
   const [targetReturn, setTargetReturn] = useState<string>("15");
   const [discountRate, setDiscountRate] = useState<string>("10");
+  const [showLevered, setShowLevered] = useState(true);
+
+  const handleYearCountChange = (newCount: number) => {
+    const clamped = Math.max(1, Math.min(10, newCount));
+    setCashFlows(prev => {
+      const next = [...prev];
+      const lastVal = prev[prev.length - 1] || "100000";
+      while (next.length < clamped) next.push(lastVal);
+      return next.slice(0, clamped);
+    });
+    setYearCount(clamped);
+  };
+
+  const updateCashFlow = (index: number, value: string) => {
+    setCashFlows(prev => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
 
   const invest = parseFloat(initialInvestment) || 0;
-  const cf1 = parseFloat(year1) || 0;
-  const cf2 = parseFloat(year2) || 0;
-  const cf3 = parseFloat(year3) || 0;
+  const parsedCFs = cashFlows.map(cf => parseFloat(cf) || 0);
   const exit = parseFloat(exitValue) || 0;
   const target = parseFloat(targetReturn) || 0;
   const disc = parseFloat(discountRate) / 100 || 0;
 
-  const cashFlows = [-invest, cf1, cf2, cf3 + exit];
-  const annualCFs = [cf1, cf2, cf3];
+  const debt = masterInputs.currentDebtBalance;
+  const leveredInvest = Math.max(0, invest - debt);
+  const activeInvest = showLevered ? leveredInvest : invest;
+
+  const buildFlows = (inv: number) => {
+    const flows = [-inv, ...parsedCFs.slice(0, -1), (parsedCFs[parsedCFs.length - 1] || 0) + exit];
+    return flows;
+  };
 
   const calculateIRR = (flows: number[]) => {
     let rate = 0.1;
     for (let i = 0; i < 100; i++) {
-      let npv = 0;
+      let npvCalc = 0;
       let npvDerivative = 0;
       for (let t = 0; t < flows.length; t++) {
-        npv += flows[t] / Math.pow(1 + rate, t);
+        npvCalc += flows[t] / Math.pow(1 + rate, t);
         npvDerivative -= t * flows[t] / Math.pow(1 + rate, t + 1);
       }
-      if (Math.abs(npv) < 0.01) break;
-      if (npvDerivative !== 0) rate = rate - npv / npvDerivative;
+      if (Math.abs(npvCalc) < 0.01) break;
+      if (npvDerivative !== 0) rate = rate - npvCalc / npvDerivative;
       else break;
     }
     return rate * 100;
   };
 
-  const irr = calculateIRR(cashFlows);
-  const totalCashFlow = cf1 + cf2 + cf3 + exit;
-  const totalProfit = totalCashFlow - invest;
-  const multiple = invest > 0 ? totalCashFlow / invest : 0;
+  const unleveredFlows = buildFlows(invest);
+  const leveredFlows = buildFlows(leveredInvest);
+  const activeFlows = showLevered ? leveredFlows : unleveredFlows;
+
+  const irr = calculateIRR(activeFlows);
+  const unleveredIRR = calculateIRR(unleveredFlows);
+  const leveredIRR = calculateIRR(leveredFlows);
+
+  const totalCashFlow = parsedCFs.reduce((a, b) => a + b, 0) + exit;
+  const totalProfit = totalCashFlow - activeInvest;
+  const multiple = activeInvest > 0 ? totalCashFlow / activeInvest : 0;
 
   const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
-  const afterTaxCFs = [-invest, cf1 * (1 - combinedRate * 0.3), cf2 * (1 - combinedRate * 0.3), (cf3 * (1 - combinedRate * 0.3)) + exit * (1 - combinedRate)];
-  const afterTaxIRR = calculateIRR(afterTaxCFs);
+  const afterTaxFlows = [-activeInvest, ...parsedCFs.slice(0, -1).map(cf => cf * (1 - combinedRate * 0.3)), (parsedCFs[parsedCFs.length - 1] * (1 - combinedRate * 0.3)) + exit * (1 - combinedRate)];
+  const afterTaxIRR = calculateIRR(afterTaxFlows);
 
   let npv = 0;
-  for (let t = 0; t < cashFlows.length; t++) {
-    npv += cashFlows[t] / Math.pow(1 + disc, t);
+  for (let t = 0; t < activeFlows.length; t++) {
+    npv += activeFlows[t] / Math.pow(1 + disc, t);
   }
 
-  let cumulativeCF = -invest;
+  let cumulativeCF = -activeInvest;
   let paybackYear = 0;
-  for (let y = 0; y < annualCFs.length; y++) {
-    cumulativeCF += annualCFs[y];
+  for (let y = 0; y < parsedCFs.length; y++) {
+    cumulativeCF += parsedCFs[y];
     if (cumulativeCF >= 0 && paybackYear === 0) {
       paybackYear = y + 1;
     }
   }
-  if (paybackYear === 0 && cumulativeCF + exit >= 0) paybackYear = annualCFs.length;
+  if (paybackYear === 0 && cumulativeCF + exit >= 0) paybackYear = parsedCFs.length;
 
   const meetsTarget = irr >= target;
+
+  const capRateSensitivity = [5, 5.5, 6, 6.5, 7];
+  const baseNOI = parsedCFs[parsedCFs.length - 1] || 0;
 
   return (
     <div className="space-y-6">
@@ -1572,30 +2216,64 @@ function IRRCalculatorPanel() {
               <Percent className="h-5 w-5 text-emerald-500" />
               IRR Calculator
             </CardTitle>
-            <CardDescription>Multi-period return analysis with tax adjustment</CardDescription>
+            <CardDescription>Multi-period return analysis with dynamic cash flows</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-4 pb-2 border-b">
+              <div className="flex-1">
+                <Label className="text-xs">Hold Period (Years)</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={yearCount}
+                    onChange={(e) => handleYearCountChange(parseInt(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="num font-semibold text-sm w-8 text-center">{yearCount}</span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Mode</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={showLevered}
+                      onChange={() => setShowLevered(true)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-medium">Levered</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={!showLevered}
+                      onChange={() => setShowLevered(false)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-medium">Unlevered</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Initial Investment</Label>
                 <CurrencyInput value={initialInvestment} onChange={setInitialInvestment} />
               </div>
               <div>
-                <Label className="text-xs">Year 1 Cash Flow</Label>
-                <CurrencyInput value={year1} onChange={setYear1} />
-              </div>
-              <div>
-                <Label className="text-xs">Year 2 Cash Flow</Label>
-                <CurrencyInput value={year2} onChange={setYear2} />
-              </div>
-              <div>
-                <Label className="text-xs">Year 3 Cash Flow</Label>
-                <CurrencyInput value={year3} onChange={setYear3} />
-              </div>
-              <div>
-                <Label className="text-xs">Exit Value (Year 3)</Label>
+                <Label className="text-xs">Exit Value (Year {yearCount})</Label>
                 <CurrencyInput value={exitValue} onChange={setExitValue} />
               </div>
+              {cashFlows.map((cf, i) => (
+                <div key={i}>
+                  <Label className="text-xs">Year {i + 1} Cash Flow</Label>
+                  <CurrencyInput value={cf} onChange={(v) => updateCashFlow(i, v)} />
+                </div>
+              ))}
               <div>
                 <Label className="text-xs">Target Return (%)</Label>
                 <PercentInput value={targetReturn} onChange={setTargetReturn} />
@@ -1605,6 +2283,24 @@ function IRRCalculatorPanel() {
                 <PercentInput value={discountRate} onChange={setDiscountRate} />
               </div>
             </div>
+
+            {showLevered && (
+              <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Leverage Adjustment</h4>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground text-sm">Total Investment</span>
+                  <span className="num font-medium">{formatCurrency(invest)}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground text-sm">Less: Debt</span>
+                  <span className="num font-medium text-red-600">-{formatCurrency(debt)}</span>
+                </div>
+                <div className="flex justify-between py-1 bg-muted/50 rounded px-2">
+                  <span className="font-semibold text-sm">Equity Invested</span>
+                  <span className="num font-semibold">{formatCurrency(leveredInvest)}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1616,13 +2312,17 @@ function IRRCalculatorPanel() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Core Returns</h4>
-              <div className="flex justify-between py-2.5 bg-emerald-50 rounded-lg px-3">
-                <span className="font-semibold">Pre-Tax IRR</span>
-                <span className={`num font-bold ${irr >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{irr.toFixed(2)}%</span>
+              <div className={`flex justify-between py-2.5 rounded-lg px-3 ${showLevered ? 'bg-emerald-50' : 'bg-muted/30'}`}>
+                <span className="font-semibold">Levered IRR</span>
+                <span className={`num font-bold ${leveredIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{isFinite(leveredIRR) ? leveredIRR.toFixed(2) : '—'}%</span>
+              </div>
+              <div className={`flex justify-between py-2.5 rounded-lg px-3 ${!showLevered ? 'bg-emerald-50' : 'bg-muted/30'}`}>
+                <span className="font-semibold">Unlevered IRR</span>
+                <span className={`num font-bold ${unleveredIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{isFinite(unleveredIRR) ? unleveredIRR.toFixed(2) : '—'}%</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">After-Tax IRR (est.)</span>
-                <span className={`num font-medium ${afterTaxIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{afterTaxIRR.toFixed(2)}%</span>
+                <span className={`num font-medium ${afterTaxIRR >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{isFinite(afterTaxIRR) ? afterTaxIRR.toFixed(2) : '—'}%</span>
               </div>
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Equity Multiple</span>
@@ -1640,20 +2340,20 @@ function IRRCalculatorPanel() {
 
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cash-on-Cash by Year</h4>
-              {annualCFs.map((cf, i) => (
+              {parsedCFs.map((cf, i) => (
                 <div key={i} className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Year {i + 1}: {formatCurrency(cf)}</span>
-                  <span className="num font-medium">{invest > 0 ? ((cf / invest) * 100).toFixed(1) : 0}%</span>
+                  <span className="num font-medium">{activeInvest > 0 ? ((cf / activeInvest) * 100).toFixed(1) : 0}%</span>
                 </div>
               ))}
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-muted-foreground text-sm">Avg Cash-on-Cash</span>
-                <span className="num font-medium">{invest > 0 ? ((annualCFs.reduce((a, b) => a + b, 0) / annualCFs.length / invest) * 100).toFixed(1) : 0}%</span>
+                <span className="num font-medium">{activeInvest > 0 ? ((parsedCFs.reduce((a, b) => a + b, 0) / parsedCFs.length / activeInvest) * 100).toFixed(1) : 0}%</span>
               </div>
               {paybackYear > 0 && (
                 <div className="flex justify-between py-1.5 border-b">
                   <span className="text-muted-foreground text-sm">Payback Period</span>
-                  <span className="num font-medium">{paybackYear === annualCFs.length ? `${paybackYear} yrs (at exit)` : `${paybackYear} yrs`}</span>
+                  <span className="num font-medium">{paybackYear === parsedCFs.length ? `${paybackYear} yrs (at exit)` : `${paybackYear} yrs`}</span>
                 </div>
               )}
             </div>
@@ -1667,6 +2367,35 @@ function IRRCalculatorPanel() {
                 </span>
               </div>
             </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exit Cap Rate Sensitivity</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="p-2 text-left">Cap Rate</th>
+                      <th className="p-2 text-center">Exit Value</th>
+                      <th className="p-2 text-center">IRR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {capRateSensitivity.map(cr => {
+                      const sensExitVal = baseNOI / (cr / 100);
+                      const sensFlows = [-activeInvest, ...parsedCFs.slice(0, -1), (parsedCFs[parsedCFs.length - 1] || 0) + sensExitVal];
+                      const sensIRR = calculateIRR(sensFlows);
+                      return (
+                        <tr key={cr} className="border-b">
+                          <td className="p-2 font-medium">{cr.toFixed(1)}%</td>
+                          <td className="p-2 text-center num">{formatCurrency(sensExitVal)}</td>
+                          <td className={`p-2 text-center num font-medium ${sensIRR >= target ? 'text-green-600' : 'text-red-600'}`}>{isFinite(sensIRR) ? sensIRR.toFixed(2) : '—'}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -1675,6 +2404,7 @@ function IRRCalculatorPanel() {
 }
 
 function SensitivityPanel() {
+  const { masterInputs } = useExitStrategiesStore();
   const [baseNOI, setBaseNOI] = useState<string>("500000");
   const [baseCapRate, setBaseCapRate] = useState<string>("6");
 
@@ -1684,6 +2414,80 @@ function SensitivityPanel() {
   const calculateValue = (noi: number, capRate: number) => {
     return noi / (capRate / 100);
   };
+
+  const holdPeriods = [3, 5, 7, 10];
+  const baseValue = masterInputs.salePrice;
+
+  const calcNetProceedsForYear = (year: number) => {
+    const salePriceAtYear = baseValue * Math.pow(1.03, year);
+    const adjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
+    const capitalGain = salePriceAtYear - adjustedBasis;
+    const depRecapture = Math.min(masterInputs.depreciationTaken, Math.max(0, capitalGain)) * 0.25;
+    const longTermGain = Math.max(0, capitalGain - masterInputs.depreciationTaken);
+    const federalTax = longTermGain * (masterInputs.federalTaxRate / 100);
+    const stateTax = longTermGain * (masterInputs.stateTaxRate / 100);
+    const niit = longTermGain > 250000 ? longTermGain * 0.038 : 0;
+    const totalTax = federalTax + stateTax + depRecapture + niit;
+    const brokerCost = salePriceAtYear * (masterInputs.brokerFeePercent / 100);
+    const netSaleProceeds = salePriceAtYear - brokerCost - masterInputs.closingCosts;
+    const netCashProceeds = netSaleProceeds - masterInputs.currentDebtBalance - totalTax;
+    return { salePrice: salePriceAtYear, capitalGain, totalTax, netCashProceeds };
+  };
+
+  const taxScenarios = [
+    { label: "Current Rates", fedRate: masterInputs.federalTaxRate, stateRate: masterInputs.stateTaxRate },
+    { label: "+5% Increase", fedRate: masterInputs.federalTaxRate + 5, stateRate: masterInputs.stateTaxRate + 5 },
+    { label: "+10% Increase", fedRate: masterInputs.federalTaxRate + 10, stateRate: masterInputs.stateTaxRate + 10 },
+    { label: "Maximum Rates", fedRate: 37, stateRate: 13.3 },
+  ];
+
+  const calcTaxScenario = (fedRate: number, stateRate: number) => {
+    const adjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
+    const capitalGain = masterInputs.salePrice - adjustedBasis;
+    const depRecapture = Math.min(masterInputs.depreciationTaken, Math.max(0, capitalGain)) * 0.25;
+    const longTermGain = Math.max(0, capitalGain - masterInputs.depreciationTaken);
+    const federalTax = longTermGain * (fedRate / 100);
+    const stateTax = longTermGain * (stateRate / 100);
+    const niit = longTermGain > 250000 ? longTermGain * 0.038 : 0;
+    const totalTax = federalTax + stateTax + depRecapture + niit;
+    const brokerCost = masterInputs.salePrice * (masterInputs.brokerFeePercent / 100);
+    const netSaleProceeds = masterInputs.salePrice - brokerCost - masterInputs.closingCosts;
+    const netCashProceeds = netSaleProceeds - masterInputs.currentDebtBalance - totalTax;
+    const effectiveRate = capitalGain > 0 ? (totalTax / capitalGain) * 100 : 0;
+    return { totalTax, effectiveRate, netCashProceeds };
+  };
+
+  const ltvLevels = [0.5, 0.6, 0.7, 0.8];
+  const currentLTV = masterInputs.salePrice > 0 ? masterInputs.currentDebtBalance / masterInputs.salePrice : 0;
+  const parsedBaseNOI = parseFloat(baseNOI) || 0;
+  const baseline = getCashSaleBaseline(masterInputs);
+
+  const bestNOI = parsedBaseNOI * 1.1;
+  const baseNOIVal = parsedBaseNOI;
+  const worstNOI = parsedBaseNOI * 0.9;
+
+  const bestValue = bestNOI / 0.05;
+  const baseValueCalc = baseNOIVal / ((parseFloat(baseCapRate) || 6) / 100);
+  const worstValue = worstNOI / 0.07;
+
+  const calcScenarioProceeds = (propertyValue: number, fedRateAdj: number, stateRateAdj: number) => {
+    const adjustedBasis = masterInputs.costBasis + masterInputs.capitalImprovements - masterInputs.depreciationTaken;
+    const capitalGain = propertyValue - adjustedBasis;
+    const depRecapture = Math.min(masterInputs.depreciationTaken, Math.max(0, capitalGain)) * 0.25;
+    const longTermGain = Math.max(0, capitalGain - masterInputs.depreciationTaken);
+    const federalTax = longTermGain * (fedRateAdj / 100);
+    const stateTax = longTermGain * (stateRateAdj / 100);
+    const niit = longTermGain > 250000 ? longTermGain * 0.038 : 0;
+    const totalTax = federalTax + stateTax + depRecapture + niit;
+    const brokerCost = propertyValue * (masterInputs.brokerFeePercent / 100);
+    const netProceeds = propertyValue - brokerCost - masterInputs.closingCosts - masterInputs.currentDebtBalance - totalTax;
+    return netProceeds;
+  };
+
+  const bestProceeds = calcScenarioProceeds(bestValue, masterInputs.federalTaxRate, masterInputs.stateTaxRate);
+  const baseProceeds = calcScenarioProceeds(baseValueCalc, masterInputs.federalTaxRate, masterInputs.stateTaxRate);
+  const worstProceeds = calcScenarioProceeds(worstValue, masterInputs.federalTaxRate + 10, masterInputs.stateTaxRate + 10);
+  const varianceRange = bestProceeds - worstProceeds;
 
   return (
     <div className="space-y-6">
@@ -1752,6 +2556,333 @@ function SensitivityPanel() {
                 })}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Exit Timing Sensitivity</CardTitle>
+          <CardDescription>Net proceeds at different hold periods (3% annual appreciation)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Hold Period</th>
+                  <th className="p-2 text-center">Sale Price</th>
+                  <th className="p-2 text-center">Capital Gain</th>
+                  <th className="p-2 text-center">Tax</th>
+                  <th className="p-2 text-center">Net Proceeds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {holdPeriods.map(year => {
+                  const r = calcNetProceedsForYear(year);
+                  return (
+                    <tr key={year} className={`border-b ${year === masterInputs.holdingPeriod ? 'bg-blue-50 font-semibold' : ''}`}>
+                      <td className="p-2 font-medium">Year {year}</td>
+                      <td className="p-2 text-center num">{formatCurrency(r.salePrice)}</td>
+                      <td className="p-2 text-center num">{formatCurrency(r.capitalGain)}</td>
+                      <td className="p-2 text-center num text-red-600">{formatCurrency(r.totalTax)}</td>
+                      <td className="p-2 text-center num text-green-600">{formatCurrency(r.netCashProceeds)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Rate Scenario Matrix</CardTitle>
+          <CardDescription>Impact of different tax rate environments on net proceeds</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Scenario</th>
+                  <th className="p-2 text-center">Total Tax</th>
+                  <th className="p-2 text-center">Effective Rate</th>
+                  <th className="p-2 text-center">Net Proceeds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {taxScenarios.map((scenario, idx) => {
+                  const r = calcTaxScenario(scenario.fedRate, scenario.stateRate);
+                  return (
+                    <tr key={idx} className={`border-b ${idx === 0 ? 'bg-blue-50 font-semibold' : ''}`}>
+                      <td className="p-2 font-medium">
+                        {scenario.label}
+                        <span className="text-xs text-muted-foreground ml-1">({scenario.fedRate.toFixed(1)}% / {scenario.stateRate.toFixed(1)}%)</span>
+                      </td>
+                      <td className="p-2 text-center num text-red-600">{formatCurrency(r.totalTax)}</td>
+                      <td className="p-2 text-center num">{r.effectiveRate.toFixed(1)}%</td>
+                      <td className="p-2 text-center num text-green-600">{formatCurrency(r.netCashProceeds)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Leverage Impact Matrix</CardTitle>
+          <CardDescription>Returns at different LTV levels</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">LTV</th>
+                  <th className="p-2 text-center">Debt Amount</th>
+                  <th className="p-2 text-center">Equity Required</th>
+                  <th className="p-2 text-center">Cash-on-Cash</th>
+                  <th className="p-2 text-center">Equity Multiple</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ltvLevels.map(ltv => {
+                  const debtAmt = masterInputs.salePrice * ltv;
+                  const equity = masterInputs.salePrice - debtAmt;
+                  const cashOnCash = equity > 0 ? (parsedBaseNOI / equity) * 100 : 0;
+                  const equityMultiple = equity > 0 ? (baseline.netSaleProceeds - debtAmt) / equity : 0;
+                  const closestLTV = Math.abs(ltv - currentLTV) < 0.05;
+                  return (
+                    <tr key={ltv} className={`border-b ${closestLTV ? 'bg-blue-50 font-semibold' : ''}`}>
+                      <td className="p-2 font-medium">{(ltv * 100).toFixed(0)}% LTV {closestLTV && <Badge variant="outline" className="ml-1 text-xs">Current</Badge>}</td>
+                      <td className="p-2 text-center num">{formatCurrency(debtAmt)}</td>
+                      <td className="p-2 text-center num">{formatCurrency(equity)}</td>
+                      <td className="p-2 text-center num">{cashOnCash.toFixed(1)}%</td>
+                      <td className="p-2 text-center num">{equityMultiple.toFixed(2)}x</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Best / Base / Worst Scenario Summary</CardTitle>
+          <CardDescription>Range of outcomes under different market conditions</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+              <div>
+                <span className="font-semibold">Best Case</span>
+                <span className="text-xs text-muted-foreground ml-2">NOI +10%, Cap 5%, Current Tax</span>
+              </div>
+              <span className="num font-bold text-green-600">{formatCurrency(bestProceeds)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
+              <div>
+                <span className="font-semibold">Base Case</span>
+                <span className="text-xs text-muted-foreground ml-2">Current NOI, Base Cap, Current Tax</span>
+              </div>
+              <span className="num font-bold text-blue-600">{formatCurrency(baseProceeds)}</span>
+            </div>
+            <div className="flex justify-between py-2.5 bg-red-50 rounded-lg px-3">
+              <div>
+                <span className="font-semibold">Worst Case</span>
+                <span className="text-xs text-muted-foreground ml-2">NOI -10%, Cap 7%, +10% Tax</span>
+              </div>
+              <span className="num font-bold text-red-600">{formatCurrency(worstProceeds)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b">
+              <span className="text-muted-foreground text-sm">Variance Range (Best - Worst)</span>
+              <span className="num font-semibold">{formatCurrency(varianceRange)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CrossStrategyComparisonPanel() {
+  const { masterInputs } = useExitStrategiesStore();
+  const baseline = getCashSaleBaseline(masterInputs);
+
+  const salePrice = masterInputs.salePrice;
+  const combinedRate = (masterInputs.federalTaxRate + masterInputs.stateTaxRate) / 100;
+
+  const cashSaleNet = baseline.netCashProceeds;
+  const cashSaleTax = baseline.totalTax;
+  const cashSaleEffRate = baseline.effectiveTaxRate;
+
+  const exchangeCosts = 25000;
+  const taxSaved1031 = baseline.totalTax;
+  const netBenefit1031 = baseline.netSaleProceeds - masterInputs.currentDebtBalance - exchangeCosts;
+  const tax1031 = 0;
+  const effRate1031 = 0;
+
+  const sfDownPct = 0.20;
+  const sfRate = 0.06;
+  const sfTerm = 10;
+  const sfDown = salePrice * sfDownPct;
+  const sfLoan = salePrice - sfDown;
+  const sfMonthlyRate = sfRate / 12;
+  const sfMonths = sfTerm * 12;
+  const sfMonthlyPmt = sfMonthlyRate > 0 && sfMonths > 0 ? sfLoan * (sfMonthlyRate * Math.pow(1 + sfMonthlyRate, sfMonths)) / (Math.pow(1 + sfMonthlyRate, sfMonths) - 1) : 0;
+  const sfTotalPayments = sfMonthlyPmt * sfMonths;
+  const sfTotalCash = sfDown + sfTotalPayments;
+  const sfGain = salePrice - masterInputs.costBasis;
+  const sfGPR = salePrice > 0 ? sfGain / salePrice : 0;
+  const sfYear1TaxableGain = sfDown * sfGPR;
+  const sfYear1Tax = sfYear1TaxableGain * combinedRate;
+  const sfDisc = 0.08;
+  let sfNPV = sfDown;
+  for (let y = 1; y <= sfTerm; y++) {
+    sfNPV += (sfMonthlyPmt * 12) / Math.pow(1 + sfDisc, y);
+  }
+  const sfTotalTax = sfYear1Tax + (sfLoan / sfTerm) * sfGPR * combinedRate * sfTerm;
+
+  const earnoutBasePrice = salePrice * 0.8;
+  const earnoutContingent = salePrice * 0.2;
+  const earnoutProb = 0.6;
+  const earnoutExpectedValue = earnoutBasePrice + earnoutContingent * earnoutProb;
+  const earnoutGain = earnoutExpectedValue - masterInputs.costBasis;
+  const earnoutTax = Math.max(0, earnoutGain) * combinedRate;
+  const earnoutNet = earnoutExpectedValue - earnoutTax - masterInputs.currentDebtBalance - masterInputs.closingCosts - salePrice * (masterInputs.brokerFeePercent / 100);
+
+  const dstInvestment = salePrice - masterInputs.currentDebtBalance - masterInputs.closingCosts;
+  const dstDistRate = 0.055;
+  const dstApprecRate = 0.03;
+  const dstFeeRate = 0.06;
+  const dstFee = dstInvestment * dstFeeRate;
+  const dstNetInvested = dstInvestment - dstFee;
+  const dstAnnualDist = dstNetInvested * dstDistRate;
+  const dstTotalDist = dstAnnualDist * masterInputs.holdingPeriod;
+  const dstExitValue = dstNetInvested * Math.pow(1 + dstApprecRate, masterInputs.holdingPeriod);
+  const dstExitFee = dstExitValue * 0.03;
+  const dstTotalReturn = dstTotalDist + dstExitValue - dstExitFee;
+  const dstDeferredTax = baseline.totalTax;
+
+  const wfTotalEquity = salePrice - masterInputs.currentDebtBalance;
+  const wfLPShare = 0.80;
+  const wfPrefRate = 0.08;
+  const wfLPEquity = wfTotalEquity * wfLPShare;
+  const wfPrefReturn = wfLPEquity * wfPrefRate * masterInputs.holdingPeriod;
+  const wfExitProceeds = salePrice * Math.pow(1.03, masterInputs.holdingPeriod);
+  const wfDistributable = wfExitProceeds - masterInputs.currentDebtBalance;
+  const wfLPPref = Math.min(wfDistributable, wfLPEquity + wfPrefReturn);
+  const wfRemaining = Math.max(0, wfDistributable - wfLPPref);
+  const wfLPTotal = wfLPPref + wfRemaining * wfLPShare;
+
+  const strategies = [
+    { name: "Cash Sale", netProceeds: cashSaleNet, totalTax: cashSaleTax, effRate: cashSaleEffRate, liquidity: "Immediate", risk: "Low", riskColor: "bg-green-100 text-green-800" },
+    { name: "1031 Exchange", netProceeds: netBenefit1031, totalTax: tax1031, effRate: effRate1031, liquidity: "45-180 days", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
+    { name: "Seller Financing", netProceeds: sfNPV, totalTax: sfTotalTax, effRate: sfTotalTax > 0 && sfGain > 0 ? (sfTotalTax / sfGain) * 100 : 0, liquidity: "Over 10 years", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
+    { name: "Earnout", netProceeds: earnoutNet, totalTax: earnoutTax, effRate: earnoutGain > 0 ? (earnoutTax / earnoutGain) * 100 : 0, liquidity: "1-3 years", risk: "High", riskColor: "bg-red-100 text-red-800" },
+    { name: "DST", netProceeds: dstTotalReturn, totalTax: 0, effRate: 0, liquidity: "7-10 years", risk: "Medium", riskColor: "bg-yellow-100 text-yellow-800" },
+    { name: "Waterfall", netProceeds: wfLPTotal, totalTax: wfLPTotal * combinedRate * 0.6, effRate: combinedRate * 60, liquidity: "At fund exit", risk: "Medium-High", riskColor: "bg-orange-100 text-orange-800" },
+  ];
+
+  const bestStrategy = strategies.reduce((best, s) => s.netProceeds > best.netProceeds ? s : best, strategies[0]);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-teal-500" />
+            Cross-Strategy Comparison
+          </CardTitle>
+          <CardDescription>Side-by-side comparison of all exit strategies using current master inputs</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left font-semibold">Strategy</th>
+                  <th className="p-2 text-center font-semibold">Net Proceeds</th>
+                  <th className="p-2 text-center font-semibold">Total Tax</th>
+                  <th className="p-2 text-center font-semibold">Eff. Tax Rate</th>
+                  <th className="p-2 text-center font-semibold">Liquidity</th>
+                  <th className="p-2 text-center font-semibold">Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {strategies.map((s, idx) => {
+                  const isBest = s.name === bestStrategy.name;
+                  return (
+                    <tr key={idx} className={`border-b ${isBest ? 'bg-teal-50 font-semibold' : ''}`}>
+                      <td className="p-2 font-medium">{s.name} {isBest && <Badge className="ml-1 text-xs bg-teal-500">Best</Badge>}</td>
+                      <td className="p-2 text-center num text-green-600">{formatCurrency(s.netProceeds)}</td>
+                      <td className="p-2 text-center num text-red-600">{formatCurrency(s.totalTax)}</td>
+                      <td className="p-2 text-center num">{s.effRate.toFixed(1)}%</td>
+                      <td className="p-2 text-center text-xs">{s.liquidity}</td>
+                      <td className="p-2 text-center"><Badge variant="outline" className={s.riskColor}>{s.risk}</Badge></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Opportunity Cost Analysis</CardTitle>
+          <CardDescription>Cost of choosing each strategy vs. the highest-return option ({bestStrategy.name})</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {strategies.map((s, idx) => {
+            const oppCost = bestStrategy.netProceeds - s.netProceeds;
+            if (s.name === bestStrategy.name) {
+              return (
+                <div key={idx} className="flex justify-between py-2.5 bg-teal-50 rounded-lg px-3">
+                  <span className="font-semibold text-teal-700">✦ {s.name} (Recommended)</span>
+                  <span className="num font-bold text-teal-600">{formatCurrency(s.netProceeds)}</span>
+                </div>
+              );
+            }
+            return (
+              <div key={idx} className="flex justify-between py-1.5 border-b">
+                <span className="text-muted-foreground text-sm">{s.name} — Opportunity Cost</span>
+                <span className="num font-medium text-red-600">-{formatCurrency(oppCost)}</span>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Key Tradeoffs</CardTitle>
+          <CardDescription>Strategic considerations for each approach</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between py-2.5 bg-green-50 rounded-lg px-3">
+            <span className="font-semibold">Highest Immediate Cash</span>
+            <span className="num font-bold text-green-600">Cash Sale</span>
+          </div>
+          <div className="flex justify-between py-2.5 bg-blue-50 rounded-lg px-3">
+            <span className="font-semibold">Maximum Tax Deferral</span>
+            <span className="num font-bold text-blue-600">1031 Exchange / DST</span>
+          </div>
+          <div className="flex justify-between py-2.5 bg-amber-50 rounded-lg px-3">
+            <span className="font-semibold">Highest Total Value (w/ time value)</span>
+            <span className="num font-bold text-amber-600">Seller Financing</span>
+          </div>
+          <div className="flex justify-between py-2.5 bg-purple-50 rounded-lg px-3">
+            <span className="font-semibold">Most Passive</span>
+            <span className="num font-bold text-purple-600">DST</span>
           </div>
         </CardContent>
       </Card>
