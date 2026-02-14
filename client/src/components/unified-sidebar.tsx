@@ -88,7 +88,7 @@ const getWorkspaceSubNav = (workspaceId: string) => [
 // Analysis Navigation (all users - modeling, analysis, and document processing)
 const analysisNav = [
   { name: "Financial Model", href: "/modeling/projects" },
-  { name: "Returns & Valuation", href: "/modeling/returns-valuation" },
+  { name: "Pipeline Returns", href: "/modeling/returns-valuation" },
   { name: "Portfolio Returns", href: "/modeling/portfolio/returns" },
   { name: "Debt Scenarios", href: "/modeling/scenarios" },
   { name: "Exit Strategies", href: "/modeling/exit-strategies" },

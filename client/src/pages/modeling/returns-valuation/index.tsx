@@ -155,7 +155,7 @@ export default function ReturnsValuationPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
-          Returns & Valuation
+          Pipeline Returns
         </h1>
         <p className="text-muted-foreground mt-1">
           Key returns and valuation metrics across all Financial Model projects
