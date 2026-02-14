@@ -30,10 +30,19 @@ export interface ExitStrategiesMode {
   hydratedProjectId?: string;
 }
 
+export interface SavedScenario {
+  id: string;
+  name: string;
+  savedAt: string;
+  inputs: MasterInputs;
+}
+
 interface ExitStrategiesState {
   masterInputs: MasterInputs;
   mode: ExitStrategiesMode;
   validationWarnings: CalculationWarning[];
+  savedScenarios: SavedScenario[];
+  activeScenarioId: string | null;
   
   setMasterInput: <K extends keyof MasterInputs>(key: K, value: MasterInputs[K]) => void;
   bulkUpdateMaster: (updates: Partial<MasterInputs>) => void;
@@ -49,6 +58,10 @@ interface ExitStrategiesState {
   }, projectId?: string) => void;
   reset: () => void;
   getValidationWarnings: () => CalculationWarning[];
+  saveScenario: (name: string) => void;
+  loadScenario: (id: string) => void;
+  deleteScenario: (id: string) => void;
+  duplicateScenario: (id: string, newName: string) => void;
 }
 
 const defaultMasterInputs: MasterInputs = {
@@ -97,6 +110,8 @@ export const useExitStrategiesStore = create<ExitStrategiesState>()(
       masterInputs: { ...defaultMasterInputs },
       mode: { type: 'standalone' },
       validationWarnings: [],
+      savedScenarios: [],
+      activeScenarioId: null,
 
       setMasterInput: (key, value) => {
         const sanitizedValue = sanitizeInputValue(key, value);
@@ -205,12 +220,73 @@ export const useExitStrategiesStore = create<ExitStrategiesState>()(
       getValidationWarnings: () => {
         return get().validationWarnings;
       },
+
+      saveScenario: (name: string) => {
+        const state = get();
+        if (state.activeScenarioId) {
+          set((s) => ({
+            savedScenarios: s.savedScenarios.map((sc) =>
+              sc.id === s.activeScenarioId
+                ? { ...sc, name, savedAt: new Date().toISOString(), inputs: { ...s.masterInputs } }
+                : sc
+            ),
+          }));
+        } else {
+          const newScenario: SavedScenario = {
+            id: Date.now().toString(),
+            name,
+            savedAt: new Date().toISOString(),
+            inputs: { ...state.masterInputs },
+          };
+          set((s) => ({
+            savedScenarios: [...s.savedScenarios, newScenario],
+            activeScenarioId: newScenario.id,
+          }));
+        }
+      },
+
+      loadScenario: (id: string) => {
+        const state = get();
+        const scenario = state.savedScenarios.find((s) => s.id === id);
+        if (scenario) {
+          set({
+            masterInputs: { ...scenario.inputs },
+            activeScenarioId: id,
+            validationWarnings: updateValidationWarnings(scenario.inputs),
+          });
+        }
+      },
+
+      deleteScenario: (id: string) => {
+        set((state) => ({
+          savedScenarios: state.savedScenarios.filter((s) => s.id !== id),
+          activeScenarioId: state.activeScenarioId === id ? null : state.activeScenarioId,
+        }));
+      },
+
+      duplicateScenario: (id: string, newName: string) => {
+        const state = get();
+        const scenario = state.savedScenarios.find((s) => s.id === id);
+        if (scenario) {
+          const newScenario: SavedScenario = {
+            id: Date.now().toString(),
+            name: newName,
+            savedAt: new Date().toISOString(),
+            inputs: { ...scenario.inputs },
+          };
+          set((s) => ({
+            savedScenarios: [...s.savedScenarios, newScenario],
+          }));
+        }
+      },
     }),
     {
       name: 'exit-strategies-storage',
       partialize: (state) => ({
         masterInputs: state.masterInputs,
         mode: state.mode.type === 'standalone' ? state.mode : { type: 'standalone' },
+        savedScenarios: state.savedScenarios,
+        activeScenarioId: state.activeScenarioId,
       }),
     }
   )
