@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray, ilike } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -85,7 +85,7 @@ import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import returnsRoutes from "./routes/returns-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -12722,6 +12722,181 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to export tasks:", error);
       res.status(500).json({ error: "Failed to export tasks" });
+    }
+  });
+
+  // ===========================
+  // Marina Map Locations API
+  // ===========================
+
+  app.get('/api/marina-map/locations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const source = (req.query.source as string) || 'all';
+      const stateFilter = req.query.state as string | undefined;
+      const searchFilter = req.query.search as string | undefined;
+
+      const results: any[] = [];
+
+      if (source === 'all' || source === 'properties') {
+        const conditions: any[] = [
+          eq(crmProperties.orgId, orgId),
+          eq(crmProperties.type, 'marina'),
+        ];
+        if (stateFilter) conditions.push(eq(crmProperties.state, stateFilter));
+        if (searchFilter) conditions.push(ilike(crmProperties.title, `%${searchFilter}%`));
+
+        const rows = await db.select().from(crmProperties).where(and(...conditions)).limit(500);
+        for (const r of rows) {
+          const coords = r.coordinates as any;
+          results.push({
+            id: r.id,
+            source: 'property' as const,
+            name: r.title,
+            address: r.address,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zipCode,
+            lat: coords?.lat ? Number(coords.lat) : null,
+            lng: coords?.lng ? Number(coords.lng) : null,
+            price: r.listingPrice ? Number(r.listingPrice) : null,
+            slips: r.totalCapacity ?? (((r.wetSlips ?? 0) + (r.drySlips ?? 0)) || null),
+            status: r.status,
+            metrics: {
+              wetSlips: r.wetSlips,
+              drySlips: r.drySlips,
+              totalCapacity: r.totalCapacity,
+              listingPrice: r.listingPrice ? Number(r.listingPrice) : null,
+            },
+          });
+        }
+      }
+
+      if (source === 'all' || source === 'projects') {
+        const conditions: any[] = [eq(modelingProjects.orgId, orgId)];
+        if (stateFilter) conditions.push(eq(modelingProjects.state, stateFilter));
+        if (searchFilter) conditions.push(ilike(modelingProjects.marinaName, `%${searchFilter}%`));
+
+        const rows = await db.select().from(modelingProjects).where(and(...conditions)).limit(500);
+        for (const r of rows) {
+          if (!r.city && !r.state) continue;
+          results.push({
+            id: r.id,
+            source: 'project' as const,
+            name: r.marinaName,
+            address: r.address,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zipCode,
+            lat: null,
+            lng: null,
+            price: r.purchasePrice ? Number(r.purchasePrice) : null,
+            slips: r.totalStorageUnits,
+            status: r.dealOutcome,
+            metrics: {
+              purchasePrice: r.purchasePrice ? Number(r.purchasePrice) : null,
+              totalStorageUnits: r.totalStorageUnits,
+              dealOutcome: r.dealOutcome,
+            },
+          });
+        }
+      }
+
+      if (source === 'all' || source === 'comps') {
+        const orgOrGlobal = or(eq(salesComps.orgId, orgId), eq(salesComps.scope, 'global'));
+        const conditions: any[] = [orgOrGlobal];
+        if (stateFilter) conditions.push(eq(salesComps.state, stateFilter));
+        if (searchFilter) conditions.push(ilike(salesComps.marina, `%${searchFilter}%`));
+
+        const rows = await db.select().from(salesComps).where(and(...conditions)).limit(500);
+        for (const r of rows) {
+          results.push({
+            id: r.id,
+            source: 'comp' as const,
+            name: r.marina,
+            address: r.address,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zip,
+            lat: r.lat ? Number(r.lat) : null,
+            lng: r.lng ? Number(r.lng) : null,
+            price: r.salePrice ? Number(r.salePrice) : null,
+            slips: (r.wetSlips ?? 0) + (r.dryRacks ?? 0) || null,
+            status: null,
+            metrics: {
+              salePrice: r.salePrice,
+              capRate: r.capRate,
+              noi: r.noi,
+              wetSlips: r.wetSlips,
+              dryRacks: r.dryRacks,
+              saleYear: r.saleYear,
+              bodyOfWater: r.bodyOfWater,
+              region: r.region,
+            },
+          });
+        }
+      }
+
+      if (source === 'all' || source === 'listings') {
+        const orgOrGlobal = or(eq(marinaListings.orgId, orgId), eq(marinaListings.scope, 'global'));
+        const conditions: any[] = [orgOrGlobal];
+        if (stateFilter) conditions.push(eq(marinaListings.state, stateFilter));
+        if (searchFilter) {
+          conditions.push(
+            or(
+              ilike(marinaListings.title, `%${searchFilter}%`),
+              ilike(marinaListings.propertyName, `%${searchFilter}%`)
+            )
+          );
+        }
+
+        const rows = await db.select().from(marinaListings).where(and(...conditions)).limit(500);
+        for (const r of rows) {
+          results.push({
+            id: r.id,
+            source: 'listing' as const,
+            name: r.propertyName || r.title,
+            address: r.propertyAddress,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zipCode,
+            lat: r.latitude ? Number(r.latitude) : null,
+            lng: r.longitude ? Number(r.longitude) : null,
+            price: r.askingPrice ? Number(r.askingPrice) : null,
+            slips: r.totalSlips,
+            status: r.status,
+            metrics: {
+              askingPrice: r.askingPrice ? Number(r.askingPrice) : null,
+              totalSlips: r.totalSlips,
+              marinaType: r.marinaType,
+              dealType: r.dealType,
+            },
+          });
+        }
+      }
+
+      const withCoordinates = results.filter(r => r.lat != null && r.lng != null).length;
+      const bySource: Record<string, number> = { property: 0, project: 0, comp: 0, listing: 0 };
+      const byState: Record<string, number> = {};
+      for (const r of results) {
+        bySource[r.source] = (bySource[r.source] || 0) + 1;
+        if (r.state) {
+          byState[r.state] = (byState[r.state] || 0) + 1;
+        }
+      }
+
+      res.json({
+        locations: results,
+        stats: {
+          total: results.length,
+          withCoordinates,
+          bySource,
+          byState,
+        },
+      });
+    } catch (error: any) {
+      console.error('Marina map locations error:', error);
+      res.status(500).json({ error: 'Failed to fetch marina map locations' });
     }
   });
 
