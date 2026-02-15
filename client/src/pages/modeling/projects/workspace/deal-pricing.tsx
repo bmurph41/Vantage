@@ -484,11 +484,20 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     },
   });
 
+  const priceDriverKeys = ['targetIRR', 'goingInCap', 'price'];
+
   const makeDriverHandler = (driver: PricingDriver, lockKey: string, setter: (v: string) => void) => {
     return (value: string) => {
       setter(value);
       setPricingDriver(driver);
-      lockInput(lockKey);
+      setLockedInputs(prev => {
+        const next = new Set<string>();
+        next.add(lockKey);
+        prev.forEach(k => {
+          if (!priceDriverKeys.includes(k)) next.add(k);
+        });
+        return next;
+      });
     };
   };
 
@@ -790,7 +799,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="green"
                 data-testid="input-target-irr"
               />
-              {pricingData && pricingData.purchasePrice > 0 && (
+              {pricingDriver === 'targetIRR' && pricingData && pricingData.purchasePrice > 0 && (
                 <div className="mt-2 pt-2 border-t border-green-500/20">
                   <p className="text-[10px] text-muted-foreground">Implied Price</p>
                   <p className="num text-sm font-bold" data-testid="text-irr-price">
@@ -849,7 +858,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="blue"
                 data-testid="input-going-in-cap"
               />
-              {pricingData && pricingData.purchasePrice > 0 && (
+              {pricingDriver === 'goingInCap' && pricingData && pricingData.purchasePrice > 0 && (
                 <div className="mt-2 pt-2 border-t border-blue-500/20">
                   <p className="text-[10px] text-muted-foreground">Implied Price</p>
                   <p className="num text-sm font-bold" data-testid="text-cap-price">
@@ -908,11 +917,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="primary"
                 data-testid="input-purchase-price"
               />
-              {pricingData && pricingData.purchasePrice > 0 && (
+              {pricingDriver === 'price' && pricingData && pricingData.irr > 0 && (
                 <div className="mt-2 pt-2 border-t border-primary/20">
-                  <p className="text-[10px] text-muted-foreground">Implied Price</p>
-                  <p className="num text-sm font-bold" data-testid="text-price-irr">
-                    {formatCurrency(pricingData.purchasePrice)}
+                  <p className="text-[10px] text-muted-foreground">Implied IRR</p>
+                  <p className="num text-sm font-bold text-green-600" data-testid="text-price-irr">
+                    {formatPercent(pricingData.irr)}
                   </p>
                 </div>
               )}
