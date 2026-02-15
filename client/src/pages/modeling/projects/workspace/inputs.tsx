@@ -684,13 +684,13 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-72 mt-2" />
+          <CardHeader className="pb-3">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-3 w-72 mt-1.5" />
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-0">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
@@ -702,15 +702,15 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {onTabChange && (
         <WorkflowNavigation currentTab="inputs" onNavigate={onTabChange} />
       )}
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Project Inputs</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold">Project Inputs</h2>
+          <p className="text-xs text-muted-foreground">
             Configure seasonality, hold period, and department settings
           </p>
         </div>
@@ -745,20 +745,20 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calendar className="h-4 w-4" />
               Hold Period & Start Date
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Set the investment timeline for pro forma projections
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="holdPeriod">Hold Period</Label>
+          <CardContent className="space-y-3 pt-0">
+            <div className="space-y-1.5">
+              <Label htmlFor="holdPeriod" className="text-xs">Hold Period</Label>
               <Select 
                 value={holdPeriod.toString()} 
                 onValueChange={(v) => setHoldPeriod(parseInt(v))}
@@ -775,8 +775,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Pro Forma Start Date</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="startDate" className="text-xs">Pro Forma Start Date</Label>
               <Input
                 id="startDate"
                 type="date"
@@ -785,9 +785,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 data-testid="input-start-date"
               />
             </div>
-            <Separator className="my-4" />
-            <div className="space-y-2">
-              <Label htmlFor="cashFlowGranularity">Cash Flow Timing</Label>
+            <Separator className="my-2" />
+            <div className="space-y-1.5">
+              <Label htmlFor="cashFlowGranularity" className="text-xs">Cash Flow Timing</Label>
               <Select 
                 value={cashFlowGranularity} 
                 onValueChange={(v) => setCashFlowGranularity(v)}
@@ -808,16 +808,16 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sun className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sun className="h-4 w-4" />
               In-Season Months
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Select months when seasonal operations are active
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-0">
             <div className="flex items-center justify-between">
               <Badge variant="outline" className="gap-1">
                 <Sun className="h-3 w-3" />
@@ -855,20 +855,20 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LandPlot className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LandPlot className="h-4 w-4" />
               Acreage
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Total property acreage broken down by upland and submerged land
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="totalAcres">Total Acres</Label>
+          <CardContent className="space-y-3 pt-0">
+            <div className="space-y-1.5">
+              <Label htmlFor="totalAcres" className="text-xs">Total Acres</Label>
               <Input
                 id="totalAcres"
                 type="number"
@@ -879,9 +879,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 onChange={(e) => setAcreage(prev => ({ ...prev, totalAcres: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="uplandAcres">Upland Acres</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="uplandAcres" className="text-xs">Upland Acres</Label>
                 <Input
                   id="uplandAcres"
                   type="number"
@@ -893,8 +893,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 />
                 <p className="text-xs text-muted-foreground">Land above the waterline</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="submergedAcres">Submerged Acres</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="submergedAcres" className="text-xs">Submerged Acres</Label>
                 <Input
                   id="submergedAcres"
                   type="number"
@@ -919,18 +919,18 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <KeyRound className="h-4 w-4" />
               Ownership Structure
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Property ownership type and applicable lease details
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Ownership Type</Label>
+          <CardContent className="space-y-3 pt-0">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ownership Type</Label>
               <Select
                 value={ownership.type}
                 onValueChange={(v) => handleOwnershipTypeChange(v as OwnershipType)}
@@ -1017,9 +1017,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                     </div>
 
                     {expandedLeases.has(lease.id) && (
-                      <div className="p-4 space-y-4">
-                        <div className="space-y-2">
-                          <Label>Counterparty / Lessor</Label>
+                      <div className="p-3 space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Counterparty / Lessor</Label>
                           <Input
                             placeholder="e.g., State of Florida, City of Miami"
                             value={lease.counterparty}
@@ -1027,9 +1027,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Monthly Rent ($)</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Monthly Rent ($)</Label>
                             <Input
                               type="number"
                               step="0.01"
@@ -1039,8 +1039,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                               onChange={(e) => updateLease(lease.id, 'monthlyRent', e.target.value)}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Annual Rent ($)</Label>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Annual Rent ($)</Label>
                             <Input
                               type="number"
                               step="0.01"
@@ -1052,9 +1052,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Term Remaining</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Term Remaining</Label>
                             <div className="flex gap-2">
                               <Input
                                 type="number"
@@ -1078,8 +1078,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                               </Select>
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label>Expiration Date</Label>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Expiration Date</Label>
                             <Input
                               type="date"
                               value={lease.expirationDate}
@@ -1088,9 +1088,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Number of Renewal Options</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Number of Renewal Options</Label>
                             <div className="flex gap-2">
                               <Input
                                 type="number"
@@ -1102,8 +1102,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                               />
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label>Length of Each Option</Label>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Length of Each Option</Label>
                             <div className="flex gap-2">
                               <Input
                                 type="number"
@@ -1129,8 +1129,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label>Notes</Label>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Notes</Label>
                           <Input
                             placeholder="Additional lease terms, escalation clauses, etc."
                             value={lease.notes}
@@ -1148,14 +1148,14 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Warehouse className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Warehouse className="h-4 w-4" />
                 Storage Configuration
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 Enable storage types and set seasonality: Year-Round, Seasonal, Winter, or Hybrid
               </CardDescription>
             </div>
@@ -1169,23 +1169,23 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 pt-0">
           <div>
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Anchor className="h-4 w-4" />
+            <h4 className="text-xs font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+              <Anchor className="h-3.5 w-3.5" />
               Storage Types
             </h4>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {storageTypes.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex flex-col p-3 rounded-lg border ${
+                  className={`flex flex-col p-2.5 rounded-lg border ${
                     item.isEnabled 
                       ? 'bg-muted/30 border-border' 
                       : 'bg-muted/10 border-dashed opacity-60'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 mb-2">
+                  <div className="flex items-center gap-2 min-w-0 mb-1.5">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
@@ -1217,21 +1217,21 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           <Separator />
 
           <div>
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
+            <h4 className="text-xs font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+              <MapPin className="h-3.5 w-3.5" />
               Designated Storage Spaces
             </h4>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {designatedSpaces.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex flex-col p-3 rounded-lg border ${
+                  className={`flex flex-col p-2.5 rounded-lg border ${
                     item.isEnabled 
                       ? 'bg-muted/30 border-border' 
                       : 'bg-muted/10 border-dashed opacity-60'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 mb-2">
+                  <div className="flex items-center gap-2 min-w-0 mb-1.5">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
@@ -1263,21 +1263,21 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Store className="h-5 w-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Store className="h-4 w-4" />
             Profit Center Configuration
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Enable profit centers for Pro Forma revenue categories
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <CardContent className="pt-0">
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {profitCenters.map((item) => (
               <div
                 key={item.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
+                className={`flex items-center justify-between p-2.5 rounded-lg border ${
                   item.isEnabled 
                     ? 'bg-muted/30 border-border' 
                     : 'bg-muted/10 border-dashed opacity-60'
