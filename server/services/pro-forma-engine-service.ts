@@ -25,6 +25,7 @@ import {
   modelingProjectConfig,
   seasonalityProfiles,
   seasonalityProfileMonths,
+  capitalStacks,
   asmpFuel,
   asmpShipStore,
   asmpService,
@@ -990,12 +991,15 @@ export class ProFormaEngineService {
     let ltv = 0;
     
     try {
-      const capitalStackResult = await db.select()
-        .from(modelingProjectConfig)
-        .where(eq(modelingProjectConfig.modelingProjectId, projectId))
+      const activeCapitalStack = await db.select()
+        .from(capitalStacks)
+        .where(and(
+          eq(capitalStacks.modelingProjectId, projectId),
+          eq(capitalStacks.orgId, orgId)
+        ))
         .limit(1);
       
-      const capitalStackId = (capitalStackResult[0] as any)?.capitalStackId;
+      const capitalStackId = activeCapitalStack[0]?.id;
       
       if (capitalStackId) {
         debtSchedule = await debtScheduleService.generateSchedule(
