@@ -3,6 +3,10 @@ import { eq, and } from 'drizzle-orm';
 import { modelingProjects, modelingActuals } from '@shared/schema';
 import { proFormaEngineService } from './pro-forma-engine-service';
 
+function roundDownToThousand(value: number): number {
+  return Math.floor(value / 1000) * 1000;
+}
+
 export interface CashFlow {
   year: number;
   noi: number;
@@ -247,7 +251,7 @@ class DealPricingService {
     targetCapRate: number
   ): number {
     if (targetCapRate <= 0) return 0;
-    return year1NOI / (targetCapRate / 100);
+    return roundDownToThousand(year1NOI / (targetCapRate / 100));
   }
 
   solveForPriceFromYearCapRate(
@@ -260,7 +264,7 @@ class DealPricingService {
       throw new Error(`No NOI projection available for year ${targetYear}`);
     }
     if (targetCapRate <= 0) return 0;
-    return targetNOI / (targetCapRate / 100);
+    return roundDownToThousand(targetNOI / (targetCapRate / 100));
   }
 
   solveForPriceFromIRR(
@@ -328,7 +332,7 @@ class DealPricingService {
       );
     }
 
-    return Math.round(purchasePrice);
+    return roundDownToThousand(purchasePrice);
   }
 
   private solveForPriceFromIRRBisection(
@@ -380,7 +384,7 @@ class DealPricingService {
       }
     }
 
-    return Math.round(bestPrice);
+    return roundDownToThousand(bestPrice);
   }
 
   async getProjectFinancials(projectId: string, orgId: string): Promise<{
