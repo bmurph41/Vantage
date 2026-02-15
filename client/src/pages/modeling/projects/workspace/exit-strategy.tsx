@@ -27,7 +27,6 @@ import { useExitStrategiesStore } from "@/stores/exitStrategiesStore";
 
 import {
   exitTools,
-  SharedInputsPanel,
   SummaryDashboardPanel,
   TaxAndProceedsPanel,
   Exchange1031Panel,
@@ -194,12 +193,12 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         </div>
       </div>
 
-      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700">
-        <Link2 className="h-4 w-4 text-blue-600 flex-shrink-0" />
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300">
+        <Link2 className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
         <span>
-          <span className="font-medium text-blue-800">Project-Linked Mode</span> — 
+          <span className="font-medium text-blue-800 dark:text-blue-200">Project-Linked</span> — 
           Sale price from {currentScenario.name}: Exit NOI ({formatCurrency(exitNOI)}) ÷ Cap Rate ({exitCapRate}%) = {formatCurrency(calculatedSalePrice)}.
-          Master inputs sync from project data. Adjust any value in the panel below to override.
+          All inputs derived from Deal Pricing, Assumptions, and Pro Forma tabs.
         </span>
       </div>
 
@@ -296,8 +295,6 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           </CardContent>
         </Card>
       </div>
-
-      <SharedInputsPanel />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 overflow-x-auto">
