@@ -340,6 +340,16 @@ function CurrencyStepper({
   );
 }
 
+interface SavedDealPricingInputs {
+  targetIRR?: number;
+  goingInCapRate?: number;
+  exitCapRate?: number;
+  holdPeriod?: number;
+  pricingDriver?: PricingDriver;
+  purchasePrice?: number;
+  updatedAt?: string;
+}
+
 export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
   
@@ -356,6 +366,50 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   
   const [pricingDriver, setPricingDriver] = useState<PricingDriver>('targetIRR');
   const [lockedInputs, setLockedInputs] = useState<Set<string>>(new Set());
+  const inputsLoadedRef = useRef(false);
+
+  const { data: savedInputs } = useQuery<SavedDealPricingInputs | null>({
+    queryKey: ['/api/modeling/projects', projectId, 'deal-pricing', 'inputs'],
+    enabled: !!projectId,
+  });
+
+  useEffect(() => {
+    if (inputsLoadedRef.current || !savedInputs) return;
+    inputsLoadedRef.current = true;
+    if (savedInputs.targetIRR !== undefined) setTargetIRR(String(savedInputs.targetIRR));
+    if (savedInputs.goingInCapRate !== undefined) setGoingInCapRate(String(savedInputs.goingInCapRate));
+    if (savedInputs.exitCapRate !== undefined) setExitCapRate(String(savedInputs.exitCapRate));
+    if (savedInputs.holdPeriod !== undefined) setHoldPeriodNum(savedInputs.holdPeriod);
+    if (savedInputs.pricingDriver) setPricingDriver(savedInputs.pricingDriver);
+    if (savedInputs.purchasePrice !== undefined && savedInputs.purchasePrice > 0) {
+      setPurchasePrice(Math.round(savedInputs.purchasePrice).toLocaleString());
+    }
+  }, [savedInputs]);
+
+  const saveInputsMutation = useMutation({
+    mutationFn: (inputs: SavedDealPricingInputs) =>
+      apiRequest('PUT', `/api/modeling/projects/${projectId}/deal-pricing/inputs`, inputs),
+  });
+
+  const debouncedSaveInputs = useCallback(
+    debounce((inputs: SavedDealPricingInputs) => {
+      saveInputsMutation.mutate(inputs);
+    }, 1500),
+    [projectId]
+  );
+
+  useEffect(() => {
+    if (!inputsLoadedRef.current) return;
+    debouncedSaveInputs({
+      targetIRR: parsePercentInput(targetIRR),
+      goingInCapRate: parsePercentInput(goingInCapRate),
+      exitCapRate: parsePercentInput(exitCapRate),
+      holdPeriod: holdPeriodNum,
+      pricingDriver,
+      purchasePrice: parseCurrencyInput(purchasePrice) || undefined,
+    });
+    return () => debouncedSaveInputs.cancel();
+  }, [targetIRR, goingInCapRate, exitCapRate, holdPeriodNum, pricingDriver, purchasePrice]);
 
   const lockInput = useCallback((key: string) => {
     setLockedInputs(prev => {
@@ -394,6 +448,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
 
   useEffect(() => {
+    if (inputsLoadedRef.current) return;
     if (activeScenario?.exitCapRate) {
       const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
       if (capRatePercent > 0 && Math.abs(capRatePercent - parseFloat(exitCapRate)) > 0.01) {
@@ -455,6 +510,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   });
 
   useEffect(() => {
+    if (inputsLoadedRef.current) return;
     if (project?.purchasePrice && !purchasePrice) {
       setPurchasePrice(String(project.purchasePrice));
     }
