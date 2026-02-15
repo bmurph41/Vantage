@@ -17764,7 +17764,7 @@ Current context: Project ${req.params.projectId}`;
       const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
       
       const projectsWithMetrics = await Promise.all(projects.map(async (project) => {
-        const purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
+        let purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
         let year1CapRate = project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : null;
 
         let t12Ebitda: number | null = null;
@@ -17772,6 +17772,21 @@ Current context: Project ${req.params.projectId}`;
         let year1Ebitda: number | null = null;
         let irr: number | null = null;
         let exitYear: number | null = null;
+
+        const customMetrics = (project.customMetrics as any) || {};
+        const dealPricing = customMetrics.dealPricing || null;
+
+        if (dealPricing) {
+          if (dealPricing.purchasePrice != null && dealPricing.purchasePrice > 0) {
+            purchasePrice = dealPricing.purchasePrice;
+          }
+          if (dealPricing.targetIRR != null && dealPricing.targetIRR !== 0) {
+            irr = dealPricing.targetIRR;
+          }
+          if (dealPricing.goingInCapRate != null && dealPricing.goingInCapRate !== 0) {
+            year1CapRate = dealPricing.goingInCapRate;
+          }
+        }
 
         try {
           const financialPeriods = await db.select()
@@ -17852,11 +17867,15 @@ Current context: Project ${req.params.projectId}`;
             const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
             if (proForma.noi && proForma.noi.length > 0) {
               year1Ebitda = proForma.noi[0];
-              const proFormaIrr = proForma.metrics?.irr ?? null;
-              irr = (proFormaIrr !== null && proFormaIrr !== 0) ? proFormaIrr : null;
-              const proFormaCapRate = proForma.metrics?.goingInCapRate ?? null;
-              if (proFormaCapRate != null && proFormaCapRate !== 0) {
-                year1CapRate = proFormaCapRate;
+              if (irr === null) {
+                const proFormaIrr = proForma.metrics?.irr ?? null;
+                irr = (proFormaIrr !== null && proFormaIrr !== 0) ? proFormaIrr : null;
+              }
+              if (year1CapRate === null || year1CapRate === 0) {
+                const proFormaCapRate = proForma.metrics?.goingInCapRate ?? null;
+                if (proFormaCapRate != null && proFormaCapRate !== 0) {
+                  year1CapRate = proFormaCapRate;
+                }
               }
               const lastYear = proForma.years?.[proForma.years.length - 1];
               exitYear = lastYear ?? null;
