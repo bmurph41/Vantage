@@ -34,6 +34,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 import type { Deal, Contact, Company } from "@shared/schema";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
+import DocumentGeneratorModal from "@/components/modals/document-generator-modal";
 import CompSetSelector from "@/components/comp-set-selector";
 import { formatCurrency } from "@/lib/utils";
 import { FocusHistoryTimeline } from "@/components/crm/FocusHistoryTimeline";
@@ -115,6 +116,7 @@ export default function DealDetail() {
   const [, setLocation] = useLocation();
   const dealId = params.dealId;
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+  const [isDocGenModalOpen, setIsDocGenModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const queryClient = useQueryClient();
 
@@ -233,6 +235,15 @@ export default function DealDetail() {
           <Button 
             variant="outline" 
             size="sm" 
+            onClick={() => setIsDocGenModalOpen(true)}
+            data-testid="button-generate-document"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Generate Document
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
             onClick={handleCreateOm}
             disabled={createOmMutation.isPending}
             data-testid="button-create-om"
@@ -255,6 +266,13 @@ export default function DealDetail() {
         isOpen={isConvertModalOpen}
         onClose={() => setIsConvertModalOpen(false)}
         deal={deal}
+      />
+
+      <DocumentGeneratorModal
+        isOpen={isDocGenModalOpen}
+        onClose={() => setIsDocGenModalOpen(false)}
+        dealId={dealId!}
+        dealName={deal.title}
       />
 
       {(workspaceData?.ddProject || workspaceData?.modelingProject) && (

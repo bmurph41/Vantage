@@ -727,6 +727,22 @@ export default function UnifiedSidebar() {
               </div>
             </Link>
           )}
+          {!sidebarCollapsed && (
+            <Link href="/document-builder">
+              <div
+                className={cn(
+                  "flex items-center gap-2 w-full pl-8 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
+                  location.startsWith('/document-builder')
+                    ? "text-blue-600 font-medium" 
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-document-builder"
+              >
+                <FileText className="w-3 h-3" />
+                <span>Document Builder</span>
+              </div>
+            </Link>
+          )}
         </div>
         
         {/* Investor Services Section - Fund Management, LP Portal (GP users only via pack check) */}
