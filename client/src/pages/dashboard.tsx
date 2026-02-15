@@ -937,7 +937,7 @@ export default function Dashboard() {
               clickable
               badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
             />
-            <div className="col-span-2 rounded-xl border bg-card p-4">
+            <div className="col-span-2 rounded-xl border bg-card p-4 overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
@@ -947,23 +947,23 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Won This Period</p>
-                  <p className="text-2xl font-bold" data-testid="crm-won-deals">{data?.wonDeals || 0}</p>
+                  <p className="text-2xl font-bold truncate" data-testid="crm-won-deals">{data?.wonDeals || 0}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Won Value</p>
-                  <p className="text-2xl font-bold text-green-600" data-testid="crm-won-value">
+                  <p className="text-lg font-bold text-green-600 truncate" data-testid="crm-won-value" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}>
                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Win Rate</p>
-                  <p className="text-2xl font-bold" data-testid="crm-win-rate">{data?.winRate || 0}%</p>
+                  <p className="text-2xl font-bold truncate" data-testid="crm-win-rate">{data?.winRate || 0}%</p>
                 </div>
               </div>
             </div>
-            <div className="col-span-2 rounded-xl border bg-card p-4">
+            <div className="col-span-2 rounded-xl border bg-card p-4 overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20">
@@ -973,17 +973,17 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Active Models</p>
-                  <p className="text-2xl font-bold" data-testid="modeling-active">{modelingData?.activeProjects || 0}</p>
+                  <p className="text-2xl font-bold truncate" data-testid="modeling-active">{modelingData?.activeProjects || 0}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Completed</p>
-                  <p className="text-2xl font-bold text-green-600" data-testid="modeling-completed">{modelingData?.completedProjects || 0}</p>
+                  <p className="text-2xl font-bold text-green-600 truncate" data-testid="modeling-completed">{modelingData?.completedProjects || 0}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Total Valuation</p>
-                  <p className="text-2xl font-bold" data-testid="modeling-valuation">
+                  <p className="text-lg font-bold truncate" data-testid="modeling-valuation" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}>
                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}
                   </p>
                 </div>

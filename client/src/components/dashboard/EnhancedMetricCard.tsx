@@ -129,7 +129,7 @@ export function EnhancedMetricCard({
   return (
     <div
       className={cn(
-        "relative group transition-all duration-200 rounded-lg border border-gray-100 bg-white p-4 hover:border-gray-200",
+        "relative group transition-all duration-200 rounded-lg border border-gray-100 bg-white p-4 hover:border-gray-200 overflow-hidden",
         isClickable && "cursor-pointer hover:shadow-md hover:-translate-y-0.5",
         "h-full flex flex-col"
       )}
@@ -188,12 +188,12 @@ export function EnhancedMetricCard({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-2 mb-2">
+      <div className="flex flex-wrap items-baseline gap-2 mb-2 min-w-0 overflow-hidden">
         <p className={cn(
-          "font-bold tracking-tight leading-none",
+          "font-bold tracking-tight leading-none truncate min-w-0 max-w-full",
           sizeClasses[size].value,
           variantClasses[variant]
-        )}>
+        )} title={formatMetricValue(value, type)}>
           {formatMetricValue(value, type)}
         </p>
 
