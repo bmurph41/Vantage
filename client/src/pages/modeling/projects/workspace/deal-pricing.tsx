@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -548,7 +547,12 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     return () => debouncedCalculate.cancel();
   }, [debouncedCalculate]);
 
-  const pricingData = calculateMutation.data as UnifiedPricingResult | undefined;
+  const lastPricingDataRef = useRef<UnifiedPricingResult | undefined>(undefined);
+  const rawPricingData = calculateMutation.data as UnifiedPricingResult | undefined;
+  if (rawPricingData) {
+    lastPricingDataRef.current = rawPricingData;
+  }
+  const pricingData = rawPricingData ?? lastPricingDataRef.current;
 
   useEffect(() => {
     if (!pricingData) return;
@@ -695,7 +699,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Stored Price</p>
+                <p className="text-muted-foreground">Target Price</p>
                 <p className="font-semibold text-lg" data-testid="text-period-price">
                   {pricingData.projectFinancials.storedPurchasePrice
                     ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
@@ -986,17 +990,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </CardContent>
       </Card>
 
-      {calculateMutation.isPending ? (
-        <Card>
-          <CardContent className="py-6">
-            <div className="space-y-3">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-3/4" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : pricingData && pricingData.purchasePrice > 0 ? (
+      {pricingData && pricingData.purchasePrice > 0 ? (
         <>
           <Card>
             <CardHeader className="pb-3">
@@ -1004,6 +998,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <CardTitle className="text-base flex items-center gap-2">
                   <Calculator className="h-4 w-4" />
                   Return Metrics
+                  {calculateMutation.isPending && (
+                    <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                  )}
                 </CardTitle>
                 {pricingData.usedProFormaData && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-medium">
@@ -1192,7 +1189,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             </CardContent>
           </Card>
         </>
-      ) : !calculateMutation.isPending && (
+      ) : !pricingData && !calculateMutation.isPending && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <Calculator className="h-8 w-8 mx-auto mb-3 opacity-50" />
