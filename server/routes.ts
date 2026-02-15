@@ -17765,7 +17765,7 @@ Current context: Project ${req.params.projectId}`;
       
       const projectsWithMetrics = await Promise.all(projects.map(async (project) => {
         const purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
-        const year1CapRate = project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : null;
+        let year1CapRate = project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : null;
 
         let t12Ebitda: number | null = null;
         let t12Label: string | null = null;
@@ -17851,10 +17851,11 @@ Current context: Project ${req.params.projectId}`;
           try {
             const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
             if (proForma.noi && proForma.noi.length > 0) {
-              if (year1Ebitda === null) {
-                year1Ebitda = proForma.noi[0];
-              }
+              year1Ebitda = proForma.noi[0];
               irr = proForma.metrics?.irr ?? null;
+              if (proForma.metrics?.goingInCapRate != null) {
+                year1CapRate = proForma.metrics.goingInCapRate;
+              }
               const lastYear = proForma.years?.[proForma.years.length - 1];
               exitYear = lastYear ?? null;
             }
