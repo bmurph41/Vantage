@@ -205,11 +205,29 @@ class DealPricingService {
     const workingCapital = options?.workingCapitalAmount || 0;
     const loanProceeds = options?.loanProceeds || 0;
     
+    const totalCashInflows = (() => {
+      let sum = 0;
+      for (let j = 0; j < holdPeriod - 1; j++) {
+        sum += useLevered ? options!.leveredCashFlows![j] : (noiProjections[j] || year1NOI * Math.pow(1.03, j + 1));
+      }
+      const lastYearCf = useLevered ? options!.leveredCashFlows![holdPeriod - 1] : (noiProjections[holdPeriod - 1] || exitNOI);
+      sum += lastYearCf + netExitProceeds;
+      return sum;
+    })();
+
     let low = 1000;
-    let high = exitValue * 3 || year1NOI * 30;
+    let high = Math.max(
+      exitValue * 3,
+      netExitProceeds * 2,
+      totalCashInflows * 2,
+      year1NOI * 30,
+      1000000
+    );
     let price = 0;
+    let bestPrice = 0;
+    let bestDiff = Infinity;
     
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 300; i++) {
       price = (low + high) / 2;
       const totalEquity = price - loanProceeds + workingCapital;
       if (totalEquity <= 0) { low = price; continue; }
@@ -222,8 +240,14 @@ class DealPricingService {
       cashFlows.push(lastYearCf + netExitProceeds);
       
       const calculatedIRR = this.calculateIRR(cashFlows);
+      const diff = Math.abs(calculatedIRR - irrDecimal);
       
-      if (Math.abs(calculatedIRR - irrDecimal) < 0.0001) break;
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestPrice = price;
+      }
+      
+      if (diff < 0.0001) break;
       
       if (calculatedIRR > irrDecimal) {
         low = price;
@@ -232,7 +256,7 @@ class DealPricingService {
       }
     }
     
-    return price;
+    return bestPrice;
   }
 
   async getProjectFinancials(projectId: string, orgId: string): Promise<{

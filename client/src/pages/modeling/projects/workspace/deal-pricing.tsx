@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
@@ -269,7 +269,6 @@ function CurrencyStepper({
 
 export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
-  const suppressSyncRef = useRef(false);
   
   const [purchasePrice, setPurchasePrice] = useState<string>('');
   const [targetIRR, setTargetIRR] = useState<string>('15');
@@ -389,7 +388,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   const makeDriverHandler = (driver: PricingDriver, setter: (v: string) => void) => {
     return (value: string) => {
-      suppressSyncRef.current = true;
       setter(value);
       setPricingDriver(driver);
     };
@@ -400,7 +398,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const handleGoingInCapRateChange = makeDriverHandler('goingInCap', setGoingInCapRate);
 
   const handleExitCapRateChange = (value: string) => {
-    suppressSyncRef.current = true;
     setExitCapRate(value);
     setPricingDriver('exitCap');
     const numVal = parseFloat(value);
@@ -410,7 +407,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   };
 
   const handleHoldPeriodChange = (value: string) => {
-    suppressSyncRef.current = true;
     setHoldPeriodNum(parseInt(value));
     setPricingDriver('holdPeriod');
   };
@@ -450,20 +446,27 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const pricingData = calculateMutation.data as UnifiedPricingResult | undefined;
 
   useEffect(() => {
-    if (!pricingData || !suppressSyncRef.current) return;
-    suppressSyncRef.current = false;
-
+    if (!pricingData) return;
     const d = pricingData;
     const driver = d.driver as PricingDriver;
 
     if (driver !== 'price' && d.purchasePrice > 0) {
-      setPurchasePrice(Math.round(d.purchasePrice).toLocaleString());
+      const current = parseCurrencyInput(purchasePrice);
+      if (Math.abs(current - d.purchasePrice) > 1) {
+        setPurchasePrice(Math.round(d.purchasePrice).toLocaleString());
+      }
     }
     if (driver !== 'targetIRR' && d.irr > 0 && d.irr < 200) {
-      setTargetIRR(d.irr.toFixed(1));
+      const current = parsePercentInput(targetIRR);
+      if (Math.abs(current - d.irr) > 0.05) {
+        setTargetIRR(d.irr.toFixed(1));
+      }
     }
     if (driver !== 'goingInCap' && d.goingInCapRate > 0 && d.goingInCapRate < 100) {
-      setGoingInCapRate(d.goingInCapRate.toFixed(2));
+      const current = parsePercentInput(goingInCapRate);
+      if (Math.abs(current - d.goingInCapRate) > 0.01) {
+        setGoingInCapRate(d.goingInCapRate.toFixed(2));
+      }
     }
   }, [pricingData]);
 
@@ -994,7 +997,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                   icon={Percent}
                   value={targetYearCapRate}
                   onChange={(v) => {
-                    suppressSyncRef.current = true;
                     setTargetYearCapRate(v);
                     setPricingDriver('targetYearCap');
                   }}
