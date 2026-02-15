@@ -327,41 +327,22 @@ export function GrowthRatesTab({
   };
 
   const sections = useMemo(() => {
-    const all: Array<{ id: string; items: number }> = [
-      { id: 'storage', items: storageItemCount + 2 },
-    ];
-
+    const revenueSections: string[] = ['storage'];
     enabledDeptCards.forEach(dept => {
-      all.push({ id: `dept_${dept.id}`, items: getDeptCardItemCount(dept) });
+      revenueSections.push(`dept_${dept.id}`);
     });
+    revenueSections.push('revenue_other');
 
-    all.push({ id: 'revenue_other', items: revenueOtherItemCount + 2 });
-    all.push({ id: 'opex', items: opexItemCount + 5 });
+    const allOrder = [...revenueSections, 'opex'];
 
-    if (!useWideLayout) return { order: all.map(s => s.id), layout: 'stack' as const };
-
-    const sorted = [...all].sort((a, b) => b.items - a.items);
-    const col1: typeof all = [];
-    const col2: typeof all = [];
-    let col1Height = 0;
-    let col2Height = 0;
-
-    for (const section of sorted) {
-      if (col1Height <= col2Height) {
-        col1.push(section);
-        col1Height += section.items;
-      } else {
-        col2.push(section);
-        col2Height += section.items;
-      }
-    }
+    if (!useWideLayout) return { order: allOrder, layout: 'stack' as const };
 
     return {
-      col1: col1.map(s => s.id),
-      col2: col2.map(s => s.id),
+      col1: ['opex'],
+      col2: revenueSections,
       layout: 'columns' as const,
     };
-  }, [storageItemCount, revenueOtherItemCount, opexItemCount, enabledDeptCards, useWideLayout]);
+  }, [enabledDeptCards, useWideLayout]);
 
   const renderDeptCard = (dept: typeof DEPARTMENT_CARDS[0]) => {
     const DeptIcon = dept.icon;
