@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface ScenarioComparisonProps {
   projectId: string;
@@ -82,6 +84,7 @@ function MetricCell({ value, baseline, format = 'currency', highlightBest = true
 }
 
 export default function ExitScenarioComparison({ projectId }: ScenarioComparisonProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
   
   const { data: project, isLoading: projectLoading } = useQuery<ModelingProject>({
@@ -147,7 +150,7 @@ export default function ExitScenarioComparison({ projectId }: ScenarioComparison
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div ref={pdfRef} className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -171,6 +174,7 @@ export default function ExitScenarioComparison({ projectId }: ScenarioComparison
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="exit-scenario-comparison" title="Exit Scenario Comparison" />
         </div>
       </div>
 

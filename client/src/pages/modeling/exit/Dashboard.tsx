@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import {
   GitCompare
 } from "lucide-react";
 import type { ModelingProject, ExitScenario } from "@shared/schema";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 
 interface ExitDashboardProps {
   projectId: string;
@@ -131,6 +133,7 @@ interface ExitMetrics {
 }
 
 export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
   
   const { data: project, isLoading: projectLoading } = useQuery<ModelingProject>({
@@ -172,7 +175,7 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -187,13 +190,16 @@ export default function ExitStrategyDashboard({ projectId }: ExitDashboardProps)
             Institutional-grade exit analysis tools for {project?.propertyName}
           </p>
         </div>
-        <Button 
-          onClick={() => setLocation(`${basePath}/scenarios`)}
-          data-testid="btn-manage-scenarios"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          Manage Scenarios
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={pdfRef} filename="exit-strategy-dashboard" title="Exit Strategy Dashboard" />
+          <Button 
+            onClick={() => setLocation(`${basePath}/scenarios`)}
+            data-testid="btn-manage-scenarios"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Manage Scenarios
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

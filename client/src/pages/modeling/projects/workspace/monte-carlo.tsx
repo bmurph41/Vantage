@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface DistributionConfig {
   type: 'normal' | 'triangular' | 'uniform' | 'lognormal' | 'pert';
@@ -144,6 +145,7 @@ function displayVarInput(key: string, value: number): string {
 export default function MonteCarloPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { toast } = useToast();
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [iterations, setIterations] = useState(10000);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMetric, setSelectedMetric] = useState<'irr' | 'npv' | 'equityMultiple' | 'cashOnCash'>('irr');
@@ -278,7 +280,7 @@ export default function MonteCarloPage() {
   const enabledCount = variables.filter(v => v.enabled).length;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Monte Carlo Simulation</h1>
@@ -342,6 +344,7 @@ export default function MonteCarloPage() {
               Export
             </Button>
           )}
+          <ExportPdfButton contentRef={pdfRef} filename="monte-carlo-simulation" title="Monte Carlo Simulation" />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ import {
   Cell,
 } from 'recharts';
 import { formatCurrency, cn } from '@/lib/utils';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface RentRollAnalysisProps {
   projectId: string;
@@ -638,6 +639,7 @@ function LeaseListSection({ units, loading }: { units: RentRollUnit[]; loading: 
 }
 
 export default function RentRollAnalysis({ projectId, projectName, onTabChange }: RentRollAnalysisProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [activeView, setActiveView] = useState<'dashboard' | 'leases' | 'analytics'>('dashboard');
 
   const { data: analysis, isLoading } = useQuery<AnalysisData>({
@@ -671,7 +673,7 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={pdfRef} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -683,6 +685,7 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={pdfRef} filename="rent-roll-analysis" title="Rent Roll Analysis" />
           {data.dataSourceMode === 'linked' && data.linkedRraLocationId && (
             <Badge variant="outline" className="gap-1">
               <Link2 className="h-3 w-3" />

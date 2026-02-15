@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { formatCurrency, formatPercent, cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import {
   Shield, Zap, PieChart as PieChartIcon, ArrowDown, ArrowUp,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell,
@@ -360,6 +361,7 @@ export default function ReturnsValuationPage() {
   const [, setLocation] = useLocation();
   const [expandedDeals, setExpandedDeals] = useState<Set<string>>(new Set());
   const [activePortfolioTab, setActivePortfolioTab] = useState("overview");
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   const { data: projects, isLoading } = useQuery<ReturnsProject[]>({
     queryKey: ["/api/modeling/returns-valuation"],
@@ -486,7 +488,7 @@ export default function ReturnsValuationPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pipeline Returns</h1>
@@ -494,12 +496,15 @@ export default function ReturnsValuationPage() {
             Returns, analytics, and risk metrics across your deal pipeline
           </p>
         </div>
-        {projects && projects.length > 0 && (
-          <Button variant="outline" onClick={() => setLocation("/modeling/projects/new")}>
-            <Building2 className="h-4 w-4 mr-2" />
-            New Project
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={pdfRef} filename="pipeline-returns" title="Pipeline Returns" />
+          {projects && projects.length > 0 && (
+            <Button variant="outline" onClick={() => setLocation("/modeling/projects/new")}>
+              <Building2 className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          )}
+        </div>
       </div>
 
       {analytics && (

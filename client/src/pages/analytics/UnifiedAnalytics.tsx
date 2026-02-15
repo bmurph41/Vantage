@@ -41,6 +41,7 @@ import {
   Play
 } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend } from "recharts";
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
@@ -222,6 +223,7 @@ export default function UnifiedAnalytics() {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [previewScheduleId, setPreviewScheduleId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -636,7 +638,7 @@ export default function UnifiedAnalytics() {
   }
 
   return (
-    <div className="p-6 space-y-6" ref={dashboardRef}>
+    <div className="p-6 space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cross-Module Analytics</h1>
@@ -657,10 +659,7 @@ export default function UnifiedAnalytics() {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" onClick={exportToPdf} disabled={isExporting || isLoading}>
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Export PDF'}
-          </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="unified-analytics" title="Unified Analytics Dashboard" />
           
           <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
             <DialogTrigger asChild>

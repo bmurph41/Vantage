@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { formatCurrency } from '@/lib/formatUtils';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 type CategoryAggregation = {
   category: string;
@@ -143,6 +144,7 @@ interface AnalyticsNormalizationProps {
 }
 
 export default function AnalyticsNormalization({ projectId }: AnalyticsNormalizationProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -370,7 +372,7 @@ export default function AnalyticsNormalization({ projectId }: AnalyticsNormaliza
   const activeAdjustmentsCount = adjustments.filter(a => a.isActive && a.periodLabel === selectedPeriod).length;
 
   return (
-    <div className="space-y-6">
+    <div ref={pdfRef} className="space-y-6">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -402,6 +404,7 @@ export default function AnalyticsNormalization({ projectId }: AnalyticsNormaliza
                   </SelectContent>
                 </Select>
               </div>
+              <ExportPdfButton contentRef={pdfRef} filename="analytics-normalization" title="Analytics & Normalization" />
               {activeAdjustmentsCount > 0 && (
                 <Badge variant="secondary" className="gap-1">
                   <Filter className="h-3 w-3" />

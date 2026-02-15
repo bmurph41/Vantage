@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
@@ -52,6 +52,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import ICMemoExport from './ic-memo-export';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { defaultScenarios, type ScenarioType, type ScenarioConfig } from '@/lib/modeling-scenarios';
 
@@ -62,6 +63,7 @@ interface WorkspaceExecutiveSummaryProps {
 
 export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: WorkspaceExecutiveSummaryProps) {
   const { toast } = useToast();
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('base');
   const [showScenarioConfig, setShowScenarioConfig] = useState(false);
   const [scenarios, setScenarios] = useState(defaultScenarios);
@@ -133,7 +135,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="summary" onNavigate={onTabChange} />
       )}
@@ -243,10 +245,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" size="sm" data-testid="button-export-summary">
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="executive-summary" title="Executive Summary" />
         </div>
       </div>
 

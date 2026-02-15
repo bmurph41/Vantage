@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import { formatCurrency, formatPercent } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { DebtScenario } from "@shared/schema";
 import LoanBuilder from '@/components/modeling/LoanBuilder';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 // FRED Series IDs for base rates
 const BASE_RATE_OPTIONS = [
@@ -59,6 +60,7 @@ const parseFormattedNumber = (value: string): number => {
 };
 
 export default function DebtScenariosIndex() {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("rates");
   const [timeRange, setTimeRange] = useState<TimeRange>("5Y");
@@ -424,7 +426,10 @@ export default function DebtScenariosIndex() {
   });
 
   return (
-    <div>
+    <div ref={pdfRef}>
+      <div className="flex justify-end mb-4">
+        <ExportPdfButton contentRef={pdfRef} filename="debt-scenarios" title="Debt Scenarios" />
+      </div>
       {/* Scenario Management Card */}
       <Card className="mb-6 bg-primary/5">
         <CardContent className="pt-6">

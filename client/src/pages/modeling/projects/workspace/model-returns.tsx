@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import {
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface ModelReturnsProps {
   projectId: string;
@@ -192,6 +193,7 @@ function AddLedgerEntryDialog({ projectId, onSuccess }: { projectId: string; onS
 }
 
 export default function ModelReturns({ projectId, projectName }: ModelReturnsProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'levered' | 'unlevered'>('levered');
   const [spendToggle, setSpendToggle] = useState<'equity' | 'all_in'>('equity');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -293,7 +295,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -302,6 +304,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
           <p className="text-sm text-muted-foreground">{projectName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <ExportPdfButton contentRef={pdfRef} filename="model-returns" title="Model Returns" />
           <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
             <Button
               size="sm"

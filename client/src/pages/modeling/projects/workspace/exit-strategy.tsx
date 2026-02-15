@@ -39,6 +39,7 @@ import {
   CrossStrategyComparisonPanel,
   AdvisorInsightsPanel,
 } from "@/pages/modeling/exit-strategies";
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface WorkspaceExitStrategyProps {
   projectId: string;
@@ -46,6 +47,7 @@ interface WorkspaceExitStrategyProps {
 }
 
 export default function WorkspaceExitStrategy({ projectId, onTabChange }: WorkspaceExitStrategyProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState("summary");
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const hydrationRef = useRef<string | null>(null);
@@ -140,7 +142,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={pdfRef} className="space-y-3">
       {onTabChange && (
         <WorkflowNavigation currentTab="exit" onNavigate={onTabChange} />
       )}
@@ -153,6 +155,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportPdfButton contentRef={pdfRef} filename="exit-strategy" title="Exit Strategy" />
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium">Scenario:</Label>
             {cases.length > 0 ? (

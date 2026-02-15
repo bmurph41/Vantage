@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
@@ -49,6 +49,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
@@ -269,6 +270,7 @@ function InlineGrowthEditor({
 }
 
 export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceProFormaProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('annual');
   const [selectedYear, setSelectedYear] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['revenue']));
@@ -793,7 +795,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const finalYearSummary = calculateYearSummary(holdPeriod - 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="proforma" onNavigate={onTabChange} />
       )}
@@ -878,6 +880,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="pro-forma-projections" title="Pro Forma Projections" />
         </div>
       </div>
 

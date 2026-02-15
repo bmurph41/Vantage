@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
@@ -36,6 +36,7 @@ import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface DCFScenario {
   id: string;
@@ -92,6 +93,7 @@ interface DCFCalculatorPageProps {
 }
 
 export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProps = {}) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { projectId } = useParams<{ projectId: string }>();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
@@ -227,7 +229,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const displayIRR = calculateQuickIRR.data?.irr ?? baseScenario?.irr ?? 0;
 
   return (
-    <div className="space-y-6 p-6" data-testid="dcf-calculator-page">
+    <div ref={pdfRef} className="space-y-6 p-6" data-testid="dcf-calculator-page">
       {onTabChange && (
         <WorkflowNavigation currentTab="dcf" onNavigate={onTabChange} />
       )}
@@ -252,6 +254,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="dcf-analysis" title="DCF Analysis" />
         </div>
       </div>
 

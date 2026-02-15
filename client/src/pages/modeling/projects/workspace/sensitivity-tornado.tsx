@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ import {
   Legend
 } from 'recharts';
 import { formatCurrency, formatPercent } from '@/lib/utils';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface SensitivityTornadoProps {
   projectId: string;
@@ -81,6 +82,7 @@ const VALUATION_METRICS = [
 ];
 
 export default function SensitivityTornado({ projectId, onTabChange }: SensitivityTornadoProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [selectedMetric, setSelectedMetric] = useState('irr');
   const [varianceRange, setVarianceRange] = useState(20);
 
@@ -237,7 +239,7 @@ export default function SensitivityTornado({ projectId, onTabChange }: Sensitivi
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold flex items-center gap-2">
@@ -249,6 +251,7 @@ export default function SensitivityTornado({ projectId, onTabChange }: Sensitivi
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportPdfButton contentRef={pdfRef} filename="sensitivity-analysis" title="Sensitivity Analysis" />
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh

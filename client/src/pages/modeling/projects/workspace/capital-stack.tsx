@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -53,6 +53,7 @@ import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker } from '@/components/modeling/MarketRatePicker';
 import WorkspaceDebtScenarios from './debt-scenarios';
 import LoanBuilder from '@/components/modeling/LoanBuilder';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface CapitalStackWorkspaceProps {
   projectId: string;
@@ -156,6 +157,7 @@ type DebtTrancheFormData = z.infer<typeof debtTrancheFormSchema>;
 type EquityLayerFormData = z.infer<typeof equityLayerFormSchema>;
 
 export default function CapitalStackWorkspace({ projectId, onTabChange }: CapitalStackWorkspaceProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
   const [showCreateStack, setShowCreateStack] = useState(false);
@@ -692,10 +694,14 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const layerType = equityForm.watch('layerType');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
       )}
+
+      <div className="flex items-center justify-end">
+        <ExportPdfButton contentRef={pdfRef} filename="capital-stack" title="Capital Stack" />
+      </div>
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 max-w-xl">

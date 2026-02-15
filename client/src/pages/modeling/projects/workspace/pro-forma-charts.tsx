@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ import {
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import type { ProjectConfig, ProFormaChartData } from '@/types/modeling';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface WorkspaceProFormaChartsProps {
   projectId: string;
@@ -64,6 +65,7 @@ const COMPARE_CHART_TYPES = [
 ] as const;
 
 export default function WorkspaceProFormaCharts({ projectId, onTabChange }: WorkspaceProFormaChartsProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [selectedYear, setSelectedYear] = useState('all');
   const [activeTab, setActiveTab] = useState('overview');
   const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
@@ -324,7 +326,7 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold flex items-center gap-2">
@@ -336,6 +338,7 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportPdfButton contentRef={pdfRef} filename="pro-forma-charts" title="Pro Forma Charts" />
           <Select value={selectedYear} onValueChange={setSelectedYear}>
             <SelectTrigger className="w-[140px]">
               <Calendar className="h-4 w-4 mr-2" />

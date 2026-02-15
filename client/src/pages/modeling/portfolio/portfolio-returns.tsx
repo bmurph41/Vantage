@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
   ComposedChart
 } from 'recharts';
 import { queryClient } from '@/lib/queryClient';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 function formatCurrencyCompact(value: number): string {
   const abs = Math.abs(value);
@@ -61,6 +62,7 @@ function KpiCard({ title, value, icon: Icon, trend }: {
 export default function PortfolioReturns() {
   const [view, setView] = useState<'levered' | 'unlevered'>('levered');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ['/api/returns/portfolio', view],
@@ -129,7 +131,7 @@ export default function PortfolioReturns() {
   const hasData = byProperty.length > 0;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" ref={pdfRef}>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -138,6 +140,7 @@ export default function PortfolioReturns() {
           <p className="text-sm text-muted-foreground">Aggregate return analysis across all owned properties</p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportPdfButton contentRef={pdfRef} filename="portfolio-returns" title="Portfolio Returns" />
           <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
             <Button
               size="sm"

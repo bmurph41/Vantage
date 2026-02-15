@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import {
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface ValuatorOperationsSummaryProps {
   projectId: string;
@@ -39,6 +41,7 @@ interface OperationsSummary {
 }
 
 export default function ValuatorOperationsSummary({ projectId, projectName }: ValuatorOperationsSummaryProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const dateRange = {
     startDate: format(subMonths(new Date(), 12), "yyyy-MM-dd"),
     endDate: format(new Date(), "yyyy-MM-dd"),
@@ -87,7 +90,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
     : 0;
 
   return (
-    <div className="space-y-6">
+    <div ref={pdfRef} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -98,10 +101,13 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
             Combined fuel and ship store performance for {projectName || "this project"}
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export Report
+          </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="operations-summary" title="Operations Summary" />
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">

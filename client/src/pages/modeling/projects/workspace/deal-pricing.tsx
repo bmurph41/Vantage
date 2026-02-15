@@ -49,6 +49,7 @@ import {
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import type { ProjectConfig } from '@/types/modeling';
 import debounce from 'lodash.debounce';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { computeDealSignal, getSignalBadgeProps, type DealSignalResult } from '@/lib/dealSignal';
 import YearSelector from '@/components/modeling/YearSelector';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -355,6 +356,7 @@ interface SavedDealPricingInputs {
 
 export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
+  const pdfRef = useRef<HTMLDivElement>(null);
   
   const [purchasePrice, setPurchasePrice] = useState<string>('');
   const [targetIRR, setTargetIRR] = useState<string>('15');
@@ -696,7 +698,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="pricing" onNavigate={onTabChange} />
       )}
@@ -726,6 +728,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
             <RefreshCw className={`h-4 w-4 mr-2 ${calculateMutation.isPending ? 'animate-spin' : ''}`} />
             Recalculate
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="deal-pricing" title="Deal Pricing Analysis" />
         </div>
       </div>
 

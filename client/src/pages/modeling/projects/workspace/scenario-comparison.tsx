@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCaseLabels, type CaseType } from '@/hooks/useCaseLabels';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import type { ModelingProject } from '@shared/schema';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import {
   GitCompare,
   TrendingUp,
@@ -108,6 +109,7 @@ const expenseCategories = [
 ];
 
 export default function ScenarioComparison({ projectId }: ScenarioComparisonProps) {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [selectedScenarios, setSelectedScenarios] = useState<string[]>([]);
   
@@ -199,7 +201,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
@@ -210,16 +212,19 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
             Compare assumptions and metrics across scenarios for IC review
           </p>
         </div>
-        {selectedScenarios.length >= 2 && (
-          <Button 
-            onClick={() => compareScenarios()} 
-            disabled={comparing}
-            data-testid="button-refresh-comparison"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${comparing ? 'animate-spin' : ''}`} />
-            Refresh Comparison
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={pdfRef} filename="scenario-comparison" title="Scenario Comparison" />
+          {selectedScenarios.length >= 2 && (
+            <Button 
+              onClick={() => compareScenarios()} 
+              disabled={comparing}
+              data-testid="button-refresh-comparison"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${comparing ? 'animate-spin' : ''}`} />
+              Refresh Comparison
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>

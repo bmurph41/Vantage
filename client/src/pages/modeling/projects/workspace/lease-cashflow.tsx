@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useParams } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface MarketAssumptions {
   marketRentPerUnit: number;
@@ -157,6 +158,7 @@ interface PropertyCashFlow {
 }
 
 export default function LeaseCashFlowPage() {
+  const pdfRef = useRef<HTMLDivElement>(null);
   const { projectId } = useParams<{ projectId: string }>();
   const [scenario, setScenario] = useState('base');
   const [activeTab, setActiveTab] = useState('summary');
@@ -203,7 +205,7 @@ export default function LeaseCashFlowPage() {
   const yearlyTotals = cashFlowData?.yearlyTotals || [];
 
   return (
-    <div className="space-y-6 p-6" data-testid="lease-cashflow-page">
+    <div ref={pdfRef} className="space-y-6 p-6" data-testid="lease-cashflow-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Lease Cash Flow Analysis</h1>
@@ -242,6 +244,7 @@ export default function LeaseCashFlowPage() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="lease-cashflow" title="Lease Cash Flow Analysis" />
         </div>
       </div>
 

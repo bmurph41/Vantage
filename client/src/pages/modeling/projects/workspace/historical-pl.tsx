@@ -1,4 +1,4 @@
-import { useState, Fragment, useMemo, useEffect } from 'react';
+import { useState, Fragment, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
@@ -70,6 +70,7 @@ import { useDisplayOverrides } from '@/hooks/useDisplayOverrides';
 import { DepartmentOrderSettings } from '@/components/modeling/DepartmentOrderSettings';
 import { InlineEditableName } from '@/components/modeling/InlineEditableName';
 import type { ProjectConfig, HistoricalPLData, ActualsData } from '@/types/modeling';
+import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 
 interface WorkspaceHistoricalPLProps {
   projectId: string;
@@ -118,6 +119,7 @@ const dataSourceLabels: Record<string, string> = {
 
 export default function WorkspaceHistoricalPL({ projectId, onTabChange }: WorkspaceHistoricalPLProps) {
   const { toast } = useToast();
+  const pdfRef = useRef<HTMLDivElement>(null);
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Revenue', 'COGS', 'Expenses']));
   const [showSyncDialog, setShowSyncDialog] = useState(false);
@@ -512,7 +514,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
       )}
@@ -764,6 +766,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <ExportPdfButton contentRef={pdfRef} filename="historical-pl" title="Historical P&L" />
         </div>
       </div>
 
