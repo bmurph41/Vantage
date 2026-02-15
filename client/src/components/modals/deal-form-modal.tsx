@@ -22,8 +22,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { 
   CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
   FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2,
-  Zap, Info
+  Zap, Info, ExternalLink, UserPlus, Building2, Check, Loader2
 } from "lucide-react";
+import { Link } from "wouter";
 import { format, addDays, parseISO } from "date-fns";
 import { addBusinessDays } from "@/lib/business-days";
 import { apiRequest } from "@/lib/queryClient";
@@ -352,6 +353,70 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       leases: [],
     },
   });
+
+  const [showQuickContact, setShowQuickContact] = useState(false);
+  const [quickContactFirst, setQuickContactFirst] = useState("");
+  const [quickContactLast, setQuickContactLast] = useState("");
+  const [quickContactEmail, setQuickContactEmail] = useState("");
+  const [quickContactPhone, setQuickContactPhone] = useState("");
+  const [isCreatingContact, setIsCreatingContact] = useState(false);
+
+  const [showQuickCompany, setShowQuickCompany] = useState(false);
+  const [quickCompanyName, setQuickCompanyName] = useState("");
+  const [quickCompanyPhone, setQuickCompanyPhone] = useState("");
+  const [quickCompanyWebsite, setQuickCompanyWebsite] = useState("");
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+
+  const handleQuickCreateContact = async () => {
+    if (!quickContactFirst.trim()) return;
+    setIsCreatingContact(true);
+    try {
+      const res = await apiRequest('POST', '/api/contacts', {
+        firstName: quickContactFirst.trim(),
+        lastName: quickContactLast.trim() || undefined,
+        email: quickContactEmail.trim() || undefined,
+        phone: quickContactPhone.trim() || undefined,
+      });
+      const newContact = await res.json();
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      form.setValue('primaryContactId', newContact.id);
+      setShowQuickContact(false);
+      setQuickContactFirst("");
+      setQuickContactLast("");
+      setQuickContactEmail("");
+      setQuickContactPhone("");
+      toast({ title: "Contact created", description: `${quickContactFirst} added and linked to this deal` });
+    } catch (error: any) {
+      const errData = error?.message ? JSON.parse(error.message).error || error.message : "Failed to create contact";
+      toast({ title: "Failed to create contact", description: String(errData), variant: "destructive" });
+    } finally {
+      setIsCreatingContact(false);
+    }
+  };
+
+  const handleQuickCreateCompany = async () => {
+    if (!quickCompanyName.trim()) return;
+    setIsCreatingCompany(true);
+    try {
+      const res = await apiRequest('POST', '/api/companies', {
+        name: quickCompanyName.trim(),
+        phone: quickCompanyPhone.trim() || undefined,
+        website: quickCompanyWebsite.trim() || undefined,
+      });
+      const newCompany = await res.json();
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      form.setValue('accountId', newCompany.id);
+      setShowQuickCompany(false);
+      setQuickCompanyName("");
+      setQuickCompanyPhone("");
+      setQuickCompanyWebsite("");
+      toast({ title: "Company created", description: `${quickCompanyName} added and linked to this deal` });
+    } catch (error: any) {
+      toast({ title: "Failed to create company", description: error?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsCreatingCompany(false);
+    }
+  };
 
   // State for DD Deal Details
   const [extensionDaysArray, setExtensionDaysArray] = useState<string[]>([]);
@@ -1124,49 +1189,174 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="primaryContactId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Contact</FormLabel>
-                            <FormControl>
-                              <SearchableSelect
-                                options={contactOptions}
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                placeholder="Search contacts..."
-                                searchPlaceholder="Type to search contacts..."
-                                emptyText="No contacts found"
-                                testId="select-contact"
+                      <div className="space-y-2">
+                        <FormField
+                          control={form.control}
+                          name="primaryContactId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contact</FormLabel>
+                              <FormControl>
+                                <SearchableSelect
+                                  options={contactOptions}
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                  placeholder="Search contacts..."
+                                  searchPlaceholder="Type to search contacts..."
+                                  emptyText="No contacts found"
+                                  testId="select-contact"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickContact(!showQuickContact)}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+                          >
+                            <UserPlus className="h-3 w-3" />
+                            {showQuickContact ? "Cancel" : "Create New Contact"}
+                          </button>
+                          <span className="text-muted-foreground text-xs">|</span>
+                          <Link href="/crm/contacts" onClick={(e: any) => { e.stopPropagation(); }} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                            <ExternalLink className="h-3 w-3" />
+                            View CRM Contacts
+                          </Link>
+                        </div>
+                        {showQuickContact && (
+                          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
+                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                              <UserPlus className="h-3 w-3" />
+                              Quick Create Contact
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="First Name *"
+                                value={quickContactFirst}
+                                onChange={(e) => setQuickContactFirst(e.target.value)}
+                                className="h-8 text-xs"
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
+                              <Input
+                                placeholder="Last Name"
+                                value={quickContactLast}
+                                onChange={(e) => setQuickContactLast(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Email"
+                                type="email"
+                                value={quickContactEmail}
+                                onChange={(e) => setQuickContactEmail(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                              <Input
+                                placeholder="Phone"
+                                value={quickContactPhone}
+                                onChange={(e) => setQuickContactPhone(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleQuickCreateContact}
+                              disabled={!quickContactFirst.trim() || isCreatingContact}
+                              className="w-full h-7 text-xs"
+                            >
+                              {isCreatingContact ? (
+                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Creating...</>
+                              ) : (
+                                <><Check className="h-3 w-3 mr-1" /> Create & Link Contact</>
+                              )}
+                            </Button>
+                          </div>
                         )}
-                      />
+                      </div>
 
-                      <FormField
-                        control={form.control}
-                        name="accountId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company</FormLabel>
-                            <FormControl>
-                              <SearchableSelect
-                                options={companyOptions}
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                placeholder="Search companies..."
-                                searchPlaceholder="Type to search companies..."
-                                emptyText="No companies found"
-                                testId="select-company"
+                      <div className="space-y-2">
+                        <FormField
+                          control={form.control}
+                          name="accountId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company</FormLabel>
+                              <FormControl>
+                                <SearchableSelect
+                                  options={companyOptions}
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                  placeholder="Search companies..."
+                                  searchPlaceholder="Type to search companies..."
+                                  emptyText="No companies found"
+                                  testId="select-company"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickCompany(!showQuickCompany)}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 transition-colors"
+                          >
+                            <Building2 className="h-3 w-3" />
+                            {showQuickCompany ? "Cancel" : "Create New Company"}
+                          </button>
+                          <span className="text-muted-foreground text-xs">|</span>
+                          <Link href="/crm/companies" onClick={(e: any) => { e.stopPropagation(); }} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                            <ExternalLink className="h-3 w-3" />
+                            View CRM Companies
+                          </Link>
+                        </div>
+                        {showQuickCompany && (
+                          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
+                            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              Quick Create Company
+                            </p>
+                            <Input
+                              placeholder="Company Name *"
+                              value={quickCompanyName}
+                              onChange={(e) => setQuickCompanyName(e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Phone"
+                                value={quickCompanyPhone}
+                                onChange={(e) => setQuickCompanyPhone(e.target.value)}
+                                className="h-8 text-xs"
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
+                              <Input
+                                placeholder="Website"
+                                value={quickCompanyWebsite}
+                                onChange={(e) => setQuickCompanyWebsite(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleQuickCreateCompany}
+                              disabled={!quickCompanyName.trim() || isCreatingCompany}
+                              className="w-full h-7 text-xs"
+                            >
+                              {isCreatingCompany ? (
+                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Creating...</>
+                              ) : (
+                                <><Check className="h-3 w-3 mr-1" /> Create & Link Company</>
+                              )}
+                            </Button>
+                          </div>
                         )}
-                      />
+                      </div>
                     </div>
 
                     <FormField
