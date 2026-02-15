@@ -174,12 +174,13 @@ export function CompactYearRateInput({
   step = 0.5,
 }: CompactYearRateInputProps) {
   const isModified = Math.abs(value - defaultValue) > 0.001;
-  const [localValue, setLocalValue] = useState(String(value));
+  const fmt = (v: number) => v.toFixed(1);
+  const [localValue, setLocalValue] = useState(fmt(value));
   const isFocused = useRef(false);
 
   useEffect(() => {
     if (!isFocused.current) {
-      setLocalValue(String(value));
+      setLocalValue(fmt(value));
     }
   }, [value]);
 
@@ -189,9 +190,9 @@ export function CompactYearRateInput({
     if (!isNaN(v)) {
       const clamped = Math.min(max, Math.max(min, v));
       onChange(clamped);
-      setLocalValue(String(clamped));
+      setLocalValue(fmt(clamped));
     } else {
-      setLocalValue(String(value));
+      setLocalValue(fmt(value));
     }
   };
 
@@ -330,7 +331,7 @@ export function YearlyRateRow({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
-                Reset to {defaultRate}%
+                Reset to {defaultRate.toFixed(1)}%
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -438,6 +439,7 @@ interface SetAllDropdownProps {
 }
 
 export function SetAllDropdown({ onSetAll }: SetAllDropdownProps) {
+  const options = Array.from({ length: 21 }, (_, i) => (i * 0.5).toFixed(1));
   return (
     <select
       onChange={(e) => e.target.value && onSetAll(parseFloat(e.target.value))}
@@ -445,14 +447,9 @@ export function SetAllDropdown({ onSetAll }: SetAllDropdownProps) {
       className="text-xs border border-slate-200 dark:border-slate-600 rounded-md px-2.5 py-1.5 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
     >
       <option value="" disabled>Set all to...</option>
-      <option value="1.0">1.0%</option>
-      <option value="1.5">1.5%</option>
-      <option value="2.0">2.0%</option>
-      <option value="2.5">2.5%</option>
-      <option value="3.0">3.0%</option>
-      <option value="3.5">3.5%</option>
-      <option value="4.0">4.0%</option>
-      <option value="5.0">5.0%</option>
+      {options.map(v => (
+        <option key={v} value={v}>{v}%</option>
+      ))}
     </select>
   );
 }
