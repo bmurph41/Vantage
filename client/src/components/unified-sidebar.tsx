@@ -103,7 +103,6 @@ const investorServicesNav = [
 
 // Market Intelligence Navigation (formerly Marinalytics)
 const marketIntelligenceNav = [
-  { name: "Marina Map", href: "/marina-map" },
   { name: "Sales Comps", href: "/analysis/sales-comps" },
   { name: "Rate Comps", href: "/analysis/rate-comps" },
   { name: "Financial Analysis", href: "/analysis/financial-analysis" },

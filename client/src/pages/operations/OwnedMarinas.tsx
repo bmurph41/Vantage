@@ -29,6 +29,8 @@ import {
   Target,
 } from "lucide-react";
 import MarinaBudgetTab from "@/components/operations/MarinaBudgetTab";
+import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
+import { Map } from "lucide-react";
 
 interface OwnedMarina {
   id: string;
@@ -225,6 +227,10 @@ export default function OwnedMarinas() {
             <Target className="h-4 w-4 mr-1" />
             Budget
           </TabsTrigger>
+          <TabsTrigger value="map" data-testid="tab-map">
+            <Map className="h-4 w-4 mr-1" />
+            Map
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -340,6 +346,24 @@ export default function OwnedMarinas() {
               <MarinaBudgetTab isPortfolioView={true} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-4">
+          <MarinaMapEmbed
+            source="properties"
+            markerColor="#4285F4"
+            sourceLabel="Owned Marinas"
+            height="calc(100vh - 380px)"
+            showSearch={true}
+            showStateFilter={true}
+            showSourceFilter={false}
+            showLayerToggles={false}
+            showListPanel={true}
+            emptyMessage="No owned marinas with location data found"
+            onLocationClick={(loc) => {
+              if (loc.id) navigate(`/crm/properties/${loc.id}`);
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

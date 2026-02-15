@@ -12837,6 +12837,87 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
+      if (source === 'all' || source === 'rate_comps') {
+        const orgOrGlobal = or(eq(rateComps.orgId, orgId), eq(rateComps.scope, 'global'));
+        const conditions: any[] = [orgOrGlobal];
+        if (stateFilter) conditions.push(eq(rateComps.state, stateFilter));
+        if (searchFilter) conditions.push(ilike(rateComps.marina, `%${searchFilter}%`));
+
+        const rows = await db.select().from(rateComps).where(and(...conditions)).limit(500);
+        for (const r of rows) {
+          results.push({
+            id: r.id,
+            source: 'rate_comp' as const,
+            name: r.marina,
+            address: r.address,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zip,
+            lat: r.lat ? Number(r.lat) : null,
+            lng: r.lng ? Number(r.lng) : null,
+            price: r.salePrice ? Number(r.salePrice) : null,
+            slips: (r.wetSlips ?? 0) + (r.dryRacks ?? 0) || null,
+            status: null,
+            metrics: {
+              rateType: r.rateType,
+              rateAmount: r.rateAmount,
+              seasonality: r.seasonality,
+              wetSlips: r.wetSlips,
+              dryRacks: r.dryRacks,
+              bodyOfWater: r.bodyOfWater,
+              region: r.region,
+              storageTypes: r.storageTypes,
+            },
+          });
+        }
+      }
+
+      if (source === 'all' || source === 'pipeline') {
+        const { deals } = await import('@shared/schema');
+        const dealConditions: any[] = [eq(deals.orgId, orgId)];
+        if (searchFilter) dealConditions.push(ilike(deals.title, `%${searchFilter}%`));
+
+        const dealRows = await db.select({
+          deal: deals,
+          property: crmProperties,
+        }).from(deals)
+          .leftJoin(crmProperties, eq(deals.propertyId, crmProperties.id))
+          .where(and(...dealConditions))
+          .limit(500);
+
+        for (const row of dealRows) {
+          const d = row.deal;
+          const p = row.property;
+          const coords = p?.coordinates as any;
+          const lat = coords?.lat ? Number(coords.lat) : null;
+          const lng = coords?.lng ? Number(coords.lng) : null;
+          const city = p?.city || null;
+          const state = p?.state || null;
+          if (stateFilter && state !== stateFilter) continue;
+          results.push({
+            id: d.id,
+            source: 'pipeline' as const,
+            name: d.title,
+            address: p?.address || null,
+            city,
+            state,
+            zipCode: p?.zipCode || null,
+            lat,
+            lng,
+            price: d.amount ? Number(d.amount) : null,
+            slips: p ? (p.totalCapacity ?? (((p.wetSlips ?? 0) + (p.drySlips ?? 0)) || null)) : null,
+            status: d.stage,
+            metrics: {
+              stage: d.stage,
+              priority: d.priority,
+              amount: d.amount ? Number(d.amount) : null,
+              probability: d.probability,
+              propertyName: p?.title || null,
+            },
+          });
+        }
+      }
+
       if (source === 'all' || source === 'listings') {
         const orgOrGlobal = or(eq(marinaListings.orgId, orgId), eq(marinaListings.scope, 'global'));
         const conditions: any[] = [orgOrGlobal];
@@ -12876,7 +12957,7 @@ Current context: Project ${req.params.projectId}`;
       }
 
       const withCoordinates = results.filter(r => r.lat != null && r.lng != null).length;
-      const bySource: Record<string, number> = { property: 0, project: 0, comp: 0, listing: 0 };
+      const bySource: Record<string, number> = { property: 0, project: 0, comp: 0, rate_comp: 0, listing: 0, pipeline: 0 };
       const byState: Record<string, number> = {};
       for (const r of results) {
         bySource[r.source] = (bySource[r.source] || 0) + 1;

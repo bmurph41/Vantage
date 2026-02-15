@@ -57,6 +57,8 @@ import DealFormModal from "@/components/modals/deal-form-modal";
 import PipelineSettingsModal from "@/components/modals/pipeline-settings-modal";
 import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
+import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
+import { Map } from "lucide-react";
 
 type DealWithRelations = Deal & {
   contact?: Contact | null;
@@ -494,7 +496,7 @@ export default function Pipeline() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map">("kanban");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -827,12 +829,22 @@ export default function Pipeline() {
               <Button
                 variant="ghost"
                 size="sm"
-                className={`rounded-l-none border-l h-9 text-sm ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                className={`border-l h-9 text-sm ${viewMode === "list" ? "bg-gray-100" : ""}`}
                 onClick={() => setViewMode("list")}
                 data-testid="button-view-list"
               >
                 <List className="w-4 h-4 mr-1" />
                 List
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`rounded-l-none border-l h-9 text-sm ${viewMode === "map" ? "bg-gray-100" : ""}`}
+                onClick={() => setViewMode("map")}
+                data-testid="button-view-map"
+              >
+                <Map className="w-4 h-4 mr-1" />
+                Map
               </Button>
             </div>
 
@@ -1061,6 +1073,27 @@ export default function Pipeline() {
         )}
 
         {/* List View */}
+        {viewMode === "map" && (
+          <div className="flex-1 overflow-hidden" data-testid="map-view">
+            <MarinaMapEmbed
+              source="pipeline"
+              markerColor="#FF5722"
+              sourceLabel="Pipeline Deals"
+              height="calc(100vh - 220px)"
+              showSearch={true}
+              showStateFilter={true}
+              showSourceFilter={false}
+              showLayerToggles={false}
+              showListPanel={true}
+              emptyMessage="No pipeline deals with location data found"
+              onLocationClick={(loc) => {
+                const deal = deals.find(d => d.id === loc.id);
+                if (deal) handleDealClick(deal);
+              }}
+            />
+          </div>
+        )}
+
         {viewMode === "list" && (
           <div className="flex-1 overflow-y-auto p-6" data-testid="list-view">
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
