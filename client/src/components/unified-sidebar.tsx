@@ -64,7 +64,7 @@ const operationsModulesNav = [
   { name: "Commercial Tenants", href: "/operations/commercial-tenants" },
   { name: "Fuel Sales", href: "/operations/fuel" },
   { name: "Ship Store", href: "/operations/ship-store" },
-  { name: "Service & Parts", href: "/operations/service-parts" },
+  { name: "Service & Parts", href: "/operations/service" },
   { name: "Boat Rentals", href: "/operations/boat-rentals" },
   { name: "Boat Club", href: "/operations/boat-club" },
   { name: "Boat Sales", href: "/operations/boat-sales" },
