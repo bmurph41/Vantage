@@ -902,7 +902,7 @@ export default function Dashboard() {
   const modules: DashboardModule[] = [
     {
       id: 'crm-pipeline',
-      title: 'CRM Pipeline Overview',
+      title: 'Pipeline Overview',
       icon: DollarSign,
       link: '/crm/deals',
       data: dashboardData?.crm,
