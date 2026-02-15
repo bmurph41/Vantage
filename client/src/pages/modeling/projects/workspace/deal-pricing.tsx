@@ -67,11 +67,15 @@ interface PricingResult {
   exitCapRate: number;
   irr: number;
   equityMultiple: number;
+  moic: number;
   averageCashOnCash: number;
   noiByYear: number[];
   cashFlowsByYear: number[];
   exitValue: number;
   totalProfit: number;
+  netExitProceeds: number;
+  totalEquityInvested: number;
+  usedProFormaData: boolean;
 }
 
 interface SolveForPriceResult {
@@ -81,6 +85,7 @@ interface SolveForPriceResult {
   year1CapRate: number;
   irr: number;
   equityMultiple: number;
+  moic: number;
 }
 
 interface PricingResponse {
@@ -95,6 +100,9 @@ interface PricingResponse {
     storedPurchasePrice: number | null;
   };
   noiProjections: number[];
+  proFormaIntegrated: boolean;
+  exitValue: number;
+  netExitProceeds: number;
 }
 
 const formatMultiple = (value: number | null | undefined): string => {
@@ -453,145 +461,101 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   const pricingData = calculateMutation.data as PricingResponse | undefined;
 
-  // Bidirectional updates based on which field is driving
   useEffect(() => {
-    if (!isLinked) return;
+    if (!isLinked || !pricingData) return;
     
     const holdYears = holdPeriodNum;
-    const revenueGrowth = parsePercentInput(revenueGrowthRate) / 100;
-    const expenseGrowth = parsePercentInput(expenseGrowthRate) / 100;
-    const netGrowth = revenueGrowth - expenseGrowth;
-    const year1NOI = pricingData?.projectFinancials?.year1NOI || 500000;
-    
+    const year1NOI = pricingData?.projectFinancials?.year1NOI || 0;
     if (year1NOI <= 0) return;
-    
-    // Calculate cumulative cash flows and exit NOI
-    let cumulativeCashFlows = 0;
-    for (let i = 1; i <= holdYears; i++) {
-      cumulativeCashFlows += year1NOI * Math.pow(1 + netGrowth, i - 1);
+
+    const isProForma = pricingData.proFormaIntegrated;
+
+    if (isProForma) {
+      if (pricingDriver === 'targetIRR' && pricingData.fromTargetIRR) {
+        const derivedPrice = pricingData.fromTargetIRR.purchasePrice;
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+          const derivedCap = (year1NOI / derivedPrice) * 100;
+          const currentCap = parsePercentInput(goingInCapRate);
+          if (Math.abs(derivedCap - currentCap) > 0.05 && derivedCap > 0 && derivedCap < 100) {
+            setGoingInCapRate(derivedCap.toFixed(2));
+          }
+        }
+      } else if (pricingDriver === 'goingInCap' && pricingData.fromGoingInCapRate) {
+        const derivedPrice = pricingData.fromGoingInCapRate.purchasePrice;
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+        }
+      } else if (pricingDriver === 'exitCap' && pricingData.fromTargetIRR) {
+        const derivedPrice = pricingData.fromTargetIRR.purchasePrice;
+        const currentPrice = parseCurrencyInput(manualPurchasePrice);
+        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
+          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
+          const derivedCap = (year1NOI / derivedPrice) * 100;
+          const currentCap = parsePercentInput(goingInCapRate);
+          if (Math.abs(derivedCap - currentCap) > 0.05 && derivedCap > 0 && derivedCap < 100) {
+            setGoingInCapRate(derivedCap.toFixed(2));
+          }
+        }
+      }
+      return;
     }
-    const projectedExitNOI = year1NOI * Math.pow(1 + netGrowth, holdYears);
     
-    // Helper to update derived cap rates from price
-    const updateDerivedRates = (newPrice: number) => {
-      if (newPrice > 0) {
-        // Derive Going-In Cap Rate = Year 1 NOI / Price
-        const derivedGoingInCap = (year1NOI / newPrice) * 100;
-        const currentGoingIn = parsePercentInput(goingInCapRate);
-        if (Math.abs(derivedGoingInCap - currentGoingIn) > 0.1) {
-          setGoingInCapRate(derivedGoingInCap.toFixed(2));
-        }
-        
-        // Derive Exit Cap Rate = Exit NOI / Exit Value
-        // Exit Value ≈ Price * (1 + appreciation)^holdYears
-        const appreciation = 0.02; // 2% annual appreciation assumption
-        const estimatedExitValue = newPrice * Math.pow(1 + appreciation, holdYears);
-        const derivedExitCap = (projectedExitNOI / estimatedExitValue) * 100;
-        const currentExitCap = parsePercentInput(exitCapRate);
-        if (Math.abs(derivedExitCap - currentExitCap) > 0.1 && pricingDriver !== 'exitCap') {
-          setExitCapRate(derivedExitCap.toFixed(2));
-        }
+    const noiProj = pricingData.noiProjections || [];
+    const getNOI = (yearIdx: number) => noiProj[yearIdx] || year1NOI * Math.pow(1.03, yearIdx + 1);
+    const exitNOI = getNOI(holdYears - 1);
+    
+    const solvePriceFromIRR = (irrPct: number): number => {
+      const r = irrPct / 100;
+      if (r <= 0) return 0;
+      const exitCap = parsePercentInput(exitCapRate) / 100 || 0.075;
+      const ev = exitCap > 0 ? exitNOI / exitCap : 0;
+      let pv = 0;
+      for (let i = 1; i <= holdYears; i++) {
+        const cf = i < holdYears ? getNOI(i - 1) : getNOI(i - 1) + ev;
+        pv += cf / Math.pow(1 + r, i);
+      }
+      return pv;
+    };
+
+    const updatePrice = (newPrice: number) => {
+      const currentPrice = parseCurrencyInput(manualPurchasePrice);
+      if (newPrice > 0 && Math.abs(newPrice - currentPrice) > 10000) {
+        setManualPurchasePrice(Math.round(newPrice).toLocaleString());
       }
     };
-    
-    if (pricingDriver === 'exitCap') {
-      // Exit Cap Rate drives Price
-      const exitCap = parsePercentInput(exitCapRate) / 100;
-      if (exitCap > 0) {
-        const exitValue = projectedExitNOI / exitCap;
-        const targetReturn = parsePercentInput(targetIRR) / 100 || 0.15;
-        const discountFactor = Math.pow(1 + targetReturn, holdYears * 0.6);
-        const derivedPrice = (exitValue + cumulativeCashFlows * 0.85) / discountFactor;
-        
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-          // Update derived going-in cap from new price
-          const derivedGoingInCap = (year1NOI / derivedPrice) * 100;
-          setGoingInCapRate(derivedGoingInCap.toFixed(2));
-        }
+
+    const updateGoingInCap = (price: number) => {
+      if (price <= 0) return;
+      const derived = (year1NOI / price) * 100;
+      const current = parsePercentInput(goingInCapRate);
+      if (Math.abs(derived - current) > 0.05 && derived > 0 && derived < 100) {
+        setGoingInCapRate(derived.toFixed(2));
       }
-    } else if (pricingDriver === 'targetIRR') {
-      // Target IRR drives Price: Higher IRR = Lower Price
-      const targetReturn = parsePercentInput(targetIRR) / 100;
-      const exitCap = parsePercentInput(exitCapRate) / 100 || 0.075;
-      
-      if (targetReturn > 0 && exitCap > 0) {
-        const exitValue = projectedExitNOI / exitCap;
-        
-        // More accurate IRR-based price calculation
-        // PV = CF1/(1+r) + CF2/(1+r)^2 + ... + (CFn + ExitValue)/(1+r)^n
-        let pvCashFlows = 0;
-        for (let i = 1; i <= holdYears; i++) {
-          const yearCF = year1NOI * Math.pow(1 + netGrowth, i - 1);
-          pvCashFlows += yearCF / Math.pow(1 + targetReturn, i);
-        }
-        const pvExitValue = exitValue / Math.pow(1 + targetReturn, holdYears);
-        const derivedPrice = pvCashFlows + pvExitValue;
-        
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-          // Update derived cap rates from new price
-          updateDerivedRates(derivedPrice);
-        }
+    };
+
+    if (pricingDriver === 'targetIRR') {
+      const irrPct = parsePercentInput(targetIRR);
+      if (irrPct > 0) {
+        const derivedPrice = solvePriceFromIRR(irrPct);
+        updatePrice(derivedPrice);
+        updateGoingInCap(derivedPrice);
       }
     } else if (pricingDriver === 'goingInCap') {
-      // Going-In Cap Rate drives Price: Price = Year 1 NOI / Cap Rate
       const goingInCap = parsePercentInput(goingInCapRate) / 100;
       if (goingInCap > 0) {
         const derivedPrice = year1NOI / goingInCap;
-        
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (Math.abs(derivedPrice - currentPrice) > 50000 && derivedPrice > 0) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-          
-          // Derive Exit Cap Rate from new price
-          const appreciation = 0.02;
-          const estimatedExitValue = derivedPrice * Math.pow(1 + appreciation, holdYears);
-          const derivedExitCap = (projectedExitNOI / estimatedExitValue) * 100;
-          const currentExitCap = parsePercentInput(exitCapRate);
-          if (Math.abs(derivedExitCap - currentExitCap) > 0.1) {
-            setExitCapRate(derivedExitCap.toFixed(2));
-          }
-          
-          // Derive Target IRR from new price
-          // IRR is the rate where: Price = sum(CF/(1+r)^t) + ExitValue/(1+r)^n
-          // Newton-Raphson approximation
-          let irr = 0.15; // initial guess
-          for (let iter = 0; iter < 10; iter++) {
-            let npv = -derivedPrice;
-            let dnpv = 0;
-            for (let i = 1; i <= holdYears; i++) {
-              const yearCF = year1NOI * Math.pow(1 + netGrowth, i - 1);
-              npv += yearCF / Math.pow(1 + irr, i);
-              dnpv -= i * yearCF / Math.pow(1 + irr, i + 1);
-            }
-            const exitValue = projectedExitNOI / (parsePercentInput(exitCapRate) / 100 || 0.075);
-            npv += exitValue / Math.pow(1 + irr, holdYears);
-            dnpv -= holdYears * exitValue / Math.pow(1 + irr, holdYears + 1);
-            if (Math.abs(dnpv) > 0.0001) {
-              irr = irr - npv / dnpv;
-            }
-          }
-          const derivedIRR = irr * 100;
-          const currentIRR = parsePercentInput(targetIRR);
-          if (Math.abs(derivedIRR - currentIRR) > 0.5 && derivedIRR > 0 && derivedIRR < 100) {
-            setTargetIRR(derivedIRR.toFixed(1));
-          }
-          
-          // Derive Target Year Cap Rate from new price
-          const currentTargetYear = parseInt(targetYear) || 3;
-          const targetYearNOI = year1NOI * Math.pow(1 + netGrowth, currentTargetYear - 1);
-          const derivedTargetYearCap = (targetYearNOI / derivedPrice) * 100;
-          const currentTargetYearCap = parsePercentInput(targetYearCapRate);
-          if (Math.abs(derivedTargetYearCap - currentTargetYearCap) > 0.1) {
-            setTargetYearCapRate(derivedTargetYearCap.toFixed(1));
-          }
-        }
+        updatePrice(derivedPrice);
       }
+    } else if (pricingDriver === 'exitCap') {
+      const irrPct = parsePercentInput(targetIRR) || 15;
+      const derivedPrice = solvePriceFromIRR(irrPct);
+      updatePrice(derivedPrice);
+      updateGoingInCap(derivedPrice);
     }
-  }, [exitCapRate, targetIRR, goingInCapRate, targetYear, targetYearCapRate, pricingDriver, isLinked, holdPeriodNum, revenueGrowthRate, expenseGrowthRate, pricingData?.projectFinancials?.year1NOI]);
+  }, [exitCapRate, targetIRR, goingInCapRate, pricingDriver, isLinked, holdPeriodNum, pricingData]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
@@ -913,6 +877,12 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               </div>
             ) : pricingData?.fromPurchasePrice ? (
               <div className="space-y-4">
+                {pricingData.fromPurchasePrice.usedProFormaData && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-medium mb-2">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Using Pro Forma Engine data
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <p className="text-xs text-muted-foreground">IRR</p>
@@ -927,9 +897,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <p className="text-xs text-muted-foreground">Equity Multiple</p>
+                    <p className="text-xs text-muted-foreground">MOIC</p>
                     <p className="num text-xl font-bold text-purple-600">
-                      {formatMultiple(pricingData.fromPurchasePrice.equityMultiple)}
+                      {formatMultiple(pricingData.fromPurchasePrice.moic)}
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
@@ -939,10 +909,18 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     </p>
                   </div>
                 </div>
-                <div className="flex justify-between text-sm pt-2 border-t">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pt-2 border-t">
                   <div>
                     <span className="text-muted-foreground">Exit Value: </span>
                     <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.exitValue)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Net Exit Proceeds: </span>
+                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.netExitProceeds)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total Equity: </span>
+                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.totalEquityInvested)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Profit: </span>
@@ -1020,8 +998,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <span className="num font-medium">{formatPercent(pricingData.fromTargetIRR.year1CapRate)}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Equity Multiple: </span>
-                    <span className="num font-medium">{formatMultiple(pricingData.fromTargetIRR.equityMultiple)}</span>
+                    <span className="text-muted-foreground">MOIC: </span>
+                    <span className="num font-medium">{formatMultiple(pricingData.fromTargetIRR.moic)}</span>
                   </div>
                 </div>
                 <Button 
@@ -1090,13 +1068,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     At {formatPercent(pricingData.fromGoingInCapRate.achievedMetric)} cap rate
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-3 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">IRR: </span>
                     <span className="num font-medium text-green-600">{formatPercent(pricingData.fromGoingInCapRate.irr)}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Equity Multiple: </span>
+                    <span className="text-muted-foreground">MOIC: </span>
+                    <span className="num font-medium">{formatMultiple(pricingData.fromGoingInCapRate.moic)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Eq. Mult: </span>
                     <span className="num font-medium">{formatMultiple(pricingData.fromGoingInCapRate.equityMultiple)}</span>
                   </div>
                 </div>
@@ -1208,10 +1190,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       {pricingData?.noiProjections && pricingData.noiProjections.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">NOI Projections</CardTitle>
-            <CardDescription>
-              Projected Net Operating Income over the hold period
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">NOI Projections</CardTitle>
+                <CardDescription>
+                  Projected Net Operating Income over the hold period
+                </CardDescription>
+              </div>
+              {pricingData?.proFormaIntegrated && (
+                <Badge variant="secondary" className="text-[10px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 border-indigo-200">
+                  Pro Forma Engine
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-5 gap-4">
@@ -1321,8 +1312,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                       <span className="font-medium">{pricingData?.fromPurchasePrice?.irr != null ? formatPercent(pricingData.fromPurchasePrice.irr) : '—'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Equity Multiple</span>
-                      <span className="font-medium">{pricingData?.fromPurchasePrice?.equityMultiple != null ? formatMultiple(pricingData.fromPurchasePrice.equityMultiple) : '—'}</span>
+                      <span className="text-muted-foreground">MOIC</span>
+                      <span className="font-medium">{pricingData?.fromPurchasePrice?.moic != null ? formatMultiple(pricingData.fromPurchasePrice.moic) : '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Cash-on-Cash</span>
