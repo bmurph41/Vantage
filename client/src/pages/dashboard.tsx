@@ -1133,6 +1133,7 @@ export default function Dashboard() {
                   value={displayMetrics?.avgPrice || 0}
                   type="currency"
                   size="md"
+                  compact={true}
                   testId="comps-avg-price"
                   tooltip={salesCompsYear === 'all' ? 'Average sale price across all comparables' : `Average sale price in ${salesCompsYear}`}
                   onClick={() => setIsSalesCompsDetailOpen(true)}
