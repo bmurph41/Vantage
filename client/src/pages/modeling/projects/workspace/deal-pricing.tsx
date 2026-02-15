@@ -135,6 +135,46 @@ function PercentStepper({
   };
   const colors = colorMap[activeColor] || colorMap.blue;
   
+  const compact = !label;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5 justify-center">
+        <button
+          onClick={decrement}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600 flex-shrink-0"
+          tabIndex={-1}
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9.\-]/g, '');
+              onChange(raw);
+            }}
+            onBlur={() => {
+              const v = parsePercentInput(value);
+              onChange(Math.min(max, Math.max(min, v)).toString());
+            }}
+            className="w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
+            data-testid={props['data-testid']}
+          />
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pr-2 font-medium select-none flex-shrink-0">%</span>
+        </div>
+        <button
+          onClick={increment}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600 flex-shrink-0"
+          tabIndex={-1}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(
       "flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border",
@@ -222,6 +262,40 @@ function CurrencyStepper({
     primary: { ring: 'ring-primary/40 border-primary/50', badge: 'bg-primary', iconBg: 'bg-primary/10', iconText: 'text-primary' },
   };
   const colors = colorMap[activeColor] || colorMap.primary;
+
+  const compact = !label;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={decrement}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600 flex-shrink-0"
+          tabIndex={-1}
+        >
+          <Minus className="w-3 h-3" />
+        </button>
+        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 overflow-hidden flex-1 min-w-0">
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-2.5 font-medium select-none flex-shrink-0">$</span>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/[^0-9,.-]/g, ''))}
+            className="w-full text-center text-[13px] font-mono py-1.5 bg-transparent outline-none text-slate-700 dark:text-slate-300"
+            placeholder="10,000,000"
+            data-testid={props['data-testid']}
+          />
+        </div>
+        <button
+          onClick={increment}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600 flex-shrink-0"
+          tabIndex={-1}
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
@@ -628,37 +702,271 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </Card>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 border-l-4 border-l-slate-400 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-            <SlidersHorizontal className="w-4 h-4" />
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Deal Inputs
+            </CardTitle>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{driverLabels[pricingDriver].description}</span>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Assumptions</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Hold period and exit cap rate</p>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          <div className="grid grid-cols-5 gap-1 p-1 rounded-lg bg-muted/50">
+            {(['targetIRR', 'goingInCap', 'price', 'exitCap', 'holdPeriod'] as PricingDriver[]).map((d) => {
+              const isActive = pricingDriver === d;
+              const IconComp = d === 'targetIRR' ? Target : d === 'goingInCap' ? Percent : d === 'price' ? DollarSign : d === 'exitCap' ? TrendingUp : Calendar;
+              return (
+                <button
+                  key={d}
+                  onClick={() => {
+                    if (d === 'targetIRR') handleTargetIRRChange(targetIRR);
+                    else if (d === 'goingInCap') handleGoingInCapRateChange(goingInCapRate);
+                    else if (d === 'price') handlePurchasePriceChange(purchasePrice);
+                    else if (d === 'exitCap') handleExitCapRateChange(exitCapRate);
+                    else if (d === 'holdPeriod') handleHoldPeriodChange(String(holdPeriodNum));
+                  }}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all",
+                    isActive
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  )}
+                >
+                  <IconComp className="h-3 w-3" />
+                  <span className="hidden sm:inline">{driverLabels[d].label}</span>
+                </button>
+              );
+            })}
           </div>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            {/* Target IRR */}
             <div className={cn(
-              "flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border",
-              pricingDriver === 'holdPeriod'
-                ? "ring-2 ring-slate-400/40 border-slate-300 dark:border-slate-600"
-                : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"
+              "rounded-lg border p-3 transition-all",
+              pricingDriver === 'targetIRR'
+                ? "border-green-500/50 bg-green-500/5 ring-1 ring-green-500/20"
+                : "border-border"
             )}>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  <Calendar className="w-3 h-3" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Target className="h-3.5 w-3.5 text-green-600" />
+                  <span className="text-xs font-medium">Target IRR</span>
                 </div>
-                <span className="text-[12px] font-medium text-slate-600 dark:text-slate-400">Hold Period</span>
+                <div className="flex items-center gap-1">
+                  {pricingDriver === 'targetIRR' ? (
+                    <Badge className="bg-green-600 text-white text-[8px] px-1.5 py-0 h-4">Solving</Badge>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleLock('targetIRR')}
+                            className={cn(
+                              "p-0.5 rounded transition-colors",
+                              lockedInputs.has('targetIRR')
+                                ? "text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30"
+                                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                            )}
+                          >
+                            {lockedInputs.has('targetIRR') ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {lockedInputs.has('targetIRR') ? `Locked at ${targetIRR}% — click to unlock` : 'Lock this value'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
+              <PercentStepper
+                label=""
+                icon={Target}
+                value={targetIRR}
+                onChange={handleTargetIRRChange}
+                step={0.5}
+                isActive={pricingDriver === 'targetIRR'}
+                activeColor="green"
+                data-testid="input-target-irr"
+              />
+              {pricingDriver === 'targetIRR' && pricingData && (
+                <div className="mt-2 pt-2 border-t border-green-500/20">
+                  <p className="text-[10px] text-muted-foreground">Solved Price</p>
+                  <p className="num text-sm font-bold" data-testid="text-irr-price">
+                    {formatCurrency(pricingData.purchasePrice)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Going-In Cap Rate */}
+            <div className={cn(
+              "rounded-lg border p-3 transition-all",
+              pricingDriver === 'goingInCap'
+                ? "border-blue-500/50 bg-blue-500/5 ring-1 ring-blue-500/20"
+                : "border-border"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Percent className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-xs font-medium">Going-In Cap</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {pricingDriver === 'goingInCap' ? (
+                    <Badge className="bg-blue-600 text-white text-[8px] px-1.5 py-0 h-4">Solving</Badge>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleLock('goingInCap')}
+                            className={cn(
+                              "p-0.5 rounded transition-colors",
+                              lockedInputs.has('goingInCap')
+                                ? "text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                            )}
+                          >
+                            {lockedInputs.has('goingInCap') ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {lockedInputs.has('goingInCap') ? `Locked at ${goingInCapRate}% — click to unlock` : 'Lock this value'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
+              <PercentStepper
+                label=""
+                icon={Percent}
+                value={goingInCapRate}
+                onChange={handleGoingInCapRateChange}
+                step={0.25}
+                isActive={pricingDriver === 'goingInCap'}
+                activeColor="blue"
+                data-testid="input-going-in-cap"
+              />
+              {pricingDriver === 'goingInCap' && pricingData && (
+                <div className="mt-2 pt-2 border-t border-blue-500/20">
+                  <p className="text-[10px] text-muted-foreground">Implied Price</p>
+                  <p className="num text-sm font-bold" data-testid="text-cap-price">
+                    {formatCurrency(pricingData.purchasePrice)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Purchase Price */}
+            <div className={cn(
+              "rounded-lg border p-3 transition-all",
+              pricingDriver === 'price'
+                ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                : "border-border"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-medium">Purchase Price</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {pricingDriver === 'price' ? (
+                    <Badge className="bg-primary text-primary-foreground text-[8px] px-1.5 py-0 h-4">Solving</Badge>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleLock('price')}
+                            className={cn(
+                              "p-0.5 rounded transition-colors",
+                              lockedInputs.has('price')
+                                ? "text-primary hover:bg-primary/10"
+                                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                            )}
+                          >
+                            {lockedInputs.has('price') ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {lockedInputs.has('price') ? `Locked at $${purchasePrice?.toLocaleString()} — click to unlock` : 'Lock this value'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
+              <CurrencyStepper
+                label=""
+                icon={DollarSign}
+                value={purchasePrice}
+                onChange={handlePurchasePriceChange}
+                step={500000}
+                isActive={pricingDriver === 'price'}
+                activeColor="primary"
+                data-testid="input-purchase-price"
+              />
+              {pricingDriver === 'price' && pricingData && (
+                <div className="mt-2 pt-2 border-t border-primary/20">
+                  <p className="text-[10px] text-muted-foreground">Resulting IRR</p>
+                  <p className="num text-sm font-bold text-green-600" data-testid="text-price-irr">
+                    {formatPercent(pricingData.irr)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Exit Cap Rate */}
+            <div className={cn(
+              "rounded-lg border p-3 transition-all",
+              pricingDriver === 'exitCap'
+                ? "border-purple-500/50 bg-purple-500/5 ring-1 ring-purple-500/20"
+                : "border-border"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-purple-600" />
+                  <span className="text-xs font-medium">Exit Cap</span>
+                </div>
+                {pricingDriver === 'exitCap' && (
+                  <Badge className="bg-purple-600 text-white text-[8px] px-1.5 py-0 h-4">Solving</Badge>
+                )}
+              </div>
+              <PercentStepper
+                label=""
+                icon={TrendingUp}
+                value={exitCapRate}
+                onChange={handleExitCapRateChange}
+                step={0.25}
+                isActive={pricingDriver === 'exitCap'}
+                activeColor="purple"
+                data-testid="input-exit-cap-rate"
+              />
+            </div>
+
+            {/* Hold Period */}
+            <div className={cn(
+              "rounded-lg border p-3 transition-all",
+              pricingDriver === 'holdPeriod'
+                ? "border-slate-400/50 bg-slate-500/5 ring-1 ring-slate-400/20"
+                : "border-border"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="text-xs font-medium">Hold Period</span>
+                </div>
                 {pricingDriver === 'holdPeriod' && (
-                  <Badge className="bg-slate-600 text-white text-[8px] px-1.5 py-0 h-4 flex-shrink-0 ml-auto">
-                    Driving
-                  </Badge>
+                  <Badge className="bg-slate-600 text-white text-[8px] px-1.5 py-0 h-4">Solving</Badge>
                 )}
               </div>
               <Select value={String(holdPeriodNum)} onValueChange={handleHoldPeriodChange}>
-                <SelectTrigger className="w-full h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-hold-period">
+                <SelectTrigger className="w-full h-9 text-sm font-mono bg-background" data-testid="select-hold-period">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -668,244 +976,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </SelectContent>
               </Select>
             </div>
-            <PercentStepper
-              label="Exit Cap"
-              icon={TrendingUp}
-              value={exitCapRate}
-              onChange={handleExitCapRateChange}
-              step={0.25}
-              isActive={pricingDriver === 'exitCap'}
-              activeBadge="Driving"
-              activeColor="purple"
-              data-testid="input-exit-cap-rate"
-            />
           </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
-        {(['targetIRR', 'goingInCap', 'price', 'exitCap', 'holdPeriod'] as PricingDriver[]).map((d) => {
-          const isActive = pricingDriver === d;
-          const colorClass = isActive 
-            ? d === 'targetIRR' ? 'bg-green-600 text-white' 
-              : d === 'goingInCap' ? 'bg-blue-600 text-white'
-              : d === 'price' ? 'bg-primary text-primary-foreground'
-              : d === 'exitCap' ? 'bg-purple-600 text-white'
-              : 'bg-slate-600 text-white'
-            : 'bg-muted text-muted-foreground';
-          const IconComp = d === 'targetIRR' ? Target : d === 'goingInCap' ? Percent : d === 'price' ? DollarSign : d === 'exitCap' ? TrendingUp : Calendar;
-          return (
-            <div key={d} className="flex items-center gap-1.5">
-              <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all", colorClass)}>
-                <IconComp className="h-3 w-3" />
-                {driverLabels[d].label}
-              </div>
-              {d !== 'holdPeriod' && <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />}
-            </div>
-          );
-        })}
-        <span className="text-xs text-muted-foreground ml-2">
-          {driverLabels[pricingDriver].description}
-        </span>
-      </div>
-
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card className={cn(
-          "border overflow-hidden",
-          pricingDriver === 'targetIRR' ? 'border-green-500 ring-2 ring-green-500/30' : ''
-        )}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Target className="h-4 w-4 text-green-600" />
-                Target IRR
-              </CardTitle>
-              <div className="flex items-center gap-1.5">
-                {pricingDriver !== 'targetIRR' && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => toggleLock('targetIRR')}
-                          className={cn(
-                            "p-1 rounded-md transition-colors",
-                            lockedInputs.has('targetIRR')
-                              ? "bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
-                          )}
-                        >
-                          {lockedInputs.has('targetIRR')
-                            ? <Lock className="h-3.5 w-3.5 text-green-600" />
-                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
-                          }
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        <p>{lockedInputs.has('targetIRR') ? `Locked at ${targetIRR}% — click to unlock` : 'Click to lock this value'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {pricingDriver === 'targetIRR' && (
-                  <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <PercentStepper
-              label="Target"
-              icon={Target}
-              value={targetIRR}
-              onChange={handleTargetIRRChange}
-              step={0.5}
-              isActive={pricingDriver === 'targetIRR'}
-              activeBadge="Driving"
-              activeColor="green"
-              data-testid="input-target-irr"
-            />
-            {pricingDriver === 'targetIRR' && pricingData && (
-              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                <p className="text-xs text-muted-foreground mb-1">Solved Purchase Price</p>
-                <p className="num text-xl font-bold" data-testid="text-irr-price">
-                  {formatCurrency(pricingData.purchasePrice)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className={cn(
-          "border overflow-hidden",
-          pricingDriver === 'goingInCap' ? 'border-blue-500 ring-2 ring-blue-500/30' : ''
-        )}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Percent className="h-4 w-4 text-blue-600" />
-                Going-In Cap Rate
-              </CardTitle>
-              <div className="flex items-center gap-1.5">
-                {pricingDriver !== 'goingInCap' && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => toggleLock('goingInCap')}
-                          className={cn(
-                            "p-1 rounded-md transition-colors",
-                            lockedInputs.has('goingInCap')
-                              ? "bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
-                          )}
-                        >
-                          {lockedInputs.has('goingInCap')
-                            ? <Lock className="h-3.5 w-3.5 text-blue-600" />
-                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
-                          }
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        <p>{lockedInputs.has('goingInCap') ? `Locked at ${goingInCapRate}% — click to unlock` : 'Click to lock this value'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {pricingDriver === 'goingInCap' && (
-                  <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <PercentStepper
-              label="Going-In Rate"
-              icon={Percent}
-              value={goingInCapRate}
-              onChange={handleGoingInCapRateChange}
-              step={0.25}
-              isActive={pricingDriver === 'goingInCap'}
-              activeBadge="Driving"
-              activeColor="blue"
-              data-testid="input-going-in-cap"
-            />
-            {pricingDriver === 'goingInCap' && pricingData && (
-              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <p className="text-xs text-muted-foreground mb-1">Implied Purchase Price</p>
-                <p className="num text-xl font-bold" data-testid="text-cap-price">
-                  {formatCurrency(pricingData.purchasePrice)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className={cn(
-          "border overflow-hidden",
-          pricingDriver === 'price' ? 'border-primary ring-2 ring-primary/30' : ''
-        )}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-primary" />
-                Purchase Price
-              </CardTitle>
-              <div className="flex items-center gap-1.5">
-                {pricingDriver !== 'price' && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => toggleLock('price')}
-                          className={cn(
-                            "p-1 rounded-md transition-colors",
-                            lockedInputs.has('price')
-                              ? "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
-                          )}
-                        >
-                          {lockedInputs.has('price')
-                            ? <Lock className="h-3.5 w-3.5 text-primary" />
-                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
-                          }
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        <p>{lockedInputs.has('price') ? `Locked at $${purchasePrice?.toLocaleString()} — click to unlock` : 'Click to lock this value'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {pricingDriver === 'price' && (
-                  <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">Driving</Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <CurrencyStepper
-              label="Enter Amount"
-              icon={DollarSign}
-              value={purchasePrice}
-              onChange={handlePurchasePriceChange}
-              step={500000}
-              isActive={pricingDriver === 'price'}
-              activeColor="primary"
-              data-testid="input-purchase-price"
-            />
-            {pricingDriver === 'price' && pricingData && (
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                <p className="text-xs text-muted-foreground mb-1">Resulting IRR</p>
-                <p className="num text-xl font-bold text-green-600" data-testid="text-price-irr">
-                  {formatPercent(pricingData.irr)}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
 
       {calculateMutation.isPending ? (
         <Card>
