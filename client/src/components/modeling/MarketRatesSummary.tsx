@@ -38,7 +38,6 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
     mutationFn: () => apiRequest("POST", "/api/capital-markets/rates/refresh", { lookbackDays: 30 }),
     onSuccess: () => {
       invalidateAllRateQueries();
-      toast({ title: "Rates Updated", description: "Market rates refreshed from FRED" });
     },
     onError: (error: any) => {
       toast({ title: "Refresh Failed", description: error.message, variant: "destructive" });
