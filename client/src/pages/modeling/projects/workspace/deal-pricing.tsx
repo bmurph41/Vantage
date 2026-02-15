@@ -368,23 +368,25 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [lockedInputs, setLockedInputs] = useState<Set<string>>(new Set());
   const inputsLoadedRef = useRef(false);
 
-  const { data: savedInputs } = useQuery<SavedDealPricingInputs | null>({
+  const { data: savedInputs, isFetched: inputsFetched } = useQuery<SavedDealPricingInputs | null>({
     queryKey: ['/api/modeling/projects', projectId, 'deal-pricing', 'inputs'],
     enabled: !!projectId,
   });
 
   useEffect(() => {
-    if (inputsLoadedRef.current || !savedInputs) return;
+    if (inputsLoadedRef.current || !inputsFetched) return;
     inputsLoadedRef.current = true;
-    if (savedInputs.targetIRR !== undefined) setTargetIRR(String(savedInputs.targetIRR));
-    if (savedInputs.goingInCapRate !== undefined) setGoingInCapRate(String(savedInputs.goingInCapRate));
-    if (savedInputs.exitCapRate !== undefined) setExitCapRate(String(savedInputs.exitCapRate));
-    if (savedInputs.holdPeriod !== undefined) setHoldPeriodNum(savedInputs.holdPeriod);
-    if (savedInputs.pricingDriver) setPricingDriver(savedInputs.pricingDriver);
-    if (savedInputs.purchasePrice !== undefined && savedInputs.purchasePrice > 0) {
-      setPurchasePrice(Math.round(savedInputs.purchasePrice).toLocaleString());
+    if (savedInputs) {
+      if (savedInputs.targetIRR !== undefined && !isNaN(savedInputs.targetIRR)) setTargetIRR(String(savedInputs.targetIRR));
+      if (savedInputs.goingInCapRate !== undefined && !isNaN(savedInputs.goingInCapRate)) setGoingInCapRate(String(savedInputs.goingInCapRate));
+      if (savedInputs.exitCapRate !== undefined && !isNaN(savedInputs.exitCapRate)) setExitCapRate(String(savedInputs.exitCapRate));
+      if (savedInputs.holdPeriod !== undefined && !isNaN(savedInputs.holdPeriod)) setHoldPeriodNum(savedInputs.holdPeriod);
+      if (savedInputs.pricingDriver) setPricingDriver(savedInputs.pricingDriver);
+      if (savedInputs.purchasePrice !== undefined && savedInputs.purchasePrice > 0) {
+        setPurchasePrice(Math.round(savedInputs.purchasePrice).toLocaleString());
+      }
     }
-  }, [savedInputs]);
+  }, [inputsFetched, savedInputs]);
 
   const saveInputsMutation = useMutation({
     mutationFn: (inputs: SavedDealPricingInputs) =>
