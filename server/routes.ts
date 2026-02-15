@@ -20036,6 +20036,29 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.put('/api/modeling/projects/:projectId/target-price', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { targetPrice } = req.body;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const customMetrics = { ...((project.customMetrics as any) || {}) };
+      customMetrics.targetPrice = targetPrice;
+
+      await storage.updateModelingProject(projectId, { customMetrics, updatedBy: userId }, orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to save target price:', error);
+      res.status(500).json({ error: error.message || 'Failed to save target price' });
+    }
+  });
+
   // Save deal pricing configuration (legacy explicit save button)
   app.post('/api/modeling/projects/:projectId/deal-pricing/save', authenticateUser, async (req: any, res) => {
     try {

@@ -364,6 +364,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
   
+  const [targetPrice, setTargetPrice] = useState<string>('');
+  const [editingTargetPrice, setEditingTargetPrice] = useState(false);
   const [pricingDriver, setPricingDriver] = useState<PricingDriver>('targetIRR');
   const [lockedInputs, setLockedInputs] = useState<Set<string>>(new Set());
   const inputsLoadedRef = useRef(false);
@@ -517,6 +519,23 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       setPurchasePrice(String(project.purchasePrice));
     }
   }, [project]);
+
+  useEffect(() => {
+    if (project) {
+      const cm = (project as any).customMetrics || {};
+      if (cm.targetPrice !== undefined && cm.targetPrice !== null) {
+        setTargetPrice(Math.round(Number(cm.targetPrice)).toLocaleString());
+      }
+    }
+  }, [project]);
+
+  const saveTargetPriceMutation = useMutation({
+    mutationFn: (price: number | null) =>
+      apiRequest('PUT', `/api/modeling/projects/${projectId}/target-price`, { targetPrice: price }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    },
+  });
 
   const calculateMutation = useMutation({
     mutationFn: async (inputs: any) => {
@@ -757,12 +776,54 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Target Price</p>
-                <p className="font-semibold text-lg" data-testid="text-period-price">
-                  {pricingData.projectFinancials.storedPurchasePrice
-                    ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
-                    : 'Not set'}
+                <p className="text-muted-foreground flex items-center gap-1">
+                  Target Price
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">Seller or broker guidance price — click to edit</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </p>
+                {editingTargetPrice ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-lg font-semibold">$</span>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={targetPrice}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setTargetPrice(raw ? Number(raw).toLocaleString() : '');
+                      }}
+                      onBlur={() => {
+                        setEditingTargetPrice(false);
+                        const numVal = Number(targetPrice.replace(/,/g, ''));
+                        saveTargetPriceMutation.mutate(numVal > 0 ? numVal : null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                      className="w-[140px] text-lg font-semibold bg-transparent border-b border-blue-400 outline-none text-foreground"
+                    />
+                  </div>
+                ) : (
+                  <p
+                    className="font-semibold text-lg cursor-pointer hover:text-blue-400 transition-colors"
+                    data-testid="text-period-price"
+                    onClick={() => setEditingTargetPrice(true)}
+                  >
+                    {targetPrice && Number(targetPrice.replace(/,/g, '')) > 0
+                      ? `$${targetPrice}`
+                      : <span className="text-muted-foreground italic">Click to set</span>}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
