@@ -17,6 +17,24 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { EnhancedMetricCard } from "@/components/dashboard/EnhancedMetricCard";
 import { ModuleSection, MetricGrid, DataList, StatBar } from "@/components/dashboard/ModuleSection";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
+
+function formatCompactCurrency(val: number): string {
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) {
+    const n = abs / 1_000_000_000;
+    return `${sign}$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}B`;
+  }
+  if (abs >= 1_000_000) {
+    const n = abs / 1_000_000;
+    return `${sign}$${n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(1)}M`;
+  }
+  if (abs >= 1_000) {
+    const n = abs / 1_000;
+    return `${sign}$${n >= 100 ? n.toFixed(0) : n.toFixed(1)}K`;
+  }
+  return formatCurrency(val);
+}
 import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
@@ -953,8 +971,8 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Won Value</p>
-                  <p className="text-lg font-bold text-green-600 truncate" data-testid="crm-won-value" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}>
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}
+                  <p className="text-2xl font-bold text-green-600" data-testid="crm-won-value" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}>
+                    {formatCompactCurrency(data?.wonValue || 0)}
                   </p>
                 </div>
                 <div className="min-w-0">
@@ -983,8 +1001,8 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Total Valuation</p>
-                  <p className="text-lg font-bold truncate" data-testid="modeling-valuation" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}>
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}
+                  <p className="text-2xl font-bold" data-testid="modeling-valuation" title={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}>
+                    {formatCompactCurrency(modelingData?.totalValuation || 0)}
                   </p>
                 </div>
               </div>

@@ -68,16 +68,38 @@ export function EnhancedMetricCard({
     return Number.isInteger(val) ? val / 100 : val;
   };
 
+  const formatCompactCurrency = (val: number): string => {
+    const abs = Math.abs(val);
+    const sign = val < 0 ? '-' : '';
+    if (abs >= 1_000_000_000) {
+      const n = abs / 1_000_000_000;
+      return `${sign}$${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}B`;
+    }
+    if (abs >= 1_000_000) {
+      const n = abs / 1_000_000;
+      return `${sign}$${n % 1 === 0 ? n.toFixed(0) : n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(1)}M`;
+    }
+    if (abs >= 1_000) {
+      const n = abs / 1_000;
+      return `${sign}$${n >= 100 ? n.toFixed(0) : n.toFixed(1)}K`;
+    }
+    return formatCurrency(val);
+  };
+
   const formatMetricValue = (val: number, metricType: MetricType, format: PercentFormat = percentFormat) => {
     switch (metricType) {
       case 'currency':
-        return formatCurrency(val);
+        return compact ? formatCompactCurrency(val) : formatCurrency(val);
       case 'percent':
         const normalizedVal = normalizePercent(val, format);
         return formatPercent(normalizedVal * 100);
       default:
         return formatNumber(val);
     }
+  };
+
+  const formatFullCurrency = (val: number): string => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
   };
 
   const formatTrendValue = (trendVal: number): string => {
@@ -188,12 +210,12 @@ export function EnhancedMetricCard({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-2 mb-2 min-w-0 overflow-hidden">
+      <div className="flex flex-wrap items-baseline gap-2 mb-2 min-w-0">
         <p className={cn(
-          "font-bold tracking-tight leading-none truncate min-w-0 max-w-full",
+          "font-bold tracking-tight leading-none min-w-0",
           sizeClasses[size].value,
           variantClasses[variant]
-        )} title={formatMetricValue(value, type)}>
+        )} title={type === 'currency' ? formatFullCurrency(value) : undefined}>
           {formatMetricValue(value, type)}
         </p>
 
