@@ -498,8 +498,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   const handleExitCapRateChange = (value: string) => {
     setExitCapRate(value);
-    setPricingDriver('exitCap');
-    lockInput('exitCap');
     const numVal = parseFloat(value);
     if (numVal > 0) {
       debouncedSaveCapRate(numVal);
@@ -508,8 +506,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
   const handleHoldPeriodChange = (value: string) => {
     setHoldPeriodNum(parseInt(value));
-    setPricingDriver('holdPeriod');
-    lockInput('holdPeriod');
   };
 
   const debouncedCalculate = useCallback(
@@ -726,8 +722,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     if (d === 'targetIRR') handleTargetIRRChange(targetIRR);
                     else if (d === 'goingInCap') handleGoingInCapRateChange(goingInCapRate);
                     else if (d === 'price') handlePurchasePriceChange(purchasePrice);
-                    else if (d === 'exitCap') handleExitCapRateChange(exitCapRate);
-                    else if (d === 'holdPeriod') handleHoldPeriodChange(String(holdPeriodNum));
+                    else if (d === 'exitCap' || d === 'holdPeriod') {
+                      setPricingDriver(d);
+                    }
                   }}
                   className={cn(
                     "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all",
@@ -793,9 +790,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="green"
                 data-testid="input-target-irr"
               />
-              {pricingDriver === 'targetIRR' && pricingData && (
+              {pricingData && pricingData.purchasePrice > 0 && (
                 <div className="mt-2 pt-2 border-t border-green-500/20">
-                  <p className="text-[10px] text-muted-foreground">Solved Price</p>
+                  <p className="text-[10px] text-muted-foreground">Implied Price</p>
                   <p className="num text-sm font-bold" data-testid="text-irr-price">
                     {formatCurrency(pricingData.purchasePrice)}
                   </p>
@@ -852,7 +849,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="blue"
                 data-testid="input-going-in-cap"
               />
-              {pricingDriver === 'goingInCap' && pricingData && (
+              {pricingData && pricingData.purchasePrice > 0 && (
                 <div className="mt-2 pt-2 border-t border-blue-500/20">
                   <p className="text-[10px] text-muted-foreground">Implied Price</p>
                   <p className="num text-sm font-bold" data-testid="text-cap-price">
@@ -911,11 +908,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 activeColor="primary"
                 data-testid="input-purchase-price"
               />
-              {pricingDriver === 'price' && pricingData && (
+              {pricingData && pricingData.purchasePrice > 0 && (
                 <div className="mt-2 pt-2 border-t border-primary/20">
-                  <p className="text-[10px] text-muted-foreground">Resulting IRR</p>
-                  <p className="num text-sm font-bold text-green-600" data-testid="text-price-irr">
-                    {formatPercent(pricingData.irr)}
+                  <p className="text-[10px] text-muted-foreground">Implied Price</p>
+                  <p className="num text-sm font-bold" data-testid="text-price-irr">
+                    {formatCurrency(pricingData.purchasePrice)}
                   </p>
                 </div>
               )}
