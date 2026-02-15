@@ -17748,6 +17748,9 @@ Current context: Project ${req.params.projectId}`;
           ? (rawCashOnCash < 1 ? rawCashOnCash * 100 : rawCashOnCash)
           : (noiVal != null && purchasePrice && purchasePrice > 0 ? (noiVal / purchasePrice) * 100 : null);
 
+        const noiByYear: number[] = Array.isArray(dpResults.noiByYear) ? dpResults.noiByYear : [];
+        const cashFlowsByYear: number[] = Array.isArray(dpResults.cashFlowsByYear) ? dpResults.cashFlowsByYear : [];
+
         return {
           id: r.id,
           marinaName: r.marina_name,
@@ -17760,6 +17763,8 @@ Current context: Project ${req.params.projectId}`;
           dealOutcome: r.deal_outcome,
           updatedAt: r.updated_at,
           t12Noi,
+          t12Revenue: toNum(r.t12_revenue),
+          t12Expenses: toNum(r.t12_expenses),
           snapshot: {
             indicatedValue: r.deal_outcome === 'won'
               ? (toNum(r.indicated_value) ?? (noiVal != null && capVal ? noiVal / (capVal / 100) : null))
@@ -17773,6 +17778,24 @@ Current context: Project ${req.params.projectId}`;
             grossRevenue: toNum(r.gross_revenue) ?? toNum(r.t12_revenue),
             snapshotDate: r.snapshot_date || r.updated_at,
           },
+          dealPricingInputs: {
+            holdPeriod: toNum(dp.holdPeriod) ?? null,
+            exitCapRate: toNum(dp.exitCapRate) ?? null,
+            goingInCapRate: capRateFromDp,
+            targetIRR: toNum(dp.targetIRR) ?? null,
+          },
+          dealPricingResults: {
+            irr: toNum(dpResults.irr) ?? null,
+            equityMultiple: toNum(dpResults.equityMultiple) ?? null,
+            cashOnCash: toNum(dpResults.cashOnCash) ?? null,
+            npv: toNum(dpResults.npv) ?? null,
+            exitValue: toNum(dpResults.exitValue) ?? null,
+            totalProfit: toNum(dpResults.totalProfit) ?? null,
+            netExitProceeds: toNum(dpResults.netExitProceeds) ?? null,
+            totalEquityInvested: toNum(dpResults.totalEquityInvested) ?? null,
+            noiByYear,
+            cashFlowsByYear,
+          },
           monteCarlo: mcResults ? {
             hasResults: true,
             probabilityOfLoss: mcResults.results?.npv?.riskMetrics?.probabilityOfLoss ?? null,
@@ -17782,9 +17805,12 @@ Current context: Project ${req.params.projectId}`;
             irrP95: mcResults.results?.irr?.statistics?.percentiles?.p95 ?? null,
             npvMean: mcResults.results?.npv?.statistics?.mean ?? null,
             sharpeRatio: mcResults.results?.irr?.riskMetrics?.sharpeRatio ?? null,
+            sortinoRatio: mcResults.results?.irr?.riskMetrics?.sortinoRatio ?? null,
+            emMean: mcResults.results?.equityMultiple?.statistics?.mean ?? null,
+            cocMean: mcResults.results?.cashOnCash?.statistics?.mean ?? null,
             iterations: mcResults.iterations ?? null,
             lastCalculated: mcResults.lastCalculated ?? null,
-            sensitivityTop: mcResults.sensitivityRanking?.slice(0, 3)?.map((s: any) => ({
+            sensitivityTop: mcResults.sensitivityRanking?.slice(0, 5)?.map((s: any) => ({
               variable: s.variable,
               contribution: s.contribution,
               correlationToIRR: s.correlationToIRR,
