@@ -14,14 +14,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   TrendingUp,
   DollarSign,
   BarChart3,
   ArrowUpRight,
   Building2,
   Percent,
+  Activity,
+  AlertTriangle,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { cn } from "@/lib/utils";
 
 interface ProjectSnapshot {
   indicatedValue: number | null;
@@ -33,6 +42,20 @@ interface ProjectSnapshot {
   cashOnCash: number | null;
   grossRevenue: number | null;
   snapshotDate: string;
+}
+
+interface MonteCarloSummary {
+  hasResults: boolean;
+  probabilityOfLoss: number | null;
+  valueAtRisk: number | null;
+  irrMean: number | null;
+  irrP5: number | null;
+  irrP95: number | null;
+  npvMean: number | null;
+  sharpeRatio: number | null;
+  iterations: number | null;
+  lastCalculated: string | null;
+  sensitivityTop: { variable: string; contribution: number; correlationToIRR: number }[];
 }
 
 interface ReturnsProject {
@@ -48,6 +71,7 @@ interface ReturnsProject {
   updatedAt: string;
   t12Noi: number | null;
   snapshot: ProjectSnapshot | null;
+  monteCarlo: MonteCarloSummary | null;
 }
 
 const formatMultiple = (val: number | null | undefined) => {
@@ -234,6 +258,15 @@ export default function ReturnsValuationPage() {
                     <TableHead className="text-right">IRR</TableHead>
                     <TableHead className="text-right">Equity Multiple</TableHead>
                     <TableHead className="text-right">Cash-on-Cash</TableHead>
+                    <TableHead className="text-right">
+                      <span className="inline-flex items-center gap-1">
+                        MC Risk
+                        <InfoTooltip
+                          content="Monte Carlo simulation risk metrics: probability of negative NPV (loss), IRR confidence range (P5–P95), and Value at Risk. Run a simulation from the deal workspace to populate."
+                          side="bottom"
+                        />
+                      </span>
+                    </TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -289,6 +322,45 @@ export default function ReturnsValuationPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {formatPercent(project.snapshot?.cashOnCash, { dash: true })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {project.monteCarlo?.hasResults ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="inline-flex flex-col items-end gap-0.5">
+                                    <span className={cn(
+                                      "text-sm font-medium",
+                                      (project.monteCarlo.probabilityOfLoss ?? 0) < 0.1
+                                        ? "text-green-600"
+                                        : (project.monteCarlo.probabilityOfLoss ?? 0) < 0.25
+                                        ? "text-yellow-600"
+                                        : "text-red-600"
+                                    )}>
+                                      {((project.monteCarlo.probabilityOfLoss ?? 0) * 100).toFixed(1)}% loss
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      IRR {formatPercent(project.monteCarlo.irrP5)}–{formatPercent(project.monteCarlo.irrP95)}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <div className="space-y-1 text-xs">
+                                    <p className="font-medium">Monte Carlo ({(project.monteCarlo.iterations ?? 0).toLocaleString()} iterations)</p>
+                                    <p>Prob. of Loss: {((project.monteCarlo.probabilityOfLoss ?? 0) * 100).toFixed(1)}%</p>
+                                    <p>VaR (95%): {project.monteCarlo.valueAtRisk != null ? formatCurrency(project.monteCarlo.valueAtRisk, { dash: true }) : '—'}</p>
+                                    <p>Mean IRR: {formatPercent(project.monteCarlo.irrMean)}</p>
+                                    <p>Sharpe: {(project.monteCarlo.sharpeRatio ?? 0).toFixed(2)}</p>
+                                    {project.monteCarlo.sensitivityTop?.length > 0 && (
+                                      <p>Top driver: {project.monteCarlo.sensitivityTop[0].variable}</p>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Button

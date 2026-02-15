@@ -1,22 +1,7 @@
-/**
- * Monte Carlo Simulation Service
- * 
- * Provides institutional-grade stochastic analysis for investment returns:
- * - Random sampling of input distributions
- * - Probability distributions for key variables
- * - Return distribution analysis (IRR, NPV, Cash-on-Cash)
- * - Risk metrics (VaR, CVaR, Sharpe Ratio)
- * - Confidence intervals and percentile analysis
- * - Correlation modeling between variables
- */
-
 import { db } from '../db';
 import { modelingProjects } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+import { dealPricingService } from './deal-pricing-service';
 
 interface DistributionConfig {
   type: 'normal' | 'triangular' | 'uniform' | 'lognormal' | 'pert';
@@ -24,7 +9,7 @@ interface DistributionConfig {
   max?: number;
   mean?: number;
   stdDev?: number;
-  mode?: number; // For triangular/PERT
+  mode?: number;
 }
 
 interface SimulationVariable {
@@ -32,6 +17,7 @@ interface SimulationVariable {
   key: string;
   distribution: DistributionConfig;
   baseValue: number;
+  enabled: boolean;
 }
 
 interface SimulationInput {
@@ -93,13 +79,9 @@ interface MonteCarloAnalysis {
   };
   executionTime: number;
   lastCalculated: string;
+  usedProFormaData: boolean;
 }
 
-// ============================================================================
-// RANDOM NUMBER GENERATORS
-// ============================================================================
-
-// Seeded random number generator (Mulberry32)
 function createSeededRandom(seed: number): () => number {
   return function() {
     let t = seed += 0x6D2B79F5;
@@ -109,21 +91,17 @@ function createSeededRandom(seed: number): () => number {
   };
 }
 
-// Box-Muller transform for normal distribution
 function normalRandom(random: () => number, mean: number, stdDev: number): number {
   let u1 = 0, u2 = 0;
   while (u1 === 0) u1 = random();
   while (u2 === 0) u2 = random();
-  
   const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
   return z * stdDev + mean;
 }
 
-// Triangular distribution
 function triangularRandom(random: () => number, min: number, max: number, mode: number): number {
   const u = random();
   const fc = (mode - min) / (max - min);
-  
   if (u < fc) {
     return min + Math.sqrt(u * (max - min) * (mode - min));
   } else {
@@ -131,188 +109,108 @@ function triangularRandom(random: () => number, min: number, max: number, mode: 
   }
 }
 
-// Uniform distribution
 function uniformRandom(random: () => number, min: number, max: number): number {
   return min + random() * (max - min);
 }
 
-// Log-normal distribution
 function lognormalRandom(random: () => number, mean: number, stdDev: number): number {
-  // Convert to log-normal parameters
   const variance = stdDev * stdDev;
   const mu = Math.log(mean * mean / Math.sqrt(variance + mean * mean));
   const sigma = Math.sqrt(Math.log(variance / (mean * mean) + 1));
-  
   return Math.exp(normalRandom(random, mu, sigma));
 }
 
-// PERT distribution (modified beta)
 function pertRandom(random: () => number, min: number, max: number, mode: number): number {
-  // PERT uses beta distribution shape
-  const mu = (min + 4 * mode + max) / 6;
-  const stdDev = (max - min) / 6;
-  
-  // Use triangular as approximation for simplicity
   return triangularRandom(random, min, max, mode);
 }
 
-// Sample from distribution based on config
 function sampleDistribution(random: () => number, config: DistributionConfig): number {
   switch (config.type) {
     case 'normal':
       return normalRandom(random, config.mean || 0, config.stdDev || 1);
     case 'triangular':
-      return triangularRandom(
-        random,
-        config.min || 0,
-        config.max || 1,
-        config.mode || (config.min! + config.max!) / 2
-      );
+      return triangularRandom(random, config.min || 0, config.max || 1, config.mode || (config.min! + config.max!) / 2);
     case 'uniform':
       return uniformRandom(random, config.min || 0, config.max || 1);
     case 'lognormal':
       return lognormalRandom(random, config.mean || 1, config.stdDev || 0.1);
     case 'pert':
-      return pertRandom(
-        random,
-        config.min || 0,
-        config.max || 1,
-        config.mode || (config.min! + config.max!) / 2
-      );
+      return pertRandom(random, config.min || 0, config.max || 1, config.mode || (config.min! + config.max!) / 2);
     default:
       return config.mean || (config.min! + config.max!) / 2;
   }
 }
 
-// ============================================================================
-// STATISTICAL FUNCTIONS
-// ============================================================================
-
 function calculateStatistics(values: number[]): SimulationResult['statistics'] {
   const n = values.length;
+  if (n === 0) return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0, skewness: 0, kurtosis: 0, percentiles: {} };
   const sorted = [...values].sort((a, b) => a - b);
-  
-  // Mean
   const mean = values.reduce((a, b) => a + b, 0) / n;
-  
-  // Median
-  const median = n % 2 === 0 
-    ? (sorted[n/2 - 1] + sorted[n/2]) / 2 
-    : sorted[Math.floor(n/2)];
-  
-  // Standard deviation
+  const median = n % 2 === 0 ? (sorted[n/2 - 1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)];
   const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / (n - 1);
   const stdDev = Math.sqrt(variance);
-  
-  // Skewness
   const m3 = values.reduce((sum, v) => sum + Math.pow(v - mean, 3), 0) / n;
-  const skewness = m3 / Math.pow(stdDev, 3);
-  
-  // Kurtosis
+  const skewness = stdDev > 0 ? m3 / Math.pow(stdDev, 3) : 0;
   const m4 = values.reduce((sum, v) => sum + Math.pow(v - mean, 4), 0) / n;
-  const kurtosis = m4 / Math.pow(stdDev, 4) - 3; // Excess kurtosis
-  
-  // Percentiles
+  const kurtosis = stdDev > 0 ? m4 / Math.pow(stdDev, 4) - 3 : 0;
   const getPercentile = (p: number) => {
     const index = (p / 100) * (n - 1);
     const lower = Math.floor(index);
     const upper = Math.ceil(index);
     const weight = index - lower;
-    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    return sorted[lower] * (1 - weight) + (sorted[upper] || sorted[lower]) * weight;
   };
-  
   return {
-    mean,
-    median,
-    stdDev,
-    min: sorted[0],
-    max: sorted[n - 1],
-    skewness,
-    kurtosis,
-    percentiles: {
-      'p5': getPercentile(5),
-      'p10': getPercentile(10),
-      'p25': getPercentile(25),
-      'p50': median,
-      'p75': getPercentile(75),
-      'p90': getPercentile(90),
-      'p95': getPercentile(95),
-    },
+    mean, median, stdDev, min: sorted[0], max: sorted[n - 1], skewness, kurtosis,
+    percentiles: { p5: getPercentile(5), p10: getPercentile(10), p25: getPercentile(25), p50: median, p75: getPercentile(75), p90: getPercentile(90), p95: getPercentile(95) },
   };
 }
 
 function calculateHistogram(values: number[], numBins: number = 20): SimulationResult['histogram'] {
+  if (values.length === 0) return { bins: [], frequencies: [], binWidth: 0 };
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const binWidth = (max - min) / numBins;
-  
+  const range = max - min;
+  const binWidth = range > 0 ? range / numBins : 1;
   const bins: number[] = [];
   const frequencies: number[] = new Array(numBins).fill(0);
-  
   for (let i = 0; i < numBins; i++) {
     bins.push(min + i * binWidth + binWidth / 2);
   }
-  
   for (const value of values) {
-    const binIndex = Math.min(Math.floor((value - min) / binWidth), numBins - 1);
+    const binIndex = range > 0 ? Math.min(Math.floor((value - min) / binWidth), numBins - 1) : 0;
     frequencies[binIndex]++;
   }
-  
   return { bins, frequencies, binWidth };
 }
 
-function calculateRiskMetrics(
-  values: number[],
-  confidenceLevel: number = 0.95,
-  riskFreeRate: number = 0.04
-): SimulationResult['riskMetrics'] {
+function calculateRiskMetrics(values: number[], confidenceLevel: number = 0.95, riskFreeRate: number = 0.04): SimulationResult['riskMetrics'] {
+  if (values.length === 0) return { valueAtRisk: 0, conditionalVaR: 0, probabilityOfLoss: 0, sharpeRatio: 0, sortinoRatio: 0 };
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
-  
-  // Value at Risk (VaR)
   const varIndex = Math.floor((1 - confidenceLevel) * n);
   const valueAtRisk = sorted[varIndex];
-  
-  // Conditional VaR (Expected Shortfall)
   const tailValues = sorted.slice(0, varIndex + 1);
   const conditionalVaR = tailValues.reduce((a, b) => a + b, 0) / tailValues.length;
-  
-  // Probability of loss (assuming 0 is break-even)
   const losses = values.filter(v => v < 0);
   const probabilityOfLoss = losses.length / n;
-  
-  // Mean and standard deviation
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const stdDev = Math.sqrt(values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / (n - 1));
-  
-  // Sharpe Ratio
   const sharpeRatio = stdDev > 0 ? (mean - riskFreeRate) / stdDev : 0;
-  
-  // Sortino Ratio (uses downside deviation)
   const downsideReturns = values.filter(v => v < mean);
   const downsideDeviation = downsideReturns.length > 0
     ? Math.sqrt(downsideReturns.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / downsideReturns.length)
     : stdDev;
   const sortinoRatio = downsideDeviation > 0 ? (mean - riskFreeRate) / downsideDeviation : 0;
-  
-  return {
-    valueAtRisk,
-    conditionalVaR,
-    probabilityOfLoss,
-    sharpeRatio,
-    sortinoRatio,
-  };
+  return { valueAtRisk, conditionalVaR, probabilityOfLoss, sharpeRatio, sortinoRatio };
 }
 
 function calculateCorrelation(x: number[], y: number[]): number {
   const n = x.length;
+  if (n === 0) return 0;
   const meanX = x.reduce((a, b) => a + b, 0) / n;
   const meanY = y.reduce((a, b) => a + b, 0) / n;
-  
-  let numerator = 0;
-  let sumX2 = 0;
-  let sumY2 = 0;
-  
+  let numerator = 0, sumX2 = 0, sumY2 = 0;
   for (let i = 0; i < n; i++) {
     const dx = x[i] - meanX;
     const dy = y[i] - meanY;
@@ -320,237 +218,203 @@ function calculateCorrelation(x: number[], y: number[]): number {
     sumX2 += dx * dx;
     sumY2 += dy * dy;
   }
-  
   const denominator = Math.sqrt(sumX2 * sumY2);
   return denominator > 0 ? numerator / denominator : 0;
 }
 
-// ============================================================================
-// DCF CALCULATION (SIMPLIFIED FOR MONTE CARLO)
-// ============================================================================
-
-interface DCFParams {
-  purchasePrice: number;
-  year1NOI: number;
-  noiGrowthRate: number;
-  discountRate: number;
-  exitCapRate: number;
-  holdPeriod: number;
-  loanAmount: number;
-  loanRate: number;
-}
-
-function calculateDCFReturns(params: DCFParams): {
-  irr: number;
-  npv: number;
-  equityMultiple: number;
-  cashOnCash: number;
-} {
-  const {
-    purchasePrice,
-    year1NOI,
-    noiGrowthRate,
-    discountRate,
-    exitCapRate,
-    holdPeriod,
-    loanAmount,
-    loanRate,
-  } = params;
-  
-  const equity = purchasePrice * 1.02 - loanAmount; // 2% closing costs
-  const annualDebtService = loanAmount > 0 
-    ? loanAmount * (loanRate * Math.pow(1 + loanRate, 300)) / (Math.pow(1 + loanRate, 300) - 1) * 12
-    : 0;
-  
-  // Generate cash flows
-  const cashFlows: number[] = [-purchasePrice * 1.02];
-  const leveredCashFlows: number[] = [-equity];
-  let totalCashFlow = 0;
-  
-  for (let year = 1; year <= holdPeriod; year++) {
-    const noi = year1NOI * Math.pow(1 + noiGrowthRate, year - 1);
-    const cfBeforeDebt = noi;
-    const cfAfterDebt = noi - annualDebtService;
-    
-    cashFlows.push(cfBeforeDebt);
-    leveredCashFlows.push(cfAfterDebt);
-    totalCashFlow += cfAfterDebt;
-  }
-  
-  // Terminal value
-  const exitNOI = year1NOI * Math.pow(1 + noiGrowthRate, holdPeriod);
-  const terminalValue = exitNOI / exitCapRate;
-  const remainingBalance = loanAmount * 0.85; // Approximate
-  
-  cashFlows[cashFlows.length - 1] += terminalValue;
-  leveredCashFlows[leveredCashFlows.length - 1] += (terminalValue - remainingBalance);
-  totalCashFlow += (terminalValue - remainingBalance);
-  
-  // Calculate IRR using Newton-Raphson
-  let rate = 0.1;
-  for (let i = 0; i < 100; i++) {
-    let npv = 0;
-    let derivative = 0;
-    
-    for (let j = 0; j < cashFlows.length; j++) {
-      npv += cashFlows[j] / Math.pow(1 + rate, j);
-      if (j > 0) {
-        derivative -= (j * cashFlows[j]) / Math.pow(1 + rate, j + 1);
-      }
-    }
-    
-    if (Math.abs(derivative) < 1e-10) break;
-    const newRate = rate - npv / derivative;
-    if (Math.abs(newRate - rate) < 0.00001) break;
-    rate = newRate;
-  }
-  
-  // Calculate NPV
-  let npv = 0;
-  for (let j = 0; j < cashFlows.length; j++) {
-    npv += cashFlows[j] / Math.pow(1 + discountRate, j);
-  }
-  
-  // Equity multiple
-  const equityMultiple = equity > 0 ? totalCashFlow / equity : 0;
-  
-  // Average cash-on-cash
-  const avgCashOnCash = equity > 0 
-    ? (totalCashFlow - (terminalValue - remainingBalance)) / holdPeriod / equity
-    : 0;
-  
-  return {
-    irr: rate * 100,
-    npv,
-    equityMultiple,
-    cashOnCash: avgCashOnCash * 100,
-  };
-}
-
-// ============================================================================
-// MAIN SERVICE CLASS
-// ============================================================================
-
 class MonteCarloService {
-  /**
-   * Run full Monte Carlo simulation
-   */
+  buildDefaultVariables(
+    purchasePrice: number,
+    year1NOI: number,
+    dealPricingInputs?: {
+      exitCapRate?: number;
+      holdPeriod?: number;
+      targetIRR?: number;
+      goingInCapRate?: number;
+    }
+  ): SimulationVariable[] {
+    const exitCap = (dealPricingInputs?.exitCapRate || 7.5) / 100;
+    const noiGrowth = 0.03;
+
+    return [
+      {
+        name: 'Purchase Price',
+        key: 'purchasePrice',
+        baseValue: purchasePrice,
+        enabled: true,
+        distribution: { type: 'triangular', min: purchasePrice * 0.90, max: purchasePrice * 1.10, mode: purchasePrice },
+      },
+      {
+        name: 'Year 1 NOI',
+        key: 'year1NOI',
+        baseValue: year1NOI,
+        enabled: true,
+        distribution: { type: 'triangular', min: year1NOI * 0.85, max: year1NOI * 1.15, mode: year1NOI },
+      },
+      {
+        name: 'NOI Growth Rate',
+        key: 'noiGrowthRate',
+        baseValue: noiGrowth,
+        enabled: true,
+        distribution: { type: 'triangular', min: 0.00, max: 0.06, mode: noiGrowth },
+      },
+      {
+        name: 'Exit Cap Rate',
+        key: 'exitCapRate',
+        baseValue: exitCap,
+        enabled: true,
+        distribution: { type: 'triangular', min: Math.max(0.04, exitCap - 0.02), max: exitCap + 0.02, mode: exitCap },
+      },
+      {
+        name: 'Vacancy Rate',
+        key: 'vacancyRate',
+        baseValue: 0.05,
+        enabled: false,
+        distribution: { type: 'triangular', min: 0.02, max: 0.15, mode: 0.05 },
+      },
+      {
+        name: 'CapEx (% of Revenue)',
+        key: 'capexRate',
+        baseValue: 0.03,
+        enabled: false,
+        distribution: { type: 'triangular', min: 0.01, max: 0.08, mode: 0.03 },
+      },
+    ];
+  }
+
   async runSimulation(
     projectId: string,
     orgId: string,
     input?: Partial<SimulationInput>
   ): Promise<MonteCarloAnalysis> {
     const startTime = Date.now();
-    
-    // Get project data for base values
+
+    const baseFinancials = await dealPricingService.getProjectFinancials(projectId, orgId);
+    const proFormaData = await dealPricingService.getProFormaData(projectId, orgId);
+
     const project = await db
       .select()
       .from(modelingProjects)
-      .where(
-        and(
-          eq(modelingProjects.id, projectId),
-          eq(modelingProjects.orgId, orgId)
-        )
-      )
+      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
       .limit(1);
-    
-    const purchasePrice = project[0]?.purchasePrice 
-      ? parseFloat(project[0].purchasePrice) 
-      : 5000000;
-    const year1NOI = project[0]?.yearOneNoi 
-      ? parseFloat(project[0].yearOneNoi) 
-      : 500000;
-    
-    // Default variables with distributions
-    const variables: SimulationVariable[] = input?.variables || [
-      {
-        name: 'Purchase Price',
-        key: 'purchasePrice',
-        baseValue: purchasePrice,
-        distribution: { type: 'triangular', min: purchasePrice * 0.95, max: purchasePrice * 1.05, mode: purchasePrice },
-      },
-      {
-        name: 'Year 1 NOI',
-        key: 'year1NOI',
-        baseValue: year1NOI,
-        distribution: { type: 'triangular', min: year1NOI * 0.85, max: year1NOI * 1.10, mode: year1NOI },
-      },
-      {
-        name: 'NOI Growth Rate',
-        key: 'noiGrowthRate',
-        baseValue: 0.03,
-        distribution: { type: 'triangular', min: 0.01, max: 0.05, mode: 0.03 },
-      },
-      {
-        name: 'Exit Cap Rate',
-        key: 'exitCapRate',
-        baseValue: 0.075,
-        distribution: { type: 'triangular', min: 0.06, max: 0.09, mode: 0.075 },
-      },
-      {
-        name: 'Discount Rate',
-        key: 'discountRate',
-        baseValue: 0.10,
-        distribution: { type: 'normal', mean: 0.10, stdDev: 0.015 },
-      },
-      {
-        name: 'Loan Rate',
-        key: 'loanRate',
-        baseValue: 0.055,
-        distribution: { type: 'triangular', min: 0.045, max: 0.07, mode: 0.055 },
-      },
-    ];
-    
-    const iterations = input?.iterations || 10000;
-    const confidenceLevel = input?.confidenceLevel || 0.95;
+
+    const customMetrics = (project[0]?.customMetrics as any) || {};
+    const dealPricingInputs = customMetrics.dealPricing || {};
+    const savedConfig = customMetrics.monteCarloConfig || {};
+
+    const purchasePrice = dealPricingInputs.purchasePrice
+      || (baseFinancials.purchasePrice ? Number(baseFinancials.purchasePrice) : 0)
+      || 5000000;
+    const year1NOI = baseFinancials.year1NOI || 500000;
+
+    const holdPeriod = dealPricingInputs.holdPeriod || 10;
+    const exitCapRatePercent = dealPricingInputs.exitCapRate || 7.5;
+    const targetIRR = dealPricingInputs.targetIRR || 15;
+
+    const defaultVars = this.buildDefaultVariables(purchasePrice, year1NOI, dealPricingInputs);
+    const variables: SimulationVariable[] = input?.variables || savedConfig.variables || defaultVars;
+
+    const iterations = input?.iterations || savedConfig.iterations || 10000;
+    const confidenceLevel = input?.confidenceLevel || savedConfig.confidenceLevel || 0.95;
     const seed = input?.seed || Date.now();
-    
     const random = createSeededRandom(seed);
-    
-    // Run simulations
+
+    const enabledVars = variables.filter(v => v.enabled);
+
+    const baseInputs = {
+      holdPeriod,
+      exitCapRate: exitCapRatePercent,
+    };
+    const baseBuild = dealPricingService.buildFinancialsAndProjections(baseFinancials, proFormaData, baseInputs);
+    const useProForma = proFormaData !== null;
+
     const irrResults: number[] = [];
     const npvResults: number[] = [];
     const emResults: number[] = [];
     const cocResults: number[] = [];
     const variableSamples: Record<string, number[]> = {};
-    
-    // Initialize variable sample storage
-    for (const v of variables) {
+
+    for (const v of enabledVars) {
       variableSamples[v.key] = [];
     }
-    
+
+    const discountRate = targetIRR / 100;
+
     for (let i = 0; i < iterations; i++) {
-      // Sample each variable
-      const params: DCFParams = {
-        purchasePrice: purchasePrice,
-        year1NOI: year1NOI,
-        noiGrowthRate: 0.03,
-        discountRate: 0.10,
-        exitCapRate: 0.075,
-        holdPeriod: 10,
-        loanAmount: purchasePrice * 0.65,
-        loanRate: 0.055,
-      };
-      
-      for (const variable of variables) {
+      const sampled: Record<string, number> = {};
+      for (const variable of enabledVars) {
         const sampledValue = sampleDistribution(random, variable.distribution);
         variableSamples[variable.key].push(sampledValue);
-        (params as any)[variable.key] = sampledValue;
+        sampled[variable.key] = sampledValue;
       }
-      
-      // Calculate returns
+
+      const iterPurchasePrice = sampled.purchasePrice ?? purchasePrice;
+      const iterYear1NOI = sampled.year1NOI ?? year1NOI;
+      const iterExitCapRate = sampled.exitCapRate !== undefined ? sampled.exitCapRate * 100 : exitCapRatePercent;
+      const iterNOIGrowth = sampled.noiGrowthRate ?? 0.03;
+      const iterVacancy = sampled.vacancyRate ?? 0;
+      const iterCapex = sampled.capexRate ?? 0;
+
+      const adjustedNOI = iterYear1NOI * (1 - iterVacancy);
+
+      let noiProjections: number[];
+      if (useProForma && proFormaData && !sampled.noiGrowthRate && !sampled.vacancyRate) {
+        noiProjections = baseBuild.noiProjections.slice(0, holdPeriod);
+        if (sampled.year1NOI !== undefined) {
+          const ratio = adjustedNOI / (baseBuild.financials.year1NOI || 1);
+          noiProjections = noiProjections.map(n => n * ratio);
+        }
+      } else {
+        noiProjections = dealPricingService.projectNOI(
+          adjustedNOI, holdPeriod, iterNOIGrowth, Math.max(0, iterNOIGrowth - 0.01),
+          baseBuild.financials.baseRevenue * (1 - iterVacancy),
+          baseBuild.financials.baseExpenses
+        );
+      }
+
+      if (iterCapex > 0) {
+        const baseRev = baseBuild.financials.baseRevenue || adjustedNOI * 2.5;
+        noiProjections = noiProjections.map((noi, yr) => {
+          const yearRev = baseRev * Math.pow(1 + iterNOIGrowth, yr + 1);
+          return noi - (yearRev * iterCapex);
+        });
+      }
+
+      const proFormaOptions = useProForma && baseBuild.proFormaOptions ? {
+        ...baseBuild.proFormaOptions,
+        usedProFormaData: true,
+      } : undefined;
+
       try {
-        const returns = calculateDCFReturns(params);
-        irrResults.push(returns.irr);
-        npvResults.push(returns.npv);
-        emResults.push(returns.equityMultiple);
-        cocResults.push(returns.cashOnCash);
+        const result = dealPricingService.calculateFromPurchasePrice(
+          iterPurchasePrice,
+          adjustedNOI,
+          holdPeriod,
+          iterExitCapRate,
+          noiProjections,
+          proFormaOptions
+        );
+
+        if (isFinite(result.irr) && Math.abs(result.irr) < 500) {
+          irrResults.push(result.irr);
+        }
+
+        const npvCashFlows = [-result.totalEquityInvested, ...result.cashFlowsByYear];
+        const npv = dealPricingService.calculateNPV(npvCashFlows, discountRate);
+        if (isFinite(npv)) {
+          npvResults.push(npv);
+        }
+
+        if (isFinite(result.equityMultiple) && result.equityMultiple < 100) {
+          emResults.push(result.equityMultiple);
+        }
+        if (isFinite(result.averageCashOnCash) && Math.abs(result.averageCashOnCash) < 500) {
+          cocResults.push(result.averageCashOnCash);
+        }
       } catch (e) {
-        // Skip failed iterations
       }
     }
-    
-    // Build results
+
     const buildResult = (values: number[], metric: string): SimulationResult => ({
       metric,
       values,
@@ -558,62 +422,38 @@ class MonteCarloService {
       histogram: calculateHistogram(values),
       riskMetrics: calculateRiskMetrics(values, confidenceLevel),
     });
-    
+
     const results = {
       irr: buildResult(irrResults, 'IRR'),
       npv: buildResult(npvResults, 'NPV'),
       equityMultiple: buildResult(emResults, 'Equity Multiple'),
       cashOnCash: buildResult(cocResults, 'Cash-on-Cash'),
     };
-    
-    // Sensitivity ranking (correlation to IRR)
-    const sensitivityRanking = variables.map(v => {
-      const correlation = calculateCorrelation(variableSamples[v.key], irrResults);
+
+    const sensitivityRanking = enabledVars.map(v => {
+      const correlation = calculateCorrelation(variableSamples[v.key], irrResults.slice(0, variableSamples[v.key].length));
       return {
         variable: v.name,
         contribution: Math.abs(correlation) * 100,
         correlationToIRR: correlation,
       };
     }).sort((a, b) => b.contribution - a.contribution);
-    
-    // Scenario analysis
+
     const sortedIRR = [...irrResults].sort((a, b) => a - b);
     const n = sortedIRR.length;
-    const optimisticThreshold = sortedIRR[Math.floor(n * 0.75)];
-    const pessimisticThreshold = sortedIRR[Math.floor(n * 0.25)];
-    
-    const optimisticResults = irrResults.filter((_, i) => irrResults[i] >= optimisticThreshold);
-    const pessimisticResults = irrResults.filter((_, i) => irrResults[i] < pessimisticThreshold);
-    const baseResults = irrResults.filter((_, i) => 
-      irrResults[i] >= pessimisticThreshold && irrResults[i] < optimisticThreshold
-    );
-    
-    const avgIRR = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-    const avgNPV = (indices: number[]) => {
-      const values = indices.map(i => npvResults[i]);
-      return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-    };
-    
+    const optimisticThreshold = n > 0 ? sortedIRR[Math.floor(n * 0.75)] : 0;
+    const pessimisticThreshold = n > 0 ? sortedIRR[Math.floor(n * 0.25)] : 0;
+    const optimisticResults = irrResults.filter(v => v >= optimisticThreshold);
+    const pessimisticResults = irrResults.filter(v => v < pessimisticThreshold);
+    const baseResults = irrResults.filter(v => v >= pessimisticThreshold && v < optimisticThreshold);
+    const avgArr = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
     const scenarioAnalysis = {
-      optimistic: {
-        probability: 0.25,
-        avgIRR: avgIRR(optimisticResults),
-        avgNPV: results.npv.statistics.percentiles['p75'],
-      },
-      base: {
-        probability: 0.50,
-        avgIRR: avgIRR(baseResults),
-        avgNPV: results.npv.statistics.median,
-      },
-      pessimistic: {
-        probability: 0.25,
-        avgIRR: avgIRR(pessimisticResults),
-        avgNPV: results.npv.statistics.percentiles['p25'],
-      },
+      optimistic: { probability: 0.25, avgIRR: avgArr(optimisticResults), avgNPV: results.npv.statistics.percentiles['p75'] || 0 },
+      base: { probability: 0.50, avgIRR: avgArr(baseResults), avgNPV: results.npv.statistics.median },
+      pessimistic: { probability: 0.25, avgIRR: avgArr(pessimisticResults), avgNPV: results.npv.statistics.percentiles['p25'] || 0 },
     };
-    
-    const executionTime = Date.now() - startTime;
-    
+
     return {
       projectId,
       analysisDate: new Date().toISOString(),
@@ -623,14 +463,12 @@ class MonteCarloService {
       results,
       sensitivityRanking,
       scenarioAnalysis,
-      executionTime,
+      executionTime: Date.now() - startTime,
       lastCalculated: new Date().toISOString(),
+      usedProFormaData: useProForma,
     };
   }
-  
-  /**
-   * Quick simulation with fewer iterations for real-time feedback
-   */
+
   async quickSimulation(
     projectId: string,
     orgId: string,
@@ -642,7 +480,6 @@ class MonteCarloService {
     probabilityOfLoss: number;
   }> {
     const analysis = await this.runSimulation(projectId, orgId, { iterations });
-    
     return {
       irrMean: analysis.results.irr.statistics.mean,
       irrStdDev: analysis.results.irr.statistics.stdDev,

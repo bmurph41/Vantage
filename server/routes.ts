@@ -17714,6 +17714,7 @@ Current context: Project ${req.params.projectId}`;
         const customMetrics = (typeof r.custom_metrics === 'string' ? JSON.parse(r.custom_metrics) : r.custom_metrics) || {};
         const dp = customMetrics.dealPricing || {};
         const dpResults = customMetrics.dealPricingResults || {};
+        const mcResults = customMetrics.monteCarloResults || null;
 
         const purchasePrice = toNum(dp.purchasePrice) || toNum(r.purchase_price);
         const t12Noi = toNum(r.t12_noi);
@@ -17772,6 +17773,23 @@ Current context: Project ${req.params.projectId}`;
             grossRevenue: toNum(r.gross_revenue) ?? toNum(r.t12_revenue),
             snapshotDate: r.snapshot_date || r.updated_at,
           },
+          monteCarlo: mcResults ? {
+            hasResults: true,
+            probabilityOfLoss: mcResults.results?.npv?.riskMetrics?.probabilityOfLoss ?? null,
+            valueAtRisk: mcResults.results?.npv?.riskMetrics?.valueAtRisk ?? null,
+            irrMean: mcResults.results?.irr?.statistics?.mean ?? null,
+            irrP5: mcResults.results?.irr?.statistics?.percentiles?.p5 ?? null,
+            irrP95: mcResults.results?.irr?.statistics?.percentiles?.p95 ?? null,
+            npvMean: mcResults.results?.npv?.statistics?.mean ?? null,
+            sharpeRatio: mcResults.results?.irr?.riskMetrics?.sharpeRatio ?? null,
+            iterations: mcResults.iterations ?? null,
+            lastCalculated: mcResults.lastCalculated ?? null,
+            sensitivityTop: mcResults.sensitivityRanking?.slice(0, 3)?.map((s: any) => ({
+              variable: s.variable,
+              contribution: s.contribution,
+              correlationToIRR: s.correlationToIRR,
+            })) ?? [],
+          } : null,
         };
       });
 
@@ -20448,41 +20466,52 @@ Current context: Project ${req.params.projectId}`;
   // MONTE CARLO SIMULATION - Stochastic Analysis Engine
   // ============================================================================
 
-  // Run full Monte Carlo simulation
+  // Get persisted Monte Carlo results and config (does NOT auto-run)
   app.get('/api/modeling/projects/:projectId/monte-carlo', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const iterations = req.query.iterations ? parseInt(req.query.iterations as string) : 10000;
-      
+
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      
-      const { monteCarloService } = await import('./services/monte-carlo-service');
-      const analysis = await monteCarloService.runSimulation(projectId, orgId, { iterations });
-      res.json(analysis);
+
+      const customMetrics = (project.customMetrics as any) || {};
+      const savedResults = customMetrics.monteCarloResults || null;
+      const savedConfig = customMetrics.monteCarloConfig || null;
+
+      if (!savedResults) {
+        const { monteCarloService } = await import('./services/monte-carlo-service');
+        const baseFinancials = await (await import('./services/deal-pricing-service')).dealPricingService.getProjectFinancials(projectId, orgId);
+        const dealPricingInputs = customMetrics.dealPricing || {};
+        const purchasePrice = dealPricingInputs.purchasePrice || (baseFinancials.purchasePrice ? Number(baseFinancials.purchasePrice) : 5000000);
+        const year1NOI = baseFinancials.year1NOI || 500000;
+        const defaultVariables = monteCarloService.buildDefaultVariables(purchasePrice, year1NOI, dealPricingInputs);
+        return res.json({ hasResults: false, config: savedConfig, defaultVariables });
+      }
+
+      res.json({ hasResults: true, ...savedResults, config: savedConfig });
     } catch (error: any) {
-      console.error('Failed to run Monte Carlo simulation:', error);
-      res.status(500).json({ error: 'Failed to run Monte Carlo simulation' });
+      console.error('Failed to get Monte Carlo data:', error);
+      res.status(500).json({ error: 'Failed to get Monte Carlo data' });
     }
   });
 
-  // Run Monte Carlo with custom configuration
+  // Run Monte Carlo simulation and persist results
   app.post('/api/modeling/projects/:projectId/monte-carlo/run', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const userId = req.user.id;
       const { projectId } = req.params;
       const { variables, iterations = 10000, confidenceLevel = 0.95 } = req.body;
-      
+
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      
+
       const { monteCarloService } = await import('./services/monte-carlo-service');
-      // Pass only defined values; service will use defaults for undefined variables
       const simulationInput: { iterations: number; confidenceLevel: number; variables?: any } = {
         iterations,
         confidenceLevel,
@@ -20490,12 +20519,63 @@ Current context: Project ${req.params.projectId}`;
       if (variables) {
         simulationInput.variables = variables;
       }
-      
+
       const analysis = await monteCarloService.runSimulation(projectId, orgId, simulationInput);
+
+      const resultsToSave = {
+        ...analysis,
+        results: {
+          irr: { ...analysis.results.irr, values: [] },
+          npv: { ...analysis.results.npv, values: [] },
+          equityMultiple: { ...analysis.results.equityMultiple, values: [] },
+          cashOnCash: { ...analysis.results.cashOnCash, values: [] },
+        },
+      };
+
+      const customMetrics = { ...((project.customMetrics as any) || {}) };
+      customMetrics.monteCarloResults = resultsToSave;
+      customMetrics.monteCarloConfig = {
+        variables: analysis.variables,
+        iterations,
+        confidenceLevel,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await storage.updateModelingProject(projectId, { customMetrics, updatedBy: userId }, orgId);
+
       res.json(analysis);
     } catch (error: any) {
-      console.error('Failed to run custom Monte Carlo simulation:', error);
-      res.status(500).json({ error: 'Failed to run custom Monte Carlo simulation' });
+      console.error('Failed to run Monte Carlo simulation:', error);
+      res.status(500).json({ error: 'Failed to run Monte Carlo simulation' });
+    }
+  });
+
+  // Save Monte Carlo configuration (variable distributions)
+  app.post('/api/modeling/projects/:projectId/monte-carlo/config', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { variables, iterations, confidenceLevel } = req.body;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const customMetrics = { ...((project.customMetrics as any) || {}) };
+      customMetrics.monteCarloConfig = {
+        variables,
+        iterations: iterations || 10000,
+        confidenceLevel: confidenceLevel || 0.95,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await storage.updateModelingProject(projectId, { customMetrics, updatedBy: userId }, orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to save Monte Carlo config:', error);
+      res.status(500).json({ error: 'Failed to save Monte Carlo config' });
     }
   });
 
@@ -20504,12 +20584,12 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      
+
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      
+
       const { monteCarloService } = await import('./services/monte-carlo-service');
       const quickResult = await monteCarloService.quickSimulation(projectId, orgId);
       res.json(quickResult);

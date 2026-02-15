@@ -481,7 +481,7 @@ class DealPricingService {
     }
   }
 
-  private buildFinancialsAndProjections(
+  buildFinancialsAndProjections(
     baseFinancials: { year1NOI: number; baseRevenue: number; baseExpenses: number; purchasePrice: number | null },
     proFormaData: ProFormaCashFlowData | null,
     inputs: {
