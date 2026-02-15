@@ -800,7 +800,6 @@ export default function Dashboard() {
     'fuel-operations',
     'ship-store',
     'rent-roll',
-    'modeling-projects',
   ];
 
   const { data: dashboardData, isLoading } = useQuery({
@@ -906,7 +905,9 @@ export default function Dashboard() {
       icon: DollarSign,
       link: '/crm/deals',
       data: dashboardData?.crm,
-      renderContent: (data) => (
+      renderContent: (data) => {
+        const modelingData = dashboardData?.modeling;
+        return (
         <div className="space-y-4">
           <MetricGrid columns={2}>
             <EnhancedMetricCard
@@ -962,10 +963,37 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            <div className="col-span-2 rounded-xl border bg-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                    <BarChart3 className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span className="text-sm font-medium">Financial Models</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Active Models</p>
+                  <p className="text-2xl font-bold" data-testid="modeling-active">{modelingData?.activeProjects || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Completed</p>
+                  <p className="text-2xl font-bold text-green-600" data-testid="modeling-completed">{modelingData?.completedProjects || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Total Valuation</p>
+                  <p className="text-2xl font-bold" data-testid="modeling-valuation">
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(modelingData?.totalValuation || 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </MetricGrid>
           <CRMCharts timeRange={timeRange} />
         </div>
-      ),
+        );
+      },
     },
     {
       id: 'due-diligence',
@@ -1494,61 +1522,6 @@ export default function Dashboard() {
               badge={data?.vacantUnits > 0 && data?.totalUnits ? `${((data.vacantUnits / data.totalUnits) * 100).toFixed(0)}%` : undefined}
             />
           </MetricGrid>
-        </div>
-      ),
-    },
-    {
-      id: 'modeling-projects',
-      title: 'Modeling Projects',
-      icon: BarChart3,
-      link: '/modeling',
-      data: dashboardData?.modeling,
-      renderContent: (data) => (
-        <div className="space-y-4">
-          <MetricGrid columns={2}>
-            <EnhancedMetricCard
-              label="Active Models"
-              value={data?.activeProjects || 0}
-              type="number"
-              size="md"
-              variant="primary"
-              icon={BarChart3}
-              testId="modeling-active"
-              tooltip="Currently active modeling projects"
-              onClick={() => setIsModelingDetailOpen(true)}
-              clickable
-            />
-            <EnhancedMetricCard
-              label="Completed"
-              value={data?.completedProjects || 0}
-              type="number"
-              size="md"
-              variant="success"
-              testId="modeling-completed"
-              tooltip="Successfully completed modeling projects"
-              onClick={() => setIsModelingDetailOpen(true)}
-              clickable
-              trend={data?.completionTrend}
-            />
-          </MetricGrid>
-          <EnhancedMetricCard
-            label="Total Valuation"
-            value={data?.totalValuation || 0}
-            type="currency"
-            size="md"
-            variant="success"
-            icon={DollarSign}
-            compact={true}
-            testId="modeling-valuation"
-            tooltip="Aggregate valuation across all modeling projects"
-            onClick={() => setIsModelingDetailOpen(true)}
-            clickable
-            comparison={{
-              label: 'Avg per Project',
-              value: (data?.totalValuation || 0) / (data?.activeProjects || 1),
-              type: 'currency'
-            }}
-          />
         </div>
       ),
     },
