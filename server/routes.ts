@@ -17852,9 +17852,11 @@ Current context: Project ${req.params.projectId}`;
             const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
             if (proForma.noi && proForma.noi.length > 0) {
               year1Ebitda = proForma.noi[0];
-              irr = proForma.metrics?.irr ?? null;
-              if (proForma.metrics?.goingInCapRate != null) {
-                year1CapRate = proForma.metrics.goingInCapRate;
+              const proFormaIrr = proForma.metrics?.irr ?? null;
+              irr = (proFormaIrr !== null && proFormaIrr !== 0) ? proFormaIrr : null;
+              const proFormaCapRate = proForma.metrics?.goingInCapRate ?? null;
+              if (proFormaCapRate != null && proFormaCapRate !== 0) {
+                year1CapRate = proFormaCapRate;
               }
               const lastYear = proForma.years?.[proForma.years.length - 1];
               exitYear = lastYear ?? null;

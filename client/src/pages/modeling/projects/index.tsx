@@ -380,12 +380,12 @@ export default function ModelingProjectsPage() {
                             {formatCurrency(project.purchasePrice, { dash: true, context: 'price' })}
                           </TableCell>
                           <TableCell className="text-center whitespace-nowrap pb-0" data-testid={`text-irr-${project.id}`}>
-                            <span className={`font-semibold ${project.irr != null ? (project.irr >= 0 ? 'text-green-600' : 'text-red-600') : ''}`}>
-                              {project.irr != null ? formatPercent(project.irr, { dash: true }) : '-'}
+                            <span className={`font-semibold ${(project.irr != null && project.irr !== 0) ? (project.irr >= 0 ? 'text-green-600' : 'text-red-600') : ''}`}>
+                              {(project.irr != null && project.irr !== 0) ? formatPercent(project.irr, { dash: true }) : '-'}
                             </span>
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-cap-rate-${project.id}`}>
-                            {formatPercent(project.year1CapRate, { dash: true })}
+                            {(project.year1CapRate != null && project.year1CapRate !== 0) ? formatPercent(project.year1CapRate, { dash: true }) : '-'}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-t12-ebitda-${project.id}`}>
                             {project.t12Ebitda != null ? formatCurrency(project.t12Ebitda, { context: 'ebitda' }) : '-'}
