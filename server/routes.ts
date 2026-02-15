@@ -17760,7 +17760,9 @@ Current context: Project ${req.params.projectId}`;
           updatedAt: r.updated_at,
           t12Noi,
           snapshot: {
-            indicatedValue: toNum(r.indicated_value) ?? (noiVal != null && capVal ? noiVal / capVal : null),
+            indicatedValue: r.deal_outcome === 'won'
+              ? (toNum(r.indicated_value) ?? (noiVal != null && capVal ? noiVal / (capVal / 100) : null))
+              : null,
             capRate: capVal,
             noi: noiVal,
             ebitda: toNum(r.snap_ebitda) ?? toNum(r.ebitda),
