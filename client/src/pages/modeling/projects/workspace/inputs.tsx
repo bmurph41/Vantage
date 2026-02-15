@@ -745,25 +745,22 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4" />
               Hold Period & Start Date
             </CardTitle>
-            <CardDescription className="text-xs">
-              Set the investment timeline for pro forma projections
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <div className="space-y-1.5">
-              <Label htmlFor="holdPeriod" className="text-xs">Hold Period</Label>
+          <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
+            <div className="space-y-1">
+              <Label htmlFor="holdPeriod" className="text-xs text-muted-foreground">Hold Period</Label>
               <Select 
                 value={holdPeriod.toString()} 
                 onValueChange={(v) => setHoldPeriod(parseInt(v))}
               >
-                <SelectTrigger id="holdPeriod" data-testid="select-hold-period">
+                <SelectTrigger id="holdPeriod" data-testid="select-hold-period" className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -775,24 +772,24 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="startDate" className="text-xs">Pro Forma Start Date</Label>
+            <div className="space-y-1">
+              <Label htmlFor="startDate" className="text-xs text-muted-foreground">Start Date</Label>
               <Input
                 id="startDate"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 data-testid="input-start-date"
+                className="h-8"
               />
             </div>
-            <Separator className="my-2" />
-            <div className="space-y-1.5">
-              <Label htmlFor="cashFlowGranularity" className="text-xs">Cash Flow Timing</Label>
+            <div className="space-y-1">
+              <Label htmlFor="cashFlowGranularity" className="text-xs text-muted-foreground">Cash Flow Timing</Label>
               <Select 
                 value={cashFlowGranularity} 
                 onValueChange={(v) => setCashFlowGranularity(v)}
               >
-                <SelectTrigger id="cashFlowGranularity" data-testid="select-granularity">
+                <SelectTrigger id="cashFlowGranularity" data-testid="select-granularity" className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -800,51 +797,44 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   <SelectItem value="monthly">Monthly</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Controls whether projections display monthly or annual periods
-              </p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sun className="h-4 w-4" />
-              In-Season Months
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Select months when seasonal operations are active
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-center justify-between">
-              <Badge variant="outline" className="gap-1">
-                <Sun className="h-3 w-3" />
-                {getSeasonLabel()}
-              </Badge>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Sun className="h-4 w-4" />
+                In-Season Months
+              </CardTitle>
               <Button
                 variant={seasonMonths.length === 12 ? 'default' : 'outline'}
                 size="sm"
+                className="h-6 text-[10px] px-2"
                 onClick={() => setSeasonMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
               >
-                <Calendar className="h-3 w-3 mr-1" />
                 Year-Round
               </Button>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <CardDescription className="text-[11px]">
+              {getSeasonLabel()}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 pb-4">
+            <div className="grid grid-cols-4 gap-1.5">
               {months.map((month) => (
                 <Button
                   key={month.value}
                   variant={seasonMonths.includes(month.value) ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => toggleSeasonMonth(month.value)}
-                  className="w-full"
+                  className="w-full h-7 text-xs px-1"
                 >
                   {seasonMonths.includes(month.value) ? (
-                    <Sun className="h-3 w-3 mr-1" />
+                    <Sun className="h-3 w-3 mr-0.5" />
                   ) : (
-                    <Snowflake className="h-3 w-3 mr-1" />
+                    <Snowflake className="h-3 w-3 mr-0.5" />
                   )}
                   {month.short}
                 </Button>
@@ -853,35 +843,30 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           </CardContent>
         </Card>
 
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <LandPlot className="h-4 w-4" />
               Acreage
             </CardTitle>
-            <CardDescription className="text-xs">
-              Total property acreage broken down by upland and submerged land
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <div className="space-y-1.5">
-              <Label htmlFor="totalAcres" className="text-xs">Total Acres</Label>
-              <Input
-                id="totalAcres"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={acreage.totalAcres}
-                onChange={(e) => setAcreage(prev => ({ ...prev, totalAcres: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="uplandAcres" className="text-xs">Upland Acres</Label>
+          <CardContent className="space-y-2 pt-0 px-4 pb-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="totalAcres" className="text-xs text-muted-foreground">Total</Label>
+                <Input
+                  id="totalAcres"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={acreage.totalAcres}
+                  onChange={(e) => setAcreage(prev => ({ ...prev, totalAcres: e.target.value }))}
+                  className="h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="uplandAcres" className="text-xs text-muted-foreground">Upland</Label>
                 <Input
                   id="uplandAcres"
                   type="number"
@@ -890,11 +875,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   placeholder="0.00"
                   value={acreage.uplandAcres}
                   onChange={(e) => setAcreage(prev => ({ ...prev, uplandAcres: e.target.value }))}
+                  className="h-8"
                 />
-                <p className="text-xs text-muted-foreground">Land above the waterline</p>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="submergedAcres" className="text-xs">Submerged Acres</Label>
+              <div className="space-y-1">
+                <Label htmlFor="submergedAcres" className="text-xs text-muted-foreground">Submerged</Label>
                 <Input
                   id="submergedAcres"
                   type="number"
@@ -903,32 +888,34 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   placeholder="0.00"
                   value={acreage.submergedAcres}
                   onChange={(e) => setAcreage(prev => ({ ...prev, submergedAcres: e.target.value }))}
+                  className="h-8"
                 />
-                <p className="text-xs text-muted-foreground">Submerged land / water area</p>
               </div>
             </div>
             {acreage.uplandAcres && acreage.submergedAcres && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border text-sm">
-                <span className="text-muted-foreground">Calculated Total</span>
+              <div className="flex items-center justify-between py-1.5 px-2 rounded bg-muted/30 border text-xs">
+                <span className="text-muted-foreground">Sum</span>
                 <span className="font-medium">
-                  {(parseFloat(acreage.uplandAcres || '0') + parseFloat(acreage.submergedAcres || '0')).toFixed(2)} acres
+                  {(parseFloat(acreage.uplandAcres || '0') + parseFloat(acreage.submergedAcres || '0')).toFixed(2)} ac
                 </span>
               </div>
             )}
           </CardContent>
         </Card>
+      </div>
 
+      <div>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <KeyRound className="h-4 w-4" />
               Ownership Structure
             </CardTitle>
-            <CardDescription className="text-xs">
+            <CardDescription className="text-[11px]">
               Property ownership type and applicable lease details
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+          <CardContent className="space-y-3 pt-0 px-4 pb-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Ownership Type</Label>
               <Select
@@ -1148,15 +1135,15 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <Warehouse className="h-4 w-4" />
                 Storage Configuration
               </CardTitle>
-              <CardDescription className="text-xs">
-                Enable storage types and set seasonality: Year-Round, Seasonal, Winter, or Hybrid
+              <CardDescription className="text-[11px]">
+                Year-Round, Seasonal, Winter, or Hybrid
               </CardDescription>
             </div>
             <Button 
@@ -1169,7 +1156,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 pt-0">
+        <CardContent className="space-y-4 pt-0 px-4 pb-4">
           <div>
             <h4 className="text-xs font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
               <Anchor className="h-3.5 w-3.5" />
@@ -1263,16 +1250,16 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <Store className="h-4 w-4" />
             Profit Center Configuration
           </CardTitle>
-          <CardDescription className="text-xs">
+          <CardDescription className="text-[11px]">
             Enable profit centers for Pro Forma revenue categories
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 px-4 pb-4">
           <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {profitCenters.map((item) => (
               <div
