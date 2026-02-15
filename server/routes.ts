@@ -19776,7 +19776,106 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Project Workspace - Deal Pricing (bidirectional solve-for calculations)
+  // Project Workspace - Unified Deal Pricing (single-driver model)
+  app.post('/api/modeling/projects/:projectId/deal-pricing/unified', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const {
+        pricingDriver = 'targetIRR',
+        purchasePrice,
+        targetIRR,
+        goingInCapRate,
+        targetYearCapRate,
+        targetYear,
+        holdPeriod = 5,
+        exitCapRate = 7.5,
+        revenueGrowthRate,
+        expenseGrowthRate,
+        periodLabel,
+        periodNOI,
+        periodRevenue,
+        periodExpenses,
+        useNormalizedData = true,
+      } = req.body;
+
+      let adjustedNOI = periodNOI ? Number(periodNOI) : undefined;
+      let adjustedRevenue = periodRevenue ? Number(periodRevenue) : undefined;
+      let adjustedExpenses = periodExpenses ? Number(periodExpenses) : undefined;
+
+      if (useNormalizedData && periodLabel) {
+        try {
+          const adjustments = await storage.getActiveAdjustmentsForPeriod(projectId, periodLabel, orgId);
+          if (adjustments.length > 0) {
+            for (const adj of adjustments) {
+              const target = (adj.targetIdentifier || '').toLowerCase();
+              const value = Number(adj.adjustmentValue) || 0;
+              const adjType = adj.adjustmentType;
+              if (target === 'revenue' || target.includes('revenue')) {
+                const base = adjustedRevenue || 0;
+                if (adjType === 'absolute') adjustedRevenue = base + value;
+                else if (adjType === 'percentage') adjustedRevenue = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedRevenue = value;
+              } else if (target === 'expenses' || target.includes('expense')) {
+                const base = adjustedExpenses || 0;
+                if (adjType === 'absolute') adjustedExpenses = base + value;
+                else if (adjType === 'percentage') adjustedExpenses = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedExpenses = value;
+              } else if (target === 'noi' || target.includes('noi')) {
+                const base = adjustedNOI || 0;
+                if (adjType === 'absolute') adjustedNOI = base + value;
+                else if (adjType === 'percentage') adjustedNOI = base * (1 + value / 100);
+                else if (adjType === 'replace') adjustedNOI = value;
+              }
+            }
+            if (adjustedRevenue !== undefined && adjustedExpenses !== undefined) {
+              const recalcNOI = adjustedRevenue - adjustedExpenses;
+              if (adjustedNOI === undefined || adjustedNOI === (periodNOI ? Number(periodNOI) : undefined)) {
+                adjustedNOI = recalcNOI;
+              }
+            }
+          }
+        } catch (adjError) {
+          console.warn('Failed to apply period adjustments:', adjError);
+        }
+      }
+
+      const result = await dealPricingService.calculateUnified(projectId, orgId, {
+        pricingDriver,
+        purchasePrice: purchasePrice ? Number(purchasePrice) : undefined,
+        targetIRR: targetIRR ? Number(targetIRR) : undefined,
+        goingInCapRate: goingInCapRate ? Number(goingInCapRate) : undefined,
+        targetYearCapRate: targetYearCapRate ? Number(targetYearCapRate) : undefined,
+        targetYear: targetYear ? Number(targetYear) : undefined,
+        holdPeriod: Number(holdPeriod),
+        exitCapRate: Number(exitCapRate),
+        revenueGrowthRate: revenueGrowthRate ? Number(revenueGrowthRate) / 100 : undefined,
+        expenseGrowthRate: expenseGrowthRate ? Number(expenseGrowthRate) / 100 : undefined,
+        periodLabel,
+        periodNOI: adjustedNOI,
+        periodRevenue: adjustedRevenue,
+        periodExpenses: adjustedExpenses,
+      });
+
+      if (result.purchasePrice > 0) {
+        try {
+          await storage.updateModelingProject(projectId, {
+            purchasePrice: String(result.purchasePrice),
+            year1CapRate: String(result.year1CapRate),
+          }, orgId);
+        } catch (saveErr) {
+          console.warn('Auto-save deal pricing failed:', saveErr);
+        }
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to calculate unified deal pricing:', error);
+      res.status(500).json({ error: error.message || 'Failed to calculate deal pricing' });
+    }
+  });
+
+  // Project Workspace - Deal Pricing (legacy bidirectional solve-for calculations)
   app.post('/api/modeling/projects/:projectId/deal-pricing', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

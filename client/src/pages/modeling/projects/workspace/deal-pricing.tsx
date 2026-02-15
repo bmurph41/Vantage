@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,9 +59,13 @@ interface DealPricingProps {
   onTabChange?: (tab: string) => void;
 }
 
-interface PricingResult {
+type PricingDriver = 'price' | 'targetIRR' | 'goingInCap' | 'targetYearCap' | 'exitCap' | 'holdPeriod';
+
+interface UnifiedPricingResult {
+  driver: string;
   purchasePrice: number;
   year1CapRate: number;
+  goingInCapRate: number;
   exitCapRate: number;
   irr: number;
   equityMultiple: number;
@@ -76,23 +78,6 @@ interface PricingResult {
   netExitProceeds: number;
   totalEquityInvested: number;
   usedProFormaData: boolean;
-}
-
-interface SolveForPriceResult {
-  purchasePrice: number;
-  achievedMetric: number;
-  metricType: 'irr' | 'cap_rate' | 'year_cap_rate';
-  year1CapRate: number;
-  irr: number;
-  equityMultiple: number;
-  moic: number;
-}
-
-interface PricingResponse {
-  fromPurchasePrice: PricingResult | null;
-  fromTargetIRR: SolveForPriceResult | null;
-  fromGoingInCapRate: SolveForPriceResult | null;
-  fromTargetYearCapRate: SolveForPriceResult | null;
   projectFinancials: {
     year1NOI: number;
     baseRevenue: number;
@@ -101,8 +86,7 @@ interface PricingResponse {
   };
   noiProjections: number[];
   proFormaIntegrated: boolean;
-  exitValue: number;
-  netExitProceeds: number;
+  stabilizedCapRate: number;
 }
 
 const formatMultiple = (value: number | null | undefined): string => {
@@ -285,8 +269,9 @@ function CurrencyStepper({
 
 export default function DealPricing({ projectId, onTabChange }: DealPricingProps) {
   const { toast } = useToast();
+  const suppressSyncRef = useRef(false);
   
-  const [manualPurchasePrice, setManualPurchasePrice] = useState<string>('');
+  const [purchasePrice, setPurchasePrice] = useState<string>('');
   const [targetIRR, setTargetIRR] = useState<string>('15');
   const [goingInCapRate, setGoingInCapRate] = useState<string>('7.5');
   const [targetYearCapRate, setTargetYearCapRate] = useState<string>('7.0');
@@ -299,9 +284,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
   
-  // Two-way linking: tracks which field was last edited to drive calculation direction
-  const [pricingDriver, setPricingDriver] = useState<'price' | 'exitCap' | 'targetIRR' | 'goingInCap'>('targetIRR');
-  const [isLinked, setIsLinked] = useState<boolean>(true);
+  const [pricingDriver, setPricingDriver] = useState<PricingDriver>('targetIRR');
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -376,14 +359,14 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   });
 
   useEffect(() => {
-    if (project?.purchasePrice) {
-      setManualPurchasePrice(String(project.purchasePrice));
+    if (project?.purchasePrice && !purchasePrice) {
+      setPurchasePrice(String(project.purchasePrice));
     }
-  }, [project, config]);
+  }, [project]);
 
   const calculateMutation = useMutation({
     mutationFn: (inputs: any) => 
-      apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing`, inputs),
+      apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing/unified`, inputs),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
@@ -402,29 +385,32 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     },
   });
 
-  // Handlers for bidirectional updates
-  const handlePurchasePriceChange = (value: string) => {
-    setManualPurchasePrice(value);
-    if (isLinked) setPricingDriver('price');
+  const makeDriverHandler = (driver: PricingDriver, setter: (v: string) => void) => {
+    return (value: string) => {
+      suppressSyncRef.current = true;
+      setter(value);
+      setPricingDriver(driver);
+    };
   };
 
+  const handlePurchasePriceChange = makeDriverHandler('price', setPurchasePrice);
+  const handleTargetIRRChange = makeDriverHandler('targetIRR', setTargetIRR);
+  const handleGoingInCapRateChange = makeDriverHandler('goingInCap', setGoingInCapRate);
+
   const handleExitCapRateChange = (value: string) => {
+    suppressSyncRef.current = true;
     setExitCapRate(value);
-    if (isLinked) setPricingDriver('exitCap');
+    setPricingDriver('exitCap');
     const numVal = parseFloat(value);
     if (numVal > 0) {
       debouncedSaveCapRate(numVal);
     }
   };
 
-  const handleTargetIRRChange = (value: string) => {
-    setTargetIRR(value);
-    if (isLinked) setPricingDriver('targetIRR');
-  };
-
-  const handleGoingInCapRateChange = (value: string) => {
-    setGoingInCapRate(value);
-    if (isLinked) setPricingDriver('goingInCap');
+  const handleHoldPeriodChange = (value: string) => {
+    suppressSyncRef.current = true;
+    setHoldPeriodNum(parseInt(value));
+    setPricingDriver('holdPeriod');
   };
 
   const debouncedCalculate = useCallback(
@@ -437,7 +423,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       } : {};
       
       calculateMutation.mutate({
-        manualPurchasePrice: manualPurchasePrice ? parseCurrencyInput(manualPurchasePrice) : undefined,
+        pricingDriver,
+        purchasePrice: purchasePrice ? parseCurrencyInput(purchasePrice) : undefined,
         targetIRR: targetIRR ? parsePercentInput(targetIRR) : undefined,
         goingInCapRate: goingInCapRate ? parsePercentInput(goingInCapRate) : undefined,
         targetYearCapRate: targetYearCapRate ? parsePercentInput(targetYearCapRate) : undefined,
@@ -447,11 +434,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         revenueGrowthRate: parsePercentInput(revenueGrowthRate),
         expenseGrowthRate: parsePercentInput(expenseGrowthRate),
         useNormalizedData,
-        pricingDriver: isLinked ? pricingDriver : undefined,
         ...periodOverrides,
       });
-    }, 500),
-    [manualPurchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, isLinked]
+    }, 400),
+    [purchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver]
   );
 
   useEffect(() => {
@@ -459,103 +445,25 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     return () => debouncedCalculate.cancel();
   }, [debouncedCalculate]);
 
-  const pricingData = calculateMutation.data as PricingResponse | undefined;
+  const pricingData = calculateMutation.data as UnifiedPricingResult | undefined;
 
   useEffect(() => {
-    if (!isLinked || !pricingData) return;
-    
-    const holdYears = holdPeriodNum;
-    const year1NOI = pricingData?.projectFinancials?.year1NOI || 0;
-    if (year1NOI <= 0) return;
+    if (!pricingData || !suppressSyncRef.current) return;
+    suppressSyncRef.current = false;
 
-    const isProForma = pricingData.proFormaIntegrated;
+    const d = pricingData;
+    const driver = d.driver as PricingDriver;
 
-    if (isProForma) {
-      if (pricingDriver === 'targetIRR' && pricingData.fromTargetIRR) {
-        const derivedPrice = pricingData.fromTargetIRR.purchasePrice;
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-          const derivedCap = (year1NOI / derivedPrice) * 100;
-          const currentCap = parsePercentInput(goingInCapRate);
-          if (Math.abs(derivedCap - currentCap) > 0.05 && derivedCap > 0 && derivedCap < 100) {
-            setGoingInCapRate(derivedCap.toFixed(2));
-          }
-        }
-      } else if (pricingDriver === 'goingInCap' && pricingData.fromGoingInCapRate) {
-        const derivedPrice = pricingData.fromGoingInCapRate.purchasePrice;
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-        }
-      } else if (pricingDriver === 'exitCap' && pricingData.fromTargetIRR) {
-        const derivedPrice = pricingData.fromTargetIRR.purchasePrice;
-        const currentPrice = parseCurrencyInput(manualPurchasePrice);
-        if (derivedPrice > 0 && Math.abs(derivedPrice - currentPrice) > 10000) {
-          setManualPurchasePrice(Math.round(derivedPrice).toLocaleString());
-          const derivedCap = (year1NOI / derivedPrice) * 100;
-          const currentCap = parsePercentInput(goingInCapRate);
-          if (Math.abs(derivedCap - currentCap) > 0.05 && derivedCap > 0 && derivedCap < 100) {
-            setGoingInCapRate(derivedCap.toFixed(2));
-          }
-        }
-      }
-      return;
+    if (driver !== 'price' && d.purchasePrice > 0) {
+      setPurchasePrice(Math.round(d.purchasePrice).toLocaleString());
     }
-    
-    const noiProj = pricingData.noiProjections || [];
-    const getNOI = (yearIdx: number) => noiProj[yearIdx] || year1NOI * Math.pow(1.03, yearIdx + 1);
-    const exitNOI = getNOI(holdYears - 1);
-    
-    const solvePriceFromIRR = (irrPct: number): number => {
-      const r = irrPct / 100;
-      if (r <= 0) return 0;
-      const exitCap = parsePercentInput(exitCapRate) / 100 || 0.075;
-      const ev = exitCap > 0 ? exitNOI / exitCap : 0;
-      let pv = 0;
-      for (let i = 1; i <= holdYears; i++) {
-        const cf = i < holdYears ? getNOI(i - 1) : getNOI(i - 1) + ev;
-        pv += cf / Math.pow(1 + r, i);
-      }
-      return pv;
-    };
-
-    const updatePrice = (newPrice: number) => {
-      const currentPrice = parseCurrencyInput(manualPurchasePrice);
-      if (newPrice > 0 && Math.abs(newPrice - currentPrice) > 10000) {
-        setManualPurchasePrice(Math.round(newPrice).toLocaleString());
-      }
-    };
-
-    const updateGoingInCap = (price: number) => {
-      if (price <= 0) return;
-      const derived = (year1NOI / price) * 100;
-      const current = parsePercentInput(goingInCapRate);
-      if (Math.abs(derived - current) > 0.05 && derived > 0 && derived < 100) {
-        setGoingInCapRate(derived.toFixed(2));
-      }
-    };
-
-    if (pricingDriver === 'targetIRR') {
-      const irrPct = parsePercentInput(targetIRR);
-      if (irrPct > 0) {
-        const derivedPrice = solvePriceFromIRR(irrPct);
-        updatePrice(derivedPrice);
-        updateGoingInCap(derivedPrice);
-      }
-    } else if (pricingDriver === 'goingInCap') {
-      const goingInCap = parsePercentInput(goingInCapRate) / 100;
-      if (goingInCap > 0) {
-        const derivedPrice = year1NOI / goingInCap;
-        updatePrice(derivedPrice);
-      }
-    } else if (pricingDriver === 'exitCap') {
-      const irrPct = parsePercentInput(targetIRR) || 15;
-      const derivedPrice = solvePriceFromIRR(irrPct);
-      updatePrice(derivedPrice);
-      updateGoingInCap(derivedPrice);
+    if (driver !== 'targetIRR' && d.irr > 0 && d.irr < 200) {
+      setTargetIRR(d.irr.toFixed(1));
     }
-  }, [exitCapRate, targetIRR, goingInCapRate, pricingDriver, isLinked, holdPeriodNum, pricingData]);
+    if (driver !== 'goingInCap' && d.goingInCapRate > 0 && d.goingInCapRate < 100) {
+      setGoingInCapRate(d.goingInCapRate.toFixed(2));
+    }
+  }, [pricingData]);
 
   const handleSavePurchasePrice = (price: number, capRate?: number) => {
     saveMutation.mutate({ 
@@ -565,6 +473,15 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   };
 
   const years = Array.from({ length: holdPeriodNum }, (_, i) => i + 1);
+
+  const driverLabels: Record<PricingDriver, { label: string; description: string; color: string }> = {
+    price: { label: 'Purchase Price', description: 'Editing price updates all yield metrics', color: 'primary' },
+    targetIRR: { label: 'Target IRR', description: 'IRR target solves for purchase price', color: 'green-600' },
+    goingInCap: { label: 'Going-In Cap', description: 'Cap rate solves for purchase price', color: 'blue-600' },
+    targetYearCap: { label: 'Year Cap Rate', description: 'Year cap rate solves for purchase price', color: 'purple-600' },
+    exitCap: { label: 'Exit Cap Rate', description: 'Exit cap change recalculates returns', color: 'purple-600' },
+    holdPeriod: { label: 'Hold Period', description: 'Hold period change recalculates returns', color: 'slate-600' },
+  };
 
   return (
     <div className="space-y-6">
@@ -576,7 +493,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         <div>
           <h2 className="text-xl font-semibold">Deal Pricing</h2>
           <p className="text-sm text-muted-foreground">
-            Price the deal from multiple angles - enter a price, target IRR, or cap rate
+            Interconnected pricing — change any input and all metrics update dynamically
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -628,84 +545,51 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 >
                   {useNormalizedData ? 'Use Raw Data' : 'Use Normalized'}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const tabsList = document.querySelector('[data-testid="tab-analytics"]') as HTMLElement;
-                    if (tabsList) tabsList.click();
-                  }}
-                  className="text-xs gap-1"
-                  data-testid="button-view-analytics"
-                >
-                  <SlidersHorizontal className="h-3 w-3" />
-                  View Analytics
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {(pricingData?.projectFinancials || selectedPeriodData) && (
+      {pricingData?.projectFinancials && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Info className="h-4 w-4" />
               {selectedPeriod ? `${selectedPeriod} Financials` : 'Project Financials'}
-              {selectedPeriodData && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {selectedPeriodData.periodType?.replace('_', ' ') || 'Period'}
+              {pricingData.proFormaIntegrated && (
+                <Badge variant="secondary" className="ml-2 text-[10px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 border-indigo-200">
+                  Pro Forma Engine
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">
-                  {selectedPeriod ? `${selectedPeriod} NOI` : 'Year 1 NOI'}
-                </p>
+                <p className="text-muted-foreground">Year 1 NOI</p>
                 <p className="font-semibold text-lg" data-testid="text-period-noi">
-                  {selectedPeriodData?.noi 
-                    ? formatCurrency(Number(selectedPeriodData.noi))
-                    : formatCurrency(pricingData?.projectFinancials?.year1NOI)}
+                  {formatCurrency(pricingData.projectFinancials.year1NOI)}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Total Revenue</p>
                 <p className="font-semibold text-lg" data-testid="text-period-revenue">
-                  {selectedPeriodData?.totalRevenue
-                    ? formatCurrency(Number(selectedPeriodData.totalRevenue))
-                    : formatCurrency(pricingData?.projectFinancials?.baseRevenue)}
+                  {formatCurrency(pricingData.projectFinancials.baseRevenue)}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Total Expenses</p>
                 <p className="font-semibold text-lg" data-testid="text-period-expenses">
-                  {selectedPeriodData?.totalExpenses
-                    ? formatCurrency(Number(selectedPeriodData.totalExpenses))
-                    : formatCurrency(pricingData?.projectFinancials?.baseExpenses)}
+                  {formatCurrency(pricingData.projectFinancials.baseExpenses)}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Cap Rate</p>
-                <p className="font-semibold text-lg" data-testid="text-period-cap-rate">
-                  {selectedPeriodData?.capRate
-                    ? formatPercent(Number(selectedPeriodData.capRate) * 100)
-                    : pricingData?.fromPurchasePrice?.year1CapRate
-                      ? formatPercent(pricingData.fromPurchasePrice.year1CapRate)
-                      : '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Purchase Price</p>
+                <p className="text-muted-foreground">Stored Price</p>
                 <p className="font-semibold text-lg" data-testid="text-period-price">
-                  {selectedPeriodData?.purchasePrice 
-                    ? formatCurrency(Number(selectedPeriodData.purchasePrice))
-                    : pricingData?.projectFinancials?.storedPurchasePrice 
-                      ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
-                      : 'Not set'}
+                  {pricingData.projectFinancials.storedPurchasePrice
+                    ? formatCurrency(pricingData.projectFinancials.storedPurchasePrice)
+                    : 'Not set'}
                 </p>
               </div>
             </div>
@@ -725,14 +609,24 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         </div>
         <div className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-            <div className="flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600">
+            <div className={cn(
+              "flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border",
+              pricingDriver === 'holdPeriod'
+                ? "ring-2 ring-slate-400/40 border-slate-300 dark:border-slate-600"
+                : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"
+            )}>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   <Calendar className="w-3 h-3" />
                 </div>
                 <span className="text-[12px] font-medium text-slate-600 dark:text-slate-400">Hold Period</span>
+                {pricingDriver === 'holdPeriod' && (
+                  <Badge className="bg-slate-600 text-white text-[8px] px-1.5 py-0 h-4 flex-shrink-0 ml-auto">
+                    Driving
+                  </Badge>
+                )}
               </div>
-              <Select value={String(holdPeriodNum)} onValueChange={(v) => setHoldPeriodNum(parseInt(v))}>
+              <Select value={String(holdPeriodNum)} onValueChange={handleHoldPeriodChange}>
                 <SelectTrigger className="w-full h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-hold-period">
                   <SelectValue />
                 </SelectTrigger>
@@ -749,7 +643,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               value={exitCapRate}
               onChange={handleExitCapRateChange}
               step={0.25}
-              isActive={pricingDriver === 'exitCap' && isLinked}
+              isActive={pricingDriver === 'exitCap'}
               activeBadge="Driving"
               activeColor="purple"
               data-testid="input-exit-cap-rate"
@@ -778,188 +672,45 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
       <Separator />
 
-      {isLinked && (
-        <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'price' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-          }`}>
-            <DollarSign className="h-3 w-3" />
-            Price
-          </div>
-          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'targetIRR' ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
-          }`}>
-            <Target className="h-3 w-3" />
-            IRR
-          </div>
-          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'goingInCap' ? 'bg-blue-600 text-white' : 'bg-muted text-muted-foreground'
-          }`}>
-            <Percent className="h-3 w-3" />
-            Cap Rate
-          </div>
-          <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-            pricingDriver === 'exitCap' ? 'bg-purple-600 text-white' : 'bg-muted text-muted-foreground'
-          }`}>
-            <TrendingUp className="h-3 w-3" />
-            Exit Cap
-          </div>
-          <span className="text-xs text-muted-foreground ml-2">
-            {pricingDriver === 'price' && '→ Editing price updates yield metrics'}
-            {pricingDriver === 'targetIRR' && '→ Editing IRR updates purchase price'}
-            {pricingDriver === 'goingInCap' && '→ Editing cap rate updates purchase price'}
-            {pricingDriver === 'exitCap' && '→ Editing exit cap updates purchase price'}
-          </span>
-        </div>
-      )}
-
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
-        <Card className={cn(
-          "border overflow-hidden",
-          pricingDriver === 'price' && isLinked ? 'border-primary ring-2 ring-primary/30' : ''
-        )}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-primary" />
-                From Purchase Price
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                {pricingDriver === 'price' && isLinked && (
-                  <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">
-                    Driving
-                  </Badge>
-                )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={isLinked ? "default" : "outline"}
-                        size="sm"
-                        className="h-5 px-1.5 text-[9px] gap-0.5"
-                        onClick={() => setIsLinked(!isLinked)}
-                      >
-                        <Link2 className={`h-2.5 w-2.5 ${!isLinked ? 'opacity-50' : ''}`} />
-                        {isLinked ? 'Link' : 'Off'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[180px]">
-                      <p className="text-xs">
-                        {isLinked 
-                          ? 'Metrics are linked. Editing one updates others.' 
-                          : 'Metrics are independent. Click to link.'}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+      <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
+        {(['targetIRR', 'goingInCap', 'price', 'exitCap', 'holdPeriod'] as PricingDriver[]).map((d) => {
+          const isActive = pricingDriver === d;
+          const colorClass = isActive 
+            ? d === 'targetIRR' ? 'bg-green-600 text-white' 
+              : d === 'goingInCap' ? 'bg-blue-600 text-white'
+              : d === 'price' ? 'bg-primary text-primary-foreground'
+              : d === 'exitCap' ? 'bg-purple-600 text-white'
+              : 'bg-slate-600 text-white'
+            : 'bg-muted text-muted-foreground';
+          const IconComp = d === 'targetIRR' ? Target : d === 'goingInCap' ? Percent : d === 'price' ? DollarSign : d === 'exitCap' ? TrendingUp : Calendar;
+          return (
+            <div key={d} className="flex items-center gap-1.5">
+              <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all", colorClass)}>
+                <IconComp className="h-3 w-3" />
+                {driverLabels[d].label}
               </div>
+              {d !== 'holdPeriod' && <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" />}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <CurrencyStepper
-              label="Enter Amount"
-              icon={DollarSign}
-              value={manualPurchasePrice}
-              onChange={handlePurchasePriceChange}
-              step={500000}
-              isActive={pricingDriver === 'price' && isLinked}
-              activeColor="primary"
-              data-testid="input-purchase-price"
-            />
+          );
+        })}
+        <span className="text-xs text-muted-foreground ml-2">
+          {driverLabels[pricingDriver].description}
+        </span>
+      </div>
 
-            {calculateMutation.isPending ? (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : pricingData?.fromPurchasePrice ? (
-              <div className="space-y-4">
-                {pricingData.fromPurchasePrice.usedProFormaData && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-medium mb-2">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Using Pro Forma Engine data
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-                    <p className="text-xs text-muted-foreground">IRR</p>
-                    <p className="num text-xl font-bold text-green-600" data-testid="text-price-irr">
-                      {formatPercent(pricingData.fromPurchasePrice.irr)}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <p className="text-xs text-muted-foreground">Year 1 Cap Rate</p>
-                    <p className="num text-xl font-bold text-blue-600" data-testid="text-price-cap-rate">
-                      {formatPercent(pricingData.fromPurchasePrice.year1CapRate)}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <p className="text-xs text-muted-foreground">MOIC</p>
-                    <p className="num text-xl font-bold text-purple-600">
-                      {formatMultiple(pricingData.fromPurchasePrice.moic)}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                    <p className="text-xs text-muted-foreground">Avg Cash-on-Cash</p>
-                    <p className="num text-xl font-bold text-orange-600">
-                      {formatPercent(pricingData.fromPurchasePrice.averageCashOnCash)}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm pt-2 border-t">
-                  <div>
-                    <span className="text-muted-foreground">Exit Value: </span>
-                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.exitValue)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Net Exit Proceeds: </span>
-                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.netExitProceeds)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Total Equity: </span>
-                    <span className="num font-medium">{formatCurrency(pricingData.fromPurchasePrice.totalEquityInvested)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Total Profit: </span>
-                    <span className="num font-medium text-green-600">{formatCurrency(pricingData.fromPurchasePrice.totalProfit)}</span>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => handleSavePurchasePrice(
-                    pricingData.fromPurchasePrice!.purchasePrice,
-                    pricingData.fromPurchasePrice!.year1CapRate
-                  )}
-                  disabled={saveMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-from-price"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save This Price to Project
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Enter a purchase price to calculate returns</p>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <Card className={cn(
           "border overflow-hidden",
-          pricingDriver === 'targetIRR' && isLinked ? 'border-green-500 ring-2 ring-green-500/30' : ''
+          pricingDriver === 'targetIRR' ? 'border-green-500 ring-2 ring-green-500/30' : ''
         )}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1.5">
                 <Target className="h-4 w-4 text-green-600" />
-                From Target IRR
+                Target IRR
               </CardTitle>
-              {pricingDriver === 'targetIRR' && isLinked && (
-                <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">
-                  Driving
-                </Badge>
+              {pricingDriver === 'targetIRR' && (
+                <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
               )}
             </div>
           </CardHeader>
@@ -970,72 +721,34 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               value={targetIRR}
               onChange={handleTargetIRRChange}
               step={0.5}
-              isActive={pricingDriver === 'targetIRR' && isLinked}
+              isActive={pricingDriver === 'targetIRR'}
               activeBadge="Driving"
               activeColor="green"
               data-testid="input-target-irr"
             />
-
-            {calculateMutation.isPending ? (
-              <Skeleton className="h-24 w-full" />
-            ) : pricingData?.fromTargetIRR ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-600">Max Purchase Price</span>
-                  </div>
-                  <p className="num text-2xl font-bold" data-testid="text-irr-price">
-                    {formatCurrency(pricingData.fromTargetIRR.purchasePrice)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    To achieve {formatPercent(pricingData.fromTargetIRR.achievedMetric)} IRR
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Year 1 Cap Rate: </span>
-                    <span className="num font-medium">{formatPercent(pricingData.fromTargetIRR.year1CapRate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">MOIC: </span>
-                    <span className="num font-medium">{formatMultiple(pricingData.fromTargetIRR.moic)}</span>
-                  </div>
-                </div>
-                <Button 
-                  variant="outline"
-                  onClick={() => handleSavePurchasePrice(
-                    pricingData.fromTargetIRR!.purchasePrice,
-                    pricingData.fromTargetIRR!.year1CapRate
-                  )}
-                  disabled={saveMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-from-irr"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Use This Price
-                </Button>
+            {pricingDriver === 'targetIRR' && pricingData && (
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Solved Purchase Price</p>
+                <p className="num text-xl font-bold" data-testid="text-irr-price">
+                  {formatCurrency(pricingData.purchasePrice)}
+                </p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Enter a target IRR to solve for price</p>
             )}
           </CardContent>
         </Card>
 
         <Card className={cn(
           "border overflow-hidden",
-          pricingDriver === 'goingInCap' && isLinked ? 'border-blue-500 ring-2 ring-blue-500/30' : ''
+          pricingDriver === 'goingInCap' ? 'border-blue-500 ring-2 ring-blue-500/30' : ''
         )}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1.5">
                 <Percent className="h-4 w-4 text-blue-600" />
-                From Going-In Cap Rate
+                Going-In Cap Rate
               </CardTitle>
-              {pricingDriver === 'goingInCap' && isLinked && (
-                <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">
-                  Driving
-                </Badge>
+              {pricingDriver === 'goingInCap' && (
+                <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
               )}
             </div>
           </CardHeader>
@@ -1046,189 +759,289 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               value={goingInCapRate}
               onChange={handleGoingInCapRateChange}
               step={0.25}
-              isActive={pricingDriver === 'goingInCap' && isLinked}
+              isActive={pricingDriver === 'goingInCap'}
               activeBadge="Driving"
               activeColor="blue"
               data-testid="input-going-in-cap"
             />
-
-            {calculateMutation.isPending ? (
-              <Skeleton className="h-24 w-full" />
-            ) : pricingData?.fromGoingInCapRate ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-600">Implied Purchase Price</span>
-                  </div>
-                  <p className="num text-2xl font-bold" data-testid="text-cap-price">
-                    {formatCurrency(pricingData.fromGoingInCapRate.purchasePrice)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    At {formatPercent(pricingData.fromGoingInCapRate.achievedMetric)} cap rate
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">IRR: </span>
-                    <span className="num font-medium text-green-600">{formatPercent(pricingData.fromGoingInCapRate.irr)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">MOIC: </span>
-                    <span className="num font-medium">{formatMultiple(pricingData.fromGoingInCapRate.moic)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Eq. Mult: </span>
-                    <span className="num font-medium">{formatMultiple(pricingData.fromGoingInCapRate.equityMultiple)}</span>
-                  </div>
-                </div>
-                <Button 
-                  variant="outline"
-                  onClick={() => handleSavePurchasePrice(
-                    pricingData.fromGoingInCapRate!.purchasePrice,
-                    pricingData.fromGoingInCapRate!.achievedMetric
-                  )}
-                  disabled={saveMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-from-cap"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Use This Price
-                </Button>
+            {pricingDriver === 'goingInCap' && pricingData && (
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Implied Purchase Price</p>
+                <p className="num text-xl font-bold" data-testid="text-cap-price">
+                  {formatCurrency(pricingData.purchasePrice)}
+                </p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Enter a cap rate to calculate price</p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border overflow-hidden">
+        <Card className={cn(
+          "border overflow-hidden",
+          pricingDriver === 'price' ? 'border-primary ring-2 ring-primary/30' : ''
+        )}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 text-purple-600" />
-              From Target Year Cap Rate
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-primary" />
+                Purchase Price
+              </CardTitle>
+              {pricingDriver === 'price' && (
+                <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">Driving</Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
-            <div className="space-y-2">
-              <div className="flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
-                    <Calendar className="w-3 h-3" />
-                  </div>
-                  <span className="text-[12px] font-medium text-slate-600 dark:text-slate-400">Target Year</span>
-                </div>
-                <Select value={targetYear} onValueChange={setTargetYear}>
-                  <SelectTrigger className="w-full h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-target-year">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map(y => (
-                      <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CurrencyStepper
+              label="Enter Amount"
+              icon={DollarSign}
+              value={purchasePrice}
+              onChange={handlePurchasePriceChange}
+              step={500000}
+              isActive={pricingDriver === 'price'}
+              activeColor="primary"
+              data-testid="input-purchase-price"
+            />
+            {pricingDriver === 'price' && pricingData && (
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                <p className="text-xs text-muted-foreground mb-1">Resulting IRR</p>
+                <p className="num text-xl font-bold text-green-600" data-testid="text-price-irr">
+                  {formatPercent(pricingData.irr)}
+                </p>
               </div>
-              <PercentStepper
-                label="Cap Rate"
-                icon={Percent}
-                value={targetYearCapRate}
-                onChange={setTargetYearCapRate}
-                step={0.25}
-                activeColor="purple"
-                data-testid="input-target-year-cap"
-              />
-            </div>
-
-            {calculateMutation.isPending ? (
-              <Skeleton className="h-24 w-full" />
-            ) : pricingData?.fromTargetYearCapRate ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-purple-600">Implied Purchase Price</span>
-                  </div>
-                  <p className="num text-2xl font-bold" data-testid="text-year-cap-price">
-                    {formatCurrency(pricingData.fromTargetYearCapRate.purchasePrice)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Year {targetYear} NOI at {formatPercent(pricingData.fromTargetYearCapRate.achievedMetric)} cap
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Year 1 Cap: </span>
-                    <span className="num font-medium">{formatPercent(pricingData.fromTargetYearCapRate.year1CapRate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">IRR: </span>
-                    <span className="num font-medium text-green-600">{formatPercent(pricingData.fromTargetYearCapRate.irr)}</span>
-                  </div>
-                </div>
-                <Button 
-                  variant="outline"
-                  onClick={() => handleSavePurchasePrice(
-                    pricingData.fromTargetYearCapRate!.purchasePrice,
-                    pricingData.fromTargetYearCapRate!.year1CapRate
-                  )}
-                  disabled={saveMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-from-year-cap"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Use This Price
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Select a year and cap rate to calculate</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {pricingData?.noiProjections && pricingData.noiProjections.length > 0 && (
+      {calculateMutation.isPending ? (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">NOI Projections</CardTitle>
-                <CardDescription>
-                  Projected Net Operating Income over the hold period
-                </CardDescription>
+          <CardContent className="py-6">
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : pricingData && pricingData.purchasePrice > 0 ? (
+        <>
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calculator className="h-4 w-4" />
+                  Return Metrics
+                </CardTitle>
+                {pricingData.usedProFormaData && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-medium">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Pro Forma Engine
+                  </div>
+                )}
               </div>
-              {pricingData?.proFormaIntegrated && (
-                <Badge variant="secondary" className="text-[10px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 border-indigo-200">
-                  Pro Forma Engine
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-5 gap-4">
-              {pricingData.noiProjections.map((noi, index) => (
-                <div key={index} className="text-center p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground mb-1">Year {index + 1}</p>
-                  <p className="num font-semibold">{formatCurrency(noi)}</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                  <p className="text-xs text-muted-foreground">Purchase Price</p>
+                  <p className="num text-2xl font-bold" data-testid="text-result-price">
+                    {formatCurrency(pricingData.purchasePrice)}
+                  </p>
                 </div>
-              ))}
-            </div>
+                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <p className="text-xs text-muted-foreground">IRR</p>
+                  <p className="num text-2xl font-bold text-green-600" data-testid="text-result-irr">
+                    {formatPercent(pricingData.irr)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <p className="text-xs text-muted-foreground">Year 1 Cap Rate</p>
+                  <p className="num text-2xl font-bold text-blue-600" data-testid="text-result-cap-rate">
+                    {formatPercent(pricingData.year1CapRate)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <p className="text-xs text-muted-foreground">MOIC</p>
+                  <p className="num text-2xl font-bold text-purple-600" data-testid="text-result-moic">
+                    {formatMultiple(pricingData.moic)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  <p className="text-xs text-muted-foreground">Avg Cash-on-Cash</p>
+                  <p className="num text-lg font-bold text-orange-600">
+                    {formatPercent(pricingData.averageCashOnCash)}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs text-muted-foreground">Equity Multiple</p>
+                  <p className="num text-lg font-bold">
+                    {formatMultiple(pricingData.equityMultiple)}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs text-muted-foreground">Stabilized Cap Rate</p>
+                  <p className="num text-lg font-bold">
+                    {formatPercent(pricingData.stabilizedCapRate)}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <p className="text-xs text-muted-foreground">Going-In Cap</p>
+                  <p className="num text-lg font-bold">
+                    {formatPercent(pricingData.goingInCapRate)}
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Exit Value: </span>
+                  <span className="num font-medium">{formatCurrency(pricingData.exitValue)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Net Exit Proceeds: </span>
+                  <span className="num font-medium">{formatCurrency(pricingData.netExitProceeds)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total Equity: </span>
+                  <span className="num font-medium">{formatCurrency(pricingData.totalEquityInvested)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total Profit: </span>
+                  <span className="num font-medium text-green-600">{formatCurrency(pricingData.totalProfit)}</span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <Button 
+                  onClick={() => handleSavePurchasePrice(pricingData.purchasePrice, pricingData.year1CapRate)}
+                  disabled={saveMutation.isPending}
+                  className="w-full sm:w-auto"
+                  data-testid="button-save-from-price"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Price & Cap Rate to Project
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {pricingData.noiProjections && pricingData.noiProjections.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">NOI Projections</CardTitle>
+                    <CardDescription>
+                      Projected Net Operating Income over the hold period
+                    </CardDescription>
+                  </div>
+                  {pricingData.proFormaIntegrated && (
+                    <Badge variant="secondary" className="text-[10px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 border-indigo-200">
+                      Pro Forma Engine
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-5 gap-4">
+                  {pricingData.noiProjections.map((noi, index) => (
+                    <div key={index} className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground mb-1">Year {index + 1}</p>
+                      <p className="num font-semibold">{formatCurrency(noi)}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="border overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+                Target Year Cap Rate (Optional)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-0">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
+                      <Calendar className="w-3 h-3" />
+                    </div>
+                    <span className="text-[12px] font-medium text-slate-600 dark:text-slate-400">Target Year</span>
+                  </div>
+                  <Select value={targetYear} onValueChange={setTargetYear}>
+                    <SelectTrigger className="w-full h-8 text-[13px] font-mono bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600" data-testid="select-target-year">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map(y => (
+                        <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <PercentStepper
+                  label="Cap Rate"
+                  icon={Percent}
+                  value={targetYearCapRate}
+                  onChange={(v) => {
+                    suppressSyncRef.current = true;
+                    setTargetYearCapRate(v);
+                    setPricingDriver('targetYearCap');
+                  }}
+                  step={0.25}
+                  isActive={pricingDriver === 'targetYearCap'}
+                  activeBadge="Driving"
+                  activeColor="purple"
+                  data-testid="input-target-year-cap"
+                />
+              </div>
+              {pricingDriver === 'targetYearCap' && pricingData && (
+                <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-purple-600" />
+                    <span className="text-xs font-medium text-purple-600">Implied Purchase Price</span>
+                  </div>
+                  <p className="num text-xl font-bold" data-testid="text-year-cap-price">
+                    {formatCurrency(pricingData.purchasePrice)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Year {targetYear} NOI at {targetYearCapRate}% cap → IRR: {formatPercent(pricingData.irr)}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : !calculateMutation.isPending && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <Calculator className="h-8 w-8 mx-auto mb-3 opacity-50" />
+            <p>Set a target IRR, cap rate, or purchase price to see return metrics</p>
           </CardContent>
         </Card>
       )}
 
       {(() => {
+        if (!pricingData || pricingData.purchasePrice <= 0) return null;
         const exitNp = bestExitScenario?.netProceeds ? parseFloat(bestExitScenario.netProceeds) : null;
         const exitMoicVal = bestExitScenario?.moic ? parseFloat(bestExitScenario.moic) : null;
         const exitIrrVal = bestExitScenario?.irr ? parseFloat(bestExitScenario.irr) : null;
         const dealSignal = computeDealSignal({
-          irr: pricingData?.fromPurchasePrice?.irr ?? null,
-          capRate: parsePercentInput(goingInCapRate) || null,
-          equityMultiple: pricingData?.fromPurchasePrice?.equityMultiple ?? null,
-          cashOnCash: pricingData?.fromPurchasePrice?.averageCashOnCash ?? null,
-          purchasePrice: parseCurrencyInput(manualPurchasePrice) || null,
-          exitValue: pricingData?.fromPurchasePrice?.exitValue ?? null,
-          totalProfit: pricingData?.fromPurchasePrice?.totalProfit ?? null,
+          irr: pricingData.irr ?? null,
+          capRate: pricingData.goingInCapRate ?? null,
+          equityMultiple: pricingData.equityMultiple ?? null,
+          cashOnCash: pricingData.averageCashOnCash ?? null,
+          purchasePrice: pricingData.purchasePrice ?? null,
+          exitValue: pricingData.exitValue ?? null,
+          totalProfit: pricingData.totalProfit ?? null,
           noiGrowthRate: parsePercentInput(revenueGrowthRate) > 0 || parsePercentInput(expenseGrowthRate) > 0 ? (parsePercentInput(revenueGrowthRate) - parsePercentInput(expenseGrowthRate)) : null,
           exitNetProceeds: exitNp,
           exitMoic: exitMoicVal,
@@ -1305,19 +1118,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Going-In Cap</span>
-                      <span className="font-medium">{parsePercentInput(goingInCapRate) > 0 ? `${goingInCapRate}%` : '—'}</span>
+                      <span className="font-medium">{pricingData.goingInCapRate > 0 ? formatPercent(pricingData.goingInCapRate) : '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">IRR</span>
-                      <span className="font-medium">{pricingData?.fromPurchasePrice?.irr != null ? formatPercent(pricingData.fromPurchasePrice.irr) : '—'}</span>
+                      <span className="font-medium">{pricingData.irr > 0 ? formatPercent(pricingData.irr) : '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">MOIC</span>
-                      <span className="font-medium">{pricingData?.fromPurchasePrice?.moic != null ? formatMultiple(pricingData.fromPurchasePrice.moic) : '—'}</span>
+                      <span className="font-medium">{pricingData.moic > 0 ? formatMultiple(pricingData.moic) : '—'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Cash-on-Cash</span>
-                      <span className="font-medium">{pricingData?.fromPurchasePrice?.averageCashOnCash != null ? formatPercent(pricingData.fromPurchasePrice.averageCashOnCash) : '—'}</span>
+                      <span className="font-medium">{pricingData.averageCashOnCash > 0 ? formatPercent(pricingData.averageCashOnCash) : '—'}</span>
                     </div>
                     {exitNp != null && (
                       <div className="flex justify-between col-span-2 pt-1 border-t border-slate-200 dark:border-slate-600 mt-1">

@@ -329,6 +329,180 @@ class DealPricingService {
     }
   }
 
+  private buildFinancialsAndProjections(
+    baseFinancials: { year1NOI: number; baseRevenue: number; baseExpenses: number; purchasePrice: number | null },
+    proFormaData: Awaited<ReturnType<typeof this.getProFormaData>>,
+    inputs: {
+      holdPeriod: number;
+      exitCapRate: number;
+      revenueGrowthRate?: number;
+      expenseGrowthRate?: number;
+      periodLabel?: string;
+      periodNOI?: number;
+      periodRevenue?: number;
+      periodExpenses?: number;
+    }
+  ) {
+    const revenueGrowth = inputs.revenueGrowthRate ?? 0.03;
+    const expenseGrowth = inputs.expenseGrowthRate ?? 0.02;
+    const useProForma = proFormaData !== null && !inputs.periodLabel;
+
+    const financials = {
+      ...baseFinancials,
+      year1NOI: inputs.periodNOI ?? (useProForma ? proFormaData!.year1NOI : baseFinancials.year1NOI),
+      baseRevenue: inputs.periodRevenue ?? (useProForma ? proFormaData!.baseRevenue : baseFinancials.baseRevenue),
+      baseExpenses: inputs.periodExpenses ?? (useProForma ? proFormaData!.baseExpenses : baseFinancials.baseExpenses),
+    };
+
+    const noiProjections = useProForma && proFormaData!.noiProjections.length >= inputs.holdPeriod
+      ? proFormaData!.noiProjections.slice(0, inputs.holdPeriod)
+      : this.projectNOI(
+          financials.year1NOI,
+          inputs.holdPeriod,
+          revenueGrowth,
+          expenseGrowth,
+          financials.baseRevenue,
+          financials.baseExpenses
+        );
+
+    const proFormaOptions = useProForma ? {
+      leveredCashFlows: proFormaData!.leveredCashFlows.slice(0, inputs.holdPeriod),
+      netExitProceeds: proFormaData!.netExitProceeds,
+      workingCapitalAmount: proFormaData!.workingCapitalAmount,
+      loanProceeds: proFormaData!.loanProceeds,
+      usedProFormaData: true,
+    } : undefined;
+
+    const exitNOI = noiProjections[inputs.holdPeriod - 1] || financials.year1NOI;
+    const exitValue = inputs.exitCapRate > 0 ? exitNOI / (inputs.exitCapRate / 100) : 0;
+    const netExitProceeds = proFormaOptions?.netExitProceeds ?? exitValue;
+
+    return { financials, noiProjections, proFormaOptions, useProForma, exitValue, netExitProceeds };
+  }
+
+  async calculateUnified(
+    projectId: string,
+    orgId: string,
+    inputs: {
+      pricingDriver: 'price' | 'targetIRR' | 'goingInCap' | 'targetYearCap' | 'exitCap' | 'holdPeriod';
+      purchasePrice?: number;
+      targetIRR?: number;
+      goingInCapRate?: number;
+      targetYearCapRate?: number;
+      targetYear?: number;
+      holdPeriod: number;
+      exitCapRate: number;
+      revenueGrowthRate?: number;
+      expenseGrowthRate?: number;
+      periodLabel?: string;
+      periodNOI?: number;
+      periodRevenue?: number;
+      periodExpenses?: number;
+    }
+  ): Promise<{
+    driver: string;
+    purchasePrice: number;
+    year1CapRate: number;
+    goingInCapRate: number;
+    exitCapRate: number;
+    irr: number;
+    equityMultiple: number;
+    moic: number;
+    averageCashOnCash: number;
+    noiByYear: number[];
+    cashFlowsByYear: number[];
+    exitValue: number;
+    totalProfit: number;
+    netExitProceeds: number;
+    totalEquityInvested: number;
+    usedProFormaData: boolean;
+    projectFinancials: {
+      year1NOI: number;
+      baseRevenue: number;
+      baseExpenses: number;
+      storedPurchasePrice: number | null;
+    };
+    noiProjections: number[];
+    proFormaIntegrated: boolean;
+    stabilizedCapRate: number;
+  }> {
+    const baseFinancials = await this.getProjectFinancials(projectId, orgId);
+    const proFormaData = await this.getProFormaData(projectId, orgId);
+    const { financials, noiProjections, proFormaOptions, useProForma, exitValue, netExitProceeds } =
+      this.buildFinancialsAndProjections(baseFinancials, proFormaData, inputs);
+
+    let resolvedPrice: number = 0;
+    const driver = inputs.pricingDriver;
+
+    if (driver === 'targetIRR') {
+      const targetIRR = inputs.targetIRR ?? 15;
+      if (targetIRR > 0) {
+        resolvedPrice = this.solveForPriceFromIRR(
+          targetIRR, financials.year1NOI, inputs.holdPeriod,
+          inputs.exitCapRate, noiProjections, proFormaOptions
+        );
+      }
+    } else if (driver === 'goingInCap') {
+      const capRate = inputs.goingInCapRate ?? 7.5;
+      if (capRate > 0) {
+        resolvedPrice = this.solveForPriceFromCapRate(financials.year1NOI, capRate);
+      }
+    } else if (driver === 'targetYearCap') {
+      const capRate = inputs.targetYearCapRate ?? 7.0;
+      const year = inputs.targetYear ?? 3;
+      if (capRate > 0) {
+        try {
+          resolvedPrice = this.solveForPriceFromYearCapRate(noiProjections, year, capRate);
+        } catch {
+          resolvedPrice = inputs.purchasePrice || baseFinancials.purchasePrice || 0;
+        }
+      }
+    } else {
+      resolvedPrice = inputs.purchasePrice || baseFinancials.purchasePrice || 0;
+    }
+
+    if (!resolvedPrice || resolvedPrice <= 0) {
+      resolvedPrice = inputs.purchasePrice || baseFinancials.purchasePrice || 0;
+    }
+
+    const result = this.calculateFromPurchasePrice(
+      resolvedPrice, financials.year1NOI, inputs.holdPeriod,
+      inputs.exitCapRate, noiProjections, proFormaOptions
+    );
+
+    const goingInCapRate = resolvedPrice > 0 ? (financials.year1NOI / resolvedPrice) * 100 : 0;
+    const stabilizedNOI = noiProjections[Math.min(2, noiProjections.length - 1)] || financials.year1NOI;
+    const stabilizedCapRate = resolvedPrice > 0 ? (stabilizedNOI / resolvedPrice) * 100 : 0;
+
+    return {
+      driver,
+      purchasePrice: resolvedPrice,
+      year1CapRate: result.year1CapRate,
+      goingInCapRate,
+      exitCapRate: inputs.exitCapRate,
+      irr: result.irr,
+      equityMultiple: result.equityMultiple,
+      moic: result.moic,
+      averageCashOnCash: result.averageCashOnCash,
+      noiByYear: result.noiByYear,
+      cashFlowsByYear: result.cashFlowsByYear,
+      exitValue: result.exitValue,
+      totalProfit: result.totalProfit,
+      netExitProceeds: result.netExitProceeds,
+      totalEquityInvested: result.totalEquityInvested,
+      usedProFormaData: result.usedProFormaData,
+      projectFinancials: {
+        year1NOI: financials.year1NOI,
+        baseRevenue: financials.baseRevenue,
+        baseExpenses: financials.baseExpenses,
+        storedPurchasePrice: baseFinancials.purchasePrice,
+      },
+      noiProjections,
+      proFormaIntegrated: useProForma,
+      stabilizedCapRate,
+    };
+  }
+
   async calculateAllPricingModes(
     projectId: string,
     orgId: string,
@@ -365,41 +539,9 @@ class DealPricingService {
     netExitProceeds: number;
   }> {
     const baseFinancials = await this.getProjectFinancials(projectId, orgId);
-    const revenueGrowth = inputs.revenueGrowthRate ?? 0.03;
-    const expenseGrowth = inputs.expenseGrowthRate ?? 0.02;
-    
     const proFormaData = await this.getProFormaData(projectId, orgId);
-    const useProForma = proFormaData !== null && !inputs.periodLabel;
-
-    const financials = {
-      ...baseFinancials,
-      year1NOI: inputs.periodNOI ?? (useProForma ? proFormaData!.year1NOI : baseFinancials.year1NOI),
-      baseRevenue: inputs.periodRevenue ?? (useProForma ? proFormaData!.baseRevenue : baseFinancials.baseRevenue),
-      baseExpenses: inputs.periodExpenses ?? (useProForma ? proFormaData!.baseExpenses : baseFinancials.baseExpenses),
-    };
-
-    const noiProjections = useProForma && proFormaData!.noiProjections.length >= inputs.holdPeriod
-      ? proFormaData!.noiProjections.slice(0, inputs.holdPeriod)
-      : this.projectNOI(
-          financials.year1NOI,
-          inputs.holdPeriod,
-          revenueGrowth,
-          expenseGrowth,
-          financials.baseRevenue,
-          financials.baseExpenses
-        );
-
-    const proFormaOptions = useProForma ? {
-      leveredCashFlows: proFormaData!.leveredCashFlows.slice(0, inputs.holdPeriod),
-      netExitProceeds: proFormaData!.netExitProceeds,
-      workingCapitalAmount: proFormaData!.workingCapitalAmount,
-      loanProceeds: proFormaData!.loanProceeds,
-      usedProFormaData: true,
-    } : undefined;
-
-    const exitNOI = noiProjections[inputs.holdPeriod - 1] || financials.year1NOI;
-    const exitValue = inputs.exitCapRate > 0 ? exitNOI / (inputs.exitCapRate / 100) : 0;
-    const netExitProceeds = proFormaOptions?.netExitProceeds ?? exitValue;
+    const { financials, noiProjections, proFormaOptions, useProForma, exitValue, netExitProceeds } =
+      this.buildFinancialsAndProjections(baseFinancials, proFormaData, inputs);
 
     let fromPurchasePrice: PricingResult | null = null;
     let fromTargetIRR: SolveForPriceResult | null = null;
@@ -409,95 +551,53 @@ class DealPricingService {
     const purchasePrice = inputs.manualPurchasePrice ?? financials.purchasePrice;
     if (purchasePrice && purchasePrice > 0) {
       fromPurchasePrice = this.calculateFromPurchasePrice(
-        purchasePrice,
-        financials.year1NOI,
-        inputs.holdPeriod,
-        inputs.exitCapRate,
-        noiProjections,
-        proFormaOptions
+        purchasePrice, financials.year1NOI, inputs.holdPeriod,
+        inputs.exitCapRate, noiProjections, proFormaOptions
       );
     }
 
     if (inputs.targetIRR !== undefined && inputs.targetIRR > 0) {
       const solvedPrice = this.solveForPriceFromIRR(
-        inputs.targetIRR,
-        financials.year1NOI,
-        inputs.holdPeriod,
-        inputs.exitCapRate,
-        noiProjections,
-        proFormaOptions
+        inputs.targetIRR, financials.year1NOI, inputs.holdPeriod,
+        inputs.exitCapRate, noiProjections, proFormaOptions
       );
-      
       const verification = this.calculateFromPurchasePrice(
-        solvedPrice,
-        financials.year1NOI,
-        inputs.holdPeriod,
-        inputs.exitCapRate,
-        noiProjections,
-        proFormaOptions
+        solvedPrice, financials.year1NOI, inputs.holdPeriod,
+        inputs.exitCapRate, noiProjections, proFormaOptions
       );
-      
       fromTargetIRR = {
-        purchasePrice: solvedPrice,
-        achievedMetric: verification.irr,
-        metricType: 'irr',
-        year1CapRate: verification.year1CapRate,
-        irr: verification.irr,
-        equityMultiple: verification.equityMultiple,
+        purchasePrice: solvedPrice, achievedMetric: verification.irr,
+        metricType: 'irr', year1CapRate: verification.year1CapRate,
+        irr: verification.irr, equityMultiple: verification.equityMultiple,
         moic: verification.moic,
       };
     }
 
     if (inputs.goingInCapRate !== undefined && inputs.goingInCapRate > 0) {
-      const solvedPrice = this.solveForPriceFromCapRate(
-        financials.year1NOI,
-        inputs.goingInCapRate
-      );
-      
+      const solvedPrice = this.solveForPriceFromCapRate(financials.year1NOI, inputs.goingInCapRate);
       const verification = this.calculateFromPurchasePrice(
-        solvedPrice,
-        financials.year1NOI,
-        inputs.holdPeriod,
-        inputs.exitCapRate,
-        noiProjections,
-        proFormaOptions
+        solvedPrice, financials.year1NOI, inputs.holdPeriod,
+        inputs.exitCapRate, noiProjections, proFormaOptions
       );
-      
       fromGoingInCapRate = {
-        purchasePrice: solvedPrice,
-        achievedMetric: inputs.goingInCapRate,
-        metricType: 'cap_rate',
-        year1CapRate: verification.year1CapRate,
-        irr: verification.irr,
-        equityMultiple: verification.equityMultiple,
+        purchasePrice: solvedPrice, achievedMetric: inputs.goingInCapRate,
+        metricType: 'cap_rate', year1CapRate: verification.year1CapRate,
+        irr: verification.irr, equityMultiple: verification.equityMultiple,
         moic: verification.moic,
       };
     }
 
     if (inputs.targetYearCapRate !== undefined && inputs.targetYearCapRate > 0 && inputs.targetYear) {
       try {
-        const solvedPrice = this.solveForPriceFromYearCapRate(
-          noiProjections,
-          inputs.targetYear,
-          inputs.targetYearCapRate
-        );
-        
+        const solvedPrice = this.solveForPriceFromYearCapRate(noiProjections, inputs.targetYear, inputs.targetYearCapRate);
         const verification = this.calculateFromPurchasePrice(
-          solvedPrice,
-          financials.year1NOI,
-          inputs.holdPeriod,
-          inputs.exitCapRate,
-          noiProjections,
-          proFormaOptions
+          solvedPrice, financials.year1NOI, inputs.holdPeriod,
+          inputs.exitCapRate, noiProjections, proFormaOptions
         );
-        
         fromTargetYearCapRate = {
-          purchasePrice: solvedPrice,
-          achievedMetric: inputs.targetYearCapRate,
-          metricType: 'year_cap_rate',
-          year1CapRate: verification.year1CapRate,
-          irr: verification.irr,
-          equityMultiple: verification.equityMultiple,
+          purchasePrice: solvedPrice, achievedMetric: inputs.targetYearCapRate,
+          metricType: 'year_cap_rate', year1CapRate: verification.year1CapRate,
+          irr: verification.irr, equityMultiple: verification.equityMultiple,
           moic: verification.moic,
         };
       } catch (e) {
@@ -505,21 +605,13 @@ class DealPricingService {
     }
 
     return {
-      fromPurchasePrice,
-      fromTargetIRR,
-      fromGoingInCapRate,
-      fromTargetYearCapRate,
+      fromPurchasePrice, fromTargetIRR, fromGoingInCapRate, fromTargetYearCapRate,
       projectFinancials: {
-        year1NOI: financials.year1NOI,
-        baseRevenue: financials.baseRevenue,
-        baseExpenses: financials.baseExpenses,
-        storedPurchasePrice: baseFinancials.purchasePrice,
+        year1NOI: financials.year1NOI, baseRevenue: financials.baseRevenue,
+        baseExpenses: financials.baseExpenses, storedPurchasePrice: baseFinancials.purchasePrice,
         selectedPeriod: inputs.periodLabel,
       },
-      noiProjections,
-      proFormaIntegrated: useProForma,
-      exitValue,
-      netExitProceeds,
+      noiProjections, proFormaIntegrated: useProForma, exitValue, netExitProceeds,
     };
   }
 }
