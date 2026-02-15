@@ -31,41 +31,87 @@ import type {
   WidgetFilters,
 } from '@shared/schema';
 
-export type TimeRange = '7d' | '30d' | '90d' | 'ytd' | 'all';
+export type TimeRange = '7d' | '30d' | '90d' | 'ytd' | 'all'
+  | 'q1' | 'q2' | 'q3' | 'q4'
+  | 'jan' | 'feb' | 'mar' | 'apr' | 'may' | 'jun'
+  | 'jul' | 'aug' | 'sep' | 'oct' | 'nov' | 'dec'
+  | 'last_year' | 'this_year';
 
 interface TimeRangeFilter {
   startDate: Date;
   endDate: Date;
 }
 
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
 export class DashboardService {
   // ================================================================================
   // TIME RANGE HELPERS
   // ================================================================================
 
-  /**
-   * Calculate date range based on time range filter
-   */
   private getTimeRangeFilter(timeRange: TimeRange = 'all'): TimeRangeFilter | null {
     if (timeRange === 'all') return null;
 
-    const endDate = new Date();
-    const startDate = new Date();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    let startDate: Date;
+    let endDate: Date;
 
     switch (timeRange) {
       case '7d':
-        startDate.setDate(endDate.getDate() - 7);
+        startDate = new Date(now); startDate.setDate(now.getDate() - 7);
+        endDate = now;
         break;
       case '30d':
-        startDate.setDate(endDate.getDate() - 30);
+        startDate = new Date(now); startDate.setDate(now.getDate() - 30);
+        endDate = now;
         break;
       case '90d':
-        startDate.setDate(endDate.getDate() - 90);
+        startDate = new Date(now); startDate.setDate(now.getDate() - 90);
+        endDate = now;
         break;
       case 'ytd':
-        startDate.setMonth(0, 1); // January 1st
-        startDate.setHours(0, 0, 0, 0);
+        startDate = new Date(currentYear, 0, 1);
+        endDate = now;
         break;
+      case 'this_year':
+        startDate = new Date(currentYear, 0, 1);
+        endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+        break;
+      case 'last_year':
+        startDate = new Date(currentYear - 1, 0, 1);
+        endDate = new Date(currentYear - 1, 11, 31, 23, 59, 59, 999);
+        break;
+      case 'q1':
+        startDate = new Date(currentYear, 0, 1);
+        endDate = new Date(currentYear, 2, 31, 23, 59, 59, 999);
+        break;
+      case 'q2':
+        startDate = new Date(currentYear, 3, 1);
+        endDate = new Date(currentYear, 5, 30, 23, 59, 59, 999);
+        break;
+      case 'q3':
+        startDate = new Date(currentYear, 6, 1);
+        endDate = new Date(currentYear, 8, 30, 23, 59, 59, 999);
+        break;
+      case 'q4':
+        startDate = new Date(currentYear, 9, 1);
+        endDate = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+        break;
+      default: {
+        const monthIdx = MONTH_MAP[timeRange];
+        if (monthIdx !== undefined) {
+          startDate = new Date(currentYear, monthIdx, 1);
+          const nextMonth = monthIdx + 1;
+          endDate = new Date(currentYear, nextMonth, 0, 23, 59, 59, 999);
+        } else {
+          return null;
+        }
+        break;
+      }
     }
 
     return { startDate, endDate };
@@ -580,36 +626,57 @@ export class DashboardService {
   }
 
   private async getCRMData(orgId: string, dateFilter: TimeRangeFilter | null) {
-    const { crmDeals, users } = await import('@shared/schema');
+    const { crmDeals } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
     
-    // Build where conditions
-    const conditions = [eq(users.orgId, orgId)];
-    if (dateFilter) {
-      conditions.push(gte(crmDeals.createdAt, dateFilter.startDate));
-    }
-    
-    // Join with users to filter by organization
+    const conditions: any[] = [eq(crmDeals.orgId, orgId)];
+
     const result = await db
       .select({
         totalDeals: count(),
-        pipelineValue: sum(crmDeals.value),
-        wonDeals: sql<number>`COUNT(CASE WHEN ${crmDeals.stage} = 'closed_won' THEN 1 END)`,
-        activeDeals: sql<number>`COUNT(CASE WHEN ${crmDeals.stage} NOT IN ('closed_won', 'closed_lost') THEN 1 END)`,
+        pipelineValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) IN ('active', 'under review', 'under_review') THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'active' THEN 1 END)`,
+        wonDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN 1 END)`,
+        wonValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
+        lostDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_lost' THEN 1 END)`,
       })
       .from(crmDeals)
-      .innerJoin(users, eq(crmDeals.ownerId, users.id))
       .where(and(...conditions));
 
     const data = result[0];
     const wonDeals = Number(data.wonDeals) || 0;
-    const totalDeals = Number(data.totalDeals) || 0;
+    const lostDeals = Number(data.lostDeals) || 0;
+    const closedDeals = wonDeals + lostDeals;
+
+    let filteredWonDeals = wonDeals;
+    let filteredWonValue = Number(data.wonValue) || 0;
+    let filteredLostDeals = lostDeals;
+    if (dateFilter) {
+      const filteredResult = await db
+        .select({
+          wonDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN 1 END)`,
+          wonValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
+          lostDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_lost' THEN 1 END)`,
+        })
+        .from(crmDeals)
+        .where(and(
+          eq(crmDeals.orgId, orgId),
+          gte(crmDeals.closedAt, dateFilter.startDate),
+          lte(crmDeals.closedAt, dateFilter.endDate)
+        ));
+      filteredWonDeals = Number(filteredResult[0]?.wonDeals) || 0;
+      filteredWonValue = Number(filteredResult[0]?.wonValue) || 0;
+      filteredLostDeals = Number(filteredResult[0]?.lostDeals) || 0;
+    }
+
+    const filteredClosed = filteredWonDeals + filteredLostDeals;
     
     return {
       pipelineValue: Number(data.pipelineValue) || 0,
       activeDeals: Number(data.activeDeals) || 0,
-      wonDeals,
-      winRate: totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0,
+      wonDeals: filteredWonDeals,
+      wonValue: filteredWonValue,
+      winRate: filteredClosed > 0 ? Math.round((filteredWonDeals / filteredClosed) * 100) : 0,
     };
   }
 

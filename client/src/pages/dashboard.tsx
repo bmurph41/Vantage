@@ -918,7 +918,7 @@ export default function Dashboard() {
               icon={DollarSign}
               compact={true}
               testId="crm-pipeline-value"
-              tooltip="Total value of all active deals across pipeline stages"
+              tooltip="Sum of deal values for Active and Under Review deals"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
               trend={data?.pipelineValueTrend}
@@ -931,39 +931,37 @@ export default function Dashboard() {
               size="md"
               icon={Users}
               testId="crm-active-deals"
-              tooltip="Number of deals currently in progress"
+              tooltip="Deals with 'Active' status (under LOI or contract)"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
               badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
             />
-            <EnhancedMetricCard
-              label="Win Rate"
-              value={data?.winRate || 0}
-              type="percent"
-              size="md"
-              variant="success"
-              icon={TrendingUp}
-              testId="crm-win-rate"
-              tooltip="Percentage of deals won vs total closed deals"
-              onClick={() => setIsCRMDetailOpen(true)}
-              clickable
-              trend={data?.winRateTrend}
-            />
-            <EnhancedMetricCard
-              label="Won This Period"
-              value={data?.wonDeals || 0}
-              type="number"
-              size="md"
-              testId="crm-won-deals"
-              tooltip="Successfully closed deals in selected timeframe"
-              onClick={() => setIsCRMDetailOpen(true)}
-              clickable
-              comparison={{
-                label: 'Total Value',
-                value: data?.wonValue || 0,
-                type: 'currency'
-              }}
-            />
+            <div className="col-span-2 rounded-xl border bg-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span className="text-sm font-medium">Won Deals & Win Rate</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Won This Period</p>
+                  <p className="text-2xl font-bold" data-testid="crm-won-deals">{data?.wonDeals || 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Won Value</p>
+                  <p className="text-2xl font-bold text-green-600" data-testid="crm-won-value">
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data?.wonValue || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Win Rate</p>
+                  <p className="text-2xl font-bold" data-testid="crm-win-rate">{data?.winRate || 0}%</p>
+                </div>
+              </div>
+            </div>
           </MetricGrid>
           <CRMCharts timeRange={timeRange} />
         </div>
