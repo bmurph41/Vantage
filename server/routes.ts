@@ -23456,6 +23456,18 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // --- EXIT SCENARIOS ---
+
+  // Get best exit scenario metrics for all projects in org (batch for listing page)
+  app.get('/api/modeling/exit-summaries', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const summaries = await storage.getExitScenarioBestByOrg(orgId);
+      res.json(summaries);
+    } catch (error: any) {
+      console.error('Failed to fetch exit summaries:', error);
+      res.status(500).json({ error: 'Failed to fetch exit summaries' });
+    }
+  });
   
   // Get all exit scenarios for a modeling project
   app.get('/api/modeling/projects/:projectId/exit/scenarios', authenticateUser, async (req: any, res) => {

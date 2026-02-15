@@ -75,6 +75,22 @@ export default function ModelingProjectsPage() {
     queryKey: ['/api/modeling/projects'],
   });
 
+  type ExitSummary = {
+    modelingProjectId: string;
+    bestNetProceeds: number | null;
+    bestIrr: number | null;
+    bestMoic: number | null;
+    scenarioCount: number;
+  };
+
+  const { data: exitSummaries = [] } = useQuery<ExitSummary[]>({
+    queryKey: ['/api/modeling/exit-summaries'],
+  });
+
+  const exitSummaryMap = new Map(
+    exitSummaries.map((s) => [s.modelingProjectId, s])
+  );
+
   const { metricLabel } = useDisplayPreferences();
 
   const deleteMutation = useMutation({
@@ -387,10 +403,14 @@ export default function ModelingProjectsPage() {
                           </TableCell>
                           <TableCell className="text-center whitespace-nowrap pb-0">
                             {(() => {
+                              const exitData = exitSummaryMap.get(project.id);
                               const signal = computeDealSignal({
                                 irr: project.irr,
                                 capRate: project.year1CapRate,
                                 purchasePrice: project.purchasePrice,
+                                exitNetProceeds: exitData?.bestNetProceeds ?? null,
+                                exitMoic: exitData?.bestMoic ?? null,
+                                exitIrr: exitData?.bestIrr ?? null,
                               });
                               const badge = getSignalBadgeProps(signal.signal);
                               return signal.score === 0 ? (
@@ -406,9 +426,14 @@ export default function ModelingProjectsPage() {
                                     </TooltipTrigger>
                                     <TooltipContent side="left" className="max-w-xs">
                                       <p className="font-semibold text-xs mb-1">Score: {signal.score}/100</p>
-                                      {signal.reasons.slice(0, 2).map((r, i) => (
+                                      {signal.reasons.slice(0, 3).map((r, i) => (
                                         <p key={i} className="text-xs text-muted-foreground">• {r}</p>
                                       ))}
+                                      {exitData && exitData.scenarioCount > 0 && (
+                                        <p className="text-xs text-indigo-500 mt-1">
+                                          {exitData.scenarioCount} exit scenario{exitData.scenarioCount > 1 ? 's' : ''} analyzed
+                                        </p>
+                                      )}
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>

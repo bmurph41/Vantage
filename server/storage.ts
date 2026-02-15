@@ -916,6 +916,7 @@ export interface IStorage {
 
   // Exit Strategy Suite - Exit Scenarios
   getExitScenarios(modelingProjectId: string, orgId: string): Promise<ExitScenario[]>;
+  getExitScenarioBestByOrg(orgId: string): Promise<Array<{ modelingProjectId: string; bestNetProceeds: number | null; bestIrr: number | null; bestMoic: number | null; scenarioCount: number }>>;
   getExitScenario(id: string, orgId: string): Promise<ExitScenario | undefined>;
   createExitScenario(data: InsertExitScenario & { orgId: string; createdBy?: string }): Promise<ExitScenario>;
   updateExitScenario(id: string, data: UpdateExitScenario & { updatedBy?: string }, orgId: string): Promise<ExitScenario | undefined>;
@@ -8049,6 +8050,27 @@ export class DatabaseStorage implements IStorage {
         eq(exitScenarios.orgId, orgId)
       ))
       .orderBy(desc(exitScenarios.createdAt));
+  }
+
+  async getExitScenarioBestByOrg(orgId: string): Promise<Array<{ modelingProjectId: string; bestNetProceeds: number | null; bestIrr: number | null; bestMoic: number | null; scenarioCount: number }>> {
+    const results = await db.select({
+      modelingProjectId: exitScenarios.modelingProjectId,
+      bestNetProceeds: sql<string>`max(${exitScenarios.netProceeds})`.as('best_net_proceeds'),
+      bestIrr: sql<string>`max(${exitScenarios.irr})`.as('best_irr'),
+      bestMoic: sql<string>`max(${exitScenarios.moic})`.as('best_moic'),
+      scenarioCount: sql<number>`count(*)::int`.as('scenario_count'),
+    })
+    .from(exitScenarios)
+    .where(eq(exitScenarios.orgId, orgId))
+    .groupBy(exitScenarios.modelingProjectId);
+
+    return results.map(r => ({
+      modelingProjectId: r.modelingProjectId,
+      bestNetProceeds: r.bestNetProceeds ? parseFloat(r.bestNetProceeds) : null,
+      bestIrr: r.bestIrr ? parseFloat(r.bestIrr) : null,
+      bestMoic: r.bestMoic ? parseFloat(r.bestMoic) : null,
+      scenarioCount: r.scenarioCount,
+    }));
   }
 
   async getExitScenario(id: string, orgId: string): Promise<ExitScenario | undefined> {

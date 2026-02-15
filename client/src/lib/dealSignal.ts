@@ -9,6 +9,9 @@ export interface DealSignalInput {
   exitValue?: number | null;
   noiGrowthRate?: number | null;
   totalProfit?: number | null;
+  exitNetProceeds?: number | null;
+  exitMoic?: number | null;
+  exitIrr?: number | null;
 }
 
 export interface DealSignalResult {
@@ -86,6 +89,39 @@ export function computeDealSignal(input: DealSignalInput): DealSignalResult {
     else if (growth < 0) { score -= 5; reasons.push('Negative NOI growth trajectory'); }
   }
 
+  if (input.exitNetProceeds != null && input.purchasePrice != null && input.purchasePrice > 0) {
+    dataPoints++;
+    const exitReturn = ((input.exitNetProceeds - input.purchasePrice) / input.purchasePrice) * 100;
+    if (exitReturn >= 100) { score += 12; reasons.push(`Exit net proceeds ${exitReturn.toFixed(0)}% above purchase — strong exit`); }
+    else if (exitReturn >= 50) { score += 8; reasons.push(`Exit net proceeds ${exitReturn.toFixed(0)}% above purchase`); }
+    else if (exitReturn >= 20) { score += 4; reasons.push(`Modest ${exitReturn.toFixed(0)}% exit gain after costs`); }
+    else if (exitReturn >= 0) { score += 1; }
+    else { score -= 10; reasons.push(`Exit net proceeds below purchase price — capital loss risk`); }
+  } else if (input.exitNetProceeds != null && input.exitNetProceeds > 0 && !input.purchasePrice) {
+    dataPoints++;
+    score += 3;
+    reasons.push(`Exit net proceeds: $${(input.exitNetProceeds / 1000000).toFixed(1)}M modeled`);
+  }
+
+  const exitMoic = input.exitMoic != null && !isNaN(input.exitMoic) ? input.exitMoic : null;
+  if (exitMoic != null && exitMoic > 0) {
+    dataPoints++;
+    if (exitMoic >= 3.0) { score += 10; reasons.push(`Exceptional ${exitMoic.toFixed(2)}x exit MOIC`); }
+    else if (exitMoic >= 2.0) { score += 7; reasons.push(`Strong ${exitMoic.toFixed(2)}x exit MOIC`); }
+    else if (exitMoic >= 1.5) { score += 3; reasons.push(`Adequate ${exitMoic.toFixed(2)}x exit MOIC`); }
+    else if (exitMoic >= 1.0) { score -= 2; reasons.push(`Marginal ${exitMoic.toFixed(2)}x exit MOIC`); }
+    else { score -= 8; reasons.push(`Below-par ${exitMoic.toFixed(2)}x exit MOIC — capital erosion`); }
+  }
+
+  const exitIrr = normalizePercent(input.exitIrr);
+  if (exitIrr != null) {
+    dataPoints++;
+    if (exitIrr >= 25) { score += 8; reasons.push(`Exit-modeled IRR of ${exitIrr.toFixed(1)}% exceeds institutional hurdles`); }
+    else if (exitIrr >= 18) { score += 5; reasons.push(`Solid ${exitIrr.toFixed(1)}% exit-modeled IRR`); }
+    else if (exitIrr >= 12) { score += 2; }
+    else if (exitIrr < 8) { score -= 5; reasons.push(`Weak ${exitIrr.toFixed(1)}% exit-modeled IRR`); }
+  }
+
   if (dataPoints < 2) {
     return {
       signal: 'Conditional',
@@ -99,7 +135,7 @@ export function computeDealSignal(input: DealSignalInput): DealSignalResult {
 
   score = Math.max(0, Math.min(100, score));
 
-  const topReasons = reasons.slice(0, 3);
+  const topReasons = reasons.slice(0, 4);
 
   if (score >= 70) {
     return {

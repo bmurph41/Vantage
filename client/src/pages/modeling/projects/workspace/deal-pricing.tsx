@@ -337,6 +337,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     [activeScenario?.id]
   );
 
+  const { data: exitScenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'exit', 'scenarios'],
+    enabled: !!projectId,
+  });
+
+  const bestExitScenario = exitScenarios.reduce((best: any, s: any) => {
+    const np = s.netProceeds ? parseFloat(s.netProceeds) : 0;
+    const bestNp = best?.netProceeds ? parseFloat(best.netProceeds) : 0;
+    return np > bestNp ? s : best;
+  }, exitScenarios[0] || null);
+
   const { data: adjustments } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects', projectId, 'period-adjustments'],
     enabled: !!projectId,
@@ -1216,6 +1227,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       )}
 
       {(() => {
+        const exitNp = bestExitScenario?.netProceeds ? parseFloat(bestExitScenario.netProceeds) : null;
+        const exitMoicVal = bestExitScenario?.moic ? parseFloat(bestExitScenario.moic) : null;
+        const exitIrrVal = bestExitScenario?.irr ? parseFloat(bestExitScenario.irr) : null;
         const dealSignal = computeDealSignal({
           irr: pricingData?.fromPurchasePrice?.irr ?? null,
           capRate: parsePercentInput(goingInCapRate) || null,
@@ -1225,35 +1239,45 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           exitValue: pricingData?.fromPurchasePrice?.exitValue ?? null,
           totalProfit: pricingData?.fromPurchasePrice?.totalProfit ?? null,
           noiGrowthRate: parsePercentInput(revenueGrowthRate) > 0 || parsePercentInput(expenseGrowthRate) > 0 ? (parsePercentInput(revenueGrowthRate) - parsePercentInput(expenseGrowthRate)) : null,
+          exitNetProceeds: exitNp,
+          exitMoic: exitMoicVal,
+          exitIrr: exitIrrVal,
         });
         const signalBadge = getSignalBadgeProps(dealSignal.signal);
         const SignalIcon = dealSignal.signal === 'Buy' ? ThumbsUp : dealSignal.signal === 'Pass' ? ThumbsDown : AlertCircleIcon;
 
         return (
-          <Card className={cn("border overflow-hidden", dealSignal.borderColor)} data-testid="card-deal-signal">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-indigo-600" />
-                  AI Deal Signal
-                </CardTitle>
-                <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border", signalBadge.className)} data-testid="badge-deal-signal">
-                  <SignalIcon className="h-3.5 w-3.5" />
+          <Card className={cn("border-2 overflow-hidden", dealSignal.borderColor)} data-testid="card-deal-signal">
+            <div className={cn("px-6 py-4 flex items-center justify-between", dealSignal.bgColor)}>
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2.5 rounded-xl", dealSignal.signal === 'Buy' ? 'bg-green-100 dark:bg-green-900/50' : dealSignal.signal === 'Pass' ? 'bg-red-100 dark:bg-red-900/50' : 'bg-amber-100 dark:bg-amber-900/50')}>
+                  <SignalIcon className={cn("h-6 w-6", dealSignal.color)} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-indigo-600" />
+                    <span className="text-sm font-semibold text-foreground">AI Deal Recommendation</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Institutional-grade Buy/Pass signal based on pricing + exit strategy analysis
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right mr-2">
+                  <p className="text-xs text-muted-foreground">Score</p>
+                  <p className="text-lg font-bold font-mono">{dealSignal.score}<span className="text-xs text-muted-foreground">/100</span></p>
+                </div>
+                <span className={cn("inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-base font-bold border-2 shadow-sm", signalBadge.className)} data-testid="badge-deal-signal">
+                  <SignalIcon className="h-4 w-4" />
                   {signalBadge.label}
                 </span>
               </div>
-              <CardDescription>
-                Institutional-grade recommendation based on current pricing assumptions
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-0">
+            </div>
+            <CardContent className="space-y-4 pt-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                    <span>Deal Quality Score</span>
-                    <span className="font-mono font-semibold">{dealSignal.score}/100</span>
-                  </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-3 bg-muted rounded-full overflow-hidden">
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-500",
@@ -1262,28 +1286,78 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                       style={{ width: `${dealSignal.score}%` }}
                     />
                   </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                    <span>Pass (0-49)</span>
+                    <span>Conditional (50-69)</span>
+                    <span>Buy (70-100)</span>
+                  </div>
                 </div>
               </div>
 
-              {dealSignal.reasons.length > 0 && (
-                <div className={cn("rounded-lg p-3 space-y-1.5", dealSignal.bgColor)}>
-                  <p className={cn("text-xs font-semibold uppercase tracking-wider", dealSignal.color)}>Key Factors</p>
-                  {dealSignal.reasons.map((reason, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm">
-                      <span className={cn("mt-0.5 flex-shrink-0 text-xs", dealSignal.color)}>
-                        {dealSignal.signal === 'Buy' ? '✓' : dealSignal.signal === 'Pass' ? '✗' : '•'}
-                      </span>
-                      <span className="text-foreground/80">{reason}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {dealSignal.reasons.length > 0 && (
+                  <div className={cn("rounded-lg p-3 space-y-1.5", dealSignal.bgColor)}>
+                    <p className={cn("text-xs font-semibold uppercase tracking-wider", dealSignal.color)}>Key Factors</p>
+                    {dealSignal.reasons.map((reason, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <span className={cn("mt-0.5 flex-shrink-0 text-xs", dealSignal.color)}>
+                          {dealSignal.signal === 'Buy' ? '✓' : dealSignal.signal === 'Pass' ? '✗' : '•'}
+                        </span>
+                        <span className="text-foreground/80">{reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="rounded-lg p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Data Sources</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Going-In Cap</span>
+                      <span className="font-medium">{parsePercentInput(goingInCapRate) > 0 ? `${goingInCapRate}%` : '—'}</span>
                     </div>
-                  ))}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">IRR</span>
+                      <span className="font-medium">{pricingData?.fromPurchasePrice?.irr != null ? formatPercent(pricingData.fromPurchasePrice.irr) : '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Equity Multiple</span>
+                      <span className="font-medium">{pricingData?.fromPurchasePrice?.equityMultiple != null ? formatMultiple(pricingData.fromPurchasePrice.equityMultiple) : '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cash-on-Cash</span>
+                      <span className="font-medium">{pricingData?.fromPurchasePrice?.averageCashOnCash != null ? formatPercent(pricingData.fromPurchasePrice.averageCashOnCash) : '—'}</span>
+                    </div>
+                    {exitNp != null && (
+                      <div className="flex justify-between col-span-2 pt-1 border-t border-slate-200 dark:border-slate-600 mt-1">
+                        <span className="text-muted-foreground">Best Exit Net Proceeds</span>
+                        <span className="font-medium text-green-600">{formatCurrency(exitNp)}</span>
+                      </div>
+                    )}
+                    {exitMoicVal != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Exit MOIC</span>
+                        <span className="font-medium">{exitMoicVal.toFixed(2)}x</span>
+                      </div>
+                    )}
+                    {exitIrrVal != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Exit IRR</span>
+                        <span className="font-medium">{formatPercent(exitIrrVal)}</span>
+                      </div>
+                    )}
+                  </div>
+                  {exitScenarios.length === 0 && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 italic mt-1">
+                      No exit strategies modeled — add exit scenarios to strengthen this signal
+                    </p>
+                  )}
                 </div>
-              )}
+              </div>
 
               <p className="text-[11px] text-muted-foreground italic">
-                Based on {parsePercentInput(goingInCapRate) > 0 ? `${goingInCapRate}% going-in cap` : 'current inputs'}
-                {pricingData?.fromPurchasePrice?.irr != null ? `, ${formatPercent(pricingData.fromPurchasePrice.irr)} IRR` : ''}
-                {pricingData?.fromPurchasePrice?.equityMultiple != null ? `, ${formatMultiple(pricingData.fromPurchasePrice.equityMultiple)} equity multiple` : ''}
-                . Adjust pricing inputs above to update this recommendation.
+                Adjust pricing inputs or model exit strategies to update this recommendation.
+                {exitScenarios.length > 0 && ` Using best of ${exitScenarios.length} exit scenario${exitScenarios.length > 1 ? 's' : ''}.`}
               </p>
             </CardContent>
           </Card>
