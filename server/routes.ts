@@ -19932,6 +19932,8 @@ Current context: Project ${req.params.projectId}`;
             purchasePrice: result.purchasePrice,
             goingInCapRate: result.goingInCapRate,
             exitValue: result.exitValue,
+            npv: result.npv,
+            moic: result.moic,
             updatedAt: new Date().toISOString(),
           };
           await storage.updateModelingProject(projectId, { customMetrics: cm, updatedBy: req.user.id } as any, orgId);
@@ -20065,7 +20067,7 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { targetIRR, goingInCapRate, exitCapRate, holdPeriod, pricingDriver, purchasePrice } = req.body;
+      const { targetIRR, goingInCapRate, exitCapRate, holdPeriod, pricingDriver, purchasePrice, lockedInputs } = req.body;
 
       const project = await storage.getModelingProject(projectId, orgId);
       if (!project) {
@@ -20080,6 +20082,7 @@ Current context: Project ${req.params.projectId}`;
         holdPeriod,
         pricingDriver,
         purchasePrice,
+        lockedInputs: Array.isArray(lockedInputs) ? lockedInputs : [],
         updatedAt: new Date().toISOString(),
       };
 

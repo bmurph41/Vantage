@@ -575,6 +575,8 @@ class DealPricingService {
     noiProjections: number[];
     proFormaIntegrated: boolean;
     stabilizedCapRate: number;
+    npv: number;
+    discountRate: number;
   }> {
     const baseFinancials = await this.getProjectFinancials(projectId, orgId);
     const proFormaData = await this.getProFormaData(projectId, orgId);
@@ -638,6 +640,10 @@ class DealPricingService {
     const stabilizedNOI = noiProjections[Math.min(2, noiProjections.length - 1)] || financials.year1NOI;
     const stabilizedCapRate = resolvedPrice > 0 ? (stabilizedNOI / resolvedPrice) * 100 : 0;
 
+    const discountRate = (inputs.targetIRR ?? 15) / 100;
+    const npvCashFlows = [-result.totalEquityInvested, ...result.cashFlowsByYear];
+    const npv = this.calculateNPV(npvCashFlows, discountRate);
+
     return {
       driver,
       purchasePrice: resolvedPrice,
@@ -664,6 +670,8 @@ class DealPricingService {
       noiProjections,
       proFormaIntegrated: useProForma,
       stabilizedCapRate,
+      npv,
+      discountRate: inputs.targetIRR ?? 15,
     };
   }
 

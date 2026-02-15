@@ -86,6 +86,8 @@ interface UnifiedPricingResult {
   noiProjections: number[];
   proFormaIntegrated: boolean;
   stabilizedCapRate: number;
+  npv: number;
+  discountRate: number;
 }
 
 const formatMultiple = (value: number | null | undefined): string => {
@@ -347,6 +349,7 @@ interface SavedDealPricingInputs {
   holdPeriod?: number;
   pricingDriver?: PricingDriver;
   purchasePrice?: number;
+  lockedInputs?: string[];
   updatedAt?: string;
 }
 
@@ -387,6 +390,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       if (savedInputs.purchasePrice !== undefined && savedInputs.purchasePrice > 0) {
         setPurchasePrice(Math.round(savedInputs.purchasePrice).toLocaleString());
       }
+      if (savedInputs.lockedInputs && Array.isArray(savedInputs.lockedInputs)) {
+        setLockedInputs(new Set(savedInputs.lockedInputs));
+      }
     }
   }, [inputsFetched, savedInputs]);
 
@@ -411,9 +417,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       holdPeriod: holdPeriodNum,
       pricingDriver,
       purchasePrice: parseCurrencyInput(purchasePrice) || undefined,
+      lockedInputs: Array.from(lockedInputs),
     });
     return () => debouncedSaveInputs.cancel();
-  }, [targetIRR, goingInCapRate, exitCapRate, holdPeriodNum, pricingDriver, purchasePrice]);
+  }, [targetIRR, goingInCapRate, exitCapRate, holdPeriodNum, pricingDriver, purchasePrice, lockedInputs]);
 
   const lockInput = useCallback((key: string) => {
     setLockedInputs(prev => {
@@ -593,6 +600,18 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     setHoldPeriodNum(parseInt(value));
   };
 
+  const resolvePricingDriver = useCallback((): PricingDriver => {
+    if (pricingDriver === 'exitCap' || pricingDriver === 'holdPeriod') {
+      if (lockedInputs.has('targetIRR') || (!lockedInputs.has('goingInCap') && !lockedInputs.has('price'))) {
+        return 'targetIRR';
+      }
+      if (lockedInputs.has('goingInCap')) return 'goingInCap';
+      if (lockedInputs.has('price')) return 'price';
+      return 'targetIRR';
+    }
+    return pricingDriver;
+  }, [pricingDriver, lockedInputs]);
+
   const debouncedCalculate = useCallback(
     debounce(() => {
       const periodOverrides = selectedPeriodData ? {
@@ -601,9 +620,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         periodRevenue: selectedPeriodData.totalRevenue ? Number(selectedPeriodData.totalRevenue) : undefined,
         periodExpenses: selectedPeriodData.totalExpenses ? Number(selectedPeriodData.totalExpenses) : undefined,
       } : {};
+
+      const effectiveDriver = resolvePricingDriver();
       
       calculateMutation.mutate({
-        pricingDriver,
+        pricingDriver: effectiveDriver,
         purchasePrice: purchasePrice ? parseCurrencyInput(purchasePrice) : undefined,
         targetIRR: targetIRR ? parsePercentInput(targetIRR) : undefined,
         goingInCapRate: goingInCapRate ? parsePercentInput(goingInCapRate) : undefined,
@@ -616,7 +637,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         ...periodOverrides,
       });
     }, 400),
-    [purchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, lockedInputs]
+    [purchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, lockedInputs, resolvePricingDriver]
   );
 
   useEffect(() => {
@@ -1157,7 +1178,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                 <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
                   <p className="text-xs text-muted-foreground">Avg Cash-on-Cash</p>
                   <p className="num text-lg font-bold text-orange-600">
@@ -1180,6 +1201,29 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                   <p className="text-xs text-muted-foreground">Going-In Cap</p>
                   <p className="num text-lg font-bold">
                     {formatPercent(pricingData.goingInCapRate)}
+                  </p>
+                </div>
+                <div className={cn(
+                  "p-3 rounded-lg border",
+                  pricingData.npv >= 0
+                    ? "bg-emerald-500/10 border-emerald-500/20"
+                    : "bg-red-500/10 border-red-500/20"
+                )}>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    NPV @ {pricingData.discountRate?.toFixed(1)}%
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[220px]">
+                          <p className="text-xs">Net Present Value of all cash flows discounted at your Target IRR. Positive = deal exceeds your target return.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </p>
+                  <p className={cn("num text-lg font-bold", pricingData.npv >= 0 ? "text-emerald-600" : "text-red-600")}>
+                    {formatCurrency(pricingData.npv)}
                   </p>
                 </div>
               </div>
