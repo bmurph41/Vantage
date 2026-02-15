@@ -904,7 +904,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         </Card>
       </div>
 
-      <div>
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="flex items-center gap-2 text-sm">
@@ -912,17 +912,17 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
               Ownership Structure
             </CardTitle>
             <CardDescription className="text-[11px]">
-              Property ownership type and applicable lease details
+              Property ownership type and lease details
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0 px-4 pb-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Ownership Type</Label>
+          <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Ownership Type</Label>
               <Select
                 value={ownership.type}
                 onValueChange={(v) => handleOwnershipTypeChange(v as OwnershipType)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -932,197 +932,139 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                   <SelectItem value="combined">Combined (Multiple)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {ownership.type === 'fee_simple' && 'Full ownership of both upland and submerged land'}
-                {ownership.type === 'submerged_land_lease' && 'Fee simple on upland, leased submerged land'}
+              <p className="text-[10px] text-muted-foreground">
+                {ownership.type === 'fee_simple' && 'Full ownership of upland and submerged land'}
+                {ownership.type === 'submerged_land_lease' && 'Fee simple upland, leased submerged'}
                 {ownership.type === 'ground_lease' && 'Operating on leased ground'}
-                {ownership.type === 'combined' && 'Mix of owned and leased parcels — add all applicable leases below'}
+                {ownership.type === 'combined' && 'Mix of owned and leased parcels'}
               </p>
             </div>
 
             {ownership.type !== 'fee_simple' && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">Lease Details</h4>
-                  <div className="flex gap-2">
+                  <h4 className="text-xs font-semibold">Lease Details</h4>
+                  <div className="flex gap-1">
                     {(ownership.type === 'submerged_land_lease' || ownership.type === 'combined') && (
-                      <Button variant="outline" size="sm" onClick={() => addLease('submerged_land_lease')}>
-                        <Plus className="h-3 w-3 mr-1" />
-                        Submerged Lease
+                      <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => addLease('submerged_land_lease')}>
+                        <Plus className="h-3 w-3 mr-0.5" />
+                        Submerged
                       </Button>
                     )}
                     {(ownership.type === 'ground_lease' || ownership.type === 'combined') && (
-                      <Button variant="outline" size="sm" onClick={() => addLease('ground_lease')}>
-                        <Plus className="h-3 w-3 mr-1" />
-                        Ground Lease
+                      <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => addLease('ground_lease')}>
+                        <Plus className="h-3 w-3 mr-0.5" />
+                        Ground
                       </Button>
                     )}
                   </div>
                 </div>
 
                 {ownership.leases.length === 0 && (
-                  <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-lg">
-                    No leases added yet. Click above to add a lease.
+                  <div className="text-center py-3 text-muted-foreground text-xs border border-dashed rounded-lg">
+                    No leases added yet.
                   </div>
                 )}
 
                 {ownership.leases.map((lease) => (
                   <div key={lease.id} className="border rounded-lg overflow-hidden">
                     <div
-                      className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer hover:bg-muted/50"
+                      className="flex items-center justify-between p-2 bg-muted/30 cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleLeaseExpanded(lease.id)}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         {expandedLeases.has(lease.id) ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
-                        <Badge variant="secondary" className="text-xs">
-                          {lease.type === 'submerged_land_lease' ? 'Submerged Land' : 'Ground Lease'}
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {lease.type === 'submerged_land_lease' ? 'Submerged' : 'Ground'}
                         </Badge>
-                        <span className="text-sm font-medium">
-                          {lease.counterparty || 'Unnamed Lease'}
+                        <span className="text-xs font-medium truncate">
+                          {lease.counterparty || 'Unnamed'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {lease.annualRent && (
-                          <span className="text-xs text-muted-foreground">
-                            ${parseFloat(lease.annualRent).toLocaleString()}/yr
-                          </span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => { e.stopPropagation(); removeLease(lease.id); }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); removeLease(lease.id); }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
 
                     {expandedLeases.has(lease.id) && (
-                      <div className="p-3 space-y-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Counterparty / Lessor</Label>
+                      <div className="p-2.5 space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Counterparty</Label>
                           <Input
-                            placeholder="e.g., State of Florida, City of Miami"
+                            placeholder="e.g., State of Florida"
                             value={lease.counterparty}
                             onChange={(e) => updateLease(lease.id, 'counterparty', e.target.value)}
+                            className="h-7 text-xs"
                           />
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Monthly Rent ($)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={lease.monthlyRent}
-                              onChange={(e) => updateLease(lease.id, 'monthlyRent', e.target.value)}
-                            />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Monthly ($)</Label>
+                            <Input type="number" step="0.01" min="0" placeholder="0" value={lease.monthlyRent}
+                              onChange={(e) => updateLease(lease.id, 'monthlyRent', e.target.value)} className="h-7 text-xs" />
                           </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Annual Rent ($)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={lease.annualRent}
-                              onChange={(e) => updateLease(lease.id, 'annualRent', e.target.value)}
-                            />
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Annual ($)</Label>
+                            <Input type="number" step="0.01" min="0" placeholder="0" value={lease.annualRent}
+                              onChange={(e) => updateLease(lease.id, 'annualRent', e.target.value)} className="h-7 text-xs" />
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Term Remaining</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={lease.termRemaining}
-                                onChange={(e) => updateLease(lease.id, 'termRemaining', e.target.value)}
-                                className="flex-1"
-                              />
-                              <Select
-                                value={lease.termUnit}
-                                onValueChange={(v) => updateLease(lease.id, 'termUnit', v)}
-                              >
-                                <SelectTrigger className="w-24">
-                                  <SelectValue />
-                                </SelectTrigger>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Term Remaining</Label>
+                            <div className="flex gap-1">
+                              <Input type="number" min="0" placeholder="0" value={lease.termRemaining}
+                                onChange={(e) => updateLease(lease.id, 'termRemaining', e.target.value)} className="h-7 text-xs flex-1" />
+                              <Select value={lease.termUnit} onValueChange={(v) => updateLease(lease.id, 'termUnit', v)}>
+                                <SelectTrigger className="w-16 h-7 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="years">Years</SelectItem>
-                                  <SelectItem value="months">Months</SelectItem>
+                                  <SelectItem value="years">Yr</SelectItem>
+                                  <SelectItem value="months">Mo</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Expiration Date</Label>
-                            <Input
-                              type="date"
-                              value={lease.expirationDate}
-                              onChange={(e) => updateLease(lease.id, 'expirationDate', e.target.value)}
-                            />
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Expiration</Label>
+                            <Input type="date" value={lease.expirationDate}
+                              onChange={(e) => updateLease(lease.id, 'expirationDate', e.target.value)} className="h-7 text-xs" />
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Number of Renewal Options</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={lease.renewalCount}
-                                onChange={(e) => updateLease(lease.id, 'renewalCount', e.target.value)}
-                                className="flex-1"
-                              />
-                            </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Renewal Options</Label>
+                            <Input type="number" min="0" placeholder="0" value={lease.renewalCount}
+                              onChange={(e) => updateLease(lease.id, 'renewalCount', e.target.value)} className="h-7 text-xs" />
                           </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Length of Each Option</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                value={lease.renewalLength}
-                                onChange={(e) => updateLease(lease.id, 'renewalLength', e.target.value)}
-                                className="flex-1"
-                              />
-                              <Select
-                                value={lease.renewalUnit}
-                                onValueChange={(v) => updateLease(lease.id, 'renewalUnit', v)}
-                              >
-                                <SelectTrigger className="w-24">
-                                  <SelectValue />
-                                </SelectTrigger>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Option Length</Label>
+                            <div className="flex gap-1">
+                              <Input type="number" min="0" placeholder="0" value={lease.renewalLength}
+                                onChange={(e) => updateLease(lease.id, 'renewalLength', e.target.value)} className="h-7 text-xs flex-1" />
+                              <Select value={lease.renewalUnit} onValueChange={(v) => updateLease(lease.id, 'renewalUnit', v)}>
+                                <SelectTrigger className="w-16 h-7 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="years">Years</SelectItem>
-                                  <SelectItem value="months">Months</SelectItem>
+                                  <SelectItem value="years">Yr</SelectItem>
+                                  <SelectItem value="months">Mo</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           </div>
                         </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Notes</Label>
-                          <Input
-                            placeholder="Additional lease terms, escalation clauses, etc."
-                            value={lease.notes}
-                            onChange={(e) => updateLease(lease.id, 'notes', e.target.value)}
-                          />
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                          <Input placeholder="Additional terms, escalation, etc."
+                            value={lease.notes} onChange={(e) => updateLease(lease.id, 'notes', e.target.value)} className="h-7 text-xs" />
                         </div>
                       </div>
                     )}
@@ -1132,165 +1074,147 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader className="pb-2 pt-4 px-4">
-          <div className="flex items-center justify-between">
-            <div>
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Warehouse className="h-4 w-4" />
-                Storage Configuration
+                Storage Types
               </CardTitle>
-              <CardDescription className="text-[11px]">
-                Year-Round, Seasonal, Winter, or Hybrid
-              </CardDescription>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="h-6 text-[10px] px-2"
+                onClick={() => { setNewProfitCenterSection('storage'); setShowAddProfitCenterDialog(true); }}
+              >
+                <Plus className="h-3 w-3 mr-0.5" />
+                Add
+              </Button>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowAddProfitCenterDialog(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Profit Center
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0 px-4 pb-4">
-          <div>
-            <h4 className="text-xs font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
-              <Anchor className="h-3.5 w-3.5" />
-              Storage Types
-            </h4>
-            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <CardDescription className="text-[11px]">
+              {storageTypes.filter(s => s.isEnabled).length} of {storageTypes.length} enabled
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 pb-4">
+            <div className="space-y-1">
               {storageTypes.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex flex-col p-2.5 rounded-lg border ${
+                  className={`flex items-center justify-between py-1.5 px-2 rounded ${
                     item.isEnabled 
-                      ? 'bg-muted/30 border-border' 
-                      : 'bg-muted/10 border-dashed opacity-60'
+                      ? 'bg-muted/30' 
+                      : 'opacity-50'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
                       onChange={() => toggleItemEnabled(item.id, 'storage')}
-                      className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
                     />
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      item.isEnabled ? 'bg-background' : 'bg-muted/30'
-                    }`}>
-                      {item.icon}
-                    </div>
-                    <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                    <span className="text-xs">{item.icon}</span>
+                    <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
                       {item.name}
                     </span>
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground">
-                        {getSeasonalityLabel(item.seasons)}
-                      </span>
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {renderSeasonalitySelector(item, 'storage')}
                     </div>
                   )}
                 </div>
               ))}
             </div>
-          </div>
 
-          <Separator />
+            <Separator className="my-2" />
 
-          <div>
-            <h4 className="text-xs font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
-              <MapPin className="h-3.5 w-3.5" />
-              Designated Storage Spaces
+            <h4 className="text-[10px] font-semibold mb-1.5 text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <MapPin className="h-3 w-3" />
+              Designated Spaces
             </h4>
-            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="space-y-1">
               {designatedSpaces.map((item) => (
                 <div
                   key={item.id}
-                  className={`flex flex-col p-2.5 rounded-lg border ${
+                  className={`flex items-center justify-between py-1.5 px-2 rounded ${
                     item.isEnabled 
-                      ? 'bg-muted/30 border-border' 
-                      : 'bg-muted/10 border-dashed opacity-60'
+                      ? 'bg-muted/30' 
+                      : 'opacity-50'
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
                     <input
                       type="checkbox"
                       checked={item.isEnabled}
                       onChange={() => toggleItemEnabled(item.id, 'designated')}
-                      className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
                     />
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      item.isEnabled ? 'bg-background' : 'bg-muted/30'
-                    }`}>
-                      {item.icon}
-                    </div>
-                    <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                    <span className="text-xs">{item.icon}</span>
+                    <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
                       {item.name}
                     </span>
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground">
-                        {getSeasonalityLabel(item.seasons)}
-                      </span>
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {renderSeasonalitySelector(item, 'designated')}
                     </div>
                   )}
                 </div>
               ))}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Store className="h-4 w-4" />
-            Profit Center Configuration
-          </CardTitle>
-          <CardDescription className="text-[11px]">
-            Enable profit centers for Pro Forma revenue categories
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0 px-4 pb-4">
-          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {profitCenters.map((item) => (
-              <div
-                key={item.id}
-                className={`flex items-center justify-between p-2.5 rounded-lg border ${
-                  item.isEnabled 
-                    ? 'bg-muted/30 border-border' 
-                    : 'bg-muted/10 border-dashed opacity-60'
-                }`}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Store className="h-4 w-4" />
+                Profit Centers
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="h-6 text-[10px] px-2"
+                onClick={() => { setNewProfitCenterSection('designated'); setShowAddProfitCenterDialog(true); }}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <Plus className="h-3 w-3 mr-0.5" />
+                Add
+              </Button>
+            </div>
+            <CardDescription className="text-[11px]">
+              {profitCenters.filter(p => p.isEnabled).length} of {profitCenters.length} enabled
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 pb-4">
+            <div className="space-y-1">
+              {profitCenters.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center gap-2 py-1.5 px-2 rounded ${
+                    item.isEnabled 
+                      ? 'bg-muted/30' 
+                      : 'opacity-50'
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={item.isEnabled}
                     onChange={() => toggleProfitCenterEnabled(item.id)}
-                    className="h-4 w-4 rounded border-muted-foreground/50 cursor-pointer"
+                    className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
                   />
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    item.isEnabled ? 'bg-background' : 'bg-muted/30'
-                  }`}>
-                    {item.icon}
-                  </div>
-                  <span className={`font-medium text-sm truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                  <span className="text-xs">{item.icon}</span>
+                  <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
                     {item.name}
                   </span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={showAddProfitCenterDialog} onOpenChange={setShowAddProfitCenterDialog}>
         <DialogContent>
