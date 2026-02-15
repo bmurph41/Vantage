@@ -483,16 +483,14 @@ class DealPricingService {
     inputs: {
       holdPeriod: number;
       exitCapRate: number;
-      revenueGrowthRate?: number;
-      expenseGrowthRate?: number;
       periodLabel?: string;
       periodNOI?: number;
       periodRevenue?: number;
       periodExpenses?: number;
     }
   ) {
-    const revenueGrowth = inputs.revenueGrowthRate ?? 0.03;
-    const expenseGrowth = inputs.expenseGrowthRate ?? 0.02;
+    const revenueGrowth = 0.03;
+    const expenseGrowth = 0.02;
     const useProForma = proFormaData !== null && !inputs.periodLabel;
 
     const financials = {
@@ -541,8 +539,7 @@ class DealPricingService {
       targetYear?: number;
       holdPeriod: number;
       exitCapRate: number;
-      revenueGrowthRate?: number;
-      expenseGrowthRate?: number;
+      lockedInputs?: string[];
       periodLabel?: string;
       periodNOI?: number;
       periodRevenue?: number;
@@ -581,7 +578,21 @@ class DealPricingService {
       this.buildFinancialsAndProjections(baseFinancials, proFormaData, inputs);
 
     let resolvedPrice: number = 0;
-    const driver = inputs.pricingDriver;
+    const locked = new Set(inputs.lockedInputs || []);
+    let effectiveDriver = inputs.pricingDriver;
+
+    const nonPriceDrivers = ['exitCap', 'holdPeriod', 'targetYearCap'];
+    if (nonPriceDrivers.includes(effectiveDriver)) {
+      if (locked.has('targetIRR') && inputs.targetIRR && inputs.targetIRR > 0) {
+        effectiveDriver = 'targetIRR';
+      } else if (locked.has('goingInCap') && inputs.goingInCapRate && inputs.goingInCapRate > 0) {
+        effectiveDriver = 'goingInCap';
+      } else if (locked.has('price') && inputs.purchasePrice && inputs.purchasePrice > 0) {
+        effectiveDriver = 'price';
+      }
+    }
+
+    const driver = effectiveDriver;
 
     if (driver === 'targetIRR') {
       const targetIRR = inputs.targetIRR ?? 15;

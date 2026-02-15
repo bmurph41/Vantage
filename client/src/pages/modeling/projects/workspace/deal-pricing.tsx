@@ -36,8 +36,8 @@ import {
   CheckCircle2,
   SlidersHorizontal,
   AlertTriangle,
-  Link2,
-  Unlink,
+  Lock,
+  Unlock,
   Minus,
   Plus,
   Calendar,
@@ -277,13 +277,37 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [targetYear, setTargetYear] = useState<string>('3');
   const { holdPeriod: holdPeriodNum, setHoldPeriod: setHoldPeriodNum } = useHoldPeriod(projectId);
   const [exitCapRate, setExitCapRate] = useState<string>('7.5');
-  const [revenueGrowthRate, setRevenueGrowthRate] = useState<string>('3.0');
-  const [expenseGrowthRate, setExpenseGrowthRate] = useState<string>('2.0');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
   
   const [pricingDriver, setPricingDriver] = useState<PricingDriver>('targetIRR');
+  const [lockedInputs, setLockedInputs] = useState<Set<string>>(new Set());
+
+  const lockInput = useCallback((key: string) => {
+    setLockedInputs(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  const unlockInput = useCallback((key: string) => {
+    setLockedInputs(prev => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const toggleLock = useCallback((key: string) => {
+    setLockedInputs(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const { data: project } = useQuery<ModelingProject>({
     queryKey: ['/api/modeling/projects', projectId],
@@ -386,20 +410,22 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     },
   });
 
-  const makeDriverHandler = (driver: PricingDriver, setter: (v: string) => void) => {
+  const makeDriverHandler = (driver: PricingDriver, lockKey: string, setter: (v: string) => void) => {
     return (value: string) => {
       setter(value);
       setPricingDriver(driver);
+      lockInput(lockKey);
     };
   };
 
-  const handlePurchasePriceChange = makeDriverHandler('price', setPurchasePrice);
-  const handleTargetIRRChange = makeDriverHandler('targetIRR', setTargetIRR);
-  const handleGoingInCapRateChange = makeDriverHandler('goingInCap', setGoingInCapRate);
+  const handlePurchasePriceChange = makeDriverHandler('price', 'price', setPurchasePrice);
+  const handleTargetIRRChange = makeDriverHandler('targetIRR', 'targetIRR', setTargetIRR);
+  const handleGoingInCapRateChange = makeDriverHandler('goingInCap', 'goingInCap', setGoingInCapRate);
 
   const handleExitCapRateChange = (value: string) => {
     setExitCapRate(value);
     setPricingDriver('exitCap');
+    lockInput('exitCap');
     const numVal = parseFloat(value);
     if (numVal > 0) {
       debouncedSaveCapRate(numVal);
@@ -409,6 +435,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const handleHoldPeriodChange = (value: string) => {
     setHoldPeriodNum(parseInt(value));
     setPricingDriver('holdPeriod');
+    lockInput('holdPeriod');
   };
 
   const debouncedCalculate = useCallback(
@@ -429,13 +456,12 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         targetYear: targetYear ? parseInt(targetYear) : undefined,
         holdPeriod: holdPeriodNum,
         exitCapRate: parsePercentInput(exitCapRate) || 7.5,
-        revenueGrowthRate: parsePercentInput(revenueGrowthRate),
-        expenseGrowthRate: parsePercentInput(expenseGrowthRate),
         useNormalizedData,
+        lockedInputs: Array.from(lockedInputs),
         ...periodOverrides,
       });
     }, 400),
-    [purchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, revenueGrowthRate, expenseGrowthRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver]
+    [purchasePrice, targetIRR, goingInCapRate, targetYearCapRate, targetYear, holdPeriodNum, exitCapRate, selectedPeriod, selectedPeriodData, useNormalizedData, pricingDriver, lockedInputs]
   );
 
   useEffect(() => {
@@ -450,19 +476,19 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     const d = pricingData;
     const driver = d.driver as PricingDriver;
 
-    if (driver !== 'price' && d.purchasePrice > 0) {
+    if (driver !== 'price' && !lockedInputs.has('price') && d.purchasePrice > 0) {
       const current = parseCurrencyInput(purchasePrice);
       if (Math.abs(current - d.purchasePrice) > 1) {
         setPurchasePrice(Math.round(d.purchasePrice).toLocaleString());
       }
     }
-    if (driver !== 'targetIRR' && d.irr > 0 && d.irr < 200) {
+    if (driver !== 'targetIRR' && !lockedInputs.has('targetIRR') && d.irr > 0 && d.irr < 200) {
       const current = parsePercentInput(targetIRR);
       if (Math.abs(current - d.irr) > 0.05) {
         setTargetIRR(d.irr.toFixed(1));
       }
     }
-    if (driver !== 'goingInCap' && d.goingInCapRate > 0 && d.goingInCapRate < 100) {
+    if (driver !== 'goingInCap' && !lockedInputs.has('goingInCap') && d.goingInCapRate > 0 && d.goingInCapRate < 100) {
       const current = parsePercentInput(goingInCapRate);
       if (Math.abs(current - d.goingInCapRate) > 0.01) {
         setGoingInCapRate(d.goingInCapRate.toFixed(2));
@@ -609,11 +635,11 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           </div>
           <div>
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Assumptions</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Hold period, cap rates, and growth rates</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Hold period and exit cap rate</p>
           </div>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className={cn(
               "flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border",
               pricingDriver === 'holdPeriod'
@@ -652,24 +678,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               activeBadge="Driving"
               activeColor="purple"
               data-testid="input-exit-cap-rate"
-            />
-            <PercentStepper
-              label="Rev Growth"
-              icon={TrendingUp}
-              value={revenueGrowthRate}
-              onChange={setRevenueGrowthRate}
-              step={0.5}
-              activeColor="green"
-              data-testid="input-revenue-growth"
-            />
-            <PercentStepper
-              label="Exp Growth"
-              icon={BarChart3}
-              value={expenseGrowthRate}
-              onChange={setExpenseGrowthRate}
-              step={0.5}
-              activeColor="slate"
-              data-testid="input-expense-growth"
             />
           </div>
         </div>
@@ -714,9 +722,36 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <Target className="h-4 w-4 text-green-600" />
                 Target IRR
               </CardTitle>
-              {pricingDriver === 'targetIRR' && (
-                <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
-              )}
+              <div className="flex items-center gap-1.5">
+                {pricingDriver !== 'targetIRR' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => toggleLock('targetIRR')}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            lockedInputs.has('targetIRR')
+                              ? "bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
+                          )}
+                        >
+                          {lockedInputs.has('targetIRR')
+                            ? <Lock className="h-3.5 w-3.5 text-green-600" />
+                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
+                          }
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        <p>{lockedInputs.has('targetIRR') ? `Locked at ${targetIRR}% — click to unlock` : 'Click to lock this value'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {pricingDriver === 'targetIRR' && (
+                  <Badge className="bg-green-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -752,9 +787,36 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <Percent className="h-4 w-4 text-blue-600" />
                 Going-In Cap Rate
               </CardTitle>
-              {pricingDriver === 'goingInCap' && (
-                <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
-              )}
+              <div className="flex items-center gap-1.5">
+                {pricingDriver !== 'goingInCap' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => toggleLock('goingInCap')}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            lockedInputs.has('goingInCap')
+                              ? "bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
+                          )}
+                        >
+                          {lockedInputs.has('goingInCap')
+                            ? <Lock className="h-3.5 w-3.5 text-blue-600" />
+                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
+                          }
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        <p>{lockedInputs.has('goingInCap') ? `Locked at ${goingInCapRate}% — click to unlock` : 'Click to lock this value'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {pricingDriver === 'goingInCap' && (
+                  <Badge className="bg-blue-600 text-white text-[9px] px-1.5 py-0">Driving</Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -790,9 +852,36 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <DollarSign className="h-4 w-4 text-primary" />
                 Purchase Price
               </CardTitle>
-              {pricingDriver === 'price' && (
-                <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">Driving</Badge>
-              )}
+              <div className="flex items-center gap-1.5">
+                {pricingDriver !== 'price' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => toggleLock('price')}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            lockedInputs.has('price')
+                              ? "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-700"
+                          )}
+                        >
+                          {lockedInputs.has('price')
+                            ? <Lock className="h-3.5 w-3.5 text-primary" />
+                            : <Unlock className="h-3.5 w-3.5 text-slate-400" />
+                          }
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        <p>{lockedInputs.has('price') ? `Locked at $${purchasePrice?.toLocaleString()} — click to unlock` : 'Click to lock this value'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {pricingDriver === 'price' && (
+                  <Badge className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0">Driving</Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -1046,7 +1135,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           purchasePrice: pricingData.purchasePrice ?? null,
           exitValue: pricingData.exitValue ?? null,
           totalProfit: pricingData.totalProfit ?? null,
-          noiGrowthRate: parsePercentInput(revenueGrowthRate) > 0 || parsePercentInput(expenseGrowthRate) > 0 ? (parsePercentInput(revenueGrowthRate) - parsePercentInput(expenseGrowthRate)) : null,
+          noiGrowthRate: pricingData.noiProjections && pricingData.noiProjections.length >= 2
+            ? ((pricingData.noiProjections[pricingData.noiProjections.length - 1] / pricingData.noiProjections[0] - 1) / (pricingData.noiProjections.length - 1)) * 100
+            : null,
           exitNetProceeds: exitNp,
           exitMoic: exitMoicVal,
           exitIrr: exitIrrVal,
