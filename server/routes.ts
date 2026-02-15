@@ -17688,7 +17688,10 @@ Current context: Project ${req.params.projectId}`;
         SELECT
           p.id, p.marina_name, p.city, p.state, p.purchase_price, p.year_1_cap_rate,
           p.ebitda, p.total_storage_units, p.deal_outcome, p.updated_at,
+          p.custom_metrics,
           fp.noi AS t12_noi,
+          fp.total_revenue AS t12_revenue,
+          fp.total_expenses AS t12_expenses,
           vs.indicated_value, vs.cap_rate AS snap_cap_rate, vs.noi AS snap_noi,
           vs.ebitda AS snap_ebitda, vs.irr, vs.equity_multiple, vs.cash_on_cash,
           vs.gross_revenue, vs.snapshot_date
@@ -17707,30 +17710,68 @@ Current context: Project ${req.params.projectId}`;
 
       const toNum = (v: any) => v != null ? parseFloat(v) : null;
 
-      const results = rows.rows.map((r: any) => ({
-        id: r.id,
-        marinaName: r.marina_name,
-        city: r.city,
-        state: r.state,
-        purchasePrice: toNum(r.purchase_price),
-        year1CapRate: toNum(r.year_1_cap_rate),
-        ebitda: toNum(r.ebitda),
-        totalStorageUnits: r.total_storage_units,
-        dealOutcome: r.deal_outcome,
-        updatedAt: r.updated_at,
-        t12Noi: toNum(r.t12_noi),
-        snapshot: r.snapshot_date ? {
-          indicatedValue: toNum(r.indicated_value),
-          capRate: toNum(r.snap_cap_rate),
-          noi: toNum(r.snap_noi),
-          ebitda: toNum(r.snap_ebitda),
-          irr: toNum(r.irr),
-          equityMultiple: toNum(r.equity_multiple),
-          cashOnCash: toNum(r.cash_on_cash),
-          grossRevenue: toNum(r.gross_revenue),
-          snapshotDate: r.snapshot_date,
-        } : null,
-      }));
+      const results = rows.rows.map((r: any) => {
+        const customMetrics = (typeof r.custom_metrics === 'string' ? JSON.parse(r.custom_metrics) : r.custom_metrics) || {};
+        const dp = customMetrics.dealPricing || {};
+        const dpResults = customMetrics.dealPricingResults || {};
+
+        const purchasePrice = toNum(dp.purchasePrice) || toNum(r.purchase_price);
+        const t12Noi = toNum(r.t12_noi);
+        const capRateFromDp = toNum(dp.goingInCapRate);
+        const irrFromDp = toNum(dpResults.irr) || toNum(dp.targetIRR);
+
+        const rawSnapCap = toNum(r.snap_cap_rate);
+        const rawYearCap = toNum(r.year_1_cap_rate);
+        const capVal = rawSnapCap != null
+          ? (rawSnapCap < 1 ? rawSnapCap * 100 : rawSnapCap)
+          : capRateFromDp != null
+            ? capRateFromDp
+            : rawYearCap != null
+              ? (rawYearCap < 1 ? rawYearCap * 100 : rawYearCap)
+              : null;
+
+        const derivedNoi = purchasePrice && capVal ? purchasePrice * (capVal / 100) : null;
+        const noiVal = toNum(r.snap_noi) ?? toNum(dpResults.noi) ?? t12Noi ?? (toNum(r.t12_revenue) != null && toNum(r.t12_expenses) != null ? toNum(r.t12_revenue)! - toNum(r.t12_expenses)! : null) ?? derivedNoi;
+
+        const rawSnapIrr = toNum(r.irr);
+        const irrVal = rawSnapIrr != null
+          ? (rawSnapIrr < 1 ? rawSnapIrr * 100 : rawSnapIrr)
+          : irrFromDp != null
+            ? irrFromDp
+            : null;
+
+        const equityMultiple = toNum(r.equity_multiple) ?? toNum(dpResults.equityMultiple) ?? null;
+
+        const rawCashOnCash = toNum(r.cash_on_cash) ?? toNum(dpResults.cashOnCash);
+        const cashOnCash = rawCashOnCash != null
+          ? (rawCashOnCash < 1 ? rawCashOnCash * 100 : rawCashOnCash)
+          : (noiVal != null && purchasePrice && purchasePrice > 0 ? (noiVal / purchasePrice) * 100 : null);
+
+        return {
+          id: r.id,
+          marinaName: r.marina_name,
+          city: r.city,
+          state: r.state,
+          purchasePrice,
+          year1CapRate: toNum(r.year_1_cap_rate),
+          ebitda: toNum(r.ebitda),
+          totalStorageUnits: r.total_storage_units,
+          dealOutcome: r.deal_outcome,
+          updatedAt: r.updated_at,
+          t12Noi,
+          snapshot: {
+            indicatedValue: toNum(r.indicated_value) ?? (noiVal != null && capVal ? noiVal / capVal : null),
+            capRate: capVal,
+            noi: noiVal,
+            ebitda: toNum(r.snap_ebitda) ?? toNum(r.ebitda),
+            irr: irrVal,
+            equityMultiple,
+            cashOnCash,
+            grossRevenue: toNum(r.gross_revenue) ?? toNum(r.t12_revenue),
+            snapshotDate: r.snapshot_date || r.updated_at,
+          },
+        };
+      });
 
       res.json(results);
     } catch (error: any) {
@@ -19876,6 +19917,26 @@ Current context: Project ${req.params.projectId}`;
         periodRevenue: adjustedRevenue,
         periodExpenses: adjustedExpenses,
       });
+
+      try {
+        const project = await storage.getModelingProject(projectId, orgId);
+        if (project) {
+          const cm = { ...((project.customMetrics as any) || {}) };
+          cm.dealPricingResults = {
+            irr: result.irr,
+            equityMultiple: result.equityMultiple,
+            cashOnCash: result.averageCashOnCash,
+            noi: result.projectFinancials.year1NOI,
+            purchasePrice: result.purchasePrice,
+            goingInCapRate: result.goingInCapRate,
+            exitValue: result.exitValue,
+            updatedAt: new Date().toISOString(),
+          };
+          await storage.updateModelingProject(projectId, { customMetrics: cm, updatedBy: req.user.id } as any, orgId);
+        }
+      } catch (persistErr) {
+        console.warn('Failed to persist deal pricing results:', persistErr);
+      }
 
       res.json(result);
     } catch (error: any) {
