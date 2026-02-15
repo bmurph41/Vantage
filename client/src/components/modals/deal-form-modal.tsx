@@ -1071,17 +1071,18 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                               onChange={field.onChange}
                               stages={pipelineStages}
                               onCreateStage={async (stageName) => {
-                                // Create a new stage for the default pipeline
-                                const pipelines = await apiRequest('/api/crm/pipelines', 'GET');
+                                const res = await apiRequest('GET', '/api/crm/pipelines');
+                                const pipelines = await res.json();
                                 if (pipelines && pipelines.length > 0) {
                                   const defaultPipeline = pipelines[0];
-                                  const maxOrder = pipelineStages.reduce((max, s) => Math.max(max, s.stageOrder || 0), 0);
-                                  const newStage = await apiRequest('/api/crm/pipeline-stages', 'POST', {
+                                  const maxOrder = pipelineStages.reduce((max: number, s: any) => Math.max(max, s.stageOrder || 0), 0);
+                                  const stageRes = await apiRequest('POST', '/api/crm/pipeline-stages', {
                                     pipelineId: defaultPipeline.id,
                                     name: stageName,
                                     color: '#6b7280',
                                     stageOrder: maxOrder + 1,
                                   });
+                                  const newStage = await stageRes.json();
                                   queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
                                   return newStage;
                                 }
