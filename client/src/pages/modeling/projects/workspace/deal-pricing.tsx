@@ -365,8 +365,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   }, [project]);
 
   const calculateMutation = useMutation({
-    mutationFn: (inputs: any) => 
-      apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing/unified`, inputs),
+    mutationFn: async (inputs: any) => {
+      const res = await apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing/unified`, inputs);
+      return res.json() as Promise<UnifiedPricingResult>;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
