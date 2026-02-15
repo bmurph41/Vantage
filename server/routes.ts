@@ -19957,7 +19957,65 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Save deal pricing configuration
+  // Get persisted deal pricing inputs
+  app.get('/api/modeling/projects/:projectId/deal-pricing/inputs', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      const customMetrics = (project.customMetrics as any) || {};
+      const dealPricing = customMetrics.dealPricing || null;
+      res.json(dealPricing);
+    } catch (error: any) {
+      console.error('Failed to get deal pricing inputs:', error);
+      res.status(500).json({ error: error.message || 'Failed to get deal pricing inputs' });
+    }
+  });
+
+  // Persist deal pricing inputs (auto-save as user changes them)
+  app.put('/api/modeling/projects/:projectId/deal-pricing/inputs', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { targetIRR, goingInCapRate, exitCapRate, holdPeriod, pricingDriver, purchasePrice } = req.body;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const customMetrics = { ...((project.customMetrics as any) || {}) };
+      customMetrics.dealPricing = {
+        targetIRR,
+        goingInCapRate,
+        exitCapRate,
+        holdPeriod,
+        pricingDriver,
+        purchasePrice,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updates: any = { customMetrics, updatedBy: userId };
+      if (purchasePrice !== undefined && purchasePrice !== null) {
+        updates.purchasePrice = String(purchasePrice);
+      }
+      if (goingInCapRate !== undefined && goingInCapRate !== null) {
+        updates.year1CapRate = String(goingInCapRate);
+      }
+
+      const updated = await storage.updateModelingProject(projectId, updates, orgId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to save deal pricing inputs:', error);
+      res.status(500).json({ error: error.message || 'Failed to save deal pricing inputs' });
+    }
+  });
+
+  // Save deal pricing configuration (legacy explicit save button)
   app.post('/api/modeling/projects/:projectId/deal-pricing/save', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
