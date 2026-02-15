@@ -626,7 +626,7 @@ export class DashboardService {
   }
 
   private async getCRMData(orgId: string, dateFilter: TimeRangeFilter | null) {
-    const { crmDeals } = await import('@shared/schema');
+    const { crmDeals, modelingProjects } = await import('@shared/schema');
     const { sql, count, sum } = await import('drizzle-orm');
     
     const conditions: any[] = [eq(crmDeals.orgId, orgId)];
@@ -635,7 +635,7 @@ export class DashboardService {
       .select({
         totalDeals: count(),
         pipelineValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) IN ('active', 'under review', 'under_review') THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
-        activeDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'active' THEN 1 END)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) IN ('active', 'under review', 'under_review') THEN 1 END)`,
         wonDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN 1 END)`,
         wonValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_won' THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
         lostDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) = 'closed_lost' THEN 1 END)`,
@@ -643,10 +643,22 @@ export class DashboardService {
       .from(crmDeals)
       .where(and(...conditions));
 
+    const modelingResult = await db
+      .select({
+        pipelineValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${modelingProjects.dealOutcome}::text) IN ('active', 'under_review', 'under review') THEN COALESCE(${modelingProjects.purchasePrice}, 0) END), 0)`,
+        activeDeals: sql<number>`COUNT(CASE WHEN LOWER(${modelingProjects.dealOutcome}::text) IN ('active', 'under_review', 'under review') THEN 1 END)`,
+      })
+      .from(modelingProjects)
+      .where(eq(modelingProjects.orgId, orgId));
+
     const data = result[0];
+    const crmPipelineValue = Number(data.pipelineValue) || 0;
+    const modelingPipelineValue = Number(modelingResult[0]?.pipelineValue) || 0;
+    const crmActiveDeals = Number(data.activeDeals) || 0;
+    const modelingActiveDeals = Number(modelingResult[0]?.activeDeals) || 0;
+
     const wonDeals = Number(data.wonDeals) || 0;
     const lostDeals = Number(data.lostDeals) || 0;
-    const closedDeals = wonDeals + lostDeals;
 
     let filteredWonDeals = wonDeals;
     let filteredWonValue = Number(data.wonValue) || 0;
@@ -672,8 +684,8 @@ export class DashboardService {
     const filteredClosed = filteredWonDeals + filteredLostDeals;
     
     return {
-      pipelineValue: Number(data.pipelineValue) || 0,
-      activeDeals: Number(data.activeDeals) || 0,
+      pipelineValue: crmPipelineValue + modelingPipelineValue,
+      activeDeals: crmActiveDeals + modelingActiveDeals,
       wonDeals: filteredWonDeals,
       wonValue: filteredWonValue,
       winRate: filteredClosed > 0 ? Math.round((filteredWonDeals / filteredClosed) * 100) : 0,
@@ -899,9 +911,9 @@ export class DashboardService {
     const result = await db
       .select({
         totalProjects: count(),
-        completedProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.dealOutcome} = 'won' THEN 1 END)`,
-        activeProjects: sql<number>`COUNT(CASE WHEN ${modelingProjects.dealOutcome} = 'active' THEN 1 END)`,
-        totalValuation: sum(modelingProjects.purchasePrice),
+        completedProjects: sql<number>`COUNT(CASE WHEN LOWER(${modelingProjects.dealOutcome}::text) = 'won' THEN 1 END)`,
+        activeProjects: sql<number>`COUNT(CASE WHEN LOWER(${modelingProjects.dealOutcome}::text) IN ('active', 'under_review', 'under review') THEN 1 END)`,
+        totalValuation: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${modelingProjects.dealOutcome}::text) NOT IN ('lost', 'closed_lost') OR ${modelingProjects.dealOutcome} IS NULL THEN COALESCE(${modelingProjects.purchasePrice}, 0) END), 0)`,
       })
       .from(modelingProjects)
       .where(and(...conditions));
