@@ -40,6 +40,8 @@ import {
   LineChart,
   Briefcase,
   Download,
+  Save,
+  Check,
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
@@ -262,6 +264,22 @@ export default function ProjectWorkspace() {
     }
   });
 
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const saveProjectMutation = useMutation({
+    mutationFn: () =>
+      apiRequest('POST', `/api/modeling/projects/${projectId}/save`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      setSaveSuccess(true);
+      toast({ title: "Saved", description: "Your progress has been saved." });
+      setTimeout(() => setSaveSuccess(false), 2000);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
+    },
+  });
+
   const handleCreateOm = () => {
     if (!project) return;
     createOmMutation.mutate({
@@ -363,6 +381,31 @@ export default function ProjectWorkspace() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={saveSuccess ? "default" : "outline"}
+            size="sm"
+            onClick={() => saveProjectMutation.mutate()}
+            disabled={saveProjectMutation.isPending}
+            className={saveSuccess ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+            data-testid="button-save-project"
+          >
+            {saveSuccess ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved
+              </>
+            ) : saveProjectMutation.isPending ? (
+              <>
+                <Save className="h-4 w-4 mr-2 animate-pulse" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </>
+            )}
+          </Button>
           <Button
             variant="outline"
             size="sm"

@@ -20036,6 +20036,23 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post('/api/modeling/projects/:projectId/save', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+
+      const project = await storage.updateModelingProject(projectId, { updatedBy: userId } as any, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      res.json({ success: true, updatedAt: project.updatedAt });
+    } catch (error: any) {
+      console.error('Failed to save project:', error);
+      res.status(500).json({ error: error.message || 'Failed to save project' });
+    }
+  });
+
   app.put('/api/modeling/projects/:projectId/target-price', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
