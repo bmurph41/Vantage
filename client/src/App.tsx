@@ -1211,6 +1211,12 @@ function Router() {
           return null;
         }}
       </Route>
+      <Route path="/operations/service-parts">
+        {() => {
+          window.location.replace('/operations/service');
+          return null;
+        }}
+      </Route>
       <Route path="/operations/service/dashboard">
         {() => {
           window.location.replace('/operations/service?tab=dashboard');
