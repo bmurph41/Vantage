@@ -357,11 +357,11 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Property Tax Assumptions</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-lg font-semibold">Property Tax Assumptions</h2>
+          <p className="text-xs text-muted-foreground">
             Configure property tax calculations for Pro Forma projections
           </p>
         </div>
@@ -378,20 +378,17 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Building2 className="h-4 w-4" />
               Property Valuation
             </CardTitle>
-            <CardDescription>
-              Purchase price and taxable value for property tax calculation
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Purchase Price</Label>
+          <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Purchase Price</Label>
               <CurrencyInput
                 value={config.purchasePrice}
                 onChange={(val) => updateField('purchasePrice', val)}
@@ -399,8 +396,8 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground flex items-center">
                 Taxable Value Basis
                 <InfoTip text="Choose whether to base taxable value on the purchase price, a percentage of purchase price, or enter a custom value (e.g., county assessed value)" />
               </Label>
@@ -408,7 +405,7 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                 value={config.taxableValueMode}
                 onValueChange={(val) => updateField('taxableValueMode', val as 'manual' | 'purchase_price' | 'pct_of_purchase')}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -420,8 +417,8 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
             </div>
 
             {config.taxableValueMode === 'pct_of_purchase' && (
-              <div className="space-y-2">
-                <Label className="flex items-center">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center">
                   Assessed Value %
                   <InfoTip text="The percentage of the purchase price used as the taxable/assessed value. For example, 85% means the county assesses property at 85% of purchase price." />
                 </Label>
@@ -431,15 +428,15 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                   placeholder="85"
                   step="0.1"
                 />
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[10px] text-muted-foreground">
                   {config.assessedValuePct}% of {formatCurrencyVal(config.purchasePrice)} = {formatCurrencyVal(effectiveTaxableValue)}
                 </div>
               </div>
             )}
 
             {config.taxableValueMode === 'manual' && (
-              <div className="space-y-2">
-                <Label>Custom Taxable Value</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Custom Taxable Value</Label>
                 <CurrencyInput
                   value={config.taxableValue}
                   onChange={(val) => updateField('taxableValue', val)}
@@ -448,47 +445,43 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
               </div>
             )}
 
-            <Separator />
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-sm text-muted-foreground">Effective Taxable Value</div>
-              <div className="text-xl font-bold">{formatCurrencyVal(effectiveTaxableValue)}</div>
+            <div className="bg-muted/50 rounded-md p-2.5 mt-1">
+              <div className="text-[10px] text-muted-foreground">Effective Taxable Value</div>
+              <div className="text-base font-bold">{formatCurrencyVal(effectiveTaxableValue)}</div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Calculator className="h-4 w-4" />
               Tax Rate
             </CardTitle>
-            <CardDescription>
-              Millage rate and calculation method
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label className="flex items-center">
+          <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground flex items-center">
                 Millage Rate
                 <InfoTip text="The tax rate applied to property value. Check your county's tax assessor for the current millage rate." />
               </Label>
               <Input
                 type="number"
                 step="0.001"
+                className="h-8"
                 value={config.millageRate || ''}
                 onChange={(e) => updateField('millageRate', parseFloat(e.target.value) || 0)}
                 placeholder="e.g., 12.5"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Rate Applied Per</Label>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Rate Applied Per</Label>
               <Select
                 value={String(config.millageRatePer)}
                 onValueChange={(val) => updateField('millageRatePer', parseInt(val) as 100 | 1000)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -498,54 +491,45 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
               </Select>
             </div>
 
-            <Separator />
-
-            <div className="bg-muted/50 rounded-lg p-3">
-              <div className="text-sm text-muted-foreground">Current Annual Property Tax</div>
-              <div className="text-xl font-bold">{formatCurrencyVal(currentAnnualTax)}</div>
-              <div className="text-xs text-muted-foreground mt-1">
+            <div className="bg-muted/50 rounded-md p-2.5 mt-1">
+              <div className="text-[10px] text-muted-foreground">Current Annual Property Tax</div>
+              <div className="text-base font-bold">{formatCurrencyVal(currentAnnualTax)}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">
                 {formatCurrencyVal(effectiveTaxableValue)} / {config.millageRatePer.toLocaleString()} × {config.millageRate}
               </div>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Growth & Reassessment
-          </CardTitle>
-          <CardDescription>
-            How property taxes change over the hold period
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center">
-                  Reassessment on Sale
-                  <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date. Before that date, historical taxes (with standard growth) are used." />
-                </Label>
-                <Switch
-                  checked={config.reassessOnSale}
-                  onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
-                />
-              </div>
-              {config.reassessOnSale && (
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  New tax will replace historical taxes starting at the reassessment date
-                </div>
-              )}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <TrendingUp className="h-4 w-4" />
+              Growth & Reassessment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground flex items-center">
+                Reassessment on Sale
+                <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date." />
+              </Label>
+              <Switch
+                checked={config.reassessOnSale}
+                onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
+              />
             </div>
+            {config.reassessOnSale && (
+              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                New tax replaces historical starting at reassessment date
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label className="flex items-center">
-                Standard Annual Growth Rate (%)
-                <InfoTip text="The rate at which property taxes increase each year. Applied to historical taxes before reassessment and to the new assessed value after." />
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground flex items-center">
+                Annual Growth Rate (%)
+                <InfoTip text="The rate at which property taxes increase each year." />
               </Label>
               <PercentInput
                 value={config.standardGrowthRate}
@@ -554,16 +538,13 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                 step="0.1"
               />
             </div>
-          </div>
 
-          {config.reassessOnSale && (
-            <>
-              <Separator />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center">
+            {config.reassessOnSale && (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center">
                     Historical Annual Tax
-                    <InfoTip text="The current/prior annual property tax before reassessment. This is what the property was paying before the sale triggers a new assessment." />
+                    <InfoTip text="The current/prior annual property tax before reassessment." />
                   </Label>
                   <CurrencyInput
                     value={config.historicalAnnualTax}
@@ -572,94 +553,96 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center">
-                    Reassessment Month
-                    <InfoTip text="The month when the new assessed tax goes into effect. Earlier months in the year mean more of the year uses the new tax; later months mean the old tax applies longer." />
-                  </Label>
-                  <Select
-                    value={String(config.reassessmentMonth)}
-                    onValueChange={(val) => updateField('reassessmentMonth', parseInt(val))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTH_NAMES.map((name, idx) => (
-                        <SelectItem key={idx + 1} value={String(idx + 1)}>{name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground flex items-center">
+                      Reassess Month
+                      <InfoTip text="The month when the new assessed tax goes into effect." />
+                    </Label>
+                    <Select
+                      value={String(config.reassessmentMonth)}
+                      onValueChange={(val) => updateField('reassessmentMonth', parseInt(val))}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTH_NAMES.map((name, idx) => (
+                          <SelectItem key={idx + 1} value={String(idx + 1)}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground flex items-center">
+                      Reassess Year
+                      <InfoTip text="The calendar year when the reassessment takes effect." />
+                    </Label>
+                    <Select
+                      value={String(config.reassessmentYear)}
+                      onValueChange={(val) => updateField('reassessmentYear', parseInt(val))}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map((yr) => (
+                          <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center">
-                    Reassessment Year
-                    <InfoTip text="The calendar year when the reassessment takes effect. Typically the year of acquisition or the year after." />
-                  </Label>
-                  <Select
-                    value={String(config.reassessmentYear)}
-                    onValueChange={(val) => updateField('reassessmentYear', parseInt(val))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.map((yr) => (
-                        <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="bg-muted/50 rounded-md p-2 text-[11px] space-y-0.5">
+                  <div className="text-[10px] text-muted-foreground font-medium">Reassessment Summary</div>
+                  <div>
+                    <span className="font-medium">Before {MONTH_NAMES[config.reassessmentMonth - 1]} {config.reassessmentYear}:</span>{' '}
+                    {formatCurrencyVal(config.historicalAnnualTax)}/yr
+                  </div>
+                  <div>
+                    <span className="font-medium">After:</span>{' '}
+                    {formatCurrencyVal(currentAnnualTax)}/yr
+                  </div>
                 </div>
-              </div>
-
-              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
-                <div className="text-muted-foreground">Reassessment Summary</div>
-                <div>
-                  <span className="font-medium">Before {MONTH_NAMES[config.reassessmentMonth - 1]} {config.reassessmentYear}:</span>{' '}
-                  {formatCurrencyVal(config.historicalAnnualTax)}/yr ({formatCurrencyVal(Math.round(config.historicalAnnualTax / 12))}/mo)
-                </div>
-                <div>
-                  <span className="font-medium">Starting {MONTH_NAMES[config.reassessmentMonth - 1]} {config.reassessmentYear}:</span>{' '}
-                  {formatCurrencyVal(currentAnnualTax)}/yr ({formatCurrencyVal(Math.round(currentAnnualTax / 12))}/mo)
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <DollarSign className="h-4 w-4" />
             Property Tax Projection
           </CardTitle>
-          <CardDescription>
-            Projected property taxes over the {holdPeriod}-year hold period
+          <CardDescription className="text-xs">
+            Projected over the {holdPeriod}-year hold period
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0 px-4 pb-4">
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Year</TableHead>
-                  <TableHead className="text-right">Taxable Value</TableHead>
-                  <TableHead className="text-right">Annual Tax</TableHead>
-                  <TableHead className="text-right">Monthly Tax</TableHead>
-                  <TableHead>Growth Applied</TableHead>
+                  <TableHead className="text-xs py-2">Year</TableHead>
+                  <TableHead className="text-xs text-right py-2">Taxable Value</TableHead>
+                  <TableHead className="text-xs text-right py-2">Annual Tax</TableHead>
+                  <TableHead className="text-xs text-right py-2">Monthly Tax</TableHead>
+                  <TableHead className="text-xs py-2">Growth</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {taxProjections.map((proj) => (
                   <TableRow key={proj.year}>
-                    <TableCell className="font-medium">{proj.label}</TableCell>
-                    <TableCell className="text-right">{formatCurrencyVal(proj.taxableValue)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrencyVal(proj.tax)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{formatCurrencyVal(proj.monthlyTax)}</TableCell>
-                    <TableCell>
-                      <Badge variant={proj.growthApplied.startsWith('Reassess') ? 'default' : proj.growthApplied === 'Base' || proj.growthApplied === 'Historical' ? 'secondary' : 'outline'} className="text-xs">
+                    <TableCell className="font-medium text-xs py-1.5">{proj.label}</TableCell>
+                    <TableCell className="text-right text-xs py-1.5">{formatCurrencyVal(proj.taxableValue)}</TableCell>
+                    <TableCell className="text-right text-xs font-semibold py-1.5">{formatCurrencyVal(proj.tax)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground py-1.5">{formatCurrencyVal(proj.monthlyTax)}</TableCell>
+                    <TableCell className="py-1.5">
+                      <Badge variant={proj.growthApplied.startsWith('Reassess') ? 'default' : proj.growthApplied === 'Base' || proj.growthApplied === 'Historical' ? 'secondary' : 'outline'} className="text-[10px] py-0 px-1.5">
                         {proj.growthApplied}
                       </Badge>
                     </TableCell>
@@ -668,8 +651,8 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
               </TableBody>
             </Table>
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            Total property tax over {holdPeriod} years: {formatCurrencyVal(taxProjections.reduce((sum, p) => sum + p.tax, 0))}
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            Total property tax over {holdPeriod} years: <span className="font-semibold">{formatCurrencyVal(taxProjections.reduce((sum, p) => sum + p.tax, 0))}</span>
           </div>
         </CardContent>
       </Card>
