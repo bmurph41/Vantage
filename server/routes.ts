@@ -19857,17 +19857,6 @@ Current context: Project ${req.params.projectId}`;
         periodExpenses: adjustedExpenses,
       });
 
-      if (result.purchasePrice > 0) {
-        try {
-          await storage.updateModelingProject(projectId, {
-            purchasePrice: String(result.purchasePrice),
-            year1CapRate: String(result.year1CapRate),
-          }, orgId);
-        } catch (saveErr) {
-          console.warn('Auto-save deal pricing failed:', saveErr);
-        }
-      }
-
       res.json(result);
     } catch (error: any) {
       console.error('Failed to calculate unified deal pricing:', error);
@@ -19958,37 +19947,6 @@ Current context: Project ${req.params.projectId}`;
           periodExpenses: adjustedExpenses,
         }
       );
-
-      let autoSavePrice: number | null = null;
-      let autoSaveCapRate: number | null = null;
-
-      if (results.fromPurchasePrice && manualPurchasePrice) {
-        autoSavePrice = results.fromPurchasePrice.purchasePrice;
-        autoSaveCapRate = results.fromPurchasePrice.year1CapRate;
-      } else if (results.fromGoingInCapRate && goingInCapRate) {
-        autoSavePrice = results.fromGoingInCapRate.purchasePrice;
-        autoSaveCapRate = results.fromGoingInCapRate.achievedMetric;
-      } else if (results.fromTargetIRR && targetIRR) {
-        autoSavePrice = results.fromTargetIRR.purchasePrice;
-        autoSaveCapRate = results.fromTargetIRR.year1CapRate;
-      } else if (results.fromTargetYearCapRate && targetYearCapRate) {
-        autoSavePrice = results.fromTargetYearCapRate.purchasePrice;
-        autoSaveCapRate = results.fromTargetYearCapRate.year1CapRate;
-      }
-
-      if (autoSavePrice !== null && !isNaN(autoSavePrice)) {
-        try {
-          const updates: any = {
-            purchasePrice: String(autoSavePrice),
-          };
-          if (autoSaveCapRate !== null && !isNaN(autoSaveCapRate)) {
-            updates.year1CapRate = String(autoSaveCapRate);
-          }
-          await storage.updateModelingProject(projectId, updates, orgId);
-        } catch (saveErr) {
-          console.warn('Auto-save deal pricing failed:', saveErr);
-        }
-      }
 
       res.json({
         ...results,

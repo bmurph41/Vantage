@@ -7664,7 +7664,24 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(asc(modelingFinancialPeriods.sortOrder));
     
-    return periods;
+    if (periods.length > 0) {
+      return periods;
+    }
+
+    const actualsYears = await db.selectDistinct({ year: modelingActuals.year })
+      .from(modelingActuals)
+      .where(eq(modelingActuals.modelingProjectId, modelingProjectId))
+      .orderBy(desc(modelingActuals.year));
+
+    if (actualsYears.length > 0) {
+      return actualsYears.map(row => ({
+        periodType: 'calendar_year',
+        periodLabel: String(row.year),
+        periodYear: row.year,
+      }));
+    }
+
+    return [];
   }
 
   // ============================================================================
