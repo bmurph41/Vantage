@@ -156,7 +156,7 @@ function PercentStepper({
             }}
             onBlur={() => {
               const v = parsePercentInput(value);
-              onChange(Math.min(max, Math.max(min, v)).toString());
+              onChange(Math.min(max, Math.max(min, v)).toFixed(2));
             }}
             className="w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
             data-testid={props['data-testid']}
@@ -210,7 +210,7 @@ function PercentStepper({
             }}
             onBlur={() => {
               const v = parsePercentInput(value);
-              onChange(Math.min(max, Math.max(min, v)).toString());
+              onChange(Math.min(max, Math.max(min, v)).toFixed(2));
             }}
             className="w-14 text-center text-[13px] font-mono py-1 bg-transparent outline-none text-slate-700 dark:text-slate-300"
             data-testid={props['data-testid']}
@@ -379,7 +379,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     if (savedInputs) {
       if (savedInputs.targetIRR !== undefined && !isNaN(savedInputs.targetIRR)) setTargetIRR(String(savedInputs.targetIRR));
       if (savedInputs.goingInCapRate !== undefined && !isNaN(savedInputs.goingInCapRate)) setGoingInCapRate(String(savedInputs.goingInCapRate));
-      if (savedInputs.exitCapRate !== undefined && !isNaN(savedInputs.exitCapRate)) setExitCapRate(String(savedInputs.exitCapRate));
+      if (savedInputs.exitCapRate !== undefined && !isNaN(savedInputs.exitCapRate)) setExitCapRate(Number(savedInputs.exitCapRate).toFixed(2));
       if (savedInputs.holdPeriod !== undefined && !isNaN(savedInputs.holdPeriod)) setHoldPeriodNum(savedInputs.holdPeriod);
       if (savedInputs.pricingDriver) setPricingDriver(savedInputs.pricingDriver);
       if (savedInputs.purchasePrice !== undefined && savedInputs.purchasePrice > 0) {
@@ -454,7 +454,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     if (activeScenario?.exitCapRate) {
       const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
       if (capRatePercent > 0 && Math.abs(capRatePercent - parseFloat(exitCapRate)) > 0.01) {
-        setExitCapRate(capRatePercent.toString());
+        setExitCapRate(capRatePercent.toFixed(2));
       }
     }
   }, [activeScenario?.exitCapRate]);
