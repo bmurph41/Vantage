@@ -25,21 +25,56 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
-  // TODO: Implement data fetching when API is available
-  const comp = null;
-  const isLoading = false;
+  const { data: comp, isLoading } = useQuery<any>({
+    queryKey: ['/api/rate-comps', compId],
+    enabled: !!compId,
+  });
 
-  // TODO: Get user from MarinaMatch auth context
-  const user = { role: 'Admin' };
+  useEffect(() => {
+    if (comp) setFormData(comp);
+  }, [comp]);
+
   const canEdit = true;
   const canDelete = true;
 
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`/api/rate-comps/${compId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Saved", description: "Rate comp changes have been saved." });
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save changes.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/rate-comps/${compId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Rate comp has been removed." });
+      queryClient.invalidateQueries({ queryKey: ['/api/rate-comps'] });
+      if (onClose) onClose();
+      else window.history.back();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete comp.", variant: "destructive" });
+    },
+  });
+
   const handleSave = () => {
-    toast({
-      title: "Saved",
-      description: "Rate comp changes have been saved.",
-    });
-    setIsEditing(false);
+    saveMutation.mutate(formData);
   };
 
   const handleCancel = () => {
@@ -49,10 +84,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
 
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this comp? This action cannot be undone.')) {
-      toast({
-        title: "Deleted",
-        description: "Rate comp has been removed.",
-      });
+      deleteMutation.mutate();
     }
   };
 
@@ -153,8 +185,43 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
 
       {/* Content */}
       <div className={contentClass}>
-        <div className="p-8 text-center text-muted-foreground">
-          Rate comp detail form pending API integration
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+          <div className="space-y-4">
+            <div>
+              <Label>Marina Name</Label>
+              <Input value={formData.marinaName || ''} disabled={!isEditing} onChange={e => handleInputChange('marinaName', e.target.value)} />
+            </div>
+            <div>
+              <Label>Location</Label>
+              <Input value={formData.location || formData.city || ''} disabled={!isEditing} onChange={e => handleInputChange('location', e.target.value)} />
+            </div>
+            <div>
+              <Label>State</Label>
+              <Input value={formData.state || ''} disabled={!isEditing} onChange={e => handleInputChange('state', e.target.value)} />
+            </div>
+            <div>
+              <Label>Total Slips</Label>
+              <Input type="number" value={formData.totalSlips || ''} disabled={!isEditing} onChange={e => handleInputChange('totalSlips', e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <Label>Avg Rate per Foot</Label>
+              <Input type="number" value={formData.avgRatePerFoot || ''} disabled={!isEditing} onChange={e => handleInputChange('avgRatePerFoot', e.target.value)} />
+            </div>
+            <div>
+              <Label>Occupancy (%)</Label>
+              <Input type="number" value={formData.occupancy || ''} disabled={!isEditing} onChange={e => handleInputChange('occupancy', e.target.value)} />
+            </div>
+            <div>
+              <Label>Storage Type</Label>
+              <Input value={formData.storageType || formData.ioBoth || ''} disabled={!isEditing} onChange={e => handleInputChange('storageType', e.target.value)} />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={formData.notes || ''} disabled={!isEditing} onChange={e => handleInputChange('notes', e.target.value)} rows={3} />
+            </div>
+          </div>
         </div>
       </div>
     </Container>

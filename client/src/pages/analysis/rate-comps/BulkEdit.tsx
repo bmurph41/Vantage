@@ -61,8 +61,8 @@ export default function BulkEdit({ selectedIds, onClose }: BulkEditProps) {
     });
 
     try {
-      const response = await fetch("/api/ratecomps/bulk-update", {
-        method: "PATCH",
+      const response = await fetch("/api/rate-comps/bulk-update", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selectedIds, updates: filteredUpdates }),
       });
@@ -71,7 +71,7 @@ export default function BulkEdit({ selectedIds, onClose }: BulkEditProps) {
         title: "Changes Saved",
         description: `Successfully updated ${selectedIds.length} records.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/ratecomps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rate-comps"] });
       onClose();
     } catch (error) {
       toast({
