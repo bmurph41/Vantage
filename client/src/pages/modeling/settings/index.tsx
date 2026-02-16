@@ -176,6 +176,7 @@ const LINE_ITEM_ROUNDING_OPTIONS = [
 ];
 
 const PERCENT_ROUNDING_OPTIONS = [
+  { value: -1, label: 'No rounding', example: '5.24837%' },
   { value: 0, label: 'Whole number', example: '5%' },
   { value: 1, label: '1 decimal', example: '5.2%' },
   { value: 2, label: '2 decimals', example: '5.25%' },

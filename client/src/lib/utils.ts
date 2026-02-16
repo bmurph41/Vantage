@@ -79,12 +79,15 @@ export function formatPercent(
   options?: { decimals?: number; dash?: boolean; showSign?: boolean }
 ): string {
   const effectiveDecimals = options?.decimals ?? _globalPercentRoundingDecimals;
-  const dash = options?.dash ? '-' : `0.${'0'.repeat(effectiveDecimals)}%`;
+  const noRounding = effectiveDecimals < 0;
+  const safeDecimals = noRounding ? 10 : effectiveDecimals;
+  const dash = options?.dash ? '-' : `0${safeDecimals > 0 ? '.' + '0'.repeat(safeDecimals) : ''}%`;
   if (value === null || value === undefined) return dash;
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return dash;
   const sign = options?.showSign && num >= 0 ? '+' : '';
-  return `${sign}${num.toFixed(effectiveDecimals)}%`;
+  const formatted = noRounding ? String(num) : num.toFixed(effectiveDecimals);
+  return `${sign}${formatted}%`;
 }
 
 export function formatNumber(value: number | string | null | undefined): string {
