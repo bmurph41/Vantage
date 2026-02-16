@@ -256,6 +256,58 @@ export class ParserService {
     }],
   ]);
 
+  private parseExcelAllSheets(buffer: Buffer): { data: Record<string, any>[]; headers: string[] } {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    let allData: Record<string, any>[] = [];
+    let primaryHeaders: string[] = [];
+
+    for (let si = 0; si < workbook.SheetNames.length; si++) {
+      const sheetName = workbook.SheetNames[si];
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet || !sheet['!ref']) continue;
+
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      if (jsonData.length < 2) continue;
+
+      const rawHeaders = (jsonData[0] as any[]).map((h, idx) => {
+        const val = h !== null && h !== undefined ? String(h).trim() : '';
+        return val || `__col_${idx}`;
+      });
+
+      if (si === 0) {
+        primaryHeaders = rawHeaders;
+      }
+
+      const sheetRows = (jsonData.slice(1) as any[][]).map((row: any[]) => {
+        const obj: Record<string, any> = {};
+        const hdrs = si === 0 ? primaryHeaders : rawHeaders;
+        hdrs.forEach((header, idx) => {
+          const val = idx < row.length ? row[idx] : undefined;
+          if (val !== undefined && val !== null && val !== '') {
+            obj[header] = val;
+          }
+        });
+        return obj;
+      }).filter(row => {
+        const values = Object.values(row);
+        return values.some(v => v !== null && v !== undefined && String(v).trim() !== '');
+      });
+
+      if (si > 0 && sheetRows.length > 0) {
+        const sheetHeaders = rawHeaders.filter(h => !h.startsWith('__col_'));
+        for (const h of sheetHeaders) {
+          if (!primaryHeaders.includes(h)) {
+            primaryHeaders.push(h);
+          }
+        }
+      }
+
+      allData = allData.concat(sheetRows);
+    }
+
+    return { data: allData, headers: primaryHeaders };
+  }
+
   async analyzeFile(file: Express.Multer.File): Promise<FileAnalysis> {
     const isExcel = file.mimetype.includes('sheet') || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls');
     
@@ -263,24 +315,10 @@ export class ParserService {
     let headers: string[];
 
     if (isExcel) {
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      
-      headers = jsonData[0] as string[];
-      data = (jsonData.slice(1) as any[][]).map((row: any[]) => {
-        const obj: Record<string, any> = {};
-        headers.forEach((header, idx) => {
-          obj[header] = row[idx];
-        });
-        return obj;
-      }).filter(row => {
-        const values = Object.values(row);
-        return values.some(v => v !== null && v !== undefined && String(v).trim() !== '');
-      });
+      const result = this.parseExcelAllSheets(file.buffer);
+      data = result.data;
+      headers = result.headers;
     } else {
-      // CSV parsing - parse ALL rows (no preview limit)
       const csvText = file.buffer.toString('utf-8');
       const parseResult = Papa.parse(csvText, {
         header: true,
@@ -291,22 +329,16 @@ export class ParserService {
       headers = parseResult.meta.fields || Object.keys(data[0] || {});
     }
 
-    // Filter out unnamed columns
-    const cleanHeaders = headers.filter(h => h && !h.toLowerCase().startsWith('unnamed'));
+    const cleanHeaders = headers.filter(h => h && !h.startsWith('__col_'));
     
-    // Estimate total rows
-    const estimatedRows = this.estimateRowCount(file);
+    const estimatedRows = data.length > 0 ? data.length : this.estimateRowCount(file);
     
-    // Generate suggested mapping with confidence scoring
     const mappingResult = this.generateEnhancedMapping(cleanHeaders, data);
     
-    // Infer column types
     const columnTypes = this.inferColumnTypes(data, cleanHeaders);
     
-    // Analyze data quality
     const dataQuality = this.analyzeDataQuality(data, cleanHeaders);
     
-    // Get sample rows (first 5)
     const sampleRows = data.slice(0, 5);
 
     return {
@@ -326,45 +358,27 @@ export class ParserService {
     let data: any[];
 
     if (isExcel) {
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      
-      const headers = jsonData[0] as string[];
-      data = (jsonData.slice(1) as any[][]).map((row: any[]) => {
-        const obj: Record<string, any> = {};
-        headers.forEach((header, idx) => {
-          obj[header] = row[idx];
-        });
-        return obj;
-      });
+      const result = this.parseExcelAllSheets(file.buffer);
+      data = result.data;
     } else {
-      // CSV parsing
       const csvText = file.buffer.toString('utf-8');
       const parseResult = Papa.parse(csvText, {
         header: true,
-        skipEmptyLines: 'greedy', // Only skip lines that are completely empty (no delimiters)
+        skipEmptyLines: 'greedy',
       });
       
       data = parseResult.data as Record<string, any>[];
     }
 
-
-    // More lenient filtering - only remove rows that are completely empty or have no meaningful data
     const filteredData = data.filter(row => {
       const values = Object.values(row);
-      const nonEmptyValues = values.filter(value => 
+      return values.some(value => 
         value !== null && 
         value !== undefined && 
         value !== '' &&
         String(value).trim() !== ''
       );
-      
-      // Keep row if it has at least one meaningful value
-      return nonEmptyValues.length > 0;
     });
-
 
     return filteredData;
   }

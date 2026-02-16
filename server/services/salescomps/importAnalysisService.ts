@@ -74,7 +74,6 @@ export class ImportAnalysisService {
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      const reviewReasons: string[] = [];
       
       const hasAnyData = Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== '');
       if (!hasAnyData) {
@@ -83,38 +82,50 @@ export class ImportAnalysisService {
       }
 
       const hasMarina = row.marina && String(row.marina).trim();
-      const hasCity = row.city && String(row.city).trim();
-      const hasState = row.state && String(row.state).trim();
 
-      if (!hasMarina) reviewReasons.push('Missing marina name');
-      if (!hasCity) reviewReasons.push('Missing city');
-      if (!hasState) reviewReasons.push('Missing state');
-
-      const key = this.normalizeMatchKey(row.marina, row.city, row.state);
-      
-      if (!key) {
-        if (hasMarina) {
+      if (!hasMarina) {
+        const hasOtherData = Object.entries(row).some(([k, v]) => 
+          k !== 'marina' && v !== null && v !== undefined && String(v).trim() !== ''
+        );
+        if (hasOtherData && mode !== 'update') {
           results.push({
             rowIndex: i,
             rowData: row,
-            confidence: 0.5,
+            confidence: 0.3,
             matchType: 'none',
-            action: 'review',
-            reason: 'Incomplete location data - needs review',
-            reviewReasons,
+            action: 'insert',
+            reason: 'Missing marina name but has other data',
           });
-          toReview++;
+          toInsert++;
         } else {
+          toSkip++;
+        }
+        continue;
+      }
+
+      const key = this.normalizeMatchKey(row.marina, row.city, row.state);
+
+      if (!key) {
+        if (mode === 'update') {
           results.push({
             rowIndex: i,
             rowData: row,
             confidence: 0,
             matchType: 'none',
-            action: 'review',
-            reason: 'Missing marina name - needs review',
-            reviewReasons,
+            action: 'skip',
+            reason: 'Incomplete location data for matching (update-only mode)'
           });
-          toReview++;
+          toSkip++;
+        } else {
+          results.push({
+            rowIndex: i,
+            rowData: row,
+            confidence: 0.7,
+            matchType: 'none',
+            action: 'insert',
+            reason: 'New record (incomplete location data)',
+          });
+          toInsert++;
         }
         continue;
       }

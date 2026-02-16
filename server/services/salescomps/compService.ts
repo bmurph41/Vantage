@@ -928,7 +928,19 @@ export class CompService {
     // Merge mapped articleUrls with legacy article/article.1 columns
     const mappedUrls = transformed.articleUrls || [];
     const legacyUrls = this.extractArticleUrls(row);
-    transformed.articleUrls = [...new Set([...mappedUrls, ...legacyUrls])]; // Deduplicate
+    transformed.articleUrls = [...new Set([...mappedUrls, ...legacyUrls])];
+
+    const mappedSourceColumns = new Set(Object.keys(mapping));
+    const custom: Record<string, any> = transformed.custom || {};
+    for (const [col, val] of Object.entries(row)) {
+      if (mappedSourceColumns.has(col)) continue;
+      if (col.toLowerCase().startsWith('unnamed') || col.startsWith('__col_')) continue;
+      if (val === null || val === undefined || String(val).trim() === '') continue;
+      custom[col] = val;
+    }
+    if (Object.keys(custom).length > 0) {
+      transformed.custom = custom;
+    }
 
     return transformed;
   }

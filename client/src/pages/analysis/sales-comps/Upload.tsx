@@ -637,12 +637,57 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
       }
     };
 
+    const totalFileRows = uploadData?.analysis?.estimatedRows || 0;
+    const totalPlanRows = previewData?.plan?.rows?.length || 0;
+    const totalActiveImport = getActiveCount('insert') + getActiveCount('update');
+
+    const unmappedColumns = uploadData?.analysis?.headers?.filter(
+      (h: string) => !mapping[h]
+    ) || [];
+
     return (
       <div>
         <div className="mb-6">
           <h3 className="text-lg font-medium text-foreground mb-2">Step 4: Preview & Verify Import</h3>
           <p className="text-sm text-muted-foreground">Verify mapping accuracy and review record categories before importing</p>
         </div>
+
+        <Card className="p-4 mb-4 border-primary/30 bg-primary/5">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <h4 className="font-medium text-foreground mb-2">Import Summary</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">File rows parsed:</span>
+                  <span className="font-semibold ml-1">{totalFileRows}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Rows in plan:</span>
+                  <span className="font-semibold ml-1">{totalPlanRows}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Will import:</span>
+                  <span className="font-semibold text-green-600 dark:text-green-400 ml-1">{totalActiveImport}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Columns mapped:</span>
+                  <span className="font-semibold ml-1">{Object.keys(mapping).filter(k => mapping[k]).length} / {uploadData?.analysis?.headers?.length || 0}</span>
+                </div>
+              </div>
+              {unmappedColumns.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-medium">Unmapped columns</span> (stored as custom data): {unmappedColumns.slice(0, 8).join(', ')}
+                  {unmappedColumns.length > 8 && ` +${unmappedColumns.length - 8} more`}
+                </div>
+              )}
+              {totalFileRows > 0 && totalPlanRows < totalFileRows && totalPlanRows > 0 && (
+                <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  {totalFileRows - totalPlanRows} row(s) were empty and filtered out during parsing.
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {renderMappingVerification()}
 

@@ -284,13 +284,14 @@ export class CompService {
         }
 
         try {
-          // Transform row using column mapping
           const transformedData = this.transformRow(row, mapping, normalization);
           
-          // Validate required fields
-          if (!transformedData.marina) {
-            results.errors.push({ row: rowNumber, message: 'Marina name is required' });
-            results.errorCount++;
+          const hasAnyData = Object.values(transformedData).some(v => 
+            v !== null && v !== undefined && v !== '' && 
+            !(Array.isArray(v) && v.length === 0) &&
+            !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0)
+          );
+          if (!hasAnyData) {
             continue;
           }
 
@@ -487,8 +488,19 @@ export class CompService {
       }
     }
 
-    // Extract article URLs if present
     transformed.articleUrls = this.extractArticleUrls(row);
+
+    const mappedSourceColumns = new Set(Object.keys(mapping));
+    const custom: Record<string, any> = transformed.custom || {};
+    for (const [col, val] of Object.entries(row)) {
+      if (mappedSourceColumns.has(col)) continue;
+      if (col.toLowerCase().startsWith('unnamed') || col.startsWith('__col_')) continue;
+      if (val === null || val === undefined || String(val).trim() === '') continue;
+      custom[col] = val;
+    }
+    if (Object.keys(custom).length > 0) {
+      transformed.custom = custom;
+    }
 
     return transformed;
   }
