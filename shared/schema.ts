@@ -16287,6 +16287,9 @@ export const docIntelUploads = pgTable('doc_intel_uploads', {
   appliedAt: timestamp('applied_at'), // When data was written to model
   appliedBy: varchar('applied_by').references(() => users.id),
 
+  // Rent Roll sub-type (only for rent_roll docType)
+  rentRollSubType: text('rent_roll_sub_type'),
+
   // Metadata
   uploadedBy: varchar('uploaded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),

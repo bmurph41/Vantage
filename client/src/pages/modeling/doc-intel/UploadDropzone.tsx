@@ -56,6 +56,7 @@ interface StagedFile {
   t12StartYear?: string;
   t12EndMonth?: string;
   t12EndYear?: string;
+  rentRollSubType?: string;
   status: "pending" | "uploading" | "complete" | "error";
   progress: number;
   errorMessage?: string;
@@ -124,16 +125,90 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface ProjectConfig {
+  departments?: Record<string, { seasons?: string[]; isEnabled?: boolean; section?: string }>;
+}
+
+interface ProjectData {
+  customMetrics?: {
+    storageMix?: {
+      items?: Array<{ storageType: string; count?: number }>;
+    };
+  };
+}
+
+const STORAGE_TYPE_LABELS: Record<string, string> = {
+  WET_SLIPS: "Wet Slips",
+  DRY_STACK: "Dry Stack Racks",
+  MOORINGS: "Moorings",
+  TRAILER_STORAGE: "Trailer Storage",
+  RV_STORAGE: "RV Storage",
+  SERVICE_BAYS: "Service Bays",
+  wet_slips: "Wet Slips",
+  lift_slips: "Lift Slips",
+  moorings: "Moorings",
+  dinghies: "Dinghies",
+  jet_skis: "Jet Skis",
+  dry_racks_indoor: "Dry Racks – Indoor",
+  dry_racks_outdoor: "Dry Racks – Outdoor",
+  land_storage: "Land Storage",
+  boats_on_trailers: "Boats on Trailers",
+  trailers: "Trailers",
+  carports: "Carports",
+  houseboats: "Houseboats",
+  rv_sites: "RV Sites",
+};
+
 export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzoneProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  // NEW: Processing message state for overlay
   const [processingMessage, setProcessingMessage] = useState("");
 
   const { data: customTypes = [], refetch: refetchCustomTypes } = useQuery<CustomDocumentType[]>({
     queryKey: ['/api/doc-intel/custom-document-types'],
   });
+
+  const { data: projectConfig } = useQuery<ProjectConfig>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+    enabled: !!projectId,
+  });
+
+  const { data: projectData } = useQuery<ProjectData>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+
+  const rentRollSubTypeOptions = (() => {
+    const options: Array<{ value: string; label: string }> = [
+      { value: "commercial_tenant", label: "Commercial Tenant" },
+    ];
+
+    if (projectConfig?.departments) {
+      Object.entries(projectConfig.departments).forEach(([key, dept]) => {
+        if (dept.isEnabled && dept.section === 'storage' && STORAGE_TYPE_LABELS[key]) {
+          options.push({ value: key, label: STORAGE_TYPE_LABELS[key] });
+        }
+      });
+    } else if (projectData?.customMetrics?.storageMix?.items) {
+      projectData.customMetrics.storageMix.items.forEach((item) => {
+        const label = STORAGE_TYPE_LABELS[item.storageType];
+        if (label) {
+          options.push({ value: item.storageType, label });
+        }
+      });
+    }
+
+    if (options.length === 1) {
+      Object.entries(STORAGE_TYPE_LABELS).forEach(([key, label]) => {
+        if (!options.some(o => o.value === key)) {
+          options.push({ value: key, label });
+        }
+      });
+    }
+
+    return options;
+  })();
 
   const createCustomTypeMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -163,9 +238,9 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const handleDocTypeChange = (stagedId: string, value: string) => {
     if (value.startsWith("custom_")) {
       const customId = value.replace("custom_", "");
-      updateStagedFile(stagedId, { docType: "other", customTypeId: customId, customTypeName: "" });
+      updateStagedFile(stagedId, { docType: "other", customTypeId: customId, customTypeName: "", rentRollSubType: undefined });
     } else {
-      updateStagedFile(stagedId, { docType: value as DocTypeEnum, customTypeId: null, customTypeName: "" });
+      updateStagedFile(stagedId, { docType: value as DocTypeEnum, customTypeId: null, customTypeName: "", rentRollSubType: undefined });
     }
   };
 
@@ -221,6 +296,10 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       if (staged.isMultiYear && staged.multiYears && staged.multiYears.length > 0) {
         formData.append("isMultiYear", "true");
         formData.append("multiYears", JSON.stringify(staged.multiYears));
+      }
+
+      if (staged.docType === 'rent_roll' && staged.rentRollSubType) {
+        formData.append("rentRollSubType", staged.rentRollSubType);
       }
 
       if (staged.docType === 't12') {
@@ -650,6 +729,26 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                             {staged.multiYears!.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}
                           </p>
                         )}
+                      </div>
+                    )}
+                    {staged.docType === 'rent_roll' && (
+                      <div>
+                        <Label className="text-xs">Rent Roll Type</Label>
+                        <Select
+                          value={staged.rentRollSubType || ''}
+                          onValueChange={(v) => updateStagedFile(staged.id, { rentRollSubType: v })}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select type..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {rentRollSubTypeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                     {staged.docType === 't12' && !staged.isMultiYear && (

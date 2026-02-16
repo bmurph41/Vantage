@@ -23313,6 +23313,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const displayName = req.body.displayName?.trim() || req.file.originalname;
       
       const isT12 = req.body.isT12 === 'true';
+      const rentRollSubType = req.body.docType === 'rent_roll' && req.body.rentRollSubType ? req.body.rentRollSubType : null;
       const isMultiYear = req.body.isMultiYear === 'true';
       let multiYears: number[] | null = null;
       if (isMultiYear && req.body.multiYears) {
@@ -23357,6 +23358,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           isMultiYear: isMultiYear,
           multiYears: multiYears,
           periodMetadata: periodMetadata,
+          rentRollSubType: rentRollSubType,
         },
         checkProjectOnly
       );
