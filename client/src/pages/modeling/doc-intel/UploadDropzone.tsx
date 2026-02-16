@@ -57,9 +57,10 @@ interface StagedFile {
   t12EndMonth?: string;
   t12EndYear?: string;
   rentRollSubType?: string;
-  status: "pending" | "uploading" | "complete" | "error";
+  status: "pending" | "uploading" | "complete" | "error" | "duplicate";
   progress: number;
   errorMessage?: string;
+  isDuplicate?: boolean;
 }
 
 const MONTH_OPTIONS = [
@@ -272,7 +273,41 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     }
   };
 
-  const uploadSingleFile = async (staged: StagedFile): Promise<DocIntelUpload | null> => {
+  const buildFormData = (staged: StagedFile, overwrite: boolean = false): FormData => {
+    const formData = new FormData();
+    formData.append("file", staged.file);
+    formData.append("docType", staged.docType === 't12' ? 'pnl' : staged.docType);
+    formData.append("year", staged.docType === 't12' ? (staged.t12EndYear || staged.year) : staged.year);
+    formData.append("isT12", staged.docType === 't12' ? 'true' : 'false');
+    formData.append("dataGranularity", staged.dataGranularity);
+    if (overwrite) formData.append("allowOverwrite", "true");
+
+    if (staged.isMultiYear && staged.multiYears && staged.multiYears.length > 0) {
+      formData.append("isMultiYear", "true");
+      formData.append("multiYears", JSON.stringify(staged.multiYears));
+    }
+    if (staged.docType === 'rent_roll' && staged.rentRollSubType) {
+      formData.append("rentRollSubType", staged.rentRollSubType);
+    }
+    if (staged.docType === 't12') {
+      if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
+      if (staged.t12StartYear) formData.append('t12StartYear', staged.t12StartYear);
+      if (staged.t12EndMonth) formData.append('t12EndMonth', staged.t12EndMonth);
+      if (staged.t12EndYear) formData.append('t12EndYear', staged.t12EndYear);
+    }
+    if (staged.customTypeId) {
+      const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
+      if (customType) {
+        formData.append("customTypeName", customType.name);
+        formData.append("customTypeId", staged.customTypeId);
+      }
+    } else if (staged.docType === "other" && staged.customTypeName.trim()) {
+      formData.append("customTypeName", staged.customTypeName.trim());
+    }
+    return formData;
+  };
+
+  const uploadSingleFile = async (staged: StagedFile, allowOverwrite: boolean = false): Promise<DocIntelUpload | 'duplicate' | null> => {
     try {
       updateStagedFile(staged.id, { status: "uploading", progress: 20 });
 
@@ -286,38 +321,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       updateStagedFile(staged.id, { progress: 40 });
 
       const csrfToken = await ensureCsrfToken();
-      const formData = new FormData();
-      formData.append("file", staged.file);
-      formData.append("docType", staged.docType === 't12' ? 'pnl' : staged.docType);
-      formData.append("year", staged.docType === 't12' ? (staged.t12EndYear || staged.year) : staged.year);
-      formData.append("isT12", staged.docType === 't12' ? 'true' : 'false');
-      formData.append("dataGranularity", staged.dataGranularity);
-
-      if (staged.isMultiYear && staged.multiYears && staged.multiYears.length > 0) {
-        formData.append("isMultiYear", "true");
-        formData.append("multiYears", JSON.stringify(staged.multiYears));
-      }
-
-      if (staged.docType === 'rent_roll' && staged.rentRollSubType) {
-        formData.append("rentRollSubType", staged.rentRollSubType);
-      }
-
-      if (staged.docType === 't12') {
-        if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
-        if (staged.t12StartYear) formData.append('t12StartYear', staged.t12StartYear);
-        if (staged.t12EndMonth) formData.append('t12EndMonth', staged.t12EndMonth);
-        if (staged.t12EndYear) formData.append('t12EndYear', staged.t12EndYear);
-      }
-
-      if (staged.customTypeId) {
-        const customType = customTypes.find((ct) => ct.id.toString() === staged.customTypeId);
-        if (customType) {
-          formData.append("customTypeName", customType.name);
-          formData.append("customTypeId", staged.customTypeId);
-        }
-      } else if (staged.docType === "other" && staged.customTypeName.trim()) {
-        formData.append("customTypeName", staged.customTypeName.trim());
-      }
+      const formData = buildFormData(staged, allowOverwrite);
 
       const headers: Record<string, string> = {};
       if (csrfToken) {
@@ -332,6 +336,16 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
         headers,
         credentials: 'include',
       });
+
+      if (response.status === 409) {
+        const dupData = await response.json();
+        updateStagedFile(staged.id, { 
+          status: "duplicate", 
+          isDuplicate: true,
+          errorMessage: `Already uploaded as "${dupData.existingUploadName || staged.file.name}"`
+        });
+        return 'duplicate';
+      }
 
       if (!response.ok) {
         const error = await response.json();
@@ -364,11 +378,14 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
     let savedCount = 0;
     let errorCount = 0;
 
+    let duplicateCount = 0;
     for (let i = 0; i < pendingFiles.length; i++) {
       const staged = pendingFiles[i];
       setProcessingMessage(`Processing document ${i + 1} of ${pendingFiles.length}...`);
       const upload = await uploadSingleFile(staged);
-      if (upload) {
+      if (upload === 'duplicate') {
+        duplicateCount++;
+      } else if (upload) {
         onUploadComplete(upload);
         const resp = upload as any;
         if (resp.savedToDataRoom) {
@@ -409,6 +426,13 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       toast({ 
         title: "Upload complete", 
         description: parts.join(', ') + '.'
+      });
+    }
+    if (duplicateCount > 0) {
+      toast({ 
+        title: "Duplicates detected", 
+        description: `${duplicateCount} file${duplicateCount > 1 ? 's were' : ' was'} already uploaded. Use "Overwrite" to replace.`,
+        variant: "destructive"
       });
     }
     if (errorCount > 0) {
@@ -562,6 +586,8 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                 className={`p-3 rounded-lg border ${
                   staged.status === "complete"
                     ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                    : staged.status === "duplicate"
+                    ? "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
                     : staged.status === "error"
                     ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
                     : "border-border"
@@ -844,6 +870,32 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                   <Progress value={staged.progress} className="h-1.5 mt-2" />
                 )}
 
+                {staged.status === "duplicate" && staged.errorMessage && (
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">{staged.errorMessage}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] px-2 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900"
+                      onClick={async () => {
+                        updateStagedFile(staged.id, { status: 'uploading', isDuplicate: false, errorMessage: undefined, progress: 10 });
+                        try {
+                          const upload = await uploadSingleFile(staged, true);
+                          if (upload && upload !== 'duplicate') {
+                            onUploadComplete(upload);
+                            toast({ title: 'Overwritten', description: `${staged.file.name} replaced successfully.` });
+                          } else if (upload === 'duplicate') {
+                            updateStagedFile(staged.id, { status: 'duplicate', isDuplicate: true, errorMessage: `Could not overwrite. File may be processing.` });
+                          }
+                        } catch {
+                          updateStagedFile(staged.id, { status: 'duplicate', isDuplicate: true, errorMessage: `Overwrite failed. Try again later.` });
+                        }
+                      }}
+                    >
+                      Overwrite
+                    </Button>
+                  </div>
+                )}
                 {staged.status === "error" && staged.errorMessage && (
                   <p className="text-xs text-red-600 mt-1">{staged.errorMessage}</p>
                 )}

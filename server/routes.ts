@@ -23337,6 +23337,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         holdingTagsList = [...holdingTagsList, 'Multi-Year'];
       }
       
+      const allowOverwrite = req.body.allowOverwrite === 'true';
+      
       const result = await docIntelService.createUploadWithDuplicateCheck(
         orgId, 
         {
@@ -23360,8 +23362,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           periodMetadata: periodMetadata,
           rentRollSubType: rentRollSubType,
         },
-        checkProjectOnly
+        checkProjectOnly,
+        allowOverwrite
       );
+      
+      if (result.isDuplicate && !allowOverwrite) {
+        return res.status(409).json({
+          error: 'duplicate',
+          message: `This file has already been uploaded as "${result.originalUpload?.originalName || 'unknown'}"`,
+          existingUploadId: result.originalUpload?.id,
+          existingUploadName: result.originalUpload?.originalName,
+          existingUploadDate: result.originalUpload?.createdAt,
+        });
+      }
       
       const isPnlDoc = (req.body.docType === 'pnl');
       

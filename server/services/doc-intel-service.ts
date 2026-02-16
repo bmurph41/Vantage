@@ -461,8 +461,9 @@ class DocIntelService {
   async createUploadWithDuplicateCheck(
     orgId: string, 
     data: InsertDocIntelUpload & { storagePath: string },
-    checkProjectOnly: boolean = false
-  ): Promise<{ upload: DocIntelUpload; isDuplicate: boolean; originalUpload?: DocIntelUpload }> {
+    checkProjectOnly: boolean = false,
+    allowOverwrite: boolean = false
+  ): Promise<{ upload: DocIntelUpload; isDuplicate: boolean; overwritten: boolean; originalUpload?: DocIntelUpload }> {
     const hash = await this.computeFileHash(data.storagePath);
     const existingUpload = await this.findDuplicateByHash(
       orgId, 
@@ -471,19 +472,28 @@ class DocIntelService {
     );
 
     if (existingUpload) {
-      const [upload] = await db
-        .insert(docIntelUploads)
-        .values({ 
-          ...data, 
-          orgId,
-          hashSha256: hash,
-          isDuplicate: true,
-          duplicateOfId: existingUpload.id,
-          holdingStatus: 'staging',
-        })
-        .returning();
+      if (allowOverwrite) {
+        if (existingUpload.status === 'processing') {
+          console.log(`[DocIntel] Cannot overwrite upload ${existingUpload.id} - currently processing`);
+          return { upload: existingUpload, isDuplicate: true, overwritten: false, originalUpload: existingUpload };
+        }
+        console.log(`[DocIntel] Overwriting duplicate upload ${existingUpload.id} (${existingUpload.originalName})`);
+        await db.delete(docIntelExtractedItems).where(eq(docIntelExtractedItems.uploadId, existingUpload.id));
+        await db.delete(docIntelUploads).where(eq(docIntelUploads.id, existingUpload.id));
+        
+        const [upload] = await db
+          .insert(docIntelUploads)
+          .values({ ...data, orgId, hashSha256: hash })
+          .returning();
+        return { upload, isDuplicate: false, overwritten: true };
+      }
       
-      return { upload, isDuplicate: true, originalUpload: existingUpload };
+      return { 
+        upload: existingUpload, 
+        isDuplicate: true, 
+        overwritten: false,
+        originalUpload: existingUpload 
+      };
     }
 
     const [upload] = await db
@@ -491,7 +501,7 @@ class DocIntelService {
       .values({ ...data, orgId, hashSha256: hash })
       .returning();
     
-    return { upload, isDuplicate: false };
+    return { upload, isDuplicate: false, overwritten: false };
   }
 
   async getUpload(orgId: string, uploadId: string): Promise<DocIntelUpload | null> {
@@ -983,6 +993,14 @@ class DocIntelService {
     await this.updateUpload(orgId, uploadId, { status: 'processing' });
 
     try {
+      const existingItems = await db.select({ id: docIntelExtractedItems.id })
+        .from(docIntelExtractedItems)
+        .where(eq(docIntelExtractedItems.uploadId, uploadId));
+      if (existingItems.length > 0) {
+        console.log(`[DocIntelService] Clearing ${existingItems.length} existing extracted items for upload ${uploadId} before re-parsing`);
+        await db.delete(docIntelExtractedItems).where(eq(docIntelExtractedItems.uploadId, uploadId));
+      }
+
       let parsedItems: ParsedLineItem[] = [];
       let usedOcrFallback = false;
       
