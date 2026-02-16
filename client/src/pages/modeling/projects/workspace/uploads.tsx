@@ -123,7 +123,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     enabled: !!projectId,
   });
 
-  const hasProcessingUploads = uploads.some(u => u.status === "processing" || u.status === "uploaded");
+  const hasProcessingUploads = uploads.some(u => (u.status === "processing" || u.status === "uploaded") && u.docType === "pnl");
   useEffect(() => {
     if (!hasProcessingUploads) return;
     const interval = setInterval(() => {
@@ -133,12 +133,14 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   }, [hasProcessingUploads, processingMessages.length]);
   
   useEffect(() => {
-    const readyUpload = uploads.find(u => 
-      u.status === 'reviewing' || u.status === 'parsed'
-    );
-    if (readyUpload) {
+    const pnlUploads = uploads.filter(u => u.docType === 'pnl');
+    const readyPnls = pnlUploads.filter(u => u.status === 'reviewing' || u.status === 'parsed');
+    const stillProcessing = pnlUploads.filter(u => u.status === 'uploaded' || u.status === 'processing');
+    
+    if (readyPnls.length > 0 && stillProcessing.length === 0) {
+      const uploadIds = readyPnls.map(u => u.id).join(',');
       const timer = setTimeout(() => {
-        navigate(`/modeling/projects/${projectId}/doc-intel?upload=${readyUpload.id}`);
+        navigate(`/modeling/projects/${projectId}/doc-intel?upload=${uploadIds}`);
       }, 1500);
       return () => clearTimeout(timer);
     }

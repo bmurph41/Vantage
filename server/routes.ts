@@ -23363,31 +23363,98 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         checkProjectOnly
       );
       
-      res.status(201).json({
-        ...result.upload,
-        isDuplicate: result.isDuplicate,
-        originalUpload: result.originalUpload ? {
-          id: result.originalUpload.id,
-          originalName: result.originalUpload.originalName,
-          createdAt: result.originalUpload.createdAt,
-        } : null,
-      });
+      const isPnlDoc = (req.body.docType === 'pnl');
       
-      // Trigger AI parsing in background (non-blocking)
-      setImmediate(async () => {
+      if (isPnlDoc) {
+        res.status(201).json({
+          ...result.upload,
+          isDuplicate: result.isDuplicate,
+          savedToDataRoom: false,
+          originalUpload: result.originalUpload ? {
+            id: result.originalUpload.id,
+            originalName: result.originalUpload.originalName,
+            createdAt: result.originalUpload.createdAt,
+          } : null,
+        });
+        
+        setImmediate(async () => {
+          try {
+            console.log(`[DocIntel] Starting automatic AI parsing for upload ${result.upload.id}`);
+            await docIntelService.parseAndExtract(orgId, result.upload.id);
+            console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
+            await docIntelService.categorizeItems(orgId, result.upload.id);
+            console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
+            await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
+          } catch (parseError: any) {
+            console.error(`[DocIntel] Background parsing failed for upload ${result.upload.id}:`, parseError.message);
+          }
+        });
+      } else {
+        let savedToVdr = false;
         try {
-          console.log(`[DocIntel] Starting automatic AI parsing for upload ${result.upload.id}`);
-          await docIntelService.parseAndExtract(orgId, result.upload.id);
-          console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
-          await docIntelService.categorizeItems(orgId, result.upload.id);
-          console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
-          // Update to reviewing status so user can see it is ready
-          await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
-        } catch (parseError: any) {
-          console.error(`[DocIntel] Background parsing failed for upload ${result.upload.id}:`, parseError.message);
-          // Error status is already set by parseAndExtract on failure
+          const ddProjectId = project.ddProjectId;
+          if (ddProjectId) {
+            const { vdrFolders, vdrDocuments: vdrDocsTable } = await import('@shared/schema');
+            const docTypeLabel = req.body.docType === 'rent_roll' ? 'Rent Rolls'
+              : req.body.docType === 'balance_sheet' ? 'Balance Sheets'
+              : req.body.docType === 'rate_sheet' ? 'Rate Sheets'
+              : req.body.docType === 'invoice' ? 'Invoices'
+              : 'Other Documents';
+            const folderPath = `/Financial Documents/${docTypeLabel}`;
+            
+            let [parentFolder] = await db.select().from(vdrFolders)
+              .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, 'Financial Documents')))
+              .limit(1);
+            if (!parentFolder) {
+              [parentFolder] = await db.insert(vdrFolders).values({
+                projectId: ddProjectId, orgId, name: 'Financial Documents', path: '/Financial Documents',
+                createdBy: userId,
+              }).returning();
+            }
+            
+            let [targetFolder] = await db.select().from(vdrFolders)
+              .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, docTypeLabel), eq(vdrFolders.parentFolderId, parentFolder.id)))
+              .limit(1);
+            if (!targetFolder) {
+              [targetFolder] = await db.insert(vdrFolders).values({
+                projectId: ddProjectId, orgId, name: docTypeLabel, path: folderPath,
+                parentFolderId: parentFolder.id, createdBy: userId,
+              }).returning();
+            }
+            
+            const fileBuffer = await fs.readFile(req.file.path);
+            const hashHex = require('crypto').createHash('sha256').update(fileBuffer).digest('hex');
+            
+            await db.insert(vdrDocsTable).values({
+              folderId: targetFolder.id, projectId: ddProjectId, orgId,
+              filename: displayName, originalFilename: req.file.originalname,
+              mimeType: req.file.mimetype, size: req.file.size,
+              checksum: hashHex, storagePath: req.file.path,
+              uploadedBy: userId,
+              aiCategory: docTypeLabel,
+              tags: [req.body.docType],
+            });
+            savedToVdr = true;
+            console.log(`[DocIntel] Non-P&L document ${result.upload.id} saved to VDR folder: ${folderPath}`);
+          }
+        } catch (vdrError: any) {
+          console.error(`[DocIntel] Failed to save to VDR for upload ${result.upload.id}:`, vdrError.message);
         }
-      });
+        
+        await docIntelService.updateUpload(orgId, result.upload.id, { status: 'completed' });
+        
+        res.status(201).json({
+          ...result.upload,
+          status: 'completed',
+          isDuplicate: result.isDuplicate,
+          savedToDataRoom: savedToVdr,
+          originalUpload: result.originalUpload ? {
+            id: result.originalUpload.id,
+            originalName: result.originalUpload.originalName,
+            createdAt: result.originalUpload.createdAt,
+          } : null,
+        });
+      }
     } catch (error: any) {
       console.error('Failed to upload document:', error);
       res.status(500).json({ error: 'Failed to upload document', details: error?.message });

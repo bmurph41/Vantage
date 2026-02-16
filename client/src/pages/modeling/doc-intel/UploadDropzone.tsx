@@ -359,7 +359,9 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
 
     setIsUploading(true);
     setProcessingMessage("Uploading documents...");
-    let successCount = 0;
+    let pnlCount = 0;
+    let dataRoomCount = 0;
+    let savedCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < pendingFiles.length; i++) {
@@ -368,15 +370,21 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       const upload = await uploadSingleFile(staged);
       if (upload) {
         onUploadComplete(upload);
-        successCount++;
+        const resp = upload as any;
+        if (resp.savedToDataRoom) {
+          dataRoomCount++;
+        } else if (resp.status === 'completed') {
+          savedCount++;
+        } else {
+          pnlCount++;
+        }
       } else {
         errorCount++;
       }
     }
 
-    if (successCount > 0) {
-      setProcessingMessage("Queued for AI processing...");
-      // Brief delay to show the queued message
+    if (pnlCount > 0) {
+      setProcessingMessage("P&L documents queued for AI processing...");
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
@@ -387,10 +395,20 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       setStagedFiles((prev) => prev.filter((f) => f.status !== "complete"));
     }, 2000);
 
-    if (successCount > 0) {
+    const parts: string[] = [];
+    if (pnlCount > 0) {
+      parts.push(`${pnlCount} P&L${pnlCount > 1 ? 's' : ''} queued for AI review`);
+    }
+    if (dataRoomCount > 0) {
+      parts.push(`${dataRoomCount} document${dataRoomCount > 1 ? 's' : ''} saved to Data Room`);
+    }
+    if (savedCount > 0) {
+      parts.push(`${savedCount} document${savedCount > 1 ? 's' : ''} saved`);
+    }
+    if (parts.length > 0) {
       toast({ 
         title: "Upload complete", 
-        description: `${successCount} document${successCount > 1 ? 's' : ''} uploaded and queued for AI processing.` 
+        description: parts.join(', ') + '.'
       });
     }
     if (errorCount > 0) {
