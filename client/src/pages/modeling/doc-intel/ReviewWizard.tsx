@@ -213,6 +213,56 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
     },
   });
 
+  const bulkExcludeMutation = useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      return apiRequest("PATCH", `/api/doc-intel/uploads/${upload.id}/items/bulk`, {
+        itemIds,
+        updates: { status: "excluded" },
+      });
+    },
+    onSuccess: (_, variables) => {
+      refetchItems();
+      setSelectedItems(new Set());
+      toast({ title: "Excluded", description: `${variables.length} items excluded from import.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to exclude items.", variant: "destructive" });
+    },
+  });
+
+  const handleBulkExcludeSelected = () => {
+    const ids = Array.from(selectedItems);
+    if (ids.length === 0) return;
+    bulkExcludeMutation.mutate(ids);
+  };
+
+  const handleExcludeAllFiltered = () => {
+    const ids = filteredItems
+      .filter(i => i.status === "pending" || i.status === "needs_review")
+      .map(i => i.id);
+    if (ids.length === 0) return;
+    bulkExcludeMutation.mutate(ids);
+  };
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const selectableIds = filteredItems.filter(i => i.status !== "excluded").map(i => i.id);
+    const allSelected = selectableIds.every(id => selectedItems.has(id));
+    if (allSelected) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(selectableIds));
+    }
+  };
+
   const autoConfirmMutation = useMutation({
     mutationFn: async (threshold: number) => {
       return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${upload.id}/items/confirm-high-confidence`, { threshold });
@@ -681,6 +731,49 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
               )}
             </div>
 
+            {selectedItems.size > 0 && viewMode !== 'spreadsheet' && (
+              <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <Checkbox
+                  checked={filteredItems.filter(i => i.status !== "excluded").every(i => selectedItems.has(i.id)) && filteredItems.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span className="text-sm font-medium">{selectedItems.size} selected</span>
+                <Separator orientation="vertical" className="h-5" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
+                  onClick={handleBulkExcludeSelected}
+                  disabled={bulkExcludeMutation.isPending}
+                >
+                  <MinusCircle className="h-4 w-4 mr-1" />
+                  Exclude Selected ({selectedItems.size})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedItems(new Set())}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            )}
+
+            {viewMode !== 'spreadsheet' && selectedItems.size === 0 && (
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
+                  onClick={handleExcludeAllFiltered}
+                  disabled={bulkExcludeMutation.isPending || filteredItems.filter(i => i.status === "pending" || i.status === "needs_review").length === 0}
+                >
+                  <MinusCircle className="h-4 w-4 mr-1" />
+                  Exclude All Pending ({filteredItems.filter(i => i.status === "pending" || i.status === "needs_review").length})
+                </Button>
+              </div>
+            )}
+
             <div className="flex items-center gap-4 text-xs text-muted-foreground border-b pb-2">
               <span className="font-medium">Confidence:</span>
               <div className="flex items-center gap-1">
@@ -821,6 +914,12 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                   <table className="w-full">
                     <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
+                        <th className="p-3 w-10 bg-muted/50">
+                          <Checkbox
+                            checked={filteredItems.filter(i => i.status !== "excluded").length > 0 && filteredItems.filter(i => i.status !== "excluded").every(i => selectedItems.has(i.id))}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </th>
                         <th className="text-left p-3 font-medium text-sm bg-muted/50">Status</th>
                         <th className="text-left p-3 font-medium text-sm bg-muted/50">Category</th>
                         <th className="text-left p-3 font-medium text-sm bg-muted/50">Department</th>
@@ -833,13 +932,13 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                     <tbody>
                       {itemsLoading ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-8">
+                          <td colSpan={8} className="text-center py-8">
                             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
                           </td>
                         </tr>
                       ) : filteredItems.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={8} className="text-center py-8 text-muted-foreground">
                             No items match your filter criteria
                           </td>
                         </tr>
@@ -855,6 +954,13 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                           }`}
                           data-testid={`table-row-${item.id}`}
                         >
+                          <td className="p-3">
+                            <Checkbox
+                              checked={selectedItems.has(item.id)}
+                              onCheckedChange={() => toggleSelectItem(item.id)}
+                              disabled={item.status === "excluded"}
+                            />
+                          </td>
                           <td className="p-3">
                             {item.status === "pending" && (
                               <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-100 text-xs">
@@ -961,6 +1067,13 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                       data-testid={`item-row-${item.id}`}
                     >
                       <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <Checkbox
+                            checked={selectedItems.has(item.id)}
+                            onCheckedChange={() => toggleSelectItem(item.id)}
+                            disabled={item.status === "excluded"}
+                            className="mt-1"
+                          />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{sanitizeDisplayText(item.rawText)}</p>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -974,6 +1087,7 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                               </Badge>
                             )}
                           </div>
+                        </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {getConfidenceBadge(item.confidenceScore)}
