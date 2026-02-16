@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -327,11 +328,126 @@ export default function OwnedMarinas() {
               <CardDescription>Financial performance trends across your portfolio</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">Performance analytics coming soon</p>
-                <p>Track revenue, occupancy, and valuation trends over time</p>
-              </div>
+              {(!marinas || marinas.length === 0) ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">No marina data available</p>
+                  <p>Add marinas to your portfolio to see performance analytics</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {(() => {
+                    const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                    const revenueData = marinas.map(m => ({ name: m.name, revenue: m.annualRevenue || 0 }));
+                    const marginData = marinas.map(m => ({ name: m.name, margin: m.annualRevenue ? ((m.annualEbitda || 0) / m.annualRevenue) * 100 : 0 }));
+                    const occupancyData = marinas.map(m => ({ name: m.name, occupancy: m.occupancy || 0 }));
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base">Revenue by Marina</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={revenueData}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={60} />
+                                  <YAxis tickFormatter={(v: number) => formatCurrency(v)} tick={{ fontSize: 11 }} />
+                                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                                  <Bar dataKey="revenue" name="Annual Revenue">
+                                    {revenueData.map((_, i) => (
+                                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base">EBITDA Margin by Marina</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <ResponsiveContainer width="100%" height={280}>
+                                <BarChart data={marginData}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="name" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={60} />
+                                  <YAxis tickFormatter={(v: number) => `${v.toFixed(0)}%`} tick={{ fontSize: 11 }} />
+                                  <Tooltip formatter={(v: number) => formatPercent(v)} />
+                                  <Bar dataKey="margin" name="EBITDA Margin %">
+                                    {marginData.map((_, i) => (
+                                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </CardContent>
+                          </Card>
+                        </div>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Occupancy by Marina</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ResponsiveContainer width="100%" height={280}>
+                              <BarChart data={occupancyData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                <YAxis tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11 }} domain={[0, 100]} />
+                                <Tooltip formatter={(v: number) => formatPercent(v)} />
+                                <Bar dataKey="occupancy" name="Occupancy %">
+                                  {occupancyData.map((_, i) => (
+                                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Value Appreciation</CardTitle>
+                            <CardDescription>Acquisition price vs current value</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {marinas.map((m, i) => {
+                                const acquisition = m.acquisitionPrice || 0;
+                                const current = m.currentValue || acquisition;
+                                const appreciation = acquisition > 0 ? ((current - acquisition) / acquisition) * 100 : 0;
+                                return (
+                                  <div key={m.id} className="p-4 border rounded-lg">
+                                    <div className="font-medium mb-2">{m.name}</div>
+                                    <div className="flex justify-between text-sm mb-1">
+                                      <span className="text-muted-foreground">Acquisition</span>
+                                      <span>{formatCurrency(acquisition)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm mb-1">
+                                      <span className="text-muted-foreground">Current Value</span>
+                                      <span className="font-medium">{formatCurrency(current)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-muted-foreground">Appreciation</span>
+                                      <span className={appreciation >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                        {appreciation >= 0 ? '+' : ''}{formatPercent(appreciation)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

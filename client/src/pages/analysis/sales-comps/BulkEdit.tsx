@@ -44,7 +44,7 @@ export default function BulkEdit({ selectedIds, onClose }: BulkEditProps) {
     setUpdates((prev: any) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const filteredUpdates: any = {};
     fieldsToUpdate.forEach(field => {
       if (updates[field] !== undefined) {
@@ -62,9 +62,30 @@ export default function BulkEdit({ selectedIds, onClose }: BulkEditProps) {
     }
 
     toast({
-      title: "Coming Soon",
-      description: "Bulk editing will be available in a future update.",
+      title: "Saving Changes...",
+      description: `Updating ${selectedIds.length} selected records...`,
     });
+
+    try {
+      const response = await fetch("/api/salescomps/bulk-update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, updates: filteredUpdates }),
+      });
+      if (!response.ok) throw new Error("Failed to update records");
+      toast({
+        title: "Changes Saved",
+        description: `Successfully updated ${selectedIds.length} records.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/salescomps"] });
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save changes. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const fields = [

@@ -286,7 +286,7 @@ export default function IntegrationDetail() {
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Setup guide coming soon for this integration.</p>
+                <p>Follow the integration provider's documentation to complete setup. Configuration details will appear here once connected.</p>
               </CardContent>
             </Card>
           )}
@@ -409,7 +409,7 @@ export default function IntegrationDetail() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Database className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Data mapping details coming soon.</p>
+                  <p>Data mapping configuration will be available once the integration is connected and syncing.</p>
                 </div>
               )}
             </CardContent>
@@ -537,7 +537,7 @@ export default function IntegrationDetail() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <RefreshCw className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Migration planning details coming soon.</p>
+                  <p>Migration planning tools will be available once data sources are configured.</p>
                 </div>
               )}
             </CardContent>

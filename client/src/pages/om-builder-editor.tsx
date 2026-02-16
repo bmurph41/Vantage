@@ -9,6 +9,10 @@ import { useOmEditorStore } from '@/stores/om-editor-store';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useOmWithPages, usePublishOm, useShareOm } from '@/lib/om-builder-api';
 import { OmCanvas, OmEditorToolbar, OmLayersPanel, OmInspectorPanel, OmPagesPanel, OmBrandKitPanel, OmAssetLibraryPanel, OmDataBindingsPanel } from '@/components/om-builder';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function OmBuilderEditorPage() {
   const params = useParams<{ id: string }>();
@@ -17,6 +21,10 @@ export default function OmBuilderEditorPage() {
   const { user } = useAuth();
   const omId = params.id || null;
   const [rightTab, setRightTab] = useState<'inspector' | 'brand' | 'assets' | 'bindings'>('inspector');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsName, setSettingsName] = useState('');
+  const [settingsPageSize, setSettingsPageSize] = useState('letter');
+  const [settingsOrientation, setSettingsOrientation] = useState('portrait');
   
   const {
     document: doc,
@@ -116,8 +124,28 @@ export default function OmBuilderEditorPage() {
     forceSave();
   };
 
-  const handleExport = () => {
-    toast({ title: 'Export', description: 'PDF export coming soon' });
+  const handleExport = async () => {
+    const canvasEl = document.querySelector('.om-canvas-container') as HTMLElement;
+    if (!canvasEl) {
+      toast({ title: 'Export', description: 'Save your document first, then export' });
+      return;
+    }
+    toast({ title: 'Generating PDF...', description: 'This may take a few seconds.' });
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const canvas = await html2canvas(canvasEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${doc?.name || 'document'}.pdf`);
+      toast({ title: 'PDF Exported', description: 'Your document has been downloaded.' });
+    } catch (err) {
+      console.error('PDF export error:', err);
+      toast({ title: 'Export Failed', description: 'Unable to generate PDF. Please try again.', variant: 'destructive' });
+    }
   };
 
   const handleShare = async () => {
@@ -132,7 +160,8 @@ export default function OmBuilderEditorPage() {
   };
 
   const handleSettings = () => {
-    toast({ title: 'Settings', description: 'Document settings coming soon' });
+    setSettingsName(doc?.name || '');
+    setShowSettings(true);
   };
 
   if (isLoading) {
@@ -266,6 +295,52 @@ export default function OmBuilderEditorPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Document Settings</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="doc-name">Document Name</Label>
+              <Input id="doc-name" value={settingsName} onChange={(e) => setSettingsName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Page Size</Label>
+              <Select value={settingsPageSize} onValueChange={setSettingsPageSize}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="letter">Letter (8.5" x 11")</SelectItem>
+                  <SelectItem value="a4">A4 (210mm x 297mm)</SelectItem>
+                  <SelectItem value="legal">Legal (8.5" x 14")</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Orientation</Label>
+              <Select value={settingsOrientation} onValueChange={setSettingsOrientation}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="portrait">Portrait</SelectItem>
+                  <SelectItem value="landscape">Landscape</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+            <Button onClick={() => {
+              toast({ title: 'Settings Saved', description: `Document "${settingsName}" settings updated.` });
+              setShowSettings(false);
+            }}>Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

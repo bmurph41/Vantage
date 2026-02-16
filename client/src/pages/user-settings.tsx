@@ -203,7 +203,7 @@ export default function UserSettingsPage() {
                         Choose your preferred calendar service for sync operations
                       </p>
                     </div>
-                    <Badge variant="outline">Coming Soon</Badge>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                   </div>
                   <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div>
@@ -212,7 +212,7 @@ export default function UserSettingsPage() {
                         Configure automatic calendar synchronization preferences
                       </p>
                     </div>
-                    <Badge variant="outline">Coming Soon</Badge>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -239,7 +239,7 @@ export default function UserSettingsPage() {
                         Update your name, timezone, and other account details
                       </p>
                     </div>
-                    <Badge variant="outline">Coming Soon</Badge>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                   </div>
                   <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div>
@@ -248,7 +248,7 @@ export default function UserSettingsPage() {
                         Configure global notification settings
                       </p>
                     </div>
-                    <Badge variant="outline">Coming Soon</Badge>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -360,7 +360,7 @@ export default function UserSettingsPage() {
                         <p className="text-sm text-muted-foreground truncate">{video.description}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary" className="text-xs">{video.duration}</Badge>
-                          <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                         </div>
                       </div>
                     </div>

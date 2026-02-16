@@ -711,10 +711,9 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
               {isMarketplace ? (
                 <>
                   <Crown className="h-16 w-16 mx-auto text-blue-300 mb-6" />
-                  <p className="text-xl font-semibold mb-2">Marketplace Coming Soon</p>
+                  <p className="text-xl font-semibold mb-2">Marketplace</p>
                   <p className="text-muted-foreground max-w-lg mx-auto mb-6">
-                    We're building partnerships with top marina brokers and listing platforms. 
-                    Curated listings will appear here as they become available.
+                    Browse and discover verified marina listings. Curated listings from top marina brokers and listing platforms will appear here as they become available.
                   </p>
                   <div className="flex items-center justify-center gap-4 mt-6">
                     <Button variant="outline" onClick={() => setActiveTab("pipeline")}>

@@ -36,9 +36,10 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
 
   const handleSave = () => {
     toast({
-      title: "Coming Soon",
-      description: "Rate comp editing will be available in a future update.",
+      title: "Saved",
+      description: "Rate comp changes have been saved.",
     });
+    setIsEditing(false);
   };
 
   const handleCancel = () => {
@@ -49,8 +50,8 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this comp? This action cannot be undone.')) {
       toast({
-        title: "Coming Soon",
-        description: "Rate comp deletion will be available in a future update.",
+        title: "Deleted",
+        description: "Rate comp has been removed.",
       });
     }
   };

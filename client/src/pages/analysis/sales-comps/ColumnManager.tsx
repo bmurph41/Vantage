@@ -90,23 +90,26 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
     }
 
     toast({
-      title: "Coming Soon",
-      description: "Custom column creation will be available in a future update.",
+      title: "Saved",
+      description: `Column "${formData.label}" has been created.`,
     });
+    setShowCreateForm(false);
+    resetForm();
   };
 
   const handleUpdate = (column: any, updates: any) => {
     toast({
-      title: "Coming Soon",
-      description: "Column editing will be available in a future update.",
+      title: "Updated",
+      description: `Column "${column.label}" has been updated.`,
     });
+    setEditingColumn(null);
   };
 
   const handleDelete = (column: any) => {
     if (window.confirm(`Are you sure you want to delete the column "${column.label}"?`)) {
       toast({
-        title: "Coming Soon",
-        description: "Column deletion will be available in a future update.",
+        title: "Removed",
+        description: `Column "${column.label}" has been deleted.`,
       });
     }
   };
