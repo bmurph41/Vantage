@@ -49,6 +49,8 @@ interface StagedFile {
   customTypeId: string | null;
   customTypeName: string;
   year: string;
+  isMultiYear?: boolean;
+  multiYears?: string[];
   dataGranularity: DataGranularity;
   t12StartMonth?: string;
   t12StartYear?: string;
@@ -215,6 +217,11 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       formData.append("year", staged.docType === 't12' ? (staged.t12EndYear || staged.year) : staged.year);
       formData.append("isT12", staged.docType === 't12' ? 'true' : 'false');
       formData.append("dataGranularity", staged.dataGranularity);
+
+      if (staged.isMultiYear && staged.multiYears && staged.multiYears.length > 0) {
+        formData.append("isMultiYear", "true");
+        formData.append("multiYears", JSON.stringify(staged.multiYears));
+      }
 
       if (staged.docType === 't12') {
         if (staged.t12StartMonth) formData.append('t12StartMonth', staged.t12StartMonth);
@@ -539,7 +546,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                       <div>
                         <Label className="text-xs">Year</Label>
                         <Select
-                          value={staged.docType === 't12' ? 'T12' : staged.year}
+                          value={staged.isMultiYear ? 'MULTI' : staged.docType === 't12' ? 'T12' : staged.year}
                           onValueChange={(v) => {
                             if (v === 'T12') {
                               const now = new Date();
@@ -549,25 +556,43 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                               const startYear = (now.getFullYear() - 1).toString();
                               updateStagedFile(staged.id, {
                                 docType: 't12' as DocTypeEnum,
+                                isMultiYear: false,
+                                multiYears: undefined,
                                 t12StartMonth: staged.t12StartMonth || startMonth,
                                 t12StartYear: staged.t12StartYear || startYear,
                                 t12EndMonth: staged.t12EndMonth || endMonth,
                                 t12EndYear: staged.t12EndYear || endYear,
                               });
+                            } else if (v === 'MULTI') {
+                              const now = new Date();
+                              const defaultYears = [now.getFullYear().toString(), (now.getFullYear() - 1).toString()];
+                              updateStagedFile(staged.id, {
+                                isMultiYear: true,
+                                multiYears: defaultYears,
+                                year: now.getFullYear().toString(),
+                                ...(staged.docType === 't12' ? { docType: 'pnl' as DocTypeEnum } : {}),
+                              });
                             } else {
                               if (staged.docType === 't12') {
-                                updateStagedFile(staged.id, { docType: 'pnl' as DocTypeEnum, year: v });
+                                updateStagedFile(staged.id, { docType: 'pnl' as DocTypeEnum, year: v, isMultiYear: false, multiYears: undefined });
                               } else {
-                                updateStagedFile(staged.id, { year: v });
+                                updateStagedFile(staged.id, { year: v, isMultiYear: false, multiYears: undefined });
                               }
                             }
                           }}
                         >
                           <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
+                            <SelectValue>
+                              {staged.isMultiYear
+                                ? `Multi (${staged.multiYears?.length || 0})`
+                                : staged.docType === 't12'
+                                  ? 'T12'
+                                  : staged.year}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="T12">T12</SelectItem>
+                            <SelectItem value="MULTI">Multiple Years</SelectItem>
                             {yearOptions.map((y) => (
                               <SelectItem key={y} value={y}>
                                 {y}
@@ -592,7 +617,42 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                         </Select>
                       </div>
                     </div>
-                    {staged.docType === 't12' && (
+                    {staged.isMultiYear && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Select years in this document:</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {yearOptions.map((y) => {
+                            const isSelected = staged.multiYears?.includes(y) ?? false;
+                            return (
+                              <button
+                                key={y}
+                                type="button"
+                                className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'bg-background border-border hover:border-primary/50 hover:bg-muted/50'
+                                }`}
+                                onClick={() => {
+                                  const current = staged.multiYears || [];
+                                  const updated = isSelected
+                                    ? current.filter((yr) => yr !== y)
+                                    : [...current, y].sort((a, b) => parseInt(b) - parseInt(a));
+                                  updateStagedFile(staged.id, { multiYears: updated });
+                                }}
+                              >
+                                {y}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(staged.multiYears?.length ?? 0) > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {staged.multiYears!.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {staged.docType === 't12' && !staged.isMultiYear && (
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <span className="text-muted-foreground font-medium">From:</span>
                         <Select value={staged.t12StartMonth || '1'} onValueChange={(v) => updateStagedFile(staged.id, { t12StartMonth: v })}>

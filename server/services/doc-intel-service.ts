@@ -538,7 +538,7 @@ class DocIntelService {
     return true;
   }
 
-  async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number): Promise<ParsedLineItem[]> {
+  async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number, multiYears?: number[]): Promise<ParsedLineItem[]> {
     const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer);
     const items: ParsedLineItem[] = [];
@@ -556,8 +556,12 @@ class DocIntelService {
       if (isAnnual) {
         console.log(`[DocIntelService] Annualized data mode - skipping month header detection, treating values as annual totals for ${yearForPeriod}`);
       }
+      
+      if (multiYears && multiYears.length > 0) {
+        console.log(`[DocIntelService] Multi-year mode: looking for data from years ${multiYears.join(', ')}`);
+      }
 
-      const monthHeaders = isAnnual ? [] : this.detectMonthHeaders(jsonData);
+      const monthHeaders = isAnnual ? [] : this.detectMonthHeaders(jsonData, multiYears);
       const isMultiColumnPnl = monthHeaders.length >= 3;
       let headerRowIndex = -1;
 
@@ -652,7 +656,7 @@ class DocIntelService {
     return items;
   }
 
-  private detectMonthHeaders(jsonData: any[][]): MonthHeader[] {
+  private detectMonthHeaders(jsonData: any[][], multiYears?: number[]): MonthHeader[] {
     const headers: MonthHeader[] = [];
     
     // Scan entire document for month headers (up to first 100 rows to handle any header position)
@@ -664,7 +668,9 @@ class DocIntelService {
       if (!row) continue;
       
       const rowHeaders: MonthHeader[] = [];
-      let defaultYear = new Date().getFullYear();
+      let defaultYear = multiYears && multiYears.length > 0 
+        ? Math.max(...multiYears) 
+        : new Date().getFullYear();
       
       // Log first few rows for debugging
       if (rowIdx < 5) {
@@ -701,6 +707,25 @@ class DocIntelService {
           continue;
         }
         
+        // Multi-year: detect standalone year columns (e.g., "2023", "2024", "FY2024")
+        if (multiYears && multiYears.length > 0) {
+          const yearMatch = cellStr.match(/^(?:fy\s*)?(\d{4})$/);
+          if (yearMatch) {
+            const yearNum = parseInt(yearMatch[1]);
+            if (multiYears.includes(yearNum)) {
+              rowHeaders.push({
+                columnIndex: colIdx,
+                month: 0, // 0 = annual column
+                year: yearNum,
+                periodKey: `${yearNum}-ANNUAL`,
+                rawLabel: String(cell).trim(),
+              });
+              defaultYear = yearNum;
+              continue;
+            }
+          }
+        }
+        
         const monthHeader = this.parseMonthHeader(cellStr, colIdx, defaultYear);
         if (monthHeader) {
           rowHeaders.push(monthHeader);
@@ -710,8 +735,24 @@ class DocIntelService {
         }
       }
       
-      // Accept if we found at least 3 consecutive month-like headers
-      if (rowHeaders.length >= 3) {
+      // Separate annual vs monthly headers to avoid mixing
+      const annualHeaders = rowHeaders.filter(h => h.month === 0);
+      const monthlyHeaders = rowHeaders.filter(h => h.month > 0);
+      
+      // If we have annual-only columns from multi-year detection, use only those
+      // Require all user-specified years to be present to avoid false positives
+      if (multiYears && multiYears.length > 0 && annualHeaders.length >= 2 && annualHeaders.length >= multiYears.length) {
+        const detectedYears = annualHeaders.map(h => h.year);
+        const allYearsFound = multiYears.every(y => detectedYears.includes(y));
+        if (allYearsFound) {
+          console.log(`[DocIntelService] Found ${annualHeaders.length} annual year headers in row ${rowIdx + 1}:`, 
+            annualHeaders.map(h => `${h.periodKey} (col ${h.columnIndex})`).join(', '));
+          return annualHeaders;
+        }
+      }
+      
+      // Standard monthly header detection: require at least 3
+      if (monthlyHeaders.length >= 3) {
         console.log(`[DocIntelService] Found ${rowHeaders.length} month headers in row ${rowIdx + 1}:`, 
           rowHeaders.map(h => `${h.periodKey} (col ${h.columnIndex})`).join(', '));
         return rowHeaders;
@@ -948,6 +989,12 @@ class DocIntelService {
       const isPdf = upload.mimeType === 'application/pdf';
       const granularity = upload.dataGranularity || 'monthly';
       const fiscalYear = upload.year || new Date().getFullYear();
+      const isMultiYear = upload.isMultiYear === true;
+      const multiYears = (upload.multiYears as number[] | null) || null;
+      
+      if (isMultiYear && multiYears) {
+        console.log(`[DocIntelService] Multi-year document detected. Years: ${multiYears.join(', ')}`);
+      }
       
       if (isPdf) {
         console.log(`[DocIntelService] Processing PDF file: ${upload.originalName} (granularity: ${granularity})`);
@@ -960,13 +1007,20 @@ class DocIntelService {
         
         parsedItems = this.parsePdfOcrResult(ocrResult);
         if (granularity === 'annual') {
-          parsedItems = parsedItems.map(item => ({
-            ...item,
-            periodKey: `${fiscalYear}-ANNUAL`,
-          }));
+          if (isMultiYear && multiYears && multiYears.length > 0) {
+            parsedItems = parsedItems.map(item => ({
+              ...item,
+              periodKey: item.periodKey || `${Math.max(...multiYears)}-ANNUAL`,
+            }));
+          } else {
+            parsedItems = parsedItems.map(item => ({
+              ...item,
+              periodKey: `${fiscalYear}-ANNUAL`,
+            }));
+          }
         }
       } else {
-        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear);
+        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear, multiYears || undefined);
       }
       
       const extractedItems: DocIntelExtractedItem[] = [];
@@ -1145,7 +1199,29 @@ class DocIntelService {
       const amountNum = parseFloat(item.amount || '0');
       const itemHasValue = !isNaN(amountNum) && amountNum !== 0;
       
-      // Check exclusion rules with has_value context
+      // Check built-in subtotal/summary exclusion patterns first
+      const builtInExclusion = this.findBuiltInExclusionMatch(item.rawText);
+      if (builtInExclusion) {
+        const [updated] = await db
+          .update(docIntelExtractedItems)
+          .set({
+            status: 'excluded',
+            reviewNotes: `Auto-excluded: ${builtInExclusion.reason}`,
+            confidenceScore: builtInExclusion.confidence.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(docIntelExtractedItems.id, item.id))
+          .returning();
+        
+        categorizedItems.push(updated);
+
+        // Train AI: create global learning rule for this exclusion pattern
+        this.createLearningRuleFromExclusion(orgId, item.rawText, builtInExclusion.reason, itemHasValue).catch(() => {});
+        
+        continue;
+      }
+
+      // Check learned exclusion rules with has_value context
       const exclusionMatch = this.findExclusionMatch(item.rawText, itemHasValue, exclusionRules);
       if (exclusionMatch) {
         const [updated] = await db
@@ -1265,6 +1341,37 @@ class DocIntelService {
           confidence: parseFloat(rule.confidenceScore || '0.85'),
           reason: ruleData.reason || 'Previously excluded by user',
         };
+      }
+    }
+    
+    return null;
+  }
+
+  private findBuiltInExclusionMatch(
+    text: string
+  ): { confidence: number; reason: string } | null {
+    const lowerText = text.toLowerCase().trim();
+    
+    // Built-in patterns for summary/total rows that should always be excluded
+    const builtInExclusionPatterns: Array<{ pattern: RegExp; reason: string }> = [
+      { pattern: /\btotal\b/i, reason: 'Summary/total row' },
+      { pattern: /^gross\s*profit/i, reason: 'Gross Profit summary line' },
+      { pattern: /^gross\s*revenue/i, reason: 'Gross Revenue summary line' },
+      { pattern: /\bgross\s*revenue\b/i, reason: 'Gross Revenue summary line' },
+      { pattern: /\bgross\s*profit\b/i, reason: 'Gross Profit summary line' },
+      { pattern: /^net\s*operating\s*income/i, reason: 'Net Operating Income summary line' },
+      { pattern: /\bnet\s*operating\s*income\b/i, reason: 'Net Operating Income summary line' },
+      { pattern: /^noi\b/i, reason: 'NOI (Net Operating Income) summary line' },
+      { pattern: /\bnoi\b/i, reason: 'NOI (Net Operating Income) summary line' },
+      { pattern: /^net\s*(ordinary\s*)?(income|profit|loss)/i, reason: 'Net Income/Profit summary line' },
+      { pattern: /^operating\s*(income|profit)/i, reason: 'Operating Income summary line' },
+      { pattern: /^ebitda\b/i, reason: 'EBITDA summary line' },
+      { pattern: /^ebit\b/i, reason: 'EBIT summary line' },
+    ];
+    
+    for (const { pattern, reason } of builtInExclusionPatterns) {
+      if (pattern.test(lowerText)) {
+        return { confidence: 0.95, reason };
       }
     }
     
@@ -2775,7 +2882,7 @@ Respond with JSON only:
     rawText: string,
     reason: string,
     hasValue: boolean,
-    userId: string
+    userId?: string | null
   ): Promise<void> {
     try {
       const normalizedText = rawText.toLowerCase().trim();
@@ -2815,8 +2922,8 @@ Respond with JSON only:
         name: `Exclusion: ${rawText.substring(0, 50)}${hasValue ? ' (with value)' : ' (no value)'}`,
         ruleJson,
         ruleType: 'learned_exclusion',
-        confidenceScore: hasValue ? '0.80' : '0.95',  // Higher confidence for no-value exclusions
-        createdBy: userId,
+        confidenceScore: hasValue ? '0.80' : '0.95',
+        createdBy: userId || null,
         isActive: true,
       });
       

@@ -23313,6 +23313,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const displayName = req.body.displayName?.trim() || req.file.originalname;
       
       const isT12 = req.body.isT12 === 'true';
+      const isMultiYear = req.body.isMultiYear === 'true';
+      let multiYears: number[] | null = null;
+      if (isMultiYear && req.body.multiYears) {
+        try {
+          multiYears = JSON.parse(req.body.multiYears).map((y: string | number) => parseInt(String(y))).filter((y: number) => !isNaN(y));
+        } catch { multiYears = null; }
+      }
       const dataGranularity = req.body.dataGranularity === 'annual' ? 'annual' : 'monthly';
       const periodMetadata = isT12 ? {
         t12StartMonth: req.body.t12StartMonth ? parseInt(req.body.t12StartMonth) : null,
@@ -23324,6 +23331,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       let holdingTagsList = holdingTags;
       if (isT12 && !holdingTagsList.includes('T12')) {
         holdingTagsList = [...holdingTagsList, 'T12'];
+      }
+      if (isMultiYear && !holdingTagsList.includes('Multi-Year')) {
+        holdingTagsList = [...holdingTagsList, 'Multi-Year'];
       }
       
       const result = await docIntelService.createUploadWithDuplicateCheck(
@@ -23344,6 +23354,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           holdingTags: holdingTagsList.length > 0 ? holdingTagsList : null,
           holdingNotes: req.body.notes || null,
           isT12: isT12,
+          isMultiYear: isMultiYear,
+          multiYears: multiYears,
           periodMetadata: periodMetadata,
         },
         checkProjectOnly
