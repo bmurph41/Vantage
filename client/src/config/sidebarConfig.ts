@@ -47,6 +47,9 @@ import {
   Users as UsersIcon,
   BookOpen,
   Store,
+  ListTree,
+  GitMerge,
+  Sparkles,
 } from 'lucide-react';
 
 import { FEATURE_MODULES, FeatureModule } from './featureModules';
@@ -288,6 +291,27 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Settings,
         matchRoutes: ['/underwriting/modeling-settings', '/modeling-settings'],
         requiredModules: [FEATURE_MODULES.UNDERWRITING_SETTINGS],
+      },
+      {
+        id: 'coa-chart-of-accounts',
+        label: 'Chart of Accounts',
+        href: '/modeling/settings/chart-of-accounts',
+        icon: ListTree,
+        matchRoutes: ['/modeling/settings/chart-of-accounts'],
+      },
+      {
+        id: 'coa-category-mapping',
+        label: 'Category Mapping',
+        href: '/modeling/settings/category-mapping',
+        icon: GitMerge,
+        matchRoutes: ['/modeling/settings/category-mapping'],
+      },
+      {
+        id: 'coa-normalization-status',
+        label: 'Normalization',
+        href: '/modeling/settings/normalization-status',
+        icon: Sparkles,
+        matchRoutes: ['/modeling/settings/normalization-status'],
       },
     ],
   },

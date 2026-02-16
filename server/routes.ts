@@ -254,6 +254,7 @@ import { validateFileUpload } from "./middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 import { exitStudioRouter } from './routes/exit-studio-routes';
+import coaRoutes from './routes/coa-routes';
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -487,6 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/om", authenticateUser, omRouter);
   app.use(authenticateUser, omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
+  app.use(authenticateUser, coaRoutes);
 
   // Entity Linking API (Phase 2B) - Cross-module relationship management
   registerEntityLinkingRoutes(app);

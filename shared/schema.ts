@@ -21880,6 +21880,171 @@ export const insertIndustryStandardSchema = createInsertSchema(industryStandards
   updatedAt: true,
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// COA-Based Financial Normalization Engine Tables
+// ═══════════════════════════════════════════════════════════════════════
+
+// 1. MM Standard Accounts - Canonical category targets
+export const mmStandardAccounts = pgTable('mm_standard_accounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  categoryGroup: text('category_group').notNull(),
+  category: text('category').notNull(),
+  subCategory: text('sub_category'),
+  assetClassTag: text('asset_class_tag').notNull().default('Marina'),
+  sortOrder: integer('sort_order').default(0),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  categoryGroupAssetIdx: index('mm_std_acct_group_asset_idx').on(table.categoryGroup, table.assetClassTag),
+}));
+
+export type MmStandardAccount = typeof mmStandardAccounts.$inferSelect;
+export const insertMmStandardAccountSchema = createInsertSchema(mmStandardAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMmStandardAccount = z.infer<typeof insertMmStandardAccountSchema>;
+
+// 2. Chart of Accounts - User-imported COA
+export const chartOfAccounts = pgTable('chart_of_accounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  source: text('source').notNull(),
+  externalSystem: text('external_system'),
+  externalAccountId: text('external_account_id'),
+  accountNumber: text('account_number'),
+  accountName: text('account_name').notNull(),
+  accountType: text('account_type').notNull(),
+  detailType: text('detail_type'),
+  parentExternalId: text('parent_external_id'),
+  parentId: varchar('parent_id'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('coa_org_idx').on(table.orgId),
+  externalIdx: index('coa_external_idx').on(table.orgId, table.externalAccountId),
+}));
+
+export type ChartOfAccount = typeof chartOfAccounts.$inferSelect;
+export const insertChartOfAccountSchema = createInsertSchema(chartOfAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertChartOfAccount = z.infer<typeof insertChartOfAccountSchema>;
+
+// 3. COA Mapping - COA → Standard Account mapping
+export const coaMapping = pgTable('coa_mapping', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  coaAccountId: varchar('coa_account_id').notNull().references(() => chartOfAccounts.id, { onDelete: 'cascade' }),
+  mmStandardAccountId: varchar('mm_standard_account_id').notNull().references(() => mmStandardAccounts.id),
+  confidenceScore: numeric('confidence_score', { precision: 5, scale: 2 }).default('0'),
+  mappingSource: text('mapping_source').notNull(),
+  notes: text('notes'),
+  locked: boolean('locked').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgCoaUnique: unique('coa_mapping_org_coa_unique').on(table.orgId, table.coaAccountId),
+  orgIdx: index('coa_mapping_org_idx').on(table.orgId),
+  coaAccountIdx: index('coa_mapping_coa_idx').on(table.coaAccountId),
+  mmStdAcctIdx: index('coa_mapping_std_acct_idx').on(table.mmStandardAccountId),
+}));
+
+export type CoaMapping = typeof coaMapping.$inferSelect;
+export const insertCoaMappingSchema = createInsertSchema(coaMapping).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCoaMapping = z.infer<typeof insertCoaMappingSchema>;
+
+// 4. COA Mapping Suggestions - AI/rule suggestion staging
+export const coaMappingSuggestions = pgTable('coa_mapping_suggestions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  coaAccountId: varchar('coa_account_id').notNull().references(() => chartOfAccounts.id, { onDelete: 'cascade' }),
+  suggestedMmStandardAccountId: varchar('suggested_mm_standard_account_id').notNull().references(() => mmStandardAccounts.id),
+  confidenceScore: numeric('confidence_score', { precision: 5, scale: 2 }).default('0'),
+  rationale: text('rationale'),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('coa_suggestions_org_idx').on(table.orgId),
+  coaAccountIdx: index('coa_suggestions_coa_idx').on(table.coaAccountId),
+  statusIdx: index('coa_suggestions_status_idx').on(table.status),
+}));
+
+export type CoaMappingSuggestion = typeof coaMappingSuggestions.$inferSelect;
+export const insertCoaMappingSuggestionSchema = createInsertSchema(coaMappingSuggestions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCoaMappingSuggestion = z.infer<typeof insertCoaMappingSuggestionSchema>;
+
+// 5. Financial Line Items Normalized - Normalized output
+export const financialLineItemsNormalized = pgTable('financial_line_items_normalized', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  projectId: varchar('project_id').references(() => modelingProjects.id),
+  sourceDocId: varchar('source_doc_id').references(() => docIntelUploads.id),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  currency: text('currency').default('USD'),
+  coaAccountId: varchar('coa_account_id').references(() => chartOfAccounts.id),
+  rawCategoryName: text('raw_category_name'),
+  rawLineName: text('raw_line_name').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  mmStandardAccountId: varchar('mm_standard_account_id').references(() => mmStandardAccounts.id),
+  categoryGroup: text('category_group'),
+  profitCenterTag: text('profit_center_tag'),
+  confidenceScore: numeric('confidence_score', { precision: 5, scale: 2 }).default('0'),
+  classificationSource: text('classification_source').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgPeriodIdx: index('flin_org_period_idx').on(table.orgId, table.periodStart),
+  projectPeriodIdx: index('flin_project_period_idx').on(table.projectId, table.periodStart),
+  stdAcctPeriodIdx: index('flin_std_acct_period_idx').on(table.mmStandardAccountId, table.periodStart),
+}));
+
+export type FinancialLineItemNormalized = typeof financialLineItemsNormalized.$inferSelect;
+export const insertFinancialLineItemNormalizedSchema = createInsertSchema(financialLineItemsNormalized).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertFinancialLineItemNormalized = z.infer<typeof insertFinancialLineItemNormalizedSchema>;
+
+// 6. COA Audit Log - Audit trail
+export const coaAuditLog = pgTable('coa_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  userId: varchar('user_id').references(() => users.id),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: varchar('entity_id'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('coa_audit_org_idx').on(table.orgId),
+  actionIdx: index('coa_audit_action_idx').on(table.action),
+  entityTypeIdx: index('coa_audit_entity_type_idx').on(table.entityType),
+}));
+
+export type CoaAuditLog = typeof coaAuditLog.$inferSelect;
+export const insertCoaAuditLogSchema = createInsertSchema(coaAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCoaAuditLog = z.infer<typeof insertCoaAuditLogSchema>;
+
 // OpsOS Insert Schemas (Zod-based validation)
 export const insertOpssosConversationSchema = createInsertSchema(opssosConversations).omit({
   id: true,

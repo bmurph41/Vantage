@@ -241,6 +241,9 @@ const ModelingFunds = lazy(() => import("@/pages/modeling/funds"));
 const FundDetail = lazy(() => import("@/pages/modeling/funds/[fundId]"));
 const LPPortal = lazy(() => import("@/pages/modeling/lp-portal"));
 const ModelingSettings = lazy(() => import("@/pages/modeling/settings"));
+const ChartOfAccounts = lazy(() => import("@/pages/modeling/settings/chart-of-accounts"));
+const CategoryMapping = lazy(() => import("@/pages/modeling/settings/category-mapping"));
+const NormalizationStatus = lazy(() => import("@/pages/modeling/settings/normalization-status"));
 const TransactionClosingPage = lazy(() => import("@/pages/modeling/projects/transaction-closing"));
 const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));
@@ -1903,6 +1906,27 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <ModelingProjectsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/settings/chart-of-accounts">
+        {() => (
+          <UnifiedLayout>
+            <ChartOfAccounts />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/settings/category-mapping">
+        {() => (
+          <UnifiedLayout>
+            <CategoryMapping />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/modeling/settings/normalization-status">
+        {() => (
+          <UnifiedLayout>
+            <NormalizationStatus />
           </UnifiedLayout>
         )}
       </Route>

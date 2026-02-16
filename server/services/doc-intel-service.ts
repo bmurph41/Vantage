@@ -1109,6 +1109,26 @@ class DocIntelService {
         status: 'parsed',
         holdingNotes 
       });
+
+      if (process.env.FEATURE_COA_MAPPING === 'true') {
+        try {
+          const { coaService } = await import('./coa-service');
+          const coaAccounts = await coaService.listAccounts(orgId);
+          if (coaAccounts.length > 0) {
+            const { normalizationEngine } = await import('./normalization-engine');
+            normalizationEngine.run(orgId, {
+              sourceDocId: uploadId,
+              projectId: upload.modelingProjectId || undefined,
+            }).then(result => {
+              console.log(`[DocIntelService] Post-parse normalization complete: ${result.totalLines} lines (${result.mappedViaCoa} COA, ${result.mappedViaFallback} fallback, ${result.unmapped} unmapped)`);
+            }).catch(err => {
+              console.error(`[DocIntelService] Post-parse normalization failed (non-blocking):`, err);
+            });
+          }
+        } catch (normErr) {
+          console.error(`[DocIntelService] COA normalization hook error (non-blocking):`, normErr);
+        }
+      }
       
       return extractedItems;
     } catch (error) {
