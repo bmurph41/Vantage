@@ -145,6 +145,8 @@ interface StorageMixItem {
   count: number;
   avgRate: string;
   currentOccupancy: string;
+  occupiedCount: string;
+  occupancyInputMode: 'percentage' | 'count';
 }
 
 interface WizardFormData {
@@ -656,7 +658,7 @@ function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideP
     } else {
       updatePayload("storageMix", {
         ...payload.storageMix,
-        items: [...items, { storageType: type, count: 0, avgRate: "", currentOccupancy: "" }],
+        items: [...items, { storageType: type, count: 0, avgRate: "", currentOccupancy: "", occupiedCount: "", occupancyInputMode: 'percentage' as const }],
       });
     }
   };
@@ -711,17 +713,34 @@ function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideP
             <div className="mt-6 space-y-4">
               <Separator />
               <h4 className="font-medium">Storage Details</h4>
-              {payload.storageMix.items.map((item) => (
+              {payload.storageMix.items.map((item) => {
+                const mode = item.occupancyInputMode || 'percentage';
+                return (
                 <div key={item.storageType} className="grid grid-cols-4 gap-3 items-end">
                   <div className="font-medium text-sm">
                     {STORAGE_TYPES.find((t) => t.value === item.storageType)?.label}
                   </div>
                   <div>
-                    <Label className="text-xs">Count</Label>
+                    <Label className="text-xs">Capacity</Label>
                     <Input
                       type="number"
                       value={item.count}
-                      onChange={(e) => updateStorageItem(item.storageType, "count", parseInt(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const capacity = parseInt(e.target.value) || 0;
+                        const updates: Partial<StorageMixItem> = { count: capacity };
+                        if (capacity > 0) {
+                          if (mode === 'count' && item.occupiedCount) {
+                            const occ = parseInt(item.occupiedCount) || 0;
+                            updates.currentOccupancy = Math.round((occ / capacity) * 100).toString();
+                          } else if (mode === 'percentage' && item.currentOccupancy) {
+                            updates.occupiedCount = Math.round((parseFloat(item.currentOccupancy) / 100) * capacity).toString();
+                          }
+                        }
+                        const items = payload.storageMix.items.map((i) =>
+                          i.storageType === item.storageType ? { ...i, ...updates } : i
+                        );
+                        updatePayload("storageMix", { ...payload.storageMix, items });
+                      }}
                       className="mt-1"
                     />
                   </div>
@@ -735,16 +754,92 @@ function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideP
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Occupancy (%)</Label>
-                    <Input
-                      type="number"
-                      value={item.currentOccupancy}
-                      onChange={(e) => updateStorageItem(item.storageType, "currentOccupancy", e.target.value)}
-                      className="mt-1"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <Label className="text-xs">Occupied</Label>
+                      <div className="flex rounded-md border border-border overflow-hidden">
+                        <button
+                          type="button"
+                          className={cn(
+                            "px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+                            mode === 'count'
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-muted-foreground hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            const updates: Partial<StorageMixItem> = { occupancyInputMode: 'count' as const };
+                            if (item.currentOccupancy && item.count > 0) {
+                              updates.occupiedCount = Math.round((parseFloat(item.currentOccupancy) / 100) * item.count).toString();
+                            }
+                            const items = payload.storageMix.items.map((i) =>
+                              i.storageType === item.storageType ? { ...i, ...updates } : i
+                            );
+                            updatePayload("storageMix", { ...payload.storageMix, items });
+                          }}
+                        >
+                          #
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+                            mode === 'percentage'
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-muted-foreground hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            const updates: Partial<StorageMixItem> = { occupancyInputMode: 'percentage' as const };
+                            if (item.occupiedCount && item.count > 0) {
+                              updates.currentOccupancy = Math.round((parseInt(item.occupiedCount) / item.count) * 100).toString();
+                            }
+                            const items = payload.storageMix.items.map((i) =>
+                              i.storageType === item.storageType ? { ...i, ...updates } : i
+                            );
+                            updatePayload("storageMix", { ...payload.storageMix, items });
+                          }}
+                        >
+                          %
+                        </button>
+                      </div>
+                    </div>
+                    {mode === 'percentage' ? (
+                      <Input
+                        type="number"
+                        value={item.currentOccupancy}
+                        placeholder="e.g. 85"
+                        onChange={(e) => {
+                          const pct = e.target.value;
+                          const updates: Partial<StorageMixItem> = { currentOccupancy: pct };
+                          if (pct && item.count > 0) {
+                            updates.occupiedCount = Math.round((parseFloat(pct) / 100) * item.count).toString();
+                          }
+                          const items = payload.storageMix.items.map((i) =>
+                            i.storageType === item.storageType ? { ...i, ...updates } : i
+                          );
+                          updatePayload("storageMix", { ...payload.storageMix, items });
+                        }}
+                      />
+                    ) : (
+                      <Input
+                        type="number"
+                        value={item.occupiedCount}
+                        placeholder="e.g. 42"
+                        onChange={(e) => {
+                          const occupied = e.target.value;
+                          const updates: Partial<StorageMixItem> = { occupiedCount: occupied };
+                          if (occupied && item.count > 0) {
+                            updates.currentOccupancy = Math.round((parseInt(occupied) / item.count) * 100).toString();
+                          }
+                          const items = payload.storageMix.items.map((i) =>
+                            i.storageType === item.storageType ? { ...i, ...updates } : i
+                          );
+                          updatePayload("storageMix", { ...payload.storageMix, items });
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -1505,6 +1600,8 @@ export default function SetupWizard() {
               count: item.count,
               avgRate: parseNumber(item.avgRate),
               currentOccupancy: parseNumber(item.currentOccupancy),
+              occupiedCount: parseNumber(item.occupiedCount),
+              occupancyInputMode: item.occupancyInputMode || 'percentage',
             })),
             hasFuelDock: payload.storageMix.hasFuelDock,
           },

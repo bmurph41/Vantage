@@ -81,38 +81,43 @@ type StorageTypeConfig = {
   id: string;
   name: string;
   section: 'storage' | 'designated';
-  // NEW: Multi-select seasonality - can have multiple seasons (hybrid = 2+ seasons)
   seasons: SeasonalityOption[];
   isEnabled: boolean;
   icon: React.ReactNode;
+  capacity: string;
+  occupiedCount: string;
+  occupancyPercent: string;
+  occupancyInputMode: 'percentage' | 'count';
 };
 
+const storageDefaults = { capacity: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const };
+
 const defaultStorageTypes: StorageTypeConfig[] = [
-  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" /> },
-  { id: 'moorings', name: 'Moorings', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'dinghies', name: 'Dinghies', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Sailboat className="h-4 w-4" /> },
-  { id: 'jet_skis', name: 'Jet Skis', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" /> },
-  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', seasons: ['annual'], isEnabled: true, icon: <Warehouse className="h-4 w-4" /> },
-  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Container className="h-4 w-4" /> },
-  { id: 'land_storage', name: 'Land Storage', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <MapPin className="h-4 w-4" /> },
-  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" /> },
-  { id: 'trailers', name: 'Trailers', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Car className="h-4 w-4" /> },
-  { id: 'carports', name: 'Carports', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Home className="h-4 w-4" /> },
-  { id: 'houseboats', name: 'Houseboats', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Home className="h-4 w-4" /> },
-  { id: 'rv_sites', name: 'RV Sites', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Car className="h-4 w-4" /> },
+  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: true, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
+  { id: 'lift_slips', name: 'Lift Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" />, ...storageDefaults },
+  { id: 'moorings', name: 'Moorings', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
+  { id: 'dinghies', name: 'Dinghies', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Sailboat className="h-4 w-4" />, ...storageDefaults },
+  { id: 'jet_skis', name: 'Jet Skis', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" />, ...storageDefaults },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', seasons: ['annual'], isEnabled: true, icon: <Warehouse className="h-4 w-4" />, ...storageDefaults },
+  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Container className="h-4 w-4" />, ...storageDefaults },
+  { id: 'land_storage', name: 'Land Storage', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <MapPin className="h-4 w-4" />, ...storageDefaults },
+  { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" />, ...storageDefaults },
+  { id: 'trailers', name: 'Trailers', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Car className="h-4 w-4" />, ...storageDefaults },
+  { id: 'carports', name: 'Carports', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Home className="h-4 w-4" />, ...storageDefaults },
+  { id: 'houseboats', name: 'Houseboats', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Home className="h-4 w-4" />, ...storageDefaults },
+  { id: 'rv_sites', name: 'RV Sites', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Car className="h-4 w-4" />, ...storageDefaults },
 ];
 
 const defaultDesignatedSpaces: StorageTypeConfig[] = [
-  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Store className="h-4 w-4" /> },
-  { id: 'service', name: 'Service', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
-  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" /> },
-  { id: 'boat_club', name: 'Boat Club', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Users className="h-4 w-4" /> },
-  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
-  { id: 'transient', name: 'Transient', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'restaurant', name: 'Restaurant', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Utensils className="h-4 w-4" /> },
-  { id: 'ship_store', name: 'Ship Store', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
+  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Store className="h-4 w-4" />, ...storageDefaults },
+  { id: 'service', name: 'Service', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Wrench className="h-4 w-4" />, ...storageDefaults },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Building2 className="h-4 w-4" />, ...storageDefaults },
+  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" />, ...storageDefaults },
+  { id: 'boat_club', name: 'Boat Club', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Users className="h-4 w-4" />, ...storageDefaults },
+  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <Fuel className="h-4 w-4" />, ...storageDefaults },
+  { id: 'transient', name: 'Transient', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
+  { id: 'restaurant', name: 'Restaurant', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Utensils className="h-4 w-4" />, ...storageDefaults },
+  { id: 'ship_store', name: 'Ship Store', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <ShoppingCart className="h-4 w-4" />, ...storageDefaults },
 ];
 
 type ProfitCenterConfig = {
@@ -234,12 +239,12 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   });
 
   const getCurrentData = () => {
-    const storageSettings: Record<string, { seasons: SeasonalityOption[]; isEnabled: boolean; section: string }> = {};
+    const storageSettings: Record<string, any> = {};
     storageTypes.forEach(item => {
-      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage' };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage', capacity: item.capacity, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode };
     });
     designatedSpaces.forEach(item => {
-      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'designated' };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'designated', capacity: item.capacity, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode };
     });
 
     const profitCenterSettings: Record<string, { isEnabled: boolean }> = {};
@@ -271,7 +276,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         setStorageTypes(prev => prev.map(item => {
           const dept = config.departments[item.id];
           if (!dept) return item;
-          // Support legacy isYearRound field migration
           let seasons = dept.seasons;
           if (!seasons && typeof dept.isYearRound === 'boolean') {
             seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
@@ -279,7 +283,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           return {
             ...item,
             seasons: seasons ?? item.seasons,
-            isEnabled: dept.isEnabled ?? item.isEnabled
+            isEnabled: dept.isEnabled ?? item.isEnabled,
+            capacity: dept.capacity ?? item.capacity,
+            occupiedCount: dept.occupiedCount ?? item.occupiedCount,
+            occupancyPercent: dept.occupancyPercent ?? item.occupancyPercent,
+            occupancyInputMode: dept.occupancyInputMode ?? item.occupancyInputMode,
           };
         }));
         setDesignatedSpaces(prev => prev.map(item => {
@@ -292,7 +300,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           return {
             ...item,
             seasons: seasons ?? item.seasons,
-            isEnabled: dept.isEnabled ?? item.isEnabled
+            isEnabled: dept.isEnabled ?? item.isEnabled,
+            capacity: dept.capacity ?? item.capacity,
+            occupiedCount: dept.occupiedCount ?? item.occupiedCount,
+            occupancyPercent: dept.occupancyPercent ?? item.occupancyPercent,
+            occupancyInputMode: dept.occupancyInputMode ?? item.occupancyInputMode,
           };
         }));
       }
@@ -417,6 +429,11 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     }
   };
 
+  const updateStorageField = (itemId: string, section: 'storage' | 'designated', updates: Partial<StorageTypeConfig>) => {
+    const setter = section === 'storage' ? setStorageTypes : setDesignatedSpaces;
+    setter(prev => prev.map(item => item.id === itemId ? { ...item, ...updates } : item));
+  };
+
   const toggleProfitCenterEnabled = (itemId: string) => {
     setProfitCenters(prev => prev.map(item => 
       item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
@@ -460,6 +477,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       seasons: ['seasonal'],
       isEnabled: true,
       icon: <CircleDot className="h-4 w-4" />,
+      ...storageDefaults,
     };
 
     if (newProfitCenterSection === 'storage') {
@@ -1099,29 +1117,126 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           <CardContent className="pt-0 px-4 pb-4">
             <div className="space-y-1">
               {storageTypes.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center justify-between py-1.5 px-2 rounded ${
-                    item.isEnabled 
-                      ? 'bg-muted/30' 
-                      : 'opacity-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={item.isEnabled}
-                      onChange={() => toggleItemEnabled(item.id, 'storage')}
-                      className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
-                    />
-                    <span className="text-xs">{item.icon}</span>
-                    <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
-                      {item.name}
-                    </span>
+                <div key={item.id}>
+                  <div
+                    className={`flex items-center justify-between py-1.5 px-2 rounded ${
+                      item.isEnabled 
+                        ? 'bg-muted/30' 
+                        : 'opacity-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={item.isEnabled}
+                        onChange={() => toggleItemEnabled(item.id, 'storage')}
+                        className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
+                      />
+                      <span className="text-xs">{item.icon}</span>
+                      <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                        {item.name}
+                      </span>
+                    </div>
+                    {item.isEnabled && (
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {renderSeasonalitySelector(item, 'storage')}
+                      </div>
+                    )}
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {renderSeasonalitySelector(item, 'storage')}
+                    <div className="flex items-center gap-2 px-2 py-1 ml-6">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground w-12">Capacity</span>
+                        <Input
+                          type="number"
+                          value={item.capacity}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const cap = e.target.value;
+                            const updates: Partial<StorageTypeConfig> = { capacity: cap };
+                            const capNum = parseInt(cap);
+                            if (capNum > 0) {
+                              if (item.occupancyInputMode === 'count' && item.occupiedCount) {
+                                updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / capNum) * 100).toString();
+                              } else if (item.occupancyInputMode === 'percentage' && item.occupancyPercent) {
+                                updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * capNum).toString();
+                              }
+                            }
+                            updateStorageField(item.id, 'storage', updates);
+                          }}
+                          className="h-6 w-16 text-[10px] px-1.5"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground w-12">Occupied</span>
+                        <div className="flex rounded-md border border-border overflow-hidden mr-1">
+                          <button
+                            type="button"
+                            className={`px-1 py-0 text-[9px] font-medium transition-colors ${
+                              item.occupancyInputMode === 'count'
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background text-muted-foreground hover:bg-muted"
+                            }`}
+                            onClick={() => {
+                              const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'count' };
+                              if (item.occupancyPercent && item.capacity) {
+                                updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * parseInt(item.capacity)).toString();
+                              }
+                              updateStorageField(item.id, 'storage', updates);
+                            }}
+                          >
+                            #
+                          </button>
+                          <button
+                            type="button"
+                            className={`px-1 py-0 text-[9px] font-medium transition-colors ${
+                              item.occupancyInputMode === 'percentage'
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-background text-muted-foreground hover:bg-muted"
+                            }`}
+                            onClick={() => {
+                              const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'percentage' };
+                              if (item.occupiedCount && item.capacity) {
+                                updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / parseInt(item.capacity)) * 100).toString();
+                              }
+                              updateStorageField(item.id, 'storage', updates);
+                            }}
+                          >
+                            %
+                          </button>
+                        </div>
+                        {item.occupancyInputMode === 'count' ? (
+                          <Input
+                            type="number"
+                            value={item.occupiedCount}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const occ = e.target.value;
+                              const updates: Partial<StorageTypeConfig> = { occupiedCount: occ };
+                              if (occ && item.capacity && parseInt(item.capacity) > 0) {
+                                updates.occupancyPercent = Math.round((parseInt(occ) / parseInt(item.capacity)) * 100).toString();
+                              }
+                              updateStorageField(item.id, 'storage', updates);
+                            }}
+                            className="h-6 w-14 text-[10px] px-1.5"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            value={item.occupancyPercent}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const pct = e.target.value;
+                              const updates: Partial<StorageTypeConfig> = { occupancyPercent: pct };
+                              if (pct && item.capacity && parseInt(item.capacity) > 0) {
+                                updates.occupiedCount = Math.round((parseFloat(pct) / 100) * parseInt(item.capacity)).toString();
+                              }
+                              updateStorageField(item.id, 'storage', updates);
+                            }}
+                            className="h-6 w-14 text-[10px] px-1.5"
+                          />
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
