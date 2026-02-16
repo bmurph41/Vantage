@@ -641,20 +641,24 @@ function getBreadcrumbsForPath(path: string): BreadcrumbItem[] {
   if (modelingProjectMatch) {
     const projectId = modelingProjectMatch[1];
     const subPath = modelingProjectMatch[2] || '';
+    const projectBase = `/modeling/projects/${projectId}`;
     
     items = [
       CATEGORIES.MODELING,
-      { label: projectId, isDynamic: true, dynamicType: 'modeling-project', dynamicId: projectId },
+      { label: projectId, isDynamic: true, dynamicType: 'modeling-project', dynamicId: projectId, href: projectBase },
     ];
     
     if (subPath) {
       const subSegments = subPath.split('/').filter(Boolean);
-      subSegments.forEach(seg => {
+      let accumulated = projectBase;
+      subSegments.forEach((seg, idx) => {
+        accumulated += '/' + seg;
         const formattedLabel = seg
           .split('-')
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
-        items.push({ label: formattedLabel });
+        const isLastSeg = idx === subSegments.length - 1;
+        items.push({ label: formattedLabel, href: isLastSeg ? undefined : accumulated });
       });
     }
     
@@ -1002,6 +1006,22 @@ function DynamicBreadcrumbItem({ item, isLast }: { item: BreadcrumbItem; isLast:
         {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
         {displayLabel}
       </span>
+    );
+  }
+
+  if (item.href) {
+    return (
+      <Link
+        href={item.href}
+        className={cn(
+          'flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors max-w-[200px] truncate',
+          Icon && 'gap-1'
+        )}
+        title={displayLabel}
+      >
+        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+        {displayLabel}
+      </Link>
     );
   }
   
