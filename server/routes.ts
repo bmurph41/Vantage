@@ -85,6 +85,8 @@ import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import returnsRoutes from "./routes/returns-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
+import searchRoutes from "./routes/search-routes";
+import bulkEmailRoutes from "./routes/bulk-email-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
@@ -425,6 +427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/commercial-leases", authenticateUser, commercialLeaseRoutes);
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
   app.use(authenticateUser, tourProgressRoutes);
+  app.use(authenticateUser, searchRoutes);
+  app.use("/api/crm", authenticateUser, bulkEmailRoutes);
   // Payroll module routes
   app.use("/api/payroll", authenticateUser, payrollRouter);
   app.use("/api/payroll/permissions", authenticateUser, permissionsRouter);

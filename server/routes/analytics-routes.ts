@@ -1182,6 +1182,46 @@ router.get('/rent-roll/interactive-analytics', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/analytics/modeling/projects/:projectId
+ * Fetch modeling project data for Hold/Sell Decision Engine
+ */
+router.get('/modeling/projects/:projectId', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = (req as any).tenantId || 'org-1';
+
+    // Fetch the modeling project
+    const [project] = await db.select()
+      .from(modelingProjects)
+      .where(and(
+        eq(modelingProjects.id, projectId),
+        eq(modelingProjects.orgId, orgId)
+      ))
+      .limit(1);
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Return project data with acquisition price and other relevant metrics
+    res.json({
+      id: project.id,
+      marinaName: project.marinaName,
+      purchasePrice: project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : 0,
+      year1CapRate: project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : 0.075,
+      ebitda: project.ebitda ? parseFloat(project.ebitda.toString()) : 0,
+      customMetrics: project.customMetrics || {},
+    });
+  } catch (error: any) {
+    console.error('[Analytics] Error fetching modeling project:', error);
+    res.status(500).json({
+      error: 'Failed to fetch modeling project',
+      message: error.message
+    });
+  }
+});
+
 router.get('/modeling/projects/:projectId/pro-forma-charts', async (req, res) => {
   try {
     const { projectId } = req.params;
