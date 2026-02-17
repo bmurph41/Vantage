@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { db } from '../db';
 import { 
   crmCompanies, crmContacts, crmProperties, crmDeals, 
-  crmActivities, crmTimelineEvents, users, crmNotes, projects
+  crmActivities, crmTimelineEvents, users, crmNotes, projects,
+  crmContactCompanies, crmCompanyProperties, crmContactProperties,
+  crmPropertyStorageEntries
 } from '@shared/schema';
 import { eq, and, or, desc, asc, sql, gte, lt, inArray } from 'drizzle-orm';
 
@@ -141,62 +143,74 @@ router.get('/companies/:id/summary', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const [company] = await db
-      .select({
-        company: companies,
-        owner: {
-          id: users.id,
-          name: users.displayName,
-          email: users.email,
-        }
-      })
+    const [companyRow] = await db
+      .select()
       .from(crmCompanies)
-      .leftJoin(users, eq(crmCompanies.ownerId, users.id))
-      .where(and(
-        eq(crmCompanies.id, id),
-        eq(crmCompanies.orgId, orgId)
-      ))
+      .where(and(eq(crmCompanies.id, id), eq(crmCompanies.orgId, orgId)))
       .limit(1);
     
-    if (!company) {
+    if (!companyRow) {
       return res.status(404).json({ error: 'Company not found' });
     }
-    
-    const [activitySummary, recentTimeline] = await Promise.all([
+
+    let owner = null;
+    if (companyRow.ownerId) {
+      const [ownerRow] = await db
+        .select({ id: users.id, name: users.displayName, email: users.email })
+        .from(users).where(eq(users.id, companyRow.ownerId)).limit(1);
+      owner = ownerRow || null;
+    }
+
+    const [activitySummary, recentTimeline, contacts, properties, deals, recentActivities, notes] = await Promise.all([
       getActivitySummary(orgId, 'company', id),
-      getRecentTimeline(orgId, 'company', id),
+      getRecentTimeline(orgId, 'company', id, 10),
+      db.select({
+        id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName,
+        email: crmContacts.email, phone: crmContacts.phone, position: crmContacts.position,
+        role: crmContactCompanies.role, isPrimary: crmContactCompanies.isPrimary,
+        contactTag: crmContacts.contactTag, leadStatus: crmContacts.leadStatus,
+      }).from(crmContactCompanies)
+        .innerJoin(crmContacts, eq(crmContactCompanies.contactId, crmContacts.id))
+        .where(eq(crmContactCompanies.companyId, id)),
+      db.select({
+        id: crmProperties.id, title: crmProperties.title, type: crmProperties.type,
+        status: crmProperties.status, city: crmProperties.city, state: crmProperties.state,
+        listingPrice: crmProperties.listingPrice, wetSlips: crmProperties.wetSlips,
+        relationship: crmCompanyProperties.relationship,
+      }).from(crmCompanyProperties)
+        .innerJoin(crmProperties, eq(crmCompanyProperties.propertyId, crmProperties.id))
+        .where(eq(crmCompanyProperties.companyId, id)),
+      db.select({
+        id: crmDeals.id, name: crmDeals.name, value: crmDeals.value,
+        stage: crmDeals.stage, probability: crmDeals.probability,
+        expectedCloseDate: crmDeals.expectedCloseDate,
+      }).from(crmDeals)
+        .where(and(eq(crmDeals.orgId, orgId), eq(crmDeals.companyId, id)))
+        .orderBy(desc(crmDeals.updatedAt)).limit(10),
+      db.select({
+        id: crmActivities.id, type: crmActivities.type, subject: crmActivities.subject,
+        status: crmActivities.status, scheduledAt: crmActivities.scheduledAt,
+        completedAt: crmActivities.completedAt,
+      }).from(crmActivities)
+        .where(and(eq(crmActivities.orgId, orgId), eq(crmActivities.companyId, id)))
+        .orderBy(desc(crmActivities.createdAt)).limit(5),
+      db.select({
+        id: crmNotes.id, content: crmNotes.content, createdAt: crmNotes.createdAt,
+      }).from(crmNotes)
+        .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'company'), eq(crmNotes.entityId, id)))
+        .orderBy(desc(crmNotes.createdAt)).limit(5),
     ]);
     
-    const [contactsCount] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(crmContacts)
-      .where(and(
-        eq(crmContacts.orgId, orgId),
-        eq(crmContacts.companyId, id)
-      ));
-    
-    const [dealsCount] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(crmDeals)
-      .where(and(
-        eq(crmDeals.orgId, orgId),
-        eq(crmDeals.companyId, id)
-      ));
-    
     res.json({
-      id: company.company.id,
-      name: company.company.name,
-      industry: company.company.industry,
-      website: company.company.website,
-      phone: company.company.phone,
-      size: company.company.size,
-      owner: company.owner,
+      ...companyRow,
+      owner,
       activities: activitySummary,
       timeline: recentTimeline,
-      associations: {
-        contacts: contactsCount?.count || 0,
-        deals: dealsCount?.count || 0,
-      },
+      contacts,
+      properties,
+      deals,
+      recentActivities,
+      notes,
     });
   } catch (error) {
     console.error('Error fetching company summary:', error);
@@ -213,59 +227,83 @@ router.get('/contacts/:id/summary', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const [contact] = await db
-      .select({
-        contact: contacts,
-        owner: {
-          id: users.id,
-          name: users.displayName,
-          email: users.email,
-        },
-        company: {
-          id: crmCompanies.id,
-          name: crmCompanies.name,
-        }
-      })
+    const [contactRow] = await db
+      .select()
       .from(crmContacts)
-      .leftJoin(users, eq(crmContacts.ownerId, users.id))
-      .leftJoin(companies, eq(crmContacts.companyId, crmCompanies.id))
       .where(and(
         eq(crmContacts.id, id),
         eq(crmContacts.orgId, orgId)
       ))
       .limit(1);
     
-    if (!contact) {
+    if (!contactRow) {
       return res.status(404).json({ error: 'Contact not found' });
     }
-    
-    const [activitySummary, recentTimeline] = await Promise.all([
+
+    let owner = null;
+    if (contactRow.ownerId) {
+      const [ownerRow] = await db
+        .select({ id: users.id, name: users.displayName, email: users.email })
+        .from(users).where(eq(users.id, contactRow.ownerId)).limit(1);
+      owner = ownerRow || null;
+    }
+
+    let primaryCompany = null;
+    if (contactRow.companyId) {
+      const [compRow] = await db
+        .select({ id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry })
+        .from(crmCompanies).where(eq(crmCompanies.id, contactRow.companyId)).limit(1);
+      primaryCompany = compRow || null;
+    }
+
+    const [activitySummary, recentTimeline, companies, properties, deals, recentActivities, notes] = await Promise.all([
       getActivitySummary(orgId, 'contact', id),
-      getRecentTimeline(orgId, 'contact', id),
+      getRecentTimeline(orgId, 'contact', id, 10),
+      db.select({
+        id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry,
+        role: crmContactCompanies.role, isPrimary: crmContactCompanies.isPrimary,
+      }).from(crmContactCompanies)
+        .innerJoin(crmCompanies, eq(crmContactCompanies.companyId, crmCompanies.id))
+        .where(eq(crmContactCompanies.contactId, id)),
+      db.select({
+        id: crmProperties.id, title: crmProperties.title, type: crmProperties.type,
+        status: crmProperties.status, city: crmProperties.city, state: crmProperties.state,
+        relationship: crmContactProperties.relationship,
+      }).from(crmContactProperties)
+        .innerJoin(crmProperties, eq(crmContactProperties.propertyId, crmProperties.id))
+        .where(eq(crmContactProperties.contactId, id)),
+      db.select({
+        id: crmDeals.id, name: crmDeals.name, value: crmDeals.value,
+        stage: crmDeals.stage, probability: crmDeals.probability,
+        expectedCloseDate: crmDeals.expectedCloseDate,
+      }).from(crmDeals)
+        .where(and(eq(crmDeals.orgId, orgId), eq(crmDeals.contactId, id)))
+        .orderBy(desc(crmDeals.updatedAt)).limit(10),
+      db.select({
+        id: crmActivities.id, type: crmActivities.type, subject: crmActivities.subject,
+        status: crmActivities.status, scheduledAt: crmActivities.scheduledAt,
+        completedAt: crmActivities.completedAt, notes: crmActivities.notes,
+      }).from(crmActivities)
+        .where(and(eq(crmActivities.orgId, orgId), eq(crmActivities.contactId, id)))
+        .orderBy(desc(crmActivities.createdAt)).limit(5),
+      db.select({
+        id: crmNotes.id, content: crmNotes.content, createdAt: crmNotes.createdAt,
+      }).from(crmNotes)
+        .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'contact'), eq(crmNotes.entityId, id)))
+        .orderBy(desc(crmNotes.createdAt)).limit(5),
     ]);
     
-    const [dealsCount] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(crmDeals)
-      .where(and(
-        eq(crmDeals.orgId, orgId),
-        eq(crmDeals.contactId, id)
-      ));
-    
     res.json({
-      id: contact.contact.id,
-      firstName: contact.contact.firstName,
-      lastName: contact.contact.lastName,
-      email: contact.contact.email,
-      phone: contact.contact.phone,
-      title: contact.contact.title,
-      owner: contact.owner,
-      company: contact.company,
+      ...contactRow,
+      owner,
+      primaryCompany,
       activities: activitySummary,
       timeline: recentTimeline,
-      associations: {
-        deals: dealsCount?.count || 0,
-      },
+      companies,
+      properties,
+      deals,
+      recentActivities,
+      notes,
     });
   } catch (error) {
     console.error('Error fetching contact summary:', error);
@@ -282,55 +320,108 @@ router.get('/properties/:id/summary', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const [property] = await db
-      .select({
-        property: properties,
-        owner: {
-          id: users.id,
-          name: users.displayName,
-          email: users.email,
-        }
-      })
+    const [propertyRow] = await db
+      .select()
       .from(crmProperties)
-      .leftJoin(users, eq(crmProperties.ownerId, users.id))
-      .where(and(
-        eq(crmProperties.id, id),
-        eq(crmProperties.orgId, orgId)
-      ))
+      .where(and(eq(crmProperties.id, id), eq(crmProperties.orgId, orgId)))
       .limit(1);
     
-    if (!property) {
+    if (!propertyRow) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    
-    const [activitySummary, recentTimeline] = await Promise.all([
+
+    let owner = null;
+    if (propertyRow.ownerId) {
+      const [ownerRow] = await db
+        .select({ id: users.id, name: users.displayName, email: users.email })
+        .from(users).where(eq(users.id, propertyRow.ownerId)).limit(1);
+      owner = ownerRow || null;
+    }
+
+    let brokerContact = null;
+    if (propertyRow.brokerContactId) {
+      const [bc] = await db
+        .select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName, email: crmContacts.email, phone: crmContacts.phone })
+        .from(crmContacts).where(eq(crmContacts.id, propertyRow.brokerContactId)).limit(1);
+      brokerContact = bc || null;
+    }
+
+    let ownerCompany = null;
+    if (propertyRow.ownerCompanyId) {
+      const [oc] = await db
+        .select({ id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry })
+        .from(crmCompanies).where(eq(crmCompanies.id, propertyRow.ownerCompanyId)).limit(1);
+      ownerCompany = oc || null;
+    }
+
+    let listingAgent = null;
+    if (propertyRow.listingAgentId) {
+      const [la] = await db
+        .select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName, email: crmContacts.email, phone: crmContacts.phone })
+        .from(crmContacts).where(eq(crmContacts.id, propertyRow.listingAgentId)).limit(1);
+      listingAgent = la || null;
+    }
+
+    const [activitySummary, recentTimeline, companies, contacts, deals, storageEntries, recentActivities, notes] = await Promise.all([
       getActivitySummary(orgId, 'property', id),
-      getRecentTimeline(orgId, 'property', id),
+      getRecentTimeline(orgId, 'property', id, 10),
+      db.select({
+        id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry,
+        relationship: crmCompanyProperties.relationship,
+      }).from(crmCompanyProperties)
+        .innerJoin(crmCompanies, eq(crmCompanyProperties.companyId, crmCompanies.id))
+        .where(eq(crmCompanyProperties.propertyId, id)),
+      db.select({
+        id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName,
+        email: crmContacts.email, phone: crmContacts.phone, position: crmContacts.position,
+        contactTag: crmContacts.contactTag, relationship: crmContactProperties.relationship,
+      }).from(crmContactProperties)
+        .innerJoin(crmContacts, eq(crmContactProperties.contactId, crmContacts.id))
+        .where(eq(crmContactProperties.propertyId, id)),
+      db.select({
+        id: crmDeals.id, name: crmDeals.name, value: crmDeals.value,
+        stage: crmDeals.stage, probability: crmDeals.probability,
+        expectedCloseDate: crmDeals.expectedCloseDate,
+      }).from(crmDeals)
+        .where(and(eq(crmDeals.orgId, orgId), eq(crmDeals.propertyId, id)))
+        .orderBy(desc(crmDeals.updatedAt)).limit(10),
+      db.select({
+        id: crmPropertyStorageEntries.id,
+        storageTypeName: crmPropertyStorageEntries.storageTypeName,
+        capacity: crmPropertyStorageEntries.capacity,
+        occupied: crmPropertyStorageEntries.occupied,
+        rate: crmPropertyStorageEntries.rate,
+        rateType: crmPropertyStorageEntries.rateType,
+      }).from(crmPropertyStorageEntries)
+        .where(eq(crmPropertyStorageEntries.propertyId, id)),
+      db.select({
+        id: crmActivities.id, type: crmActivities.type, subject: crmActivities.subject,
+        status: crmActivities.status, scheduledAt: crmActivities.scheduledAt,
+        completedAt: crmActivities.completedAt,
+      }).from(crmActivities)
+        .where(and(eq(crmActivities.orgId, orgId), eq(crmActivities.propertyId, id)))
+        .orderBy(desc(crmActivities.createdAt)).limit(5),
+      db.select({
+        id: crmNotes.id, content: crmNotes.content, createdAt: crmNotes.createdAt,
+      }).from(crmNotes)
+        .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'property'), eq(crmNotes.entityId, id)))
+        .orderBy(desc(crmNotes.createdAt)).limit(5),
     ]);
     
-    const [dealsCount] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(crmDeals)
-      .where(and(
-        eq(crmDeals.orgId, orgId),
-        eq(crmDeals.propertyId, id)
-      ));
-    
     res.json({
-      id: property.property.id,
-      name: property.property.name,
-      address: property.property.address,
-      city: property.property.city,
-      state: property.property.state,
-      zipCode: property.property.zipCode,
-      propertyType: property.property.propertyType,
-      status: property.property.status,
-      owner: property.owner,
+      ...propertyRow,
+      owner,
+      brokerContact,
+      ownerCompany,
+      listingAgent,
       activities: activitySummary,
       timeline: recentTimeline,
-      associations: {
-        deals: dealsCount?.count || 0,
-      },
+      companies,
+      contacts,
+      deals,
+      storageEntries,
+      recentActivities,
+      notes,
     });
   } catch (error) {
     console.error('Error fetching property summary:', error);
