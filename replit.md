@@ -51,6 +51,7 @@ The platform utilizes a dual-sourced data model separating "Universal/Global" cu
 - **Analytics**: Marina KPI Calculator, ancillary revenue tracking, benchmarking, and Unified Cross-Module Analytics Dashboard.
 - **AI Assistant**: Context-aware chatbot powered by GPT-5 with streaming responses and platform knowledge base.
 - **Add-on Packs**: Fund Management, LP Portal, Prospecting, and MarinaMatch Intel.
+- **Admin Panel**: Enterprise admin dashboard (`/admin/*`) with: Customer management (list, search, detail drawer with subscription actions: cancel/reactivate/extend trial/change plan), Organization management (`/admin/organizations` with member listing, ownership transfer, pack grant/revoke), Usage & Engagement metrics (models, deals, comps, projects, documents, contacts counts per org), Admin Audit Trail (`/admin/audit-trail` with filterable paginated log), User invite/onboarding tools (invite with bcrypt-hashed temp password, resend verification, reset password). All routes protected by `requireAdmin` middleware with consistent audit logging to `adminAuditLog` table. Routes: `server/routes/admin/customer-routes.ts`, `server/routes/admin/organization-routes.ts`.
 
 ### Data Governance & Benchmarking Framework
 - **Legal Documents**: Versioned TOS, Privacy Policy, and Benchmarking Policy stored in `legal_documents` table (doc_type enum: TOS, PRIVACY, BENCHMARK_POLICY). Public API: `GET /api/legal/:docType` (terms/privacy/benchmarking). Frontend pages at `/terms`, `/privacy`, `/benchmarking`.
