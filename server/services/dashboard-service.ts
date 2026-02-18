@@ -681,14 +681,64 @@ export class DashboardService {
       filteredLostDeals = Number(filteredResult[0]?.lostDeals) || 0;
     }
 
-    const filteredClosed = filteredWonDeals + filteredLostDeals;
+    let pipelineValueTrend: number | undefined;
+    let activeDealsTrend: number | undefined;
+    let newDeals = 0;
+    if (dateFilter) {
+      const periodMs = dateFilter.endDate.getTime() - dateFilter.startDate.getTime();
+      const priorStart = new Date(dateFilter.startDate.getTime() - periodMs);
+      const priorEnd = dateFilter.startDate;
+
+      const priorResult = await db
+        .select({
+          pipelineValue: sql<string>`COALESCE(SUM(CASE WHEN LOWER(${crmDeals.stage}) IN ('active', 'under review', 'under_review') THEN COALESCE(${crmDeals.value}, 0) + COALESCE(${crmDeals.amount}, 0) END), 0)`,
+          activeDeals: sql<number>`COUNT(CASE WHEN LOWER(${crmDeals.stage}) IN ('active', 'under review', 'under_review') THEN 1 END)`,
+        })
+        .from(crmDeals)
+        .where(and(
+          eq(crmDeals.orgId, orgId),
+          lte(crmDeals.createdAt, priorEnd)
+        ));
+
+      const priorPipeline = Number(priorResult[0]?.pipelineValue) || 0;
+      const priorActive = Number(priorResult[0]?.activeDeals) || 0;
+      const currentPipeline = crmPipelineValue + modelingPipelineValue;
+      const currentActive = crmActiveDeals + modelingActiveDeals;
+
+      if (priorPipeline > 0) {
+        pipelineValueTrend = ((currentPipeline - priorPipeline) / priorPipeline) * 100;
+      } else if (currentPipeline > 0) {
+        pipelineValueTrend = 100;
+      }
+
+      if (priorActive > 0) {
+        activeDealsTrend = ((currentActive - priorActive) / priorActive) * 100;
+      } else if (currentActive > 0) {
+        activeDealsTrend = 100;
+      }
+
+      const newResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(crmDeals)
+        .where(and(
+          eq(crmDeals.orgId, orgId),
+          gte(crmDeals.createdAt, dateFilter.startDate),
+          lte(crmDeals.createdAt, dateFilter.endDate)
+        ));
+      newDeals = Number(newResult[0]?.count) || 0;
+    }
+
+    const filteredClosed2 = filteredWonDeals + filteredLostDeals;
     
     return {
       pipelineValue: crmPipelineValue + modelingPipelineValue,
+      pipelineValueTrend,
       activeDeals: crmActiveDeals + modelingActiveDeals,
+      activeDealsTrend,
+      newDeals,
       wonDeals: filteredWonDeals,
       wonValue: filteredWonValue,
-      winRate: filteredClosed > 0 ? Math.round((filteredWonDeals / filteredClosed) * 100) : 0,
+      winRate: filteredClosed2 > 0 ? Math.round((filteredWonDeals / filteredClosed2) * 100) : 0,
     };
   }
 

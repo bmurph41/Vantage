@@ -953,6 +953,8 @@ export default function Dashboard() {
               tooltip="Deals with 'Active' status (under LOI or contract)"
               onClick={() => setIsCRMDetailOpen(true)}
               clickable
+              trend={data?.activeDealsTrend}
+              trendLabel={timeRange === '7d' ? 'vs last week' : timeRange === '30d' ? 'vs last month' : timeRange === '90d' ? 'vs last quarter' : 'vs last year'}
               badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
             />
             <div className="col-span-2 rounded-xl border bg-card p-4 overflow-hidden">
