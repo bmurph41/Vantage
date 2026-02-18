@@ -1914,7 +1914,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                   floorRate={debtForm.watch('floorRate') ? parseFloat(debtForm.watch('floorRate')!) : undefined}
                                 />
                               )}
-                              </div>
 
                               <div className="grid grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="termYears" render={({ field }) => (
