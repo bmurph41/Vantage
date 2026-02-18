@@ -7761,6 +7761,46 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post("/api/crm/pending-contacts/bulk/accept", async (req: any, res) => {
+    try {
+      const { ids, mode = 'add_new' } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { accepted: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.acceptPendingContact(id, req.user.id, mode);
+          results.accepted++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk accept pending contacts:", error);
+      res.status(500).json({ error: "Failed to bulk accept pending contacts" });
+    }
+  });
+
+  app.post("/api/crm/pending-contacts/bulk/reject", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { rejected: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.rejectPendingContact(id, req.user.id);
+          results.rejected++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk reject pending contacts:", error);
+      res.status(500).json({ error: "Failed to bulk reject pending contacts" });
+    }
+  });
+
   app.post("/api/crm/pending-contacts/:id/accept", async (req: any, res) => {
     try {
       const { mode } = req.body;
@@ -7868,6 +7908,46 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.post("/api/crm/pending-companies/bulk/accept", async (req: any, res) => {
+    try {
+      const { ids, mode = 'add_new' } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { accepted: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.acceptPendingCompany(id, req.user.id, mode);
+          results.accepted++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk accept pending companies:", error);
+      res.status(500).json({ error: "Failed to bulk accept pending companies" });
+    }
+  });
+
+  app.post("/api/crm/pending-companies/bulk/reject", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { rejected: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.rejectPendingCompany(id, req.user.id);
+          results.rejected++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk reject pending companies:", error);
+      res.status(500).json({ error: "Failed to bulk reject pending companies" });
+    }
+  });
+
   app.post("/api/crm/pending-companies/:id/accept", async (req: any, res) => {
     try {
       const { mode } = req.body;
@@ -7936,6 +8016,46 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to get pending property:", error);
       res.status(500).json({ error: "Failed to retrieve pending property" });
+    }
+  });
+
+  app.post("/api/crm/pending-properties/bulk/accept", async (req: any, res) => {
+    try {
+      const { ids, mode = 'add_new' } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { accepted: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.acceptPendingProperty(id, req.user.id, mode);
+          results.accepted++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk accept pending properties:", error);
+      res.status(500).json({ error: "Failed to bulk accept pending properties" });
+    }
+  });
+
+  app.post("/api/crm/pending-properties/bulk/reject", async (req: any, res) => {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "ids array is required" });
+      }
+      const results = { rejected: 0, failed: 0 };
+      for (const id of ids) {
+        try {
+          await storage.rejectPendingProperty(id, req.user.orgId, req.user.id);
+          results.rejected++;
+        } catch { results.failed++; }
+      }
+      res.json(results);
+    } catch (error: any) {
+      console.error("Failed to bulk reject pending properties:", error);
+      res.status(500).json({ error: "Failed to bulk reject pending properties" });
     }
   });
 

@@ -11,10 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, AlertTriangle, MapPin, DollarSign, Calendar, Building, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import { PendingPropertyDetailDialog } from "@/components/pending-property-detail-dialog";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
 import { formatCurrency } from "@/lib/utils";
@@ -37,6 +39,7 @@ export default function PendingProperties() {
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [duplicateMatches, setDuplicateMatches] = useState<Record<string, DuplicateMatch[]>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,6 +48,24 @@ export default function PendingProperties() {
     staleTime: 60 * 1000,
     refetchInterval: 2 * 60 * 1000,
   });
+
+  const pendingItems = pendingProperties.filter(p => p.status === 'pending');
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === pendingItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingItems.map(p => p.id)));
+    }
+  };
 
   const detectDuplicatesMutation = useMutation({
     mutationFn: async (pendingId: string) => {
@@ -115,6 +136,37 @@ export default function PendingProperties() {
     },
   });
 
+  const bulkAcceptMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-properties/bulk/accept', { ids, mode: 'add_new' });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.accepted} propert${data.accepted !== 1 ? 'ies' : 'y'} accepted` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk accept properties", variant: "destructive" });
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-properties/bulk/reject', { ids });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-properties'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.rejected} propert${data.rejected !== 1 ? 'ies' : 'y'} removed` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk remove properties", variant: "destructive" });
+    },
+  });
+
   const handleAccept = async (pending: PendingProperty) => {
     setSelectedPending(pending);
     
@@ -168,7 +220,8 @@ export default function PendingProperties() {
     return `${monthName} ${year}`;
   };
 
-  const pendingCount = pendingProperties.filter(p => p.status === 'pending').length;
+  const pendingCount = pendingItems.length;
+  const isBulkPending = bulkAcceptMutation.isPending || bulkRejectMutation.isPending;
 
   if (isLoading) {
     return (
@@ -212,6 +265,12 @@ export default function PendingProperties() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={selectedIds.size === pendingItems.length && pendingItems.length > 0}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
                   <TableHead>Marina Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Sale Price</TableHead>
@@ -221,18 +280,23 @@ export default function PendingProperties() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingProperties
-                  .filter(p => p.status === 'pending')
+                {pendingItems
                   .map((pending) => (
                     <TableRow
                       key={pending.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${selectedIds.has(pending.id) ? 'bg-muted/30' : ''}`}
                       onClick={() => {
                         setSelectedPending(pending);
                         setShowDetailDialog(true);
                       }}
                       data-testid={`row-pending-${pending.id}`}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(pending.id)}
+                          onCheckedChange={() => toggleSelection(pending.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-muted-foreground" />
@@ -314,6 +378,27 @@ export default function PendingProperties() {
           </CardContent>
         </Card>
       )}
+
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        itemLabel="property"
+        actions={[
+          {
+            label: "Accept All",
+            icon: <Check className="h-4 w-4" />,
+            onClick: () => bulkAcceptMutation.mutate(Array.from(selectedIds)),
+            disabled: isBulkPending,
+          },
+          {
+            label: "Remove All",
+            icon: <X className="h-4 w-4" />,
+            onClick: () => bulkRejectMutation.mutate(Array.from(selectedIds)),
+            variant: "destructive",
+            disabled: isBulkPending,
+          },
+        ]}
+      />
 
       <DuplicateResolutionModal
         isOpen={showDuplicatesDialog}

@@ -11,11 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, AlertTriangle, Building2, MapPin, Phone, Globe, Calendar, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
 import { PendingCompanyDetailDialog } from "@/components/pending-company-detail-dialog";
 import type { PendingCompany, CrmCompany } from "@shared/schema";
@@ -25,14 +27,33 @@ export default function PendingCompanies() {
   const [selectedExisting, setSelectedExisting] = useState<CrmCompany | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingCompanies = [], isLoading } = useQuery<PendingCompany[]>({
     queryKey: ['/api/crm/pending-companies'],
-    staleTime: 60 * 1000, // Consider data fresh for 1 minute
-    refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
+
+  const pendingItems = pendingCompanies.filter(c => c.status === 'pending');
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === pendingItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingItems.map(p => p.id)));
+    }
+  };
 
   const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
     mutationFn: async (companyId: string) => {
@@ -74,6 +95,37 @@ export default function PendingCompanies() {
     },
     onError: () => {
       toast({ title: "Failed to remove company", variant: "destructive" });
+    },
+  });
+
+  const bulkAcceptMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-companies/bulk/accept', { ids, mode: 'add_new' });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.accepted} compan${data.accepted !== 1 ? 'ies' : 'y'} accepted` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk accept companies", variant: "destructive" });
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-companies/bulk/reject', { ids });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.rejected} compan${data.rejected !== 1 ? 'ies' : 'y'} removed` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk remove companies", variant: "destructive" });
     },
   });
 
@@ -131,7 +183,8 @@ export default function PendingCompanies() {
     return 'N/A';
   };
 
-  const pendingCount = pendingCompanies.filter(c => c.status === 'pending').length;
+  const pendingCount = pendingItems.length;
+  const isBulkPending = bulkAcceptMutation.isPending || bulkRejectMutation.isPending;
 
   if (isLoading) {
     return (
@@ -191,6 +244,12 @@ export default function PendingCompanies() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={selectedIds.size === pendingItems.length && pendingItems.length > 0}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Phone</TableHead>
@@ -201,18 +260,23 @@ export default function PendingCompanies() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingCompanies
-                  .filter(c => c.status === 'pending')
+                {pendingItems
                   .map((pending) => (
                     <TableRow
                       key={pending.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${selectedIds.has(pending.id) ? 'bg-muted/30' : ''}`}
                       data-testid={`row-pending-company-${pending.id}`}
                       onClick={() => {
                         setSelectedPending(pending);
                         setShowDetailDialog(true);
                       }}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(pending.id)}
+                          onCheckedChange={() => toggleSelection(pending.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2" data-testid={`text-company-name-${pending.id}`}>
                           <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -317,6 +381,27 @@ export default function PendingCompanies() {
           </CardContent>
         </Card>
       )}
+
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        itemLabel="company"
+        actions={[
+          {
+            label: "Accept All",
+            icon: <Check className="h-4 w-4" />,
+            onClick: () => bulkAcceptMutation.mutate(Array.from(selectedIds)),
+            disabled: isBulkPending,
+          },
+          {
+            label: "Remove All",
+            icon: <X className="h-4 w-4" />,
+            onClick: () => bulkRejectMutation.mutate(Array.from(selectedIds)),
+            variant: "destructive",
+            disabled: isBulkPending,
+          },
+        ]}
+      />
 
       <DuplicateResolutionModal
         isOpen={showDuplicatesDialog}

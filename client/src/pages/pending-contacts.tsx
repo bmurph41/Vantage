@@ -11,11 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, AlertTriangle, User, Mail, Phone, Calendar, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import DuplicateResolutionModal from "@/components/modals/duplicate-resolution-modal";
 import { PendingContactDetailDialog } from "@/components/pending-contact-detail-dialog";
 import type { PendingContact, CrmContact } from "@shared/schema";
@@ -25,14 +27,33 @@ export default function PendingContacts() {
   const [selectedExisting, setSelectedExisting] = useState<CrmContact | null>(null);
   const [showDuplicatesDialog, setShowDuplicatesDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pendingContacts = [], isLoading } = useQuery<PendingContact[]>({
     queryKey: ['/api/crm/pending-contacts'],
-    staleTime: 60 * 1000, // Consider data fresh for 1 minute
-    refetchInterval: 2 * 60 * 1000, // Refresh every 2 minutes
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
+
+  const pendingItems = pendingContacts.filter(c => c.status === 'pending');
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === pendingItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingItems.map(p => p.id)));
+    }
+  };
 
   const { mutate: fetchDuplicate, isPending: isFetchingDuplicate } = useMutation({
     mutationFn: async (contactId: string) => {
@@ -74,6 +95,37 @@ export default function PendingContacts() {
     },
     onError: () => {
       toast({ title: "Failed to remove contact", variant: "destructive" });
+    },
+  });
+
+  const bulkAcceptMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-contacts/bulk/accept', { ids, mode: 'add_new' });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.accepted} contact${data.accepted !== 1 ? 's' : ''} accepted` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk accept contacts", variant: "destructive" });
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      return await apiRequest('POST', '/api/crm/pending-contacts/bulk/reject', { ids });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/pending-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
+      toast({ title: `${data.rejected} contact${data.rejected !== 1 ? 's' : ''} removed` });
+      setSelectedIds(new Set());
+    },
+    onError: () => {
+      toast({ title: "Failed to bulk remove contacts", variant: "destructive" });
     },
   });
 
@@ -119,7 +171,8 @@ export default function PendingContacts() {
     });
   };
 
-  const pendingCount = pendingContacts.filter(c => c.status === 'pending').length;
+  const pendingCount = pendingItems.length;
+  const isBulkPending = bulkAcceptMutation.isPending || bulkRejectMutation.isPending;
 
   if (isLoading) {
     return (
@@ -179,6 +232,12 @@ export default function PendingContacts() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={selectedIds.size === pendingItems.length && pendingItems.length > 0}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
@@ -189,18 +248,23 @@ export default function PendingContacts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingContacts
-                  .filter(c => c.status === 'pending')
+                {pendingItems
                   .map((pending) => (
                     <TableRow
                       key={pending.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${selectedIds.has(pending.id) ? 'bg-muted/30' : ''}`}
                       data-testid={`row-pending-contact-${pending.id}`}
                       onClick={() => {
                         setSelectedPending(pending);
                         setShowDetailDialog(true);
                       }}
                     >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(pending.id)}
+                          onCheckedChange={() => toggleSelection(pending.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2" data-testid={`text-contact-name-${pending.id}`}>
                           <User className="h-4 w-4 text-muted-foreground" />
@@ -302,6 +366,27 @@ export default function PendingContacts() {
           </CardContent>
         </Card>
       )}
+
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        itemLabel="contact"
+        actions={[
+          {
+            label: "Accept All",
+            icon: <Check className="h-4 w-4" />,
+            onClick: () => bulkAcceptMutation.mutate(Array.from(selectedIds)),
+            disabled: isBulkPending,
+          },
+          {
+            label: "Remove All",
+            icon: <X className="h-4 w-4" />,
+            onClick: () => bulkRejectMutation.mutate(Array.from(selectedIds)),
+            variant: "destructive",
+            disabled: isBulkPending,
+          },
+        ]}
+      />
 
       <DuplicateResolutionModal
         isOpen={showDuplicatesDialog}
