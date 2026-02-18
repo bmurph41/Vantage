@@ -378,26 +378,24 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
         </div>
       </div>
 
-      <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
+      <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center">
-              Property Tax Reassessment
-              <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date. This is common when a marina is acquired and the county reassesses property value." />
-            </Label>
-            {config.reassessOnSale && (
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                New tax replaces historical starting at reassessment date
-              </p>
-            )}
-          </div>
+          <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center">
+            Property Tax Reassessment
+            <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date. This is common when a marina is acquired and the county reassesses property value." />
+          </Label>
+          <Switch
+            checked={config.reassessOnSale}
+            onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
+          />
         </div>
-        <Switch
-          checked={config.reassessOnSale}
-          onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
-        />
+        {config.reassessOnSale && (
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 ml-6">
+            <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+            New tax replaces historical starting at reassessment date
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
