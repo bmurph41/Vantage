@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,12 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, User, Mail, Calendar, HelpCircle, RotateCcw, Play, CheckCircle2, Shield, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, User, Mail, Calendar, HelpCircle, RotateCcw, Play, CheckCircle2, Shield, Info, Save, Phone, Globe, Bell } from "lucide-react";
 import { useLocation } from "wouter";
 import { EmailManagement } from "@/components/email-management";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { TOUR_IDS } from "@/lib/tour-configs";
+
+const TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Chicago", label: "Central (CT)" },
+  { value: "America/Denver", label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Anchorage", label: "Alaska (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (HT)" },
+  { value: "UTC", label: "UTC" },
+];
+
+const CALENDAR_PROVIDERS = [
+  { value: "google", label: "Google Calendar", icon: "📅" },
+  { value: "outlook", label: "Outlook", icon: "📧" },
+  { value: "apple", label: "Apple Calendar", icon: "🍎" },
+];
 
 const TOUR_INFO = [
   { id: TOUR_IDS.DASHBOARD, name: "Dashboard", description: "Overview of your marina acquisitions", route: "/" },
@@ -27,16 +47,79 @@ const TOUR_INFO = [
 ];
 
 const VIDEO_PLACEHOLDERS = [
-  { title: "Getting Started with MarinaMatch", description: "Learn the basics of navigating the platform", duration: "5 min" },
-  { title: "CRM & Deal Management", description: "How to manage your acquisition pipeline", duration: "8 min" },
-  { title: "Rent Roll Deep Dive", description: "Advanced rent roll features and reporting", duration: "12 min" },
-  { title: "Financial Modeling", description: "Building accurate marina valuations", duration: "15 min" },
+  { title: "Getting Started with MarinaMatch", description: "Learn the basics of navigating the platform", duration: "5 min", link: "/" },
+  { title: "CRM & Deal Management", description: "How to manage your acquisition pipeline", duration: "8 min", link: "/deals" },
+  { title: "Rent Roll Deep Dive", description: "Advanced rent roll features and reporting", duration: "12 min", link: "/operations/rent-roll" },
+  { title: "Financial Modeling", description: "Building accurate marina valuations", duration: "15 min", link: "/modeling" },
 ];
 
 export default function UserSettingsPage() {
   const [location, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("emails");
   const { toast } = useToast();
+
+  const [profileName, setProfileName] = useState("");
+  const [profileTz, setProfileTz] = useState("America/New_York");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [inAppNotifications, setInAppNotifications] = useState(true);
+  const [smsNotifications, setSmsNotifications] = useState(false);
+  const [calendarProvider, setCalendarProvider] = useState<string>("");
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(true);
+
+  const { data: settingsData, isLoading: isLoadingSettings } = useQuery<{
+    settings: any;
+    profile: { id: string; email: string; name: string; role: string; orgId: string; mfaEnabled: boolean; emailVerified: boolean };
+    organization: any;
+  }>({
+    queryKey: ['/api/settings/me'],
+  });
+
+  useEffect(() => {
+    if (settingsData) {
+      setProfileName(settingsData.profile?.name || "");
+      setProfilePhone((settingsData.profile as any)?.phone || "");
+      setProfileTz((settingsData.profile as any)?.tz || settingsData.settings?.timezone || "America/New_York");
+      setCalendarProvider((settingsData.profile as any)?.defaultCalendarProvider || "");
+      setCalendarSyncEnabled((settingsData.profile as any)?.calendarSyncEnabled ?? true);
+      const notifPrefs = settingsData.settings?.notificationPreferences?.channels;
+      if (notifPrefs) {
+        setEmailNotifications(notifPrefs.email ?? true);
+        setInAppNotifications(notifPrefs.inApp ?? true);
+        setSmsNotifications(notifPrefs.sms ?? false);
+      }
+    }
+  }, [settingsData]);
+
+  const profileMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      await apiRequest("PATCH", "/api/user/profile", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/me'] });
+      toast({ title: "Profile updated", description: "Your changes have been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
+    },
+  });
+
+  const notificationMutation = useMutation({
+    mutationFn: async (channels: { inApp: boolean; email: boolean; sms: boolean }) => {
+      await apiRequest("PUT", "/api/settings/me", {
+        notificationPreferences: {
+          channels,
+        },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/me'] });
+      toast({ title: "Preferences saved", description: "Notification preferences updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update notification preferences.", variant: "destructive" });
+    },
+  });
 
   // Fetch user emails
   const { data: userEmails = [], isLoading: isLoadingEmails } = useQuery({
@@ -195,25 +278,51 @@ export default function UserSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  <div>
+                    <Label className="text-sm font-medium">Default Calendar Provider</Label>
+                    <p className="text-sm text-muted-foreground mb-3">Choose your preferred calendar service for sync operations</p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {CALENDAR_PROVIDERS.map((provider) => (
+                        <div
+                          key={provider.value}
+                          onClick={() => setCalendarProvider(provider.value)}
+                          className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                            calendarProvider === provider.value
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          <span className="text-2xl">{provider.icon}</span>
+                          <span className="font-medium text-foreground">{provider.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Separator />
                   <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                     <div>
-                      <h4 className="font-medium text-foreground">Default Calendar Provider</h4>
+                      <h4 className="font-medium text-foreground">Auto-Sync</h4>
                       <p className="text-sm text-muted-foreground">
-                        Choose your preferred calendar service for sync operations
+                        Automatically synchronize events with your calendar
                       </p>
                     </div>
-                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                    <Switch
+                      checked={calendarSyncEnabled}
+                      onCheckedChange={setCalendarSyncEnabled}
+                    />
                   </div>
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-foreground">Auto-Sync Settings</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Configure automatic calendar synchronization preferences
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
-                  </div>
+                  <Button
+                    onClick={() => profileMutation.mutate({
+                      defaultCalendarProvider: calendarProvider || null,
+                      calendarSyncEnabled,
+                    })}
+                    disabled={profileMutation.isPending}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    {profileMutation.isPending ? "Saving..." : "Save Calendar Settings"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -231,24 +340,96 @@ export default function UserSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-foreground">Account Information</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Update your name, timezone, and other account details
-                      </p>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="displayName">Display Name</Label>
+                      <Input
+                        id="displayName"
+                        value={profileName}
+                        onChange={(e) => setProfileName(e.target.value)}
+                        placeholder="Your display name"
+                      />
                     </div>
-                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                    <div className="space-y-2">
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select value={profileTz} onValueChange={setProfileTz}>
+                        <SelectTrigger id="timezone">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        value={profilePhone}
+                        onChange={(e) => setProfilePhone(e.target.value)}
+                        placeholder="+1 (555) 123-4567"
+                        type="tel"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => profileMutation.mutate({ name: profileName, tz: profileTz, phone: profilePhone })}
+                      disabled={profileMutation.isPending}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {profileMutation.isPending ? "Saving..." : "Save Profile"}
+                    </Button>
                   </div>
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+
+                  <Separator />
+
+                  <div className="space-y-4">
                     <div>
-                      <h4 className="font-medium text-foreground">Notification Preferences</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Configure global notification settings
-                      </p>
+                      <h4 className="font-medium text-foreground flex items-center gap-2">
+                        <Bell className="h-4 w-4" />
+                        Notification Preferences
+                      </h4>
+                      <p className="text-sm text-muted-foreground">Configure how you receive notifications</p>
                     </div>
-                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div>
+                          <h4 className="font-medium text-foreground text-sm">Email Notifications</h4>
+                          <p className="text-xs text-muted-foreground">Receive updates via email</p>
+                        </div>
+                        <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+                      </div>
+                      <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div>
+                          <h4 className="font-medium text-foreground text-sm">In-App Notifications</h4>
+                          <p className="text-xs text-muted-foreground">Show notifications within the application</p>
+                        </div>
+                        <Switch checked={inAppNotifications} onCheckedChange={setInAppNotifications} />
+                      </div>
+                      <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+                        <div>
+                          <h4 className="font-medium text-foreground text-sm">SMS Notifications</h4>
+                          <p className="text-xs text-muted-foreground">Receive text message alerts</p>
+                        </div>
+                        <Switch checked={smsNotifications} onCheckedChange={setSmsNotifications} />
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => notificationMutation.mutate({
+                        email: emailNotifications,
+                        inApp: inAppNotifications,
+                        sms: smsNotifications,
+                      })}
+                      disabled={notificationMutation.isPending}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {notificationMutation.isPending ? "Saving..." : "Save Notification Preferences"}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -350,7 +531,8 @@ export default function UserSettingsPage() {
                   {VIDEO_PLACEHOLDERS.map((video, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-4 p-4 border border-border rounded-lg bg-muted/30"
+                      onClick={() => setLocation(video.link)}
+                      className="flex items-center gap-4 p-4 border border-border rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/60 transition-colors"
                     >
                       <div className="flex-shrink-0 w-16 h-12 bg-muted rounded flex items-center justify-center">
                         <Play className="h-6 w-6 text-muted-foreground" />
@@ -360,7 +542,7 @@ export default function UserSettingsPage() {
                         <p className="text-sm text-muted-foreground truncate">{video.description}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary" className="text-xs">{video.duration}</Badge>
-                          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                          <Badge variant="outline" className="text-xs text-primary border-primary">Interactive Guide</Badge>
                         </div>
                       </div>
                     </div>

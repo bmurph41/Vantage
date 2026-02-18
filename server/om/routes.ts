@@ -2489,6 +2489,49 @@ router.patch("/pages/:id/layout", async (req, res) => {
 });
 
 // ============================================================================
+// Email Sharing
+// ============================================================================
+
+router.post("/oms/:omId/email", async (req, res) => {
+  try {
+    const { omId } = req.params;
+    const { recipientEmail, omName } = req.body;
+
+    if (!recipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      return res.status(400).json({ error: "Valid recipient email is required" });
+    }
+
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Email service not configured" });
+    }
+
+    const sgMail = require('@sendgrid/mail');
+    sgMail.setApiKey(apiKey);
+
+    const msg = {
+      to: recipientEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com',
+      subject: `Offering Memorandum: ${omName || 'Document'}`,
+      text: `Please find the attached Offering Memorandum: ${omName || 'Document'}.\n\nThis document was shared with you via MarinaMatch.`,
+      html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a365d;">Offering Memorandum</h2>
+        <p>You've been sent an Offering Memorandum: <strong>${omName || 'Document'}</strong></p>
+        <p>This document was shared with you via MarinaMatch.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #718096; font-size: 12px;">MarinaMatch - Marina Acquisition Platform</p>
+      </div>`,
+    };
+
+    await sgMail.send(msg);
+    res.json({ success: true, message: `Email sent to ${recipientEmail}` });
+  } catch (error) {
+    console.error("Error sending OM email:", error);
+    res.status(500).json({ error: "Failed to send email" });
+  }
+});
+
+// ============================================================================
 // Seed Routes
 // ============================================================================
 

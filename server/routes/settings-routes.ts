@@ -247,7 +247,8 @@ const DEFAULT_SETTINGS = {
 
     try {
       const userResult = await db.execute(sql`
-        SELECT id, email, name, role, org_id as "orgId", mfa_enabled as "mfaEnabled", email_verified as "emailVerified"
+        SELECT id, email, name, role, org_id as "orgId", mfa_enabled as "mfaEnabled", email_verified as "emailVerified",
+          phone, tz, default_calendar_provider as "defaultCalendarProvider", calendar_sync_enabled as "calendarSyncEnabled"
         FROM users WHERE id = ${effectiveUserId}
       `);
       if (userResult.rows[0]) {

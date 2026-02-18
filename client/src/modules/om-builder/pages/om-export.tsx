@@ -3,6 +3,7 @@ import { Link, useRoute } from "wouter";
 import { ArrowLeft, Download, Printer, FileText, Mail, Share2, FolderLock, Check, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -31,19 +32,14 @@ export default function OMExport() {
   const [selectedVdrFolder, setSelectedVdrFolder] = useState<VdrFolder | null>(null);
   const [vdrExportSuccess, setVdrExportSuccess] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
 
   const pages: OmPage[] = om?.pages as OmPage[] || [];
   const dimension: OmDocumentDimension = (om?.dimension as OmDocumentDimension) || 'portrait';
 
   const handleExport = async () => {
-    if (exportFormat !== 'pdf') {
-      toast({ 
-        title: "Coming Soon", 
-        description: `${exportFormat.toUpperCase()} export will be available in a future update.` 
-      });
-      return;
-    }
-
     if (pages.length === 0) {
       toast({ 
         title: "No Pages", 
@@ -54,35 +50,100 @@ export default function OMExport() {
     }
 
     setIsExporting(true);
-    toast({ 
-      title: "Export Started", 
-      description: "Your PDF is being generated..." 
-    });
-    
-    try {
-      const blob = await generatePdf(pages, om?.name || 'Offering Memorandum', {
-        dimension,
-        includePageNumbers: true,
-        includeHeader: true,
-      });
-      
-      const filename = `${om?.name || 'Offering_Memorandum'}.pdf`.replace(/\s+/g, '_');
-      downloadPdf(blob, filename);
-      
-      toast({ 
-        title: "Export Complete", 
-        description: "Your PDF has been downloaded." 
-      });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({ 
-        title: "Export Failed", 
-        description: "There was an error generating the PDF. Please try again.",
-        variant: "destructive" 
-      });
-    } finally {
-      setIsExporting(false);
+
+    if (exportFormat === 'pdf') {
+      toast({ title: "Export Started", description: "Your PDF is being generated..." });
+      try {
+        const blob = await generatePdf(pages, om?.name || 'Offering Memorandum', {
+          dimension,
+          includePageNumbers: true,
+          includeHeader: true,
+        });
+        const filename = `${om?.name || 'Offering_Memorandum'}.pdf`.replace(/\s+/g, '_');
+        downloadPdf(blob, filename);
+        toast({ title: "Export Complete", description: "Your PDF has been downloaded." });
+      } catch (error) {
+        console.error('PDF generation error:', error);
+        toast({ title: "Export Failed", description: "There was an error generating the PDF. Please try again.", variant: "destructive" });
+      } finally {
+        setIsExporting(false);
+      }
+      return;
     }
+
+    if (exportFormat === 'docx') {
+      try {
+        toast({ title: "Export Started", description: "Your Word document is being generated..." });
+        const htmlContent = pages.map((page, idx) => {
+          const title = page.title || `Page ${idx + 1}`;
+          const body = page.content || page.body || '';
+          return `<div style="page-break-after: always;"><h2>${title}</h2><div>${body}</div></div>`;
+        }).join('');
+        
+        const fullHtml = `
+          <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+          <head><meta charset="utf-8"><title>${om?.name || 'Offering Memorandum'}</title>
+          <style>body { font-family: Calibri, Arial, sans-serif; margin: 1in; } h1 { color: #1a365d; } h2 { color: #2d3748; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }</style>
+          </head><body>
+          <h1>${om?.name || 'Offering Memorandum'}</h1>
+          ${includeToc ? '<h2>Table of Contents</h2><ul>' + pages.map((p, i) => `<li>${p.title || `Page ${i + 1}`}</li>`).join('') + '</ul><div style="page-break-after: always;"></div>' : ''}
+          ${htmlContent}
+          </body></html>`;
+        
+        const blob = new Blob([fullHtml], { type: 'application/msword' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${om?.name || 'Offering_Memorandum'}.doc`.replace(/\s+/g, '_');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast({ title: "Export Complete", description: "Your Word document has been downloaded." });
+      } catch (error) {
+        console.error('DOCX generation error:', error);
+        toast({ title: "Export Failed", description: "There was an error generating the document.", variant: "destructive" });
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
+
+    if (exportFormat === 'pptx') {
+      try {
+        toast({ title: "Export Started", description: "Your presentation is being generated..." });
+        const htmlContent = pages.map((page, idx) => {
+          const title = page.title || `Slide ${idx + 1}`;
+          const body = page.content || page.body || '';
+          return `<div style="page-break-after: always; min-height: 500px;"><h1 style="font-size: 28px; color: #1a365d;">${title}</h1><div style="font-size: 16px; margin-top: 20px;">${body}</div></div>`;
+        }).join('');
+        
+        const fullHtml = `
+          <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+          <head><meta charset="utf-8"><title>${om?.name || 'Offering Memorandum'}</title>
+          <style>body { font-family: Calibri, Arial, sans-serif; margin: 40px; }</style>
+          </head><body>${htmlContent}</body></html>`;
+        
+        const blob = new Blob([fullHtml], { type: 'application/vnd.ms-powerpoint' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${om?.name || 'Offering_Memorandum'}.ppt`.replace(/\s+/g, '_');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast({ title: "Export Complete", description: "Your presentation has been downloaded." });
+      } catch (error) {
+        console.error('PPTX generation error:', error);
+        toast({ title: "Export Failed", description: "There was an error generating the presentation.", variant: "destructive" });
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
+
+    setIsExporting(false);
   };
 
   const handlePrint = () => {
@@ -90,10 +151,27 @@ export default function OMExport() {
   };
 
   const handleEmail = () => {
-    toast({ 
-      title: "Coming Soon", 
-      description: "Email sharing will be available in a future update." 
-    });
+    setRecipientEmail("");
+    setEmailDialogOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
+      return;
+    }
+
+    setEmailSending(true);
+    try {
+      await apiRequest("POST", `/api/om/oms/${omId}/email`, { recipientEmail, omName: om?.name || 'Offering Memorandum' });
+      toast({ title: "Email Sent", description: `Document sent to ${recipientEmail}` });
+      setEmailDialogOpen(false);
+    } catch (error) {
+      toast({ title: "Send Failed", description: "Could not send the email. Please try again.", variant: "destructive" });
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const exportToVdrMutation = useMutation({
@@ -309,6 +387,36 @@ export default function OMExport() {
           </div>
         </div>
       </div>
+
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Email Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Recipient Email</Label>
+              <Input
+                type="email"
+                placeholder="name@example.com"
+                value={recipientEmail}
+                onChange={(e: any) => setRecipientEmail(e.target.value)}
+                onKeyDown={(e: any) => e.key === 'Enter' && handleSendEmail()}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              The document will be sent as a PDF attachment.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSendEmail} disabled={!recipientEmail || emailSending}>
+              {emailSending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+              {emailSending ? 'Sending...' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

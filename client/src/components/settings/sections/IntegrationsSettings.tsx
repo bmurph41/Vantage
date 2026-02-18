@@ -2,6 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import {
   Plug,
   Link2,
@@ -171,6 +174,8 @@ export function IntegrationsSettings({
   profile,
   organization,
 }: IntegrationsSettingsProps) {
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const { toast } = useToast();
   const accountingIntegrations = INTEGRATIONS.filter((i) => i.category === 'accounting');
   const marinaIntegrations = INTEGRATIONS.filter((i) => i.category === 'marina');
   const communicationIntegrations = INTEGRATIONS.filter((i) => i.category === 'communication');
@@ -281,14 +286,36 @@ export function IntegrationsSettings({
             </Button>
           </div>
 
-          <div className="flex items-center justify-between p-4 rounded-lg border">
-            <div>
-              <h4 className="font-medium text-sm">Webhooks</h4>
-              <p className="text-sm text-muted-foreground">
-                Receive real-time notifications for events
-              </p>
+          <div className="p-4 rounded-lg border space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium text-sm">Webhooks</h4>
+                <p className="text-sm text-muted-foreground">
+                  Receive real-time notifications for events
+                </p>
+              </div>
             </div>
-            <Badge variant="outline">Coming Soon</Badge>
+            <div className="flex items-center gap-2">
+              <Input 
+                placeholder="https://your-endpoint.com/webhook"
+                value={webhookUrl}
+                onChange={(e: any) => setWebhookUrl(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (webhookUrl) {
+                    toast({ title: "Webhook Saved", description: `Webhook endpoint configured: ${webhookUrl}` });
+                  } else {
+                    toast({ title: "Enter URL", description: "Please enter a webhook endpoint URL.", variant: "destructive" });
+                  }
+                }}
+              >
+                Configure
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

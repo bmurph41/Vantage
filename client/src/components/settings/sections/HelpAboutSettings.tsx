@@ -82,7 +82,7 @@ export function HelpAboutSettings({
           </a>
 
           <a
-            href="#"
+            href="mailto:support@marinamatch.com?subject=Live%20Chat%20Support%20Request"
             className="flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors"
           >
             <MessageCircle className="h-5 w-5 text-primary" />
@@ -90,7 +90,7 @@ export function HelpAboutSettings({
               <h4 className="font-medium text-sm">Live Chat</h4>
               <p className="text-xs text-muted-foreground">Chat with our team</p>
             </div>
-            <Badge variant="outline" className="ml-auto">Coming Soon</Badge>
+            <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
           </a>
 
           <a

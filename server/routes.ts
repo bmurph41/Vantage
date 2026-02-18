@@ -5037,6 +5037,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  app.patch("/api/user/profile", async (req: any, res) => {
+    try {
+      const userId = req.user?.id || (process.env.NODE_ENV !== 'production' ? 'user-1' : null);
+      if (!userId) return res.status(401).json({ error: "Authentication required" });
+
+      const { name, tz, phone, defaultCalendarProvider, calendarSyncEnabled } = req.body;
+      const setClauses: string[] = [];
+      const values: any[] = [];
+
+      if (name !== undefined) { setClauses.push(`name = $${values.length + 1}`); values.push(name); }
+      if (tz !== undefined) { setClauses.push(`tz = $${values.length + 1}`); values.push(tz); }
+      if (phone !== undefined) { setClauses.push(`phone = $${values.length + 1}`); values.push(phone); }
+      if (defaultCalendarProvider !== undefined) { setClauses.push(`default_calendar_provider = $${values.length + 1}`); values.push(defaultCalendarProvider || null); }
+      if (calendarSyncEnabled !== undefined) { setClauses.push(`calendar_sync_enabled = $${values.length + 1}`); values.push(calendarSyncEnabled); }
+
+      if (setClauses.length === 0) return res.json({ success: true });
+
+      const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${values.length + 1}`;
+      values.push(userId);
+      await db.execute(sql.raw(query, values));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Update user profile error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
   // User Email Management
   app.get("/api/user/emails", async (req: any, res) => {
     try {
