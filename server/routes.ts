@@ -60,6 +60,7 @@ import crmTimelineRoutes from "./routes/crm-timeline-routes";
 import crmPreviewRoutes from "./routes/crm-preview-routes";
 import crmNotesRoutes from "./routes/crm-notes-routes";
 import crmSummaryRoutes from "./routes/crm-summary-routes";
+import crmSavedViewsRoutes from "./routes/crm-saved-views-routes";
 import crmAssociationsRoutes from "./routes/crm-associations-routes";
 import { getSlaRouter } from "./routes/sla-routes";
 import opssosRouter from "./routes/opssos";
@@ -412,6 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", crmPreviewRoutes);
   app.use("/api/crm/notes", crmNotesRoutes);
   app.use("/api/crm/summary", crmSummaryRoutes);
+  app.use("/api/crm/saved-views", authenticateUser, crmSavedViewsRoutes);
   app.use("/api/crm/associations", crmAssociationsRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
@@ -8068,7 +8070,14 @@ Current context: Project ${req.params.projectId}`;
   app.post("/api/crm/activities", async (req: any, res) => {
     try {
       const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
-      res.json(activity);
+      
+      if (activity.entityType && activity.entityId && req.user.orgId) {
+        const { associateActivity } = await import('./services/activity-association-service');
+        const associations = await associateActivity(activity.id, activity.entityType, activity.entityId, req.user.orgId);
+        res.json({ ...activity, associations });
+      } else {
+        res.json(activity);
+      }
     } catch (error: any) {
       console.error("Failed to create activity:", error);
       res.status(500).json({ error: "Failed to create activity" });
@@ -8597,17 +8606,15 @@ Current context: Project ${req.params.projectId}`;
       const { entityType, entityId } = req.params;
       const orgId = req.user.orgId;
       const { inArray, or } = await import('drizzle-orm');
+      const { crmActivityAssociations } = await import('@shared/schema');
 
-      // Get all user IDs in this organization for org-scoped queries
       const orgUserIds = db.select({ id: users.id }).from(users).where(eq(users.orgId, orgId));
 
-      // Validate entity type
       const validTypes = ['contact', 'company', 'deal', 'property', 'lead'];
       if (!validTypes.includes(entityType)) {
         return res.status(400).json({ error: `Invalid entity type. Must be one of: ${validTypes.join(', ')}` });
       }
 
-      // For contacts, also fetch activities from linked companies
       let linkedCompanyIds: string[] = [];
       let linkedCompanyNames: Map<string, string> = new Map();
       if (entityType === 'contact') {
@@ -8620,31 +8627,43 @@ Current context: Project ${req.params.projectId}`;
         });
       }
 
-      // Fetch activities for this entity (and linked companies for contacts)
+      const associatedActivityRows = await db.select({
+        activityId: crmActivityAssociations.activityId,
+        isPrimary: crmActivityAssociations.isPrimary,
+      }).from(crmActivityAssociations).where(
+        and(
+          eq(crmActivityAssociations.objectType, entityType),
+          eq(crmActivityAssociations.objectId, entityId),
+          eq(crmActivityAssociations.orgId, orgId)
+        )
+      );
+      const associatedActivityIds = associatedActivityRows.map(r => r.activityId);
+
       let activities: any[] = [];
       if (entityType === 'contact' && linkedCompanyIds.length > 0) {
         activities = await db.query.crmActivities.findMany({
           where: and(
             or(
               and(eq(crmActivities.entityType, 'contact'), eq(crmActivities.entityId, entityId)),
-              and(eq(crmActivities.entityType, 'company'), inArray(crmActivities.entityId, linkedCompanyIds))
+              and(eq(crmActivities.entityType, 'company'), inArray(crmActivities.entityId, linkedCompanyIds)),
+              ...(associatedActivityIds.length > 0 ? [inArray(crmActivities.id, associatedActivityIds)] : [])
             ),
             inArray(crmActivities.userId, orgUserIds)
           ),
           orderBy: [desc(crmActivities.createdAt)],
         });
       } else {
+        const directCondition = and(eq(crmActivities.entityType, entityType), eq(crmActivities.entityId, entityId));
+        const conditions = associatedActivityIds.length > 0
+          ? or(directCondition, inArray(crmActivities.id, associatedActivityIds))
+          : directCondition;
+        
         activities = await db.query.crmActivities.findMany({
-          where: and(
-            eq(crmActivities.entityType, entityType),
-            eq(crmActivities.entityId, entityId),
-            inArray(crmActivities.userId, orgUserIds)
-          ),
+          where: and(conditions, inArray(crmActivities.userId, orgUserIds)),
           orderBy: [desc(crmActivities.createdAt)],
         });
       }
 
-      // Fetch notes for this entity (and linked companies for contacts)
       let notes: any[] = [];
       if (entityType === 'contact' && linkedCompanyIds.length > 0) {
         notes = await db.query.crmNotes.findMany({
@@ -8668,7 +8687,6 @@ Current context: Project ${req.params.projectId}`;
         });
       }
 
-      // Fetch files for this entity (and linked companies for contacts)
       let files: any[] = [];
       if (entityType === 'contact' && linkedCompanyIds.length > 0) {
         files = await db.query.crmFiles.findMany({
@@ -8692,7 +8710,6 @@ Current context: Project ${req.params.projectId}`;
         });
       }
 
-      // Normalize all items into a unified timeline format
       type TimelineItem = {
         id: string;
         type: 'activity' | 'note' | 'file';
@@ -8705,21 +8722,32 @@ Current context: Project ${req.params.projectId}`;
       };
 
       const timelineItems: TimelineItem[] = [];
+      const associatedIdSet = new Set(associatedActivityIds);
 
-      // Helper to get source entity info
-      const getSourceEntity = (itemEntityType: string, itemEntityId: string) => {
-        if (entityType === 'contact' && itemEntityType === 'company') {
-          return {
-            type: 'company',
-            id: itemEntityId,
-            name: linkedCompanyNames.get(itemEntityId) || 'Company'
-          };
+      const getSourceEntity = (itemEntityType: string, itemEntityId: string, activityId?: string) => {
+        if (itemEntityType !== entityType || itemEntityId !== entityId) {
+          if (entityType === 'contact' && itemEntityType === 'company') {
+            return {
+              type: 'company',
+              id: itemEntityId,
+              name: linkedCompanyNames.get(itemEntityId) || 'Company'
+            };
+          }
+          if (activityId && associatedIdSet.has(activityId)) {
+            return {
+              type: itemEntityType,
+              id: itemEntityId,
+              name: itemEntityType.charAt(0).toUpperCase() + itemEntityType.slice(1)
+            };
+          }
         }
         return undefined;
       };
 
-      // Add activities
+      const seenIds = new Set<string>();
       for (const activity of activities) {
+        if (seenIds.has(activity.id)) continue;
+        seenIds.add(activity.id);
         timelineItems.push({
           id: activity.id,
           type: 'activity',
@@ -8735,11 +8763,10 @@ Current context: Project ${req.params.projectId}`;
             scheduledAt: activity.scheduledAt,
             completedAt: activity.completedAt,
           },
-          sourceEntity: getSourceEntity(activity.entityType, activity.entityId),
+          sourceEntity: getSourceEntity(activity.entityType, activity.entityId, activity.id),
         });
       }
 
-      // Add notes
       for (const note of notes) {
         timelineItems.push({
           id: note.id,
@@ -8748,14 +8775,11 @@ Current context: Project ${req.params.projectId}`;
           title: 'Note',
           description: note.content,
           timestamp: note.createdAt,
-          metadata: {
-            isPinned: note.isPinned,
-          },
+          metadata: { isPinned: note.isPinned },
           sourceEntity: getSourceEntity(note.entityType, note.entityId),
         });
       }
 
-      // Add files
       for (const file of files) {
         timelineItems.push({
           id: file.id,
@@ -8774,7 +8798,6 @@ Current context: Project ${req.params.projectId}`;
         });
       }
 
-      // Sort by timestamp descending
       timelineItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       res.json({
@@ -8786,6 +8809,7 @@ Current context: Project ${req.params.projectId}`;
           total: timelineItems.length,
         },
         linkedCompanies: linkedCompanyIds.length,
+        associatedActivities: associatedActivityIds.length,
       });
     } catch (error: any) {
       console.error("Failed to get unified timeline:", error);
@@ -17832,7 +17856,57 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-    // Get all modeling projects for organization
+  app.post('/api/modeling/projects/compare', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectIds } = req.body;
+      
+      if (!projectIds || !Array.isArray(projectIds) || projectIds.length < 2 || projectIds.length > 5) {
+        return res.status(400).json({ error: 'Select 2-5 projects to compare' });
+      }
+
+      const projects = await db.select().from(modelingProjects).where(
+        and(
+          eq(modelingProjects.orgId, orgId),
+          inArray(modelingProjects.id, projectIds)
+        )
+      );
+
+      if (projects.length < 2) {
+        return res.status(404).json({ error: 'Not enough projects found' });
+      }
+
+      const { modelingScenarioVersions, modelingFinancialPeriods } = await import('@shared/schema');
+
+      const enrichedProjects = await Promise.all(projects.map(async (project) => {
+        const scenarios = await db.select().from(modelingScenarioVersions).where(
+          and(
+            eq(modelingScenarioVersions.modelingProjectId, project.id),
+            eq(modelingScenarioVersions.isCurrentVersion, true)
+          )
+        );
+        
+        const baseScenario = scenarios.find((s: any) => s.scenarioType === 'base') || scenarios[0] || null;
+
+        const financialData = await db.select().from(modelingFinancialPeriods).where(
+          eq(modelingFinancialPeriods.modelingProjectId, project.id)
+        );
+
+        return {
+          ...project,
+          baseScenario,
+          scenarios,
+          financialDocumentCount: financialData.length,
+        };
+      }));
+
+      res.json(enrichedProjects);
+    } catch (error: any) {
+      console.error('Failed to compare acquisition projects:', error);
+      res.status(500).json({ error: 'Failed to compare projects' });
+    }
+  });
+
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

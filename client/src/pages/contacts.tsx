@@ -18,6 +18,7 @@ import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
+import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import type { Contact, Company, Deal } from "@shared/schema";
 
 type ContactWithCompany = Contact & { 
@@ -64,6 +65,7 @@ export default function Contacts() {
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showImportResults, setShowImportResults] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -235,6 +237,20 @@ export default function Contacts() {
     toast({ title: `Exported ${selectedIds.size} ${selectedIds.size === 1 ? 'contact' : 'contacts'}` });
   };
 
+  const handleSelectView = (view: any) => {
+    if (!view) {
+      setActiveViewId(null);
+      setStatusFilter('all');
+      setContactTagFilter('all');
+      return;
+    }
+    setActiveViewId(view.id);
+    if (view.filters?.leadStatus) setStatusFilter(view.filters.leadStatus);
+    else setStatusFilter('all');
+    if (view.filters?.contactTag) setContactTagFilter(view.filters.contactTag);
+    else setContactTagFilter('all');
+  };
+
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
       const matchesSearch = !searchTerm || 
@@ -354,6 +370,14 @@ export default function Contacts() {
 
   return (
     <CrmPageShell>
+      <div className="flex h-full">
+        <SavedViewsSidebar
+          objectType="contact"
+          activeViewId={activeViewId}
+          onSelectView={handleSelectView}
+          currentFilters={{ leadStatus: statusFilter !== 'all' ? statusFilter : undefined, contactTag: contactTagFilter !== 'all' ? contactTagFilter : undefined }}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
       <CrmTopBar
         title="Contacts"
         subtitle={`${filteredContacts.length} contacts`}
@@ -495,6 +519,8 @@ export default function Contacts() {
       <ContactFormModal isOpen={isContactFormOpen} onClose={() => { setIsContactFormOpen(false); setEditingContact(null); }} contact={editingContact} />
       <ImportResultsModal isOpen={showImportResults} onClose={() => setShowImportResults(false)} results={importResults} entityType="contacts" />
       <CreateContactWizardModal open={isCreateWizardOpen} onOpenChange={setIsCreateWizardOpen} />
+        </div>
+      </div>
     </CrmPageShell>
   );
 }

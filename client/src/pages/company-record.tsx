@@ -1,18 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import {
   Building2, Globe, Phone, Mail, MapPin, Users, Briefcase,
   Calendar, DollarSign, TrendingUp, Activity, Star, ExternalLink,
   Clock, Tag, Flame, Thermometer, ShieldCheck, FileText,
   MessageSquare, Home, Anchor, ChevronRight, ArrowUpRight,
-  Linkedin, Twitter
+  Linkedin, Twitter, Hash, Target, BarChart3, Zap,
 } from 'lucide-react';
-import { CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard } from '@/components/crm/CrmRecordPage';
+import {
+  CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard, AssociationRow,
+} from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
+import { cn, formatCurrency } from '@/lib/utils';
+
+// ── Types ─────────────────────────────────────────────────
 
 interface CompanyRecord {
   id: string;
@@ -50,55 +57,52 @@ interface CompanyRecord {
   deals: Array<{ id: string; name: string; value: string | null; stage: string; probability: number | null; expectedCloseDate: string | null }>;
   recentActivities: Array<{ id: string; type: string; subject: string; status: string; scheduledAt: string | null; completedAt: string | null }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
+  rollups?: { lastActivityAt?: string; nextActivityAt?: string; openDealsCount?: number; pipelineValue?: number; engagementScore30d?: number };
 }
 
+// ── Color maps ────────────────────────────────────────────
+
 const industryColors: Record<string, string> = {
-  marina: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  marine: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  real_estate: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  technology: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  finance: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  hospitality: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-  construction: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  healthcare: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  default: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  marina: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300',
+  marine: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  real_estate: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  technology: 'bg-purple-50 text-purple-700 border-purple-200',
+  finance: 'bg-amber-50 text-amber-700 border-amber-200',
+  hospitality: 'bg-rose-50 text-rose-700 border-rose-200',
+  construction: 'bg-orange-50 text-orange-700 border-orange-200',
 };
 
 const stageColors: Record<string, string> = {
-  discovery: 'bg-blue-100 text-blue-700',
-  qualification: 'bg-indigo-100 text-indigo-700',
-  proposal: 'bg-purple-100 text-purple-700',
-  negotiation: 'bg-amber-100 text-amber-700',
-  closed_won: 'bg-green-100 text-green-700',
-  closed_lost: 'bg-red-100 text-red-700',
-  default: 'bg-gray-100 text-gray-700',
+  discovery: 'bg-blue-50 text-blue-700',
+  qualification: 'bg-indigo-50 text-indigo-700',
+  proposal: 'bg-purple-50 text-purple-700',
+  negotiation: 'bg-amber-50 text-amber-700',
+  closed_won: 'bg-green-50 text-green-700',
+  closed_lost: 'bg-red-50 text-red-700',
 };
 
 const acquisitionConfig: Record<string, { color: string; icon: any; bg: string; text: string }> = {
-  hot: { color: 'text-red-600', icon: Flame, bg: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800', text: 'Actively pursuing acquisition — high priority target' },
-  warm: { color: 'text-orange-500', icon: Thermometer, bg: 'bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800', text: 'Moderate interest — monitoring for opportunities' },
-  cold: { color: 'text-blue-500', icon: Thermometer, bg: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800', text: 'Low priority — not currently pursuing' },
-  none: { color: 'text-gray-400', icon: ShieldCheck, bg: 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700', text: 'No acquisition interest indicated' },
-  unknown: { color: 'text-gray-300', icon: ShieldCheck, bg: 'bg-gray-50 border-dashed border-gray-300 dark:bg-gray-900 dark:border-gray-600', text: 'Acquisition interest has not been assessed' },
+  hot: { color: 'text-red-600', icon: Flame, bg: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800', text: 'Actively pursuing — high priority' },
+  warm: { color: 'text-orange-500', icon: Thermometer, bg: 'bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800', text: 'Moderate interest — monitoring' },
+  cold: { color: 'text-blue-500', icon: Thermometer, bg: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800', text: 'Low priority' },
+  none: { color: 'text-gray-400', icon: ShieldCheck, bg: 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700', text: 'No interest' },
 };
 
-const activityIcons: Record<string, any> = {
-  call: Phone,
-  email: Mail,
-  meeting: Calendar,
-  task: FileText,
-  note: MessageSquare,
-  default: Activity,
-};
+// ── Helpers ───────────────────────────────────────────────
 
-function formatCurrency(value: string | null): string {
-  if (!value) return '—';
-  const num = parseFloat(value);
-  if (isNaN(num)) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+function fmtCurrency(v: string | number | null): string {
+  if (!v) return '—';
+  const n = typeof v === 'string' ? parseFloat(v) : v;
+  if (isNaN(n)) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 }
 
-function formatLabel(str: string): string {
+function fmtDate(d: string | null): string {
+  if (!d) return '—';
+  try { return format(new Date(d), 'MMM d, yyyy'); } catch { return '—'; }
+}
+
+function fmtLabel(str: string): string {
   return str.split(/[_-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
@@ -106,604 +110,431 @@ function getInitials(firstName: string, lastName: string): string {
   return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return format(new Date(dateStr), 'MMM d, yyyy');
-  } catch {
-    return '—';
-  }
-}
-
-function formatDateTime(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  try {
-    return format(new Date(dateStr), 'MMM d, yyyy · h:mm a');
-  } catch {
-    return '—';
-  }
-}
+// ── Page Component ────────────────────────────────────────
 
 export default function CompanyRecordPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
 
   const { data: company, isLoading } = useQuery<CompanyRecord>({
-    queryKey: ['/api/crm/summary/companies', id, 'summary'],
+    queryKey: ['crm-company-record', id],
     queryFn: async () => {
-      const res = await apiRequest('GET', `/api/crm/summary/companies/${id}/summary`);
+      const res = await apiRequest('GET', `/api/crm/companies/${id}`);
       return res.json();
     },
     enabled: !!id,
   });
 
-  if (isLoading || !company) {
-    return (
-      <CrmRecordPage
-        entityType="company"
-        entityId={id || ''}
-        entityName=""
-        isLoading={true}
-        overviewLeft={null}
-      />
-    );
-  }
+  if (!id) return null;
 
-  const industryLabel = company.industry ? formatLabel(company.industry) : null;
-  const industryColor = industryColors[company.industry || 'default'] || industryColors.default;
-  const acqInterest = acquisitionConfig[company.acquisitionInterest || 'unknown'] || acquisitionConfig.unknown;
-  const AcqIcon = acqInterest.icon;
+  const subtitle = company
+    ? [company.industry ? fmtLabel(company.industry) : null, company.city && company.state ? `${company.city}, ${company.state}` : null].filter(Boolean).join(' · ')
+    : undefined;
 
-  const formatAddress = () => {
-    const line1 = company.address;
-    const line2 = [company.city, company.state].filter(Boolean).join(', ');
-    const line3 = [company.zipCode, company.country].filter(Boolean).join(' ');
-    const parts = [line1, line2, line3].filter(Boolean);
-    return parts.length > 0 ? parts.join('\n') : null;
-  };
+  // KPI chips
+  const kpiChips = company ? [
+    ...(company.contacts?.length ? [{
+      label: 'Contacts',
+      value: company.contacts.length,
+      icon: Users,
+      color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+    }] : []),
+    ...(company.deals?.length ? [{
+      label: 'Deals',
+      value: company.deals.length,
+      icon: DollarSign,
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+    }] : []),
+    ...(company.deals?.length ? [{
+      label: 'Pipeline',
+      value: fmtCurrency(company.deals.reduce((s, d) => s + (parseFloat(d.value || '0') || 0), 0).toString()),
+      icon: TrendingUp,
+    }] : []),
+    ...(company.properties?.length ? [{
+      label: 'Properties',
+      value: company.properties.length,
+      icon: MapPin,
+      color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+    }] : []),
+    ...(company.annualRevenue ? [{
+      label: 'Revenue',
+      value: fmtCurrency(company.annualRevenue),
+      icon: BarChart3,
+    }] : []),
+    { label: 'Open Deals', value: company.rollups?.openDealsCount || 0, icon: Target },
+    { label: 'Pipeline', value: company.rollups?.pipelineValue ? formatCurrency(company.rollups.pipelineValue) : '$0', icon: DollarSign },
+    { label: 'Engagement (30d)', value: company.rollups?.engagementScore30d || 0, icon: Activity },
+  ] : [];
 
-  const sortedContacts = [...(company.contacts || [])].sort((a, b) => {
-    if (a.isPrimary && !b.isPrimary) return -1;
-    if (!a.isPrimary && b.isPrimary) return 1;
-    return 0;
-  });
-
-  const overviewLeft = (
-    <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Company Profile</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Building2 className="h-7 w-7 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{company.name}</h2>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                {industryLabel && (
-                  <Badge className={industryColor}>{industryLabel}</Badge>
-                )}
-                {company.size && (
-                  <Badge variant="outline" className="capitalize">{company.size}</Badge>
-                )}
-                {company.isPortfolioCompany && (
-                  <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                    <Star className="h-3 w-3 mr-1" />
-                    Portfolio Company
-                  </Badge>
-                )}
-              </div>
-              {company.isPortfolioCompany && company.capitalPartner && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  <span className="font-medium">Capital Partner:</span> {company.capitalPartner}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Contact & Address</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <RecordField icon={Phone} label="Phone" value={company.phone} />
-          <RecordField
-            icon={Globe}
-            label="Website"
-            value={company.website}
-            href={company.website ? (company.website.startsWith('http') ? company.website : `https://${company.website}`) : undefined}
-          />
-          <RecordField icon={Globe} label="Domain" value={company.domain} />
-          {formatAddress() && (
-            <div className="flex items-start gap-3">
-              <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Address</p>
-                <p className="text-sm text-gray-900 dark:text-white whitespace-pre-line">{formatAddress()}</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Financial Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/50 p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs text-gray-500 dark:text-gray-400">Annual Revenue</span>
-              </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(company.annualRevenue)}</p>
-            </div>
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/50 p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Anchor className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-gray-500 dark:text-gray-400">Marina Spend</span>
-              </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(company.annualMarinaSpend)}</p>
-            </div>
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/50 p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Briefcase className="h-4 w-4 text-purple-500" />
-                <span className="text-xs text-gray-500 dark:text-gray-400">Portfolio Count</span>
-              </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{company.portfolioCount ?? '—'}</p>
-            </div>
-            <div className="rounded-lg border bg-gray-50 dark:bg-gray-800/50 p-3">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-indigo-500" />
-                <span className="text-xs text-gray-500 dark:text-gray-400">Employees</span>
-              </div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{company.employeeCount?.toLocaleString() ?? '—'}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className={`border ${acqInterest.bg}`}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Acquisition Interest</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${company.acquisitionInterest === 'hot' ? 'bg-red-100 dark:bg-red-900/40' : company.acquisitionInterest === 'warm' ? 'bg-orange-100 dark:bg-orange-900/40' : company.acquisitionInterest === 'cold' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-800'}`}>
-              <AcqIcon className={`h-6 w-6 ${acqInterest.color}`} />
-            </div>
-            <div className="flex-1">
-              <p className="text-base font-semibold capitalize text-gray-900 dark:text-white">
-                {company.acquisitionInterest || 'Unknown'}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{acqInterest.text}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {(company.linkedInUrl || company.twitterHandle || company.domain) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Social & Online</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {company.linkedInUrl && (
-              <a href={company.linkedInUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <Linkedin className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-primary hover:underline truncate">LinkedIn Profile</span>
-                <ArrowUpRight className="h-3 w-3 text-gray-400 ml-auto flex-shrink-0" />
-              </a>
-            )}
-            {company.twitterHandle && (
-              <a href={`https://twitter.com/${company.twitterHandle.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <Twitter className="h-4 w-4 text-sky-500" />
-                <span className="text-sm text-primary hover:underline truncate">@{company.twitterHandle.replace('@', '')}</span>
-                <ArrowUpRight className="h-3 w-3 text-gray-400 ml-auto flex-shrink-0" />
-              </a>
-            )}
-            {company.domain && (
-              <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <Globe className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-primary hover:underline truncate">{company.domain}</span>
-                <ArrowUpRight className="h-3 w-3 text-gray-400 ml-auto flex-shrink-0" />
-              </a>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {company.description && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{company.description}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {((company.labels && company.labels.length > 0) || (company.tags && company.tags.length > 0)) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Labels & Tags</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {company.labels?.map((label, i) => (
-                <Badge key={`label-${i}`} className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                  <Tag className="h-3 w-3 mr-1" />
-                  {label}
-                </Badge>
-              ))}
-              {company.tags?.map((tag, i) => (
-                <Badge key={`tag-${i}`} variant="outline" className="text-gray-600 dark:text-gray-300">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </>
-  );
-
-  const overviewRight = (
-    <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Quick Stats</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-              <Users className="h-5 w-5 text-blue-500 mx-auto mb-1" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{company.contacts?.length || 0}</p>
-              <p className="text-xs text-gray-500">Contacts</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
-              <Home className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{company.properties?.length || 0}</p>
-              <p className="text-xs text-gray-500">Properties</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20">
-              <Briefcase className="h-5 w-5 text-purple-500 mx-auto mb-1" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{company.deals?.length || 0}</p>
-              <p className="text-xs text-gray-500">Active Deals</p>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20">
-              <Activity className="h-5 w-5 text-amber-500 mx-auto mb-1" />
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{company.activities?.openCount || 0}</p>
-              <p className="text-xs text-gray-500">Open Activities</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {company.activities?.nextActivity && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Next Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-start gap-3 p-3 rounded-lg border bg-blue-50/50 dark:bg-blue-950/10 border-blue-200 dark:border-blue-800">
-              <div className="h-9 w-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                {(() => {
-                  const NextIcon = activityIcons[company.activities.nextActivity.type] || activityIcons.default;
-                  return <NextIcon className="h-4 w-4 text-blue-600" />;
-                })()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{company.activities.nextActivity.subject}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Clock className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">{formatDateTime(company.activities.nextActivity.scheduledAt)}</span>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(!company.recentActivities || company.recentActivities.length === 0) ? (
-            <p className="text-sm text-gray-400 text-center py-4">No recent activity</p>
-          ) : (
-            <div className="space-y-0">
-              {company.recentActivities.slice(0, 5).map((act, i) => {
-                const ActIcon = activityIcons[act.type] || activityIcons.default;
-                return (
-                  <div key={act.id} className="flex items-start gap-3 py-2.5 relative">
-                    {i < Math.min(company.recentActivities.length, 5) - 1 && (
-                      <div className="absolute left-[11px] top-[30px] bottom-0 w-px bg-gray-200 dark:bg-gray-700" />
-                    )}
-                    <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 z-10">
-                      <ActIcon className="h-3 w-3 text-gray-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 dark:text-white truncate">{act.subject}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">{act.status}</Badge>
-                        <span className="text-[10px] text-gray-400">{formatDate(act.completedAt || act.scheduledAt)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </>
-  );
-
-  const associationsContent = (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Team / Contacts
-            <Badge variant="secondary" className="ml-2">{sortedContacts.length}</Badge>
-          </CardTitle>
-          <CardDescription>People associated with this company</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {sortedContacts.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-6">No contacts linked</p>
-          ) : (
-            <div className="space-y-2">
-              {sortedContacts.map((contact) => (
-                <div
-                  key={contact.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                  onClick={() => setLocation(`/crm/contacts/${contact.id}`)}
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                      {getInitials(contact.firstName, contact.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {contact.firstName} {contact.lastName}
-                      </p>
-                      {contact.isPrimary && (
-                        <Badge className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0">Primary</Badge>
-                      )}
-                      {contact.contactTag && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{contact.contactTag}</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      {contact.email && (
-                        <span className="text-xs text-gray-500 truncate flex items-center gap-1">
-                          <Mail className="h-3 w-3" />{contact.email}
-                        </span>
-                      )}
-                      {contact.phone && (
-                        <span className="text-xs text-gray-500 truncate flex items-center gap-1">
-                          <Phone className="h-3 w-3" />{contact.phone}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    {(contact.role || contact.position) && (
-                      <p className="text-xs text-gray-500">{contact.role || contact.position}</p>
-                    )}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Home className="h-4 w-4" />
-            Properties
-            <Badge variant="secondary" className="ml-2">{company.properties?.length || 0}</Badge>
-          </CardTitle>
-          <CardDescription>Properties associated with this company</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {(!company.properties || company.properties.length === 0) ? (
-            <p className="text-sm text-gray-500 text-center py-6">No properties linked</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {company.properties.map((prop) => (
-                <div
-                  key={prop.id}
-                  className="p-4 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                  onClick={() => setLocation(`/crm/properties/${prop.id}`)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{prop.title}</p>
-                    <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    <Badge variant="outline" className="text-[10px] capitalize">{formatLabel(prop.type)}</Badge>
-                    <Badge className={`text-[10px] ${prop.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{formatLabel(prop.status)}</Badge>
-                    {prop.relationship && (
-                      <Badge variant="outline" className="text-[10px]">{formatLabel(prop.relationship)}</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                    {(prop.city || prop.state) && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />{[prop.city, prop.state].filter(Boolean).join(', ')}
-                      </span>
-                    )}
-                    {prop.listingPrice && (
-                      <span className="flex items-center gap-1 font-medium text-gray-700 dark:text-gray-300">
-                        <DollarSign className="h-3 w-3" />{formatCurrency(prop.listingPrice)}
-                      </span>
-                    )}
-                    {prop.wetSlips != null && (
-                      <span className="flex items-center gap-1">
-                        <Anchor className="h-3 w-3" />{prop.wetSlips} slips
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            Deals
-            <Badge variant="secondary" className="ml-2">{company.deals?.length || 0}</Badge>
-          </CardTitle>
-          <CardDescription>Active and historical deals</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {(!company.deals || company.deals.length === 0) ? (
-            <p className="text-sm text-gray-500 text-center py-6">No deals linked</p>
-          ) : (
-            <div className="space-y-2">
-              {company.deals.map((deal) => {
-                const stageColor = stageColors[deal.stage?.toLowerCase().replace(/\s+/g, '_')] || stageColors.default;
-                return (
-                  <div
-                    key={deal.id}
-                    className="flex items-center gap-4 p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                    onClick={() => setLocation(`/crm/deals/${deal.id}`)}
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-green-50 dark:bg-green-950/20 flex items-center justify-center flex-shrink-0">
-                      <DollarSign className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{deal.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge className={`text-[10px] ${stageColor}`}>{formatLabel(deal.stage)}</Badge>
-                        {deal.probability != null && (
-                          <span className="text-xs text-gray-500">{deal.probability}% likely</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      {deal.value && (
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(deal.value)}</p>
-                      )}
-                      {deal.expectedCloseDate && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1 justify-end mt-0.5">
-                          <Calendar className="h-3 w-3" />{formatDate(deal.expectedCloseDate)}
-                        </p>
-                      )}
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const activityTab = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-4 w-4" />
-          Recent Activities
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {(!company.recentActivities || company.recentActivities.length === 0) ? (
-          <p className="text-sm text-gray-500 text-center py-8">No activities recorded</p>
-        ) : (
-          <div className="space-y-3">
-            {company.recentActivities.slice(0, 5).map((act) => {
-              const ActIcon = activityIcons[act.type] || activityIcons.default;
-              return (
-                <div key={act.id} className="flex items-center gap-4 p-3 rounded-lg border">
-                  <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                    <ActIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{act.subject}</p>
-                    <p className="text-xs text-gray-500 capitalize">{act.type}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <Badge variant="outline" className="capitalize text-xs">{act.status}</Badge>
-                    <p className="text-xs text-gray-400 mt-1">{formatDate(act.completedAt || act.scheduledAt)}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const notesTab = (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="h-4 w-4" />
-          Notes
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {(!company.notes || company.notes.length === 0) ? (
-          <p className="text-sm text-gray-500 text-center py-8">No notes yet</p>
-        ) : (
-          <div className="space-y-4">
-            {company.notes.map((note) => (
-              <div key={note.id} className="p-4 rounded-lg border bg-gray-50/50 dark:bg-gray-800/30">
-                <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">{note.content}</p>
-                <div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <Clock className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-400">{formatDateTime(note.createdAt)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const nextActivity = company?.activities?.nextActivity
+    ? { id: company.activities.nextActivity.id, type: company.activities.nextActivity.type, subject: company.activities.nextActivity.subject || 'Upcoming', scheduledAt: company.activities.nextActivity.scheduledAt }
+    : null;
 
   return (
     <CrmRecordPage
       entityType="company"
-      entityId={id || ''}
-      entityName={company.name}
-      entitySubtitle={industryLabel || undefined}
-      status={company.size ? formatLabel(company.size) : undefined}
-      statusColor={industryColor}
-      owner={company.owner}
-      overviewLeft={overviewLeft}
-      overviewRight={overviewRight}
-      associationsContent={associationsContent}
-      customTabs={[
-        { value: 'activity', label: 'Activity', content: activityTab },
-        { value: 'notes', label: 'Notes', content: notesTab },
-      ]}
+      entityId={id}
+      entityName={company?.name || 'Loading...'}
+      entitySubtitle={subtitle}
+      entityAvatar={company && (
+        <Avatar className="h-9 w-9 flex-shrink-0">
+          <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-sm font-medium">
+            {company.name.slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      )}
+      status={company?.industry ? fmtLabel(company.industry) : undefined}
+      statusColor={company?.industry ? industryColors[company.industry.toLowerCase()] || 'bg-gray-100 text-gray-700' : undefined}
+      owner={company?.owner}
+      isLoading={isLoading}
+      kpiChips={kpiChips}
+      nextActivity={nextActivity}
+
+      // ── LEFT: About Sidebar ──
+      aboutSidebar={company && <CompanyAboutSidebar company={company} />}
+
+      // ── CENTER: Tabbed content ──
+      centerTabs={company ? [
+        {
+          value: 'contacts',
+          label: 'Contacts',
+          count: company.contacts?.length || 0,
+          content: <CompanyContactsTab contacts={company.contacts} onNavigate={setLocation} />,
+        },
+        {
+          value: 'deals',
+          label: 'Deals',
+          count: company.deals?.length || 0,
+          content: <CompanyDealsTab deals={company.deals} onNavigate={setLocation} />,
+        },
+        {
+          value: 'notes',
+          label: 'Notes',
+          count: company.notes?.length || 0,
+          content: <NotesTab notes={company.notes} />,
+        },
+      ] : []}
+
+      // ── RIGHT: Associations Sidebar ──
+      rightSidebar={company && <CompanyAssociationsSidebar company={company} onNavigate={setLocation} />}
     />
   );
 }
+
+// ── About Sidebar ─────────────────────────────────────────
+
+function CompanyAboutSidebar({ company }: { company: CompanyRecord }) {
+  const acqConfig = acquisitionConfig[company.acquisitionInterest || 'none'] || acquisitionConfig.none;
+  const AcqIcon = acqConfig.icon;
+
+  return (
+    <>
+      {/* Company Info */}
+      <RecordFieldGroup title="Company Info" icon={Building2}>
+        <RecordField label="Phone" value={company.phone} icon={Phone} href={company.phone ? `tel:${company.phone}` : undefined} />
+        <RecordField label="Website" value={company.website || company.domain} icon={Globe} href={company.website || (company.domain ? `https://${company.domain}` : undefined)} />
+        <RecordField
+          label="Location"
+          value={[company.address, [company.city, company.state].filter(Boolean).join(', '), company.zipCode].filter(Boolean).join(', ') || null}
+          icon={MapPin}
+        />
+        {company.size && <RecordField label="Size" value={company.size} icon={Users} />}
+        {company.employeeCount && <RecordField label="Employees" value={company.employeeCount.toLocaleString()} icon={Users} />}
+      </RecordFieldGroup>
+
+      {/* Financial */}
+      <RecordFieldGroup title="Financial" icon={DollarSign}>
+        <RecordField label="Annual Revenue" value={company.annualRevenue ? fmtCurrency(company.annualRevenue) : null} icon={TrendingUp} />
+        {company.annualMarinaSpend && <RecordField label="Marina Spend" value={fmtCurrency(company.annualMarinaSpend)} icon={Anchor} />}
+        {company.capitalPartner && <RecordField label="Capital Partner" value={company.capitalPartner} icon={Briefcase} />}
+      </RecordFieldGroup>
+
+      {/* Acquisition Interest */}
+      {company.acquisitionInterest && company.acquisitionInterest !== 'none' && (
+        <Card className={cn("shadow-sm border", acqConfig.bg)}>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <AcqIcon className={cn("h-4 w-4", acqConfig.color)} />
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">
+                Acquisition: {fmtLabel(company.acquisitionInterest)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500">{acqConfig.text}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Portfolio */}
+      {(company.isPortfolioCompany || company.portfolioCount) && (
+        <RecordFieldGroup title="Portfolio" icon={Anchor}>
+          {company.isPortfolioCompany && (
+            <RecordField label="Status" value={<Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700">Portfolio Company</Badge>} />
+          )}
+          {company.portfolioCount != null && <RecordField label="Properties" value={String(company.portfolioCount)} icon={Home} />}
+        </RecordFieldGroup>
+      )}
+
+      {/* Social */}
+      {(company.linkedInUrl || company.twitterHandle) && (
+        <RecordFieldGroup title="Social" icon={Globe}>
+          {company.linkedInUrl && <RecordField label="LinkedIn" value="Company Page" icon={Linkedin} href={company.linkedInUrl} />}
+          {company.twitterHandle && <RecordField label="X / Twitter" value={`@${company.twitterHandle.replace('@', '')}`} icon={Twitter} href={`https://x.com/${company.twitterHandle.replace('@', '')}`} />}
+        </RecordFieldGroup>
+      )}
+
+      {/* Description */}
+      {company.description && (
+        <RecordFieldGroup title="Description" icon={FileText} collapsible>
+          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{company.description}</p>
+        </RecordFieldGroup>
+      )}
+
+      {/* Labels / Tags */}
+      {((company.labels?.length || 0) > 0 || (company.tags?.length || 0) > 0) && (
+        <RecordFieldGroup title="Labels" icon={Tag} collapsible defaultOpen={false}>
+          <div className="flex flex-wrap gap-1">
+            {company.labels?.map(l => <Badge key={l} variant="secondary" className="text-xs">{fmtLabel(l)}</Badge>)}
+            {company.tags?.map(t => <Badge key={t} variant="outline" className="text-xs">{fmtLabel(t)}</Badge>)}
+          </div>
+        </RecordFieldGroup>
+      )}
+
+      {/* Record metadata */}
+      <RecordFieldGroup title="Record" icon={Calendar} collapsible defaultOpen={false}>
+        <RecordField label="Created" value={fmtDate(company.createdAt)} icon={Calendar} />
+        <RecordField label="Updated" value={fmtDate(company.updatedAt)} icon={Clock} />
+      </RecordFieldGroup>
+    </>
+  );
+}
+
+// ── Associations Sidebar ──────────────────────────────────
+
+function CompanyAssociationsSidebar({ company, onNavigate }: { company: CompanyRecord; onNavigate: (url: string) => void }) {
+  return (
+    <>
+      {/* Properties */}
+      <AssociationCard
+        type="Properties"
+        icon={MapPin}
+        items={company.properties || []}
+        onAdd={() => {}}
+        renderItem={(prop) => (
+          <AssociationRow
+            key={prop.id}
+            entityType="property"
+            entityId={prop.id}
+            name={prop.title || 'Untitled'}
+            subtitle={[prop.city, prop.state].filter(Boolean).join(', ') || (prop.wetSlips ? `${prop.wetSlips} slips` : undefined)}
+            badge={prop.relationship ? fmtLabel(prop.relationship) : prop.status ? fmtLabel(prop.status) : undefined}
+            avatarInitials={(prop.title || 'P').slice(0, 2).toUpperCase()}
+          />
+        )}
+      />
+
+      {/* Deals */}
+      <AssociationCard
+        type="Deals"
+        icon={DollarSign}
+        items={company.deals || []}
+        onAdd={() => {}}
+        renderItem={(deal) => (
+          <AssociationRow
+            key={deal.id}
+            entityType="deal"
+            entityId={deal.id}
+            name={deal.name}
+            subtitle={deal.value ? fmtCurrency(deal.value) : undefined}
+            badge={deal.stage ? fmtLabel(deal.stage) : undefined}
+            badgeColor={stageColors[deal.stage]}
+            avatarInitials={deal.name.slice(0, 2).toUpperCase()}
+          />
+        )}
+      />
+
+      {/* Recent Activities */}
+      {company.recentActivities?.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2 px-4 pt-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-3.5 w-3.5 text-gray-400" />
+              <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wider">Recent Activities</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-2">
+            {company.recentActivities.slice(0, 4).map((a) => {
+              const AIcon = activityIconMap[a.type] || Activity;
+              return (
+                <div key={a.id} className="flex items-start gap-2 py-1">
+                  <div className="mt-0.5 h-5 w-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                    <AIcon className="h-3 w-3 text-gray-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-900 dark:text-white truncate leading-tight">{a.subject}</p>
+                    <p className="text-[10px] text-gray-500">{fmtDate(a.scheduledAt || a.completedAt)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+}
+
+// ── Contacts Tab ──────────────────────────────────────────
+
+function CompanyContactsTab({ contacts, onNavigate }: { contacts: CompanyRecord['contacts']; onNavigate: (url: string) => void }) {
+  if (!contacts || contacts.length === 0) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-12 text-center">
+          <Users className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">No contacts linked to this company</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Sort: primary first, then alphabetical
+  const sorted = [...contacts].sort((a, b) => {
+    if (a.isPrimary && !b.isPrimary) return -1;
+    if (!a.isPrimary && b.isPrimary) return 1;
+    return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+  });
+
+  return (
+    <div className="space-y-2">
+      {sorted.map((contact) => (
+        <Card
+          key={contact.id}
+          className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => onNavigate(`/crm/contacts/${contact.id}`)}
+        >
+          <CardContent className="p-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
+                  {getInitials(contact.firstName, contact.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {contact.firstName} {contact.lastName}
+                  </p>
+                  {contact.isPrimary && (
+                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 h-4 px-1.5">Primary</Badge>
+                  )}
+                  {contact.contactTag && (
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">{fmtLabel(contact.contactTag)}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                  {contact.position && <span>{contact.position}</span>}
+                  {contact.email && <span className="truncate">{contact.email}</span>}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── Deals Tab ─────────────────────────────────────────────
+
+function CompanyDealsTab({ deals, onNavigate }: { deals: CompanyRecord['deals']; onNavigate: (url: string) => void }) {
+  if (!deals || deals.length === 0) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-12 text-center">
+          <DollarSign className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">No deals linked to this company</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalPipeline = deals.reduce((s, d) => s + (parseFloat(d.value || '0') || 0), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="shadow-sm"><CardContent className="p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Deals</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">{deals.length}</p>
+        </CardContent></Card>
+        <Card className="shadow-sm"><CardContent className="p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Pipeline</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">{fmtCurrency(totalPipeline.toString())}</p>
+        </CardContent></Card>
+        <Card className="shadow-sm"><CardContent className="p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Avg Prob.</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+            {deals.length ? Math.round(deals.reduce((s, d) => s + (d.probability || 0), 0) / deals.length) : 0}%
+          </p>
+        </CardContent></Card>
+      </div>
+      <div className="space-y-2">
+        {deals.map((deal) => (
+          <Card key={deal.id} className="shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate(`/crm/deals/${deal.id}`)}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{deal.name}</p>
+                    <Badge variant="outline" className={cn("text-[10px]", stageColors[deal.stage])}>{fmtLabel(deal.stage)}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                    {deal.value && <span className="font-medium text-gray-700 dark:text-gray-300">{fmtCurrency(deal.value)}</span>}
+                    {deal.expectedCloseDate && <span>Close: {fmtDate(deal.expectedCloseDate)}</span>}
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Notes Tab ─────────────────────────────────────────────
+
+function NotesTab({ notes }: { notes: CompanyRecord['notes'] }) {
+  if (!notes || notes.length === 0) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="py-12 text-center">
+          <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">No notes yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {notes.map((note) => (
+        <Card key={note.id} className="shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap leading-relaxed">{note.content}</p>
+            <p className="text-[10px] text-gray-400 mt-2">{fmtDate(note.createdAt)}</p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── Shared ────────────────────────────────────────────────
+
+const activityIconMap: Record<string, typeof Activity> = {
+  call: Phone, email: Mail, meeting: Users, task: FileText,
+  note: MessageSquare, follow_up: Clock, site_visit: MapPin,
+};

@@ -88,6 +88,101 @@ async function getActivitySummary(orgId: string, entityType: string, entityId: s
   };
 }
 
+async function getEntityRollups(orgId: string, entityType: string, entityId: string) {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  let entityCondition;
+  switch (entityType) {
+    case 'company':
+      entityCondition = and(
+        eq(crmActivities.entityType, 'company'),
+        eq(crmActivities.entityId, entityId)
+      );
+      break;
+    case 'contact':
+      entityCondition = and(
+        eq(crmActivities.entityType, 'contact'),
+        eq(crmActivities.entityId, entityId)
+      );
+      break;
+    case 'property':
+      entityCondition = and(
+        eq(crmActivities.entityType, 'property'),
+        eq(crmActivities.entityId, entityId)
+      );
+      break;
+    default:
+      entityCondition = and(
+        eq(crmActivities.entityType, entityType),
+        eq(crmActivities.entityId, entityId)
+      );
+  }
+
+  const [lastActivity] = await db
+    .select({ lastAt: sql<string>`max(${crmActivities.createdAt})` })
+    .from(crmActivities)
+    .where(and(eq(crmActivities.orgId, orgId), entityCondition));
+
+  const [nextScheduled] = await db
+    .select({
+      nextAt: sql<string>`min(${crmActivities.scheduledAt})`,
+    })
+    .from(crmActivities)
+    .where(and(
+      eq(crmActivities.orgId, orgId),
+      entityCondition,
+      eq(crmActivities.status, 'scheduled'),
+      gte(crmActivities.scheduledAt, now)
+    ));
+
+  const [engagement30d] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(crmActivities)
+    .where(and(
+      eq(crmActivities.orgId, orgId),
+      entityCondition,
+      gte(crmActivities.createdAt, thirtyDaysAgo)
+    ));
+
+  let openDealsCount = 0;
+  let pipelineValue = 0;
+
+  const activeStages = ['lead', 'qualifying', 'proposal', 'negotiation', 'due_diligence', 'under_contract'];
+
+  if (entityType === 'contact') {
+    const deals = await db.select({
+      count: sql<number>`count(*)::int`,
+      totalValue: sql<string>`coalesce(sum(cast(${crmDeals.value} as numeric)), 0)`,
+    }).from(crmDeals).where(and(
+      eq(crmDeals.orgId, orgId),
+      eq(crmDeals.contactId, entityId),
+      inArray(crmDeals.stage, activeStages)
+    ));
+    openDealsCount = deals[0]?.count || 0;
+    pipelineValue = parseFloat(deals[0]?.totalValue || '0');
+  } else if (entityType === 'company') {
+    const deals = await db.select({
+      count: sql<number>`count(*)::int`,
+      totalValue: sql<string>`coalesce(sum(cast(${crmDeals.value} as numeric)), 0)`,
+    }).from(crmDeals).where(and(
+      eq(crmDeals.orgId, orgId),
+      eq(crmDeals.companyId, entityId),
+      inArray(crmDeals.stage, activeStages)
+    ));
+    openDealsCount = deals[0]?.count || 0;
+    pipelineValue = parseFloat(deals[0]?.totalValue || '0');
+  }
+
+  return {
+    lastActivityAt: lastActivity?.lastAt || null,
+    nextActivityAt: nextScheduled?.nextAt || null,
+    openDealsCount,
+    pipelineValue,
+    engagementScore30d: engagement30d?.count || 0,
+  };
+}
+
 async function getRecentTimeline(orgId: string, entityType: string, entityId: string, limit: number = 3) {
   let entityCondition;
   switch (entityType) {
@@ -161,7 +256,7 @@ router.get('/companies/:id/summary', async (req, res) => {
       owner = ownerRow || null;
     }
 
-    const [activitySummary, recentTimeline, contacts, properties, deals, recentActivities, notes] = await Promise.all([
+    const [activitySummary, recentTimeline, contacts, properties, deals, recentActivities, notes, rollups] = await Promise.all([
       getActivitySummary(orgId, 'company', id),
       getRecentTimeline(orgId, 'company', id, 10),
       db.select({
@@ -199,6 +294,7 @@ router.get('/companies/:id/summary', async (req, res) => {
       }).from(crmNotes)
         .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'company'), eq(crmNotes.entityId, id)))
         .orderBy(desc(crmNotes.createdAt)).limit(5),
+      getEntityRollups(orgId, 'company', id),
     ]);
     
     res.json({
@@ -211,6 +307,7 @@ router.get('/companies/:id/summary', async (req, res) => {
       deals,
       recentActivities,
       notes,
+      rollups,
     });
   } catch (error) {
     console.error('Error fetching company summary:', error);
@@ -256,7 +353,7 @@ router.get('/contacts/:id/summary', async (req, res) => {
       primaryCompany = compRow || null;
     }
 
-    const [activitySummary, recentTimeline, companies, properties, deals, recentActivities, notes] = await Promise.all([
+    const [activitySummary, recentTimeline, companies, properties, deals, recentActivities, notes, rollups] = await Promise.all([
       getActivitySummary(orgId, 'contact', id),
       getRecentTimeline(orgId, 'contact', id, 10),
       db.select({
@@ -291,6 +388,7 @@ router.get('/contacts/:id/summary', async (req, res) => {
       }).from(crmNotes)
         .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'contact'), eq(crmNotes.entityId, id)))
         .orderBy(desc(crmNotes.createdAt)).limit(5),
+      getEntityRollups(orgId, 'contact', id),
     ]);
     
     res.json({
@@ -304,6 +402,7 @@ router.get('/contacts/:id/summary', async (req, res) => {
       deals,
       recentActivities,
       notes,
+      rollups,
     });
   } catch (error) {
     console.error('Error fetching contact summary:', error);
@@ -362,7 +461,7 @@ router.get('/properties/:id/summary', async (req, res) => {
       listingAgent = la || null;
     }
 
-    const [activitySummary, recentTimeline, companies, contacts, deals, storageEntries, recentActivities, notes] = await Promise.all([
+    const [activitySummary, recentTimeline, companies, contacts, deals, storageEntries, recentActivities, notes, rollups] = await Promise.all([
       getActivitySummary(orgId, 'property', id),
       getRecentTimeline(orgId, 'property', id, 10),
       db.select({
@@ -406,6 +505,7 @@ router.get('/properties/:id/summary', async (req, res) => {
       }).from(crmNotes)
         .where(and(eq(crmNotes.orgId, orgId), eq(crmNotes.entityType, 'property'), eq(crmNotes.entityId, id)))
         .orderBy(desc(crmNotes.createdAt)).limit(5),
+      getEntityRollups(orgId, 'property', id),
     ]);
     
     res.json({
@@ -422,6 +522,7 @@ router.get('/properties/:id/summary', async (req, res) => {
       storageEntries,
       recentActivities,
       notes,
+      rollups,
     });
   } catch (error) {
     console.error('Error fetching property summary:', error);

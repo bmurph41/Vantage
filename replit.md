@@ -39,7 +39,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 The platform utilizes a dual-sourced data model separating "Universal/Global" curated data from user-specific data. Data scopes include Global (MarinaMatch curated, pack-subscriber access), Organization (org-specific, visible to members), and User (private to creator). Curated data tables include `salesComps`, `rateComps`, `industryStandards`, `marinaListings`, and `marinaScrapeources`, managed via admin routes and a dedicated admin dashboard.
 
 ### Feature Specifications
-- **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, property status tracking, entity relationship management, and Comment Threads.
+- **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, property status tracking, entity relationship management, Comment Threads, Multi-Entity Activity Associations (auto-linking engine via `crm_activity_associations` junction table), Saved Views (CRUD with user/org scoping, sharing, and default capabilities), Computed Rollups (lastActivityAt, nextActivityAt, openDealsCount, pipelineValue, engagementScore30d), and Source Entity Badges on unified timeline.
 - **Due Diligence**: Project management, task tracking, template management, DD Fees Tracker, and project-level contact management with CRM pending contacts integration.
 - **Rent Roll V2**: Marina-centric lease management with normalized schema, supporting seasonal/year-round operations and CRM/DD integrations.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, validation, and Pending Sales Comps workflow (property sales history → pending review → accepted/rejected → sales comp creation).

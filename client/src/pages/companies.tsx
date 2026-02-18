@@ -19,6 +19,7 @@ import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
+import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/utils";
@@ -108,6 +109,7 @@ export default function Companies() {
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [mergeMode, setMergeMode] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
 
   // HubSpot-style: Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -360,6 +362,20 @@ export default function Companies() {
     return 'small';
   };
 
+  const handleSelectView = (view: any) => {
+    if (!view) {
+      setActiveViewId(null);
+      setIndustryFilter('all');
+      setSizeFilter('all');
+      return;
+    }
+    setActiveViewId(view.id);
+    if (view.filters?.industry) setIndustryFilter(view.filters.industry);
+    else setIndustryFilter('all');
+    if (view.filters?.size) setSizeFilter(view.filters.size);
+    else setSizeFilter('all');
+  };
+
   const filteredCompanies = useMemo(() => {
     return companies?.filter(company => {
       const matchesSearch = !searchTerm || 
@@ -467,6 +483,14 @@ export default function Companies() {
 
   return (
     <CrmPageShell>
+      <div className="flex h-full">
+        <SavedViewsSidebar
+          objectType="company"
+          activeViewId={activeViewId}
+          onSelectView={handleSelectView}
+          currentFilters={{ industry: industryFilter !== 'all' ? industryFilter : undefined, size: sizeFilter !== 'all' ? sizeFilter : undefined }}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
       <CrmTopBar
         title="Companies"
         subtitle={`${companies?.length || 0} companies`}
@@ -695,6 +719,8 @@ export default function Companies() {
       </AlertDialog>
 
       <CreateCompanyWizardModal open={isCreateWizardOpen} onOpenChange={setIsCreateWizardOpen} />
+        </div>
+      </div>
     </CrmPageShell>
   );
 }

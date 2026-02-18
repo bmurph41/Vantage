@@ -4960,6 +4960,41 @@ export const crmActivities = pgTable("crm_activities", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const crmActivityAssociations = pgTable("crm_activity_associations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  activityId: varchar("activity_id").notNull().references(() => crmActivities.id, { onDelete: 'cascade' }),
+  objectType: text("object_type").notNull(),
+  objectId: varchar("object_id").notNull(),
+  isPrimary: boolean("is_primary").default(false),
+  orgId: varchar("org_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  activityIdx: index("crm_activity_assoc_activity_idx").on(table.activityId),
+  objectIdx: index("crm_activity_assoc_object_idx").on(table.objectType, table.objectId),
+  orgIdx: index("crm_activity_assoc_org_idx").on(table.orgId),
+  uniqueAssoc: unique().on(table.activityId, table.objectType, table.objectId),
+}));
+
+export const crmSavedViews = pgTable("crm_saved_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  objectType: text("object_type").notNull(),
+  filters: jsonb("filters").default(sql`'{}'`),
+  columns: jsonb("columns").default(sql`'[]'`),
+  sortBy: text("sort_by"),
+  sortOrder: text("sort_order").default('asc'),
+  isDefault: boolean("is_default").default(false),
+  isShared: boolean("is_shared").default(false),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  orgId: varchar("org_id").references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("crm_saved_views_user_idx").on(table.userId),
+  orgIdx: index("crm_saved_views_org_idx").on(table.orgId),
+  objectTypeIdx: index("crm_saved_views_object_type_idx").on(table.objectType),
+}));
+
 // Activity Templates for quick activity creation
 
 export const crmActivityTemplates = pgTable("crm_activity_templates", {
@@ -6471,6 +6506,21 @@ export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
   createdAt: true,
 });
 export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
+
+export type CrmActivityAssociation = typeof crmActivityAssociations.$inferSelect;
+export const insertCrmActivityAssociationSchema = createInsertSchema(crmActivityAssociations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCrmActivityAssociation = z.infer<typeof insertCrmActivityAssociationSchema>;
+
+export type CrmSavedView = typeof crmSavedViews.$inferSelect;
+export const insertCrmSavedViewSchema = createInsertSchema(crmSavedViews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmSavedView = z.infer<typeof insertCrmSavedViewSchema>;
 
 // Deal Analytics Insert Schemas
 export const insertCrmDealStageHistorySchema = createInsertSchema(crmDealStageHistory).omit({

@@ -15,6 +15,7 @@ import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
+import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -116,6 +117,7 @@ export default function Properties() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatusValue, setBulkStatusValue] = useState<string>('');
   const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | null>('default-0');
 
   // HubSpot-style: Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -270,6 +272,20 @@ export default function Properties() {
     return property.type.replace('_', ' ');
   };
 
+  const handleSelectView = (view: any) => {
+    if (!view) {
+      setActiveViewId(null);
+      setTypeFilter('all');
+      setStatusFilter('all');
+      return;
+    }
+    setActiveViewId(view.id);
+    if (view.filters?.status) setStatusFilter(view.filters.status);
+    else setStatusFilter('all');
+    if (view.filters?.propertyType) setTypeFilter(view.filters.propertyType);
+    else setTypeFilter('all');
+  };
+
   const filteredProperties = useMemo(() => {
     return properties.filter(property => {
       const matchesSearch = !searchTerm || 
@@ -373,6 +389,14 @@ export default function Properties() {
 
   return (
     <CrmPageShell>
+      <div className="flex h-full">
+        <SavedViewsSidebar
+          objectType="property"
+          activeViewId={activeViewId}
+          onSelectView={handleSelectView}
+          currentFilters={{ status: statusFilter !== 'all' ? statusFilter : undefined, propertyType: typeFilter !== 'all' ? typeFilter : undefined }}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
       <CrmTopBar
         title="Properties"
         subtitle={`${totalProperties} properties`}
@@ -582,6 +606,8 @@ export default function Properties() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </div>
+      </div>
     </CrmPageShell>
   );
 }

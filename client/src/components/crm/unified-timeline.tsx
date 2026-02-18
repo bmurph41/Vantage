@@ -203,9 +203,15 @@ export default function UnifiedTimeline({
                           </Badge>
                         )}
                         {item.sourceEntity && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Building2 className="w-3 h-3" />
-                            {item.sourceEntity.name || 'Company'}
+                          <Badge 
+                            variant="outline" 
+                            className="text-[9px] px-1.5 py-0 h-4 gap-1 mt-1 cursor-pointer hover:bg-accent"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                          >
+                            <Building2 className="h-2.5 w-2.5" />
+                            via {item.sourceEntity.name || item.sourceEntity.type}
                           </Badge>
                         )}
                         {item.type === 'file' && item.metadata?.size && (
