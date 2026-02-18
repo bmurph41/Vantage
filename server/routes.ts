@@ -25126,7 +25126,18 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!item) {
         return res.status(404).json({ error: 'Item not found' });
       }
-      res.json(item);
+
+      let propagation = { propagatedCount: 0, affectedUploadIds: [] as string[] };
+      const hasStatusChange = updates.status !== undefined;
+      const hasClassificationChange = updates.categoryTierConfirmed !== undefined || 
+        updates.revenueCogsDeptConfirmed !== undefined || updates.expenseDeptConfirmed !== undefined;
+      if (hasStatusChange || hasClassificationChange) {
+        propagation = await docIntelService.propagateClassificationToSiblingUploads(
+          orgId, item.uploadId, item.rawText, updates, userId
+        );
+      }
+
+      res.json({ ...item, _propagation: propagation });
     } catch (error: any) {
       console.error('Failed to update item:', error);
       res.status(500).json({ error: 'Failed to update item' });
@@ -25146,7 +25157,30 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       const results = await docIntelService.bulkUpdateExtractedItems(orgId, itemIds, updates, userId);
-      res.json({ updated: results.length });
+
+      const allAffectedUploadIds = new Set<string>();
+      let totalPropagated = 0;
+      const hasStatusChange = updates.status !== undefined;
+      const hasClassificationChange = updates.categoryTierConfirmed !== undefined || 
+        updates.revenueCogsDeptConfirmed !== undefined || updates.expenseDeptConfirmed !== undefined;
+      if (hasStatusChange || hasClassificationChange) {
+        const uniqueTexts = [...new Set(results.map(r => r.rawText))];
+        for (const rawText of uniqueTexts) {
+          const propagation = await docIntelService.propagateClassificationToSiblingUploads(
+            orgId, uploadId, rawText, updates, userId
+          );
+          totalPropagated += propagation.propagatedCount;
+          propagation.affectedUploadIds.forEach(id => allAffectedUploadIds.add(id));
+        }
+      }
+
+      res.json({ 
+        updated: results.length, 
+        _propagation: { 
+          propagatedCount: totalPropagated, 
+          affectedUploadIds: [...allAffectedUploadIds] 
+        } 
+      });
     } catch (error: any) {
       console.error('Failed to bulk update items:', error);
       res.status(500).json({ error: 'Failed to bulk update items' });

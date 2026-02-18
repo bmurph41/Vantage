@@ -37,7 +37,7 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
 });
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray, ne } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import path from 'path';
@@ -2886,6 +2886,77 @@ Respond with JSON only:
     }
     
     return results;
+  }
+
+  async propagateClassificationToSiblingUploads(
+    orgId: string,
+    sourceUploadId: string,
+    rawText: string,
+    updates: Record<string, any>,
+    userId: string
+  ): Promise<{ propagatedCount: number; affectedUploadIds: string[] }> {
+    try {
+      const sourceUpload = await this.getUpload(orgId, sourceUploadId);
+      if (!sourceUpload?.modelingProjectId) {
+        return { propagatedCount: 0, affectedUploadIds: [] };
+      }
+
+      const siblingUploads = await db
+        .select({ id: docIntelUploads.id })
+        .from(docIntelUploads)
+        .where(and(
+          eq(docIntelUploads.orgId, orgId),
+          eq(docIntelUploads.modelingProjectId, sourceUpload.modelingProjectId),
+          ne(docIntelUploads.id, sourceUploadId)
+        ));
+
+      if (siblingUploads.length === 0) {
+        return { propagatedCount: 0, affectedUploadIds: [] };
+      }
+
+      const siblingUploadIds = siblingUploads.map(u => u.id);
+      const normalizedText = rawText.toLowerCase().trim();
+
+      const matchingItems = await db
+        .select()
+        .from(docIntelExtractedItems)
+        .where(and(
+          eq(docIntelExtractedItems.orgId, orgId),
+          inArray(docIntelExtractedItems.uploadId, siblingUploadIds),
+          eq(docIntelExtractedItems.status, 'pending'),
+          sql`lower(trim(${docIntelExtractedItems.rawText})) = ${normalizedText}`
+        ));
+
+      if (matchingItems.length === 0) {
+        return { propagatedCount: 0, affectedUploadIds: [] };
+      }
+
+      const propagateData: Record<string, any> = { updatedAt: new Date() };
+      if (updates.status !== undefined) propagateData.status = updates.status;
+      if (updates.categoryTierConfirmed !== undefined) propagateData.categoryTierConfirmed = updates.categoryTierConfirmed;
+      if (updates.revenueCogsDeptConfirmed !== undefined) propagateData.revenueCogsDeptConfirmed = updates.revenueCogsDeptConfirmed;
+      if (updates.expenseDeptConfirmed !== undefined) propagateData.expenseDeptConfirmed = updates.expenseDeptConfirmed;
+      if (updates.reviewNotes !== undefined) propagateData.reviewNotes = updates.reviewNotes;
+      if (updates.status === 'confirmed') {
+        propagateData.confirmedBy = userId;
+        propagateData.confirmedAt = new Date();
+      }
+
+      const matchingItemIds = matchingItems.map(i => i.id);
+      await db
+        .update(docIntelExtractedItems)
+        .set(propagateData)
+        .where(inArray(docIntelExtractedItems.id, matchingItemIds));
+
+      const affectedUploadIds = [...new Set(matchingItems.map(i => i.uploadId))];
+
+      console.log(`[DocIntel] Propagated classification for "${rawText}" to ${matchingItems.length} items across ${affectedUploadIds.length} sibling uploads`);
+
+      return { propagatedCount: matchingItems.length, affectedUploadIds };
+    } catch (error: any) {
+      console.error('[DocIntel] Failed to propagate classification:', error.message);
+      return { propagatedCount: 0, affectedUploadIds: [] };
+    }
   }
   
   async createLearningRuleFromConfirmation(

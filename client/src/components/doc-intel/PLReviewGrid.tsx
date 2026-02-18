@@ -275,15 +275,23 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ itemId, updates }: { itemId: string; updates: Partial<ExtractedItem> }) => {
-      return apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
+      const res = await apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
+      return res;
     },
-    onSuccess: async (_, variables) => {
-      // Invalidate and wait for refetch to complete before clearing pending state
-      await Promise.all([
+    onSuccess: async (data: any, variables) => {
+      const invalidations = [
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] }),
-      ]);
-      // Now clear pending edit - fresh data is already in cache
+      ];
+      if (data?._propagation?.affectedUploadIds?.length > 0) {
+        for (const siblingUploadId of data._propagation.affectedUploadIds) {
+          invalidations.push(
+            queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", siblingUploadId, "items"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", siblingUploadId, "items", "grouped"] }),
+          );
+        }
+      }
+      await Promise.all(invalidations);
       setPendingMonthlyEdits(prev => {
         const next = { ...prev };
         delete next[variables.itemId];
@@ -324,11 +332,20 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       }
       return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, { itemIds: updates.itemIds, updates: updates.updates });
     },
-    onSuccess: async (_, variables) => {
-      await Promise.all([
+    onSuccess: async (data: any, variables) => {
+      const invalidations = [
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] }),
-      ]);
+      ];
+      if (data?._propagation?.affectedUploadIds?.length > 0) {
+        for (const siblingUploadId of data._propagation.affectedUploadIds) {
+          invalidations.push(
+            queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", siblingUploadId, "items"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", siblingUploadId, "items", "grouped"] }),
+          );
+        }
+      }
+      await Promise.all(invalidations);
       setSelectedIds(new Set());
       if (variables.lineItemKey) {
         setOptimisticCategories(prev => {
