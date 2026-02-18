@@ -98,7 +98,7 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
       id: 'assumptions',
       title: 'Set Assumptions',
       description: 'Configure growth rates, occupancy, and margin assumptions',
-      tab: 'assumptions',
+      tab: 'inputs',
       icon: <TrendingUp className="h-5 w-5" />,
       status: hasAssumptions ? 'complete' : hasCompletedUploads ? 'in-progress' : 'pending',
     },

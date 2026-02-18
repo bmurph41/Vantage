@@ -113,10 +113,9 @@ const TAB_GROUPS: TabGroup[] = [
     label: 'Inputs & Data',
     icon: Database,
     tabs: [
-      { value: 'inputs', label: 'Inputs', icon: Settings2 },
+      { value: 'inputs', label: 'Inputs & Assumptions', icon: Settings2 },
       { value: 'uploads', label: 'Uploads', icon: Upload },
       { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
-      { value: 'assumptions', label: 'Assumptions', icon: TrendingUp },
       { value: 'property-tax', label: 'Property Tax', icon: Building2 },
       { value: 'storage-leases', label: 'Storage Leases', icon: Anchor },
       { value: 'commercial-leases', label: 'Commercial Leases', icon: Building2 },
@@ -489,6 +488,7 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
           <WorkspaceInputs projectId={projectId!} onTabChange={handleTabChange} />
+          <WorkspaceAssumptions projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
@@ -499,9 +499,6 @@ export default function ProjectWorkspace() {
           <WorkspaceUploads projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="assumptions" className="space-y-6">
-          <WorkspaceAssumptions projectId={projectId!} onTabChange={handleTabChange} />
-        </TabsContent>
 
         <TabsContent value="historical" className="space-y-6">
           <WorkspaceHistoricalPL projectId={projectId!} onTabChange={handleTabChange} />

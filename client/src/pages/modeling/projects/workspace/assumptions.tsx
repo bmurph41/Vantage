@@ -1392,10 +1392,6 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
   return (
     <div className="space-y-6">
-      {onTabChange && (
-        <WorkflowNavigation currentTab="assumptions" onNavigate={onTabChange} />
-      )}
-      
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold">Assumptions</h2>
