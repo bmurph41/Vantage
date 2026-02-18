@@ -882,17 +882,17 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         <CardContent className="p-0 sm:p-6">
           <div className="overflow-x-auto relative isolate">
             {displayMode === 'monthly' ? (
-              <Table className="table-fixed">
+              <Table className="w-full table-fixed">
                 <colgroup>
-                  <col className="w-[220px] min-w-[220px]" />
+                  <col style={{ width: '15%', minWidth: '140px' }} />
                   {months.map((_, idx) => (
-                    <col key={idx} className="w-[90px] min-w-[90px]" />
+                    <col key={idx} style={{ width: `${65 / 12}%` }} />
                   ))}
-                  <col className="w-[100px] min-w-[100px]" />
+                  <col style={{ width: '7%', minWidth: '70px' }} />
                 </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r w-[220px] min-w-[220px] max-w-[220px] py-2"></TableHead>
+                    <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r min-w-[140px] max-w-[200px] py-2"></TableHead>
                     {months.map((month, idx) => (
                       <TableHead 
                         key={month} 
@@ -911,7 +911,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis px-3 py-1.5 text-sm">
+                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] overflow-hidden text-ellipsis px-3 py-1.5 text-sm">
                           <div className="flex items-center gap-1.5">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
@@ -990,7 +990,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               className="cursor-pointer hover:bg-muted/50"
                               onClick={() => toggleDepartment(`${category}-${department}`)}
                             >
-                              <TableCell className="pl-5 font-medium whitespace-nowrap sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] px-3 py-1">
+                              <TableCell className="pl-5 font-medium whitespace-nowrap sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">
                                 <div className="flex items-center gap-1">
                                   {expandedDepartments.has(`${category}-${department}`) ? (
                                     <ChevronDown className="h-3 w-3 shrink-0" />
@@ -1033,7 +1033,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               const SourceIcon = item.dataSource ? dataSourceIcons[item.dataSource] : null;
                               return (
                                 <TableRow key={item.id} className={`group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
-                                  <TableCell className="pl-9 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] overflow-hidden text-ellipsis px-3 py-1 text-xs">
+                                  <TableCell className="pl-9 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] overflow-hidden text-ellipsis px-3 py-1 text-xs">
                                     <div className="flex items-center gap-2">
                                       {SourceIcon && (
                                         <SourceIcon className="h-3 w-3 text-muted-foreground" />
@@ -1175,7 +1175,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   ))}
 
                   <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] px-3 py-1.5 text-sm">Gross Profit</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1.5 text-sm">Gross Profit</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1192,7 +1192,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[220px] min-w-[220px] max-w-[220px] px-3 py-1">Gross Profit Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">Gross Profit Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1217,7 +1217,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[220px] min-w-[220px] max-w-[220px] px-3 py-1.5 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1.5 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1243,7 +1243,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[220px] min-w-[220px] max-w-[220px] px-3 py-1">Operating Margin</TableCell>
+                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">Operating Margin</TableCell>
                     {months.map((month, idx) => {
                       const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
                       const cogs = getAdjustedCategoryTotal('COGS', month, idx);
@@ -1273,11 +1273,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </Table>
             ) : (
               <div className="overflow-x-auto">
-              <Table className="table-fixed">
+              <Table className="w-full">
                 <colgroup>
-                  <col className="w-[200px] min-w-[180px]" />
+                  <col style={{ width: '200px', minWidth: '160px' }} />
                   {yearRange.map((year) => (
-                    <col key={year} className="w-[90px] min-w-[80px]" />
+                    <col key={year} style={{ minWidth: '100px' }} />
                   ))}
                 </colgroup>
                 <TableHeader>

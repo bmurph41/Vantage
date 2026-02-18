@@ -378,6 +378,28 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
         </div>
       </div>
 
+      <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center">
+              Property Tax Reassessment
+              <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date. This is common when a marina is acquired and the county reassesses property value." />
+            </Label>
+            {config.reassessOnSale && (
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                New tax replaces historical starting at reassessment date
+              </p>
+            )}
+          </div>
+        </div>
+        <Switch
+          checked={config.reassessOnSale}
+          onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
+        />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2 pt-4 px-4">
@@ -505,27 +527,10 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="flex items-center gap-2 text-sm">
               <TrendingUp className="h-4 w-4" />
-              Growth & Reassessment
+              Growth & Tax Schedule
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2.5 pt-0 px-4 pb-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground flex items-center">
-                Reassessment on Sale
-                <InfoTip text="When enabled, property taxes will be recalculated based on the new assessed value starting at the reassessment date." />
-              </Label>
-              <Switch
-                checked={config.reassessOnSale}
-                onCheckedChange={(checked) => updateField('reassessOnSale', checked)}
-              />
-            </div>
-            {config.reassessOnSale && (
-              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                New tax replaces historical starting at reassessment date
-              </div>
-            )}
-
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground flex items-center">
                 Annual Growth Rate (%)

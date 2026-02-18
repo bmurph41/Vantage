@@ -1641,100 +1641,142 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
               accent="blue"
               icon={DollarSign}
             >
-              <div className="space-y-4 p-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Management Fee (%)</Label>
-                    <div className="flex items-center gap-2">
-                      <NumericInput
-                        className="w-24"
-                        value={belowTheLine.managementFeePct}
-                        onChange={(val) => {
-                          setBelowTheLine(prev => ({ ...prev, managementFeePct: val }));
-                          setHasChanges(true);
-                          changesSinceSaveRef.current = true;
-                          hasChangesRef.current = true;
-                        }}
-                        disabled={isScenarioLocked}
-                      />
-                      <span className="text-xs text-muted-foreground">% of Gross Revenue</span>
-                    </div>
+              <div className="space-y-2 p-1">
+                <div className="mb-2 last:mb-0">
+                  <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                    <span>Percentage-Based</span>
+                    <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">CapEx</Label>
-                    <div className="flex items-center gap-2">
-                      <NumericInput
-                        className="w-24"
-                        value={belowTheLine.capexPct}
-                        onChange={(val) => {
-                          setBelowTheLine(prev => ({ ...prev, capexPct: val }));
-                          setHasChanges(true);
-                          changesSinceSaveRef.current = true;
-                          hasChangesRef.current = true;
-                        }}
-                        disabled={isScenarioLocked}
-                      />
-                      <span className="text-xs text-muted-foreground">% of Revenue</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          <Users className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Mgmt Fee</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <NumericInput
+                          className="w-16 h-7 text-xs text-center"
+                          value={belowTheLine.managementFeePct}
+                          onChange={(val) => {
+                            setBelowTheLine(prev => ({ ...prev, managementFeePct: val }));
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">% of Gross Revenue</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">or fixed $</span>
-                      <NumericInput
-                        className="w-28"
-                        value={belowTheLine.capexAmount || ''}
-                        placeholder="0"
-                        onChange={(val) => {
-                          setBelowTheLine(prev => ({ ...prev, capexAmount: val }));
-                          setHasChanges(true);
-                          changesSinceSaveRef.current = true;
-                          hasChangesRef.current = true;
-                        }}
-                        disabled={isScenarioLocked}
-                      />
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          <Wrench className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">CapEx</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <NumericInput
+                          className="w-16 h-7 text-xs text-center"
+                          value={belowTheLine.capexPct}
+                          onChange={(val) => {
+                            setBelowTheLine(prev => ({ ...prev, capexPct: val }));
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">% of Revenue</span>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">Fixed overrides % when &gt; 0</p>
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          <Shield className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Reserves</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <NumericInput
+                          className="w-16 h-7 text-xs text-center"
+                          value={belowTheLine.reservesPct}
+                          onChange={(val) => {
+                            setBelowTheLine(prev => ({ ...prev, reservesPct: val }));
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">% of Revenue</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Replacement Reserves</Label>
-                  <div className="flex items-center gap-2">
-                    <NumericInput
-                      className="w-24"
-                      value={belowTheLine.reservesPct}
-                      onChange={(val) => {
-                        setBelowTheLine(prev => ({ ...prev, reservesPct: val }));
-                        setHasChanges(true);
-                        changesSinceSaveRef.current = true;
-                        hasChangesRef.current = true;
-                      }}
-                      disabled={isScenarioLocked}
-                    />
-                    <span className="text-xs text-muted-foreground">% of Revenue</span>
+                <div className="mb-2 last:mb-0">
+                  <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                    <span>Fixed Amounts</span>
+                    <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">or fixed $</span>
-                    <NumericInput
-                      className="w-28"
-                      value={belowTheLine.reservesAmount || ''}
-                      placeholder="0"
-                      onChange={(val) => {
-                        setBelowTheLine(prev => ({ ...prev, reservesAmount: val }));
-                        setHasChanges(true);
-                        changesSinceSaveRef.current = true;
-                        hasChangesRef.current = true;
-                      }}
-                      disabled={isScenarioLocked}
-                    />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          <DollarSign className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">CapEx Fixed</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <span className="text-[10px] text-muted-foreground">$</span>
+                        <NumericInput
+                          className="w-20 h-7 text-xs text-center"
+                          value={belowTheLine.capexAmount || ''}
+                          placeholder="0"
+                          onChange={(val) => {
+                            setBelowTheLine(prev => ({ ...prev, capexAmount: val }));
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">overrides % when &gt; 0</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                        <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                          <DollarSign className="w-3 h-3" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Reserves Fixed</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <span className="text-[10px] text-muted-foreground">$</span>
+                        <NumericInput
+                          className="w-20 h-7 text-xs text-center"
+                          value={belowTheLine.reservesAmount || ''}
+                          placeholder="0"
+                          onChange={(val) => {
+                            setBelowTheLine(prev => ({ ...prev, reservesAmount: val }));
+                            setHasChanges(true);
+                            changesSinceSaveRef.current = true;
+                            hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                        />
+                        <span className="text-[10px] text-muted-foreground">overrides % when &gt; 0</span>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Fixed overrides % when &gt; 0</p>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Levered Cash Flow = NOI − Mgmt Fee − CapEx − Reserves − Debt Service</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Debt Service auto-calculated from Capital Stack.
-                  </p>
+                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg">
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Levered Cash Flow = NOI − Mgmt Fee − CapEx − Reserves − Debt Service</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Debt Service auto-calculated from Capital Stack.</p>
                 </div>
               </div>
             </SectionCard>
@@ -1746,35 +1788,35 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 accent="emerald"
                 icon={TrendingUp}
               >
-                <div className="p-1">
-                  <div className="flex items-center gap-4">
-                    <div className="space-y-1.5 flex-1 max-w-xs">
-                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Exit Cap Rate (%)</Label>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          className="w-24"
-                          value={exitCapRateValue}
-                          onChange={(val) => {
-                            setExitCapRateValue(val);
-                            setHasChanges(true);
-                            changesSinceSaveRef.current = true;
-                            hasChangesRef.current = true;
-                          }}
-                          disabled={isScenarioLocked}
-                        />
-                        <span className="text-xs text-muted-foreground">%</span>
+                <div className="p-1 space-y-2">
+                  <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                      <div className="w-5 h-5 rounded flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                        <TrendingUp className="w-3 h-3" />
                       </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Exit Value = Final Year NOI / Exit Cap Rate
-                      </p>
+                      <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Cap Rate</span>
                     </div>
-                    {exitCapRateValue > 0 && (
-                      <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg">
-                        <p className="text-[10px] text-muted-foreground">Implied Exit Multiple</p>
-                        <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">{(1 / (exitCapRateValue / 100)).toFixed(2)}x NOI</p>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <NumericInput
+                        className="w-20 h-7 text-xs text-center"
+                        value={exitCapRateValue}
+                        onChange={(val) => {
+                          setExitCapRateValue(val);
+                          setHasChanges(true);
+                          changesSinceSaveRef.current = true;
+                          hasChangesRef.current = true;
+                        }}
+                        disabled={isScenarioLocked}
+                      />
+                      <span className="text-[10px] text-muted-foreground">%</span>
+                      {exitCapRateValue > 0 && (
+                        <Badge variant="outline" className="ml-auto text-[10px] bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                          {(1 / (exitCapRateValue / 100)).toFixed(2)}x NOI
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+                  <p className="text-[10px] text-muted-foreground px-2">Exit Value = Final Year NOI / Exit Cap Rate</p>
                 </div>
               </SectionCard>
 
@@ -1784,86 +1826,117 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 accent="purple"
                 icon={Shield}
               >
-                <div className="space-y-4 p-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Selling Fees (%)</Label>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          className="w-24"
-                          value={exitAssumptions.sellingFeePct}
-                          onChange={(val) => {
-                            setExitAssumptions(prev => ({ ...prev, sellingFeePct: val }));
-                            setHasChanges(true);
-                            changesSinceSaveRef.current = true;
-                            hasChangesRef.current = true;
-                          }}
-                          disabled={isScenarioLocked}
-                        />
-                        <span className="text-xs text-muted-foreground">% of Exit Value</span>
-                      </div>
+                <div className="space-y-2 p-1">
+                  <div className="mb-2 last:mb-0">
+                    <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                      <span>Fees & Costs</span>
+                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                     </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Loan Exit Fee (%)</Label>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          className="w-24"
-                          value={exitAssumptions.loanExitFeePct}
-                          onChange={(val) => {
-                            setExitAssumptions(prev => ({ ...prev, loanExitFeePct: val }));
-                            setHasChanges(true);
-                            changesSinceSaveRef.current = true;
-                            hasChangesRef.current = true;
-                          }}
-                          disabled={isScenarioLocked}
-                        />
-                        <span className="text-xs text-muted-foreground">% of Loan Balance</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                          <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            <Percent className="w-3 h-3" />
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Selling Fees</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <NumericInput
+                            className="w-16 h-7 text-xs text-center"
+                            value={exitAssumptions.sellingFeePct}
+                            onChange={(val) => {
+                              setExitAssumptions(prev => ({ ...prev, sellingFeePct: val }));
+                              setHasChanges(true);
+                              changesSinceSaveRef.current = true;
+                              hasChangesRef.current = true;
+                            }}
+                            disabled={isScenarioLocked}
+                          />
+                          <span className="text-[10px] text-muted-foreground">% of Exit Value</span>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Working Capital ($)</Label>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          className="w-28"
-                          value={exitAssumptions.workingCapitalAmount || ''}
-                          placeholder="0"
-                          onChange={(val) => {
-                            setExitAssumptions(prev => ({ ...prev, workingCapitalAmount: val }));
-                            setHasChanges(true);
-                            changesSinceSaveRef.current = true;
-                            hasChangesRef.current = true;
-                          }}
-                          disabled={isScenarioLocked}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">WC Recovery (%)</Label>
-                      <div className="flex items-center gap-2">
-                        <NumericInput
-                          className="w-24"
-                          value={exitAssumptions.workingCapitalRecoveryPct}
-                          onChange={(val) => {
-                            setExitAssumptions(prev => ({ ...prev, workingCapitalRecoveryPct: val }));
-                            setHasChanges(true);
-                            changesSinceSaveRef.current = true;
-                            hasChangesRef.current = true;
-                          }}
-                          disabled={isScenarioLocked}
-                        />
-                        <span className="text-xs text-muted-foreground">% recovered at exit</span>
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                          <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            <Percent className="w-3 h-3" />
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">Loan Exit Fee</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <NumericInput
+                            className="w-16 h-7 text-xs text-center"
+                            value={exitAssumptions.loanExitFeePct}
+                            onChange={(val) => {
+                              setExitAssumptions(prev => ({ ...prev, loanExitFeePct: val }));
+                              setHasChanges(true);
+                              changesSinceSaveRef.current = true;
+                              hasChangesRef.current = true;
+                            }}
+                            disabled={isScenarioLocked}
+                          />
+                          <span className="text-[10px] text-muted-foreground">% of Loan Balance</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-3 rounded-lg">
-                    <p className="text-xs font-medium text-purple-800 dark:text-purple-300">Net Exit = Exit Value − Selling Fees − Loan Payoff − Exit Fees + WC Recovery</p>
-                    <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">
-                      Exit Value = Terminal NOI ÷ Cap Rate. Loan payoff from debt schedule.
-                    </p>
+                  <div className="mb-2 last:mb-0">
+                    <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 px-1 flex items-center gap-1.5">
+                      <span>Working Capital</span>
+                      <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                          <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            <DollarSign className="w-3 h-3" />
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">WC Amount</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <span className="text-[10px] text-muted-foreground">$</span>
+                          <NumericInput
+                            className="w-20 h-7 text-xs text-center"
+                            value={exitAssumptions.workingCapitalAmount || ''}
+                            placeholder="0"
+                            onChange={(val) => {
+                              setExitAssumptions(prev => ({ ...prev, workingCapitalAmount: val }));
+                              setHasChanges(true);
+                              changesSinceSaveRef.current = true;
+                              hasChangesRef.current = true;
+                            }}
+                            disabled={isScenarioLocked}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-[140px]">
+                          <div className="w-5 h-5 rounded flex items-center justify-center bg-slate-50 dark:bg-slate-700/60 text-slate-400 dark:text-slate-500 flex-shrink-0">
+                            <Percent className="w-3 h-3" />
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">WC Recovery</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <NumericInput
+                            className="w-16 h-7 text-xs text-center"
+                            value={exitAssumptions.workingCapitalRecoveryPct}
+                            onChange={(val) => {
+                              setExitAssumptions(prev => ({ ...prev, workingCapitalRecoveryPct: val }));
+                              setHasChanges(true);
+                              changesSinceSaveRef.current = true;
+                              hasChangesRef.current = true;
+                            }}
+                            disabled={isScenarioLocked}
+                          />
+                          <span className="text-[10px] text-muted-foreground">% recovered at exit</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 p-2.5 rounded-lg">
+                    <p className="text-[11px] font-medium text-purple-800 dark:text-purple-300">Net Exit = Exit Value − Selling Fees − Loan Payoff − Exit Fees + WC Recovery</p>
+                    <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">Exit Value = Terminal NOI ÷ Cap Rate. Loan payoff from debt schedule.</p>
                   </div>
                 </div>
               </SectionCard>
