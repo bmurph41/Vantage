@@ -14,10 +14,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, Legend, BarChart, Bar, Area, AreaChart 
 } from "recharts";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Calculator, TrendingUp, AlertCircle, Save, Trash2, Copy, 
   DollarSign, Percent, Calendar, Building2, ArrowRight,
-  RefreshCw, FileSpreadsheet, ChevronRight, ExternalLink, Layers
+  RefreshCw, FileSpreadsheet, ChevronRight, ExternalLink, Layers,
+  Download, Landmark
 } from "lucide-react";
 import { format, subYears } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -350,6 +352,45 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
     getPrimeRate, getFedFundsRate, 
     getTreasuryRate 
   } = useAllMarketRates();
+
+  const holdYearsNum = parseInt(inputs.loanTermYears) || 10;
+  const spreadBpsNum = parseInt(inputs.spreadBps) || 250;
+  const { data: forwardCurveData, isLoading: forwardCurveLoading } = useQuery<{
+    holdYears: number;
+    startYear: number;
+    spreadBps: number;
+    forwardCurveAvailable: boolean;
+    yearlyRates: {
+      year: number;
+      yearIndex: number;
+      baseSofrRate: number;
+      spreadBps: number;
+      allInRate: number;
+      allInRateCapped: number;
+    }[];
+  }>({
+    queryKey: ['sofr-forward-rates-debt-scenario', holdYearsNum, spreadBpsNum],
+    queryFn: async () => {
+      const res = await fetch(`/api/capital-markets/sofr-forward-rates/${Math.min(Math.max(holdYearsNum, 1), 30)}?spreadBps=${spreadBpsNum}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch forward rates');
+      return res.json();
+    },
+  });
+
+  const importForwardCurveRates = () => {
+    if (!forwardCurveData?.forwardCurveAvailable || !forwardCurveData.yearlyRates.length) return;
+    const avgAllIn = forwardCurveData.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / forwardCurveData.yearlyRates.length;
+    const avgBase = forwardCurveData.yearlyRates.reduce((s, r) => s + r.baseSofrRate, 0) / forwardCurveData.yearlyRates.length;
+    setInputs(prev => ({
+      ...prev,
+      baseRate: 'SOFR',
+      spreadBps: String(forwardCurveData.yearlyRates[0]?.spreadBps || 250),
+    }));
+    toast({
+      title: "Forward Curve Imported",
+      description: `SOFR base avg ${(avgBase * 100).toFixed(2)}% + ${forwardCurveData.yearlyRates[0]?.spreadBps || 250}bps = ${(avgAllIn * 100).toFixed(2)}% avg all-in rate over ${holdYearsNum}yr`,
+    });
+  };
   
   const getBaseRateValue = (): number => {
     switch (inputs.baseRate) {
@@ -453,6 +494,23 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={importForwardCurveRates}
+            disabled={!forwardCurveData?.forwardCurveAvailable}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Import Forward Curve
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/analysis/capital-markets?tab=debt-modeling')}
+          >
+            <Landmark className="h-4 w-4 mr-2" />
+            Capital Markets
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -633,6 +691,72 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
               </div>
             </CardContent>
           </Card>
+
+          {forwardCurveData?.forwardCurveAvailable && (
+            <Card className="border-blue-200 dark:border-blue-800">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900">
+                      <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">SOFR Forward Curve — Variable Rate Projection</CardTitle>
+                      <CardDescription>Year-by-year rates using {inputs.baseRate} + {inputs.spreadBps}bps over {holdYearsNum}-year term</CardDescription>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
+                    Live Data
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-xs py-1 h-auto">Year</TableHead>
+                          <TableHead className="text-xs py-1 h-auto text-right">Base SOFR</TableHead>
+                          <TableHead className="text-xs py-1 h-auto text-right">Spread</TableHead>
+                          <TableHead className="text-xs py-1 h-auto text-right font-semibold">All-In</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {forwardCurveData.yearlyRates.map((yr) => (
+                          <TableRow key={yr.year} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/30">
+                            <TableCell className="text-xs py-1.5 font-medium">Yr {yr.yearIndex} ({yr.year})</TableCell>
+                            <TableCell className="text-xs py-1.5 text-right tabular-nums">{(yr.baseSofrRate * 100).toFixed(2)}%</TableCell>
+                            <TableCell className="text-xs py-1.5 text-right tabular-nums text-amber-600">+{yr.spreadBps}bps</TableCell>
+                            <TableCell className="text-xs py-1.5 text-right tabular-nums font-semibold text-blue-700 dark:text-blue-300">{(yr.allInRateCapped * 100).toFixed(2)}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <p className="text-lg font-bold tabular-nums">{(forwardCurveData.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / forwardCurveData.yearlyRates.length * 100).toFixed(2)}%</p>
+                        <p className="text-[10px] uppercase text-muted-foreground">Avg All-In Rate</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg text-center">
+                        <p className="text-lg font-bold tabular-nums">{(forwardCurveData.yearlyRates.reduce((s, r) => s + r.baseSofrRate, 0) / forwardCurveData.yearlyRates.length * 100).toFixed(2)}%</p>
+                        <p className="text-[10px] uppercase text-muted-foreground">Avg Base SOFR</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      These forward curve rates are automatically applied to floating-rate debt tranches in the Pro Forma engine. The variable rates replace flat-rate assumptions for more accurate debt service projections.
+                    </p>
+                    <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => navigate('/analysis/capital-markets?tab=debt-modeling')}>
+                      <Landmark className="h-3.5 w-3.5" />
+                      Explore Full Debt Modeling in Capital Markets
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="calculator" className="space-y-6">

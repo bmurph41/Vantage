@@ -44,11 +44,15 @@ import {
   Settings2,
   Briefcase,
   Link,
-  Unlink
+  Unlink,
+  ChevronDown,
+  Landmark
 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { CapitalStack, DebtTranche, EquityLayer, CapitalStackProjection, Fund, FundDealAllocation, FundCapitalStackTemplate } from '@shared/schema';
+import { useSearch } from 'wouter';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker } from '@/components/modeling/MarketRatePicker';
 import WorkspaceDebtScenarios from './debt-scenarios';
@@ -262,6 +266,7 @@ function SofrForwardRatePreview({ holdYears, spreadBps, floorRate }: SofrForward
 export default function CapitalStackWorkspace({ projectId, onTabChange }: CapitalStackWorkspaceProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const searchString = useSearch();
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
   const [showCreateStack, setShowCreateStack] = useState(false);
   const [showAddDebt, setShowAddDebt] = useState(false);
@@ -277,6 +282,32 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const [selectedFundId, setSelectedFundId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState("capital-stack");
+  const [showMarketRates, setShowMarketRates] = useState(false);
+  const [capitalMarketsParams, setCapitalMarketsParams] = useState<{
+    debtSpread?: string;
+    debtIndex?: string;
+    debtTerm?: string;
+    debtFloor?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const debtSpread = params.get('debtSpread');
+    const debtIndex = params.get('debtIndex');
+    if (debtSpread || debtIndex) {
+      setCapitalMarketsParams({
+        debtSpread: debtSpread || undefined,
+        debtIndex: debtIndex || undefined,
+        debtTerm: params.get('debtTerm') || undefined,
+        debtFloor: params.get('debtFloor') || undefined,
+      });
+      setShowMarketRates(true);
+      toast({
+        title: "Capital Markets Configuration Applied",
+        description: `${debtIndex || 'SOFR'} + ${debtSpread || '250'}bps loaded from Capital Markets debt modeling`,
+      });
+    }
+  }, [searchString]);
   
   const [stackPartners, setStackPartners] = useState<{
     id: string;
@@ -374,6 +405,36 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
     enabled: !!selectedStackId,
   });
 
+  const holdYearsForMarket = capitalMarketsParams?.debtTerm 
+    ? Math.min(Math.max(parseInt(capitalMarketsParams.debtTerm), 1), 30)
+    : stackDetails?.stack 
+      ? Math.min(Math.max(parseInt(String(stackDetails.stack.holdPeriod || 5)), 1), 30) 
+      : 5;
+  const spreadBpsForMarket = capitalMarketsParams?.debtSpread ? parseInt(capitalMarketsParams.debtSpread) : 250;
+  const { data: marketForwardRates, isLoading: marketRatesLoading } = useQuery<{
+    holdYears: number;
+    startYear: number;
+    spreadBps: number;
+    forwardCurveAvailable: boolean;
+    yearlyRates: {
+      year: number;
+      yearIndex: number;
+      baseSofrRate: number;
+      spreadBps: number;
+      allInRate: number;
+      allInRateCapped: number;
+    }[];
+  }>({
+    queryKey: ['sofr-forward-rates', holdYearsForMarket, spreadBpsForMarket],
+    queryFn: async () => {
+      const params = new URLSearchParams({ spreadBps: String(spreadBpsForMarket) });
+      if (capitalMarketsParams?.debtFloor) params.set('rateFloor', capitalMarketsParams.debtFloor);
+      const res = await fetch(`/api/capital-markets/sofr-forward-rates/${holdYearsForMarket}?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch forward rates');
+      return res.json();
+    },
+  });
+
   const debtForm = useForm<DebtTrancheFormData>({
     resolver: zodResolver(debtTrancheFormSchema),
     defaultValues: {
@@ -414,6 +475,30 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
       promoteTiers: [],
     },
   });
+
+  useEffect(() => {
+    if (capitalMarketsParams && !editingDebt) {
+      debtForm.reset({
+        name: 'SOFR Floating Rate',
+        trancheType: 'senior',
+        lenderName: '',
+        principal: '',
+        interestRate: '',
+        indexRate: capitalMarketsParams.debtIndex || 'SOFR',
+        spreadBps: capitalMarketsParams.debtSpread || '250',
+        floorRate: capitalMarketsParams.debtFloor || '',
+        termYears: capitalMarketsParams.debtTerm || '10',
+        amortizationYears: '30',
+        interestOnlyMonths: '0',
+        originationFeePct: '0.01',
+        exitFeePct: '0',
+        prepaymentPenalty: '',
+        minDscr: '1.25',
+        maxLtv: '0.75',
+        minDebtYield: '',
+      });
+    }
+  }, [capitalMarketsParams]);
 
   useEffect(() => {
     if (editingDebt) {
@@ -848,6 +933,18 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         </TabsContent>
 
         <TabsContent value="capital-stack" className="space-y-6">
+
+      {capitalMarketsParams && (
+        <Alert className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20">
+          <Landmark className="h-4 w-4 text-indigo-600" />
+          <AlertTitle className="text-indigo-800 dark:text-indigo-200">Capital Markets Configuration Active</AlertTitle>
+          <AlertDescription className="text-indigo-700 dark:text-indigo-300">
+            {capitalMarketsParams.debtIndex || 'SOFR'} + {capitalMarketsParams.debtSpread || '250'}bps over {capitalMarketsParams.debtTerm || '5'}-year hold
+            {capitalMarketsParams.debtFloor ? ` · Floor: ${(parseFloat(capitalMarketsParams.debtFloor) * 100).toFixed(1)}%` : ''}
+            . Add a new floating-rate tranche below to use these rates, or view the forward curve in the Market Rates panel.
+          </AlertDescription>
+        </Alert>
+      )}
       
       <div className="flex items-center justify-between">
         <div>
@@ -1197,6 +1294,110 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
             </Tabs>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="rounded-lg border bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
+        <button
+          onClick={() => setShowMarketRates(!showMarketRates)}
+          className="w-full flex items-center justify-between p-4 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-colors rounded-lg"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900">
+              <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-semibold">Market Rates & SOFR Forward Curve</h3>
+              <p className="text-xs text-muted-foreground">
+                {marketForwardRates?.forwardCurveAvailable 
+                  ? `Live forward curve data · Avg rate: ${(marketForwardRates.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / marketForwardRates.yearlyRates.length * 100).toFixed(2)}% over ${holdYearsForMarket}yr`
+                  : 'View current market conditions for debt pricing'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {marketForwardRates?.forwardCurveAvailable && (
+              <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
+                Live Data
+              </Badge>
+            )}
+            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${showMarketRates ? 'rotate-90' : ''}`} />
+          </div>
+        </button>
+        
+        {showMarketRates && (
+          <div className="px-4 pb-4 space-y-4">
+            <Separator />
+            {marketRatesLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : marketForwardRates?.forwardCurveAvailable ? (
+              <>
+                <div className="grid grid-cols-4 gap-3">
+                  <Card className="p-3">
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Current SOFR</p>
+                    <p className="text-lg font-bold tabular-nums">{(marketForwardRates.yearlyRates[0]?.baseSofrRate * 100).toFixed(2)}%</p>
+                  </Card>
+                  <Card className="p-3">
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Avg Forward</p>
+                    <p className="text-lg font-bold tabular-nums">
+                      {(marketForwardRates.yearlyRates.reduce((s, r) => s + r.baseSofrRate, 0) / marketForwardRates.yearlyRates.length * 100).toFixed(2)}%
+                    </p>
+                  </Card>
+                  <Card className="p-3">
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">+250bps All-In</p>
+                    <p className="text-lg font-bold tabular-nums">
+                      {(marketForwardRates.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / marketForwardRates.yearlyRates.length * 100).toFixed(2)}%
+                    </p>
+                  </Card>
+                  <Card className="p-3">
+                    <p className="text-[10px] uppercase text-muted-foreground font-medium">Hold Period</p>
+                    <p className="text-lg font-bold tabular-nums">{holdYearsForMarket}yr</p>
+                  </Card>
+                </div>
+                
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs py-1 h-auto">Year</TableHead>
+                      <TableHead className="text-xs py-1 h-auto text-right">Base SOFR</TableHead>
+                      <TableHead className="text-xs py-1 h-auto text-right">+250bps</TableHead>
+                      <TableHead className="text-xs py-1 h-auto text-right font-semibold">All-In</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {marketForwardRates.yearlyRates.map((yr) => (
+                      <TableRow key={yr.year} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/30">
+                        <TableCell className="text-xs py-1.5 font-medium">Yr {yr.yearIndex} ({yr.year})</TableCell>
+                        <TableCell className="text-xs py-1.5 text-right tabular-nums">{(yr.baseSofrRate * 100).toFixed(2)}%</TableCell>
+                        <TableCell className="text-xs py-1.5 text-right tabular-nums text-amber-600">+{yr.spreadBps}bps</TableCell>
+                        <TableCell className="text-xs py-1.5 text-right tabular-nums font-semibold text-blue-700 dark:text-blue-300">{(yr.allInRateCapped * 100).toFixed(2)}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-xs text-muted-foreground">Forward rates auto-applied to floating-rate tranche debt service in Pro Forma</p>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => window.location.href = '/analysis/capital-markets?tab=debt-modeling'}>
+                    <ArrowUpDown className="h-3 w-3" />
+                    Open Capital Markets
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground mb-3">No SOFR forward curve data available yet</p>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/analysis/capital-markets'}>
+                  Go to Capital Markets to Refresh Data
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Fund Inheritance Section */}

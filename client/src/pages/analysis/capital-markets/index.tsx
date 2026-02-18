@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCw, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, Database, Calendar, Calculator, Landmark } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { RefreshCw, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, Database, Calendar, Calculator, Landmark, Building2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
+import type { ModelingProject } from "@shared/schema";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, BarChart, Bar, Cell } from "recharts";
 
 type RateType = "sofr" | "treasury" | "prime" | "fed_funds";
@@ -86,12 +89,45 @@ const RATE_TYPE_LABELS: Record<RateType, string> = {
 export default function CapitalMarketsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+  const searchString = useSearch();
   const [selectedRateType, setSelectedRateType] = useState<RateType>("treasury");
   const [selectedForwardType, setSelectedForwardType] = useState<RateType>("sofr");
   const [forwardMonths, setForwardMonths] = useState(60);
   const [debtSpreadBps, setDebtSpreadBps] = useState(250);
   const [debtHoldYears, setDebtHoldYears] = useState(5);
   const [debtFloorRate, setDebtFloorRate] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("overview");
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const tab = params.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchString]);
+
+  const { data: modelingProjects } = useQuery<ModelingProject[]>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
+  const applyToModel = () => {
+    if (!selectedProjectId) {
+      toast({ title: "Select a project first", variant: "destructive" });
+      return;
+    }
+    const params = new URLSearchParams({
+      tab: 'capital',
+      debtSpread: String(debtSpreadBps),
+      debtIndex: 'SOFR',
+      debtTerm: String(debtHoldYears),
+      ...(debtFloorRate ? { debtFloor: debtFloorRate } : {}),
+    });
+    navigate(`/modeling/projects/${selectedProjectId}?${params.toString()}`);
+    toast({
+      title: "Navigating to Capital Stack",
+      description: `Opening with SOFR + ${debtSpreadBps}bps configured for ${debtHoldYears}-year hold`,
+    });
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery<StatsResponse>({
     queryKey: ["/api/capital-markets/stats"],
@@ -250,15 +286,15 @@ export default function CapitalMarketsPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="yield-curve" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="yield-curve">Yield Curve</TabsTrigger>
+          <TabsTrigger value="overview">Yield Curve</TabsTrigger>
           <TabsTrigger value="forward-curve">Forward Curves</TabsTrigger>
           <TabsTrigger value="debt-modeling">Debt Modeling</TabsTrigger>
           <TabsTrigger value="rates-table">Rates Table</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="yield-curve" className="space-y-4">
+        <TabsContent value="overview" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -596,6 +632,50 @@ export default function CapitalMarketsPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border-indigo-200 dark:border-indigo-800">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-indigo-100 dark:bg-indigo-900">
+                  <Building2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Apply to Financial Model</CardTitle>
+                  <CardDescription>Push these debt parameters into a project's Capital Stack</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-end gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <Label className="text-xs">Select Project</Label>
+                  <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a modeling project..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelingProjects?.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.marinaName || p.name || `Project #${p.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={applyToModel}
+                  disabled={!selectedProjectId || !debtModelingData?.forwardCurveAvailable}
+                  className="gap-1.5"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Apply to Model
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Opens the project's Capital Stack with SOFR + {debtSpreadBps}bps pre-configured for a {debtHoldYears}-year hold
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="rates-table" className="space-y-4">
