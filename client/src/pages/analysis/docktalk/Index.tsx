@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, docktalkTourSteps } from "@/lib/tour-configs";
 
 export default function DockTalkPage() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<'all' | 'marinaMatch' | 'aiExtraction'>('marinaMatch');
 
   const { data, isLoading } = useQuery<{ deals: DocktalkDeal[]; total: number }>({
@@ -60,7 +62,7 @@ export default function DockTalkPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" ref={reportRef}>
       <PageTour tourId={TOUR_IDS.DOCKTALK} steps={docktalkTourSteps} />
       {/* Header */}
       <div className="border-b bg-card">
@@ -75,6 +77,7 @@ export default function DockTalkPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <ExportPdfButton contentRef={reportRef} filename="docktalk-ma-spotlight" title="DockTalk M&A Spotlight" />
               <Badge variant="outline" className="text-lg px-4 py-2" data-testid="badge-total-deals">
                 {total} {total === 1 ? 'Deal' : 'Deals'}
               </Badge>
