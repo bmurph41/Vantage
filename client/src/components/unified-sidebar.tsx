@@ -856,6 +856,48 @@ export default function UnifiedSidebar() {
           </div>
         )}
 
+        {/* Admin - Only visible to owners */}
+        {user?.role === 'owner' && (
+          <div className="mb-2">
+            {sidebarCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href="/admin/customers">
+                    <div 
+                      className={cn(
+                        "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors",
+                        location.startsWith('/admin') ? "bg-sidebar-accent" : ""
+                      )}
+                    >
+                      <Shield className={cn("w-4 h-4", location.startsWith('/admin') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                    </div>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={10}>
+                  <p>Admin</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Link href="/admin/customers">
+                <div
+                  className={cn(
+                    "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                    location.startsWith('/admin')
+                      ? "bg-blue-600 text-white hover:bg-blue-700" 
+                      : "text-gray-500 hover:text-gray-700"
+                  )}
+                  data-testid="nav-admin"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Admin</span>
+                  </div>
+                </div>
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Integrations - Section Title Style Link */}
         <div className="mb-2">
           {sidebarCollapsed ? (

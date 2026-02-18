@@ -21883,6 +21883,80 @@ export const integrationSyncHistory = pgTable("integration_sync_history", {
 
 export type IntegrationSyncHistory = typeof integrationSyncHistory.$inferSelect;
 export type InsertIntegrationSyncHistory = typeof integrationSyncHistory.$inferInsert;
+
+// ============ ADMIN CUSTOMERS DASHBOARD ============
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled", "unpaid"]);
+export const subscriptionIntervalEnum = pgEnum("subscription_interval", ["month", "year"]);
+
+export const subscriptions = pgTable("subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  provider: text("provider").notNull().default("stripe"),
+  planKey: text("plan_key"),
+  planName: text("plan_name"),
+  interval: subscriptionIntervalEnum("interval").notNull().default("month"),
+  status: subscriptionStatusEnum("status").notNull().default("trialing"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  mrrCents: integer("mrr_cents").notNull().default(0),
+  providerCustomerId: text("provider_customer_id"),
+  providerSubscriptionId: text("provider_subscription_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("subscriptions_user_idx").on(table.userId),
+  orgIdx: index("subscriptions_org_idx").on(table.orgId),
+  statusIdx: index("subscriptions_status_idx").on(table.status),
+}));
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+  action: text("action").notNull(),
+  targetUserId: varchar("target_user_id").references(() => users.id),
+  metadataJson: jsonb("metadata_json").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  adminIdx: index("admin_audit_admin_idx").on(table.adminUserId),
+  targetIdx: index("admin_audit_target_idx").on(table.targetUserId),
+  createdAtIdx: index("admin_audit_created_at_idx").on(table.createdAt),
+}));
+
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAdminAuditLog = z.infer<typeof insertAdminAuditLogSchema>;
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+
+export const customerNotes = pgTable("customer_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+  note: text("note").notNull(),
+  tags: text("tags").array().default(sql`'{}'`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("customer_notes_user_idx").on(table.userId),
+}));
+
+export const insertCustomerNoteSchema = createInsertSchema(customerNotes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCustomerNote = z.infer<typeof insertCustomerNoteSchema>;
+export type CustomerNote = typeof customerNotes.$inferSelect;
 export const insertIntegrationSyncHistorySchema = createInsertSchema(integrationSyncHistory).omit({
   id: true,
   startedAt: true,

@@ -135,6 +135,7 @@ const SyncMonitor = lazy(() => import("@/pages/integrations/SyncMonitor"));
 const VDRActivity = lazy(() => import("@/pages/vdr/ActivityDashboard"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboard"));
+const AdminCustomersPage = lazy(() => import("@/pages/admin/AdminCustomersPage"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -537,6 +538,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <IntegrationDetail />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/customers">
+        {() => (
+          <UnifiedLayout>
+            <AdminCustomersPage />
           </UnifiedLayout>
         )}
       </Route>
