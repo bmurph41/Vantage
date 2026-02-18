@@ -4,9 +4,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 const WORKFLOW_STEPS = [
   { id: 'overview', label: 'Overview' },
   { id: 'inputs', label: 'Inputs' },
-  { id: 'assumptions', label: 'Assumptions' },
   { id: 'uploads', label: 'Uploads' },
   { id: 'historical', label: 'Historical' },
+  { id: 'assumptions', label: 'Assumptions' },
   { id: 'proforma', label: 'Pro Forma' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'summary', label: 'Summary' },
