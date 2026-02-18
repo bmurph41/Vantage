@@ -52,23 +52,23 @@ export default function UserSettingsPage() {
 
   // Fetch benchmarking settings
   const { data: benchmarkingSettings, isLoading: isLoadingBenchmarking } = useQuery<{
+    benchmarkOptIn: boolean;
     benchmarkingOptOut: boolean;
-    optOutTimestamp: string | null;
     dataBenchmarkingConsent: boolean;
     consentTimestamp: string | null;
     consentVersion: string | null;
   }>({
-    queryKey: ['/api/auth/account/benchmarking'],
+    queryKey: ['/api/benchmarking/settings'],
   });
 
   // Update benchmarking settings mutation
   const updateBenchmarkingMutation = useMutation({
     mutationFn: async (benchmarkingOptOut: boolean) => {
-      const response = await apiRequest("PATCH", "/api/auth/account/benchmarking", { benchmarkingOptOut });
+      const response = await apiRequest("PATCH", "/api/benchmarking/settings", { benchmarkingOptOut, benchmarkOptIn: !benchmarkingOptOut });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/account/benchmarking'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/benchmarking/settings'] });
       toast({ 
         title: "Settings updated", 
         description: "Your privacy preferences have been saved." 
@@ -401,9 +401,9 @@ export default function UserSettingsPage() {
                       <p className="text-sm text-muted-foreground mt-1">
                         This helps improve industry analytics for all MarinaMatch users. Your marina's identity is never disclosed. You can opt out at any time.
                       </p>
-                      {benchmarkingSettings?.optOutTimestamp && benchmarkingSettings.benchmarkingOptOut && (
+                      {benchmarkingSettings?.benchmarkingOptOut && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          Opted out on {new Date(benchmarkingSettings.optOutTimestamp).toLocaleDateString()}
+                          Currently opted out of benchmarking
                         </p>
                       )}
                     </div>

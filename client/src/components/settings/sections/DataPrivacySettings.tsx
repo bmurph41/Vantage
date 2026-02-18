@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useExportData, useDeleteAccount } from '@/hooks/use-settings';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   Database,
   Download,
@@ -26,7 +28,15 @@ import {
   ExternalLink,
   Loader2,
   BarChart3,
+  Info,
 } from 'lucide-react';
+import { Link } from 'wouter';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { UserSettings, UserProfile, Organization } from '@/types/settings';
 
 interface DataPrivacySettingsProps {
@@ -47,7 +57,63 @@ export function DataPrivacySettings({
   const deleteAccount = useDeleteAccount();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showOptOutConfirm, setShowOptOutConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const { data: benchmarkSettings, isLoading: isLoadingBenchmark } = useQuery<{
+    benchmarkOptIn: boolean;
+    benchmarkingOptOut: boolean;
+    dataBenchmarkingConsent: boolean;
+    consentTimestamp: string | null;
+    consentVersion: string | null;
+  }>({
+    queryKey: ['/api/benchmarking/settings'],
+  });
+
+  const updateBenchmarkMutation = useMutation({
+    mutationFn: async (body: { benchmarkOptIn?: boolean; benchmarkingOptOut?: boolean }) => {
+      const response = await apiRequest('PATCH', '/api/benchmarking/settings', body);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/benchmarking/settings'] });
+    },
+  });
+
+  const isOptedIn = benchmarkSettings ? benchmarkSettings.benchmarkOptIn && !benchmarkSettings.benchmarkingOptOut : true;
+
+  const handleToggleBenchmark = (checked: boolean) => {
+    if (!checked) {
+      setShowOptOutConfirm(true);
+      return;
+    }
+    updateBenchmarkMutation.mutate(
+      { benchmarkOptIn: true, benchmarkingOptOut: false },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Opted in',
+            description: 'Thank you for contributing to industry benchmarks.',
+          });
+        },
+      }
+    );
+  };
+
+  const confirmOptOut = () => {
+    updateBenchmarkMutation.mutate(
+      { benchmarkOptIn: false, benchmarkingOptOut: true },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Opted out',
+            description: 'Your data will no longer contribute to benchmarks.',
+          });
+          setShowOptOutConfirm(false);
+        },
+      }
+    );
+  };
 
   const handleExport = async () => {
     try {
@@ -133,52 +199,48 @@ export function DataPrivacySettings({
         </CardContent>
       </Card>
 
-      {/* Benchmarking Consent */}
+      {/* Benchmarking Opt-in */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Industry Benchmarking
+            Contribute De-Identified Data to Benchmarks
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>We only use de-identified, aggregated stats (e.g., averages, ranges) and enforce minimum cohort sizes to prevent identifying any one marina.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardTitle>
           <CardDescription>
-            Help improve industry insights while keeping your data private
+            Help improve MarinaMatch benchmarks by contributing de-identified, aggregated statistics derived from your data. Your marina's identity is never disclosed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg space-y-3">
-            <h4 className="font-medium text-sm">What is anonymized benchmarking?</h4>
-            <p className="text-sm text-muted-foreground">
-              When enabled, we aggregate anonymized data from your marina valuations
-              to provide industry-wide benchmarks. Your data is:
-            </p>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li>Fully anonymized — no marina names, locations, or identifying info</li>
-              <li>Aggregated with other data points before any analysis</li>
-              <li>Never sold or shared with third parties</li>
-              <li>Used only to improve benchmark accuracy for all users</li>
-            </ul>
-          </div>
-
           <div className="flex items-center justify-between">
-            <div>
-              <Label>Participate in Anonymized Benchmarking</Label>
-              <p className="text-sm text-muted-foreground">
-                Contribute to industry insights while maintaining privacy
+            <div className="space-y-1">
+              <Label>Included in benchmark cohorts</Label>
+              <p className="text-xs text-muted-foreground">
+                This setting does not affect your own dashboards, reports, or modeling outputs — only whether your data contributes to aggregated benchmarks.
               </p>
             </div>
             <Switch
-              checked={true} // This would come from actual user settings
-              onCheckedChange={(checked) => {
-                // Handle opt-in/out
-                toast({
-                  title: checked ? 'Opted in' : 'Opted out',
-                  description: checked
-                    ? 'Thank you for contributing to industry benchmarks.'
-                    : 'Your data will no longer be used for benchmarking.',
-                });
-              }}
+              checked={isOptedIn}
+              onCheckedChange={handleToggleBenchmark}
+              disabled={isLoadingBenchmark || updateBenchmarkMutation.isPending}
             />
           </div>
+
+          <Separator />
+
+          <Link href="/benchmarking" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+            Learn how benchmarking works
+            <ExternalLink className="h-3 w-3" />
+          </Link>
         </CardContent>
       </Card>
 
@@ -193,21 +255,18 @@ export function DataPrivacySettings({
         </CardHeader>
         <CardContent className="space-y-3">
           {[
-            { name: 'Terms of Service', url: '/legal/terms' },
-            { name: 'Privacy Policy', url: '/legal/privacy' },
-            { name: 'Data Processing Agreement', url: '/legal/dpa' },
-            { name: 'Acceptable Use Policy', url: '/legal/aup' },
+            { name: 'Terms of Service', url: '/terms' },
+            { name: 'Privacy Policy', url: '/privacy' },
+            { name: 'Benchmarking Policy', url: '/benchmarking' },
           ].map((doc) => (
-            <a
+            <Link
               key={doc.name}
               href={doc.url}
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
             >
               <span className="text-sm font-medium">{doc.name}</span>
               <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            </a>
+            </Link>
           ))}
         </CardContent>
       </Card>
@@ -268,6 +327,27 @@ export function DataPrivacySettings({
           </div>
         </CardContent>
       </Card>
+
+      {/* Opt-out Confirmation Modal */}
+      <AlertDialog open={showOptOutConfirm} onOpenChange={setShowOptOutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Opt out of benchmarks?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You can still use all analytics features. Your data just won't contribute to aggregated industry benchmarks. You can opt back in at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmOptOut}
+              disabled={updateBenchmarkMutation.isPending}
+            >
+              {updateBenchmarkMutation.isPending ? 'Updating...' : 'Opt Out'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Account Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

@@ -961,6 +961,13 @@ export default function UnifiedSidebar() {
         </Tooltip>
       </div>
       
+          {!sidebarCollapsed && (
+            <div className="border-t border-sidebar-border px-4 py-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+              <a href="/terms" target="_blank" className="hover:text-foreground transition-colors">Terms</a>
+              <a href="/privacy" target="_blank" className="hover:text-foreground transition-colors">Privacy</a>
+              <a href="/benchmarking" target="_blank" className="hover:text-foreground transition-colors">Benchmarking</a>
+            </div>
+          )}
           <div className={cn(
             "border-t border-sidebar-border bg-sidebar flex-shrink-0",
             sidebarCollapsed ? "p-2" : "p-4"

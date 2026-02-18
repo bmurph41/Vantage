@@ -27,6 +27,7 @@ import { ddChecklistRouter } from "./routes/dd-checklist-routes";
 import healthRoutes from './routes/health';
 import { deprecationWarning } from './routes/api-versioning';
 import { exitStudioRouter } from './routes/exit-studio-routes';
+import legalBenchmarkingRoutes from './routes/legal-benchmarking-routes';
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
@@ -69,6 +70,7 @@ app.use('/api', deprecationWarning('2027-06-01'));
     const server = await registerRoutes(app);
     // Then add after auth routes:
     app.use('/api/settings', settingsRoutes);
+    app.use('/api', legalBenchmarkingRoutes);
     app.use('/api/valuator/:projectId/leases', leasesRouter);
     app.use('/api/wizard-drafts', wizardDraftsRouter);
 app.use(ddChecklistRouter);

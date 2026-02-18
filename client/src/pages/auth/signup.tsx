@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Anchor, Eye, EyeOff, Check, Building, Calculator, ChartLine, Briefcase, Users, Target, BarChart3, Waves, Info } from "lucide-react";
+import { Loader2, Anchor, Eye, EyeOff, Check, Building, Calculator, ChartLine, Briefcase, Users, Target, BarChart3, Waves, Info, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -53,9 +53,7 @@ const signupSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string(),
   orgName: z.string().min(2, "Company name must be at least 2 characters"),
-  dataBenchmarkingConsent: z.boolean().refine((val) => val === true, {
-    message: "You must agree to the Data Use & Anonymized Benchmarking Terms to create an account",
-  }),
+  dataBenchmarkingConsent: z.boolean().default(true),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -83,7 +81,7 @@ export default function SignupPage() {
       password: "",
       confirmPassword: "",
       orgName: "",
-      dataBenchmarkingConsent: false,
+      dataBenchmarkingConsent: true,
     },
   });
 
@@ -488,49 +486,34 @@ export default function SignupPage() {
                 />
               </CardContent>
               <CardFooter className="flex flex-col space-y-4 pt-2">
-                <div className="w-full space-y-3 p-4 bg-slate-50/50 rounded-lg border border-slate-200">
+                <div className="w-full space-y-2 p-4 bg-slate-50/50 rounded-lg border border-slate-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-700">Data Use & Anonymized Benchmarking Consent</span>
+                    <Shield className="h-4 w-4 text-cyan-600" />
+                    <span className="text-sm font-medium text-slate-700">Data privacy & benchmarking</span>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Info className="h-4 w-4 text-slate-400 cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs">
-                          <p>Anonymized benchmarking means your data is combined with many others and cannot be traced back to your marina.</p>
+                          <p>We only use de-identified, aggregated stats (e.g., averages, ranges) and enforce minimum cohort sizes to prevent identifying any one marina.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    I understand and agree that financial statements, rent rolls, occupancy data, pricing, and other operational information I upload or connect to MarinaMatch may be used to generate aggregated, anonymized, and de-identified industry benchmarks and analytics. MarinaMatch will not disclose my marina's name, address, ownership, or any identifying information.
+                    MarinaMatch uses aggregated, de-identified platform data to improve analytics and produce industry benchmarks. Your marina's identity and raw financial files are never shared or sold.
                   </p>
-                  <FormField
-                    control={form.control}
-                    name="dataBenchmarkingConsent"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-consent"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="text-sm text-slate-700 cursor-pointer">
-                            I agree to the Data Use & Anonymized Benchmarking Terms <span className="text-red-500">*</span>
-                          </FormLabel>
-                          <FormMessage />
-                        </div>
-                      </FormItem>
-                    )}
-                  />
+                  <a href="/benchmarking" target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-600 hover:underline inline-flex items-center gap-1">
+                    Learn how benchmarking works
+                  </a>
+                  <p className="text-xs text-slate-400 mt-1">
+                    By continuing, you agree to our <a href="/terms" target="_blank" className="text-cyan-600 hover:underline">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-cyan-600 hover:underline">Privacy Policy</a>.
+                  </p>
                 </div>
                 <Button
                   type="submit"
                   className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium shadow-lg shadow-cyan-500/25"
-                  disabled={!form.watch("dataBenchmarkingConsent")}
                   data-testid="button-continue"
                 >
                   Continue to Pack Selection

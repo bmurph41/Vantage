@@ -126,6 +126,7 @@ const MagicLinkPage = lazy(() => import("@/pages/auth/magic-link"));
 const MagicLinkVerifyPage = lazy(() => import("@/pages/auth/magic-link-verify"));
 const VerifyEmailPage = lazy(() => import("@/pages/auth/verify-email"));
 const DesignPreview = lazy(() => import("@/pages/design-preview"));
+const LegalPage = lazy(() => import("@/pages/LegalPage"));
 const MMUIDemo = lazy(() => import("@/pages/mm-ui-demo"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
 const IntegrationsMarketplace = lazy(() => import("@/pages/integrations/IntegrationsMarketplace"));
@@ -440,6 +441,28 @@ function Router() {
         {() => (
           <Suspense fallback={<PageLoader />}>
             <VerifyEmailPage />
+          </Suspense>
+        )}
+      </Route>
+      {/* Legal pages - public, no auth required */}
+      <Route path="/terms">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <LegalPage docType="terms" />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/privacy">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <LegalPage docType="privacy" />
+          </Suspense>
+        )}
+      </Route>
+      <Route path="/benchmarking">
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <LegalPage docType="benchmarking" />
           </Suspense>
         )}
       </Route>

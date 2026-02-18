@@ -52,6 +52,14 @@ The platform utilizes a dual-sourced data model separating "Universal/Global" cu
 - **AI Assistant**: Context-aware chatbot powered by GPT-5 with streaming responses and platform knowledge base.
 - **Add-on Packs**: Fund Management, LP Portal, Prospecting, and MarinaMatch Intel.
 
+### Data Governance & Benchmarking Framework
+- **Legal Documents**: Versioned TOS, Privacy Policy, and Benchmarking Policy stored in `legal_documents` table (doc_type enum: TOS, PRIVACY, BENCHMARK_POLICY). Public API: `GET /api/legal/:docType` (terms/privacy/benchmarking). Frontend pages at `/terms`, `/privacy`, `/benchmarking`.
+- **Benchmark Opt-in**: Organization-level `benchmark_opt_in` boolean (default true) + user-level `benchmarkingOptOut` field. API: `GET/PATCH /api/benchmarking/settings`. Toggle in Settings > Data & Privacy with opt-out confirmation modal.
+- **Benchmark Aggregates**: `benchmark_aggregates` table stores de-identified aggregates (metric_key, cohort_key, period_key, p25/p50/p75/mean, cohort_size). Cohort suppression enforced: results only returned when `cohort_size >= MIN_COHORT_SIZE` (env var, default 10). Admin rebuild: `POST /api/admin/benchmarks/rebuild`.
+- **Benchmarking Guardrails**: `server/services/benchmarking-guardrails.ts` provides `getOptedOutUserIds()`, `getOptedOutOrgIds()`, `isUserOptedOut()`, and Drizzle conditions for filtering opted-out data from aggregation queries.
+- **Signup Flow**: Calm "Data privacy & benchmarking" info block replaces consent checkbox. `dataBenchmarkingConsent` defaults to true (implied consent via TOS acceptance). Links to /benchmarking, /terms, /privacy.
+- **Sidebar Footer**: Terms, Privacy, Benchmarking links visible when sidebar is expanded.
+
 ### System Design Choices
 - **Database**: PostgreSQL with Neon serverless hosting, Drizzle ORM, schema-first, Drizzle Kit for migrations.
 - **Multi-tenancy**: Organization-based data isolation.

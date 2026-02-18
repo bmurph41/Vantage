@@ -191,8 +191,46 @@ export const organizations = pgTable("organizations", {
   sessionTimeoutMinutes: integer("session_timeout_minutes").notNull().default(480), // 8 hours default
   ipAllowlist: text("ip_allowlist").array(), // CIDR ranges
   allowedEmailDomains: text("allowed_email_domains").array(), // For JIT provisioning
+  benchmarkOptIn: boolean("benchmark_opt_in").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Legal Documents - versioned legal text (TOS, Privacy, Benchmark Policy)
+export const legalDocTypeEnum = pgEnum("legal_doc_type", ["TOS", "PRIVACY", "BENCHMARK_POLICY"]);
+
+export const legalDocuments = pgTable("legal_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  docType: legalDocTypeEnum("doc_type").notNull(),
+  version: varchar("version", { length: 32 }).notNull(),
+  contentMd: text("content_md").notNull(),
+  effectiveAt: timestamp("effective_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type LegalDocument = typeof legalDocuments.$inferSelect;
+export type InsertLegalDocument = typeof legalDocuments.$inferInsert;
+
+// Benchmark Aggregates - de-identified aggregate metrics only
+export const benchmarkAggregates = pgTable("benchmark_aggregates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  metricKey: varchar("metric_key", { length: 128 }).notNull(),
+  cohortKey: varchar("cohort_key", { length: 256 }).notNull(),
+  periodKey: varchar("period_key", { length: 32 }).notNull(),
+  cohortSize: integer("cohort_size").notNull(),
+  p25: numeric("p25"),
+  p50: numeric("p50"),
+  p75: numeric("p75"),
+  mean: numeric("mean"),
+  minBucketed: numeric("min_bucketed"),
+  maxBucketed: numeric("max_bucketed"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  metricCohortIdx: index("bench_agg_metric_cohort_idx").on(table.metricKey, table.cohortKey),
+  periodIdx: index("bench_agg_period_idx").on(table.periodKey),
+}));
+
+export type BenchmarkAggregate = typeof benchmarkAggregates.$inferSelect;
+export type InsertBenchmarkAggregate = typeof benchmarkAggregates.$inferInsert;
 
 // Pack Types - Add-on feature packs that can be purchased
 // Core packs: crm_pipeline, modeling_tools, analysis, operations
