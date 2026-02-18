@@ -244,6 +244,8 @@ export const MARINA_DEFAULT_PATTERNS = [
 ];
 
 class DocIntelService {
+  private _lastGlobalPromotion: number = 0;
+
   async recoverStuckUploads(): Promise<number> {
     const stuckUploads = await db
       .update(docIntelUploads)
@@ -1346,6 +1348,17 @@ class DocIntelService {
             .returning();
           
           categorizedItems.push(updated);
+
+          if (aiResult.confidence >= 0.85 && aiResult.tier && item.rawText) {
+            try {
+              const dept = aiResult.tier === 'expense' ? aiResult.department : aiResult.department;
+              const coaCode = await buildCoaCode(aiResult.tier as 'revenue' | 'cogs' | 'expense', dept);
+              await learnAlias(item.rawText, coaCode, orgId);
+              console.log(`[DocIntel AI Training] High-confidence AI result learned: "${item.rawText.substring(0, 40)}..." -> ${coaCode} (${(aiResult.confidence * 100).toFixed(0)}%)`);
+            } catch (err) {
+              console.error('[DocIntel AI Training] Failed to learn from AI classification:', err);
+            }
+          }
         } else {
           categorizedItems.push(item);
         }
@@ -1613,7 +1626,7 @@ Respond with JSON only:
 
     const enhancedMap = new Map(enhancedItems.map(e => [e.id, e]));
 
-    return items.map(item => {
+    const results = items.map(item => {
       const enhanced = enhancedMap.get(item.id);
       if (enhanced?.autoConfirmed) {
         return {
@@ -1632,6 +1645,49 @@ Respond with JSON only:
         learningRuleApplied: enhanced?.learningRuleApplied ?? false,
       };
     });
+
+    for (const item of results) {
+      if ((item as any).autoConfirmed && item.status === 'confirmed') {
+        const originalItem = items.find(i => i.id === item.id);
+        if (originalItem && originalItem.status === 'confirmed') continue;
+
+        try {
+          const tier = item.categoryTierConfirmed;
+          const dept = item.expenseDeptConfirmed || item.revenueCogsDeptConfirmed || 
+                       item.expenseDeptSuggested || item.revenueCogsDeptSuggested;
+
+          const persistData: Record<string, any> = {
+            status: 'confirmed',
+            confirmedAt: new Date(),
+            updatedAt: new Date(),
+          };
+          if (tier) persistData.categoryTierConfirmed = tier;
+          if (item.expenseDeptConfirmed || item.expenseDeptSuggested) {
+            persistData.expenseDeptConfirmed = item.expenseDeptConfirmed || item.expenseDeptSuggested;
+          }
+          if (item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested) {
+            persistData.revenueCogsDeptConfirmed = item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested;
+          }
+
+          await db
+            .update(docIntelExtractedItems)
+            .set(persistData)
+            .where(and(
+              eq(docIntelExtractedItems.id, item.id),
+              eq(docIntelExtractedItems.orgId, orgId)
+            ));
+
+          if (tier && dept && item.rawText) {
+            const coaCode = await buildCoaCode(tier as 'revenue' | 'cogs' | 'expense', dept);
+            await learnAlias(item.rawText, coaCode, orgId);
+          }
+        } catch (err) {
+          console.error('[DocIntel AutoConfirm Persist] Failed:', err);
+        }
+      }
+    }
+
+    return results;
   }
 
   async getExtractedItemsWithCategories(orgId: string, uploadId: string): Promise<(DocIntelExtractedItem & { suggestedCategory?: PnlCategory; confirmedCategory?: PnlCategory })[]> {
@@ -2910,6 +2966,14 @@ Respond with JSON only:
       });
       
       console.log(`[DocIntel Learning] Created rule from confirmation: "${rawText.substring(0, 30)}..."`);
+
+      if (!this._lastGlobalPromotion || Date.now() - this._lastGlobalPromotion > 300000) {
+        this._lastGlobalPromotion = Date.now();
+        try {
+          const { promoteHighFrequencyAliasesToGlobal } = await import('./pnl-alias-matcher');
+          promoteHighFrequencyAliasesToGlobal().catch(() => {});
+        } catch {}
+      }
     } catch (error) {
       console.error('[DocIntel Learning] Failed to create learning rule:', error);
     }

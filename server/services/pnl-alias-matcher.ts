@@ -244,6 +244,94 @@ export async function clearAliasCache() {
   canonicalCache = null;
 }
 
+export async function promoteHighFrequencyAliasesToGlobal(): Promise<number> {
+  const PROMOTION_THRESHOLD = 3;
+  
+  try {
+    const orgScopedAliases = await db.select()
+      .from(pnlLineItemAliases)
+      .where(and(
+        eq(pnlLineItemAliases.source, 'user_learned'),
+        eq(pnlLineItemAliases.isActive, true)
+      ));
+    
+    const labelGroups = new Map<string, { coaCodes: Map<string, number>; orgCount: Set<string> }>();
+    
+    for (const alias of orgScopedAliases) {
+      const key = alias.normalizedLabel;
+      if (!labelGroups.has(key)) {
+        labelGroups.set(key, { coaCodes: new Map(), orgCount: new Set() });
+      }
+      const group = labelGroups.get(key)!;
+      if (alias.orgId) group.orgCount.add(alias.orgId);
+      const count = group.coaCodes.get(alias.canonicalCoaCode) || 0;
+      group.coaCodes.set(alias.canonicalCoaCode, count + (alias.timesUsed || 1));
+    }
+    
+    let promoted = 0;
+    
+    for (const [normalizedLabel, group] of labelGroups) {
+      if (group.orgCount.size < PROMOTION_THRESHOLD) continue;
+      
+      let bestCode = '';
+      let bestCount = 0;
+      for (const [code, count] of group.coaCodes) {
+        if (count > bestCount) {
+          bestCode = code;
+          bestCount = count;
+        }
+      }
+      
+      if (!bestCode) continue;
+      
+      const existingGlobal = await db.select()
+        .from(pnlLineItemAliases)
+        .where(and(
+          eq(pnlLineItemAliases.normalizedLabel, normalizedLabel),
+          eq(pnlLineItemAliases.source, 'global_promoted')
+        ))
+        .limit(1);
+      
+      if (existingGlobal.length > 0) {
+        await db.update(pnlLineItemAliases)
+          .set({
+            canonicalCoaCode: bestCode,
+            confidence: '0.92',
+            timesUsed: bestCount,
+            lastUsedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(pnlLineItemAliases.id, existingGlobal[0].id));
+      } else {
+        const sampleAlias = orgScopedAliases.find(a => a.normalizedLabel === normalizedLabel);
+        await db.insert(pnlLineItemAliases)
+          .values({
+            orgId: null,
+            rawLabel: sampleAlias?.rawLabel || normalizedLabel,
+            normalizedLabel,
+            canonicalCoaCode: bestCode,
+            source: 'global_promoted',
+            confidence: '0.92',
+            timesUsed: bestCount,
+            lastUsedAt: new Date(),
+          });
+      }
+      
+      promoted++;
+    }
+    
+    if (promoted > 0) {
+      aliasCache = null;
+      console.log(`[AliasMatcher] Promoted ${promoted} aliases to global scope`);
+    }
+    
+    return promoted;
+  } catch (err) {
+    console.error('[AliasMatcher] Global promotion failed:', err);
+    return 0;
+  }
+}
+
 export async function learnAlias(
   rawLabel: string,
   canonicalCoaCode: string,
