@@ -13,9 +13,11 @@ import { db } from '../db';
 import { 
   capitalStacks,
   debtTranches,
-  type DebtTranche
+  type DebtTranche,
+  type ForwardCurvePoint,
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { getStoredForwardCurve, calculateForwardCurve } from './capital-markets/fred-service';
 
 // ============================================
 // TYPES
@@ -45,6 +47,7 @@ export interface TrancheMonthlyPayment {
   principal: number;        // Principal portion
   interest: number;         // Interest portion
   balance: number;          // Remaining balance
+  effectiveRate?: number;   // Effective annual rate (may vary for floating)
   
   isInterestOnly: boolean;  // Whether in IO period
   ioPeriodsRemaining: number;
@@ -119,15 +122,51 @@ export class DebtScheduleService {
       };
     }
     
+    const hasFloatingTranches = tranches.some(t => t.indexRate && t.spreadBps);
+    let forwardCurveYearRates: Record<number, number> = {};
+
+    if (hasFloatingTranches) {
+      try {
+        const holdYears = Math.ceil(holdPeriodMonths / 12);
+        const maxMonths = holdYears * 12;
+        let points = await getStoredForwardCurve('sofr');
+        if (points.length === 0) {
+          points = await calculateForwardCurve('sofr', maxMonths);
+        }
+        if (points.length > 0) {
+          for (let yr = 0; yr < holdYears; yr++) {
+            const midpointMonth = yr * 12 + 6;
+            const closest = points.reduce((prev, curr) =>
+              Math.abs(curr.forwardMonths - midpointMonth) < Math.abs(prev.forwardMonths - midpointMonth) ? curr : prev
+            );
+            forwardCurveYearRates[startYear + yr] = closest.forwardRate / 100;
+          }
+        }
+      } catch (err) {
+        console.warn('[DebtSchedule] Forward curve fetch failed, using fixed rates:', err);
+      }
+    }
+
     // Initialize tranche states
-    const trancheStates = tranches.map(t => ({
-      tranche: t,
-      balance: parseFloat(t.amount?.toString() || '0'),
-      ioPeriodsRemaining: (t.interestOnlyMonths || 0),
-      rate: parseFloat(t.interestRate?.toString() || '0') / 100,
-      amortMonths: (t.amortizationYears || 30) * 12,
-      termMonths: (t.termYears || 10) * 12,
-    }));
+    const trancheStates = tranches.map(t => {
+      const isFloating = !!(t.indexRate && t.spreadBps);
+      const baseRate = parseFloat(t.interestRate?.toString() || '0') / 100;
+      const spreadDecimal = (t.spreadBps || 0) / 10000;
+      const floorRate = t.floorRate ? parseFloat(t.floorRate.toString()) / 100 : 0;
+
+      return {
+        tranche: t,
+        balance: parseFloat(t.amount?.toString() || '0'),
+        ioPeriodsRemaining: (t.interestOnlyMonths || 0),
+        baseRate,
+        rate: baseRate,
+        isFloating,
+        spreadDecimal,
+        floorRate,
+        amortMonths: (t.amortizationYears || 30) * 12,
+        termMonths: (t.termYears || 10) * 12,
+      };
+    });
     
     const schedule: MonthlyDebtPayment[] = [];
     const annualDebtService: Record<number, number> = {};
@@ -149,6 +188,14 @@ export class DebtScheduleService {
       
       for (const state of trancheStates) {
         if (state.balance <= 0) continue;
+
+        if (state.isFloating && forwardCurveYearRates[year] !== undefined) {
+          let allInRate = forwardCurveYearRates[year] + state.spreadDecimal;
+          if (state.floorRate > 0) {
+            allInRate = Math.max(allInRate, state.floorRate);
+          }
+          state.rate = allInRate;
+        }
         
         const monthlyRate = state.rate / 12;
         let payment = 0;
@@ -157,13 +204,11 @@ export class DebtScheduleService {
         const isInterestOnly = state.ioPeriodsRemaining > 0;
         
         if (isInterestOnly) {
-          // Interest-only payment
           interest = state.balance * monthlyRate;
           payment = interest;
           principal = 0;
           state.ioPeriodsRemaining--;
         } else {
-          // Amortizing payment
           if (state.rate === 0) {
             payment = state.balance / Math.max(state.amortMonths - i, 1);
             principal = payment;
@@ -178,7 +223,6 @@ export class DebtScheduleService {
             }
           }
           
-          // Ensure we don't overpay
           principal = Math.min(principal, state.balance);
           state.balance -= principal;
         }
@@ -190,6 +234,7 @@ export class DebtScheduleService {
           principal: Math.round(principal * 100) / 100,
           interest: Math.round(interest * 100) / 100,
           balance: Math.round(state.balance * 100) / 100,
+          effectiveRate: Math.round(state.rate * 10000) / 10000,
           isInterestOnly,
           ioPeriodsRemaining: state.ioPeriodsRemaining,
         });

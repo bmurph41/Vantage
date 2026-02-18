@@ -8,9 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, Database, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RefreshCw, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, Database, Calendar, Calculator, Landmark } from "lucide-react";
 import { format } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area, BarChart, Bar, Cell } from "recharts";
 
 type RateType = "sofr" | "treasury" | "prime" | "fed_funds";
 type Tenor = "overnight" | "1m" | "3m" | "6m" | "1y" | "2y" | "3y" | "5y" | "7y" | "10y" | "20y" | "30y";
@@ -86,6 +89,9 @@ export default function CapitalMarketsPage() {
   const [selectedRateType, setSelectedRateType] = useState<RateType>("treasury");
   const [selectedForwardType, setSelectedForwardType] = useState<RateType>("sofr");
   const [forwardMonths, setForwardMonths] = useState(60);
+  const [debtSpreadBps, setDebtSpreadBps] = useState(250);
+  const [debtHoldYears, setDebtHoldYears] = useState(5);
+  const [debtFloorRate, setDebtFloorRate] = useState("");
 
   const { data: stats, isLoading: statsLoading } = useQuery<StatsResponse>({
     queryKey: ["/api/capital-markets/stats"],
@@ -103,6 +109,35 @@ export default function CapitalMarketsPage() {
 
   const { data: yieldSpread, isLoading: spreadLoading } = useQuery<YieldSpreadResponse>({
     queryKey: ["/api/capital-markets/yield-spreads"],
+  });
+
+  const floorParam = debtFloorRate ? parseFloat(debtFloorRate) : undefined;
+  const { data: debtModelingData, isLoading: debtModelingLoading } = useQuery<{
+    holdYears: number;
+    startYear: number;
+    spreadBps: number;
+    rateCap: number | null;
+    rateFloor: number | null;
+    forwardCurveAvailable: boolean;
+    yearlyRates: {
+      year: number;
+      yearIndex: number;
+      baseSofrRate: number;
+      spreadBps: number;
+      allInRate: number;
+      allInRateCapped: number;
+    }[];
+  }>({
+    queryKey: ['sofr-debt-modeling', debtHoldYears, debtSpreadBps, floorParam],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        spreadBps: String(debtSpreadBps),
+        ...(floorParam ? { rateFloor: String(floorParam) } : {}),
+      });
+      const res = await fetch(`/api/capital-markets/sofr-forward-rates/${debtHoldYears}?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
   });
 
   const refreshMutation = useMutation({
@@ -219,6 +254,7 @@ export default function CapitalMarketsPage() {
         <TabsList>
           <TabsTrigger value="yield-curve">Yield Curve</TabsTrigger>
           <TabsTrigger value="forward-curve">Forward Curves</TabsTrigger>
+          <TabsTrigger value="debt-modeling">Debt Modeling</TabsTrigger>
           <TabsTrigger value="rates-table">Rates Table</TabsTrigger>
         </TabsList>
 
@@ -387,6 +423,179 @@ export default function CapitalMarketsPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="debt-modeling" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5" />
+                  Spread Calculator
+                </CardTitle>
+                <CardDescription>
+                  Configure floating-rate debt assumptions to see projected year-by-year rates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Hold Period</Label>
+                  <Select value={debtHoldYears.toString()} onValueChange={(v) => setDebtHoldYears(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 Years</SelectItem>
+                      <SelectItem value="5">5 Years</SelectItem>
+                      <SelectItem value="7">7 Years</SelectItem>
+                      <SelectItem value="10">10 Years</SelectItem>
+                      <SelectItem value="15">15 Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Credit Spread (bps)</Label>
+                  <Input
+                    type="number"
+                    value={debtSpreadBps}
+                    onChange={(e) => setDebtSpreadBps(parseInt(e.target.value) || 0)}
+                    placeholder="250"
+                  />
+                  <p className="text-xs text-muted-foreground">Basis points over SOFR (250bps = 2.50%)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Floor Rate (optional)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={debtFloorRate}
+                    onChange={(e) => setDebtFloorRate(e.target.value)}
+                    placeholder="e.g. 0.04 = 4%"
+                  />
+                  <p className="text-xs text-muted-foreground">Minimum all-in rate as decimal</p>
+                </div>
+
+                {debtModelingData && !debtModelingLoading && (
+                  <div className="pt-4 border-t space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Avg All-In Rate</span>
+                      <span className="font-semibold">
+                        {(debtModelingData.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / debtModelingData.yearlyRates.length * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Min Rate</span>
+                      <span>{(Math.min(...debtModelingData.yearlyRates.map(r => r.allInRateCapped)) * 100).toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Max Rate</span>
+                      <span>{(Math.max(...debtModelingData.yearlyRates.map(r => r.allInRateCapped)) * 100).toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Data Source</span>
+                      <Badge variant="outline" className="text-xs">
+                        {debtModelingData.forwardCurveAvailable ? 'SOFR Forward Curve' : 'Estimated'}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Landmark className="h-5 w-5" />
+                  Projected Annual Debt Rates
+                </CardTitle>
+                <CardDescription>
+                  SOFR forward curve + {debtSpreadBps}bps spread over a {debtHoldYears}-year hold
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {debtModelingLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : !debtModelingData?.forwardCurveAvailable ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No SOFR forward curve data available. Click "Refresh Rates" to fetch latest market data.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={debtModelingData.yearlyRates.map(r => ({
+                        name: `${r.year}`,
+                        baseSofr: +(r.baseSofrRate * 100).toFixed(2),
+                        spread: +(debtSpreadBps / 100).toFixed(2),
+                        allIn: +(r.allInRateCapped * 100).toFixed(2),
+                      }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="name" className="text-xs" />
+                        <YAxis tickFormatter={(v) => `${v.toFixed(1)}%`} className="text-xs" />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-background border rounded-lg shadow-lg p-3 space-y-1">
+                                  <p className="font-medium">{label}</p>
+                                  <p className="text-sm text-blue-500">Base SOFR: {payload[0]?.value}%</p>
+                                  <p className="text-sm text-amber-500">Spread: +{payload[1]?.value}%</p>
+                                  <p className="text-sm font-semibold">All-In: {payload[2]?.value}%</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="baseSofr" name="Base SOFR" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                        <Bar dataKey="spread" name="Spread" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                        <Line type="monotone" dataKey="allIn" name="All-In Rate" stroke="#ef4444" strokeWidth={2} />
+                        <Legend />
+                      </BarChart>
+                    </ResponsiveContainer>
+
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Year</TableHead>
+                            <TableHead className="text-right">Base SOFR</TableHead>
+                            <TableHead className="text-right">Spread</TableHead>
+                            <TableHead className="text-right font-semibold">All-In Rate</TableHead>
+                            <TableHead className="text-right">vs. Flat 6.5%</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {debtModelingData.yearlyRates.map((yr) => {
+                            const diff = yr.allInRateCapped - 0.065;
+                            return (
+                              <TableRow key={yr.year}>
+                                <TableCell className="font-medium">Year {yr.yearIndex} ({yr.year})</TableCell>
+                                <TableCell className="text-right tabular-nums">{(yr.baseSofrRate * 100).toFixed(2)}%</TableCell>
+                                <TableCell className="text-right tabular-nums text-amber-600">+{yr.spreadBps}bps</TableCell>
+                                <TableCell className="text-right tabular-nums font-semibold">
+                                  {(yr.allInRateCapped * 100).toFixed(2)}%
+                                  {yr.allInRate !== yr.allInRateCapped && (
+                                    <Badge variant="outline" className="ml-1 text-[10px]">capped</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className={`text-right tabular-nums ${diff > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                  {diff > 0 ? '+' : ''}{(diff * 100).toFixed(0)}bps
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="rates-table" className="space-y-4">

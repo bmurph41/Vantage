@@ -33,6 +33,10 @@ import { eq, and, desc, asc } from 'drizzle-orm';
 // TYPES
 // ============================================================================
 
+export interface ForwardRateCurve {
+  yearRates: Record<number, number>;
+}
+
 export interface LoanInputs {
   name: string;
   principal: number;
@@ -55,6 +59,8 @@ export interface LoanInputs {
   floatingRateSpreadBps?: number;
   rateCap?: number;
   rateFloor?: number;
+  forwardCurve?: ForwardRateCurve;
+  useForwardCurve?: boolean;
 }
 
 export interface BlendedLoanMetrics {
@@ -278,7 +284,44 @@ export class EnhancedDebtService {
   // ============================================================================
 
   /**
-   * Generate complete monthly amortization schedule with DSCR tracking
+   * Resolve the effective annual interest rate for a given year of a floating-rate loan.
+   * If a forward curve is provided and the loan is floating, the rate is:
+   *   Base SOFR (from curve) + Spread, clamped by [floor, cap].
+   * Otherwise, falls back to the loan's fixed interestRate.
+   */
+  private resolveEffectiveRate(
+    loan: LoanInputs,
+    yearIndex: number,
+    startYear: number
+  ): number {
+    if (!loan.isFloatingRate || !loan.useForwardCurve || !loan.forwardCurve) {
+      return loan.interestRate;
+    }
+
+    const year = startYear + yearIndex;
+    const baseRate = loan.forwardCurve.yearRates[year];
+    if (baseRate === undefined) {
+      return loan.interestRate;
+    }
+
+    const spreadDecimal = (loan.floatingRateSpreadBps || 0) / 10000;
+    let allInRate = baseRate + spreadDecimal;
+
+    if (loan.rateCap !== undefined && loan.rateCap > 0) {
+      allInRate = Math.min(allInRate, loan.rateCap);
+    }
+    if (loan.rateFloor !== undefined && loan.rateFloor > 0) {
+      allInRate = Math.max(allInRate, loan.rateFloor);
+    }
+
+    return allInRate;
+  }
+
+  /**
+   * Generate complete monthly amortization schedule with DSCR tracking.
+   * Supports floating-rate loans with SOFR forward curve integration:
+   * when loan.useForwardCurve is true and loan.forwardCurve is provided,
+   * the interest rate adjusts year-by-year based on the forward curve.
    */
   generateAmortizationSchedule(
     loan: LoanInputs,
@@ -290,10 +333,11 @@ export class EnhancedDebtService {
     let balance = loan.principal;
     let cumulativePrincipal = 0;
     let cumulativeInterest = 0;
-    const monthlyRate = loan.interestRate / 12;
-    
-    // Calculate amortizing payment
-    const amortPayment = this.calculateMonthlyPayment(
+
+    const isVariableRate = loan.isFloatingRate && loan.useForwardCurve && loan.forwardCurve;
+
+    const fixedMonthlyRate = loan.interestRate / 12;
+    const fixedAmortPayment = this.calculateMonthlyPayment(
       loan.principal,
       loan.interestRate,
       loan.amortizationMonths,
@@ -301,22 +345,44 @@ export class EnhancedDebtService {
     );
     
     const monthlyNoi = annualNoi ? annualNoi / 12 : undefined;
+
+    let currentYearIndex = -1;
+    let currentEffectiveRate = loan.interestRate;
+    let currentMonthlyRate = fixedMonthlyRate;
     
     for (let i = 0; i < holdPeriodMonths; i++) {
       const periodMonth = (i % 12) + 1;
       const periodYear = startYear + Math.floor(i / 12);
+      const yearIndex = Math.floor(i / 12);
       const periodDate = new Date(periodYear, periodMonth - 1, 1);
       const isInterestOnly = i < loan.interestOnlyMonths;
+
+      if (isVariableRate && yearIndex !== currentYearIndex) {
+        currentYearIndex = yearIndex;
+        currentEffectiveRate = this.resolveEffectiveRate(loan, yearIndex, startYear);
+        currentMonthlyRate = currentEffectiveRate / 12;
+      }
       
       const beginningBalance = balance;
-      let interestPayment = balance * monthlyRate;
+      let interestPayment = balance * currentMonthlyRate;
       let principalPayment = 0;
       let scheduledPayment = 0;
       
       if (isInterestOnly) {
         scheduledPayment = interestPayment;
       } else {
-        scheduledPayment = amortPayment;
+        if (isVariableRate) {
+          const amortPeriodsElapsed = Math.max(0, i - loan.interestOnlyMonths);
+          const remainingAmortMonths = Math.max(1, loan.amortizationMonths - amortPeriodsElapsed);
+          if (currentMonthlyRate === 0) {
+            scheduledPayment = balance / remainingAmortMonths;
+          } else {
+            scheduledPayment = (balance * currentMonthlyRate * Math.pow(1 + currentMonthlyRate, remainingAmortMonths)) /
+                               (Math.pow(1 + currentMonthlyRate, remainingAmortMonths) - 1);
+          }
+        } else {
+          scheduledPayment = fixedAmortPayment;
+        }
         principalPayment = Math.min(scheduledPayment - interestPayment, balance);
       }
       
@@ -324,7 +390,6 @@ export class EnhancedDebtService {
       cumulativePrincipal += principalPayment;
       cumulativeInterest += interestPayment;
       
-      // DSCR calculation
       let dscr: number | undefined;
       let dscrPassFail: boolean | undefined;
       if (monthlyNoi !== undefined && scheduledPayment > 0) {
@@ -341,7 +406,7 @@ export class EnhancedDebtService {
         scheduledPayment: Math.round(scheduledPayment * 100) / 100,
         principalPayment: Math.round(principalPayment * 100) / 100,
         interestPayment: Math.round(interestPayment * 100) / 100,
-        interestRate: loan.interestRate,
+        interestRate: currentEffectiveRate,
         isInterestOnly,
         cumulativePrincipal: Math.round(cumulativePrincipal * 100) / 100,
         cumulativeInterest: Math.round(cumulativeInterest * 100) / 100,

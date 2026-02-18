@@ -156,6 +156,109 @@ const equityLayerFormSchema = z.object({
 type DebtTrancheFormData = z.infer<typeof debtTrancheFormSchema>;
 type EquityLayerFormData = z.infer<typeof equityLayerFormSchema>;
 
+interface SofrForwardRatePreviewProps {
+  holdYears: number;
+  spreadBps: number;
+  floorRate?: number;
+}
+
+function SofrForwardRatePreview({ holdYears, spreadBps, floorRate }: SofrForwardRatePreviewProps) {
+  const clampedHoldYears = Math.min(Math.max(holdYears || 5, 1), 30);
+  const params = new URLSearchParams({
+    spreadBps: String(spreadBps || 0),
+    ...(floorRate ? { rateFloor: String(floorRate) } : {}),
+  });
+
+  const { data, isLoading } = useQuery<{
+    holdYears: number;
+    startYear: number;
+    spreadBps: number;
+    forwardCurveAvailable: boolean;
+    yearlyRates: {
+      year: number;
+      yearIndex: number;
+      baseSofrRate: number;
+      spreadBps: number;
+      allInRate: number;
+      allInRateCapped: number;
+    }[];
+  }>({
+    queryKey: ['sofr-forward-rates', clampedHoldYears, spreadBps, floorRate],
+    queryFn: async () => {
+      const res = await fetch(`/api/capital-markets/sofr-forward-rates/${clampedHoldYears}?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch forward rates');
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">SOFR Forward Curve Rates</span>
+        </div>
+        <Skeleton className="h-20 w-full" />
+      </div>
+    );
+  }
+
+  if (!data || !data.forwardCurveAvailable || data.yearlyRates.length === 0) {
+    return (
+      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <span className="text-sm text-amber-700 dark:text-amber-300">
+            SOFR forward curve data not available. Refresh market data in Capital Markets to enable variable rate modeling.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="flex items-center gap-2 mb-3">
+        <TrendingUp className="h-4 w-4 text-blue-600" />
+        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">SOFR Forward Curve — Projected Year-by-Year Rates</span>
+        <Badge variant="outline" className="text-xs ml-auto">
+          {data.forwardCurveAvailable ? 'Live Data' : 'Estimated'}
+        </Badge>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="text-xs py-1 px-2 h-auto">Year</TableHead>
+              <TableHead className="text-xs py-1 px-2 h-auto text-right">Base SOFR</TableHead>
+              <TableHead className="text-xs py-1 px-2 h-auto text-right">Spread</TableHead>
+              <TableHead className="text-xs py-1 px-2 h-auto text-right font-semibold">All-In Rate</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.yearlyRates.map((yr) => (
+              <TableRow key={yr.year} className="hover:bg-blue-100/50 dark:hover:bg-blue-900/30">
+                <TableCell className="text-xs py-1 px-2 font-medium">Yr {yr.yearIndex} ({yr.year})</TableCell>
+                <TableCell className="text-xs py-1 px-2 text-right">{(yr.baseSofrRate * 100).toFixed(2)}%</TableCell>
+                <TableCell className="text-xs py-1 px-2 text-right">+{yr.spreadBps}bps</TableCell>
+                <TableCell className="text-xs py-1 px-2 text-right font-semibold text-blue-700 dark:text-blue-300">
+                  {(yr.allInRateCapped * 100).toFixed(2)}%
+                  {yr.allInRate !== yr.allInRateCapped && (
+                    <span className="text-amber-600 ml-1">(capped)</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        Forward rates auto-applied to Pro Forma debt service calculations for floating-rate tranches.
+      </p>
+    </div>
+  );
+}
+
 export default function CapitalStackWorkspace({ projectId, onTabChange }: CapitalStackWorkspaceProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -1603,6 +1706,15 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 )}
                               </div>
 
+                              {debtForm.watch('indexRate') === 'SOFR' && (
+                                <SofrForwardRatePreview
+                                  holdYears={parseInt(debtForm.watch('termYears') || '5') || 5}
+                                  spreadBps={parseInt(debtForm.watch('spreadBps') || '0') || 0}
+                                  floorRate={debtForm.watch('floorRate') ? parseFloat(debtForm.watch('floorRate')!) : undefined}
+                                />
+                              )}
+                              </div>
+
                               <div className="grid grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="termYears" render={({ field }) => (
                                   <FormItem>
@@ -1721,12 +1833,20 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <TableCell>
                                 <Badge>{DEBT_TRANCHE_TYPES.find(t => t.value === tranche.trancheType)?.label || tranche.trancheType}</Badge>
                                 {tranche.indexRate && tranche.indexRate !== 'fixed' && (
-                                  <div className="text-xs text-muted-foreground mt-1">{tranche.indexRate} + {tranche.spreadBps}bps</div>
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                      {tranche.indexRate} + {tranche.spreadBps}bps
+                                    </Badge>
+                                    <TrendingUp className="h-3 w-3 text-blue-500" />
+                                  </div>
                                 )}
                               </TableCell>
                               <TableCell>{formatCurrency(parseNumber(tranche.principal))}</TableCell>
                               <TableCell>
                                 {formatPercent(parseNumber(tranche.interestRate) * 100)}
+                                {tranche.indexRate && tranche.indexRate !== 'fixed' && (
+                                  <div className="text-[10px] text-blue-600 dark:text-blue-400">Variable (fwd curve)</div>
+                                )}
                                 {tranche.floorRate && <div className="text-xs text-muted-foreground">Floor: {formatPercent(parseNumber(tranche.floorRate) * 100)}</div>}
                               </TableCell>
                               <TableCell>

@@ -181,6 +181,89 @@ router.get('/stats', async (req: any, res) => {
   }
 });
 
+router.get('/sofr-forward-rates/:holdYears', async (req: any, res) => {
+  try {
+    const holdYears = parseInt(req.params.holdYears);
+    if (isNaN(holdYears) || holdYears < 1 || holdYears > 30) {
+      return res.status(400).json({ error: 'holdYears must be between 1 and 30' });
+    }
+
+    const schema = z.object({
+      spreadBps: z.coerce.number().int().min(0).max(5000).default(0),
+      rateCap: z.coerce.number().min(0).max(1).optional(),
+      rateFloor: z.coerce.number().min(0).max(1).optional(),
+    });
+
+    const parsed = schema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+
+    const { spreadBps, rateCap, rateFloor } = parsed.data;
+    const spreadDecimal = spreadBps / 10000;
+    const maxMonths = holdYears * 12;
+
+    let points = await getStoredForwardCurve('sofr');
+    if (points.length === 0) {
+      points = await calculateForwardCurve('sofr', maxMonths);
+    }
+
+    const startYear = new Date().getFullYear();
+    const yearlyRates: {
+      year: number;
+      yearIndex: number;
+      baseSofrRate: number;
+      spreadBps: number;
+      allInRate: number;
+      allInRateCapped: number;
+    }[] = [];
+
+    for (let yr = 0; yr < holdYears; yr++) {
+      const midpointMonth = yr * 12 + 6;
+      let baseSofrRate = 0;
+
+      if (points.length > 0) {
+        const closest = points.reduce((prev, curr) =>
+          Math.abs(curr.forwardMonths - midpointMonth) < Math.abs(prev.forwardMonths - midpointMonth) ? curr : prev
+        );
+        baseSofrRate = closest.forwardRate / 100;
+      }
+
+      let allInRate = baseSofrRate + spreadDecimal;
+      let allInRateCapped = allInRate;
+
+      if (rateCap !== undefined && rateCap > 0) {
+        allInRateCapped = Math.min(allInRateCapped, rateCap);
+      }
+      if (rateFloor !== undefined && rateFloor > 0) {
+        allInRateCapped = Math.max(allInRateCapped, rateFloor);
+      }
+
+      yearlyRates.push({
+        year: startYear + yr,
+        yearIndex: yr + 1,
+        baseSofrRate: Math.round(baseSofrRate * 10000) / 10000,
+        spreadBps,
+        allInRate: Math.round(allInRate * 10000) / 10000,
+        allInRateCapped: Math.round(allInRateCapped * 10000) / 10000,
+      });
+    }
+
+    res.json({
+      holdYears,
+      startYear,
+      spreadBps,
+      rateCap: rateCap ?? null,
+      rateFloor: rateFloor ?? null,
+      forwardCurveAvailable: points.length > 0,
+      yearlyRates,
+    });
+  } catch (error: any) {
+    console.error('Get SOFR forward rates error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/yield-spreads', async (req: any, res) => {
   try {
     const schema = z.object({
