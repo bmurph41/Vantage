@@ -900,6 +900,190 @@ export class CensusService {
     };
   }
 
+  async getHistoricalTrends(
+    latitude: number,
+    longitude: number,
+    radiusMiles?: number
+  ): Promise<Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number }>> {
+    if (!this.apiKey) {
+      logger.debug({ latitude, longitude }, "Census API key not configured, returning empty historical trends");
+      return [];
+    }
+
+    try {
+      const geoData = await this.getGeographicCodes(latitude, longitude);
+      const years = [2019, 2020, 2021, 2022, 2023];
+      const variables = ["B01003_001E", "B19013_001E", "B25077_001E", "B23025_003E", "B23025_005E"];
+
+      const results: Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number }> = [];
+
+      for (const year of years) {
+        try {
+          const data = await this.fetchHistoricalYearData(year, variables, geoData);
+          if (data) {
+            const population = this.parseNumber(data.B01003_001E) || 0;
+            const medianIncome = this.parseNumber(data.B19013_001E) || 0;
+            const medianHomeValue = this.parseNumber(data.B25077_001E) || 0;
+            const laborForce = this.parseNumber(data.B23025_003E) || 0;
+            const unemployed = this.parseNumber(data.B23025_005E) || 0;
+            const unemploymentRate = laborForce > 0 ? Math.round((unemployed / laborForce) * 1000) / 10 : 0;
+
+            results.push({ year, population, medianIncome, medianHomeValue, unemploymentRate });
+          }
+        } catch (e) {
+          logger.debug({ year, error: e }, "Failed to fetch historical data for year");
+        }
+      }
+
+      return results;
+    } catch (error) {
+      logger.error({ error }, "Failed to fetch historical trends");
+      return [];
+    }
+  }
+
+  private async fetchHistoricalYearData(
+    year: number,
+    variables: string[],
+    geoData: GeographicCodes
+  ): Promise<CensusApiResponse | null> {
+    const endpoint = `${year}/acs/acs5`;
+    const url = `${this.baseUrl}/${endpoint}`;
+
+    const geoLevels = [
+      geoData.county ? {
+        for: `county:${geoData.county}`,
+        in: `state:${geoData.state}`
+      } : null,
+      {
+        for: `state:${geoData.state}`,
+        in: null as string | null
+      }
+    ].filter((level): level is NonNullable<typeof level> => level !== null);
+
+    for (const geoLevel of geoLevels) {
+      try {
+        const params = new URLSearchParams({
+          get: variables.join(","),
+          key: this.apiKey
+        });
+        params.append('for', geoLevel.for);
+        if (geoLevel.in) {
+          params.append('in', geoLevel.in);
+        }
+
+        const response = await fetch(`${url}?${params}`);
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        if (!data || data.length < 2) continue;
+
+        const headers = data[0];
+        const values = data[1];
+        const result: CensusApiResponse = {};
+        headers.forEach((header: string, index: number) => {
+          result[header] = values[index];
+        });
+
+        return result;
+      } catch (error) {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  async getBusinessPatterns(
+    stateFips: string,
+    countyFips: string
+  ): Promise<{
+    totalEstablishments: number;
+    totalEmployees: number;
+    totalPayroll: number;
+    sectors: Array<{ naicsCode: string; name: string; establishments: number; employees: number; payroll: number }>;
+  }> {
+    if (!this.apiKey) {
+      logger.debug("Census API key not configured, returning empty business patterns");
+      return { totalEstablishments: 0, totalEmployees: 0, totalPayroll: 0, sectors: [] };
+    }
+
+    const naicsSectors: Record<string, string> = {
+      "00": "Total",
+      "44-45": "Retail Trade",
+      "72": "Accommodation and Food Services",
+      "71": "Arts, Entertainment, Recreation",
+      "23": "Construction",
+      "48-49": "Transportation/Warehousing",
+      "52": "Finance/Insurance",
+      "53": "Real Estate",
+      "62": "Health Care",
+      "31-33": "Manufacturing"
+    };
+
+    try {
+      const url = `${this.baseUrl}/2022/cbp`;
+      const variables = ["ESTAB", "EMP", "PAYANN", "NAICS2017"];
+      const params = new URLSearchParams({
+        get: variables.join(","),
+        key: this.apiKey
+      });
+      params.append('for', `county:${countyFips}`);
+      params.append('in', `state:${stateFips}`);
+
+      const response = await fetch(`${url}?${params}`);
+      if (!response.ok) {
+        throw new Error(`CBP API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data || data.length < 2) {
+        throw new Error("No CBP data returned");
+      }
+
+      const headers: string[] = data[0];
+      const rows: string[][] = data.slice(1);
+
+      const estabIdx = headers.indexOf("ESTAB");
+      const empIdx = headers.indexOf("EMP");
+      const payannIdx = headers.indexOf("PAYANN");
+      const naicsIdx = headers.indexOf("NAICS2017");
+
+      let totalEstablishments = 0;
+      let totalEmployees = 0;
+      let totalPayroll = 0;
+      const sectors: Array<{ naicsCode: string; name: string; establishments: number; employees: number; payroll: number }> = [];
+
+      for (const row of rows) {
+        const naicsCode = row[naicsIdx];
+        if (!naicsSectors[naicsCode]) continue;
+
+        const establishments = this.parseNumber(row[estabIdx]) || 0;
+        const employees = this.parseNumber(row[empIdx]) || 0;
+        const payroll = this.parseNumber(row[payannIdx]) || 0;
+
+        if (naicsCode === "00") {
+          totalEstablishments = establishments;
+          totalEmployees = employees;
+          totalPayroll = payroll;
+        } else {
+          sectors.push({
+            naicsCode,
+            name: naicsSectors[naicsCode],
+            establishments,
+            employees,
+            payroll
+          });
+        }
+      }
+
+      return { totalEstablishments, totalEmployees, totalPayroll, sectors };
+    } catch (error) {
+      logger.error({ error }, "Failed to fetch business patterns");
+      return { totalEstablishments: 0, totalEmployees: 0, totalPayroll: 0, sectors: [] };
+    }
+  }
+
   static getMockDemographics(latitude?: number, longitude?: number): DemographicSummary {
     const basePopulation = 45000 + Math.floor(Math.random() * 30000);
     const medianIncome = 55000 + Math.floor(Math.random() * 40000);

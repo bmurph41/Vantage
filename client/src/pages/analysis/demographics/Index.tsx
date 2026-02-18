@@ -18,7 +18,10 @@ import {
   TargetDemographicsForm, 
   SiteSuitabilityScore, 
   MarketTrendAnalysis, 
-  PropertyComparisonPanel 
+  PropertyComparisonPanel,
+  BusinessEnvironmentPanel,
+  MarketPotentialIndex,
+  DaytimePopulationCard
 } from "@/components/demographics";
 import type { TargetDemographics } from "@shared/schema";
 import { 
@@ -1884,20 +1887,42 @@ function LocationAnalysisSection() {
             const firstTradeArea = tradeAreasList[0]?.[1];
             
             if (!firstTradeArea?.demographics) return null;
+            const demo = firstTradeArea.demographics as any;
             
             return (
-              <MarketTrendAnalysis
-                key={idx}
-                demographics={firstTradeArea.demographics as any}
-                locationName={loc.label || loc.address.split(',')[0]}
-              />
+              <div key={idx} className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <MarketTrendAnalysis
+                    demographics={demo}
+                    locationLabel={loc.label || loc.address.split(',')[0]}
+                    latitude={loc.latitude}
+                    longitude={loc.longitude}
+                    fipsState={demo.fipsState}
+                    fipsCounty={demo.fipsCounty}
+                  />
+                  <MarketPotentialIndex
+                    demographics={demo}
+                    locationLabel={loc.label || loc.address.split(',')[0]}
+                  />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <BusinessEnvironmentPanel
+                    latitude={loc.latitude}
+                    longitude={loc.longitude}
+                    locationLabel={loc.label || loc.address.split(',')[0]}
+                  />
+                  <DaytimePopulationCard
+                    demographics={demo}
+                    locationLabel={loc.label || loc.address.split(',')[0]}
+                  />
+                </div>
+              </div>
             );
           })}
           
           {selectedLocations.length >= 2 && (
             <PropertyComparisonPanel
               locations={getComparisonLocationsData().filter(l => l.demographics) as any}
-              targetDemographics={targetDemographics || undefined}
             />
           )}
         </div>

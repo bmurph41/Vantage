@@ -28607,6 +28607,71 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  app.post('/api/demographics/historical-trends', authenticateUser, async (req: any, res) => {
+    try {
+      const { latitude, longitude, radiusMiles } = req.body;
+
+      if (latitude === undefined || longitude === undefined) {
+        return res.status(400).json({ error: 'Latitude and longitude are required' });
+      }
+
+      const { CensusService } = await import('./services/census-service');
+      const censusApiKey = process.env.CENSUS_API_KEY;
+      const censusService = new CensusService(censusApiKey);
+
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const radius = radiusMiles ? parseFloat(radiusMiles) : undefined;
+
+      const trends = await censusService.getHistoricalTrends(lat, lng, radius);
+
+      res.json({
+        location: { latitude: lat, longitude: lng },
+        trends,
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch historical trends:', error);
+      res.status(500).json({ error: 'Failed to fetch historical trends' });
+    }
+  });
+
+  app.post('/api/demographics/business-patterns', authenticateUser, async (req: any, res) => {
+    try {
+      const { latitude, longitude } = req.body;
+
+      if (latitude === undefined || longitude === undefined) {
+        return res.status(400).json({ error: 'Latitude and longitude are required' });
+      }
+
+      const { CensusService } = await import('./services/census-service');
+      const censusApiKey = process.env.CENSUS_API_KEY;
+      const censusService = new CensusService(censusApiKey);
+
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+
+      const geoData = await (censusService as any).getGeographicCodes(lat, lng);
+
+      if (!geoData.state || !geoData.county) {
+        return res.status(400).json({ error: 'Could not determine county FIPS codes for this location' });
+      }
+
+      const businessPatterns = await censusService.getBusinessPatterns(geoData.state, geoData.county);
+
+      res.json({
+        location: { latitude: lat, longitude: lng },
+        fipsState: geoData.state,
+        fipsCounty: geoData.county,
+        businessPatterns,
+        fetchedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch business patterns:', error);
+      res.status(500).json({ error: 'Failed to fetch business patterns' });
+    }
+  });
+
   // Calculate validated drive time radius for a location
   app.post('/api/demographics/drivetime-radius', authenticateUser, async (req: any, res) => {
     try {

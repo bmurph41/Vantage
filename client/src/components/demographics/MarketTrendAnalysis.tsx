@@ -4,6 +4,8 @@ import { TrendingUp } from "lucide-react";
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from "recharts";
 import { formatPercent, formatNumber } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DemographicData {
   totalPopulation?: number;
@@ -12,35 +14,98 @@ interface DemographicData {
   populationDensity?: number;
 }
 
+interface TrendDataPoint {
+  year: number;
+  population: number;
+  medianIncome: number;
+  medianHomeValue: number;
+  unemploymentRate: number;
+}
+
 interface MarketTrendAnalysisProps {
   demographics: DemographicData | null;
   locationLabel?: string;
+  fipsState?: string;
+  fipsCounty?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
-export default function MarketTrendAnalysis({ demographics, locationLabel }: MarketTrendAnalysisProps) {
+function calculateCAGR(startValue: number, endValue: number, years: number): number {
+  if (startValue <= 0 || years <= 0) return 0;
+  return Math.pow(endValue / startValue, 1 / years) - 1;
+}
+
+export default function MarketTrendAnalysis({ demographics, locationLabel, fipsState, fipsCounty, latitude, longitude }: MarketTrendAnalysisProps) {
   const [trendType, setTrendType] = useState("5-year");
+
+  const { data: trendsData, isLoading: trendsLoading } = useQuery({
+    queryKey: ['/api/demographics/historical-trends', latitude, longitude],
+    queryFn: async () => {
+      const res = await apiRequest('POST', '/api/demographics/historical-trends', { latitude, longitude });
+      return res.json();
+    },
+    enabled: !!latitude && !!longitude,
+  });
+
+  const hasRealData = !!(trendsData?.trends && trendsData.trends.length >= 2);
+  const isEstimated = !hasRealData;
 
   const trendData = useMemo(() => {
     if (!demographics) return [];
-    
+
     const currentYear = new Date().getFullYear();
-    
+
+    if (hasRealData) {
+      const trends: TrendDataPoint[] = trendsData.trends;
+      const sorted = [...trends].sort((a, b) => a.year - b.year);
+
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const years = last.year - first.year;
+
+      const popCAGR = calculateCAGR(first.population, last.population, years);
+      const incomeCAGR = calculateCAGR(first.medianIncome, last.medianIncome, years);
+      const homeCAGR = calculateCAGR(first.medianHomeValue, last.medianHomeValue, years);
+
+      const data: any[] = sorted.map(t => ({
+        year: t.year.toString(),
+        population: t.population,
+        income: t.medianIncome,
+        homeValue: t.medianHomeValue,
+        isProjection: false
+      }));
+
+      for (let i = 1; i <= 3; i++) {
+        const projYear = last.year + i;
+        data.push({
+          year: projYear.toString(),
+          population: Math.round(last.population * Math.pow(1 + popCAGR, i)),
+          income: Math.round(last.medianIncome * Math.pow(1 + incomeCAGR, i)),
+          homeValue: Math.round(last.medianHomeValue * Math.pow(1 + homeCAGR, i)),
+          isProjection: true
+        });
+      }
+
+      return data;
+    }
+
     const basePopulation = demographics.totalPopulation || 42000;
     const baseIncome = demographics.medianHouseholdIncome || 65000;
     const baseHomeValue = demographics.medianHomeValue || 450000;
-    
+
     const populationGrowthRate = 0.012;
     const incomeGrowthRate = 0.025;
     const homeValueGrowthRate = 0.035;
-    
+
     const historicalYears = trendType === "10-year" ? 10 : 5;
-    
+
     const data = [];
-    
+
     for (let i = -historicalYears; i <= 5; i++) {
       const year = currentYear + i;
       const isProjection = i > 0;
-      
+
       data.push({
         year: year.toString(),
         population: Math.round(basePopulation * Math.pow(1 + populationGrowthRate, i)),
@@ -49,28 +114,38 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
         isProjection
       });
     }
-    
+
     return data;
-  }, [demographics, trendType]);
+  }, [demographics, trendType, hasRealData, trendsData]);
 
   const growthStats = useMemo(() => {
+    if (hasRealData && trendsData?.trends?.length >= 2) {
+      const sorted = [...trendsData.trends].sort((a: TrendDataPoint, b: TrendDataPoint) => a.year - b.year);
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+
+      return {
+        population: ((last.population - first.population) / first.population * 100),
+        income: ((last.medianIncome - first.medianIncome) / first.medianIncome * 100),
+        homeValue: ((last.medianHomeValue - first.medianHomeValue) / first.medianHomeValue * 100)
+      };
+    }
+
     const currentYear = new Date().getFullYear();
     const currentData = trendData.find(d => d.year === currentYear.toString());
     const years = trendType === "10-year" ? 10 : 5;
     const pastData = trendData.find(d => d.year === (currentYear - years).toString());
-    
+
     if (!currentData || !pastData) return { population: 0, income: 0, homeValue: 0 };
-    
+
     return {
       population: ((currentData.population - pastData.population) / pastData.population * 100),
       income: ((currentData.income - pastData.income) / pastData.income * 100),
       homeValue: ((currentData.homeValue - pastData.homeValue) / pastData.homeValue * 100)
     };
-  }, [trendData, trendType]);
+  }, [trendData, trendType, hasRealData, trendsData]);
 
   const getChartData = () => {
-    const currentYear = new Date().getFullYear();
-    
     switch (trendType) {
       case "population-growth":
         return {
@@ -83,7 +158,7 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
       case "income-growth":
         return {
           data: trendData,
-          dataKey: "income", 
+          dataKey: "income",
           color: "#10b981",
           label: "Median Income",
           formatValue: (value: number) => `$${(value / 1000).toFixed(0)}k`
@@ -123,7 +198,12 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Market Trend Analysis</h3>
+            <h3 className="text-base font-semibold text-foreground">
+              Market Trend Analysis
+              {isEstimated && (
+                <span className="text-xs font-normal text-muted-foreground ml-2" data-testid="estimated-label">(estimated)</span>
+              )}
+            </h3>
             {locationLabel && (
               <p className="text-xs text-muted-foreground mt-0.5">{locationLabel}</p>
             )}
@@ -133,10 +213,20 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="5-year">5 Year Trend</SelectItem>
-              <SelectItem value="10-year">10 Year Trend</SelectItem>
-              <SelectItem value="population-growth">Population</SelectItem>
-              <SelectItem value="income-growth">Income</SelectItem>
+              {hasRealData ? (
+                <>
+                  <SelectItem value="5-year">Census Trends</SelectItem>
+                  <SelectItem value="population-growth">Population</SelectItem>
+                  <SelectItem value="income-growth">Income</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="5-year">5 Year Trend</SelectItem>
+                  <SelectItem value="10-year">10 Year Trend</SelectItem>
+                  <SelectItem value="population-growth">Population</SelectItem>
+                  <SelectItem value="income-growth">Income</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -145,21 +235,21 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
         <div className="h-64 mb-4" data-testid="chart-container">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <XAxis 
-                dataKey="year" 
+              <XAxis
+                dataKey="year"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                 interval="preserveStartEnd"
               />
-              <YAxis 
+              <YAxis
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                 tickFormatter={chartData.formatValue}
                 width={60}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number) => [chartData.formatValue(value), chartData.label]}
                 labelFormatter={(label) => `Year: ${label}`}
                 contentStyle={{
@@ -169,9 +259,9 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
                   fontSize: '12px'
                 }}
               />
-              <ReferenceLine 
-                x={currentYear.toString()} 
-                stroke="#ef4444" 
+              <ReferenceLine
+                x={currentYear.toString()}
+                stroke="#ef4444"
                 strokeDasharray="3 3"
                 strokeWidth={1}
               />
@@ -188,7 +278,7 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
                       key={props.index}
                       cx={props.cx}
                       cy={props.cy}
-                      r={3}
+                      r={isProjection ? 3 : 4}
                       fill={isProjection ? "transparent" : chartData.color}
                       stroke={chartData.color}
                       strokeWidth={2}
@@ -218,7 +308,9 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
 
         <div className="grid grid-cols-3 gap-3">
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-population-growth">
-            <p className="text-xs text-muted-foreground">{trendType === "10-year" ? "10" : "5"}-Yr Pop. Growth</p>
+            <p className="text-xs text-muted-foreground">
+              {hasRealData ? "" : (trendType === "10-year" ? "10" : "5") + "-Yr "}Pop. Growth
+            </p>
             <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
               +{formatPercent(growthStats.population)}
             </p>
@@ -242,7 +334,10 @@ export default function MarketTrendAnalysis({ demographics, locationLabel }: Mar
           <div className="text-xs text-muted-foreground space-y-1">
             <p>• Population density: {demographics.populationDensity ? formatNumber(demographics.populationDensity) : 'N/A'} per sq mi</p>
             <p>• Historical trends show {growthStats.income > 15 ? "strong" : "steady"} income growth</p>
-            <p>• Projections based on {trendType === "10-year" ? "10" : "5"}-year CAGR</p>
+            <p>• Projections based on {hasRealData ? "real historical" : (trendType === "10-year" ? "10" : "5") + "-year"} CAGR</p>
+            {isEstimated && (
+              <p className="text-xs italic text-muted-foreground/70">Note: Using estimated data. Add coordinates for real Census trends.</p>
+            )}
             <p className="text-xs italic text-muted-foreground/70">Note: Dashed lines indicate estimates</p>
           </div>
         </div>
