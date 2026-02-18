@@ -26470,11 +26470,26 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
+      const { debtTranches: debtTrancheData, ...stackData } = req.body;
       const { capitalStackService } = await import('./services/capital-stack-service');
       const stack = await capitalStackService.createCapitalStack(orgId, userId, {
-        ...req.body,
+        ...stackData,
         modelingProjectId: projectId,
       });
+
+      if (Array.isArray(debtTrancheData) && debtTrancheData.length > 0) {
+        for (const tranche of debtTrancheData) {
+          try {
+            await capitalStackService.createDebtTranche(orgId, {
+              ...tranche,
+              capitalStackId: stack.id,
+            });
+          } catch (trancheError: any) {
+            console.error('Failed to create debt tranche:', trancheError.message);
+          }
+        }
+      }
+
       res.status(201).json(stack);
     } catch (error: any) {
       console.error('Failed to create capital stack:', error);

@@ -21,6 +21,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/formatUtils';
+import { cn } from '@/lib/utils';
 import {
   Plus,
   Trash2,
@@ -35,6 +36,7 @@ import {
   RefreshCw,
   AlertCircle,
   ChevronRight,
+  ChevronLeft,
   BarChart3,
   Save,
   X,
@@ -46,7 +48,9 @@ import {
   Link,
   Unlink,
   ChevronDown,
-  Landmark
+  Landmark,
+  Anchor,
+  Loader2
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -373,6 +377,131 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
     setStackPromoteTiers(stackPromoteTiers.map(t => t.id === id ? { ...t, [field]: value } : t));
   };
   
+  const [wizardStep, setWizardStep] = useState(1);
+  const wizardScrollRef = useRef<HTMLDivElement>(null);
+
+  const [wizardStackName, setWizardStackName] = useState('');
+  const [wizardStackDescription, setWizardStackDescription] = useState('');
+  const [wizardPurchasePrice, setWizardPurchasePrice] = useState('');
+  const [wizardClosingCosts, setWizardClosingCosts] = useState('');
+  const [wizardCapexReserves, setWizardCapexReserves] = useState('');
+  const [wizardWorkingCapital, setWizardWorkingCapital] = useState('');
+  const [wizardHoldPeriod, setWizardHoldPeriod] = useState('5');
+  const [wizardExitCapRate, setWizardExitCapRate] = useState('7');
+  const [wizardNoiGrowthRate, setWizardNoiGrowthRate] = useState('2');
+
+  interface WizardLender {
+    id: string;
+    lenderName: string;
+    trancheType: string;
+    principal: string;
+    interestRate: string;
+    indexRate: string;
+    spreadBps: string;
+    floorRate: string;
+    termYears: string;
+    amortizationYears: string;
+    interestOnlyMonths: string;
+    originationFeePct: string;
+    exitFeePct: string;
+    prepaymentPenalty: string;
+    minDscr: string;
+    maxLtv: string;
+  }
+
+  const createEmptyLender = (index: number): WizardLender => ({
+    id: crypto.randomUUID(),
+    lenderName: `Lender ${index + 1}`,
+    trancheType: 'senior',
+    principal: '',
+    interestRate: '',
+    indexRate: 'fixed',
+    spreadBps: '',
+    floorRate: '',
+    termYears: '10',
+    amortizationYears: '25',
+    interestOnlyMonths: '0',
+    originationFeePct: '1',
+    exitFeePct: '0',
+    prepaymentPenalty: '',
+    minDscr: '',
+    maxLtv: '',
+  });
+
+  const [wizardLenders, setWizardLenders] = useState<WizardLender[]>([createEmptyLender(0)]);
+
+  const addWizardLender = () => {
+    if (wizardLenders.length < 10) {
+      setWizardLenders([...wizardLenders, createEmptyLender(wizardLenders.length)]);
+    }
+  };
+
+  const removeWizardLender = (id: string) => {
+    if (wizardLenders.length > 1) {
+      setWizardLenders(wizardLenders.filter(l => l.id !== id));
+    }
+  };
+
+  const updateWizardLender = (id: string, field: keyof WizardLender, value: string) => {
+    setWizardLenders(wizardLenders.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
+
+  const WIZARD_STEPS = [
+    { id: 1, title: 'Stack Details', icon: Settings2 },
+    { id: 2, title: 'Uses of Funds', icon: DollarSign },
+    { id: 3, title: 'Advanced Debt', icon: Landmark },
+    { id: 4, title: 'Partners', icon: Building2 },
+    { id: 5, title: 'Promote', icon: PieChart },
+    { id: 6, title: 'Exit Strategy', icon: TrendingUp },
+  ];
+
+  const wizardProgress = (wizardStep / WIZARD_STEPS.length) * 100;
+
+  const handleWizardNext = () => {
+    if (wizardStep === 1 && !wizardStackName.trim()) {
+      toast({ title: 'Stack name is required', variant: 'destructive' });
+      return;
+    }
+    if (wizardStep === 2 && !parseFloat(wizardPurchasePrice)) {
+      toast({ title: 'Purchase price is required', variant: 'destructive' });
+      return;
+    }
+    if (wizardStep < WIZARD_STEPS.length) {
+      setWizardStep(s => s + 1);
+      wizardScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleWizardBack = () => {
+    if (wizardStep > 1) {
+      setWizardStep(s => s - 1);
+      wizardScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const resetWizard = () => {
+    setWizardStep(1);
+    setWizardStackName('');
+    setWizardStackDescription('');
+    setWizardPurchasePrice('');
+    setWizardClosingCosts('');
+    setWizardCapexReserves('');
+    setWizardWorkingCapital('');
+    setWizardHoldPeriod('5');
+    setWizardExitCapRate('7');
+    setWizardNoiGrowthRate('2');
+    setStackPartners([
+      { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '500000', ownershipPct: '10', preferredReturn: '8' },
+      { id: crypto.randomUUID(), name: 'LP Investor 1', type: 'lp', commitmentAmount: '2000000', ownershipPct: '40', preferredReturn: '8' },
+    ]);
+    setStackPromoteTiers([
+      { id: crypto.randomUUID(), irrHurdle: '8', gpSplit: '20', lpSplit: '80' },
+      { id: crypto.randomUUID(), irrHurdle: '12', gpSplit: '30', lpSplit: '70' },
+      { id: crypto.randomUUID(), irrHurdle: '15', gpSplit: '40', lpSplit: '60' },
+    ]);
+    setWizardLenders([createEmptyLender(0)]);
+  };
+
   const totalPartnerCommitment = stackPartners.reduce((sum, p) => sum + (parseFloat(p.commitmentAmount) || 0), 0);
   const totalOwnership = stackPartners.reduce((sum, p) => sum + (parseFloat(p.ownershipPct) || 0), 0);
 
@@ -951,347 +1080,630 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
           <h2 className="text-2xl font-bold">Capital Stack Builder</h2>
           <p className="text-muted-foreground">Configure multi-tranche debt, equity layers, and waterfall distributions</p>
         </div>
-        <Dialog open={showCreateStack} onOpenChange={setShowCreateStack}>
+        <Dialog open={showCreateStack} onOpenChange={(open) => { setShowCreateStack(open); if (!open) resetWizard(); }}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-capital-stack">
               <Plus className="h-4 w-4 mr-2" />
               New Capital Stack
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>Create Capital Stack</DialogTitle>
-              <DialogDescription>Define the capital structure, partners, and waterfall for this deal</DialogDescription>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col p-0">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <DialogTitle className="flex items-center gap-2">
+                  <Anchor className="h-5 w-5 text-[#1E4FAB]" />
+                  Create Capital Stack
+                </DialogTitle>
+                <div className="flex items-center gap-1.5 mr-6 -mt-1">
+                  {WIZARD_STEPS.map((s) => (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        "w-2.5 h-2.5 rounded-full transition-colors border cursor-pointer",
+                        wizardStep >= s.id
+                          ? "bg-[#1E4FAB] border-[#1E4FAB]"
+                          : "bg-transparent border-[#1E4FAB]/30"
+                      )}
+                      onClick={() => {
+                        if (s.id > wizardStep) {
+                          if (!wizardStackName.trim()) { toast({ title: 'Stack name is required', variant: 'destructive' }); return; }
+                          if (s.id > 2 && !parseFloat(wizardPurchasePrice)) { toast({ title: 'Purchase price is required', variant: 'destructive' }); return; }
+                        }
+                        setWizardStep(s.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Progress value={wizardProgress} className="h-1" />
+              <DialogDescription className="text-sm text-muted-foreground pt-1">
+                Step {wizardStep} of {WIZARD_STEPS.length}: {WIZARD_STEPS.find(s => s.id === wizardStep)?.title}
+              </DialogDescription>
             </DialogHeader>
-            <Tabs defaultValue="basics" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="basics">Basics</TabsTrigger>
-                <TabsTrigger value="partners">Partners</TabsTrigger>
-                <TabsTrigger value="promote">Promote</TabsTrigger>
-                <TabsTrigger value="exit">Exit</TabsTrigger>
-              </TabsList>
-              
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                const purchasePrice = parseFloat(formData.get('purchasePrice') as string) || 0;
-                const closingCosts = parseFloat(formData.get('closingCosts') as string) || 0;
-                const capexReserves = parseFloat(formData.get('capexReserves') as string) || 0;
-                const workingCapital = parseFloat(formData.get('workingCapital') as string) || 0;
-                createStackMutation.mutate({
-                  name: formData.get('name'),
-                  description: formData.get('description'),
-                  purchasePrice: purchasePrice,
-                  closingCosts: closingCosts,
-                  capexReserves: capexReserves,
-                  workingCapital: workingCapital,
-                  totalCapitalization: purchasePrice + closingCosts + capexReserves + workingCapital,
-                  holdPeriodYears: parseInt(formData.get('holdPeriodYears') as string) || 5,
-                  exitCapRate: formData.get('exitCapRate') || '0.07',
-                  noiGrowthRate: formData.get('noiGrowthRate') || '0.02',
-                  partners: stackPartners.map(p => ({
-                    name: p.name,
-                    type: p.type,
-                    commitmentAmount: parseFloat(p.commitmentAmount) || 0,
-                    ownershipPct: (parseFloat(p.ownershipPct) || 0) / 100,
-                    preferredReturn: (parseFloat(p.preferredReturn) || 0) / 100,
-                  })),
-                  promoteTiers: stackPromoteTiers.map(t => ({
-                    irrHurdle: (parseFloat(t.irrHurdle) || 0) / 100,
-                    gpSplit: (parseFloat(t.gpSplit) || 0) / 100,
-                    lpSplit: (parseFloat(t.lpSplit) || 0) / 100,
-                  })),
-                });
-              }}>
-                <div className="max-h-[55vh] overflow-y-auto py-4">
-                  <TabsContent value="basics" className="space-y-4 mt-0">
-                    <Card className="p-4 bg-slate-50/50">
-                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
-                        <Settings2 className="h-4 w-4 text-slate-600" />
-                        Stack Details
-                      </h4>
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor="name">Stack Name *</Label>
-                          <Input id="name" name="name" placeholder="Base Case" required />
-                        </div>
-                        <div>
-                          <Label htmlFor="description">Description</Label>
-                          <Textarea id="description" name="description" placeholder="Deal assumptions and notes..." rows={2} />
-                        </div>
+
+            <div ref={wizardScrollRef} className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <Settings2 className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base">Stack Details</h3>
+                      <p className="text-sm text-muted-foreground">Name and describe this capital structure scenario</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="wizard-name">Stack Name *</Label>
+                      <Input id="wizard-name" value={wizardStackName} onChange={(e) => setWizardStackName(e.target.value)} placeholder="e.g., Base Case, Conservative, Aggressive" />
+                    </div>
+                    <div>
+                      <Label htmlFor="wizard-description">Description</Label>
+                      <Textarea id="wizard-description" value={wizardStackDescription} onChange={(e) => setWizardStackDescription(e.target.value)} placeholder="Deal assumptions, strategy notes, and key considerations..." rows={3} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base">Uses of Funds</h3>
+                      <p className="text-sm text-muted-foreground">Define the total capital required for this deal</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Purchase Price *</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={wizardPurchasePrice} onChange={(e) => setWizardPurchasePrice(e.target.value)} placeholder="10,000,000" className="pl-8" />
                       </div>
-                    </Card>
-                    
-                    <Card className="p-4 bg-blue-50/50">
-                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
-                        <DollarSign className="h-4 w-4 text-blue-600" />
-                        Uses of Funds
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="purchasePrice">Purchase Price *</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="purchasePrice" name="purchasePrice" type="number" placeholder="10,000,000" className="pl-8" required />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="closingCosts">Closing Costs</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="closingCosts" name="closingCosts" type="number" placeholder="150,000" className="pl-8" />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="capexReserves">CapEx Reserves</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="capexReserves" name="capexReserves" type="number" placeholder="200,000" className="pl-8" />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="workingCapital">Working Capital</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="workingCapital" name="workingCapital" type="number" placeholder="50,000" className="pl-8" />
-                          </div>
-                        </div>
+                    </div>
+                    <div>
+                      <Label>Closing Costs</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={wizardClosingCosts} onChange={(e) => setWizardClosingCosts(e.target.value)} placeholder="150,000" className="pl-8" />
                       </div>
-                    </Card>
-                  </TabsContent>
-                  
-                  <TabsContent value="partners" className="space-y-4 mt-0">
-                    <Card className="p-4 bg-green-50/50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-green-600" />
-                          Capital Partners
-                        </h4>
-                        <Button type="button" variant="outline" size="sm" onClick={addStackPartner} className="bg-white">
-                          <Plus className="h-4 w-4 mr-1" /> Add Partner
-                        </Button>
+                    </div>
+                    <div>
+                      <Label>CapEx Reserves</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={wizardCapexReserves} onChange={(e) => setWizardCapexReserves(e.target.value)} placeholder="200,000" className="pl-8" />
                       </div>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Add GP and LP partners with their capital contributions and ownership percentages.
-                      </p>
-                      
-                      <div className="space-y-3">
-                        {stackPartners.map((partner, index) => (
-                          <Card key={partner.id} className={`p-3 ${partner.type === 'gp' ? 'bg-amber-50 border-amber-200' : 'bg-white border-green-200'}`}>
-                            <div className="flex items-center gap-3">
-                              <Badge variant={partner.type === 'gp' ? 'default' : 'secondary'} className={partner.type === 'gp' ? 'bg-amber-600' : 'bg-green-600 text-white'}>
-                                {partner.type === 'gp' ? 'GP' : 'LP'}
-                              </Badge>
-                              <div className="flex-1 grid grid-cols-4 gap-3">
-                                <div>
-                                  <Label className="text-xs">Partner Name</Label>
-                                  <Input
-                                    value={partner.name}
-                                    onChange={(e) => updateStackPartner(partner.id, 'name', e.target.value)}
-                                    placeholder="Partner name"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Commitment ($)</Label>
-                                  <Input
-                                    type="number"
-                                    value={partner.commitmentAmount}
-                                    onChange={(e) => updateStackPartner(partner.id, 'commitmentAmount', e.target.value)}
-                                    placeholder="1,000,000"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Ownership %</Label>
-                                  <Input
-                                    type="number"
-                                    value={partner.ownershipPct}
-                                    onChange={(e) => updateStackPartner(partner.id, 'ownershipPct', e.target.value)}
-                                    placeholder="25"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Pref Return %</Label>
-                                  <Input
-                                    type="number"
-                                    value={partner.preferredReturn}
-                                    onChange={(e) => updateStackPartner(partner.id, 'preferredReturn', e.target.value)}
-                                    placeholder="8"
-                                    className="h-8 text-sm"
-                                  />
-                                </div>
+                    </div>
+                    <div>
+                      <Label>Working Capital</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" value={wizardWorkingCapital} onChange={(e) => setWizardWorkingCapital(e.target.value)} placeholder="50,000" className="pl-8" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 3 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <Landmark className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-base">Advanced Debt</h3>
+                        <p className="text-sm text-muted-foreground">Configure up to 10 lenders side-by-side</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addWizardLender}
+                      disabled={wizardLenders.length >= 10}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Lender ({wizardLenders.length}/10)
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/50">
+                          <th className="sticky left-0 bg-slate-50 dark:bg-slate-800/50 z-10 text-left px-3 py-2 text-xs font-semibold text-muted-foreground min-w-[160px] border-r">Field</th>
+                          {wizardLenders.map((lender, i) => (
+                            <th key={lender.id} className="text-center px-2 py-2 min-w-[150px]">
+                              <div className="flex items-center justify-center gap-1">
+                                <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                                  {i + 1}
+                                </Badge>
+                                {wizardLenders.length > 1 && (
+                                  <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-400 hover:text-red-600" onClick={() => removeWizardLender(lender.id)}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </div>
-                              <Select value={partner.type} onValueChange={(v) => updateStackPartner(partner.id, 'type', v)}>
-                                <SelectTrigger className="w-20 h-8">
-                                  <SelectValue />
-                                </SelectTrigger>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Lender Name</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" value={l.lenderName} onChange={(e) => updateWizardLender(l.id, 'lenderName', e.target.value)} placeholder="Lender name" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Loan Type</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Select value={l.trancheType} onValueChange={(v) => updateWizardLender(l.id, 'trancheType', v)}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="gp">GP</SelectItem>
-                                  <SelectItem value="lp">LP</SelectItem>
+                                  {DEBT_TRANCHE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                                 </SelectContent>
                               </Select>
-                              {stackPartners.length > 1 && (
-                                <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPartner(partner.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                      
-                      <div className="mt-4 p-3 bg-white rounded-lg border">
-                        <div className="flex justify-between text-sm">
-                          <span>Total Commitment:</span>
-                          <span className="font-semibold">{formatCurrency(totalPartnerCommitment)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mt-1">
-                          <span>Total Ownership:</span>
-                          <span className={`font-semibold ${totalOwnership === 100 ? 'text-green-600' : totalOwnership > 100 ? 'text-red-600' : 'text-amber-600'}`}>
-                            {totalOwnership.toFixed(1)}%
-                            {totalOwnership !== 100 && <span className="text-xs ml-1">({totalOwnership < 100 ? `${(100 - totalOwnership).toFixed(1)}% remaining` : 'exceeds 100%'})</span>}
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
-                  </TabsContent>
-                  
-                  <TabsContent value="promote" className="space-y-4 mt-0">
-                    <Card className="p-4 bg-purple-50/50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <PieChart className="h-4 w-4 text-purple-600" />
-                          Promote / Waterfall Tiers
-                        </h4>
-                        <Button type="button" variant="outline" size="sm" onClick={addStackPromoteTier} className="bg-white">
-                          <Plus className="h-4 w-4 mr-1" /> Add Tier
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Define tiered promote structure based on IRR hurdles. GP receive increasing share of profits above each threshold.
-                      </p>
-                      
-                      <div className="space-y-3">
-                        {stackPromoteTiers.map((tier, index) => (
-                          <Card key={tier.id} className="p-3 bg-white border-purple-200">
-                            <div className="flex items-center gap-3">
-                              <Badge className="bg-purple-600 text-white">Tier {index + 1}</Badge>
-                              <div className="flex-1 grid grid-cols-3 gap-3">
-                                <div>
-                                  <Label className="text-xs">IRR Hurdle (%)</Label>
-                                  <div className="relative">
-                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                                    <Input
-                                      type="number"
-                                      value={tier.irrHurdle}
-                                      onChange={(e) => updateStackPromoteTier(tier.id, 'irrHurdle', e.target.value)}
-                                      placeholder="8"
-                                      className="h-8 text-sm pl-7"
-                                    />
-                                  </div>
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-green-700">GP Split (%)</Label>
-                                  <div className="relative">
-                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-green-600" />
-                                    <Input
-                                      type="number"
-                                      value={tier.gpSplit}
-                                      onChange={(e) => updateStackPromoteTier(tier.id, 'gpSplit', e.target.value)}
-                                      placeholder="20"
-                                      className="h-8 text-sm pl-7 border-green-200"
-                                    />
-                                  </div>
-                                </div>
-                                <div>
-                                  <Label className="text-xs text-blue-700">LP Split (%)</Label>
-                                  <div className="relative">
-                                    <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-blue-600" />
-                                    <Input
-                                      type="number"
-                                      value={tier.lpSplit}
-                                      onChange={(e) => updateStackPromoteTier(tier.id, 'lpSplit', e.target.value)}
-                                      placeholder="80"
-                                      className="h-8 text-sm pl-7 border-blue-200"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                              {stackPromoteTiers.length > 1 && (
-                                <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPromoteTier(tier.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                            <div className="mt-2 p-2 bg-purple-50 rounded text-xs text-purple-700">
-                              Above {tier.irrHurdle}% IRR: GP receives {tier.gpSplit}%, LP receives {tier.lpSplit}%
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                      
-                      <div className="mt-4 p-3 bg-white rounded-lg border">
-                        <h5 className="text-xs font-medium mb-2 text-muted-foreground">Waterfall Summary</h5>
-                        <div className="space-y-1 text-xs">
-                          <div className="flex justify-between">
-                            <span>1. Return of Capital</span>
-                            <span className="text-muted-foreground">100% to Investors</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>2. Preferred Return</span>
-                            <span className="text-muted-foreground">100% to LPs (until pref met)</span>
-                          </div>
-                          {stackPromoteTiers.map((tier, i) => (
-                            <div key={tier.id} className="flex justify-between">
-                              <span>{i + 3}. Above {tier.irrHurdle}% IRR</span>
-                              <span className="text-muted-foreground">GP {tier.gpSplit}% / LP {tier.lpSplit}%</span>
-                            </div>
+                            </td>
                           ))}
-                        </div>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Principal ($)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" value={l.principal} onChange={(e) => updateWizardLender(l.id, 'principal', e.target.value)} placeholder="5,000,000" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Rate Type</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Select value={l.indexRate} onValueChange={(v) => updateWizardLender(l.id, 'indexRate', v)}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {INDEX_RATES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Interest Rate (%)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" step="0.01" value={l.interestRate} onChange={(e) => updateWizardLender(l.id, 'interestRate', e.target.value)} placeholder="5.50" />
+                            </td>
+                          ))}
+                        </tr>
+                        {wizardLenders.some(l => l.indexRate !== 'fixed') && (
+                          <>
+                            <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                              <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Spread (bps)</td>
+                              {wizardLenders.map(l => (
+                                <td key={l.id} className="px-2 py-1.5">
+                                  <Input className="h-7 text-xs" type="number" value={l.spreadBps} onChange={(e) => updateWizardLender(l.id, 'spreadBps', e.target.value)} placeholder="250" disabled={l.indexRate === 'fixed'} />
+                                </td>
+                              ))}
+                            </tr>
+                            <tr className="border-t">
+                              <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Floor Rate (%)</td>
+                              {wizardLenders.map(l => (
+                                <td key={l.id} className="px-2 py-1.5">
+                                  <Input className="h-7 text-xs" type="number" step="0.01" value={l.floorRate} onChange={(e) => updateWizardLender(l.id, 'floorRate', e.target.value)} placeholder="4.00" disabled={l.indexRate === 'fixed'} />
+                                </td>
+                              ))}
+                            </tr>
+                          </>
+                        )}
+                        <tr className="border-t bg-blue-50/30 dark:bg-blue-950/10">
+                          <td colSpan={wizardLenders.length + 1} className="px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400">Loan Structure</td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Term (Years)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" value={l.termYears} onChange={(e) => updateWizardLender(l.id, 'termYears', e.target.value)} placeholder="10" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Amortization (Years)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" value={l.amortizationYears} onChange={(e) => updateWizardLender(l.id, 'amortizationYears', e.target.value)} placeholder="25" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">IO Period (Months)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" value={l.interestOnlyMonths} onChange={(e) => updateWizardLender(l.id, 'interestOnlyMonths', e.target.value)} placeholder="12" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-blue-50/30 dark:bg-blue-950/10">
+                          <td colSpan={wizardLenders.length + 1} className="px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-400">Fees & Covenants</td>
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Origination Fee (%)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" step="0.1" value={l.originationFeePct} onChange={(e) => updateWizardLender(l.id, 'originationFeePct', e.target.value)} placeholder="1.0" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Exit Fee (%)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" step="0.1" value={l.exitFeePct} onChange={(e) => updateWizardLender(l.id, 'exitFeePct', e.target.value)} placeholder="0" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Prepayment Terms</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" value={l.prepaymentPenalty} onChange={(e) => updateWizardLender(l.id, 'prepaymentPenalty', e.target.value)} placeholder="5-4-3-2-1" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t">
+                          <td className="sticky left-0 bg-white dark:bg-background z-10 px-3 py-1.5 text-xs font-medium border-r">Min DSCR</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" step="0.01" value={l.minDscr} onChange={(e) => updateWizardLender(l.id, 'minDscr', e.target.value)} placeholder="1.25" />
+                            </td>
+                          ))}
+                        </tr>
+                        <tr className="border-t bg-slate-50/50 dark:bg-slate-800/20">
+                          <td className="sticky left-0 bg-slate-50/50 dark:bg-slate-800/20 z-10 px-3 py-1.5 text-xs font-medium border-r">Max LTV (%)</td>
+                          {wizardLenders.map(l => (
+                            <td key={l.id} className="px-2 py-1.5">
+                              <Input className="h-7 text-xs" type="number" step="0.1" value={l.maxLtv} onChange={(e) => updateWizardLender(l.id, 'maxLtv', e.target.value)} placeholder="75" />
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {wizardLenders.some(l => parseFloat(l.principal) > 0) && (
+                    <div className="p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium text-indigo-700 dark:text-indigo-300">Total Debt:</span>
+                        <span className="font-semibold text-indigo-700 dark:text-indigo-300">
+                          {formatCurrency(wizardLenders.reduce((sum, l) => sum + (parseFloat(l.principal) || 0), 0))}
+                        </span>
                       </div>
-                    </Card>
-                  </TabsContent>
-                  
-                  <TabsContent value="exit" className="space-y-4 mt-0">
-                    <Card className="p-4 bg-orange-50/50">
-                      <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
-                        <TrendingUp className="h-4 w-4 text-orange-600" />
-                        Exit Assumptions
-                      </h4>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label htmlFor="holdPeriodYears">Hold Period (Years)</Label>
-                          <Input id="holdPeriodYears" name="holdPeriodYears" type="number" placeholder="5" defaultValue="5" />
-                        </div>
-                        <div>
-                          <Label htmlFor="exitCapRate">Exit Cap Rate</Label>
-                          <div className="relative">
-                            <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="exitCapRate" name="exitCapRate" type="number" step="0.1" placeholder="7" defaultValue="7" className="pl-8" />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="noiGrowthRate">NOI Growth Rate</Label>
-                          <div className="relative">
-                            <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="noiGrowthRate" name="noiGrowthRate" type="number" step="0.1" placeholder="2" defaultValue="2" className="pl-8" />
-                          </div>
-                        </div>
+                      <div className="flex justify-between text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                        <span>Active Lenders:</span>
+                        <span>{wizardLenders.filter(l => parseFloat(l.principal) > 0).length}</span>
                       </div>
-                    </Card>
-                  </TabsContent>
+                    </div>
+                  )}
                 </div>
-                
-                <DialogFooter className="border-t pt-4">
-                  <Button type="button" variant="outline" onClick={() => setShowCreateStack(false)}>Cancel</Button>
-                  <Button type="submit" disabled={createStackMutation.isPending}>
-                    {createStackMutation.isPending ? 'Creating...' : 'Create Stack'}
+              )}
+
+              {wizardStep === 4 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-base">Capital Partners</h3>
+                        <p className="text-sm text-muted-foreground">Add GP and LP partners with contributions and ownership</p>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addStackPartner}>
+                      <Plus className="h-4 w-4 mr-1" /> Add Partner
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {stackPartners.map((partner) => (
+                      <Card key={partner.id} className={cn("p-3", partner.type === 'gp' ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800' : 'bg-white dark:bg-background border-green-200 dark:border-green-800')}>
+                        <div className="flex items-center gap-3">
+                          <Badge variant={partner.type === 'gp' ? 'default' : 'secondary'} className={partner.type === 'gp' ? 'bg-amber-600' : 'bg-green-600 text-white'}>
+                            {partner.type === 'gp' ? 'GP' : 'LP'}
+                          </Badge>
+                          <div className="flex-1 grid grid-cols-4 gap-3">
+                            <div>
+                              <Label className="text-xs">Partner Name</Label>
+                              <Input value={partner.name} onChange={(e) => updateStackPartner(partner.id, 'name', e.target.value)} placeholder="Partner name" className="h-8 text-sm" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Commitment ($)</Label>
+                              <Input type="number" value={partner.commitmentAmount} onChange={(e) => updateStackPartner(partner.id, 'commitmentAmount', e.target.value)} placeholder="1,000,000" className="h-8 text-sm" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Ownership %</Label>
+                              <Input type="number" value={partner.ownershipPct} onChange={(e) => updateStackPartner(partner.id, 'ownershipPct', e.target.value)} placeholder="25" className="h-8 text-sm" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Pref Return %</Label>
+                              <Input type="number" value={partner.preferredReturn} onChange={(e) => updateStackPartner(partner.id, 'preferredReturn', e.target.value)} placeholder="8" className="h-8 text-sm" />
+                            </div>
+                          </div>
+                          <Select value={partner.type} onValueChange={(v) => updateStackPartner(partner.id, 'type', v)}>
+                            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="gp">GP</SelectItem>
+                              <SelectItem value="lp">LP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {stackPartners.length > 1 && (
+                            <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPartner(partner.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Commitment:</span>
+                      <span className="font-semibold">{formatCurrency(totalPartnerCommitment)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span>Total Ownership:</span>
+                      <span className={cn("font-semibold", totalOwnership === 100 ? 'text-green-600' : totalOwnership > 100 ? 'text-red-600' : 'text-amber-600')}>
+                        {totalOwnership.toFixed(1)}%
+                        {totalOwnership !== 100 && <span className="text-xs ml-1">({totalOwnership < 100 ? `${(100 - totalOwnership).toFixed(1)}% remaining` : 'exceeds 100%'})</span>}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 5 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <PieChart className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-base">Promote / Waterfall Tiers</h3>
+                        <p className="text-sm text-muted-foreground">Define tiered promote structure based on IRR hurdles</p>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addStackPromoteTier}>
+                      <Plus className="h-4 w-4 mr-1" /> Add Tier
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {stackPromoteTiers.map((tier, index) => (
+                      <Card key={tier.id} className="p-3 bg-white dark:bg-background border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center gap-3">
+                          <Badge className="bg-purple-600 text-white">Tier {index + 1}</Badge>
+                          <div className="flex-1 grid grid-cols-3 gap-3">
+                            <div>
+                              <Label className="text-xs">IRR Hurdle (%)</Label>
+                              <div className="relative">
+                                <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input type="number" value={tier.irrHurdle} onChange={(e) => updateStackPromoteTier(tier.id, 'irrHurdle', e.target.value)} placeholder="8" className="h-8 text-sm pl-7" />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-green-700 dark:text-green-400">GP Split (%)</Label>
+                              <div className="relative">
+                                <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-green-600" />
+                                <Input type="number" value={tier.gpSplit} onChange={(e) => updateStackPromoteTier(tier.id, 'gpSplit', e.target.value)} placeholder="20" className="h-8 text-sm pl-7 border-green-200" />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-blue-700 dark:text-blue-400">LP Split (%)</Label>
+                              <div className="relative">
+                                <Percent className="absolute left-2 top-2 h-3.5 w-3.5 text-blue-600" />
+                                <Input type="number" value={tier.lpSplit} onChange={(e) => updateStackPromoteTier(tier.id, 'lpSplit', e.target.value)} placeholder="80" className="h-8 text-sm pl-7 border-blue-200" />
+                              </div>
+                            </div>
+                          </div>
+                          {stackPromoteTiers.length > 1 && (
+                            <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 h-8 w-8 p-0" onClick={() => removeStackPromoteTier(tier.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-950/20 rounded text-xs text-purple-700 dark:text-purple-300">
+                          Above {tier.irrHurdle}% IRR: GP receives {tier.gpSplit}%, LP receives {tier.lpSplit}%
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border">
+                    <h5 className="text-xs font-medium mb-2 text-muted-foreground">Waterfall Summary</h5>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span>1. Return of Capital</span>
+                        <span className="text-muted-foreground">100% to Investors</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>2. Preferred Return</span>
+                        <span className="text-muted-foreground">100% to LPs (until pref met)</span>
+                      </div>
+                      {stackPromoteTiers.map((tier, i) => (
+                        <div key={tier.id} className="flex justify-between">
+                          <span>{i + 3}. Above {tier.irrHurdle}% IRR</span>
+                          <span className="text-muted-foreground">GP {tier.gpSplit}% / LP {tier.lpSplit}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 6 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base">Exit Strategy</h3>
+                      <p className="text-sm text-muted-foreground">Define hold period and exit assumptions</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>Hold Period (Years)</Label>
+                      <Input type="number" value={wizardHoldPeriod} onChange={(e) => setWizardHoldPeriod(e.target.value)} placeholder="5" />
+                    </div>
+                    <div>
+                      <Label>Exit Cap Rate (%)</Label>
+                      <div className="relative">
+                        <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" step="0.1" value={wizardExitCapRate} onChange={(e) => setWizardExitCapRate(e.target.value)} placeholder="7" className="pl-8" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>NOI Growth Rate (%)</Label>
+                      <div className="relative">
+                        <Percent className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="number" step="0.1" value={wizardNoiGrowthRate} onChange={(e) => setWizardNoiGrowthRate(e.target.value)} placeholder="2" className="pl-8" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <h5 className="text-sm font-medium mb-3 text-orange-700 dark:text-orange-300">Summary</h5>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Debt:</span>
+                        <span className="font-medium">{formatCurrency(wizardLenders.reduce((sum, l) => sum + (parseFloat(l.principal) || 0), 0))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Equity:</span>
+                        <span className="font-medium">{formatCurrency(totalPartnerCommitment)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Lenders:</span>
+                        <span className="font-medium">{wizardLenders.filter(l => parseFloat(l.principal) > 0).length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Partners:</span>
+                        <span className="font-medium">{stackPartners.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Promote Tiers:</span>
+                        <span className="font-medium">{stackPromoteTiers.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Ownership:</span>
+                        <span className={cn("font-medium", totalOwnership === 100 ? 'text-green-600' : 'text-amber-600')}>{totalOwnership.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between px-6 py-4 border-t shrink-0">
+              <Button variant="ghost" onClick={handleWizardBack} disabled={wizardStep === 1}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={() => { setShowCreateStack(false); resetWizard(); }}>
+                  Cancel
+                </Button>
+                {wizardStep < WIZARD_STEPS.length ? (
+                  <Button onClick={handleWizardNext} className="bg-[#1E4FAB] hover:bg-[#1a4294]">
+                    Continue
+                    <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
-                </DialogFooter>
-              </form>
-            </Tabs>
+                ) : (
+                  <Button
+                    className="bg-[#1E4FAB] hover:bg-[#1a4294]"
+                    disabled={createStackMutation.isPending}
+                    onClick={() => {
+                      const purchasePrice = parseFloat(wizardPurchasePrice) || 0;
+                      const closingCosts = parseFloat(wizardClosingCosts) || 0;
+                      const capexReserves = parseFloat(wizardCapexReserves) || 0;
+                      const workingCapital = parseFloat(wizardWorkingCapital) || 0;
+
+                      if (!wizardStackName.trim()) {
+                        toast({ title: 'Stack name is required', variant: 'destructive' });
+                        setWizardStep(1);
+                        return;
+                      }
+
+                      createStackMutation.mutate({
+                        name: wizardStackName,
+                        description: wizardStackDescription,
+                        purchasePrice,
+                        closingCosts,
+                        capexReserves,
+                        workingCapital,
+                        totalCapitalization: purchasePrice + closingCosts + capexReserves + workingCapital,
+                        holdPeriodYears: parseInt(wizardHoldPeriod) || 5,
+                        exitCapRate: wizardExitCapRate || '0.07',
+                        noiGrowthRate: wizardNoiGrowthRate || '0.02',
+                        partners: stackPartners.map(p => ({
+                          name: p.name,
+                          type: p.type,
+                          commitmentAmount: parseFloat(p.commitmentAmount) || 0,
+                          ownershipPct: (parseFloat(p.ownershipPct) || 0) / 100,
+                          preferredReturn: (parseFloat(p.preferredReturn) || 0) / 100,
+                        })),
+                        promoteTiers: stackPromoteTiers.map(t => ({
+                          irrHurdle: (parseFloat(t.irrHurdle) || 0) / 100,
+                          gpSplit: (parseFloat(t.gpSplit) || 0) / 100,
+                          lpSplit: (parseFloat(t.lpSplit) || 0) / 100,
+                        })),
+                        debtTranches: wizardLenders
+                          .filter(l => parseFloat(l.principal) > 0)
+                          .map((l, i) => ({
+                            name: l.lenderName || `Tranche ${i + 1}`,
+                            trancheType: l.trancheType,
+                            lenderName: l.lenderName,
+                            principal: parseFloat(l.principal) || 0,
+                            interestRate: (parseFloat(l.interestRate) || 0) / 100,
+                            indexRate: l.indexRate === 'fixed' ? null : l.indexRate,
+                            spreadBps: parseInt(l.spreadBps) || 0,
+                            floorRate: l.floorRate ? (parseFloat(l.floorRate) / 100).toString() : null,
+                            termYears: parseInt(l.termYears) || 10,
+                            amortizationYears: parseInt(l.amortizationYears) || 25,
+                            interestOnlyMonths: parseInt(l.interestOnlyMonths) || 0,
+                            originationFeePct: l.originationFeePct ? (parseFloat(l.originationFeePct) / 100).toString() : '0.01',
+                            exitFeePct: l.exitFeePct ? (parseFloat(l.exitFeePct) / 100).toString() : '0',
+                            prepaymentPenalty: l.prepaymentPenalty || null,
+                            minDscr: l.minDscr ? l.minDscr : null,
+                            maxLtv: l.maxLtv ? (parseFloat(l.maxLtv) / 100).toString() : null,
+                            priority: i + 1,
+                          })),
+                      });
+                    }}
+                  >
+                    {createStackMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : 'Create Stack'}
+                  </Button>
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
