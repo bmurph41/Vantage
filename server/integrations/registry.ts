@@ -30,7 +30,7 @@ export type IntegrationRegistryItem = {
   key: string;
   name: string;
   description: string;
-  category: "Marina PMS" | "Reservations & Booking" | "Service & Maintenance" | "Communications" | "Accounting";
+  category: "Marina PMS" | "Reservations & Booking" | "Service & Maintenance" | "Communications" | "Accounting" | "Transaction Management" | "Document & E-Signature";
   contexts: Array<
     "boatRentals" | "fuelSales" | "financials" | "crm" | "documents" | "analytics" | "marketing" | "rentRoll" | "shipStore" | "dockit" | "service" | "bookkeeping" | string
   >;
@@ -1021,6 +1021,270 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       supportsHistoricalImport: true,
       migrationComplexity: "high",
       estimatedMigrationDays: 30
+    }
+  },
+
+  // ============ ACCOUNTING (ENTERPRISE) ============
+  {
+    key: "sage_intacct",
+    name: "Sage Intacct",
+    description: "Enterprise-grade cloud accounting for institutional marina operators and PE-backed portfolios. Sync multi-entity financials, GL, AP/AR, and dimensional reporting into MarinaMatch for sophisticated underwriting and portfolio analysis.",
+    category: "Accounting",
+    contexts: ["financials", "bookkeeping", "analytics"],
+    uiPlacements: ["financials.integrations.panel", "financials.toolbar.importButton", "bookkeeping.integrations.panel", "analytics.integrations.panel"],
+    authType: "apiKey",
+    websiteUrl: "https://www.sage.com/en-us/sage-business-cloud/intacct/",
+    iconUrl: "/assets/integrations/sage-intacct.svg",
+    logoColor: "#00DC00",
+    capabilities: {
+      dataRead: ["financials.pnl", "financials.coa", "financials.gl", "financials.invoices", "financials.payments", "financials.budgets", "financials.dimensions"],
+      dataWrite: [],
+      actions: ["financials.import", "financials.sync", "financials.multiEntitySync"],
+      uiHooks: ["financials.toolbar.importButton", "bookkeeping.toolbar.syncButton"],
+    },
+    settingsSchema: {
+      fields: [
+        { key: "companyId", label: "Company ID", type: "string", required: true, helpText: "Your Sage Intacct Company ID (found in Company > Company Info)." },
+        { key: "userId", label: "Web Services User ID", type: "string", required: true, helpText: "The Web Services user configured for API access." },
+        { key: "userPassword", label: "Web Services Password", type: "secret", required: true, helpText: "Password for the Web Services user. Stored encrypted." },
+        { key: "senderId", label: "Sender ID", type: "string", required: true, helpText: "Your Marketplace Sender ID provided by Sage." },
+        { key: "senderPassword", label: "Sender Password", type: "secret", required: true, helpText: "Sender password from your Marketplace listing. Stored encrypted." },
+        { key: "locationId", label: "Location / Entity ID", type: "string", helpText: "Optional: Specific entity/location for multi-entity companies." },
+        { key: "syncFrequency", label: "Sync Frequency", type: "select", required: true, options: [
+          { label: "Daily", value: "daily" },
+          { label: "Weekly", value: "weekly" },
+          { label: "Monthly", value: "monthly" },
+        ], helpText: "How often to pull updates from Sage Intacct." },
+        { key: "syncBudgets", label: "Sync Budgets", type: "boolean", helpText: "Import budget data for variance analysis." },
+        { key: "syncDimensions", label: "Sync Dimensions", type: "boolean", helpText: "Import dimensional reporting data (departments, locations, classes)." },
+      ],
+    },
+    connectionGuide: {
+      overview: "Connect Sage Intacct to sync your enterprise financial data — general ledger, P&L statements, Chart of Accounts, budgets, AP/AR, and dimensional reporting — directly into MarinaMatch for institutional-grade underwriting and portfolio analysis.",
+      prerequisites: [
+        "Sage Intacct subscription with Web Services enabled",
+        "A Web Services user with appropriate permissions (read access to GL, AP, AR modules)",
+        "Marketplace Sender ID and Sender Password from Sage",
+        "Company ID from Company > Company Info in Sage Intacct"
+      ],
+      steps: [
+        { title: "Create a Web Services User", description: "In Sage Intacct, go to Company > Admin > Web Services Users. Create a new user with read permissions for General Ledger, Accounts Payable, and Accounts Receivable modules." },
+        { title: "Get Your Company ID", description: "Go to Company > Company Info. Your Company ID is displayed at the top of the page." },
+        { title: "Obtain Sender Credentials", description: "Contact your Sage Intacct account representative or visit the Sage Marketplace to get your Sender ID and Sender Password for API access." },
+        { title: "Enter Credentials", description: "Paste your Company ID, Web Services User ID, password, Sender ID, and Sender Password into the fields above." },
+        { title: "Configure Multi-Entity (Optional)", description: "If you manage multiple entities, enter the specific Location/Entity ID to sync, or leave blank to sync all entities." },
+        { title: "Test Connection", description: "Click 'Test Connection' to verify your credentials. MarinaMatch will attempt to read your Chart of Accounts as a validation step." }
+      ],
+      supportUrl: "https://www.sage.com/en-us/support/",
+      apiDocsUrl: "https://developer.intacct.com/api/",
+      estimatedTime: "15-20 minutes"
+    },
+    dataMappings: [
+      { sourceEntity: "GLENTRY", targetModule: "financials", targetEntity: "gl", fields: [
+        { source: "RECORDNO", target: "externalId" },
+        { source: "BATCH_DATE", target: "date" },
+        { source: "DEBIT", target: "debit" },
+        { source: "CREDIT", target: "credit" },
+        { source: "ACCOUNTNO", target: "accountNumber" },
+        { source: "DESCRIPTION", target: "description" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "GLACCOUNT", targetModule: "financials", targetEntity: "chartOfAccounts", fields: [
+        { source: "ACCOUNTNO", target: "accountNumber" },
+        { source: "TITLE", target: "name" },
+        { source: "ACCOUNTTYPE", target: "type" },
+        { source: "NORMALBALANCE", target: "normalBalance" },
+        { source: "STATUS", target: "status" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "APBILL", targetModule: "financials", targetEntity: "payables", fields: [
+        { source: "RECORDNO", target: "externalId" },
+        { source: "VENDORNAME", target: "vendorName" },
+        { source: "TOTALDUE", target: "amount" },
+        { source: "WHENDUE", target: "dueDate" },
+        { source: "STATE", target: "status" }
+      ], syncDirection: "read", frequency: "daily" },
+      { sourceEntity: "ARINVOICE", targetModule: "financials", targetEntity: "receivables", fields: [
+        { source: "RECORDNO", target: "externalId" },
+        { source: "CUSTOMERNAME", target: "customerName" },
+        { source: "TOTALDUE", target: "amount" },
+        { source: "WHENDUE", target: "dueDate" },
+        { source: "STATE", target: "status" }
+      ], syncDirection: "read", frequency: "daily" }
+    ],
+    migrationSupport: {
+      canExportAll: true,
+      supportsHistoricalImport: true,
+      migrationComplexity: "high",
+      estimatedMigrationDays: 45
+    }
+  },
+
+  // ============ TRANSACTION MANAGEMENT ============
+  {
+    key: "qualia",
+    name: "Qualia",
+    description: "Real estate closing and title management platform. Track title orders, escrow status, closing milestones, and document delivery directly from your MarinaMatch deal pipeline for seamless marina acquisition closings.",
+    category: "Transaction Management",
+    contexts: ["crm", "documents", "financials"],
+    uiPlacements: ["crm.deals.closingPanel", "documents.vdr.closingDocs", "crm.pipeline.closingStatus"],
+    authType: "oauth",
+    websiteUrl: "https://www.qualia.com/",
+    iconUrl: "/assets/integrations/qualia.svg",
+    logoColor: "#6366F1",
+    capabilities: {
+      dataRead: ["crm.closingOrders", "crm.titleStatus", "crm.escrowStatus", "documents.closingDocs", "financials.closingCosts"],
+      dataWrite: ["crm.createOrder", "documents.uploadDocs"],
+      actions: ["crm.createClosingOrder", "crm.syncClosingStatus", "documents.importClosingPackage", "crm.trackMilestones"],
+      uiHooks: ["crm.dealDetail.closingPanel", "crm.pipeline.closingBadge", "documents.vdr.closingFolder"],
+    },
+    settingsSchema: {
+      fields: [
+        { key: "clientId", label: "OAuth Client ID", type: "secret", required: true, helpText: "Your Qualia Connect app Client ID from the Qualia Developer Portal." },
+        { key: "clientSecret", label: "OAuth Client Secret", type: "secret", required: true, helpText: "Your Qualia Connect app Client Secret. Stored encrypted." },
+        { key: "environment", label: "Environment", type: "select", required: true, options: [
+          { label: "Production", value: "production" },
+          { label: "Sandbox", value: "sandbox" },
+        ], helpText: "Select sandbox for testing, production for live transactions." },
+        { key: "defaultTitleCompany", label: "Default Title Company", type: "string", helpText: "Preferred title company for new orders (optional)." },
+        { key: "autoCreateOrders", label: "Auto-Create Closing Orders", type: "boolean", helpText: "Automatically create a Qualia order when a deal moves to 'Under Contract' stage." },
+        { key: "syncClosingDocs", label: "Sync Closing Documents", type: "boolean", helpText: "Import closing documents into the Virtual Data Room automatically." },
+      ],
+    },
+    connectionGuide: {
+      overview: "Connect Qualia to manage your marina acquisition closings end-to-end. Track title work, escrow status, closing milestones, and automatically sync closing documents to your Virtual Data Room.",
+      prerequisites: [
+        "Qualia account with Connect API access",
+        "OAuth credentials from the Qualia Developer Portal",
+        "Admin access to configure organization-level settings"
+      ],
+      steps: [
+        { title: "Register a Qualia Connect App", description: "Log into the Qualia Developer Portal at developer.qualia.com and register a new application. Select 'Closing Management' and 'Document Access' scopes." },
+        { title: "Get OAuth Credentials", description: "After app registration, copy your Client ID and Client Secret from the app settings page." },
+        { title: "Choose Environment", description: "Select Sandbox for testing or Production for live transactions. We recommend testing in Sandbox first." },
+        { title: "Enter Credentials", description: "Paste your Client ID and Client Secret into the fields above and select your environment." },
+        { title: "Authorize Access", description: "Click 'Connect' to initiate the OAuth flow. You'll be redirected to Qualia to authorize MarinaMatch access." },
+        { title: "Configure Automation", description: "Choose whether to auto-create closing orders when deals move to 'Under Contract' and whether to sync closing documents to your VDR." }
+      ],
+      supportUrl: "https://support.qualia.com/",
+      apiDocsUrl: "https://developer.qualia.com/docs",
+      estimatedTime: "10-15 minutes"
+    },
+    dataMappings: [
+      { sourceEntity: "orders", targetModule: "crm", targetEntity: "closingOrders", fields: [
+        { source: "order_id", target: "externalId" },
+        { source: "property_address", target: "propertyAddress" },
+        { source: "status", target: "closingStatus" },
+        { source: "estimated_closing_date", target: "estimatedClosingDate" },
+        { source: "actual_closing_date", target: "actualClosingDate" }
+      ], syncDirection: "bidirectional", frequency: "hourly" },
+      { sourceEntity: "milestones", targetModule: "crm", targetEntity: "closingMilestones", fields: [
+        { source: "milestone_id", target: "externalId" },
+        { source: "name", target: "milestoneName" },
+        { source: "status", target: "status" },
+        { source: "completed_at", target: "completedAt" }
+      ], syncDirection: "read", frequency: "hourly" },
+      { sourceEntity: "documents", targetModule: "documents", targetEntity: "closingDocs", fields: [
+        { source: "document_id", target: "externalId" },
+        { source: "name", target: "fileName" },
+        { source: "type", target: "documentType" },
+        { source: "url", target: "downloadUrl" }
+      ], syncDirection: "read", frequency: "hourly" },
+      { sourceEntity: "settlement", targetModule: "financials", targetEntity: "closingCosts", fields: [
+        { source: "line_item", target: "description" },
+        { source: "amount", target: "amount" },
+        { source: "paid_by", target: "paidBy" }
+      ], syncDirection: "read", frequency: "daily" }
+    ],
+    migrationSupport: {
+      canExportAll: false,
+      supportsHistoricalImport: false,
+      migrationComplexity: "low",
+      estimatedMigrationDays: 3
+    }
+  },
+
+  // ============ DOCUMENT & E-SIGNATURE ============
+  {
+    key: "docusign",
+    name: "DocuSign",
+    description: "Industry-leading electronic signature platform. Send, track, and manage e-signatures for LOIs, purchase agreements, NDAs, LP subscription documents, and all transaction paperwork directly from MarinaMatch.",
+    category: "Document & E-Signature",
+    contexts: ["documents", "crm", "financials"],
+    uiPlacements: ["documents.vdr.signaturePanel", "crm.deals.signatureActions", "documents.toolbar.sendForSignature"],
+    authType: "oauth",
+    websiteUrl: "https://www.docusign.com/",
+    iconUrl: "/assets/integrations/docusign.svg",
+    logoColor: "#FFCC22",
+    capabilities: {
+      dataRead: ["documents.envelopes", "documents.signatureStatus", "documents.signedDocs", "documents.templates"],
+      dataWrite: ["documents.createEnvelope", "documents.sendForSignature", "documents.voidEnvelope"],
+      actions: ["documents.sendForSignature", "documents.trackSignatures", "documents.downloadSigned", "documents.useTemplate", "documents.bulkSend"],
+      uiHooks: ["documents.vdr.signButton", "crm.dealDetail.signatureStatus", "documents.toolbar.templatePicker"],
+    },
+    settingsSchema: {
+      fields: [
+        { key: "integrationKey", label: "Integration Key (Client ID)", type: "secret", required: true, helpText: "Your DocuSign Integration Key from the Admin console > Integrations > API and Keys." },
+        { key: "secretKey", label: "Secret Key", type: "secret", required: true, helpText: "RSA Private Key or Secret Key for authentication. Stored encrypted." },
+        { key: "accountId", label: "API Account ID", type: "string", required: true, helpText: "Your DocuSign API Account ID (GUID format), found in Admin > Integrations > API and Keys." },
+        { key: "environment", label: "Environment", type: "select", required: true, options: [
+          { label: "Production", value: "production" },
+          { label: "Demo / Sandbox", value: "demo" },
+        ], helpText: "Use Demo for testing, Production for live signatures." },
+        { key: "defaultSenderName", label: "Default Sender Name", type: "string", helpText: "Name that appears as the sender on envelopes (defaults to your account name)." },
+        { key: "autoFileToVDR", label: "Auto-File Signed Documents to VDR", type: "boolean", helpText: "Automatically upload completed/signed documents to the deal's Virtual Data Room." },
+        { key: "webhookNotifications", label: "Enable Signature Notifications", type: "boolean", helpText: "Receive real-time notifications when documents are signed, declined, or voided." },
+      ],
+    },
+    connectionGuide: {
+      overview: "Connect DocuSign to send documents for electronic signature directly from MarinaMatch. Track signature status on deals, auto-file signed documents to your Virtual Data Room, and use templates for common marina transaction documents.",
+      prerequisites: [
+        "DocuSign account (Business Pro or higher recommended for API access)",
+        "Admin access to DocuSign to create an integration key",
+        "API Account ID from DocuSign Admin panel"
+      ],
+      steps: [
+        { title: "Create an Integration Key", description: "In DocuSign Admin, go to Integrations > API and Keys. Click 'Add Integration Key' and copy the Integration Key (Client ID)." },
+        { title: "Generate Authentication Key", description: "Under the integration key settings, generate an RSA keypair or Secret Key for server-to-server authentication." },
+        { title: "Get Your Account ID", description: "On the API and Keys page, copy your API Account ID (the GUID shown at the top)." },
+        { title: "Enter Credentials", description: "Paste your Integration Key, Secret Key, and Account ID into the fields above." },
+        { title: "Choose Environment", description: "Select Demo to test with the DocuSign sandbox, or Production for live signatures." },
+        { title: "Authorize & Test", description: "Click 'Connect' to authorize. MarinaMatch will verify access by listing your available templates." },
+        { title: "Configure Options", description: "Enable auto-filing to VDR and signature notifications for a fully automated workflow." }
+      ],
+      supportUrl: "https://support.docusign.com/",
+      apiDocsUrl: "https://developers.docusign.com/docs/esign-rest-api/",
+      estimatedTime: "10-15 minutes"
+    },
+    dataMappings: [
+      { sourceEntity: "envelopes", targetModule: "documents", targetEntity: "signatureEnvelopes", fields: [
+        { source: "envelopeId", target: "externalId" },
+        { source: "status", target: "signatureStatus" },
+        { source: "subject", target: "subject" },
+        { source: "sentDateTime", target: "sentAt" },
+        { source: "completedDateTime", target: "completedAt" }
+      ], syncDirection: "read", frequency: "realtime" },
+      { sourceEntity: "recipients", targetModule: "documents", targetEntity: "signers", fields: [
+        { source: "recipientId", target: "externalId" },
+        { source: "name", target: "name" },
+        { source: "email", target: "email" },
+        { source: "status", target: "signerStatus" },
+        { source: "signedDateTime", target: "signedAt" }
+      ], syncDirection: "read", frequency: "realtime" },
+      { sourceEntity: "documents", targetModule: "documents", targetEntity: "signedDocuments", fields: [
+        { source: "documentId", target: "externalId" },
+        { source: "name", target: "fileName" },
+        { source: "uri", target: "downloadUri" }
+      ], syncDirection: "read", frequency: "realtime" },
+      { sourceEntity: "templates", targetModule: "documents", targetEntity: "signatureTemplates", fields: [
+        { source: "templateId", target: "externalId" },
+        { source: "name", target: "templateName" },
+        { source: "description", target: "description" }
+      ], syncDirection: "read", frequency: "daily" }
+    ],
+    migrationSupport: {
+      canExportAll: false,
+      supportsHistoricalImport: true,
+      migrationComplexity: "low",
+      estimatedMigrationDays: 2
     }
   },
 ];
