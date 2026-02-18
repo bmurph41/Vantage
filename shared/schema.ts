@@ -20181,6 +20181,33 @@ export const modelingAddbackValues = pgTable("modeling_addback_values", {
 }));
 
 // ============================================================================
+// P&L LINE ITEM OVERRIDES
+// Department moves and line item exclusions for Historical P&L and Pro Forma
+// ============================================================================
+
+export const pnlOverrideTypeEnum = pgEnum("pnl_override_type", ["department", "exclude"]);
+
+export const modelingPnlOverrides = pgTable("modeling_pnl_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  lineItemKey: text("line_item_key").notNull(),
+  category: text("category"),
+  overrideType: pnlOverrideTypeEnum("override_type").notNull(),
+  overrideDepartment: text("override_department"),
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("modeling_pnl_overrides_project_idx").on(table.projectId),
+  orgIdx: index("modeling_pnl_overrides_org_idx").on(table.orgId),
+  lineItemIdx: index("modeling_pnl_overrides_line_item_idx").on(table.projectId, table.lineItemKey),
+  uniqueOverride: unique("modeling_pnl_overrides_unique").on(table.projectId, table.lineItemKey, table.overrideType),
+}));
+
+// ============================================================================
 // DUE DILIGENCE FEES TRACKING
 // Track fees paid to third-parties and deal team members
 // ============================================================================

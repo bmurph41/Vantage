@@ -46,13 +46,28 @@ import {
   AlertCircle,
   History,
   Settings2,
-  Pencil
+  Pencil,
+  MoreHorizontal,
+  FolderInput,
+  EyeOff,
+  Undo2
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
+import { useModelingPnlOverrides, VALID_DEPARTMENTS } from '@/hooks/useModelingPnlOverrides';
 import { REVENUE_CATEGORIES, OPEX_CATEGORIES, DEPARTMENTAL_EXPENSE_CATEGORIES } from '@/components/modeling/growth-rates/index';
 
 interface WorkspaceProFormaProps {
@@ -289,6 +304,16 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [editMode, setEditMode] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<{ department: string; category: 'Revenue' | 'COGS' | 'Expenses' } | null>(null);
   const { toast } = useToast();
+
+  const {
+    moveToDepartment,
+    excludeLineItem,
+    restoreLineItem,
+    removeDepartmentOverride,
+    getDepartmentOverride,
+    getExcludedItems,
+    isPending: overridesPending,
+  } = useModelingPnlOverrides(projectId);
 
   // Fetch project configuration
   const { holdPeriod, setHoldPeriod, isUpdating: holdPeriodUpdating, config } = useHoldPeriod(projectId);
@@ -1597,9 +1622,69 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             {expandedDepartments.has(`${category}-${department}`) && Object.entries(deptItems).map(([itemName, values]) => {
                               const baselineValue = baselinePeriod ? (values.historical[baselinePeriod.id] || 0) : 0;
                               return (
-                                <TableRow key={itemName} className="text-sm">
+                                <TableRow key={itemName} className="text-sm group">
                                   <TableCell className="pl-10 sticky left-0 bg-background z-10">
-                                    {itemName}
+                                    <div className="flex items-center gap-1">
+                                      <span className="truncate">{itemName}</span>
+                                      {getDepartmentOverride(itemName) && (
+                                        <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-300 shrink-0">
+                                          <FolderInput className="h-2.5 w-2.5 mr-0.5" />
+                                          Moved
+                                        </Badge>
+                                      )}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100 ml-auto"
+                                          >
+                                            <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-52">
+                                          <DropdownMenuSub>
+                                            <DropdownMenuSubTrigger>
+                                              <FolderInput className="h-3.5 w-3.5 mr-2" />
+                                              Move to Department
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
+                                              {VALID_DEPARTMENTS.filter(d => d !== department).map(dept => (
+                                                <DropdownMenuItem
+                                                  key={dept}
+                                                  onClick={() => moveToDepartment(itemName, dept, category)}
+                                                  disabled={overridesPending}
+                                                >
+                                                  {dept}
+                                                </DropdownMenuItem>
+                                              ))}
+                                              {getDepartmentOverride(itemName) && (
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem
+                                                    onClick={() => removeDepartmentOverride(itemName)}
+                                                    disabled={overridesPending}
+                                                    className="text-muted-foreground"
+                                                  >
+                                                    <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                                    Restore Original
+                                                  </DropdownMenuItem>
+                                                </>
+                                              )}
+                                            </DropdownMenuSubContent>
+                                          </DropdownMenuSub>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={() => excludeLineItem(itemName, category)}
+                                            disabled={overridesPending}
+                                            className="text-red-600 focus:text-red-600"
+                                          >
+                                            <EyeOff className="h-3.5 w-3.5 mr-2" />
+                                            Exclude from P&L
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </TableCell>
 
                                   {showHistorical && priorPeriods.map(period => (
@@ -1913,6 +1998,35 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </div>
         </CardContent>
       </Card>
+
+      {getExcludedItems().length > 0 && (
+        <Card className="mt-4">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              Excluded Line Items ({getExcludedItems().length})
+            </CardTitle>
+            <CardDescription className="text-xs">
+              These items have been excluded from the P&L. Click restore to bring them back.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="flex flex-wrap gap-2">
+              {getExcludedItems().map(item => (
+                <Badge
+                  key={item.id}
+                  variant="outline"
+                  className="text-xs px-2 py-1 bg-red-50 text-red-700 border-red-200 cursor-pointer hover:bg-red-100 transition-colors"
+                  onClick={() => restoreLineItem(item.lineItemKey)}
+                >
+                  {item.lineItemKey}
+                  <Undo2 className="h-3 w-3 ml-1.5" />
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Methodology Card */}
       <Card className="border-dashed">

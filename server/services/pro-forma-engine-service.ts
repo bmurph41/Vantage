@@ -272,9 +272,18 @@ export class ProFormaEngineService {
       ))
       .limit(1);
 
-    const actuals = await db.select()
+    const allActuals = await db.select()
       .from(modelingActuals)
       .where(eq(modelingActuals.modelingProjectId, projectId));
+
+    const { modelingPnlOverrides } = await import('@shared/schema');
+    const pnlOverrides = await db.select()
+      .from(modelingPnlOverrides)
+      .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+    const excludeSet = new Set(
+      pnlOverrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
+    );
+    const actuals = allActuals.filter(a => !excludeSet.has(a.subcategory || ''));
     
     // ========================================
     // 2. BUILD TIMELINE (no more hardcoded years!)
@@ -1314,9 +1323,18 @@ export class ProFormaEngineService {
       throw new Error('Project not found');
     }
 
-    const actuals = await db.select()
+    const { modelingPnlOverrides } = await import('@shared/schema');
+    const pnlOverrides = await db.select()
+      .from(modelingPnlOverrides)
+      .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+    const excludeSet = new Set(
+      pnlOverrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
+    );
+
+    const allActuals = await db.select()
       .from(modelingActuals)
       .where(eq(modelingActuals.modelingProjectId, projectId));
+    const actuals = allActuals.filter(a => !excludeSet.has(a.subcategory || ''));
 
     const relevantActuals = year 
       ? actuals.filter(a => a.year === year)

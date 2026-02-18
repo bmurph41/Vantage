@@ -19947,6 +19947,116 @@ Current context: Project ${req.params.projectId}`;
 
 
   // ============================================================================
+  // P&L LINE ITEM OVERRIDES - Department moves and exclusions
+  // ============================================================================
+
+  app.get('/api/modeling/projects/:projectId/pnl-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const overrides = await db.select()
+        .from(modelingPnlOverrides)
+        .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+
+      res.json(overrides);
+    } catch (error: any) {
+      console.error('Failed to fetch P&L overrides:', error);
+      res.status(500).json({ error: 'Failed to fetch P&L overrides' });
+    }
+  });
+
+  app.post('/api/modeling/projects/:projectId/pnl-overrides', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { lineItemKey, category, overrideType, overrideDepartment, notes } = req.body;
+
+      if (!lineItemKey || !overrideType) {
+        return res.status(400).json({ error: 'lineItemKey and overrideType are required' });
+      }
+      if (overrideType === 'department' && !overrideDepartment) {
+        return res.status(400).json({ error: 'overrideDepartment is required for department overrides' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [existing] = await db.select()
+        .from(modelingPnlOverrides)
+        .where(and(
+          eq(modelingPnlOverrides.projectId, projectId),
+          eq(modelingPnlOverrides.lineItemKey, lineItemKey),
+          eq(modelingPnlOverrides.overrideType, overrideType),
+        ));
+
+      let result;
+      if (existing) {
+        [result] = await db.update(modelingPnlOverrides)
+          .set({
+            category: category || existing.category,
+            overrideDepartment: overrideDepartment || existing.overrideDepartment,
+            notes: notes !== undefined ? notes : existing.notes,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(modelingPnlOverrides.id, existing.id))
+          .returning();
+      } else {
+        [result] = await db.insert(modelingPnlOverrides).values({
+          projectId,
+          orgId,
+          lineItemKey,
+          category: category || null,
+          overrideType,
+          overrideDepartment: overrideDepartment || null,
+          isActive: true,
+          notes: notes || null,
+          createdBy: userId,
+        }).returning();
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to upsert P&L override:', error);
+      res.status(500).json({ error: 'Failed to save P&L override' });
+    }
+  });
+
+  app.delete('/api/modeling/projects/:projectId/pnl-overrides/:overrideId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, overrideId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [deleted] = await db.delete(modelingPnlOverrides)
+        .where(and(eq(modelingPnlOverrides.id, overrideId), eq(modelingPnlOverrides.orgId, orgId)))
+        .returning();
+
+      if (!deleted) return res.status(404).json({ error: 'Override not found' });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete P&L override:', error);
+      res.status(500).json({ error: 'Failed to delete P&L override' });
+    }
+  });
+
+  // ============================================================================
   // DISPLAY NAME OVERRIDES - Project-level and org-level name customization
   // ============================================================================
 
@@ -22045,15 +22155,32 @@ Current context: Project ${req.params.projectId}`;
         year ? parseInt(year as string) : undefined
       );
 
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const overrides = await db.select()
+        .from(modelingPnlOverrides)
+        .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+
+      const excludeSet = new Set(
+        overrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
+      );
+      const deptOverrideMap: Record<string, string> = {};
+      overrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
+        .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
+
       // Group by category and subcategory for P&L display
       const { inferDepartment } = await import('./utils/department-mapping');
       const grouped = actuals.reduce((acc: any, item) => {
-        const key = `${item.category}-${item.subcategory}`;
+        const subcategory = item.subcategory || '';
+        if (excludeSet.has(subcategory)) return acc;
+
+        const key = `${item.category}-${subcategory}`;
         if (!acc[key]) {
+          const dept = deptOverrideMap[subcategory] || inferDepartment(subcategory, item.category);
           acc[key] = {
             category: item.category,
-            subcategory: item.subcategory,
-            department: inferDepartment(item.subcategory || '', item.category),
+            subcategory,
+            department: dept,
             monthlyData: {},
             annualTotal: 0
           };
@@ -22113,17 +22240,33 @@ Current context: Project ${req.params.projectId}`;
       const yearList = years ? String(years).split(',').map(Number) : [];
       const actualsData = await operationsDataSyncService.getActualsForMultipleYears(projectId, yearList);
 
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const overrides = await db.select()
+        .from(modelingPnlOverrides)
+        .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+      const excludeSet = new Set(
+        overrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
+      );
+      const deptOverrideMap: Record<string, string> = {};
+      overrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
+        .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
+
       const { inferDepartment: inferDepartmentFn } = await import('./utils/department-mapping');
       // Group each year's data
       const groupedByYear: Record<number, any> = {};
       for (const [year, actuals] of Object.entries(actualsData)) {
         const grouped = (actuals as any[]).reduce((acc: any, item) => {
-          const key = `${item.category}-${item.subcategory}`;
+          const subcategory = item.subcategory || '';
+          if (excludeSet.has(subcategory)) return acc;
+
+          const key = `${item.category}-${subcategory}`;
           if (!acc[key]) {
+            const dept = deptOverrideMap[subcategory] || inferDepartmentFn(subcategory, item.category);
             acc[key] = {
               category: item.category,
-              subcategory: item.subcategory,
-              department: inferDepartmentFn(item.subcategory || '', item.category),
+              subcategory,
+              department: dept,
               monthlyData: {},
               annualTotal: 0
             };
