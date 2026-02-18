@@ -1183,27 +1183,74 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                       );
                     })()}
                   </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => {
-                      const allItemIds: string[] = [];
-                      selectedRowKeys.forEach(key => {
-                        const lineItem = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
-                        if (lineItem) {
-                          lineItem.monthlyData.forEach(m => allItemIds.push(m.id));
-                        }
-                      });
-                      if (allItemIds.length > 0) {
-                        bulkUpdateMutation.mutate({ itemIds: allItemIds, updates: { status: 'confirmed' } });
-                        setSelectedRowKeys(new Set());
+                  {(() => {
+                    const confirmableIds: string[] = [];
+                    const allIds: string[] = [];
+                    selectedRowKeys.forEach(key => {
+                      const li = groupedData.lineItems.find(li => `${li.lineItemName}__${li.sourceRow}` === key);
+                      if (li) {
+                        const first = li.monthlyData[0];
+                        const tier = first ? (first.categoryTierConfirmed || first.categoryTierSuggested) as CategoryTier | null : null;
+                        const dept = tier === "expense"
+                          ? (first?.expenseDeptConfirmed || first?.expenseDeptSuggested)
+                          : (first?.revenueCogsDeptConfirmed || first?.revenueCogsDeptSuggested);
+                        const valid = !!tier && !!dept;
+                        li.monthlyData.forEach(m => {
+                          allIds.push(m.id);
+                          if (valid) confirmableIds.push(m.id);
+                        });
                       }
-                    }}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Confirm Selected
-                  </Button>
+                    });
+                    const unclassifiedCount = allIds.length - confirmableIds.length;
+                    return (
+                      <>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-8"
+                                  disabled={confirmableIds.length === 0}
+                                  onClick={() => {
+                                    if (confirmableIds.length > 0) {
+                                      bulkUpdateMutation.mutate({ itemIds: confirmableIds, updates: { status: 'confirmed' } });
+                                      setSelectedRowKeys(new Set());
+                                    }
+                                  }}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Confirm Selected
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {unclassifiedCount > 0 && (
+                              <TooltipContent>
+                                {confirmableIds.length === 0
+                                  ? "All selected items need a Category and Department before confirming"
+                                  : `${unclassifiedCount} item(s) missing Category/Department will be skipped`}
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TooltipProvider>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-8 text-red-100 bg-red-600/80 hover:bg-red-600"
+                          onClick={() => {
+                            if (allIds.length > 0) {
+                              bulkUpdateMutation.mutate({ itemIds: allIds, updates: { status: 'excluded' } });
+                              setSelectedRowKeys(new Set());
+                            }
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Exclude Selected
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1569,24 +1616,45 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                      onClick={() => {
-                                        const itemIds = lineItem.monthlyData.map((m) => m.id);
-                                        bulkUpdateMutation.mutate({
-                                          itemIds,
-                                          updates: { status: "confirmed" },
-                                          silent: true,
-                                        });
-                                      }}
-                                      disabled={bulkUpdateMutation.isPending || lineItem.status === "confirmed"}
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                    </Button>
+                                    <span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                        onClick={() => {
+                                          const itemIds = lineItem.monthlyData.map((m) => m.id);
+                                          bulkUpdateMutation.mutate({
+                                            itemIds,
+                                            updates: { status: "confirmed" },
+                                            silent: true,
+                                          });
+                                        }}
+                                        disabled={bulkUpdateMutation.isPending || lineItem.status === "confirmed" || (() => {
+                                          const first = lineItem.monthlyData[0];
+                                          if (!first) return true;
+                                          const tier = (first.categoryTierConfirmed || first.categoryTierSuggested) as CategoryTier | null;
+                                          if (!tier) return true;
+                                          const dept = tier === "expense"
+                                            ? (first.expenseDeptConfirmed || first.expenseDeptSuggested)
+                                            : (first.revenueCogsDeptConfirmed || first.revenueCogsDeptSuggested);
+                                          return !dept;
+                                        })()}
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </span>
                                   </TooltipTrigger>
-                                  <TooltipContent>Confirm all months</TooltipContent>
+                                  <TooltipContent>
+                                    {(() => {
+                                      const first = lineItem.monthlyData[0];
+                                      const tier = first ? (first.categoryTierConfirmed || first.categoryTierSuggested) as CategoryTier | null : null;
+                                      const dept = tier === "expense"
+                                        ? (first?.expenseDeptConfirmed || first?.expenseDeptSuggested)
+                                        : (first?.revenueCogsDeptConfirmed || first?.revenueCogsDeptSuggested);
+                                      if (!tier || !dept) return "Set Category and Department first";
+                                      return "Confirm all months";
+                                    })()}
+                                  </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
                               <TooltipProvider>
@@ -1650,6 +1718,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                           variant="ghost"
                                           size="sm"
                                           className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                          title={(() => {
+                                            const tier = (month.categoryTierConfirmed || month.categoryTierSuggested) as CategoryTier | null;
+                                            const dept = tier === "expense"
+                                              ? (month.expenseDeptConfirmed || month.expenseDeptSuggested)
+                                              : (month.revenueCogsDeptConfirmed || month.revenueCogsDeptSuggested);
+                                            if (!tier || !dept) return "Set Category and Department first";
+                                            return "Confirm";
+                                          })()}
                                           onClick={() => {
                                             bulkUpdateMutation.mutate({
                                               itemIds: [month.id],
@@ -1657,7 +1733,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                               silent: true,
                                             });
                                           }}
-                                          disabled={bulkUpdateMutation.isPending || month.status === "confirmed"}
+                                          disabled={bulkUpdateMutation.isPending || month.status === "confirmed" || (() => {
+                                            const tier = (month.categoryTierConfirmed || month.categoryTierSuggested) as CategoryTier | null;
+                                            if (!tier) return true;
+                                            const dept = tier === "expense"
+                                              ? (month.expenseDeptConfirmed || month.expenseDeptSuggested)
+                                              : (month.revenueCogsDeptConfirmed || month.revenueCogsDeptSuggested);
+                                            return !dept;
+                                          })()}
                                         >
                                           <Check className="h-3.5 w-3.5" />
                                         </Button>
