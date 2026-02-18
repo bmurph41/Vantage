@@ -11,7 +11,8 @@ export interface ProjectConfig {
   acquisitionCloseDate?: string;
   storageTypes?: Array<{ id: string; label: string; enabled: boolean }>;
   designatedSpaces?: Array<{ id: string; label: string; enabled: boolean }>;
-  profitCenters?: Array<{ id: string; label: string; enabled: boolean }>;
+  profitCenters?: Record<string, { enabled?: boolean; [key: string]: unknown }> | Array<{ id: string; label: string; enabled: boolean }>;
+  storageMix?: { items?: Array<{ storageType: string; count: number; [key: string]: unknown }>; hasFuelDock?: boolean };
   [key: string]: unknown;
 }
 

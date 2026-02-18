@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import {
   BarChart3, Fuel, ShoppingCart, DollarSign,
-  TrendingUp, ArrowUpRight, ArrowDownRight, Download
+  TrendingUp, ArrowUpRight, ArrowDownRight, Download,
+  Anchor, Building2, Wrench, Ship, Sailboat
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/utils";
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import type { ProjectConfig } from "@/types/modeling";
 
 interface ValuatorOperationsSummaryProps {
   projectId: string;
@@ -40,12 +42,49 @@ interface OperationsSummary {
   };
 }
 
+const PROFIT_CENTER_META: Record<string, { label: string; icon: any; description: string }> = {
+  "__storageMix": { label: "Storage Leases", icon: Anchor, description: "Wet slips, dry storage & other marina storage" },
+  "commercialTenants": { label: "Commercial Leases", icon: Building2, description: "Leasable commercial space" },
+  "fuelSales": { label: "Fuel Sales", icon: Fuel, description: "Fuel dock operations" },
+  "shipStore": { label: "Ship Store", icon: ShoppingCart, description: "Retail merchandise" },
+  "serviceDepartment": { label: "Service Dept", icon: Wrench, description: "Boat repairs & maintenance" },
+  "boatRentals": { label: "Boat Rentals", icon: Ship, description: "Charter & rental operations" },
+  "boatClub": { label: "Boat Club", icon: Sailboat, description: "Membership-based boat access" },
+  "boatSales": { label: "Boat Sales", icon: DollarSign, description: "New & used boat sales" },
+};
+
+function getEnabledCenterKeys(config: ProjectConfig | undefined): string[] {
+  if (!config) return [];
+  const keys: string[] = [];
+
+  if (config.storageMix?.items && config.storageMix.items.length > 0) {
+    keys.push("__storageMix");
+  }
+
+  const pc = config.profitCenters;
+  if (pc && !Array.isArray(pc)) {
+    for (const [key, val] of Object.entries(pc)) {
+      if (val?.enabled) keys.push(key);
+    }
+  } else if (Array.isArray(pc)) {
+    for (const item of pc) {
+      if (item.enabled) keys.push(item.id);
+    }
+  }
+
+  return keys;
+}
+
 export default function ValuatorOperationsSummary({ projectId, projectName }: ValuatorOperationsSummaryProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const dateRange = {
     startDate: format(subMonths(new Date(), 12), "yyyy-MM-dd"),
     endDate: format(new Date(), "yyyy-MM-dd"),
   };
+
+  const { data: config } = useQuery<ProjectConfig>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+  });
 
   const { data: summary, isLoading } = useQuery<OperationsSummary>({
     queryKey: ["/api/operations-context/projects", projectId, "ops/summary", dateRange],
@@ -63,6 +102,8 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
     },
   });
 
+  const enabledKeys = getEnabledCenterKeys(config);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -72,22 +113,40 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-64" />
-          ))}
-        </div>
       </div>
     );
   }
 
-  const hasData = (summary?.combined?.totalRevenue || 0) > 0;
-  const fuelShare = hasData && summary
-    ? (summary.fuel.totalRevenue / summary.combined.totalRevenue) * 100
-    : 0;
-  const storeShare = hasData && summary
-    ? (summary.shipStore.totalRevenue / summary.combined.totalRevenue) * 100
-    : 0;
+  if (enabledKeys.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Operations Summary
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Overview of enabled profit centers for {projectName || "this project"}
+            </p>
+          </div>
+        </div>
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center">
+            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h4 className="font-semibold mb-2">No Profit Centers Configured</h4>
+            <p className="text-sm text-muted-foreground">
+              Enable profit centers in the project setup wizard to see your operations summary.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const hasFuelData = enabledKeys.includes("fuelSales");
+  const hasStoreData = enabledKeys.includes("shipStore");
+  const hasOpsData = (summary?.combined?.totalRevenue || 0) > 0;
 
   return (
     <div ref={pdfRef} className="space-y-6">
@@ -98,7 +157,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
             Operations Summary
           </h3>
           <p className="text-sm text-muted-foreground">
-            Combined fuel and ship store performance for {projectName || "this project"}
+            Active profit centers for {projectName || "this project"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -110,182 +169,188 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(summary?.combined?.totalRevenue || 0)}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total COGS</p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(summary?.combined?.totalCogs || 0)}
-                </p>
-              </div>
-              <ArrowDownRight className="h-8 w-8 text-red-500/50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Gross Margin</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(summary?.combined?.grossMargin || 0)}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-green-500/50" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Margin %</p>
-                <p className="text-2xl font-bold">
-                  {summary?.combined?.marginPercent || 0}%
-                </p>
-              </div>
-              <ArrowUpRight className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {enabledKeys.map((key) => {
+          const meta = PROFIT_CENTER_META[key];
+          if (!meta) return null;
+          const Icon = meta.icon;
+          return (
+            <Card key={key}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-muted rounded-lg">
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{meta.label}</p>
+                    <p className="text-xs text-muted-foreground">{meta.description}</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="mt-3">Active</Badge>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Fuel className="h-5 w-5" />
-              Fuel Sales
-            </CardTitle>
-            <CardDescription>
-              {summary?.fuel?.transactionCount || 0} transactions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="text-xl font-semibold">
-                  {formatCurrency(summary?.fuel?.totalRevenue || 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Gross Margin</p>
-                <p className="text-xl font-semibold text-green-600">
-                  {formatCurrency(summary?.fuel?.grossMargin || 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Gallons</p>
-                <p className="text-xl font-semibold">
-                  {(summary?.fuel?.totalGallons || 0).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">COGS</p>
-                <p className="text-xl font-semibold">
-                  {formatCurrency(summary?.fuel?.totalCogs || 0)}
-                </p>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Revenue Share</span>
-                <span>{fuelShare.toFixed(1)}%</span>
-              </div>
-              <Progress value={fuelShare} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
+      {(hasFuelData || hasStoreData) && hasOpsData && (
+        <>
+          <div className="grid grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    <p className="text-2xl font-bold">
+                      {formatCurrency(summary?.combined?.totalRevenue || 0)}
+                    </p>
+                  </div>
+                  <DollarSign className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Ship Store
-            </CardTitle>
-            <CardDescription>
-              {summary?.shipStore?.transactionCount || 0} transactions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Revenue</p>
-                <p className="text-xl font-semibold">
-                  {formatCurrency(summary?.shipStore?.totalRevenue || 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Gross Margin</p>
-                <p className="text-xl font-semibold text-green-600">
-                  {formatCurrency(summary?.shipStore?.grossMargin || 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Transaction</p>
-                <p className="text-xl font-semibold">
-                  {summary?.shipStore?.transactionCount 
-                    ? formatCurrency((summary.shipStore.totalRevenue || 0) / summary.shipStore.transactionCount)
-                    : "$0.00"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">COGS</p>
-                <p className="text-xl font-semibold">
-                  {formatCurrency(summary?.shipStore?.totalCogs || 0)}
-                </p>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Revenue Share</span>
-                <span>{storeShare.toFixed(1)}%</span>
-              </div>
-              <Progress value={storeShare} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total COGS</p>
+                    <p className="text-2xl font-bold">
+                      {formatCurrency(summary?.combined?.totalCogs || 0)}
+                    </p>
+                  </div>
+                  <ArrowDownRight className="h-8 w-8 text-red-500/50" />
+                </div>
+              </CardContent>
+            </Card>
 
-      {!hasData && (
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gross Margin</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatCurrency(summary?.combined?.grossMargin || 0)}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-500/50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Margin %</p>
+                    <p className="text-2xl font-bold">
+                      {summary?.combined?.marginPercent || 0}%
+                    </p>
+                  </div>
+                  <ArrowUpRight className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {hasFuelData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Fuel className="h-5 w-5" />
+                    Fuel Sales
+                  </CardTitle>
+                  <CardDescription>
+                    {summary?.fuel?.transactionCount || 0} transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Revenue</p>
+                      <p className="text-xl font-semibold">
+                        {formatCurrency(summary?.fuel?.totalRevenue || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Gross Margin</p>
+                      <p className="text-xl font-semibold text-green-600">
+                        {formatCurrency(summary?.fuel?.grossMargin || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Gallons</p>
+                      <p className="text-xl font-semibold">
+                        {(summary?.fuel?.totalGallons || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">COGS</p>
+                      <p className="text-xl font-semibold">
+                        {formatCurrency(summary?.fuel?.totalCogs || 0)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {hasStoreData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5" />
+                    Ship Store
+                  </CardTitle>
+                  <CardDescription>
+                    {summary?.shipStore?.transactionCount || 0} transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Revenue</p>
+                      <p className="text-xl font-semibold">
+                        {formatCurrency(summary?.shipStore?.totalRevenue || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Gross Margin</p>
+                      <p className="text-xl font-semibold text-green-600">
+                        {formatCurrency(summary?.shipStore?.grossMargin || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Avg Transaction</p>
+                      <p className="text-xl font-semibold">
+                        {summary?.shipStore?.transactionCount 
+                          ? formatCurrency((summary.shipStore.totalRevenue || 0) / summary.shipStore.transactionCount)
+                          : "$0.00"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">COGS</p>
+                      <p className="text-xl font-semibold">
+                        {formatCurrency(summary?.shipStore?.totalCogs || 0)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
+
+      {!hasOpsData && !(hasFuelData || hasStoreData) && (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center">
-            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h4 className="font-semibold mb-2">No Operations Data Yet</h4>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add fuel sales and ship store transactions to see your operations summary
+            <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h4 className="font-semibold mb-2">Profit Centers Active</h4>
+            <p className="text-sm text-muted-foreground">
+              Navigate to individual profit center tabs above to manage data for each revenue stream.
             </p>
-            <div className="flex justify-center gap-4">
-              <Badge variant="outline" className="text-sm py-1 px-3">
-                <Fuel className="h-4 w-4 mr-1" />
-                Add Fuel Sales
-              </Badge>
-              <Badge variant="outline" className="text-sm py-1 px-3">
-                <ShoppingCart className="h-4 w-4 mr-1" />
-                Add Ship Store Sales
-              </Badge>
-            </div>
           </CardContent>
         </Card>
       )}

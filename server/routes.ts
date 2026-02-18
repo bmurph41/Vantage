@@ -20790,9 +20790,16 @@ Current context: Project ${req.params.projectId}`;
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      // Return config from customMetrics or defaults
+      const cm = (project.customMetrics as any) || {};
       const configDefault = { holdPeriod: 5, startDate: '2026-01-31', cashFlowGranularity: 'annual', seasonMonths: [4, 5, 6, 7, 8, 9, 10], departments: {} };
-      const config = { ...configDefault, ...((project.customMetrics as any)?.config || {}) };
+      const config = { ...configDefault, ...(cm.config || {}) };
+
+      if (cm.profitCenters && !config.profitCenters) {
+        config.profitCenters = cm.profitCenters;
+      }
+      if (cm.storageMix && !config.storageMix) {
+        config.storageMix = cm.storageMix;
+      }
       
       res.json(config);
     } catch (error: any) {
