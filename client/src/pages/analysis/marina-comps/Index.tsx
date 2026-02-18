@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,7 @@ interface CompSet {
 export default function MarinaCompsIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const reportRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState("subjects");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSubjectDialog, setShowSubjectDialog] = useState(false);
@@ -165,13 +167,14 @@ export default function MarinaCompsIndex() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" ref={reportRef}>
       <div className="flex-none border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-4">
             <Anchor className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-semibold">Marina Comps Engine</h1>
           </div>
+          <ExportPdfButton contentRef={reportRef} filename="marina-comps" title="Marina Comparables Analysis" />
         </div>
       </div>
 

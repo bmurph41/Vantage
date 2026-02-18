@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { ArrowLeft, Save, Trash2, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 
 interface DetailProps {
   compId?: string;
@@ -17,6 +18,7 @@ interface DetailProps {
 }
 
 export default function Detail({ compId: propCompId, onClose, isModal = false }: DetailProps) {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [, params] = useRoute("/analysis/rate-comps/:id");
   const compId = propCompId || params?.id;
   const { toast } = useToast();
@@ -120,7 +122,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   }
 
   return (
-    <Container className={isModal ? 'h-full overflow-auto' : 'max-w-4xl mx-auto'}>
+    <Container ref={reportRef} className={isModal ? 'h-full overflow-auto' : 'max-w-4xl mx-auto'}>
       {/* Header */}
       <div className={`${isModal ? 'sticky top-0 bg-background z-10 ' : ''}p-6 border-b border-border`}>
         <div className="flex items-center justify-between">
@@ -142,6 +144,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ExportPdfButton contentRef={reportRef} filename="rate-comp-detail" title="Rate Comp Detail" />
             {canDelete && (
               <Button
                 variant="destructive"

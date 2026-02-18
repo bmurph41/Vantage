@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import {
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { FeatureChecklist } from "@/components/ui/_primitives/feature-highlight";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -43,6 +45,7 @@ const getAvatarColor = (name: string): string => {
 };
 
 export default function CRMDashboard() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const { data: dealsData, isLoading: dealsLoading } = useQuery({
     queryKey: ['/api/crm/deals'],
   });
@@ -208,7 +211,7 @@ export default function CRMDashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div ref={reportRef} className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">CRM Dashboard</h1>
@@ -217,6 +220,7 @@ export default function CRMDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="crm-dashboard" title="CRM Dashboard" />
           <Link href="/crm/deals">
             <Button data-testid="button-new-deal">
               <DollarSign className="w-4 h-4 mr-2" />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { ArrowLeft, Trash2, Building2, MapPin, DollarSign, Calendar, Anchor, Shi
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CreateEditCompDialog from "@/components/salescomps/sales-comps/CreateEditCompDialog";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import type { SalesComp } from "@shared/schema";
 
 interface DetailProps {
@@ -46,6 +47,7 @@ const MONTHS = [
 ];
 
 export default function Detail({ compId: propCompId, onClose, isModal = false }: DetailProps) {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [, params] = useRoute("/analysis/sales-comps/:id");
   const [, navigate] = useLocation();
   const compId = propCompId || params?.id;
@@ -147,7 +149,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
   };
 
   return (
-    <Container className={isModal ? 'h-full overflow-auto' : 'max-w-5xl mx-auto'}>
+    <Container ref={reportRef} className={isModal ? 'h-full overflow-auto' : 'max-w-5xl mx-auto'}>
       <div className={`${isModal ? 'sticky top-0 bg-background z-10 ' : ''}p-6 border-b border-border`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -174,6 +176,7 @@ export default function Detail({ compId: propCompId, onClose, isModal = false }:
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ExportPdfButton contentRef={reportRef} filename="sales-comp-detail" title="Sales Comp Detail" />
             {canDelete && (
               <Button
                 variant="destructive"

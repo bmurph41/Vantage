@@ -4,10 +4,11 @@
 // - @/lib/seo
 // - @/components/reports/* (all report components)
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -16,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function ProjectReport() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const reportRef = useRef<HTMLDivElement>(null);
   const [match, params] = useRoute("/analysis/projects/:id/report");
   
   const projectId = params?.id;
@@ -105,14 +107,17 @@ export default function ProjectReport() {
   }
 
   return (
-    <div className="min-h-screen bg-background print:bg-white">
+    <div className="min-h-screen bg-background print:bg-white" ref={reportRef}>
       {/* Navigation - hidden when printing */}
       <div className="print:hidden">
         <div className="container mx-auto px-4 py-4">
-          <Button onClick={handleGoBack} variant="outline" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Projects
-          </Button>
+          <div className="flex items-center justify-between mb-4">
+            <Button onClick={handleGoBack} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Projects
+            </Button>
+            <ExportPdfButton contentRef={reportRef} filename="analysis-report" title="Analysis Report" />
+          </div>
         </div>
       </div>
 

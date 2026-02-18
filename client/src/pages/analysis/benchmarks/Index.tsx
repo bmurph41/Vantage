@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +60,7 @@ export default function BenchmarksIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<TimeRange>("1Y");
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: benchmarkAggregates, isLoading: benchmarksLoading } = useQuery<BenchmarkAggregateRow[]>({
     queryKey: ["/api/benchmarking/aggregates"],
@@ -91,7 +93,7 @@ export default function BenchmarksIndex() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8" ref={reportRef}>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-benchmarks-title">Capital Markets</h1>
@@ -99,10 +101,13 @@ export default function BenchmarksIndex() {
             Live tracking of key interest rates and treasury yields from Federal Reserve Economic Data
           </p>
         </div>
-        <Button onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending} data-testid="btn-refresh-rates">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-          Refresh Rates
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="market-benchmarks" title="Market Benchmarks & FRED Rates" />
+          <Button onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending} data-testid="btn-refresh-rates">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+            Refresh Rates
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4 flex justify-end">

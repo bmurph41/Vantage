@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { format, subDays, subWeeks, subMonths } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ const formatPercent = (value: number | null | undefined) => {
 export default function ValuationTimelinePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -204,7 +206,7 @@ export default function ValuationTimelinePage() {
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6" ref={reportRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Valuation Timeline</h1>
@@ -212,26 +214,29 @@ export default function ValuationTimelinePage() {
             Track valuations over time and see how your marina's value has changed
           </p>
         </div>
-        {selectedProjectId && (
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => createSnapshotMutation.mutate()}
-              disabled={createSnapshotMutation.isPending}
-            >
-              <Camera className="h-4 w-4 mr-2" />
-              {createSnapshotMutation.isPending ? "Saving..." : "Take Snapshot"}
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => pushToModelingMutation.mutate()}
-              disabled={pushToModelingMutation.isPending || !currentValuation}
-              title="Sync current valuation metrics to the modeling project"
-            >
-              <ArrowRightCircle className="h-4 w-4 mr-2" />
-              {pushToModelingMutation.isPending ? "Pushing..." : "Push to Modeling"}
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="valuation-timeline" title="Valuation Timeline" />
+          {selectedProjectId && (
+            <>
+              <Button 
+                onClick={() => createSnapshotMutation.mutate()}
+                disabled={createSnapshotMutation.isPending}
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                {createSnapshotMutation.isPending ? "Saving..." : "Take Snapshot"}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => pushToModelingMutation.mutate()}
+                disabled={pushToModelingMutation.isPending || !currentValuation}
+                title="Sync current valuation metrics to the modeling project"
+              >
+                <ArrowRightCircle className="h-4 w-4 mr-2" />
+                {pushToModelingMutation.isPending ? "Pushing..." : "Push to Modeling"}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

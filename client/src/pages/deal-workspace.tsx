@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import DealFormModal from "@/components/modals/deal-form-modal";
 import LeadFormModal from "@/components/modals/lead-form-modal";
 import type { Deal, Contact, Company, PipelineStage, Lead } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 
 const PipelineView = lazy(() => import("@/components/deal-workspace/PipelineView"));
 const ListView = lazy(() => import("@/components/deal-workspace/ListView"));
@@ -72,6 +73,7 @@ function ViewLoader() {
 }
 
 export default function DealWorkspace() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -154,7 +156,7 @@ export default function DealWorkspace() {
   const isLoading = dealsLoading || leadsLoading;
 
   return (
-    <div className="flex flex-col min-h-full bg-gray-50">
+    <div ref={reportRef} className="flex flex-col min-h-full bg-gray-50">
       <div className="flex-shrink-0 bg-white border-b shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-4">
@@ -168,6 +170,7 @@ export default function DealWorkspace() {
             </div>
             
             <div className="flex items-center gap-3">
+              <ExportPdfButton contentRef={reportRef} filename="deal-workspace" title="Deal Workspace" />
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input 

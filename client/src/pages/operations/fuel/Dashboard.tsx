@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { MetricCard } from "@/components/fuel/metric-card";
@@ -17,6 +17,7 @@ import { AssetSelector } from "@/components/AssetSelector";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, fuelSalesTourSteps } from "@/lib/tour-configs";
 import { SyncStatusBanner } from "@/components/operations/SyncStatusBanner";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { 
   BarChart, 
   Bar, 
@@ -46,6 +47,7 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState(false);
   const [isAddDeliveryModalOpen, setIsAddDeliveryModalOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -210,15 +212,16 @@ export default function Dashboard() {
   };
 
   return (
-    <>
+    <div ref={reportRef}>
       <PageTour tourId={TOUR_IDS.FUEL_SALES} steps={fuelSalesTourSteps} />
       <Header 
         title="Fuel Sales Dashboard"
         subtitle="Welcome back! Here's what's happening with your fuel sales."
       />
 
-      <div className="px-6 pt-4">
+      <div className="px-6 pt-4 flex justify-between items-center">
         <SyncStatusBanner moduleName="fuel" />
+        <ExportPdfButton contentRef={reportRef} filename="fuel-dashboard" title="Fuel Sales Dashboard" />
       </div>
 
       <div className="px-6 pt-4 border-b border-border">
@@ -662,6 +665,6 @@ export default function Dashboard() {
         isOpen={isAddDeliveryModalOpen}
         onClose={() => setIsAddDeliveryModalOpen(false)}
       />
-    </>
+    </div>
   );
 }

@@ -1,11 +1,14 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, Target, Activity } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
 
 export default function MarketingDashboard() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const { data: campaigns = [] } = useQuery({ queryKey: ['/api/marketing/campaigns'] });
   const { data: expenses = [] } = useQuery({ queryKey: ['/api/marketing/expenses'] });
   const { data: attribution = [] } = useQuery({ queryKey: ['/api/marketing/attribution'] });
@@ -43,9 +46,10 @@ export default function MarketingDashboard() {
   }));
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div ref={reportRef} className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold" data-testid="page-title">Marketing Dashboard</h1>
+        <ExportPdfButton contentRef={reportRef} filename="marketing-dashboard" title="Marketing Dashboard" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

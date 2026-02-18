@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -90,6 +91,7 @@ export default function CapitalMarketsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const reportRef = useRef<HTMLDivElement>(null);
   const searchString = useSearch();
   const [selectedRateType, setSelectedRateType] = useState<RateType>("treasury");
   const [selectedForwardType, setSelectedForwardType] = useState<RateType>("sofr");
@@ -205,16 +207,19 @@ export default function CapitalMarketsPage() {
   })) ?? [];
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6 space-y-6" ref={reportRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Capital Markets</h1>
           <p className="text-muted-foreground">Real-time yield curves, SOFR, and Treasury rates from FRED</p>
         </div>
-        <Button onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-          Refresh Rates
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="capital-markets" title="Capital Markets Analysis" />
+          <Button onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+            Refresh Rates
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

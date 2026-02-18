@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QuickBooksExportDialog } from "@/components/fuel/quickbooks-export-dialog";
 import type { TransactionsResponse, InventoryResponse, DeliveriesResponse } from "@/types/fuel-api";
 import { AssetSelector } from "@/components/AssetSelector";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { 
   FileText, 
   Download, 
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 export default function Reports() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [reportType, setReportType] = useState("transactions");
   const [dateRange, setDateRange] = useState("30");
   const [startDate, setStartDate] = useState("");
@@ -188,11 +190,15 @@ export default function Reports() {
   }
 
   return (
-    <>
+    <div ref={reportRef}>
       <Header 
         title="Fuel Sales Reports"
         subtitle="Generate and export detailed sales and inventory reports"
       />
+
+      <div className="px-6 pt-4 flex justify-end">
+        <ExportPdfButton contentRef={reportRef} filename="fuel-reports" title="Fuel Sales Reports" />
+      </div>
 
       <div className="px-6 pt-4 border-b border-border">
         <div className="flex justify-end pb-4">
@@ -487,6 +493,6 @@ export default function Reports() {
         open={showQuickBooksDialog} 
         onOpenChange={setShowQuickBooksDialog} 
       />
-    </>
+    </div>
   );
 }

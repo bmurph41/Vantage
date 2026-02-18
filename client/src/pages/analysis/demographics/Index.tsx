@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -1906,8 +1907,9 @@ function LocationAnalysisSection() {
 }
 
 export default function DemographicsIndex() {
+  const reportRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="container mx-auto px-4 py-6 space-y-6" ref={reportRef}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-demographics-title">
@@ -1917,6 +1919,7 @@ export default function DemographicsIndex() {
             Analyze Census demographics for any U.S. property address
           </p>
         </div>
+        <ExportPdfButton contentRef={reportRef} filename="demographics-analysis" title="Demographics Analysis" />
       </div>
 
       <LocationAnalysisSection />

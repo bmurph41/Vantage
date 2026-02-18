@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { AssetSelector } from "@/components/AssetSelector";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import type { ShipStoreTransaction, ShipStoreProduct, ShipStoreCategory } from "@shared/schema";
 import {
   FileText,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 
 export default function ShipStoreReports() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState("30");
   const [startDate, setStartDate] = useState("");
@@ -315,11 +317,15 @@ export default function ShipStoreReports() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div ref={reportRef} className="min-h-screen bg-gray-50">
       <Header
         title="Ship Store Reports"
         subtitle="Financial reports and analytics"
       />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 flex justify-end">
+        <ExportPdfButton contentRef={reportRef} filename="ship-store-reports" title="Ship Store Reports" />
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}

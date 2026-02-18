@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,13 @@ import { useToast } from "@/hooks/use-toast";
 import { salesCompsApi } from "@/lib/salescomps/api";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/salescomps/format";
 import { generateCompsComparisonPDF, downloadPDF } from "@/components/salescomps/analytics/CompsComparisonPDF";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import type { SalesComp } from "@shared/schema";
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export default function Compare() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [location] = useLocation();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -128,7 +130,7 @@ export default function Compare() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div ref={reportRef} className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
@@ -143,6 +145,7 @@ export default function Compare() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <ExportPdfButton contentRef={reportRef} filename="sales-comps-comparison" title="Sales Comps Comparison" />
               <Button 
                 onClick={handleExportPDF}
                 disabled={isExportingPdf}

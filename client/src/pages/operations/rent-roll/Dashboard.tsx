@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency, formatPercent } from "@/lib/utils";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 
 type DashboardMetrics = {
   totalGrossRent: number;
@@ -223,6 +225,7 @@ function RecentActivity({ data, loading }: { data: DashboardMetrics['recentActiv
 }
 
 export default function RentRollDashboard() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const { data: metrics, isLoading, error } = useQuery<DashboardMetrics>({
     queryKey: ['/api/rent-roll/dashboard'],
     staleTime: 60 * 1000,
@@ -260,7 +263,7 @@ export default function RentRollDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="page-rent-roll-dashboard">
+    <div ref={reportRef} className="container mx-auto p-6 space-y-6" data-testid="page-rent-roll-dashboard">
       <PageTour 
         tourId={TOUR_IDS.RENT_ROLL} 
         steps={rentRollTourSteps}
@@ -279,6 +282,7 @@ export default function RentRollDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="rent-roll-dashboard" title="Rent Roll Dashboard" />
           <Link href="/operations/rent-roll/projects">
             <Button variant="outline" data-testid="btn-view-projects">
               View Projects

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,7 @@ interface ComparativeAnalysis {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
 export default function AnalyticsIndex() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [filters, setFilters] = useState<AnalyticsFilters>({});
   const [selectedState, setSelectedState] = useState<string[]>([]);
   const [selectedWaterType, setSelectedWaterType] = useState<string[]>([]);
@@ -91,7 +93,7 @@ export default function AnalyticsIndex() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-6" ref={reportRef}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Sales Comps Analytics</h1>
@@ -100,6 +102,7 @@ export default function AnalyticsIndex() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportPdfButton contentRef={reportRef} filename="unified-analytics" title="Analytics Dashboard" />
           <Button onClick={handleCalculate} data-testid="button-calculate-analytics">
             <BarChart3 className="h-4 w-4 mr-2" />
             Calculate Metrics

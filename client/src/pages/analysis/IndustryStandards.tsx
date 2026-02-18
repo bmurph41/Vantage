@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,7 @@ function getCategoryIcon(category: string) {
 }
 
 export default function IndustryStandards() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedRegion, setSelectedRegion] = useState("all");
   const [selectedYear, setSelectedYear] = useState<string>("2025");
@@ -116,7 +118,11 @@ export default function IndustryStandards() {
       title="Industry Standards" 
       subtitle="Global marina benchmarks and performance metrics"
     >
-      <div className="space-y-6">
+      <div className="space-y-6" ref={reportRef}>
+        <div className="flex items-center justify-between">
+          <div />
+          <ExportPdfButton contentRef={reportRef} filename="industry-standards" title="Marina Industry Standards" />
+        </div>
         <InlineBanner variant="info">
           <Info className="h-4 w-4 mr-2" />
           Industry standards are curated by MarinaMatch from authoritative sources including NMMA, industry surveys, and proprietary research.

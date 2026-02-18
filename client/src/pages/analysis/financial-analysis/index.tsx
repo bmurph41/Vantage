@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +30,7 @@ import {
 import { formatCurrency, formatPercent } from '@/lib/utils';
 
 export default function FinancialAnalysisDashboard() {
+  const reportRef = useRef<HTMLDivElement>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState('12m');
   const [selectedProject, setSelectedProject] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('overview');
@@ -141,7 +143,7 @@ export default function FinancialAnalysisDashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-muted/30 min-h-screen">
+    <div className="p-6 space-y-6 bg-muted/30 min-h-screen" ref={reportRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -153,6 +155,7 @@ export default function FinancialAnalysisDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <ExportPdfButton contentRef={reportRef} filename="financial-analysis" title="Financial Analysis" />
           <Select value={selectedProject} onValueChange={setSelectedProject}>
             <SelectTrigger className="w-[200px]">
               <Building2 className="h-4 w-4 mr-2" />
