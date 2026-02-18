@@ -481,12 +481,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
 
+  app.get("/api/geocode", authenticateUser, async (req: any, res) => {
+    try {
+      const address = req.query.address as string;
+      if (!address || address.trim().length < 5) {
+        return res.status(400).json({ error: "Address is required (min 5 characters)" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ error: "Geocoding service not configured" });
+      }
+
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address.trim())}&key=${apiKey}`
+      );
+      const data = await response.json();
+
+      if (data.status !== "OK" || !data.results?.length) {
+        return res.status(404).json({ error: "Address not found" });
+      }
+
+      const result = data.results[0];
+      const components = result.address_components || [];
+
+      let city = "";
+      let state = "";
+      let zip = "";
+
+      for (const comp of components) {
+        const types: string[] = comp.types || [];
+        if (types.includes("locality")) {
+          city = comp.long_name;
+        } else if (types.includes("sublocality_level_1") && !city) {
+          city = comp.long_name;
+        } else if (types.includes("administrative_area_level_1")) {
+          state = comp.short_name;
+        } else if (types.includes("postal_code")) {
+          zip = comp.long_name;
+        }
+      }
+
+      res.json({
+        city,
+        state,
+        zip,
+        formattedAddress: result.formatted_address,
+        lat: result.geometry?.location?.lat,
+        lng: result.geometry?.location?.lng,
+      });
+    } catch (error: any) {
+      console.error("Geocode error:", error.message);
+      res.status(500).json({ error: "Geocoding failed" });
+    }
+  });
+
   app.get("/api/analysis/hub-stats", authenticateUser, enforceTenant, async (req: any, res) => {
     try {
-      const orgId = req.user?.organizationId;
+      const orgId = req.user?.organizationId || '';
       const [salesResult, rateResult, dealsResult] = await Promise.all([
-        db.execute(sql`SELECT COUNT(*)::int as count FROM sales_comps WHERE org_id = ${orgId} OR is_global = true`),
-        db.execute(sql`SELECT COUNT(*)::int as count FROM rate_comps WHERE org_id = ${orgId} OR is_global = true`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM sales_comps WHERE org_id = ${orgId}`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM rate_comps WHERE org_id = ${orgId}`),
         db.execute(sql`SELECT COUNT(*)::int as count FROM docktalk_deals`),
       ]);
 
@@ -28399,6 +28454,136 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.send(excelBuffer);
     } catch (error: any) {
       console.error('Failed to export Excel:', error);
+      res.status(500).json({ error: 'Failed to export dashboard' });
+    }
+  });
+
+  // Export dashboard via email
+  app.post('/api/dashboards/export/email', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { timeRange, modules, recipientEmail } = req.body;
+
+      // Validate email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipientEmail)) {
+        return res.status(400).json({ error: 'Invalid email address' });
+      }
+
+      // Security: Validate input and fetch data server-side
+      const validatedTimeRange = ['7d', '30d', '90d', 'ytd', 'all'].includes(timeRange) ? timeRange : '30d';
+      const validatedModules = Array.isArray(modules) ? modules.filter((m: any) => typeof m === 'string') : null;
+
+      // Fetch data server-side to prevent payload injection
+      const dashboardData = await dashboardService.getAggregatedDashboardData(orgId, validatedTimeRange, validatedModules);
+
+      // Generate HTML email
+      const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: #0891b2; margin: 0;">Dashboard Report</h1>
+  </div>
+
+  <div style="background: #f8fafc; border-radius: 8px; padding: 30px; margin-bottom: 20px;">
+    <p><strong>Report Generated:</strong> ${new Date().toLocaleString()}</p>
+    <p><strong>Time Range:</strong> ${validatedTimeRange}</p>
+    <p><strong>Modules:</strong> ${validatedModules?.join(', ') || 'All'}</p>
+  </div>
+
+  <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
+    ${dashboardData?.crm ? `
+    <h2 style="color: #1e293b; margin-top: 0;">CRM Pipeline</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Pipeline Value</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">$${Number(dashboardData.crm.pipelineValue || 0).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Active Deals</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.crm.activeDeals || 0)}</td>
+      </tr>
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Win Rate</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.crm.winRate || 0)}%</td>
+      </tr>
+    </table>
+    ` : ''}
+
+    ${dashboardData?.dueDiligence ? `
+    <h2 style="color: #1e293b; margin-top: 20px;">Due Diligence</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Active Projects</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.dueDiligence.activeProjects || 0)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Completed Projects</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.dueDiligence.completedProjects || 0)}</td>
+      </tr>
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Completion Rate</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.dueDiligence.completionRate || 0)}%</td>
+      </tr>
+    </table>
+    ` : ''}
+
+    ${dashboardData?.fuel ? `
+    <h2 style="color: #1e293b; margin-top: 20px;">Fuel Operations</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Monthly Revenue</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">$${Number(dashboardData.fuel.monthlyRevenue || 0).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Monthly Gallons</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.fuel.monthlyGallons || 0).toLocaleString()}</td>
+      </tr>
+    </table>
+    ` : ''}
+
+    ${dashboardData?.shipStore ? `
+    <h2 style="color: #1e293b; margin-top: 20px;">Ship Store</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Monthly Revenue</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">$${Number(dashboardData.shipStore.monthlyRevenue || 0).toLocaleString()}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Transactions</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${Number(dashboardData.shipStore.monthlyTransactions || 0)}</td>
+      </tr>
+      <tr style="background: #f1f5f9;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0;"><strong>Avg Transaction</strong></td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">$${Number(dashboardData.shipStore.avgTransaction || 0).toLocaleString()}</td>
+      </tr>
+    </table>
+    ` : ''}
+  </div>
+
+  <div style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+    <p>&copy; ${new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+  </div>
+</body>
+</html>
+      `;
+
+      // Import email service
+      const { sendDashboardReportEmail } = await import('./services/dashboard-email-service');
+      const success = await sendDashboardReportEmail(recipientEmail, emailHtml, dashboardData);
+
+      if (!success) {
+        return res.status(500).json({ error: 'Failed to send email' });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to export email:', error);
       res.status(500).json({ error: 'Failed to export dashboard' });
     }
   });

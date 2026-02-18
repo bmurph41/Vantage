@@ -33,6 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import {
   Collapsible,
   CollapsibleContent,
@@ -355,6 +356,8 @@ export const AIGenerationPanel: React.FC = () => {
   const document = useDocument();
   const sectionLibrary = useSectionLibrary();
   const sections = useSections();
+  const { toast } = useToast();
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   // Filter enabled sections with AI templates
   const sectionsWithAI = useMemo(() => {
@@ -425,6 +428,86 @@ export const AIGenerationPanel: React.FC = () => {
     value: string
   ) => {
     store.updateSectionContent(sectionId, { [fieldKey]: value });
+  };
+
+  const handleGenerateAll = async () => {
+    if (sectionsWithAI.length === 0) return;
+
+    setIsGeneratingAll(true);
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (let i = 0; i < sectionsWithAI.length; i++) {
+        const section = sectionsWithAI[i];
+        const sectionDef = sectionLibrary[section.sectionKey];
+        
+        // Get the first available prompt template
+        const promptTemplates = sectionDef?.aiPromptTemplates;
+        if (!promptTemplates || promptTemplates.length === 0) {
+          failureCount++;
+          continue;
+        }
+
+        const promptKey = promptTemplates[0].key;
+
+        try {
+          // Build context from bindings
+          const context: Record<string, any> = {};
+          Object.entries(section.dataBindings).forEach(([key, binding]: [string, any]) => {
+            if (binding?.resolvedValue !== undefined) {
+              context[key] = binding.resolvedValue;
+            }
+          });
+
+          // Call the generation endpoint
+          const response = await fetch('/api/document-builder/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sectionKey: section.sectionKey,
+              promptKey,
+              context,
+              provider: 'anthropic',
+              temperature: 0.7,
+            }),
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            // Call the existing handleGenerate to persist and update state
+            await handleGenerate(section.id, promptKey, result.data.content);
+            successCount++;
+          } else {
+            failureCount++;
+          }
+        } catch (err) {
+          console.error(`Failed to generate content for section ${section.sectionKey}:`, err);
+          failureCount++;
+        }
+
+        // Small delay between requests to avoid rate limiting
+        if (i < sectionsWithAI.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Show completion toast
+      if (successCount > 0) {
+        toast({
+          title: 'Generation Complete',
+          description: `Successfully generated ${successCount} section${successCount !== 1 ? 's' : ''}${failureCount > 0 ? `. Failed: ${failureCount}` : ''}`,
+        });
+      } else if (failureCount > 0) {
+        toast({
+          title: 'Generation Failed',
+          description: `Failed to generate ${failureCount} section${failureCount !== 1 ? 's' : ''}`,
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsGeneratingAll(false);
+    }
   };
 
   if (!document) {
@@ -502,12 +585,27 @@ export const AIGenerationPanel: React.FC = () => {
 
       {/* Quick Actions */}
       <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg">
-        <Button variant="outline" disabled>
-          <Zap className="w-4 h-4 mr-2" />
-          Generate All (Coming Soon)
+        <Button
+          onClick={handleGenerateAll}
+          disabled={isGeneratingAll || sectionsWithAI.length === 0}
+          variant={isGeneratingAll ? 'default' : 'outline'}
+        >
+          {isGeneratingAll ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4 mr-2" />
+              Generate All
+            </>
+          )}
         </Button>
         <span className="text-sm text-muted-foreground">
-          Generate content for all sections at once
+          {sectionsWithAI.length === 0
+            ? 'No sections available for generation'
+            : `Generate content for ${sectionsWithAI.length} section${sectionsWithAI.length !== 1 ? 's' : ''}`}
         </span>
       </div>
     </div>

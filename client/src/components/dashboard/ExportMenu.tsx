@@ -9,6 +9,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Download, FileText, File, Loader2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { TimeRange } from "./TimeRangeSelector";
@@ -21,6 +30,8 @@ interface ExportMenuProps {
 export function ExportMenu({ timeRange, selectedModules }: ExportMenuProps) {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
 
   const { data: dashboardData } = useQuery({
     queryKey: ['/api/dashboards/data', timeRange, JSON.stringify(selectedModules)],
@@ -129,14 +140,57 @@ export function ExportMenu({ timeRange, selectedModules }: ExportMenuProps) {
     }
   };
 
-  const handleEmailReport = async () => {
-    toast({
-      title: "Coming Soon",
-      description: "Email scheduling will be available soon",
-    });
+  const handleEmailReport = () => {
+    setRecipientEmail("");
+    setEmailDialogOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEmailDialogOpen(false);
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/dashboards/export/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timeRange,
+          modules: selectedModules.length > 0 ? selectedModules : ['all'],
+          recipientEmail,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Export failed');
+      }
+
+      toast({
+        title: "Email Sent Successfully",
+        description: `Dashboard report with JSON attachment sent to ${recipientEmail}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Could not send email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button 
@@ -184,9 +238,43 @@ export function ExportMenu({ timeRange, selectedModules }: ExportMenuProps) {
           data-testid="export-email"
         >
           <Mail className="h-4 w-4 mr-2" />
-          Schedule Email Report
+          Email Report
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Email Dashboard Report</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="recipient-email">Recipient Email</Label>
+            <Input
+              id="recipient-email"
+              type="email"
+              placeholder="name@example.com"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendEmail()}
+            />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            The report will be sent as an email with a JSON data attachment.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSendEmail} disabled={!recipientEmail}>
+            <Mail className="h-4 w-4 mr-2" />
+            Send Report
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

@@ -80,6 +80,22 @@ const ASSET_CLASS_OPTIONS: { value: AssetClass; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+const COLOR_SCHEMES = [
+  { value: 'navy', label: 'Navy & Gold', primary: '#1e3a5f', accent: '#c5a355', description: 'Classic institutional' },
+  { value: 'forest', label: 'Forest & Silver', primary: '#2d4a3e', accent: '#8c8c8c', description: 'Sophisticated earth tones' },
+  { value: 'slate', label: 'Slate & Blue', primary: '#334155', accent: '#3b82f6', description: 'Modern professional' },
+  { value: 'burgundy', label: 'Burgundy & Cream', primary: '#722f37', accent: '#f5f0e1', description: 'Premium classic' },
+  { value: 'charcoal', label: 'Charcoal & Teal', primary: '#374151', accent: '#14b8a6', description: 'Contemporary clean' },
+];
+
+const FONT_OPTIONS = [
+  { value: 'inter', label: 'Inter', description: 'Clean modern sans-serif' },
+  { value: 'georgia', label: 'Georgia', description: 'Classic serif' },
+  { value: 'merriweather', label: 'Merriweather', description: 'Elegant serif' },
+  { value: 'roboto', label: 'Roboto', description: 'Versatile sans-serif' },
+  { value: 'playfair', label: 'Playfair Display', description: 'Premium display serif' },
+];
+
 // =============================================================================
 // Document Configurator
 // =============================================================================
@@ -95,6 +111,8 @@ export const DocumentConfigurator: React.FC = () => {
   const [assetClass, setAssetClass] = useState<AssetClass | ''>(
     document?.assetClass || 'marina'
   );
+  const [colorScheme, setColorScheme] = useState(document?.theme?.colorScheme || 'navy');
+  const [fontFamily, setFontFamily] = useState(document?.theme?.fontFamily || 'inter');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -104,10 +122,12 @@ export const DocumentConfigurator: React.FC = () => {
       const changed =
         title !== document.title ||
         audience !== (document.audience || '') ||
-        assetClass !== (document.assetClass || 'marina');
+        assetClass !== (document.assetClass || 'marina') ||
+        colorScheme !== (document?.theme?.colorScheme || 'navy') ||
+        fontFamily !== (document?.theme?.fontFamily || 'inter');
       setHasChanges(changed);
     }
-  }, [title, audience, assetClass, document]);
+  }, [title, audience, assetClass, colorScheme, fontFamily, document]);
 
   // Sync with document
   useEffect(() => {
@@ -115,6 +135,8 @@ export const DocumentConfigurator: React.FC = () => {
       setTitle(document.title);
       setAudience(document.audience || '');
       setAssetClass(document.assetClass || 'marina');
+      setColorScheme(document?.theme?.colorScheme || 'navy');
+      setFontFamily(document?.theme?.fontFamily || 'inter');
     }
   }, [document?.id]);
 
@@ -132,6 +154,10 @@ export const DocumentConfigurator: React.FC = () => {
             title,
             audience: audience || null,
             assetClass: assetClass || null,
+            theme: {
+              colorScheme,
+              fontFamily,
+            },
           }),
         }
       );
@@ -235,18 +261,68 @@ export const DocumentConfigurator: React.FC = () => {
         </p>
       </div>
 
-      {/* Theme Selection (placeholder for now) */}
-      <div className="space-y-2">
+      {/* Theme Selection */}
+      <div className="space-y-3">
         <Label className="flex items-center gap-2">
           <Palette className="w-4 h-4" />
-          Theme
+          Color Scheme
         </Label>
-        <div className="p-4 rounded-lg border border-dashed bg-muted/30">
-          <p className="text-sm text-muted-foreground">
-            Theme customization coming soon. Documents will use the default
-            institutional theme.
-          </p>
+        <div className="grid grid-cols-2 gap-3">
+          {COLOR_SCHEMES.map((scheme) => (
+            <button
+              key={scheme.value}
+              onClick={() => setColorScheme(scheme.value)}
+              className={cn(
+                'p-3 rounded-lg border text-left transition-all',
+                'hover:border-primary/50',
+                colorScheme === scheme.value
+                  ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                  : 'border-muted'
+              )}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: scheme.primary }}
+                />
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: scheme.accent }}
+                />
+              </div>
+              <div className="font-medium text-sm">{scheme.label}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {scheme.description}
+              </div>
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Font Family */}
+      <div className="space-y-2">
+        <Label htmlFor="fontFamily" className="flex items-center gap-2">
+          <Type className="w-4 h-4" />
+          Font Family
+        </Label>
+        <Select
+          value={fontFamily}
+          onValueChange={setFontFamily}
+        >
+          <SelectTrigger id="fontFamily">
+            <SelectValue placeholder="Select font family" />
+          </SelectTrigger>
+          <SelectContent>
+            {FONT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <span>{option.label} — {option.description}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          Choose a font that matches your document's tone and audience
+        </p>
       </div>
 
       {/* Save Button */}

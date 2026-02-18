@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Clock, Download, Upload, Users } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Clock, Download, Upload, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -114,6 +114,10 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [viewingContact, setViewingContact] = useState<any | null>(null);
+  const [showCrmSearch, setShowCrmSearch] = useState(false);
+  const [crmSearchTerm, setCrmSearchTerm] = useState('');
+  const [crmSearchResults, setCrmSearchResults] = useState<any[]>([]);
+  const [isSearchingCrm, setIsSearchingCrm] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -281,6 +285,50 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
     deleteContactMutation.mutate(contactId);
   };
 
+  const handleCrmSearch = async () => {
+    if (!crmSearchTerm.trim()) return;
+    setIsSearchingCrm(true);
+    try {
+      const res = await fetch(`/api/crm/contacts?search=${encodeURIComponent(crmSearchTerm)}&limit=10`);
+      if (res.ok) {
+        const data = await res.json();
+        setCrmSearchResults(Array.isArray(data) ? data : data.contacts || []);
+      }
+    } catch (err) {
+      console.error('CRM search error:', err);
+      toast({
+        title: "Error",
+        description: "Failed to search CRM contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearchingCrm(false);
+    }
+  };
+
+  const handleImportCrmContact = (contact: any) => {
+    // Map CRM contact data to the expected contact format
+    const formData: ContactFormData = {
+      name: contact.name || contact.firstName ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() : '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      timezone: contact.timezone || 'America/New_York',
+      role: contact.role || undefined,
+      customRole: contact.customRole || undefined,
+      company: contact.company || undefined,
+      onDealTeam: contact.onDealTeam || false,
+      dealTeamNotes: contact.dealTeamNotes || undefined,
+    };
+    
+    // Use the existing submit handler to add the contact
+    handleSubmit(formData);
+    
+    // Close the CRM search dialog and clear the results
+    setShowCrmSearch(false);
+    setCrmSearchTerm('');
+    setCrmSearchResults([]);
+  };
+
   const handleExportCSV = () => {
     const csvHeaders = ["Name", "Email", "Phone", "Timezone", "Role", "Company"];
     const csvData = contacts.map(contact => [
@@ -351,16 +399,12 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          {/* CRM Integration Placeholder Button */}
+          {/* CRM Search Button */}
           <Button 
             variant="outline" 
-            onClick={() => {
-              // TODO: Implement CRM search when connecting to external CRM
-            }}
+            onClick={() => setShowCrmSearch(true)}
             className="border-2 hover:bg-purple-50 border-purple-200 text-purple-700" 
             data-testid="button-search-crm"
-            disabled={true}
-            title="CRM Integration - Coming Soon"
           >
             <Search className="h-4 w-4 mr-2" />
             Search CRM
@@ -569,6 +613,101 @@ export function ContactManagement({ contacts, isLoading, projectId }: ContactMan
       <div className="text-sm text-muted-foreground text-center pt-4" data-testid="contacts-summary">
         Showing {filteredContacts.length} of {allContacts.length} Contacts
       </div>
+
+      {/* CRM Search Dialog */}
+      <Dialog open={showCrmSearch} onOpenChange={setShowCrmSearch}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Search CRM Contacts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search for contacts by name, email, or company..."
+                value={crmSearchTerm}
+                onChange={(e) => setCrmSearchTerm(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCrmSearch();
+                  }
+                }}
+                className="flex-1"
+                data-testid="input-crm-search"
+              />
+              <Button
+                onClick={handleCrmSearch}
+                disabled={isSearchingCrm || !crmSearchTerm.trim()}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                data-testid="button-perform-crm-search"
+              >
+                {isSearchingCrm ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                {isSearchingCrm ? 'Searching...' : 'Search'}
+              </Button>
+            </div>
+
+            {/* Search Results */}
+            {crmSearchResults.length > 0 ? (
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {crmSearchResults.map((contact, index) => (
+                  <div
+                    key={index}
+                    className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    data-testid={`crm-contact-result-${index}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-foreground">
+                          {contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()}
+                        </h4>
+                        <div className="space-y-1 mt-2 text-sm text-muted-foreground">
+                          {contact.email && (
+                            <div className="flex items-center">
+                              <Mail className="h-3 w-3 mr-2" />
+                              {contact.email}
+                            </div>
+                          )}
+                          {contact.company && (
+                            <div className="flex items-center">
+                              <span className="font-medium text-foreground">Company:</span>
+                              <span className="ml-2">{contact.company}</span>
+                            </div>
+                          )}
+                          {contact.phone && (
+                            <div className="flex items-center">
+                              <Phone className="h-3 w-3 mr-2" />
+                              {contact.phone}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleImportCrmContact(contact)}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white ml-2 flex-shrink-0"
+                        data-testid={`button-import-crm-contact-${index}`}
+                      >
+                        Import
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : crmSearchTerm && !isSearchingCrm ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No contacts found matching your search.
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Enter a search term to find CRM contacts
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Contact Modals */}
       <ContactModal

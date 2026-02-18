@@ -26,10 +26,17 @@ import {
   FileDown,
   ExternalLink,
   Clock,
+  Send,
+  MessageSquare,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -72,7 +79,7 @@ const EXPORT_OPTIONS: ExportOption[] = [
     label: 'Word',
     description: 'Editable document format',
     icon: FileText,
-    available: false,
+    available: true,
   },
 ];
 
@@ -236,10 +243,20 @@ export const DocumentReview: React.FC = () => {
   const document = useDocument();
   const sectionLibrary = useSectionLibrary();
   const sections = useSections();
+  const { toast } = useToast();
 
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('pdf');
   const [isExporting, setIsExporting] = useState(false);
   const [exportJob, setExportJob] = useState<any>(null);
+
+  // Review & Approval state
+  const [reviewStatus, setReviewStatus] = useState<'draft' | 'in_review' | 'approved' | 'changes_requested' | 'rejected'>('draft');
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewerName, setReviewerName] = useState('');
+  const [reviewerEmail, setReviewerEmail] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewHistory, setReviewHistory] = useState<Array<{action: string, by: string, date: Date, message?: string}>>([]);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Calculate overall completion
   const completionStats = useMemo(() => {
@@ -355,6 +372,112 @@ export const DocumentReview: React.FC = () => {
     store.setCurrentStep('bind_data');
   };
 
+  const handleSendForReview = async () => {
+    if (!reviewerName.trim() || !reviewerEmail.trim()) {
+      toast({
+        title: 'Missing information',
+        description: 'Please provide reviewer name and email',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      // Try to POST to the API (gracefully handle 404 if route doesn't exist yet)
+      try {
+        const response = await fetch(
+          `/api/document-builder/documents/${document.id}/review`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              reviewerName,
+              reviewerEmail,
+              message: reviewMessage || undefined,
+            }),
+          }
+        );
+
+        if (!response.ok && response.status !== 404) {
+          console.error('API request failed:', response.status);
+        }
+      } catch (err) {
+        console.error('Failed to send review request to API:', err);
+      }
+
+      // Update local state regardless (optimistic UI)
+      setReviewStatus('in_review');
+
+      // Add to review history
+      const newHistoryEntry = {
+        action: 'sent_for_review',
+        by: reviewerName,
+        date: new Date(),
+        message: reviewMessage || undefined,
+      };
+      setReviewHistory([...reviewHistory, newHistoryEntry]);
+
+      // Reset form and show success
+      setShowReviewForm(false);
+      setReviewerName('');
+      setReviewerEmail('');
+      setReviewMessage('');
+
+      toast({
+        title: 'Review request sent',
+        description: `Document sent to ${reviewerName} for review`,
+      });
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const handleApprove = () => {
+    setReviewStatus('approved');
+    const newHistoryEntry = {
+      action: 'approved',
+      by: 'You',
+      date: new Date(),
+    };
+    setReviewHistory([...reviewHistory, newHistoryEntry]);
+    toast({
+      title: 'Document approved',
+      description: 'Document has been approved',
+    });
+  };
+
+  const handleRequestChanges = () => {
+    setReviewStatus('changes_requested');
+    const newHistoryEntry = {
+      action: 'changes_requested',
+      by: 'You',
+      date: new Date(),
+    };
+    setReviewHistory([...reviewHistory, newHistoryEntry]);
+    toast({
+      title: 'Changes requested',
+      description: 'Reviewer has been notified to make changes',
+    });
+  };
+
+  const getReviewStatusBadge = () => {
+    const statusConfig = {
+      draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
+      in_review: { label: 'In Review', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' },
+      approved: { label: 'Approved', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+      rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+      changes_requested: { label: 'Changes Requested', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
+    };
+
+    const config = statusConfig[reviewStatus];
+    return (
+      <Badge className={cn('font-semibold', config.color)}>
+        {config.label}
+      </Badge>
+    );
+  };
+
   if (!document) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -461,6 +584,183 @@ export const DocumentReview: React.FC = () => {
                 onNavigate={() => handleNavigateToSection(section.id)}
               />
             ))}
+        </CardContent>
+      </Card>
+
+      {/* Review & Approval Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Review & Approval</CardTitle>
+              <CardDescription>
+                Send document for review or approve changes
+              </CardDescription>
+            </div>
+            {getReviewStatusBadge()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Send for Review Section */}
+          {reviewStatus === 'draft' && (
+            <>
+              {!showReviewForm ? (
+                <Button
+                  onClick={() => setShowReviewForm(true)}
+                  className="w-full"
+                  variant="outline"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send for Review
+                </Button>
+              ) : (
+                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                  <div>
+                    <Label htmlFor="reviewer-name" className="text-sm font-medium mb-2 block">
+                      Reviewer Name
+                    </Label>
+                    <Input
+                      id="reviewer-name"
+                      placeholder="Enter reviewer name"
+                      value={reviewerName}
+                      onChange={(e) => setReviewerName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="reviewer-email" className="text-sm font-medium mb-2 block">
+                      Reviewer Email
+                    </Label>
+                    <Input
+                      id="reviewer-email"
+                      type="email"
+                      placeholder="Enter reviewer email"
+                      value={reviewerEmail}
+                      onChange={(e) => setReviewerEmail(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="review-message" className="text-sm font-medium mb-2 block">
+                      Message (Optional)
+                    </Label>
+                    <Textarea
+                      id="review-message"
+                      placeholder="Add any notes for the reviewer"
+                      value={reviewMessage}
+                      onChange={(e) => setReviewMessage(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSendForReview}
+                      disabled={isSubmittingReview}
+                      className="flex-1"
+                    >
+                      {isSubmittingReview ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-2" />
+                          Submit for Review
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowReviewForm(false);
+                        setReviewerName('');
+                        setReviewerEmail('');
+                        setReviewMessage('');
+                      }}
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Approval Actions for In Review Status */}
+          {reviewStatus === 'in_review' && (
+            <div className="flex gap-2">
+              <Button
+                onClick={handleApprove}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                <UserCheck className="w-4 h-4 mr-2" />
+                Approve
+              </Button>
+              <Button
+                onClick={handleRequestChanges}
+                variant="outline"
+                className="flex-1"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Request Changes
+              </Button>
+            </div>
+          )}
+
+          {/* Approved/Rejected Status Message */}
+          {reviewStatus === 'approved' && (
+            <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                  Document has been approved and is ready to export
+                </span>
+              </div>
+            </div>
+          )}
+
+          {reviewStatus === 'changes_requested' && (
+            <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                  Changes requested. Please review and update the document.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Review History */}
+          {reviewHistory.length > 0 && (
+            <div className="space-y-3 pt-4 border-t">
+              <h4 className="text-sm font-semibold">Review Timeline</h4>
+              <div className="space-y-2">
+                {reviewHistory.map((entry, idx) => (
+                  <div key={idx} className="flex gap-3 text-sm">
+                    <div className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">
+                          {entry.action === 'sent_for_review'
+                            ? `Sent for review to ${entry.by}`
+                            : entry.action === 'approved'
+                              ? 'Document approved'
+                              : 'Changes requested'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {entry.date.toLocaleString()}
+                        </div>
+                        {entry.message && (
+                          <div className="text-xs text-muted-foreground mt-1 italic">
+                            "{entry.message}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

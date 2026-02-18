@@ -821,6 +821,23 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
     },
   });
 
+  const handleAutoFillAddress = async () => {
+    const address = form.getValues("companyAddress");
+    if (!address || address.trim().length < 5) return;
+
+    try {
+      const res = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.city) form.setValue("companyCity", data.city, { shouldDirty: true });
+        if (data.state) form.setValue("companyState", toStateAbbr(data.state), { shouldDirty: true });
+        if (data.zip) form.setValue("companyZip", data.zip, { shouldDirty: true });
+      }
+    } catch (err) {
+      console.error('Auto-fill failed:', err);
+    }
+  };
+
   // Reset form when editingTask changes or modal opens
   useEffect(() => {
     if (isOpen) {
@@ -1605,16 +1622,15 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       <div className="space-y-3">
                         <div className="text-xs font-medium text-gray-600 uppercase tracking-wide flex items-center justify-between">
                           <span>Company Address</span>
-                          {/* Placeholder Auto-fill Button - Ready for Future Geocoding Integration */}
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-7 px-2 text-xs opacity-50 cursor-not-allowed"
-                            disabled
+                            className="h-7 px-2 text-xs"
+                            onClick={handleAutoFillAddress}
                             data-testid="button-autofill-address"
                             data-geocoding-trigger="true"
-                            title="Auto-fill address (Coming Soon)"
+                            title="Auto-fill city, state, and ZIP from address"
                           >
                             <MapPin className="h-3 w-3 mr-1" />
                             Auto-fill
@@ -2323,16 +2339,15 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                       <div className="space-y-3">
                         <div className="text-xs font-medium text-gray-600 uppercase tracking-wide flex items-center justify-between">
                           <span>Company Address</span>
-                          {/* Placeholder Auto-fill Button - Ready for Future Geocoding Integration */}
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-7 px-2 text-xs opacity-50 cursor-not-allowed"
-                            disabled
+                            className="h-7 px-2 text-xs"
+                            onClick={handleAutoFillAddress}
                             data-testid="button-autofill-address"
                             data-geocoding-trigger="true"
-                            title="Auto-fill address (Coming Soon)"
+                            title="Auto-fill city, state, and ZIP from address"
                           >
                             <MapPin className="h-3 w-3 mr-1" />
                             Auto-fill
