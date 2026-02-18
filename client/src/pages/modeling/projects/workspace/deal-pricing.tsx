@@ -364,7 +364,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const [targetYearCapRate, setTargetYearCapRate] = useState<string>('7.0');
   const [targetYear, setTargetYear] = useState<string>('3');
   const { holdPeriod: holdPeriodNum, setHoldPeriod: setHoldPeriodNum } = useHoldPeriod(projectId);
-  const [exitCapRate, setExitCapRate] = useState<string>('7.5');
+  const [exitCapRate, setExitCapRate] = useState<string>('7.0');
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [selectedPeriodData, setSelectedPeriodData] = useState<ModelingFinancialPeriod | null>(null);
   const [useNormalizedData, setUseNormalizedData] = useState<boolean>(true);
@@ -461,12 +461,10 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
 
   useEffect(() => {
-    if (inputsLoadedRef.current) return;
-    if (activeScenario?.exitCapRate) {
-      const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
-      if (capRatePercent > 0 && Math.abs(capRatePercent - parseFloat(exitCapRate)) > 0.01) {
-        setExitCapRate(capRatePercent.toFixed(2));
-      }
+    if (!activeScenario?.exitCapRate) return;
+    const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
+    if (capRatePercent > 0 && Math.abs(capRatePercent - parseFloat(exitCapRate)) > 0.01) {
+      setExitCapRate(capRatePercent.toFixed(2));
     }
   }, [activeScenario?.exitCapRate]);
 

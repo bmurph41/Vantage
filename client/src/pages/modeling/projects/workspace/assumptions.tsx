@@ -649,7 +649,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     workingCapitalRecoveryPct: 100,
     workingCapitalAmount: 0,
   });
-  const [exitCapRateValue, setExitCapRateValue] = useState<number>(7.5);
+  const [exitCapRateValue, setExitCapRateValue] = useState<number>(7);
   const [expandedStorageTypes, setExpandedStorageTypes] = useState<Record<string, boolean>>({});
   const [expandedOccupancyTypes, setExpandedOccupancyTypes] = useState<Record<string, boolean>>({});
 
@@ -884,7 +884,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
       setBelowTheLine(assumptions.belowTheLine || { managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions(assumptions.exitAssumptions || { sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
-      setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : 7.5);
+      setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : 7);
       setHasChanges(false);
     } else {
       setGrowthRates(getDefaultGrowthRates(activeScenarioType));
@@ -894,7 +894,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       setStorageGrowth(getDefaultStorageGrowth(activeScenarioType));
       setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions({ sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
-      setExitCapRateValue(7.5);
+      setExitCapRateValue(7);
       setHasChanges(false);
     }
   }, [activeScenario, activeScenarioType, holdPeriod]);
