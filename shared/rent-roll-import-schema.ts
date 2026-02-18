@@ -203,6 +203,12 @@ export const SEASONAL_RATE_FIELDS: ImportFieldDefinition[] = [
 export const ADDITIONAL_FEE_FIELDS: ImportFieldDefinition[] = [
   { id: "liveaboardAmount", label: "Liveaboard Fee", type: "currency", required: false, aliases: ["liveaboard", "liveaboard_fee", "liveaboard_charge", "live aboard fee"] },
   { id: "electricAmount", label: "Electric Fee", type: "currency", required: false, aliases: ["electric", "electric_fee", "electric_charge", "power_fee", "electricity"] },
+  { id: "waterAmount", label: "Water Charge", type: "currency", required: false, aliases: ["water", "water_charge", "water_fee", "water charge"] },
+  { id: "sewerAmount", label: "Sewer Charge", type: "currency", required: false, aliases: ["sewer", "sewer_charge", "sewer_fee", "sewer charge"] },
+  { id: "pumpoutAmount", label: "Pumpout Charge", type: "currency", required: false, aliases: ["pumpout", "pump_out", "pump out", "pumpout_charge", "pumpout_fee", "pump out charge"] },
+  { id: "taxesAmount", label: "Taxes", type: "currency", required: false, aliases: ["taxes", "tax", "taxes_charge", "tax_charge", "property_tax", "sales_tax"] },
+  { id: "isLiveaboard", label: "Liveaboard", type: "boolean", required: false, aliases: ["liveaboard", "live_aboard", "live aboard", "is_liveaboard"] },
+  { id: "liveaboardRate", label: "Liveaboard Rate", type: "currency", required: false, aliases: ["liveaboard_rate", "liveaboard rate", "live aboard rate"] },
   { id: "additionalCharge1", label: "Additional Charge 1", type: "currency", required: false, aliases: ["additional 1", "charge 1", "extra 1", "misc 1"] },
   { id: "additionalCharge2", label: "Additional Charge 2", type: "currency", required: false, aliases: ["additional 2", "charge 2", "extra 2", "misc 2"] },
   { id: "additionalCharge3", label: "Additional Charge 3", type: "currency", required: false, aliases: ["additional 3", "charge 3", "extra 3", "misc 3"] },

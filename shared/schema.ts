@@ -3110,6 +3110,13 @@ export const rraLeases = pgTable("rra_leases", {
   hasDiscount: boolean("has_discount").default(false),
   discountType: rraDiscountTypeEnum("discount_type"),
   discountValue: numeric("discount_value", { precision: 14, scale: 2 }),
+  isLiveaboard: boolean("is_liveaboard").default(false),
+  liveaboardRate: numeric("liveaboard_rate", { precision: 14, scale: 2 }).default("0"),
+  waterCharge: numeric("water_charge", { precision: 14, scale: 2 }).default("0"),
+  electricCharge: numeric("electric_charge", { precision: 14, scale: 2 }).default("0"),
+  sewerCharge: numeric("sewer_charge", { precision: 14, scale: 2 }).default("0"),
+  pumpoutCharge: numeric("pumpout_charge", { precision: 14, scale: 2 }).default("0"),
+  taxesCharge: numeric("taxes_charge", { precision: 14, scale: 2 }).default("0"),
   isActive: boolean("is_active").default(true).notNull(),
   isIncomplete: boolean("is_incomplete").default(false).notNull(),
   usesDefaultDates: boolean("uses_default_dates").default(false).notNull(),
@@ -21129,7 +21136,7 @@ export interface RentRollTableConfig {
   version?: number;
 }
 
-export const RENT_ROLL_CONFIG_VERSION = 11;
+export const RENT_ROLL_CONFIG_VERSION = 12;
 
 export const DEFAULT_RENT_ROLL_COLUMNS: RentRollColumnConfig[] = [
   { id: 'tenant', label: 'Tenant', visible: true, order: 0, sortable: true, align: 'left' },
@@ -21168,11 +21175,16 @@ export const DEFAULT_RENT_ROLL_COLUMNS: RentRollColumnConfig[] = [
   { id: 'additionalCharge1', label: "Add'l Charge 1", visible: false, order: 33, sortable: true, align: 'right' },
   { id: 'additionalCharge2', label: "Add'l Charge 2", visible: false, order: 34, sortable: true, align: 'right' },
   { id: 'additionalCharge3', label: "Add'l Charge 3", visible: false, order: 35, sortable: true, align: 'right' },
-  { id: 'liveaboard', label: 'Liveaboard', visible: false, order: 36, sortable: true, align: 'right' },
-  { id: 'electric', label: 'Electric', visible: false, order: 37, sortable: true, align: 'right' },
-  { id: 'discount', label: 'Discount', visible: false, order: 38, sortable: true, align: 'right' },
-  { id: 'status', label: 'Status', visible: true, order: 39, sortable: true, align: 'center' },
-  { id: 'actions', label: 'Actions', visible: true, order: 40, sortable: false, align: 'right' },
+  { id: 'isLiveaboard', label: 'Liveaboard', visible: false, order: 36, sortable: true, align: 'center' },
+  { id: 'electricCharge', label: 'Electric Charge', visible: false, order: 37, sortable: true, align: 'right' },
+  { id: 'liveaboardRate', label: 'Liveaboard Rate', visible: false, order: 38, sortable: true, align: 'right' },
+  { id: 'waterCharge', label: 'Water Charge', visible: false, order: 39, sortable: true, align: 'right' },
+  { id: 'sewerCharge', label: 'Sewer Charge', visible: false, order: 40, sortable: true, align: 'right' },
+  { id: 'pumpoutCharge', label: 'Pumpout Charge', visible: false, order: 41, sortable: true, align: 'right' },
+  { id: 'taxesCharge', label: 'Taxes', visible: false, order: 42, sortable: true, align: 'right' },
+  { id: 'discount', label: 'Discount', visible: false, order: 43, sortable: true, align: 'right' },
+  { id: 'status', label: 'Status', visible: true, order: 44, sortable: true, align: 'center' },
+  { id: 'actions', label: 'Actions', visible: true, order: 45, sortable: false, align: 'right' },
 ];
 
 // Note: Scenario type already defined at line 11933 as ShipStoreScenario
@@ -23759,6 +23771,11 @@ export const modelingRentRollUnits = pgTable("modeling_rent_roll_units", {
   electricCharge: numeric("electric_charge", { precision: 14, scale: 2 }).default("0"),
   waterCharge: numeric("water_charge", { precision: 14, scale: 2 }).default("0"),
   otherCharges: numeric("other_charges", { precision: 14, scale: 2 }).default("0"),
+  isLiveaboard: boolean("is_liveaboard").default(false),
+  liveaboardRate: numeric("liveaboard_rate", { precision: 14, scale: 2 }).default("0"),
+  sewerCharge: numeric("sewer_charge", { precision: 14, scale: 2 }).default("0"),
+  pumpoutCharge: numeric("pumpout_charge", { precision: 14, scale: 2 }).default("0"),
+  taxesCharge: numeric("taxes_charge", { precision: 14, scale: 2 }).default("0"),
   
   // Notes
   notes: text("notes"),

@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
@@ -81,6 +82,11 @@ interface RentRollUnit {
   electricCharge?: string;
   waterCharge?: string;
   otherCharges?: string;
+  isLiveaboard?: boolean;
+  liveaboardRate?: string;
+  sewerCharge?: string;
+  pumpoutCharge?: string;
+  taxesCharge?: string;
   dock?: string;
   section?: string;
   notes?: string;
@@ -137,6 +143,11 @@ const unitFormSchema = z.object({
   electricCharge: z.string().optional(),
   waterCharge: z.string().optional(),
   otherCharges: z.string().optional(),
+  isLiveaboard: z.boolean().optional(),
+  liveaboardRate: z.string().optional(),
+  sewerCharge: z.string().optional(),
+  pumpoutCharge: z.string().optional(),
+  taxesCharge: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -347,6 +358,11 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
       electricCharge: unit.electricCharge || '',
       waterCharge: unit.waterCharge || '',
       otherCharges: unit.otherCharges || '',
+      isLiveaboard: unit.isLiveaboard || false,
+      liveaboardRate: unit.liveaboardRate || '',
+      sewerCharge: unit.sewerCharge || '',
+      pumpoutCharge: unit.pumpoutCharge || '',
+      taxesCharge: unit.taxesCharge || '',
       notes: unit.notes || '',
     });
   };
@@ -645,6 +661,75 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                                 </FormItem>
                               )}
                             />
+                            <FormField
+                              control={form.control}
+                              name="sewerCharge"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Sewer Charge ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="pumpoutCharge"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Pumpout Charge ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="taxesCharge"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Taxes ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="isLiveaboard"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                  <div className="space-y-0.5">
+                                    <FormLabel>Liveaboard</FormLabel>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="liveaboardRate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Liveaboard Rate ($)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" step="0.01" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
                           <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => {
@@ -783,6 +868,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                             <TableHead>Status</TableHead>
                             <TableHead>Dimensions</TableHead>
                             <TableHead>Monthly Rent</TableHead>
+                            <TableHead>Liveaboard</TableHead>
                             <TableHead>Tenant</TableHead>
                             <TableHead className="w-[80px]">Actions</TableHead>
                           </TableRow>
@@ -804,6 +890,9 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                                   : unit.length ? `${unit.length}'` : '-'}
                               </TableCell>
                               <TableCell>{formatCurrency(parseFloat(unit.monthlyRent || '0'))}</TableCell>
+                              <TableCell>
+                                {unit.isLiveaboard ? <Badge variant="secondary" className="text-xs">Yes</Badge> : '—'}
+                              </TableCell>
                               <TableCell>{unit.tenantName || '-'}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">

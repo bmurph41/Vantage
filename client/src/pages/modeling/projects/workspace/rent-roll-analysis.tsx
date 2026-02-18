@@ -98,6 +98,11 @@ interface RentRollUnit {
   electricCharge?: string;
   waterCharge?: string;
   otherCharges?: string;
+  isLiveaboard?: boolean;
+  liveaboardRate?: string;
+  sewerCharge?: string;
+  pumpoutCharge?: string;
+  taxesCharge?: string;
   dock?: string;
   section?: string;
   notes?: string;
@@ -580,6 +585,7 @@ function LeaseListSection({ units, loading }: { units: RentRollUnit[]; loading: 
                   <TableHead className="text-right cursor-pointer" onClick={() => toggleSort('monthlyRent')}>
                     Monthly Rent {sortBy === 'monthlyRent' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
+                  <TableHead className="text-right">Charges</TableHead>
                   <TableHead className="cursor-pointer" onClick={() => toggleSort('leaseEndDate')}>
                     Lease End {sortBy === 'leaseEndDate' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
@@ -609,6 +615,15 @@ function LeaseListSection({ units, loading }: { units: RentRollUnit[]; loading: 
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(parseFloat(unit.monthlyRent || '0'))}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {(() => {
+                          const total = [
+                            unit.electricCharge, unit.waterCharge, unit.sewerCharge,
+                            unit.pumpoutCharge, unit.taxesCharge, unit.liveaboardRate
+                          ].reduce((sum, v) => sum + parseFloat(v || '0'), 0);
+                          return total > 0 ? formatCurrency(total) : '—';
+                        })()}
                       </TableCell>
                       <TableCell>
                         {unit.isMonthToMonth ? (

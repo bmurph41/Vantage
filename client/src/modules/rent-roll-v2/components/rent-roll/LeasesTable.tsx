@@ -534,27 +534,33 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
         aVal = ((a as any).slipStatus || (a.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
         bVal = ((b as any).slipStatus || (b.isActive ? 'Occupied' : 'Vacant')).toLowerCase();
         break;
-      case 'liveaboard':
-        // Sort by liveaboard fee from line items
-        const aLiveaboardItems = ((a as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'liveaboard' || item.lineType === 'liveaboard_fee'
-        );
-        aVal = aLiveaboardItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0);
-        const bLiveaboardItems = ((b as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'liveaboard' || item.lineType === 'liveaboard_fee'
-        );
-        bVal = bLiveaboardItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0);
+      case 'isLiveaboard':
+        aVal = (a as any).isLiveaboard ? 1 : 0;
+        bVal = (b as any).isLiveaboard ? 1 : 0;
         break;
-      case 'electric':
-        // Sort by electric fee from line items
-        const aElectricItems = ((a as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'electric'
-        );
-        aVal = aElectricItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0);
-        const bElectricItems = ((b as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'electric'
-        );
-        bVal = bElectricItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0);
+      case 'electricCharge':
+        aVal = parseFloat((a as any).electricCharge || '0');
+        bVal = parseFloat((b as any).electricCharge || '0');
+        break;
+      case 'liveaboardRate':
+        aVal = parseFloat((a as any).liveaboardRate || '0');
+        bVal = parseFloat((b as any).liveaboardRate || '0');
+        break;
+      case 'waterCharge':
+        aVal = parseFloat((a as any).waterCharge || '0');
+        bVal = parseFloat((b as any).waterCharge || '0');
+        break;
+      case 'sewerCharge':
+        aVal = parseFloat((a as any).sewerCharge || '0');
+        bVal = parseFloat((b as any).sewerCharge || '0');
+        break;
+      case 'pumpoutCharge':
+        aVal = parseFloat((a as any).pumpoutCharge || '0');
+        bVal = parseFloat((b as any).pumpoutCharge || '0');
+        break;
+      case 'taxesCharge':
+        aVal = parseFloat((a as any).taxesCharge || '0');
+        bVal = parseFloat((b as any).taxesCharge || '0');
         break;
       default:
         return 0;
@@ -1250,30 +1256,57 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
           <span className="text-muted-foreground">—</span>
         );
       
-      case "liveaboard":
-        // Get liveaboard fee from line items
-        const liveaboardItems = ((lease as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'liveaboard' || item.lineType === 'liveaboard_fee'
-        );
-        const liveaboardTotal = liveaboardItems.reduce(
-          (sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0
-        );
-        return liveaboardTotal > 0 ? (
-          <span className="tabular-nums">{formatCurrency(liveaboardTotal)}</span>
+      case "isLiveaboard":
+        return (lease as any).isLiveaboard ? (
+          <Badge variant="secondary" className="text-xs">Yes</Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
       
-      case "electric":
-        // Get electric fee from line items
-        const electricItems = ((lease as any).lineItems || []).filter(
-          (item: any) => item.lineType === 'electric'
+      case "electricCharge":
+        const elecCharge = (lease as any).electricCharge ? parseFloat((lease as any).electricCharge) : 0;
+        return elecCharge > 0 ? (
+          <span className="tabular-nums">{formatCurrency(elecCharge)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
         );
-        const electricTotal = electricItems.reduce(
-          (sum: number, item: any) => sum + parseFloat(item.amount || '0'), 0
+      
+      case "liveaboardRate":
+        const lbRate = (lease as any).liveaboardRate ? parseFloat((lease as any).liveaboardRate) : 0;
+        return lbRate > 0 ? (
+          <span className="tabular-nums">{formatCurrency(lbRate)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
         );
-        return electricTotal > 0 ? (
-          <span className="tabular-nums">{formatCurrency(electricTotal)}</span>
+      
+      case "waterCharge":
+        const waterCh = (lease as any).waterCharge ? parseFloat((lease as any).waterCharge) : 0;
+        return waterCh > 0 ? (
+          <span className="tabular-nums">{formatCurrency(waterCh)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      
+      case "sewerCharge":
+        const sewerCh = (lease as any).sewerCharge ? parseFloat((lease as any).sewerCharge) : 0;
+        return sewerCh > 0 ? (
+          <span className="tabular-nums">{formatCurrency(sewerCh)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      
+      case "pumpoutCharge":
+        const pumpCh = (lease as any).pumpoutCharge ? parseFloat((lease as any).pumpoutCharge) : 0;
+        return pumpCh > 0 ? (
+          <span className="tabular-nums">{formatCurrency(pumpCh)}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      
+      case "taxesCharge":
+        const taxCh = (lease as any).taxesCharge ? parseFloat((lease as any).taxesCharge) : 0;
+        return taxCh > 0 ? (
+          <span className="tabular-nums">{formatCurrency(taxCh)}</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         );

@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -91,6 +92,17 @@ const leaseFormSchema = z.object({
   additionalCharge1: z.coerce.number().min(0).optional().or(z.literal("")),
   additionalCharge2: z.coerce.number().min(0).optional().or(z.literal("")),
   additionalCharge3: z.coerce.number().min(0).optional().or(z.literal("")),
+  
+  // Liveaboard
+  isLiveaboard: z.boolean().default(false),
+  liveaboardRate: z.coerce.number().min(0).optional().or(z.literal("")),
+  
+  // Utility charges
+  electricCharge: z.coerce.number().min(0).optional().or(z.literal("")),
+  waterCharge: z.coerce.number().min(0).optional().or(z.literal("")),
+  sewerCharge: z.coerce.number().min(0).optional().or(z.literal("")),
+  pumpoutCharge: z.coerce.number().min(0).optional().or(z.literal("")),
+  taxesCharge: z.coerce.number().min(0).optional().or(z.literal("")),
   
   // Discount tracking
   hasDiscount: z.boolean().default(false),
@@ -348,6 +360,13 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
       additionalCharge1: "" as any,
       additionalCharge2: "" as any,
       additionalCharge3: "" as any,
+      isLiveaboard: false,
+      liveaboardRate: "" as any,
+      electricCharge: "" as any,
+      waterCharge: "" as any,
+      sewerCharge: "" as any,
+      pumpoutCharge: "" as any,
+      taxesCharge: "" as any,
       hasDiscount: false,
       discountType: undefined,
       discountValue: "" as any,
@@ -388,6 +407,13 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
         additionalCharge1: existingLease.additionalCharge1 ? parseFloat(existingLease.additionalCharge1) : ("" as any),
         additionalCharge2: existingLease.additionalCharge2 ? parseFloat(existingLease.additionalCharge2) : ("" as any),
         additionalCharge3: existingLease.additionalCharge3 ? parseFloat(existingLease.additionalCharge3) : ("" as any),
+        isLiveaboard: (existingLease as any).isLiveaboard || false,
+        liveaboardRate: (existingLease as any).liveaboardRate ? parseFloat((existingLease as any).liveaboardRate) : ("" as any),
+        electricCharge: (existingLease as any).electricCharge ? parseFloat((existingLease as any).electricCharge) : ("" as any),
+        waterCharge: (existingLease as any).waterCharge ? parseFloat((existingLease as any).waterCharge) : ("" as any),
+        sewerCharge: (existingLease as any).sewerCharge ? parseFloat((existingLease as any).sewerCharge) : ("" as any),
+        pumpoutCharge: (existingLease as any).pumpoutCharge ? parseFloat((existingLease as any).pumpoutCharge) : ("" as any),
+        taxesCharge: (existingLease as any).taxesCharge ? parseFloat((existingLease as any).taxesCharge) : ("" as any),
         hasDiscount: existingLease.hasDiscount || false,
         discountType: existingLease.discountType || undefined,
         discountValue: existingLease.discountValue ? parseFloat(existingLease.discountValue) : ("" as any),
@@ -478,6 +504,13 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
         additionalCharge1: data.additionalCharge1 ? data.additionalCharge1.toString() : "0",
         additionalCharge2: data.additionalCharge2 ? data.additionalCharge2.toString() : "0",
         additionalCharge3: data.additionalCharge3 ? data.additionalCharge3.toString() : "0",
+        isLiveaboard: data.isLiveaboard || false,
+        liveaboardRate: data.liveaboardRate ? data.liveaboardRate.toString() : "0",
+        electricCharge: data.electricCharge ? data.electricCharge.toString() : "0",
+        waterCharge: data.waterCharge ? data.waterCharge.toString() : "0",
+        sewerCharge: data.sewerCharge ? data.sewerCharge.toString() : "0",
+        pumpoutCharge: data.pumpoutCharge ? data.pumpoutCharge.toString() : "0",
+        taxesCharge: data.taxesCharge ? data.taxesCharge.toString() : "0",
         hasDiscount: data.hasDiscount || false,
         discountType: data.hasDiscount ? data.discountType : null,
         discountValue: data.hasDiscount && data.discountValue ? data.discountValue.toString() : null,
@@ -1351,6 +1384,147 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                                 step="0.01"
                                 placeholder="0.00"
                                 data-testid="input-additional-charge-3"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Separator />
+                    <h4 className="text-sm font-medium">Liveaboard</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="isLiveaboard"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                            <div className="space-y-0.5">
+                              <FormLabel>Liveaboard Tenant</FormLabel>
+                              <p className="text-xs text-muted-foreground">Is this tenant a liveaboard?</p>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="liveaboardRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Liveaboard Rate</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Separator />
+                    <h4 className="text-sm font-medium">Utility & Tax Charges</h4>
+                    <p className="text-xs text-muted-foreground">Monthly charges for utilities and taxes passed through to the tenant.</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="electricCharge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Electric</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="waterCharge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Water</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sewerCharge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Sewer</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="pumpoutCharge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Pumpout</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="taxesCharge"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Taxes</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
                                 {...field}
                               />
                             </FormControl>
