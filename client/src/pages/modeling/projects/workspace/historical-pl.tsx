@@ -145,6 +145,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     toggleLineItemAddback,
     toggleCategoryAddback,
     toggleMonthCellAddback,
+    bulkAddbackAllMonths,
+    hasAnyMonthAddback,
     getAnyAddback,
     getAddbackForLineItem,
     getAddbackForCategory,
@@ -1135,6 +1137,42 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                           </Button>
                                         }
                                       />
+                                      {displayMode === 'monthly' && selectedYear && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-5 px-1 shrink-0 text-[10px] ${hasAnyMonthAddback(item.subcategory, parseInt(selectedYear)) ? 'opacity-100 text-amber-600' : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-amber-600'}`}
+                                                disabled={addbackPending}
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
+                                                  const year = parseInt(selectedYear);
+                                                  const monthEntries = months.map((month, idx) => ({
+                                                    year,
+                                                    month: idx + 1,
+                                                    amount: '0',
+                                                  }));
+                                                  await bulkAddbackAllMonths({
+                                                    lineItemKey: item.subcategory,
+                                                    lineItemLabel: item.description,
+                                                    category,
+                                                    department,
+                                                    reason: 'other',
+                                                    months: monthEntries,
+                                                  });
+                                                }}
+                                              >
+                                                All
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">
+                                              <p className="text-xs">Addback all months (zero out entire row)</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
                                     </div>
                                   </TableCell>
                                   {months.map((month, idx) => {

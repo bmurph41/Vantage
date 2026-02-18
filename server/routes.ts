@@ -19816,6 +19816,111 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Bulk addback all months for a line item
+  app.post('/api/modeling/projects/:projectId/addbacks/bulk-months', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const { lineItemKey, lineItemLabel, category, department, reason, notes, months: monthEntries } = req.body;
+
+      if (!lineItemKey || !category || !monthEntries || !Array.isArray(monthEntries) || monthEntries.length === 0) {
+        return res.status(400).json({ error: 'lineItemKey, category, and months array are required' });
+      }
+
+      const { modelingAddbacks, modelingAddbackValues, modelingProjects } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [project] = await db.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const seen = new Set<string>();
+      const deduped = monthEntries.filter((entry: any) => {
+        const key = `${entry.year}-${entry.month}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      const results: any[] = [];
+
+      for (const entry of deduped) {
+        const { year, month, amount } = entry;
+        if (year == null || month == null || month < 1 || month > 12) continue;
+
+        const conditions = [
+          eq(modelingAddbacks.projectId, projectId),
+          eq(modelingAddbacks.lineItemKey, lineItemKey),
+          eq(modelingAddbacks.orgId, orgId),
+          eq(modelingAddbacks.scope, 'month_cell'),
+          eq(modelingAddbacks.addbackMonth, month),
+          eq(modelingAddbacks.addbackYear, year),
+        ];
+
+        const [existing] = await db.select()
+          .from(modelingAddbacks)
+          .where(and(...conditions));
+
+        let addback;
+        if (existing) {
+          [addback] = await db.update(modelingAddbacks)
+            .set({
+              lineItemLabel: lineItemLabel || existing.lineItemLabel,
+              category: category || existing.category,
+              department: department || existing.department,
+              reason: reason || existing.reason || 'other',
+              notes: notes || existing.notes,
+              isActive: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(modelingAddbacks.id, existing.id))
+            .returning();
+
+          await db.delete(modelingAddbackValues).where(eq(modelingAddbackValues.addbackId, existing.id));
+        } else {
+          [addback] = await db.insert(modelingAddbacks).values({
+            projectId,
+            orgId,
+            lineItemKey,
+            lineItemLabel: lineItemLabel || lineItemKey,
+            category: category || null,
+            department: department || null,
+            scope: 'month_cell',
+            reason: reason || 'other',
+            notes: notes || null,
+            periodType: 'monthly',
+            isActive: true,
+            addbackMonth: month,
+            addbackYear: year,
+            createdBy: userId,
+          }).returning();
+        }
+
+        const amountStr = amount != null ? String(amount) : '0';
+        await db.insert(modelingAddbackValues).values({
+          addbackId: addback.id,
+          year,
+          month,
+          amount: amountStr,
+        });
+
+        const addbackValues = await db.select()
+          .from(modelingAddbackValues)
+          .where(eq(modelingAddbackValues.addbackId, addback.id));
+
+        results.push({ ...addback, values: addbackValues });
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('Failed to bulk create addbacks:', error);
+      res.status(500).json({ error: 'Failed to bulk create addbacks', details: error.message });
+    }
+  });
+
   // Delete an addback
   app.delete('/api/modeling/addbacks/:addbackId', authenticateUser, async (req: any, res) => {
     try {

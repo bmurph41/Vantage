@@ -217,6 +217,32 @@ export function useModelingAddbacks(projectId: string | undefined) {
     }
   };
 
+  const bulkAddbackAllMonths = async (data: {
+    lineItemKey: string;
+    lineItemLabel: string;
+    category: string;
+    department?: string;
+    reason?: string;
+    notes?: string;
+    months: { year: number; month: number; amount: string }[];
+  }) => {
+    const response = await apiRequest('POST', `/api/modeling/projects/${projectId}/addbacks/bulk-months`, data);
+    const result = await response.json();
+    queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
+    toast({ title: 'Addbacks Applied', description: `Applied addback to ${data.months.length} months.` });
+    return result;
+  };
+
+  const hasAnyMonthAddback = (lineItemKey: string, year: number): boolean => {
+    if (!addbacksQuery.data) return false;
+    return addbacksQuery.data.some(
+      a => (a.lineItemKey === lineItemKey || a.lineItemId === lineItemKey)
+        && a.scope === 'month_cell'
+        && a.addbackYear === year
+        && a.isActive
+    );
+  };
+
   const getActiveAddbacks = (): Addback[] => {
     return (addbacksQuery.data || []).filter(a => a.isActive);
   };
@@ -287,6 +313,8 @@ export function useModelingAddbacks(projectId: string | undefined) {
     toggleLineItemAddback,
     toggleCategoryAddback,
     toggleMonthCellAddback,
+    bulkAddbackAllMonths,
+    hasAnyMonthAddback,
     getAddbackAmountForCell,
     getAddbackAmountForLineItem,
     getTotalAddbacksForPeriod,
