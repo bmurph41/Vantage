@@ -133,6 +133,8 @@ export default function CompanyDetailModal({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [newNote, setNewNote] = useState("");
   const [activityFilter, setActivityFilter] = useState<string>("all");
+  const [showTimelineNote, setShowTimelineNote] = useState(false);
+  const [timelineNoteContent, setTimelineNoteContent] = useState("");
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -484,7 +486,7 @@ export default function CompanyDetailModal({
   // Create note mutation
   const createNoteMutation = useMutation({
     mutationFn: async (content: string) => {
-      return await apiRequest('POST', '/api/notes', {
+      return await apiRequest('POST', '/api/crm/notes', {
         content,
         entityType: 'company',
         entityId: company?.id,
@@ -492,6 +494,7 @@ export default function CompanyDetailModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/notes', 'company', company?.id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/timeline/company/${company?.id}`] });
       setNewNote("");
       toast({ title: "Note added" });
     },
@@ -1566,20 +1569,79 @@ export default function CompanyDetailModal({
             <TabsContent value="activity" className="mt-0 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Activity Timeline</h3>
-                <Select value={activityFilter} onValueChange={setActivityFilter}>
-                  <SelectTrigger className="w-40 h-9">
-                    <Filter className="w-3 h-3 mr-2" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Activities</SelectItem>
-                    <SelectItem value="email">Emails</SelectItem>
-                    <SelectItem value="call">Calls</SelectItem>
-                    <SelectItem value="meeting">Meetings</SelectItem>
-                    <SelectItem value="note">Notes</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => setShowTimelineNote(!showTimelineNote)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add Note
+                  </Button>
+                  <Select value={activityFilter} onValueChange={setActivityFilter}>
+                    <SelectTrigger className="w-40 h-9">
+                      <Filter className="w-3 h-3 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Activities</SelectItem>
+                      <SelectItem value="email">Emails</SelectItem>
+                      <SelectItem value="call">Calls</SelectItem>
+                      <SelectItem value="meeting">Meetings</SelectItem>
+                      <SelectItem value="note">Notes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {showTimelineNote && (
+                <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                  <Textarea
+                    placeholder="Write a note..."
+                    value={timelineNoteContent}
+                    onChange={(e) => setTimelineNoteContent(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        if (timelineNoteContent.trim()) {
+                          createNoteMutation.mutate(timelineNoteContent.trim());
+                          setTimelineNoteContent('');
+                          setShowTimelineNote(false);
+                        }
+                      }
+                      if (e.key === 'Escape') {
+                        setShowTimelineNote(false);
+                        setTimelineNoteContent('');
+                      }
+                    }}
+                    rows={3}
+                    className="resize-none text-sm"
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Ctrl+Enter to save · Esc to cancel</span>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowTimelineNote(false); setTimelineNoteContent(''); }}>Cancel</Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        disabled={!timelineNoteContent.trim() || createNoteMutation.isPending}
+                        onClick={() => {
+                          if (timelineNoteContent.trim()) {
+                            createNoteMutation.mutate(timelineNoteContent.trim());
+                            setTimelineNoteContent('');
+                            setShowTimelineNote(false);
+                          }
+                        }}
+                      >
+                        {createNoteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                        Save Note
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {filteredActivities.length === 0 ? (
                 <Card>

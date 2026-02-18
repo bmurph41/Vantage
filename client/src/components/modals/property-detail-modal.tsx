@@ -25,7 +25,7 @@ import {
 import { 
   User, Building, MapPin, DollarSign, Phone, Mail,
   Edit, X, Clock, Check, Loader2, Anchor, Home, Link2,
-  TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History, Send
+  TrendingUp, Calendar, Briefcase, FolderOpen, BarChart3, History, Send, Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -122,6 +122,8 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
   const [activeTab, setActiveTab] = useState("overview");
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [showTimelineNote, setShowTimelineNote] = useState(false);
+  const [timelineNoteContent, setTimelineNoteContent] = useState("");
   const isAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -367,6 +369,25 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
     },
     onError: (error: any) => {
       toast({ title: "Failed to create pending comp", description: error?.message, variant: "destructive" });
+    },
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest('POST', '/api/crm/notes', {
+        content,
+        entityType: 'property',
+        entityId: property?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notes', 'property', property?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/activities', 'property', property?.id] });
+      queryClient.invalidateQueries({ queryKey: [`/api/crm/timeline/property/${property?.id}`] });
+      toast({ title: "Note added" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
     },
   });
 
@@ -1211,12 +1232,70 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
             <TabsContent value="activity" className="mt-0 space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Activity Timeline
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Activity Timeline
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1"
+                      onClick={() => setShowTimelineNote(!showTimelineNote)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Note
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
+                  {showTimelineNote && (
+                    <div className="space-y-2 border rounded-lg p-3 bg-muted/30 mb-4">
+                      <Textarea
+                        placeholder="Write a note..."
+                        value={timelineNoteContent}
+                        onChange={(e) => setTimelineNoteContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            if (timelineNoteContent.trim()) {
+                              createNoteMutation.mutate(timelineNoteContent.trim());
+                              setTimelineNoteContent('');
+                              setShowTimelineNote(false);
+                            }
+                          }
+                          if (e.key === 'Escape') {
+                            setShowTimelineNote(false);
+                            setTimelineNoteContent('');
+                          }
+                        }}
+                        rows={3}
+                        className="resize-none text-sm"
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Ctrl+Enter to save · Esc to cancel</span>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowTimelineNote(false); setTimelineNoteContent(''); }}>Cancel</Button>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            disabled={!timelineNoteContent.trim() || createNoteMutation.isPending}
+                            onClick={() => {
+                              if (timelineNoteContent.trim()) {
+                                createNoteMutation.mutate(timelineNoteContent.trim());
+                                setTimelineNoteContent('');
+                                setShowTimelineNote(false);
+                              }
+                            }}
+                          >
+                            {createNoteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                            Save Note
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {activities.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Clock className="w-12 h-12 mx-auto mb-2 text-gray-400" />

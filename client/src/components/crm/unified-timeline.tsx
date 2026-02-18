@@ -1,15 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Phone, Mail, MessageSquare, Calendar, FileText, 
   Clock, PhoneIncoming, PhoneOutgoing, StickyNote, 
-  Upload, Filter, Image, File, Paperclip, Pin, Building2
+  Upload, Filter, Image, File, Paperclip, Pin, Building2,
+  Plus, Send, Loader2
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface UnifiedTimelineProps {
   entityType: 'contact' | 'deal' | 'property' | 'company' | 'lead';
@@ -49,10 +53,59 @@ export default function UnifiedTimeline({
   compact = false
 }: UnifiedTimelineProps) {
   const [filter, setFilter] = useState<string>('all');
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (showNoteInput && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [showNoteInput]);
 
   const { data, isLoading } = useQuery<TimelineResponse>({
     queryKey: [`/api/crm/timeline/${entityType}/${entityId}`],
   });
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("POST", "/api/crm/notes", {
+        content,
+        entityType,
+        entityId,
+        isPinned: false,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/crm/timeline/${entityType}/${entityId}`] });
+      setNoteContent('');
+      setShowNoteInput(false);
+      toast({ title: "Note added", description: "Your note has been saved to the timeline" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add note", variant: "destructive" });
+    },
+  });
+
+  const handleSubmitNote = () => {
+    const trimmed = noteContent.trim();
+    if (!trimmed) return;
+    addNoteMutation.mutate(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmitNote();
+    }
+    if (e.key === 'Escape') {
+      setShowNoteInput(false);
+      setNoteContent('');
+    }
+  };
 
   const getItemIcon = (item: TimelineItem) => {
     if (item.type === 'note') {
@@ -163,8 +216,51 @@ export default function UnifiedTimeline({
     );
   }
 
+  const noteInputBox = showNoteInput ? (
+    <div className="mb-4 space-y-2 border rounded-lg p-3 bg-muted/30">
+      <Textarea
+        ref={textareaRef}
+        placeholder="Write a note..."
+        value={noteContent}
+        onChange={(e) => setNoteContent(e.target.value)}
+        onKeyDown={handleKeyDown}
+        rows={3}
+        className="resize-none text-sm"
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          Ctrl+Enter to save · Esc to cancel
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => { setShowNoteInput(false); setNoteContent(''); }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={handleSubmitNote}
+            disabled={!noteContent.trim() || addNoteMutation.isPending}
+          >
+            {addNoteMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Send className="h-3 w-3" />
+            )}
+            Save Note
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const content = (
     <>
+      {noteInputBox}
       {filteredItems.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground text-sm">
           {filter === 'all' 
@@ -287,6 +383,15 @@ export default function UnifiedTimeline({
               </Badge>
             ) : null}
           </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setShowNoteInput(!showNoteInput)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Note
+          </Button>
         </div>
         
         <div className="flex items-center gap-1.5 flex-wrap pt-2">
