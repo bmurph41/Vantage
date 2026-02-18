@@ -27562,28 +27562,42 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Get recent deals for detail panel
   app.get('/api/crm/deals/recent', authenticateUser, async (req: any, res) => {
     try {
-      const userId = req.user.id;
       const orgId = req.user.orgId;
-      const { crmDeals, users } = await import('@shared/schema');
-      const { desc } = await import('drizzle-orm');
-      
-      const deals = await db
-        .select({
-          id: crmDeals.id,
-          title: crmDeals.title,
-          value: crmDeals.value,
-          stage: crmDeals.stage,
-          probability: crmDeals.probability,
-          expectedCloseDate: crmDeals.expectedCloseDate,
-          createdAt: crmDeals.createdAt,
-        })
-        .from(crmDeals)
-        .innerJoin(users, eq(crmDeals.ownerId, users.id))
-        .where(eq(users.orgId, orgId))
-        .orderBy(desc(crmDeals.createdAt))
-        .limit(20);
+      const { sql } = await import('drizzle-orm');
 
-      res.json(deals);
+      const crmResult = await db.execute(sql`
+        SELECT d.id, d.title, 
+          COALESCE(d.value, 0) + COALESCE(d.amount, 0) as value,
+          d.stage, d.probability, d.created_at as "createdAt",
+          'crm' as source
+        FROM crm_deals d
+        INNER JOIN users u ON d.owner_id = u.id
+        WHERE u.org_id = ${orgId}
+          AND LOWER(d.stage) IN ('active', 'under review', 'under_review')
+        ORDER BY d.created_at DESC
+        LIMIT 50
+      `);
+
+      const modelingResult = await db.execute(sql`
+        SELECT id, marina_name as title,
+          COALESCE(purchase_price, 0) as value,
+          COALESCE(deal_outcome::text, 'active') as stage,
+          0 as probability, created_at as "createdAt",
+          'modeling' as source
+        FROM modeling_projects
+        WHERE org_id = ${orgId}
+          AND LOWER(COALESCE(deal_outcome::text, 'active')) IN ('active', 'under review', 'under_review')
+        ORDER BY created_at DESC
+        LIMIT 50
+      `);
+
+      const crmRows = (crmResult as any).rows || crmResult || [];
+      const modelingRows = (modelingResult as any).rows || modelingResult || [];
+
+      const combined = [...crmRows, ...modelingRows]
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json(combined);
     } catch (error: any) {
       console.error('Failed to fetch recent deals:', error);
       res.status(500).json({ error: 'Failed to fetch recent deals' });

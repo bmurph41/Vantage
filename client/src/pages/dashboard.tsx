@@ -1714,8 +1714,8 @@ export default function Dashboard() {
       <DetailPanel
         open={isCRMDetailOpen}
         onOpenChange={setIsCRMDetailOpen}
-        title="CRM Pipeline Details"
-        description={`${recentDeals?.length || 0} deals found in the selected time period`}
+        title="Pipeline Overview"
+        description={`${recentDeals?.length || 0} active deals in your pipeline`}
         icon={DollarSign}
         sourceLink={`/crm/deals?timeRange=${timeRange}&status=open`}
         sourceLinkText="Go to CRM"
@@ -1743,11 +1743,30 @@ export default function Dashboard() {
               key: 'value',
               header: 'Value',
               sortable: true,
-              render: (deal: any) => (
-                <div className="text-gray-900 font-semibold">
-                  {formatCurrency(Number(deal.value || 0))}
-                </div>
-              ),
+              render: (deal: any) => {
+                const val = Number(deal.value || 0);
+                return (
+                  <div className="text-gray-900 font-semibold">
+                    {val > 0 ? formatCurrency(val) : <span className="text-gray-400">-</span>}
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'source',
+              header: 'Source',
+              sortable: true,
+              render: (deal: any) => {
+                const sourceColors: Record<string, string> = {
+                  crm: 'bg-blue-100 text-blue-800',
+                  modeling: 'bg-purple-100 text-purple-800',
+                };
+                return (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${sourceColors[deal.source] || 'bg-gray-100 text-gray-800'}`}>
+                    {deal.source === 'modeling' ? 'Model' : 'CRM Deal'}
+                  </span>
+                );
+              },
             },
             {
               key: 'stage',
@@ -1755,35 +1774,16 @@ export default function Dashboard() {
               sortable: true,
               render: (deal: any) => {
                 const stageColors: Record<string, string> = {
-                  lead: 'bg-gray-100 text-gray-800',
-                  qualified: 'bg-blue-100 text-blue-800',
-                  proposal: 'bg-purple-100 text-purple-800',
-                  negotiation: 'bg-yellow-100 text-yellow-800',
-                  closed_won: 'bg-green-100 text-green-800',
-                  closed_lost: 'bg-red-100 text-red-800',
+                  active: 'bg-green-100 text-green-800',
+                  under_review: 'bg-yellow-100 text-yellow-800',
+                  'under review': 'bg-yellow-100 text-yellow-800',
                 };
                 return (
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stageColors[deal.stage] || 'bg-gray-100 text-gray-800'}`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stageColors[deal.stage?.toLowerCase()] || 'bg-gray-100 text-gray-800'}`}>
                     {deal.stage?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                   </span>
                 );
               },
-            },
-            {
-              key: 'probability',
-              header: 'Probability',
-              sortable: true,
-              render: (deal: any) => (
-                <div className="flex items-center gap-2">
-                  <div className="text-gray-700 font-medium">{deal.probability || 0}%</div>
-                  <div className="flex-1 max-w-[60px] bg-gray-200 rounded-full h-1.5">
-                    <div 
-                      className="bg-blue-600 h-1.5 rounded-full" 
-                      style={{ width: `${deal.probability || 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ),
             },
             {
               key: 'createdAt',
@@ -1796,23 +1796,34 @@ export default function Dashboard() {
               ),
             },
           ]}
-          onRowClick={(deal: any) => { setIsCRMDetailOpen(false); navigate(`/crm/deals/${deal.id}`); }}
-          getRowLink={(deal: any) => `/crm/deals/${deal.id}`}
-          emptyMessage="No deals found for the selected time period"
+          onRowClick={(deal: any) => {
+            setIsCRMDetailOpen(false);
+            if (deal.source === 'modeling') {
+              navigate(`/modeling/projects/${deal.id}`);
+            } else {
+              navigate(`/crm/deals/${deal.id}`);
+            }
+          }}
+          getRowLink={(deal: any) => deal.source === 'modeling' ? `/modeling/projects/${deal.id}` : `/crm/deals/${deal.id}`}
+          emptyMessage="No active deals in your pipeline"
           isLoading={dealsLoading}
           searchable={true}
-          searchPlaceholder="Search deals..."
+          searchPlaceholder="Search pipeline..."
           filters={[
+            {
+              key: 'source',
+              label: 'Source',
+              options: [
+                { value: 'crm', label: 'CRM Deals' },
+                { value: 'modeling', label: 'Models' },
+              ],
+            },
             {
               key: 'stage',
               label: 'Stage',
               options: [
-                { value: 'lead', label: 'Lead' },
-                { value: 'qualified', label: 'Qualified' },
-                { value: 'proposal', label: 'Proposal' },
-                { value: 'negotiation', label: 'Negotiation' },
-                { value: 'closed_won', label: 'Closed Won' },
-                { value: 'closed_lost', label: 'Closed Lost' },
+                { value: 'active', label: 'Active' },
+                { value: 'under_review', label: 'Under Review' },
               ],
             },
           ]}
