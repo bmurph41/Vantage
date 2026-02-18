@@ -137,6 +137,8 @@ const VDRActivity = lazy(() => import("@/pages/vdr/ActivityDashboard"));
 const AccountMappingPage = lazy(() => import("@/pages/admin/AccountMappingPage"));
 const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboard"));
 const AdminCustomersPage = lazy(() => import("@/pages/admin/AdminCustomersPage"));
+const AdminOrganizationsPage = lazy(() => import("@/pages/admin/AdminOrganizationsPage"));
+const AdminAuditTrailPage = lazy(() => import("@/pages/admin/AdminAuditTrailPage"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -569,6 +571,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <AdminCustomersPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/organizations">
+        {() => (
+          <UnifiedLayout>
+            <AdminOrganizationsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/audit-trail">
+        {() => (
+          <UnifiedLayout>
+            <AdminAuditTrailPage />
           </UnifiedLayout>
         )}
       </Route>

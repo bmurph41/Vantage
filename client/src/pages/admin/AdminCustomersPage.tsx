@@ -18,10 +18,12 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
 import {
   Search, Download, Users, CreditCard, Clock, AlertTriangle, DollarSign,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, UserCheck, UserX,
   Building, CalendarDays, Mail, Phone, Tag, Plus, Loader2,
+  Ban, RefreshCw, CalendarPlus, ArrowRight, UserPlus, KeyRound, MailCheck,
 } from "lucide-react";
 
 interface CustomerRow {
@@ -95,10 +97,20 @@ interface CustomerDetail {
   interval: string | null;
   mrrCents: number | null;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean | null;
+  planKey: string | null;
   providerCustomerId: string | null;
   providerSubscriptionId: string | null;
   notes: CustomerNote[];
   auditLog: AuditLogEntry[];
+  usage?: {
+    models_count: number;
+    deals_count: number;
+    sales_comps_count: number;
+    dd_projects_count: number;
+    documents_count: number;
+    contacts_count: number;
+  };
 }
 
 function formatCurrency(cents: number): string {
@@ -180,6 +192,10 @@ export default function AdminCustomersPage() {
 
   const [newNote, setNewNote] = useState("");
   const [newNoteTags, setNewNoteTags] = useState("");
+  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [changePlanForm, setChangePlanForm] = useState({ planName: "", planKey: "", interval: "month", mrrDollars: "" });
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", orgId: "", role: "viewer" });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -241,6 +257,118 @@ export default function AdminCustomersPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Error adding note", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const cancelSubMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/subscription/cancel`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      if (selectedCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/customers", selectedCustomerId] });
+      }
+      toast({ title: "Subscription canceled" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error canceling subscription", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reactivateSubMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/subscription/reactivate`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      if (selectedCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/customers", selectedCustomerId] });
+      }
+      toast({ title: "Subscription reactivated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error reactivating subscription", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const extendTrialMutation = useMutation({
+    mutationFn: async ({ id, days }: { id: string; days: number }) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/subscription/extend-trial`, { days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      if (selectedCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/customers", selectedCustomerId] });
+      }
+      toast({ title: "Trial extended" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error extending trial", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const changePlanMutation = useMutation({
+    mutationFn: async ({ id, planKey, planName, interval, mrrCents }: { id: string; planKey: string; planName: string; interval: string; mrrCents: number }) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/subscription/change-plan`, { planKey, planName, interval, mrrCents });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      if (selectedCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/customers", selectedCustomerId] });
+      }
+      setShowChangePlan(false);
+      setChangePlanForm({ planName: "", planKey: "", interval: "month", mrrDollars: "" });
+      toast({ title: "Plan changed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error changing plan", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const { data: orgsData } = useQuery<{ rows: { id: string; name: string }[] }>({
+    queryKey: ["/api/admin/organizations?pageSize=100"],
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; orgId: string; role: string }) => {
+      await apiRequest("POST", "/api/admin/customers/invite", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      setInviteOpen(false);
+      setInviteForm({ name: "", email: "", orgId: "", role: "viewer" });
+      toast({ title: "User invited successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error inviting user", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/resend-verification`);
+    },
+    onSuccess: () => {
+      if (selectedCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/customers", selectedCustomerId] });
+      }
+      toast({ title: "Verification email resent" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error resending verification", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", `/api/admin/customers/${id}/reset-password`);
+    },
+    onSuccess: () => {
+      toast({ title: "Password reset link generated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error resetting password", description: err.message, variant: "destructive" });
     },
   });
 
@@ -435,6 +563,10 @@ export default function AdminCustomersPage() {
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
+        <Button size="sm" onClick={() => setInviteOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Invite User
+        </Button>
       </div>
 
       {/* Table */}
@@ -587,6 +719,30 @@ export default function AdminCustomersPage() {
                   <DetailField icon={<CalendarDays className="h-4 w-4" />} label="Joined" value={formatDate(customerDetail.createdAt)} />
                   <DetailField icon={<Clock className="h-4 w-4" />} label="Last Login" value={formatDate(customerDetail.lastLoginAt)} />
                 </div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={resendVerificationMutation.isPending}
+                    onClick={() => resendVerificationMutation.mutate(customerDetail.id)}
+                  >
+                    {resendVerificationMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MailCheck className="h-3 w-3 mr-1" />}
+                    Resend Verification
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={resetPasswordMutation.isPending}
+                    onClick={() => {
+                      if (confirm(`Send password reset link to ${customerDetail.email}?`)) {
+                        resetPasswordMutation.mutate(customerDetail.id);
+                      }
+                    }}
+                  >
+                    {resetPasswordMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <KeyRound className="h-3 w-3 mr-1" />}
+                    Reset Password
+                  </Button>
+                </div>
               </section>
 
               <Separator />
@@ -595,6 +751,21 @@ export default function AdminCustomersPage() {
               <section>
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Organization</h3>
                 <DetailField icon={<Building className="h-4 w-4" />} label="Org Name" value={customerDetail.orgName || "—"} />
+              </section>
+
+              <Separator />
+
+              {/* Usage & Engagement */}
+              <section>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Usage & Engagement</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <UsageMetric icon={<Building className="h-4 w-4" />} count={customerDetail.usage?.models_count ?? 0} label="Models" />
+                  <UsageMetric icon={<DollarSign className="h-4 w-4" />} count={customerDetail.usage?.deals_count ?? 0} label="Deals" />
+                  <UsageMetric icon={<Tag className="h-4 w-4" />} count={customerDetail.usage?.sales_comps_count ?? 0} label="Sales Comps" />
+                  <UsageMetric icon={<AlertTriangle className="h-4 w-4" />} count={customerDetail.usage?.dd_projects_count ?? 0} label="DD Projects" />
+                  <UsageMetric icon={<Download className="h-4 w-4" />} count={customerDetail.usage?.documents_count ?? 0} label="Documents" />
+                  <UsageMetric icon={<Users className="h-4 w-4" />} count={customerDetail.usage?.contacts_count ?? 0} label="Contacts" />
+                </div>
               </section>
 
               <Separator />
@@ -618,6 +789,136 @@ export default function AdminCustomersPage() {
                     <DetailField label="Stripe Subscription" value={customerDetail.providerSubscriptionId} />
                   )}
                 </div>
+
+                {customerDetail.subStatus && (
+                  <div className="mt-4 space-y-3">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(customerDetail.subStatus === "active" || customerDetail.subStatus === "trialing") && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={cancelSubMutation.isPending}
+                          onClick={() => {
+                            if (confirm("Are you sure you want to cancel this subscription?")) {
+                              cancelSubMutation.mutate(customerDetail.id);
+                            }
+                          }}
+                        >
+                          {cancelSubMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Ban className="h-3 w-3 mr-1" />}
+                          Cancel Subscription
+                        </Button>
+                      )}
+                      {customerDetail.subStatus === "canceled" && (
+                        <Button
+                          size="sm"
+                          disabled={reactivateSubMutation.isPending}
+                          onClick={() => reactivateSubMutation.mutate(customerDetail.id)}
+                        >
+                          {reactivateSubMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                          Reactivate
+                        </Button>
+                      )}
+                      {customerDetail.subStatus === "trialing" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={extendTrialMutation.isPending}
+                          onClick={() => {
+                            const input = prompt("How many days to extend the trial? (1-90)", "14");
+                            if (input) {
+                              const days = parseInt(input, 10);
+                              if (!isNaN(days) && days >= 1 && days <= 90) {
+                                extendTrialMutation.mutate({ id: customerDetail.id, days });
+                              } else {
+                                toast({ title: "Invalid input", description: "Please enter a number between 1 and 90", variant: "destructive" });
+                              }
+                            }
+                          }}
+                        >
+                          {extendTrialMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CalendarPlus className="h-3 w-3 mr-1" />}
+                          Extend Trial
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowChangePlan(!showChangePlan)}
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Change Plan
+                      </Button>
+                    </div>
+
+                    {showChangePlan && (
+                      <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Plan Name</label>
+                            <Input
+                              value={changePlanForm.planName}
+                              onChange={(e) => setChangePlanForm({ ...changePlanForm, planName: e.target.value })}
+                              placeholder="e.g. Pro"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Plan Key</label>
+                            <Input
+                              value={changePlanForm.planKey}
+                              onChange={(e) => setChangePlanForm({ ...changePlanForm, planKey: e.target.value })}
+                              placeholder="e.g. pro"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Interval</label>
+                            <Select value={changePlanForm.interval} onValueChange={(v) => setChangePlanForm({ ...changePlanForm, interval: v })}>
+                              <SelectTrigger className="mt-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="month">Monthly</SelectItem>
+                                <SelectItem value="year">Yearly</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">MRR ($)</label>
+                            <Input
+                              type="number"
+                              value={changePlanForm.mrrDollars}
+                              onChange={(e) => setChangePlanForm({ ...changePlanForm, mrrDollars: e.target.value })}
+                              placeholder="e.g. 49.99"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={!changePlanForm.planName || !changePlanForm.planKey || changePlanMutation.isPending}
+                            onClick={() => {
+                              changePlanMutation.mutate({
+                                id: customerDetail.id,
+                                planKey: changePlanForm.planKey,
+                                planName: changePlanForm.planName,
+                                interval: changePlanForm.interval,
+                                mrrCents: Math.round(parseFloat(changePlanForm.mrrDollars || "0") * 100),
+                              });
+                            }}
+                          >
+                            {changePlanMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Save Plan Change
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setShowChangePlan(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
 
               <Separator />
@@ -683,6 +984,74 @@ export default function AdminCustomersPage() {
           ) : null}
         </SheetContent>
       </Sheet>
+
+      <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Invite User</SheetTitle>
+            <SheetDescription>Send an invitation to a new user</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 mt-6">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                placeholder="Full name"
+                value={inviteForm.name}
+                onChange={(e) => setInviteForm({ ...inviteForm, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="user@example.com"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Organization</Label>
+              <Select value={inviteForm.orgId} onValueChange={(v) => setInviteForm({ ...inviteForm, orgId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select organization…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(orgsData?.rows ?? []).map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={inviteForm.role} onValueChange={(v) => setInviteForm({ ...inviteForm, role: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full"
+              disabled={!inviteForm.name || !inviteForm.email || !inviteForm.orgId || inviteMutation.isPending}
+              onClick={() => inviteMutation.mutate(inviteForm)}
+            >
+              {inviteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <UserPlus className="h-4 w-4 mr-2" />
+              )}
+              Send Invitation
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -695,6 +1064,16 @@ function DetailField({ icon, label, value }: { icon?: JSX.Element; label: string
         {label}
       </span>
       <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white break-all">{value}</p>
+    </div>
+  );
+}
+
+function UsageMetric({ icon, count, label }: { icon: React.ReactNode; count: number; label: string }) {
+  return (
+    <div className="bg-muted/50 rounded-lg p-3 text-center">
+      <div className="flex justify-center mb-1 text-muted-foreground">{icon}</div>
+      <div className="text-lg font-bold text-gray-900 dark:text-white">{count}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }

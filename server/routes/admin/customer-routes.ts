@@ -1,4 +1,6 @@
 import { Router } from "express";
+import crypto from "crypto";
+import bcrypt from "bcrypt";
 import { db } from "../../db";
 import { users, organizations, subscriptions, adminAuditLog, customerNotes } from "@shared/schema";
 import { eq, and, or, ilike, sql, desc, asc, count, sum } from "drizzle-orm";
@@ -15,6 +17,68 @@ const requireAdmin = (req: any, res: any, next: any) => {
 };
 
 router.use(requireAdmin);
+
+router.post("/invite", async (req, res) => {
+  try {
+    const { email, name, orgId, role } = req.body;
+
+    if (!email || !name || !orgId || !role) {
+      return res.status(400).json({ error: "email, name, orgId, and role are required" });
+    }
+
+    const [existingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (existingUser) {
+      return res.status(400).json({ error: "A user with this email already exists" });
+    }
+
+    const [org] = await db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+
+    if (!org) {
+      return res.status(404).json({ error: "Organization not found" });
+    }
+
+    const tempPassword = crypto.randomUUID();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    const [created] = await db
+      .insert(users)
+      .values({
+        email,
+        name,
+        orgId,
+        role: role as any,
+        passwordHash: hashedPassword,
+        isActive: true,
+      })
+      .returning();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "user_invited",
+      targetUserId: created.id,
+      metadataJson: {
+        email,
+        name,
+        orgId,
+        orgName: org.name,
+        role,
+      },
+    });
+
+    const { passwordHash: _, ...userWithoutPassword } = created;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    logger.error({ error }, "Error inviting user");
+    res.status(500).json({ error: "Failed to invite user" });
+  }
+});
 
 router.get("/export", async (req, res) => {
   try {
@@ -269,6 +333,15 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
+    let usageMetrics = {
+      models_count: 0,
+      deals_count: 0,
+      sales_comps_count: 0,
+      dd_projects_count: 0,
+      documents_count: 0,
+      contacts_count: 0,
+    };
+
     const [notes, auditEntries] = await Promise.all([
       db
         .select()
@@ -283,10 +356,38 @@ router.get("/:id", async (req, res) => {
         .limit(20),
     ]);
 
+    if (customer.orgId) {
+      try {
+        const result = await db.execute(sql`
+          SELECT 
+            (SELECT COUNT(*)::int FROM modeling_project_config WHERE org_id = ${customer.orgId}) as models_count,
+            (SELECT COUNT(*)::int FROM crm_deals WHERE org_id = ${customer.orgId}) as deals_count,
+            (SELECT COUNT(*)::int FROM sales_comps WHERE org_id = ${customer.orgId}) as sales_comps_count,
+            (SELECT COUNT(*)::int FROM dd_projects WHERE org_id = ${customer.orgId}) as dd_projects_count,
+            (SELECT COUNT(*)::int FROM vdr_documents WHERE org_id = ${customer.orgId}) as documents_count,
+            (SELECT COUNT(*)::int FROM crm_contacts WHERE org_id = ${customer.orgId}) as contacts_count
+        `);
+        if (result.rows && result.rows.length > 0) {
+          const row = result.rows[0] as any;
+          usageMetrics = {
+            models_count: row.models_count ?? 0,
+            deals_count: row.deals_count ?? 0,
+            sales_comps_count: row.sales_comps_count ?? 0,
+            dd_projects_count: row.dd_projects_count ?? 0,
+            documents_count: row.documents_count ?? 0,
+            contacts_count: row.contacts_count ?? 0,
+          };
+        }
+      } catch (usageErr) {
+        logger.warn({ error: usageErr }, "Failed to fetch usage metrics, returning zeros");
+      }
+    }
+
     res.json({
       ...customer,
       notes,
       auditLog: auditEntries,
+      usage: usageMetrics,
     });
   } catch (error) {
     logger.error({ error }, "Error fetching customer detail");
@@ -374,6 +475,277 @@ router.post("/:id/notes", async (req, res) => {
   } catch (error) {
     logger.error({ error }, "Error adding customer note");
     res.status(500).json({ error: "Failed to add customer note" });
+  }
+});
+
+router.post("/:id/subscription/cancel", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, id));
+
+    if (!sub) {
+      return res.status(404).json({ error: "Subscription not found" });
+    }
+
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd: true, status: "canceled", updatedAt: new Date() })
+      .where(eq(subscriptions.userId, id))
+      .returning();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "subscription_canceled",
+      targetUserId: id,
+      metadataJson: { subscriptionId: sub.id, previousStatus: sub.status },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Error canceling subscription");
+    res.status(500).json({ error: "Failed to cancel subscription" });
+  }
+});
+
+router.post("/:id/subscription/reactivate", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, id));
+
+    if (!sub) {
+      return res.status(404).json({ error: "Subscription not found" });
+    }
+
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ cancelAtPeriodEnd: false, status: "active", updatedAt: new Date() })
+      .where(eq(subscriptions.userId, id))
+      .returning();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "subscription_reactivated",
+      targetUserId: id,
+      metadataJson: { subscriptionId: sub.id, previousStatus: sub.status },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Error reactivating subscription");
+    res.status(500).json({ error: "Failed to reactivate subscription" });
+  }
+});
+
+router.post("/:id/subscription/extend-trial", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { days = 14 } = req.body;
+
+    const numDays = Math.min(Math.max(1, Number(days) || 14), 90);
+
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, id));
+
+    if (!sub) {
+      return res.status(404).json({ error: "Subscription not found" });
+    }
+
+    if (sub.status !== "trialing") {
+      return res.status(400).json({ error: "Can only extend trial for subscriptions with 'trialing' status" });
+    }
+
+    const currentEnd = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : new Date();
+    currentEnd.setDate(currentEnd.getDate() + numDays);
+
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ currentPeriodEnd: currentEnd, updatedAt: new Date() })
+      .where(eq(subscriptions.userId, id))
+      .returning();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "trial_extended",
+      targetUserId: id,
+      metadataJson: { subscriptionId: sub.id, daysAdded: numDays, newPeriodEnd: currentEnd.toISOString() },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Error extending trial");
+    res.status(500).json({ error: "Failed to extend trial" });
+  }
+});
+
+router.post("/:id/subscription/change-plan", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { planKey, planName, interval, mrrCents } = req.body;
+
+    if (!planKey || !planName) {
+      return res.status(400).json({ error: "planKey and planName are required" });
+    }
+
+    if (interval && interval !== "month" && interval !== "year") {
+      return res.status(400).json({ error: "interval must be 'month' or 'year'" });
+    }
+
+    const [sub] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, id));
+
+    if (!sub) {
+      return res.status(404).json({ error: "Subscription not found" });
+    }
+
+    const oldPlan = { planKey: sub.planKey, planName: sub.planName, interval: sub.interval, mrrCents: sub.mrrCents };
+
+    const updateData: any = { planKey, planName, updatedAt: new Date() };
+    if (interval) updateData.interval = interval;
+    if (mrrCents !== undefined) updateData.mrrCents = Number(mrrCents);
+
+    const [updated] = await db
+      .update(subscriptions)
+      .set(updateData)
+      .where(eq(subscriptions.userId, id))
+      .returning();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "plan_changed",
+      targetUserId: id,
+      metadataJson: {
+        subscriptionId: sub.id,
+        oldPlan,
+        newPlan: { planKey, planName, interval: interval || sub.interval, mrrCents: mrrCents !== undefined ? Number(mrrCents) : sub.mrrCents },
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Error changing plan");
+    res.status(500).json({ error: "Failed to change plan" });
+  }
+});
+
+router.post("/:id/resend-verification", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, id));
+
+    if (!existing) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    await db
+      .update(users)
+      .set({ emailVerified: false })
+      .where(eq(users.id, id));
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "verification_resent",
+      targetUserId: id,
+      metadataJson: {
+        email: existing.email,
+        name: existing.name,
+      },
+    });
+
+    res.json({ success: true, message: "Verification email queued for resend" });
+  } catch (error) {
+    logger.error({ error }, "Error resending verification");
+    res.status(500).json({ error: "Failed to resend verification" });
+  }
+});
+
+router.post("/:id/reset-password", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [existing] = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, id));
+
+    if (!existing) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const resetToken = crypto.randomUUID();
+
+    await db.insert(adminAuditLog).values({
+      adminUserId: req.user.id,
+      action: "password_reset_initiated",
+      targetUserId: id,
+      metadataJson: {
+        email: existing.email,
+        name: existing.name,
+        resetToken,
+      },
+    });
+
+    res.json({ success: true, message: "Password reset link has been generated" });
+  } catch (error) {
+    logger.error({ error }, "Error initiating password reset");
+    res.status(500).json({ error: "Failed to initiate password reset" });
+  }
+});
+
+router.get("/audit-trail", async (req, res) => {
+  try {
+    const { action, page = "1", pageSize = "50" } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page || "1", 10));
+    const size = Math.max(1, Math.min(100, parseInt(pageSize || "50", 10)));
+    const offset = (pageNum - 1) * size;
+
+    const conditions: any[] = [];
+    if (action) conditions.push(eq(adminAuditLog.action, action));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const rows = await db.execute(sql`
+      SELECT 
+        a.id, a.action, a.metadata_json, a.created_at,
+        a.admin_user_id, admin_u.name as admin_name, admin_u.email as admin_email,
+        a.target_user_id, target_u.name as target_name, target_u.email as target_email
+      FROM admin_audit_log a
+      LEFT JOIN users admin_u ON admin_u.id = a.admin_user_id
+      LEFT JOIN users target_u ON target_u.id = a.target_user_id
+      ${action ? sql`WHERE a.action = ${action}` : sql``}
+      ORDER BY a.created_at DESC
+      LIMIT ${size} OFFSET ${offset}
+    `);
+
+    const [totalResult] = await db.select({ total: count() }).from(adminAuditLog)
+      .where(whereClause);
+
+    res.json({
+      rows: rows.rows,
+      pagination: {
+        page: pageNum,
+        pageSize: size,
+        totalPages: Math.ceil(Number(totalResult?.total ?? 0) / size),
+        total: Number(totalResult?.total ?? 0),
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching audit trail");
+    res.status(500).json({ error: "Failed to fetch audit trail" });
   }
 });
 

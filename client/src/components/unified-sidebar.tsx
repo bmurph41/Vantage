@@ -879,22 +879,27 @@ export default function UnifiedSidebar() {
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <Link href="/admin/customers">
-                <div
-                  className={cn(
-                    "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
-                    location.startsWith('/admin')
-                      ? "bg-blue-600 text-white hover:bg-blue-700" 
-                      : "text-gray-500 hover:text-gray-700"
-                  )}
-                  data-testid="nav-admin"
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>Admin</span>
+              <>
+                <Link href="/admin/customers">
+                  <div
+                    className={cn(
+                      "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer",
+                      location.startsWith('/admin')
+                        ? "bg-blue-600 text-white hover:bg-blue-700" 
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                    data-testid="nav-admin"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>Admin</span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                <NavLink item={{ name: "Customers", href: "/admin/customers" }} />
+                <NavLink item={{ name: "Organizations", href: "/admin/organizations" }} />
+                <NavLink item={{ name: "Activity Log", href: "/admin/audit-trail" }} />
+              </>
             )}
           </div>
         )}
