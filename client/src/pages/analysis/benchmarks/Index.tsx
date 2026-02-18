@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { TrendingUp, TrendingDown, Minus, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, RefreshCw, BarChart3 } from "lucide-react";
 import { format, subYears, subMonths } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -25,10 +27,43 @@ const BENCHMARK_SERIES = {
 
 type TimeRange = "1M" | "3M" | "6M" | "1Y" | "2Y" | "5Y" | "ALL";
 
+interface BenchmarkAggregateRow {
+  id: string;
+  metricKey: string;
+  cohortKey: string;
+  periodKey: string;
+  cohortSize: number;
+  p25: string | null;
+  p50: string | null;
+  p75: string | null;
+  mean: string | null;
+  minBucketed: string | null;
+  maxBucketed: string | null;
+  createdAt: string;
+}
+
+function formatMetricKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatNumber(value: string | null): string {
+  if (value === null || value === undefined) return "—";
+  const num = parseFloat(value);
+  if (isNaN(num)) return "—";
+  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export default function BenchmarksIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<TimeRange>("1Y");
+
+  const { data: benchmarkAggregates, isLoading: benchmarksLoading } = useQuery<BenchmarkAggregateRow[]>({
+    queryKey: ["/api/benchmarking/aggregates"],
+    staleTime: 1000 * 60 * 30,
+  });
 
   const refreshMutation = useMutation({
     mutationFn: () => apiRequest("/api/capital-markets/rates/refresh", { method: "POST", body: JSON.stringify({ lookbackDays: 365 }) }),
@@ -111,6 +146,74 @@ export default function BenchmarksIndex() {
           </TabsContent>
         ))}
       </Tabs>
+
+      <div className="mt-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-6 w-6" />
+              Marina Industry Benchmarks
+            </h2>
+            <p className="text-muted-foreground mt-1">
+              De-identified performance metrics across the marina industry
+            </p>
+          </div>
+        </div>
+
+        {benchmarksLoading ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : !benchmarkAggregates || benchmarkAggregates.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8 text-muted-foreground">
+                <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                <p className="font-medium">Not enough data to display industry benchmarks.</p>
+                <p className="text-sm mt-1">Benchmarks require data from multiple organizations.</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Metric</TableHead>
+                  <TableHead className="text-right">25th Percentile</TableHead>
+                  <TableHead className="text-right">Median</TableHead>
+                  <TableHead className="text-right">75th Percentile</TableHead>
+                  <TableHead className="text-right">Average</TableHead>
+                  <TableHead className="text-right">Sample Size</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {benchmarkAggregates.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{formatMetricKey(row.metricKey)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(row.p25)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(row.p50)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(row.p75)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(row.mean)}</TableCell>
+                    <TableCell className="text-right">{row.cohortSize}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Industry benchmarks are computed from de-identified, aggregated data from participating organizations.
+        </p>
+      </div>
     </div>
   );
 }

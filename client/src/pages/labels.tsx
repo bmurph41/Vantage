@@ -44,7 +44,7 @@ export default function LabelsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { key: string; name: string; color: string; scope: string }) => {
-      return await apiRequest('/api/labels', 'POST', data);
+      return await apiRequest('POST', '/api/labels', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/labels'] });
@@ -58,7 +58,7 @@ export default function LabelsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<ContactsLabel> }) => {
-      return await apiRequest(`/api/labels/${id}`, 'PUT', data);
+      return await apiRequest('PUT', `/api/labels/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/labels'] });
@@ -72,7 +72,7 @@ export default function LabelsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/labels/${id}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/labels/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/labels'] });

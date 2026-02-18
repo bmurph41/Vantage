@@ -88,7 +88,7 @@ import returnsRoutes from "./routes/returns-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import searchRoutes from "./routes/search-routes";
 import bulkEmailRoutes from "./routes/bulk-email-routes";
-import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings } from "@shared/schema";
+import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings, outreachCampaigns, outreachTemplates, insertOutreachCampaignSchema, insertOutreachTemplateSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
 import { rentRollService } from "./services/rent-roll-service";
@@ -230,7 +230,9 @@ import {
   insertNwcLineSchema,
   insertRateCompSchema,
   targetDemographics,
-  insertTargetDemographicsSchema
+  insertTargetDemographicsSchema,
+  marketTargets,
+  insertMarketTargetSchema
 } from "@shared/schema";
 import { createCalendarEvent, checkCalendarAvailability } from "./lib/google-calendar";
 import { 
@@ -463,6 +465,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
   app.use("/api/debt-scenarios", authenticateUser);
+  app.use("/api/products", authenticateUser, enforceTenant);
+  app.use("/api/labels", authenticateUser, enforceTenant);
+  app.use("/api/forms", authenticateUser, enforceTenant);
+  app.use("/api/form-templates", authenticateUser, enforceTenant);
+  app.use("/api/form-fields", authenticateUser, enforceTenant);
   app.use("/api/docktalk", authenticateUser, enforceTenant);
   app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
@@ -7052,8 +7059,8 @@ Current context: Project ${req.params.projectId}`;
 
       // Update the deal to mark it as converted
       await storage.updateCrmDeal(dealId, {
-        ...deal,
-        ddProjectId: project.id
+        ddProjectId: project.id,
+        stage: 'due_diligence',
       });
 
       res.json({
@@ -7105,6 +7112,135 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to delete lead:", error);
       res.status(500).json({ error: "Failed to delete lead" });
+    }
+  });
+
+  app.post("/api/crm/leads/:id/convert", async (req: any, res) => {
+    try {
+      const leadId = req.params.id;
+      const lead = await storage.getCrmLead(leadId);
+      if (!lead) {
+        return res.status(404).json({ error: "Lead not found" });
+      }
+
+      const { dealConfig, options } = req.body || {};
+
+      let contactId: string | null = null;
+      let companyId: string | null = null;
+
+      const existingContacts = await db.select().from(crmContacts)
+        .where(and(
+          eq(crmContacts.orgId, req.user.orgId),
+          lead.email ? eq(crmContacts.email, lead.email) : sql`false`
+        ));
+
+      if (existingContacts.length > 0) {
+        contactId = existingContacts[0].id;
+      } else {
+        const [newContact] = await db.insert(crmContacts).values({
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          email: lead.email || '',
+          phone: lead.phone || undefined,
+          company: lead.company || undefined,
+          jobTitle: lead.jobTitle || undefined,
+          ownerId: req.user.id,
+          orgId: req.user.orgId,
+        }).returning();
+        contactId = newContact.id;
+      }
+
+      if (lead.company) {
+        const existingCompanies = await db.select().from(crmCompanies)
+          .where(and(
+            eq(crmCompanies.orgId, req.user.orgId),
+            ilike(crmCompanies.name, lead.company)
+          ));
+
+        if (existingCompanies.length > 0) {
+          companyId = existingCompanies[0].id;
+        } else {
+          const [newCompany] = await db.insert(crmCompanies).values({
+            name: lead.company,
+            ownerId: req.user.id,
+            orgId: req.user.orgId,
+          }).returning();
+          companyId = newCompany.id;
+        }
+
+        if (contactId && companyId) {
+          try {
+            await db.insert(crmContactCompanies).values({
+              contactId,
+              companyId,
+              orgId: req.user.orgId,
+            }).onConflictDoNothing();
+          } catch (linkErr) {
+            console.error("Failed to link contact to company (non-fatal):", linkErr);
+          }
+        }
+      }
+
+      const dealName = dealConfig?.name || `${lead.firstName} ${lead.lastName} - Deal`;
+      const [deal] = await db.insert(crmDeals).values({
+        title: dealName,
+        value: dealConfig?.value ? String(dealConfig.value) : undefined,
+        stage: dealConfig?.stage || 'qualified',
+        priority: dealConfig?.priority || 'medium',
+        expectedCloseDate: dealConfig?.expectedCloseDate ? new Date(dealConfig.expectedCloseDate) : undefined,
+        description: dealConfig?.description || undefined,
+        primaryContactId: contactId,
+        companyId: companyId,
+        leadId: leadId,
+        leadSource: lead.leadSource || lead.originalSource || undefined,
+        ownerId: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+
+      if (contactId) {
+        try {
+          await db.insert(crmDealContacts).values({
+            dealId: deal.id,
+            contactId,
+            role: 'primary',
+            isPrimary: true,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+        } catch (linkErr) {
+          console.error("Failed to link deal to contact (non-fatal):", linkErr);
+        }
+      }
+
+      if (companyId) {
+        try {
+          await db.insert(crmDealCompanies).values({
+            dealId: deal.id,
+            companyId,
+            role: 'primary',
+            isPrimary: true,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+        } catch (linkErr) {
+          console.error("Failed to link deal to company (non-fatal):", linkErr);
+        }
+      }
+
+      await storage.updateCrmLead(leadId, {
+        leadStatus: 'converted',
+        convertedContactId: contactId,
+        convertedDate: new Date(),
+      });
+
+      res.json({
+        success: true,
+        dealId: deal.id,
+        contactId,
+        companyId,
+        message: "Lead converted successfully",
+      });
+    } catch (error: any) {
+      console.error("Failed to convert lead:", error);
+      res.status(500).json({ error: "Failed to convert lead" });
     }
   });
 
@@ -7961,6 +8097,313 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error("Failed to remove list member:", error);
       res.status(500).json({ error: "Failed to remove member from list" });
+    }
+  });
+
+  // CRM Products
+  app.get("/api/products", async (req: any, res) => {
+    try {
+      const { crmProducts } = await import("@shared/schema");
+      const orgId = req.user.orgId;
+      const products = await db.select().from(crmProducts)
+        .where(eq(crmProducts.orgId, orgId))
+        .orderBy(desc(crmProducts.createdAt));
+      res.json(products);
+    } catch (error: any) {
+      console.error("Failed to get products:", error);
+      res.status(500).json({ error: "Failed to retrieve products" });
+    }
+  });
+
+  app.post("/api/products", async (req: any, res) => {
+    try {
+      const { crmProducts } = await import("@shared/schema");
+      const [product] = await db.insert(crmProducts).values({
+        ...req.body,
+        ownerId: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+      res.json(product);
+    } catch (error: any) {
+      console.error("Failed to create product:", error);
+      res.status(500).json({ error: "Failed to create product" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req: any, res) => {
+    try {
+      const { crmProducts } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmProducts)
+        .where(and(eq(crmProducts.id, req.params.id), eq(crmProducts.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      const [product] = await db.update(crmProducts)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmProducts.id, req.params.id))
+        .returning();
+      res.json(product);
+    } catch (error: any) {
+      console.error("Failed to update product:", error);
+      res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req: any, res) => {
+    try {
+      const { crmProducts } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmProducts)
+        .where(and(eq(crmProducts.id, req.params.id), eq(crmProducts.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      await db.delete(crmProducts).where(eq(crmProducts.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete product:", error);
+      res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
+  // CRM Labels
+  app.get("/api/labels", async (req: any, res) => {
+    try {
+      const { crmContactsLabels } = await import("@shared/schema");
+      const orgId = req.user.orgId;
+      const labels = await db.select().from(crmContactsLabels)
+        .where(eq(crmContactsLabels.orgId, orgId))
+        .orderBy(desc(crmContactsLabels.createdAt));
+      res.json(labels);
+    } catch (error: any) {
+      console.error("Failed to get labels:", error);
+      res.status(500).json({ error: "Failed to retrieve labels" });
+    }
+  });
+
+  app.post("/api/labels", async (req: any, res) => {
+    try {
+      const { crmContactsLabels } = await import("@shared/schema");
+      const [label] = await db.insert(crmContactsLabels).values({
+        ...req.body,
+        createdById: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+      res.json(label);
+    } catch (error: any) {
+      console.error("Failed to create label:", error);
+      res.status(500).json({ error: "Failed to create label" });
+    }
+  });
+
+  app.put("/api/labels/:id", async (req: any, res) => {
+    try {
+      const { crmContactsLabels } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmContactsLabels)
+        .where(and(eq(crmContactsLabels.id, req.params.id), eq(crmContactsLabels.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Label not found" });
+      }
+      const [label] = await db.update(crmContactsLabels)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmContactsLabels.id, req.params.id))
+        .returning();
+      res.json(label);
+    } catch (error: any) {
+      console.error("Failed to update label:", error);
+      res.status(500).json({ error: "Failed to update label" });
+    }
+  });
+
+  app.delete("/api/labels/:id", async (req: any, res) => {
+    try {
+      const { crmContactsLabels } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmContactsLabels)
+        .where(and(eq(crmContactsLabels.id, req.params.id), eq(crmContactsLabels.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Label not found" });
+      }
+      await db.delete(crmContactsLabels).where(eq(crmContactsLabels.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete label:", error);
+      res.status(500).json({ error: "Failed to delete label" });
+    }
+  });
+
+  // CRM Forms
+  app.get("/api/forms", async (req: any, res) => {
+    try {
+      const { crmForms } = await import("@shared/schema");
+      const orgId = req.user.orgId;
+      const forms = await db.select().from(crmForms)
+        .where(eq(crmForms.orgId, orgId))
+        .orderBy(desc(crmForms.createdAt));
+      res.json(forms);
+    } catch (error: any) {
+      console.error("Failed to get forms:", error);
+      res.status(500).json({ error: "Failed to retrieve forms" });
+    }
+  });
+
+  app.get("/api/form-templates", async (req: any, res) => {
+    try {
+      res.json([
+        { id: "tpl-contact", name: "Contact Form", type: "contact", description: "Basic contact information capture" },
+        { id: "tpl-demo", name: "Demo Request", type: "demo_request", description: "Schedule a demo" },
+        { id: "tpl-newsletter", name: "Newsletter Signup", type: "newsletter", description: "Email newsletter subscription" },
+        { id: "tpl-property", name: "Property Inquiry", type: "property_inquiry", description: "Marina/property inquiry form" },
+        { id: "tpl-boat", name: "Boat Inquiry", type: "boat_inquiry", description: "Boat purchase/service inquiry" },
+        { id: "tpl-quote", name: "Quote Request", type: "quote_request", description: "Request a custom quote" },
+        { id: "tpl-download", name: "Download Gate", type: "download", description: "Gated content download" },
+      ]);
+    } catch (error: any) {
+      console.error("Failed to get form templates:", error);
+      res.status(500).json({ error: "Failed to retrieve form templates" });
+    }
+  });
+
+  app.post("/api/forms", async (req: any, res) => {
+    try {
+      const { crmForms } = await import("@shared/schema");
+      const [form] = await db.insert(crmForms).values({
+        ...req.body,
+        createdById: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+      res.json(form);
+    } catch (error: any) {
+      console.error("Failed to create form:", error);
+      res.status(500).json({ error: "Failed to create form" });
+    }
+  });
+
+  app.put("/api/forms/:id", async (req: any, res) => {
+    try {
+      const { crmForms } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmForms)
+        .where(and(eq(crmForms.id, req.params.id), eq(crmForms.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      const [form] = await db.update(crmForms)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmForms.id, req.params.id))
+        .returning();
+      res.json(form);
+    } catch (error: any) {
+      console.error("Failed to update form:", error);
+      res.status(500).json({ error: "Failed to update form" });
+    }
+  });
+
+  app.delete("/api/forms/:id", async (req: any, res) => {
+    try {
+      const { crmForms } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmForms)
+        .where(and(eq(crmForms.id, req.params.id), eq(crmForms.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      await db.delete(crmForms).where(eq(crmForms.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete form:", error);
+      res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  app.post("/api/forms/:id/duplicate", async (req: any, res) => {
+    try {
+      const { crmForms } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmForms)
+        .where(and(eq(crmForms.id, req.params.id), eq(crmForms.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      const { id, createdAt, updatedAt, submissionCount, conversionRate, ...formData } = existing;
+      const [form] = await db.insert(crmForms).values({
+        ...formData,
+        name: req.body.name || `${existing.name} (Copy)`,
+        status: 'draft',
+        submissionCount: 0,
+        conversionRate: '0',
+        createdById: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+      res.json(form);
+    } catch (error: any) {
+      console.error("Failed to duplicate form:", error);
+      res.status(500).json({ error: "Failed to duplicate form" });
+    }
+  });
+
+  app.get("/api/forms/:id/submissions", async (req: any, res) => {
+    try {
+      const { crmFormSubmissions } = await import("@shared/schema");
+      const submissions = await db.select().from(crmFormSubmissions)
+        .where(and(eq(crmFormSubmissions.formId, req.params.id), eq(crmFormSubmissions.orgId, req.user.orgId)))
+        .orderBy(desc(crmFormSubmissions.createdAt));
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("Failed to get form submissions:", error);
+      res.status(500).json({ error: "Failed to retrieve form submissions" });
+    }
+  });
+
+  // CRM Form Fields
+  app.post("/api/forms/:formId/fields", async (req: any, res) => {
+    try {
+      const { crmFormFields, crmForms } = await import("@shared/schema");
+      const [form] = await db.select().from(crmForms)
+        .where(and(eq(crmForms.id, req.params.formId), eq(crmForms.orgId, req.user.orgId)));
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      const { id, createdAt, updatedAt, ...fieldData } = req.body;
+      const [field] = await db.insert(crmFormFields).values({
+        ...fieldData,
+        formId: req.params.formId,
+        orgId: req.user.orgId,
+      }).returning();
+      res.json(field);
+    } catch (error: any) {
+      console.error("Failed to create form field:", error);
+      res.status(500).json({ error: "Failed to create form field" });
+    }
+  });
+
+  app.put("/api/form-fields/:id", async (req: any, res) => {
+    try {
+      const { crmFormFields } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmFormFields)
+        .where(and(eq(crmFormFields.id, req.params.id), eq(crmFormFields.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Form field not found" });
+      }
+      const [field] = await db.update(crmFormFields)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(crmFormFields.id, req.params.id))
+        .returning();
+      res.json(field);
+    } catch (error: any) {
+      console.error("Failed to update form field:", error);
+      res.status(500).json({ error: "Failed to update form field" });
+    }
+  });
+
+  app.delete("/api/form-fields/:id", async (req: any, res) => {
+    try {
+      const { crmFormFields } = await import("@shared/schema");
+      const [existing] = await db.select().from(crmFormFields)
+        .where(and(eq(crmFormFields.id, req.params.id), eq(crmFormFields.orgId, req.user.orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Form field not found" });
+      }
+      await db.delete(crmFormFields).where(eq(crmFormFields.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete form field:", error);
+      res.status(500).json({ error: "Failed to delete form field" });
     }
   });
 
@@ -9790,6 +10233,249 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ===================================================================
+  // CRM Prospecting - Market Targets CRUD
+  // ===================================================================
+
+  app.get("/api/prospecting/market-targets", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const targets = await db.select().from(marketTargets)
+        .where(eq(marketTargets.orgId, orgId))
+        .orderBy(desc(marketTargets.createdAt));
+      res.json(targets);
+    } catch (error: any) {
+      console.error("Failed to get market targets:", error);
+      res.status(500).json({ error: "Failed to retrieve market targets" });
+    }
+  });
+
+  app.post("/api/prospecting/market-targets", async (req: any, res) => {
+    try {
+      const validated = insertMarketTargetSchema.parse({
+        ...req.body,
+        orgId: req.user.orgId,
+        ownerId: req.user.id,
+      });
+      const [target] = await db.insert(marketTargets).values(validated).returning();
+      res.json(target);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid market target data", details: error.errors });
+      }
+      console.error("Failed to create market target:", error);
+      res.status(500).json({ error: "Failed to create market target" });
+    }
+  });
+
+  app.put("/api/prospecting/market-targets/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(marketTargets)
+        .where(and(eq(marketTargets.id, req.params.id), eq(marketTargets.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Market target not found" });
+      }
+      const { id, orgId: _orgId, ownerId, createdAt, ...updateData } = req.body;
+      const [updated] = await db.update(marketTargets)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(marketTargets.id, req.params.id), eq(marketTargets.orgId, orgId)))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update market target:", error);
+      res.status(500).json({ error: "Failed to update market target" });
+    }
+  });
+
+  app.delete("/api/prospecting/market-targets/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(marketTargets)
+        .where(and(eq(marketTargets.id, req.params.id), eq(marketTargets.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Market target not found" });
+      }
+      await db.delete(marketTargets)
+        .where(and(eq(marketTargets.id, req.params.id), eq(marketTargets.orgId, orgId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete market target:", error);
+      res.status(500).json({ error: "Failed to delete market target" });
+    }
+  });
+
+  // ===================================================================
+  // CRM Prospecting - Outreach Campaigns CRUD
+  // ===================================================================
+
+  app.get("/api/prospecting/campaigns", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const campaigns = await db.select().from(outreachCampaigns)
+        .where(eq(outreachCampaigns.orgId, orgId))
+        .orderBy(desc(outreachCampaigns.createdAt));
+      res.json(campaigns);
+    } catch (error: any) {
+      console.error("Failed to get outreach campaigns:", error);
+      res.status(500).json({ error: "Failed to retrieve outreach campaigns" });
+    }
+  });
+
+  app.post("/api/prospecting/campaigns", async (req: any, res) => {
+    try {
+      const validated = insertOutreachCampaignSchema.parse({
+        ...req.body,
+        orgId: req.user.orgId,
+        ownerId: req.user.id,
+      });
+      const [campaign] = await db.insert(outreachCampaigns).values(validated).returning();
+      res.json(campaign);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid campaign data", details: error.errors });
+      }
+      console.error("Failed to create outreach campaign:", error);
+      res.status(500).json({ error: "Failed to create outreach campaign" });
+    }
+  });
+
+  app.put("/api/prospecting/campaigns/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(outreachCampaigns)
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      const { id, orgId: _orgId, ownerId, createdAt, ...updateData } = req.body;
+      const [updated] = await db.update(outreachCampaigns)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update outreach campaign:", error);
+      res.status(500).json({ error: "Failed to update outreach campaign" });
+    }
+  });
+
+  app.delete("/api/prospecting/campaigns/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(outreachCampaigns)
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      await db.delete(outreachCampaigns)
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete outreach campaign:", error);
+      res.status(500).json({ error: "Failed to delete outreach campaign" });
+    }
+  });
+
+  app.patch("/api/prospecting/campaigns/:id/status", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { status } = req.body;
+      if (!status || !["draft", "active", "paused", "completed", "archived"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      const [existing] = await db.select().from(outreachCampaigns)
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      const updateData: any = { status, updatedAt: new Date() };
+      if (status === "completed") {
+        updateData.endDate = new Date().toISOString().split('T')[0];
+      }
+      const [updated] = await db.update(outreachCampaigns)
+        .set(updateData)
+        .where(and(eq(outreachCampaigns.id, req.params.id), eq(outreachCampaigns.orgId, orgId)))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update campaign status:", error);
+      res.status(500).json({ error: "Failed to update campaign status" });
+    }
+  });
+
+  // ===================================================================
+  // CRM Prospecting - Outreach Templates CRUD
+  // ===================================================================
+
+  app.get("/api/prospecting/templates", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const templates = await db.select().from(outreachTemplates)
+        .where(eq(outreachTemplates.orgId, orgId))
+        .orderBy(desc(outreachTemplates.createdAt));
+      res.json(templates);
+    } catch (error: any) {
+      console.error("Failed to get outreach templates:", error);
+      res.status(500).json({ error: "Failed to retrieve outreach templates" });
+    }
+  });
+
+  app.post("/api/prospecting/templates", async (req: any, res) => {
+    try {
+      const validated = insertOutreachTemplateSchema.parse({
+        ...req.body,
+        orgId: req.user.orgId,
+        ownerId: req.user.id,
+      });
+      const [template] = await db.insert(outreachTemplates).values(validated).returning();
+      res.json(template);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      console.error("Failed to create outreach template:", error);
+      res.status(500).json({ error: "Failed to create outreach template" });
+    }
+  });
+
+  app.put("/api/prospecting/templates/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(outreachTemplates)
+        .where(and(eq(outreachTemplates.id, req.params.id), eq(outreachTemplates.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      const { id, orgId: _orgId, ownerId, createdAt, ...updateData } = req.body;
+      const [updated] = await db.update(outreachTemplates)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(and(eq(outreachTemplates.id, req.params.id), eq(outreachTemplates.orgId, orgId)))
+        .returning();
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update outreach template:", error);
+      res.status(500).json({ error: "Failed to update outreach template" });
+    }
+  });
+
+  app.delete("/api/prospecting/templates/:id", async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const [existing] = await db.select().from(outreachTemplates)
+        .where(and(eq(outreachTemplates.id, req.params.id), eq(outreachTemplates.orgId, orgId)));
+      if (!existing) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      await db.delete(outreachTemplates)
+        .where(and(eq(outreachTemplates.id, req.params.id), eq(outreachTemplates.orgId, orgId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete outreach template:", error);
+      res.status(500).json({ error: "Failed to delete outreach template" });
+    }
+  });
+
+  // ===================================================================
   // CRM Route Aliases - Frontend Integration
   // Map /api/* routes to /api/crm/* for frontend compatibility
   // ===================================================================
@@ -9831,7 +10517,136 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete lead" });
     }
   });
-  
+
+  app.post("/api/leads/:id/convert", async (req: any, res) => {
+    try {
+      const leadId = req.params.id;
+      const lead = await storage.getCrmLead(leadId);
+      if (!lead) {
+        return res.status(404).json({ error: "Lead not found" });
+      }
+
+      const { dealConfig, options } = req.body || {};
+
+      let contactId: string | null = null;
+      let companyId: string | null = null;
+
+      const existingContacts = await db.select().from(crmContacts)
+        .where(and(
+          eq(crmContacts.orgId, req.user.orgId),
+          lead.email ? eq(crmContacts.email, lead.email) : sql`false`
+        ));
+
+      if (existingContacts.length > 0) {
+        contactId = existingContacts[0].id;
+      } else {
+        const [newContact] = await db.insert(crmContacts).values({
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          email: lead.email || '',
+          phone: lead.phone || undefined,
+          company: lead.company || undefined,
+          jobTitle: lead.jobTitle || undefined,
+          ownerId: req.user.id,
+          orgId: req.user.orgId,
+        }).returning();
+        contactId = newContact.id;
+      }
+
+      if (lead.company) {
+        const existingCompanies = await db.select().from(crmCompanies)
+          .where(and(
+            eq(crmCompanies.orgId, req.user.orgId),
+            ilike(crmCompanies.name, lead.company)
+          ));
+
+        if (existingCompanies.length > 0) {
+          companyId = existingCompanies[0].id;
+        } else {
+          const [newCompany] = await db.insert(crmCompanies).values({
+            name: lead.company,
+            ownerId: req.user.id,
+            orgId: req.user.orgId,
+          }).returning();
+          companyId = newCompany.id;
+        }
+
+        if (contactId && companyId) {
+          try {
+            await db.insert(crmContactCompanies).values({
+              contactId,
+              companyId,
+              orgId: req.user.orgId,
+            }).onConflictDoNothing();
+          } catch (linkErr) {
+            console.error("Failed to link contact to company (non-fatal):", linkErr);
+          }
+        }
+      }
+
+      const dealName = dealConfig?.name || `${lead.firstName} ${lead.lastName} - Deal`;
+      const [deal] = await db.insert(crmDeals).values({
+        title: dealName,
+        value: dealConfig?.value ? String(dealConfig.value) : undefined,
+        stage: dealConfig?.stage || 'qualified',
+        priority: dealConfig?.priority || 'medium',
+        expectedCloseDate: dealConfig?.expectedCloseDate ? new Date(dealConfig.expectedCloseDate) : undefined,
+        description: dealConfig?.description || undefined,
+        primaryContactId: contactId,
+        companyId: companyId,
+        leadId: leadId,
+        leadSource: lead.leadSource || lead.originalSource || undefined,
+        ownerId: req.user.id,
+        orgId: req.user.orgId,
+      }).returning();
+
+      if (contactId) {
+        try {
+          await db.insert(crmDealContacts).values({
+            dealId: deal.id,
+            contactId,
+            role: 'primary',
+            isPrimary: true,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+        } catch (linkErr) {
+          console.error("Failed to link deal to contact (non-fatal):", linkErr);
+        }
+      }
+
+      if (companyId) {
+        try {
+          await db.insert(crmDealCompanies).values({
+            dealId: deal.id,
+            companyId,
+            role: 'primary',
+            isPrimary: true,
+            orgId: req.user.orgId,
+          }).onConflictDoNothing();
+        } catch (linkErr) {
+          console.error("Failed to link deal to company (non-fatal):", linkErr);
+        }
+      }
+
+      await storage.updateCrmLead(leadId, {
+        leadStatus: 'converted',
+        convertedContactId: contactId,
+        convertedDate: new Date(),
+      });
+
+      res.json({
+        success: true,
+        dealId: deal.id,
+        contactId,
+        companyId,
+        message: "Lead converted successfully",
+      });
+    } catch (error: any) {
+      console.error("Failed to convert lead:", error);
+      res.status(500).json({ error: "Failed to convert lead" });
+    }
+  });
+
   // Deals aliases
   app.get("/api/deals", async (req: any, res) => {
     try {

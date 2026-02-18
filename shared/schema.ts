@@ -2477,6 +2477,9 @@ export const crmContactsLabels = pgTable("crm_contacts_labels", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type ContactsLabel = typeof crmContactsLabels.$inferSelect;
+export type InsertContactsLabel = typeof crmContactsLabels.$inferInsert;
+
 // Properties table
 
 export const crmProperties = pgTable("crm_properties", {
@@ -4307,6 +4310,9 @@ export const crmProducts = pgTable("crm_products", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type CrmProduct = typeof crmProducts.$inferSelect;
+export type InsertCrmProduct = typeof crmProducts.$inferInsert;
+
 // Deal Products junction table - for associating products with deals and tracking recurring revenue
 
 export const crmDealProducts = pgTable("crm_deal_products", {
@@ -5926,6 +5932,9 @@ export const crmForms = pgTable("crm_forms", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export type Form = typeof crmForms.$inferSelect;
+export type InsertForm = typeof crmForms.$inferInsert;
 
 // Form Fields table - stores individual field configurations
 

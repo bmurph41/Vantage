@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Search, Plus, LayoutGrid, List, Users, DollarSign, TrendingUp, 
-  Target, Clock, Flame, Filter, Settings2, BarChart3
+  Target, Clock, Flame, Filter, Settings2, BarChart3, Activity, CheckSquare
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,8 @@ import { formatCurrency } from "@/lib/utils";
 const PipelineView = lazy(() => import("@/components/deal-workspace/PipelineView"));
 const ListView = lazy(() => import("@/components/deal-workspace/ListView"));
 const LeadsView = lazy(() => import("@/components/deal-workspace/LeadsView"));
+const ActivityView = lazy(() => import("@/components/deal-workspace/ActivityView"));
+const TasksView = lazy(() => import("@/components/deal-workspace/TasksView"));
 
 type DealWithRelations = Deal & { contact?: Contact | null; company?: Company | null };
 
@@ -77,8 +79,8 @@ export default function DealWorkspace() {
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const initialView = urlParams.get('view') || 'pipeline';
   
-  const [activeView, setActiveView] = useState<'pipeline' | 'list' | 'leads'>(
-    initialView as 'pipeline' | 'list' | 'leads'
+  const [activeView, setActiveView] = useState<'pipeline' | 'list' | 'leads' | 'activity' | 'tasks'>(
+    initialView as 'pipeline' | 'list' | 'leads' | 'activity' | 'tasks'
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
@@ -137,7 +139,7 @@ export default function DealWorkspace() {
   }, [deals, leads, stages]);
 
   const handleViewChange = (view: string) => {
-    setActiveView(view as 'pipeline' | 'list' | 'leads');
+    setActiveView(view as 'pipeline' | 'list' | 'leads' | 'activity' | 'tasks');
   };
 
   const handleAddNew = () => {
@@ -267,6 +269,22 @@ export default function DealWorkspace() {
                     {leads.length}
                   </Badge>
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="activity" 
+                  className="gap-2 data-[state=active]:bg-white"
+                  data-testid="tab-activity"
+                >
+                  <Activity className="w-4 h-4" />
+                  Activity
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="tasks" 
+                  className="gap-2 data-[state=active]:bg-white"
+                  data-testid="tab-tasks"
+                >
+                  <CheckSquare className="w-4 h-4" />
+                  Tasks
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -305,6 +323,12 @@ export default function DealWorkspace() {
           )}
           {activeView === 'leads' && (
             <LeadsView searchQuery={searchQuery} />
+          )}
+          {activeView === 'activity' && (
+            <ActivityView />
+          )}
+          {activeView === 'tasks' && (
+            <TasksView />
           )}
         </Suspense>
       </div>

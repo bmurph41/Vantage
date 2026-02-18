@@ -33,14 +33,14 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Product } from "@shared/schema";
+import type { CrmProduct } from "@shared/schema";
 
 export default function ProductsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<CrmProduct | null>(null);
   const { toast } = useToast();
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const { data: products = [], isLoading } = useQuery<CrmProduct[]>({
     queryKey: ['/api/products'],
   });
 
@@ -55,7 +55,7 @@ export default function ProductsPage() {
       category?: string;
       isActive: boolean;
     }) => {
-      return await apiRequest('/api/products', 'POST', data);
+      return await apiRequest('POST', '/api/products', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -68,8 +68,8 @@ export default function ProductsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Product> }) => {
-      return await apiRequest(`/api/products/${id}`, 'PUT', data);
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CrmProduct> }) => {
+      return await apiRequest('PUT', `/api/products/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -83,7 +83,7 @@ export default function ProductsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/products/${id}`, 'DELETE');
+      return await apiRequest('DELETE', `/api/products/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
@@ -201,8 +201,8 @@ function ProductCard({
   onEdit,
   onDelete,
 }: {
-  product: Product;
-  onEdit: (product: Product) => void;
+  product: CrmProduct;
+  onEdit: (product: CrmProduct) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -420,8 +420,8 @@ function EditProductForm({
   onCancel,
   isPending,
 }: {
-  product: Product;
-  onSubmit: (data: Partial<Product>) => void;
+  product: CrmProduct;
+  onSubmit: (data: Partial<CrmProduct>) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
