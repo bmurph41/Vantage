@@ -11,7 +11,7 @@ import {
   DollarSign, Activity, Star, ExternalLink, Clock, Tag, Users, Home,
   Target, TrendingUp, MessageSquare, FileText, ChevronRight, Heart, ArrowUpRight,
 } from 'lucide-react';
-import { SiLinkedin, SiTwitter } from 'react-icons/si';
+import { SiLinkedin, SiX } from 'react-icons/si';
 import { format } from 'date-fns';
 import { CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
@@ -332,7 +332,7 @@ export default function ContactRecordPage() {
       )}
       {contact.twitterHandle && (
         <div className="flex items-start gap-3">
-          <SiTwitter className="h-4 w-4 text-[#1DA1F2] mt-0.5 flex-shrink-0" />
+          <SiX className="h-4 w-4 text-[#1DA1F2] mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 dark:text-gray-400">Twitter</p>
             <a
