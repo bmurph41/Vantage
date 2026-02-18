@@ -1365,6 +1365,57 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                   return (
                     <Fragment key={category}>
+                      {category === 'Expenses' && (
+                        <TableRow className="bg-muted font-bold border-t-2">
+                          <TableCell className="sticky left-0 bg-muted z-10">Gross Profit</TableCell>
+
+                          {showHistorical && priorPeriods.map(period => {
+                            const summary = calculatePeriodSummary(period.id);
+                            return (
+                              <TableCell key={period.id} className="text-right bg-blue-100/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100">
+                                {formatCurrency(summary.grossProfit, { dash: true })}
+                              </TableCell>
+                            );
+                          })}
+
+                          <TableCell className="text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800">
+                            {formatCurrency(baselineSummary?.grossProfit, { dash: true })}
+                          </TableCell>
+
+                          {viewMode === 'monthly' ? (
+                            months.map((_, monthIndex) => {
+                              const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                              return (
+                                <TableCell 
+                                  key={monthIndex} 
+                                  className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                                >
+                                  {formatCurrency(summary.grossProfit, { dash: true })}
+                                </TableCell>
+                              );
+                            })
+                          ) : (
+                            years.map((_, i) => {
+                              const summary = calculateYearSummary(i);
+                              return (
+                                <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit, { dash: true })}</TableCell>
+                              );
+                            })
+                          )}
+
+                          <TableCell className="text-right text-muted-foreground">
+                            {viewMode === 'monthly' ? (
+                              formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0), { dash: true })
+                            ) : (
+                              formatPercent(calculateCAGR(
+                                calculateYearSummary(0).grossProfit,
+                                calculateYearSummary(holdPeriod - 1).grossProfit,
+                                holdPeriod - 1
+                              ), { showSign: true, dash: true })
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
                       {/* Category Header Row */}
                       <TableRow 
                         className="bg-muted cursor-pointer hover:bg-muted"
@@ -1605,57 +1656,6 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                     </Fragment>
                   );
                 })}
-
-                {/* Gross Profit Row */}
-                <TableRow className="bg-muted font-bold border-t-2">
-                  <TableCell className="sticky left-0 bg-muted z-10">Gross Profit</TableCell>
-
-                  {showHistorical && priorPeriods.map(period => {
-                    const summary = calculatePeriodSummary(period.id);
-                    return (
-                      <TableCell key={period.id} className="text-right bg-blue-100/60 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100">
-                        {formatCurrency(summary.grossProfit, { dash: true })}
-                      </TableCell>
-                    );
-                  })}
-
-                  <TableCell className="text-right bg-blue-100 dark:bg-blue-900/30 border-x border-blue-200 dark:border-blue-800">
-                    {formatCurrency(baselineSummary?.grossProfit, { dash: true })}
-                  </TableCell>
-
-                  {viewMode === 'monthly' ? (
-                    months.map((_, monthIndex) => {
-                      const summary = calculateMonthSummary(selectedYearInt, monthIndex);
-                      return (
-                        <TableCell 
-                          key={monthIndex} 
-                          className={`text-right ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
-                        >
-                          {formatCurrency(summary.grossProfit, { dash: true })}
-                        </TableCell>
-                      );
-                    })
-                  ) : (
-                    years.map((_, i) => {
-                      const summary = calculateYearSummary(i);
-                      return (
-                        <TableCell key={i} className="text-right">{formatCurrency(summary.grossProfit, { dash: true })}</TableCell>
-                      );
-                    })
-                  )}
-
-                  <TableCell className="text-right text-muted-foreground">
-                    {viewMode === 'monthly' ? (
-                      formatCurrency(months.reduce((sum, _, monthIndex) => sum + calculateMonthSummary(selectedYearInt, monthIndex).grossProfit, 0), { dash: true })
-                    ) : (
-                      formatPercent(calculateCAGR(
-                        calculateYearSummary(0).grossProfit,
-                        calculateYearSummary(holdPeriod - 1).grossProfit,
-                        holdPeriod - 1
-                      ), { showSign: true, dash: true })
-                    )}
-                  </TableCell>
-                </TableRow>
 
                 {/* Net Operating Income Row */}
                 <TableRow className="bg-primary/10 font-bold">

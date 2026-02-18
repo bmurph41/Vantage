@@ -907,6 +907,50 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <TableBody>
                   {['Revenue', 'COGS', 'Expenses'].map((category) => (
                     <Fragment key={category}>
+                      {category === 'Expenses' && (
+                        <>
+                          <TableRow className="bg-muted font-bold border-t-2">
+                            <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1.5 text-sm">Gross Profit</TableCell>
+                            {months.map((month, idx) => {
+                              const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                              const cogs = getAdjustedCategoryTotal('COGS', month, idx);
+                              return (
+                                <TableCell 
+                                  key={month} 
+                                  className={`text-right whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
+                                >
+                                  {formatCurrency(revenue - cogs, { dash: true })}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'), { dash: true })}</TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">Gross Profit Margin</TableCell>
+                            {months.map((month, idx) => {
+                              const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
+                              const cogs = getAdjustedCategoryTotal('COGS', month, idx);
+                              const gp = revenue - cogs;
+                              const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
+                              return (
+                                <TableCell 
+                                  key={month} 
+                                  className={`text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/20' : 'bg-muted/30'}`}
+                                >
+                                  {formatPercent(margin, { dash: true })}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted/30">
+                              {(() => {
+                                const adjRev = getAdjustedCategoryAnnualTotal('Revenue');
+                                const adjGP = adjRev - getAdjustedCategoryAnnualTotal('COGS');
+                                return formatPercent(adjRev !== 0 ? (adjGP / adjRev) * 100 : null, { dash: true });
+                              })()}
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      )}
                       <TableRow 
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
@@ -1174,48 +1218,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                     </Fragment>
                   ))}
 
-                  <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1.5 text-sm">Gross Profit</TableCell>
-                    {months.map((month, idx) => {
-                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
-                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
-                      return (
-                        <TableCell 
-                          key={month} 
-                          className={`text-right whitespace-nowrap px-2 py-1.5 text-xs ${!isSeasonalMonth(idx) ? 'bg-muted/70' : 'bg-muted'}`}
-                        >
-                          {formatCurrency(revenue - cogs, { dash: true })}
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="text-right whitespace-nowrap px-2 py-1.5 text-xs bg-muted">{formatCurrency(getAdjustedCategoryAnnualTotal('Revenue') - getAdjustedCategoryAnnualTotal('COGS'), { dash: true })}</TableCell>
-                  </TableRow>
-
-                  <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground w-[15%] min-w-[140px] max-w-[200px] px-3 py-1">Gross Profit Margin</TableCell>
-                    {months.map((month, idx) => {
-                      const revenue = getAdjustedCategoryTotal('Revenue', month, idx);
-                      const cogs = getAdjustedCategoryTotal('COGS', month, idx);
-                      const gp = revenue - cogs;
-                      const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
-                      return (
-                        <TableCell 
-                          key={month} 
-                          className={`text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/20' : 'bg-muted/30'}`}
-                        >
-                          {formatPercent(margin, { dash: true })}
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted/30">
-                      {(() => {
-                        const adjRev = getAdjustedCategoryAnnualTotal('Revenue');
-                        const adjGP = adjRev - getAdjustedCategoryAnnualTotal('COGS');
-                        return formatPercent(adjRev !== 0 ? (adjGP / adjRev) * 100 : null, { dash: true });
-                      })()}
-                    </TableCell>
-                  </TableRow>
-
                   <TableRow className="bg-primary/10 font-bold">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] px-3 py-1.5 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
                     {months.map((month, idx) => {
@@ -1293,6 +1295,44 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                 <TableBody>
                   {['Revenue', 'COGS', 'Expenses'].map((category) => (
                     <Fragment key={category}>
+                      {category === 'Expenses' && (
+                        <>
+                          <TableRow className="bg-muted font-bold border-t-2">
+                            <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-2 py-1.5 text-sm">Gross Profit</TableCell>
+                            {yearRange.map((year) => {
+                              const revenue = getAnnualCategoryTotal('Revenue', year);
+                              const cogs = getAnnualCategoryTotal('COGS', year);
+                              const hasData = availableYears.includes(String(year));
+                              return (
+                                <TableCell 
+                                  key={year} 
+                                  className={`text-right text-sm font-bold bg-muted px-2 py-1.5 ${!hasData ? 'text-muted-foreground/50' : ''}`}
+                                >
+                                  {hasData ? formatCurrency(revenue - cogs, { dash: true }) : '-'}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-2 py-1">Gross Profit Margin</TableCell>
+                            {yearRange.map((year) => {
+                              const revenue = getAnnualCategoryTotal('Revenue', year);
+                              const cogs = getAnnualCategoryTotal('COGS', year);
+                              const gp = revenue - cogs;
+                              const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
+                              const hasData = availableYears.includes(String(year));
+                              return (
+                                <TableCell 
+                                  key={year} 
+                                  className={`text-right text-xs text-muted-foreground bg-muted/30 px-2 py-1 ${!hasData ? 'opacity-50' : ''}`}
+                                >
+                                  {hasData ? formatPercent(margin, { dash: true }) : '-'}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        </>
+                      )}
                       <TableRow 
                         className="bg-muted/50 cursor-pointer hover:bg-muted"
                         onClick={() => toggleCategory(category)}
@@ -1419,42 +1459,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       })()}
                     </Fragment>
                   ))}
-
-                  <TableRow className="bg-muted font-bold border-t-2">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-2 py-1.5 text-sm">Gross Profit</TableCell>
-                    {yearRange.map((year) => {
-                      const revenue = getAnnualCategoryTotal('Revenue', year);
-                      const cogs = getAnnualCategoryTotal('COGS', year);
-                      const hasData = availableYears.includes(String(year));
-                      return (
-                        <TableCell 
-                          key={year} 
-                          className={`text-right text-sm font-bold bg-muted px-2 py-1.5 ${!hasData ? 'text-muted-foreground/50' : ''}`}
-                        >
-                          {hasData ? formatCurrency(revenue - cogs, { dash: true }) : '-'}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-
-                  <TableRow className="bg-muted/30">
-                    <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-2 py-1">Gross Profit Margin</TableCell>
-                    {yearRange.map((year) => {
-                      const revenue = getAnnualCategoryTotal('Revenue', year);
-                      const cogs = getAnnualCategoryTotal('COGS', year);
-                      const gp = revenue - cogs;
-                      const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
-                      const hasData = availableYears.includes(String(year));
-                      return (
-                        <TableCell 
-                          key={year} 
-                          className={`text-right text-xs text-muted-foreground bg-muted/30 px-2 py-1 ${!hasData ? 'opacity-50' : ''}`}
-                        >
-                          {hasData ? formatPercent(margin, { dash: true }) : '-'}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
 
                   <TableRow className="bg-primary/10 font-bold">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-2 py-1.5 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
