@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -80,6 +80,10 @@ export default function AnalyticsIndex() {
   const handleCalculate = () => {
     mutate();
   };
+
+  useEffect(() => {
+    mutate();
+  }, []);
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000) {

@@ -174,7 +174,30 @@ export default function IndustryStandards() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">Loading standards...</div>
+          <div className="grid gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 rounded bg-muted animate-pulse" />
+                    <div className="h-5 w-32 rounded bg-muted animate-pulse" />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="flex items-center gap-4">
+                      <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-28 rounded bg-muted animate-pulse" />
+                      <div className="h-4 w-12 rounded bg-muted animate-pulse" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : standards.length === 0 ? (
           <Card>
             <CardContent className="py-12">

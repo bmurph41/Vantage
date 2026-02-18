@@ -222,6 +222,46 @@ export default function CapitalMarketsPage() {
         </div>
       </div>
 
+      {curveLoading ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border-primary/20 bg-primary/5">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-20" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-3 w-16 mt-1" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : yieldCurve?.points && yieldCurve.points.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          {(() => {
+            const keyTenors: Tenor[] = ["overnight", "2y", "5y", "10y"];
+            const labels: Record<string, string> = { overnight: "SOFR / O/N", "2y": "2-Year Treasury", "5y": "5-Year Treasury", "10y": "10-Year Treasury" };
+            return keyTenors.map((t) => {
+              const point = yieldCurve.points.find((p) => p.tenor === t);
+              return (
+                <Card key={t} className="border-primary/20 bg-primary/5">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">{labels[t]}</CardTitle>
+                    <Landmark className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{point ? `${point.rate.toFixed(3)}%` : "N/A"}</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {yieldCurve.curveDate ? format(new Date(yieldCurve.curveDate), "MMM d, yyyy") : ""}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            });
+          })()}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -231,6 +231,7 @@ const ValuationTimelineIndex = lazy(() => import("@/pages/analysis/valuation-tim
 const DemographicsIndex = lazy(() => import("@/pages/analysis/demographics/Index"));
 const BenchmarksIndex = lazy(() => import("@/pages/analysis/benchmarks/Index"));
 const CapitalMarketsIndex = lazy(() => import("@/pages/analysis/capital-markets"));
+const AnalysisHub = lazy(() => import("@/pages/analysis/AnalysisHub"));
 const DebtScenariosIndex = lazy(() => import("@/pages/modeling/debt-scenarios/Index"));
 const ExitStrategiesIndex = lazy(() => import("@/pages/modeling/exit-strategies"));
 const ScenariosIndex = lazy(() => import("@/pages/modeling/scenarios"));
@@ -1912,6 +1913,13 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <CapitalMarketsIndex />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/hub">
+        {() => (
+          <UnifiedLayout>
+            <AnalysisHub />
           </UnifiedLayout>
         )}
       </Route>

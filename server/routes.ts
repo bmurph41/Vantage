@@ -480,6 +480,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
+
+  app.get("/api/analysis/hub-stats", authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user?.organizationId;
+      const [salesResult, rateResult, dealsResult] = await Promise.all([
+        db.execute(sql`SELECT COUNT(*)::int as count FROM sales_comps WHERE org_id = ${orgId} OR is_global = true`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM rate_comps WHERE org_id = ${orgId} OR is_global = true`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM docktalk_deals`),
+      ]);
+
+      let marketRatesCount = 0;
+      try {
+        const ratesResult = await db.execute(sql`SELECT COUNT(*)::int as count FROM fred_rate_observations`);
+        marketRatesCount = (ratesResult.rows[0] as any)?.count ?? 0;
+      } catch {
+        marketRatesCount = 0;
+      }
+
+      res.json({
+        salesCompsCount: (salesResult.rows[0] as any)?.count ?? 0,
+        rateCompsCount: (rateResult.rows[0] as any)?.count ?? 0,
+        dealsCount: (dealsResult.rows[0] as any)?.count ?? 0,
+        marketRatesCount,
+      });
+    } catch (error: any) {
+      console.error("Hub stats error:", error);
+      res.json({ salesCompsCount: 0, rateCompsCount: 0, dealsCount: 0, marketRatesCount: 0 });
+    }
+  });
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);
   app.use("/api/marketplace", authenticateUser, enforceTenant, marketplaceRoutes);
   app.use("/api/funds", authenticateUser, requireFundManagement());
