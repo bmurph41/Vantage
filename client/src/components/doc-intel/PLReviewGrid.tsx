@@ -305,19 +305,31 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     },
   });
 
+  const [bulkOpLabel, setBulkOpLabel] = useState<string>("");
+
   const bulkUpdateMutation = useMutation({
     mutationFn: async (updates: { itemIds: string[]; updates: Partial<ExtractedItem>; lineItemKey?: string; silent?: boolean }) => {
+      const status = updates.updates.status;
+      const count = updates.itemIds.length;
+      if (status === "confirmed") {
+        setBulkOpLabel(`Confirming ${count} item${count !== 1 ? "s" : ""}…`);
+      } else if (status === "excluded") {
+        setBulkOpLabel(`Excluding ${count} item${count !== 1 ? "s" : ""}…`);
+      } else if (updates.updates.categoryTierConfirmed) {
+        setBulkOpLabel(`Updating category for ${count} item${count !== 1 ? "s" : ""}…`);
+      } else if (updates.updates.expenseDeptConfirmed || updates.updates.revenueCogsDeptConfirmed) {
+        setBulkOpLabel(`Updating department for ${count} item${count !== 1 ? "s" : ""}…`);
+      } else {
+        setBulkOpLabel(`Updating ${count} item${count !== 1 ? "s" : ""}…`);
+      }
       return apiRequest("PATCH", `/api/doc-intel/uploads/${uploadId}/items/bulk`, { itemIds: updates.itemIds, updates: updates.updates });
     },
     onSuccess: async (_, variables) => {
-      // Wait for both queries to complete before clearing optimistic state
-      // This prevents the "disappearing selection" issue
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", uploadId, "items", "grouped"] }),
       ]);
       setSelectedIds(new Set());
-      // Clear optimistic state AFTER data is refetched so selections don't disappear
       if (variables.lineItemKey) {
         setOptimisticCategories(prev => {
           const next = { ...prev };
@@ -330,10 +342,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           return next;
         });
       }
-      // Only show toast for explicit bulk operations, not individual row actions
       if (!variables.silent && variables.itemIds.length > 1 && !variables.lineItemKey) {
         toast({ title: "Updated", description: "Selected items have been updated." });
       }
+      setBulkOpLabel("");
+    },
+    onError: () => {
+      setBulkOpLabel("");
     },
   });
 
@@ -941,7 +956,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                   disabled={bulkUpdateMutation.isPending || confirmablePendingItems.length === 0}
                   className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
                 >
-                  <Check className="h-4 w-4 mr-1" />
+                  {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Confirming") ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-1" />
+                  )}
                   Confirm All ({confirmablePendingItems.length})
                   {skippedPendingCount > 0 && (
                     <span className="ml-1 text-amber-600">({skippedPendingCount} need classification)</span>
@@ -962,7 +981,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             disabled={bulkUpdateMutation.isPending || visiblePendingItems.length === 0}
             className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
           >
-            <X className="h-4 w-4 mr-1" />
+            {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Excluding") ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <X className="h-4 w-4 mr-1" />
+            )}
             Exclude All ({visiblePendingItems.length})
           </Button>
         </div>
@@ -1001,7 +1024,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                 onClick={handleBulkConfirm}
                 disabled={bulkUpdateMutation.isPending}
               >
-                <Check className="h-4 w-4 mr-1" />
+                {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Confirming") ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-1" />
+                )}
                 Confirm
               </Button>
               <Button
@@ -1010,7 +1037,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                 onClick={handleBulkExclude}
                 disabled={bulkUpdateMutation.isPending}
               >
-                <X className="h-4 w-4 mr-1" />
+                {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Excluding") ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4 mr-1" />
+                )}
                 Exclude
               </Button>
             </>
@@ -1018,7 +1049,17 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-hidden relative">
+        {bulkUpdateMutation.isPending && (
+          <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-3 transition-opacity duration-200">
+            <div className="relative">
+              <div className="h-10 w-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+            </div>
+            <p className="text-sm font-medium text-foreground animate-pulse">
+              {bulkOpLabel || "Processing…"}
+            </p>
+          </div>
+        )}
         {isLoadingGrouped ? (
           <div className="flex items-center justify-center h-48">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
