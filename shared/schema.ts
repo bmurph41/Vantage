@@ -25220,3 +25220,96 @@ export const insertUtilPresenceEventSchema = createInsertSchema(utilPresenceEven
 export const selectUtilPresenceEventSchema = createSelectSchema(utilPresenceEvents);
 export type InsertUtilPresenceEvent = z.infer<typeof insertUtilPresenceEventSchema>;
 export type UtilPresenceEvent = typeof utilPresenceEvents.$inferSelect;
+
+// ── Phase 5: Waitlist & Turn Management ──
+
+export const waitlistStatusEnum = pgEnum("waitlist_status", ["active", "paused", "closed"]);
+export const waitlistEntryStatusEnum = pgEnum("waitlist_entry_status", ["waiting", "offered", "accepted", "declined", "expired", "cancelled"]);
+export const waitlistOfferStatusEnum = pgEnum("waitlist_offer_status", ["pending", "accepted", "declined", "expired", "cancelled"]);
+
+export const waitlists = pgTable('waitlists', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  unitType: varchar('unit_type', { length: 50 }).notNull(),
+  bandKey: varchar('band_key', { length: 20 }),
+  name: varchar('name', { length: 200 }).notNull(),
+  status: waitlistStatusEnum('status').notNull().default('active'),
+  constraints: jsonb('constraints').$type<Record<string, any>>().default({}),
+  maxEntries: integer('max_entries'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('wl_org_idx').on(table.orgId),
+  propertyIdx: index('wl_property_idx').on(table.propertyId),
+  propertyTypeIdx: index('wl_property_type_idx').on(table.propertyId, table.unitType),
+  propertyBandIdx: index('wl_property_band_idx').on(table.propertyId, table.unitType, table.bandKey),
+  statusIdx: index('wl_status_idx').on(table.status),
+}));
+
+export const waitlistEntries = pgTable('waitlist_entries', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  waitlistId: varchar('waitlist_id').notNull().references(() => waitlists.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  contactName: varchar('contact_name', { length: 200 }).notNull(),
+  contactEmail: varchar('contact_email', { length: 200 }),
+  contactPhone: varchar('contact_phone', { length: 50 }),
+  contactId: varchar('contact_id'),
+  boatLengthFt: decimal('boat_length_ft', { precision: 8, scale: 2 }),
+  boatBeamFt: decimal('boat_beam_ft', { precision: 8, scale: 2 }),
+  boatDraftFt: decimal('boat_draft_ft', { precision: 8, scale: 2 }),
+  boatName: varchar('boat_name', { length: 200 }),
+  preferredBandKey: varchar('preferred_band_key', { length: 20 }),
+  notes: text('notes'),
+  priority: integer('priority').notNull().default(0),
+  position: integer('position').notNull().default(0),
+  status: waitlistEntryStatusEnum('status').notNull().default('waiting'),
+  joinedAt: timestamp('joined_at').defaultNow().notNull(),
+  offeredAt: timestamp('offered_at'),
+  resolvedAt: timestamp('resolved_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  waitlistIdx: index('wle_waitlist_idx').on(table.waitlistId),
+  orgIdx: index('wle_org_idx').on(table.orgId),
+  statusIdx: index('wle_status_idx').on(table.status),
+  positionIdx: index('wle_position_idx').on(table.waitlistId, table.position),
+  contactIdx: index('wle_contact_idx').on(table.contactId),
+}));
+
+export const waitlistOffers = pgTable('waitlist_offers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  entryId: varchar('entry_id').notNull().references(() => waitlistEntries.id, { onDelete: 'cascade' }),
+  waitlistId: varchar('waitlist_id').notNull().references(() => waitlists.id, { onDelete: 'cascade' }),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  unitId: varchar('unit_id').notNull(),
+  unitCode: varchar('unit_code', { length: 50 }),
+  status: waitlistOfferStatusEnum('status').notNull().default('pending'),
+  offeredAt: timestamp('offered_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at'),
+  respondedAt: timestamp('responded_at'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  entryIdx: index('wlo_entry_idx').on(table.entryId),
+  waitlistIdx: index('wlo_waitlist_idx').on(table.waitlistId),
+  orgIdx: index('wlo_org_idx').on(table.orgId),
+  statusIdx: index('wlo_status_idx').on(table.status),
+  unitIdx: index('wlo_unit_idx').on(table.unitId),
+}));
+
+export const insertWaitlistSchema = createInsertSchema(waitlists).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectWaitlistSchema = createSelectSchema(waitlists);
+export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
+export type Waitlist = typeof waitlists.$inferSelect;
+
+export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
+export type InsertWaitlistEntry = z.infer<typeof insertWaitlistEntrySchema>;
+export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
+
+export const insertWaitlistOfferSchema = createInsertSchema(waitlistOffers).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectWaitlistOfferSchema = createSelectSchema(waitlistOffers);
+export type InsertWaitlistOffer = z.infer<typeof insertWaitlistOfferSchema>;
+export type WaitlistOffer = typeof waitlistOffers.$inferSelect;

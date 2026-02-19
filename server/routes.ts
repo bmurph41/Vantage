@@ -439,6 +439,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { createUtilizationRouter } = await import('./modules/utilization/utilization-routes');
   app.use("/api/utilization", authenticateUser, createUtilizationRouter());
 
+  // Waitlist module routes
+  const { createWaitlistRouter } = await import('./modules/utilization/waitlist-routes');
+  app.use("/api/waitlist", authenticateUser, createWaitlistRouter());
+
   // Payroll module routes
   app.use("/api/payroll", authenticateUser, payrollRouter);
   app.use("/api/payroll/permissions", authenticateUser, permissionsRouter);

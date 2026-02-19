@@ -16,6 +16,7 @@ import UtilizationByTypeTable from './UtilizationByTypeTable';
 import UtilizationByBandChart from './UtilizationByBandChart';
 import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
 import OfflineBreakdownTable from './OfflineBreakdownTable';
+import WaitlistPanel from './WaitlistPanel';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
 type UtilizationMode = 'contracted' | 'physical';
@@ -307,6 +308,8 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         periodEnd={periodEnd}
         mode={utilMode}
       />
+
+      <WaitlistPanel propertyId={effectivePropertyId} />
 
       <UtilizationDrilldownDrawer
         open={drilldownOpen}
