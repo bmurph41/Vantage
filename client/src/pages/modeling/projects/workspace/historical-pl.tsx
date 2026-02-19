@@ -414,8 +414,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       if (lineAddback && lineAddback.values.length > 0) {
         const yearValue = lineAddback.values.find(v => v.year === yearNum && v.month == null);
         if (yearValue) {
-          const customAmount = parseFloat(yearValue.amount) || 0;
-          return customAmount / 12;
+          const replacementAmount = parseFloat(yearValue.amount);
+          return isNaN(replacementAmount) ? 0 : replacementAmount;
         }
       }
       return showNormalized ? 0 : rawValue;
@@ -423,7 +423,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     if (isMonthCellAddedBack(item.subcategory, yearNum, monthNum)) {
       const cellAddback = getAddbackForMonthCell(item.subcategory, yearNum, monthNum);
       if (cellAddback && cellAddback.values.length > 0) {
-        return parseFloat(cellAddback.values[0].amount) || 0;
+        const replacementAmount = parseFloat(cellAddback.values[0].amount);
+        return isNaN(replacementAmount) ? 0 : replacementAmount;
       }
       return showNormalized ? 0 : rawValue;
     }

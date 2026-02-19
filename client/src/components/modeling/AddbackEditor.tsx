@@ -92,14 +92,12 @@ export function AddbackEditor({
 
   const handleSave = async () => {
     const values: { year: number; month?: number; amount: string }[] = [];
-    const amountStr = customAmount?.trim();
+    const amountStr = customAmount?.trim() || '0';
 
-    if (amountStr && parseFloat(amountStr) !== 0) {
-      if (scope === 'month_cell' && year != null && month != null) {
-        values.push({ year, month, amount: amountStr });
-      } else if (year != null) {
-        values.push({ year, amount: amountStr });
-      }
+    if (scope === 'month_cell' && year != null && month != null) {
+      values.push({ year, month, amount: amountStr });
+    } else if (year != null) {
+      values.push({ year, amount: amountStr });
     }
 
     await onSave({
@@ -110,11 +108,11 @@ export function AddbackEditor({
       scope,
       reason: reason || 'other',
       notes: notes || undefined,
-      amount: amountStr || undefined,
+      amount: amountStr,
       addbackMonth: scope === 'month_cell' ? month : undefined,
       addbackYear: scope === 'month_cell' ? year : (year || undefined),
       periodType: scope === 'month_cell' ? 'monthly' : 'yearly',
-      values: values.length > 0 ? values : undefined,
+      values,
     });
     setOpen(false);
   };
@@ -233,10 +231,10 @@ export function AddbackEditor({
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded px-2 py-1.5">
               <p className="text-[10px] text-blue-700 dark:text-blue-400 leading-relaxed">
                 {scope === 'month_cell'
-                  ? 'This value will replace the original amount for this month in the normalized view. Leave blank to zero it out.'
+                  ? 'This value replaces the original amount for this month. Leave blank or enter $0 to zero it out.'
                   : scope === 'category'
-                    ? 'This value will replace the original total for the entire category in the normalized view. Leave blank to zero it out.'
-                    : 'This replaces the annual total for ALL months in this line item. The value is distributed evenly across months. Enter $0 to eliminate it entirely, or enter an adjusted total.'}
+                    ? 'This value replaces the original total for the entire category. Leave blank or enter $0 to zero it out.'
+                    : 'This value replaces the original amount for ALL months in this line item. Each month will show this value. Leave blank or enter $0 to eliminate it entirely.'}
               </p>
             </div>
           </div>

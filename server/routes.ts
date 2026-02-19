@@ -20178,7 +20178,7 @@ Current context: Project ${req.params.projectId}`;
             amount: String(v.amount || '0'),
           }))
         );
-      } else if (amount != null && amount !== '' && amount !== '0') {
+      } else if (amount != null && amount !== '') {
         if (resolvedScope === 'month_cell' && addbackYear != null && addbackMonth != null) {
           await db.insert(modelingAddbackValues).values({
             addbackId: addback.id,
