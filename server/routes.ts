@@ -13858,19 +13858,25 @@ Current context: Project ${req.params.projectId}`;
         if (stateFilter) conditions.push(eq(modelingProjects.state, stateFilter));
         if (searchFilter) conditions.push(ilike(modelingProjects.marinaName, `%${searchFilter}%`));
 
-        const rows = await db.select().from(modelingProjects).where(and(...conditions)).limit(500);
-        for (const r of rows) {
-          if (!r.city && !r.state) continue;
+        const rows = await db.select({
+          project: modelingProjects,
+          property: crmProperties,
+        }).from(modelingProjects)
+          .leftJoin(crmProperties, eq(modelingProjects.propertyId, crmProperties.id))
+          .where(and(...conditions)).limit(500);
+        for (const { project: r, property: p } of rows) {
+          if (!r.city && !r.state && !p?.city && !p?.state) continue;
+          const coords = p?.coordinates as any;
           results.push({
             id: r.id,
             source: 'project' as const,
             name: r.marinaName,
-            address: r.address,
-            city: r.city,
-            state: r.state,
-            zipCode: r.zipCode,
-            lat: null,
-            lng: null,
+            address: r.address || p?.address,
+            city: r.city || p?.city,
+            state: r.state || p?.state,
+            zipCode: r.zipCode || p?.zipCode,
+            lat: coords?.lat ? Number(coords.lat) : null,
+            lng: coords?.lng ? Number(coords.lng) : null,
             price: r.purchasePrice ? Number(r.purchasePrice) : null,
             slips: r.totalStorageUnits,
             status: r.dealOutcome,
@@ -13924,7 +13930,24 @@ Current context: Project ${req.params.projectId}`;
         if (stateFilter) conditions.push(eq(rateComps.state, stateFilter));
         if (searchFilter) conditions.push(ilike(rateComps.marina, `%${searchFilter}%`));
 
-        const rows = await db.select().from(rateComps).where(and(...conditions)).limit(500);
+        const rows = await db.select({
+          id: rateComps.id,
+          marina: rateComps.marina,
+          address: rateComps.address,
+          city: rateComps.city,
+          state: rateComps.state,
+          zip: rateComps.zip,
+          lat: rateComps.lat,
+          lng: rateComps.lng,
+          salePrice: rateComps.salePrice,
+          wetSlips: rateComps.wetSlips,
+          dryRacks: rateComps.dryRacks,
+          rateType: rateComps.rateType,
+          seasonality: rateComps.seasonality,
+          bodyOfWater: rateComps.bodyOfWater,
+          region: rateComps.region,
+          storageTypes: rateComps.storageTypes,
+        }).from(rateComps).where(and(...conditions)).limit(500);
         for (const r of rows) {
           results.push({
             id: r.id,
@@ -13941,7 +13964,6 @@ Current context: Project ${req.params.projectId}`;
             status: null,
             metrics: {
               rateType: r.rateType,
-              rateAmount: r.rateAmount,
               seasonality: r.seasonality,
               wetSlips: r.wetSlips,
               dryRacks: r.dryRacks,
@@ -13954,15 +13976,16 @@ Current context: Project ${req.params.projectId}`;
       }
 
       if (source === 'all' || source === 'pipeline') {
-        const { deals } = await import('@shared/schema');
-        const dealConditions: any[] = [eq(deals.orgId, orgId)];
-        if (searchFilter) dealConditions.push(ilike(deals.title, `%${searchFilter}%`));
+        const { dealWorkspaces: dws } = await import('@shared/schema');
+        const dealConditions: any[] = [eq(crmDeals.orgId, orgId)];
+        if (searchFilter) dealConditions.push(ilike(crmDeals.title, `%${searchFilter}%`));
 
         const dealRows = await db.select({
-          deal: deals,
+          deal: crmDeals,
           property: crmProperties,
-        }).from(deals)
-          .leftJoin(crmProperties, eq(deals.propertyId, crmProperties.id))
+        }).from(crmDeals)
+          .leftJoin(dws, eq(dws.dealId, crmDeals.id))
+          .leftJoin(crmProperties, eq(dws.propertyId, crmProperties.id))
           .where(and(...dealConditions))
           .limit(500);
 
@@ -13972,8 +13995,8 @@ Current context: Project ${req.params.projectId}`;
           const coords = p?.coordinates as any;
           const lat = coords?.lat ? Number(coords.lat) : null;
           const lng = coords?.lng ? Number(coords.lng) : null;
-          const city = p?.city || null;
-          const state = p?.state || null;
+          const city = p?.city || d.city || null;
+          const state = p?.state || d.state || null;
           if (stateFilter && state !== stateFilter) continue;
           results.push({
             id: d.id,
@@ -14037,6 +14060,45 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
+      const needsGeocoding = results.filter(r => r.lat == null && r.lng == null && (r.address || r.city));
+      if (needsGeocoding.length > 0) {
+        const { geocodingService } = await import('./services/geocodingService');
+        const BATCH_LIMIT = 25;
+        const toGeocode = needsGeocoding.slice(0, BATCH_LIMIT);
+        const geocodePromises = toGeocode.map(async (loc) => {
+          try {
+            const addressStr = geocodingService.buildAddressString({
+              address: loc.address || undefined,
+              city: loc.city || undefined,
+              state: loc.state || undefined,
+              zip: loc.zipCode || undefined,
+            });
+            if (!addressStr) return;
+            const result = await geocodingService.geocodeAddress(addressStr);
+            if ('lat' in result && 'lng' in result) {
+              loc.lat = result.lat;
+              loc.lng = result.lng;
+              try {
+                if (loc.source === 'property') {
+                  await db.update(crmProperties).set({ coordinates: { lat: result.lat, lng: result.lng } }).where(eq(crmProperties.id, loc.id));
+                } else if (loc.source === 'comp') {
+                  await db.update(salesComps).set({ lat: String(result.lat), lng: String(result.lng) }).where(eq(salesComps.id, loc.id));
+                } else if (loc.source === 'rate_comp') {
+                  await db.update(rateComps).set({ lat: String(result.lat), lng: String(result.lng) }).where(eq(rateComps.id, loc.id));
+                } else if (loc.source === 'pipeline' && loc.metrics?.propertyId) {
+                  await db.update(crmProperties).set({ coordinates: { lat: result.lat, lng: result.lng } }).where(eq(crmProperties.id, loc.metrics.propertyId));
+                }
+              } catch (dbErr: any) {
+                console.error(`[Marina Map] Failed to persist geocode for ${loc.source}/${loc.id}:`, dbErr.message);
+              }
+            }
+          } catch (err: any) {
+            console.error(`[Marina Map] Geocode error for ${loc.name}:`, err.message);
+          }
+        });
+        await Promise.all(geocodePromises);
+      }
+
       const withCoordinates = results.filter(r => r.lat != null && r.lng != null).length;
       const bySource: Record<string, number> = { property: 0, project: 0, comp: 0, rate_comp: 0, listing: 0, pipeline: 0 };
       const byState: Record<string, number> = {};
@@ -14052,6 +14114,8 @@ Current context: Project ${req.params.projectId}`;
         stats: {
           total: results.length,
           withCoordinates,
+          needsGeocoding: needsGeocoding.length,
+          geocodedThisRequest: Math.min(needsGeocoding.length, 25),
           bySource,
           byState,
         },
@@ -17172,6 +17236,45 @@ Current context: Project ${req.params.projectId}`;
             },
           });
         }
+      }
+
+      const needsGeocoding = results.filter(r => r.lat == null && r.lng == null && (r.address || r.city));
+      if (needsGeocoding.length > 0) {
+        const { geocodingService } = await import('./services/geocodingService');
+        const toGeocode = needsGeocoding.slice(0, 25);
+        const geocodePromises = toGeocode.map(async (loc) => {
+          try {
+            const addressStr = geocodingService.buildAddressString({
+              address: loc.address || undefined,
+              city: loc.city || undefined,
+              state: loc.state || undefined,
+              zip: loc.zipCode || undefined,
+            });
+            if (!addressStr) return;
+            const result = await geocodingService.geocodeAddress(addressStr);
+            if ('lat' in result && 'lng' in result) {
+              loc.lat = result.lat;
+              loc.lng = result.lng;
+              try {
+                if (loc.source === 'owned' && loc.metrics?.propertyId) {
+                  await db.update(crmProperties).set({ coordinates: { lat: result.lat, lng: result.lng } }).where(eq(crmProperties.id, loc.metrics.propertyId));
+                } else if (loc.source === 'pipeline') {
+                  const props = await db.select({ id: crmProperties.id }).from(crmProperties)
+                    .innerJoin(dealWorkspaces, eq(dealWorkspaces.propertyId, crmProperties.id))
+                    .where(eq(dealWorkspaces.dealId, loc.id)).limit(1);
+                  if (props.length > 0) {
+                    await db.update(crmProperties).set({ coordinates: { lat: result.lat, lng: result.lng } }).where(eq(crmProperties.id, props[0].id));
+                  }
+                }
+              } catch (dbErr: any) {
+                console.error(`[Portfolio Map] Failed to persist geocode for ${loc.source}/${loc.id}:`, dbErr.message);
+              }
+            }
+          } catch (err: any) {
+            console.error(`[Portfolio Map] Geocode error for ${loc.name}:`, err.message);
+          }
+        });
+        await Promise.all(geocodePromises);
       }
 
       const bySource: Record<string, number> = {};
