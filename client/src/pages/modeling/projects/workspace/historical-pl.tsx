@@ -131,6 +131,11 @@ const dataSourceLabels: Record<string, string> = {
   doc_intel: 'Document Intelligence'
 };
 
+function calcGrowthRate(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 export default function WorkspaceHistoricalPL({ projectId, onTabChange }: WorkspaceHistoricalPLProps) {
   const { toast } = useToast();
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -149,6 +154,9 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   const [showMoM, setShowMoM] = useState(false);
   const [showNormalized, setShowNormalized] = useState(false);
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const [showCategoryGrowth, setShowCategoryGrowth] = useState(true);
+  const [showDepartmentGrowth, setShowDepartmentGrowth] = useState(false);
+  const [showLineItemGrowth, setShowLineItemGrowth] = useState(false);
   const { revenueCogsOrder, expensesOrder, updateRevenueCogsOrder, updateExpensesOrder, resetRevenueCogsOrder, resetExpensesOrder, sortDepartments } = useDepartmentOrder();
 
   const { 
@@ -215,6 +223,12 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   }, [availableYears]);
 
   useEffect(() => {
+    if (viewMode === 'all' || viewMode === 'compare') {
+      setDisplayMode('annual');
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
     if (availableYears.length > 0 && !selectedYear) {
       const latestYear = availableYears[availableYears.length - 1];
       setSelectedYear(latestYear);
@@ -239,7 +253,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const { data: allYearsActualsData } = useQuery<ActualsData>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`],
-    enabled: displayMode === 'annual' && yearRange.length > 0,
+    enabled: (displayMode === 'annual' || viewMode === 'all' || viewMode === 'compare') && yearRange.length > 0,
   });
 
   const { data: dataSources } = useQuery<DataSourceSummary[]>({
@@ -609,18 +623,20 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </div>
           )}
           
-          <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'monthly' | 'annual')} className="h-9">
-            <TabsList className="h-9">
-              <TabsTrigger value="monthly" className="text-xs px-3">
-                <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                Monthly
-              </TabsTrigger>
-              <TabsTrigger value="annual" className="text-xs px-3">
-                <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-                Annual
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {viewMode === 'single' && (
+            <Tabs value={displayMode} onValueChange={(v) => setDisplayMode(v as 'monthly' | 'annual')} className="h-9">
+              <TabsList className="h-9">
+                <TabsTrigger value="monthly" className="text-xs px-3">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  Monthly
+                </TabsTrigger>
+                <TabsTrigger value="annual" className="text-xs px-3">
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                  Annual
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
           
           <DepartmentOrderSettings
             revenueCogsOrder={revenueCogsOrder}
@@ -832,7 +848,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </CardDescription>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {displayMode === 'monthly' && (
+              {displayMode === 'monthly' && viewMode === 'single' && (
                 <>
                   <TooltipProvider>
                     <Tooltip>
@@ -902,12 +918,308 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                   </Badge>
                 </>
               )}
+              {(viewMode === 'all' || viewMode === 'compare') && (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showCategoryGrowth ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowCategoryGrowth(!showCategoryGrowth)}
+                          className="h-8 text-xs"
+                        >
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          Category Growth
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Show year-over-year growth at category level</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showDepartmentGrowth ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowDepartmentGrowth(!showDepartmentGrowth)}
+                          className="h-8 text-xs"
+                        >
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          Department Growth
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Show year-over-year growth at department level</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showLineItemGrowth ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowLineItemGrowth(!showLineItemGrowth)}
+                          className="h-8 text-xs"
+                        >
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          Line Item Growth
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Show year-over-year growth at line item level</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
           <div className="overflow-x-auto relative isolate">
-            {displayMode === 'monthly' ? (
+            {viewMode === 'compare' ? (
+              <div className="overflow-x-auto">
+              <Table style={{ minWidth: '700px' }}>
+                <colgroup>
+                  <col style={{ width: '240px', minWidth: '180px' }} />
+                  <col style={{ width: '140px', minWidth: '110px' }} />
+                  <col style={{ width: '140px', minWidth: '110px' }} />
+                  <col style={{ width: '130px', minWidth: '100px' }} />
+                  <col style={{ width: '100px', minWidth: '80px' }} />
+                </colgroup>
+                <TableHeader>
+                  <TableRow className="border-b-2">
+                    <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r px-3 py-2.5 text-xs uppercase tracking-wider text-muted-foreground">Line Item</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">{compareYears[0]}</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">{compareYears[1]}</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">$ Change</TableHead>
+                    <TableHead className="text-center px-3 py-2.5 font-bold text-sm">% Change</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['Revenue', 'COGS', 'Expenses'].map((category) => {
+                    const yearA = Number(compareYears[0]);
+                    const yearB = Number(compareYears[1]);
+                    const hasDataA = availableYears.includes(compareYears[0]);
+                    const hasDataB = availableYears.includes(compareYears[1]);
+                    const catTotalA = getAnnualCategoryTotal(category, yearA);
+                    const catTotalB = getAnnualCategoryTotal(category, yearB);
+                    const catDollarChange = catTotalB - catTotalA;
+                    const catPctChange = calcGrowthRate(catTotalB, catTotalA);
+
+                    return (
+                      <Fragment key={category}>
+                        {category === 'Expenses' && (() => {
+                          const revA = getAnnualCategoryTotal('Revenue', yearA);
+                          const revB = getAnnualCategoryTotal('Revenue', yearB);
+                          const cogsA = getAnnualCategoryTotal('COGS', yearA);
+                          const cogsB = getAnnualCategoryTotal('COGS', yearB);
+                          const gpA = revA - cogsA;
+                          const gpB = revB - cogsB;
+                          const gpDollarChange = gpB - gpA;
+                          const gpPctChange = calcGrowthRate(gpB, gpA);
+                          const marginA = revA !== 0 ? (gpA / revA) * 100 : null;
+                          const marginB = revB !== 0 ? (gpB / revB) * 100 : null;
+                          return (
+                            <>
+                              <TableRow className="bg-muted font-bold border-t-2">
+                                <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">Gross Profit</TableCell>
+                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataA ? formatCurrency(gpA, { dash: true }) : '-'}</TableCell>
+                                <TableCell className="text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums">{hasDataB ? formatCurrency(gpB, { dash: true }) : '-'}</TableCell>
+                                <TableCell className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${gpDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {hasDataA && hasDataB ? formatCurrency(gpDollarChange, { dash: true }) : 'N/A'}
+                                </TableCell>
+                                <TableCell className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${gpPctChange !== null && gpPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {hasDataA && hasDataB ? (gpPctChange !== null ? `${gpPctChange >= 0 ? '+' : ''}${gpPctChange.toFixed(1)}%` : '—') : 'N/A'}
+                                </TableCell>
+                              </TableRow>
+                              <TableRow className="bg-muted/30">
+                                <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-3 py-1.5">Gross Margin</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums">{hasDataA ? formatPercent(marginA, { dash: true }) : '-'}</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums">{hasDataB ? formatPercent(marginB, { dash: true }) : '-'}</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums">—</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums">
+                                  {marginA !== null && marginB !== null ? `${(marginB - marginA).toFixed(1)}pp` : '—'}
+                                </TableCell>
+                              </TableRow>
+                            </>
+                          );
+                        })()}
+                        <TableRow
+                          className="bg-muted/50 cursor-pointer hover:bg-muted"
+                          onClick={() => toggleCategory(category)}
+                        >
+                          <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
+                            <div className="flex items-center gap-1.5">
+                              {expandedCategories.has(category) ? (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                              )}
+                              {category}
+                              {showCategoryGrowth && catPctChange !== null && hasDataA && hasDataB && (
+                                <Badge variant="outline" className={`ml-2 text-[10px] ${catPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
+                                  {catPctChange >= 0 ? '+' : ''}{catPctChange.toFixed(1)}%
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
+                            {hasDataA ? formatCurrency(catTotalA, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
+                            {hasDataB ? formatCurrency(catTotalB, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${catDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA && hasDataB ? formatCurrency(catDollarChange, { dash: true }) : 'N/A'}
+                          </TableCell>
+                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${catPctChange !== null && catPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA && hasDataB ? (catPctChange !== null ? `${catPctChange >= 0 ? '+' : ''}${catPctChange.toFixed(1)}%` : '—') : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+
+                        {expandedCategories.has(category) && (() => {
+                          const subcats = annualSubcategories[category as keyof typeof annualSubcategories] || [];
+                          const deptGrouped: Record<string, string[]> = {};
+                          subcats.forEach((sub: string) => {
+                            const dept = annualSubcatDeptMap[sub] || inferDepartmentClient(sub, category);
+                            if (!deptGrouped[dept]) deptGrouped[dept] = [];
+                            deptGrouped[dept].push(sub);
+                          });
+                          const sortedDepts = sortDepartments(Object.keys(deptGrouped), category);
+                          return sortedDepts.map(department => {
+                            const deptSubcats = deptGrouped[department] || [];
+                            const deptTotalA = deptSubcats.reduce((sum: number, sub: string) => sum + getAnnualSubcategoryAmount(category, sub, yearA), 0);
+                            const deptTotalB = deptSubcats.reduce((sum: number, sub: string) => sum + getAnnualSubcategoryAmount(category, sub, yearB), 0);
+                            const deptDollarChange = deptTotalB - deptTotalA;
+                            const deptPctChange = calcGrowthRate(deptTotalB, deptTotalA);
+                            return (
+                              <Fragment key={`${category}-${department}`}>
+                                <TableRow
+                                  className="cursor-pointer hover:bg-muted/50"
+                                  onClick={() => toggleDepartment(`${category}-${department}`)}
+                                >
+                                  <TableCell className="pl-6 whitespace-nowrap sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5">
+                                    <div className="flex items-center gap-1">
+                                      {expandedDepartments.has(`${category}-${department}`) ? (
+                                        <ChevronDown className="h-3 w-3 shrink-0" />
+                                      ) : (
+                                        <ChevronRight className="h-3 w-3 shrink-0" />
+                                      )}
+                                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{getDisplayName(department, 'department')}</span>
+                                      {showDepartmentGrowth && deptPctChange !== null && hasDataA && hasDataB && (
+                                        <Badge variant="outline" className={`ml-1 text-[10px] ${deptPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
+                                          {deptPctChange >= 0 ? '+' : ''}{deptPctChange.toFixed(1)}%
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums`}>
+                                    {hasDataA ? formatCurrency(deptTotalA, { dash: true }) : '-'}
+                                  </TableCell>
+                                  <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums`}>
+                                    {hasDataB ? formatCurrency(deptTotalB, { dash: true }) : '-'}
+                                  </TableCell>
+                                  <TableCell className={`text-right text-xs font-medium bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${deptDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {hasDataA && hasDataB ? formatCurrency(deptDollarChange, { dash: true }) : 'N/A'}
+                                  </TableCell>
+                                  <TableCell className={`text-right text-xs font-medium bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${deptPctChange !== null && deptPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {hasDataA && hasDataB ? (deptPctChange !== null ? `${deptPctChange >= 0 ? '+' : ''}${deptPctChange.toFixed(1)}%` : '—') : 'N/A'}
+                                  </TableCell>
+                                </TableRow>
+
+                                {expandedDepartments.has(`${category}-${department}`) && deptSubcats.map((subcategory: string) => {
+                                  const subAmountA = getAnnualSubcategoryAmount(category, subcategory, yearA);
+                                  const subAmountB = getAnnualSubcategoryAmount(category, subcategory, yearB);
+                                  const subDollarChange = subAmountB - subAmountA;
+                                  const subPctChange = calcGrowthRate(subAmountB, subAmountA);
+                                  return (
+                                    <TableRow key={`${category}-${subcategory}`}>
+                                      <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-xs truncate max-w-[240px]">
+                                        <div className="flex items-center gap-1">
+                                          <span>{getDisplayName(subcategory, 'line_item', category, department)}</span>
+                                          {showLineItemGrowth && subPctChange !== null && hasDataA && hasDataB && (
+                                            <Badge variant="outline" className={`ml-1 text-[10px] ${subPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
+                                              {subPctChange >= 0 ? '+' : ''}{subPctChange.toFixed(1)}%
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
+                                        {hasDataA && subAmountA !== 0 ? formatCurrency(subAmountA, { dash: true }) : '-'}
+                                      </TableCell>
+                                      <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
+                                        {hasDataB && subAmountB !== 0 ? formatCurrency(subAmountB, { dash: true }) : '-'}
+                                      </TableCell>
+                                      <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${subDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {hasDataA && hasDataB ? formatCurrency(subDollarChange, { dash: true }) : 'N/A'}
+                                      </TableCell>
+                                      <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${subPctChange !== null && subPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {hasDataA && hasDataB ? (subPctChange !== null ? `${subPctChange >= 0 ? '+' : ''}${subPctChange.toFixed(1)}%` : '—') : 'N/A'}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </Fragment>
+                            );
+                          });
+                        })()}
+                      </Fragment>
+                    );
+                  })}
+
+                  {(() => {
+                    const yearA = Number(compareYears[0]);
+                    const yearB = Number(compareYears[1]);
+                    const hasDataA = availableYears.includes(compareYears[0]);
+                    const hasDataB = availableYears.includes(compareYears[1]);
+                    const revA = getAnnualCategoryTotal('Revenue', yearA);
+                    const revB = getAnnualCategoryTotal('Revenue', yearB);
+                    const cogsA = getAnnualCategoryTotal('COGS', yearA);
+                    const cogsB = getAnnualCategoryTotal('COGS', yearB);
+                    const expA = getAnnualCategoryTotal('Expenses', yearA);
+                    const expB = getAnnualCategoryTotal('Expenses', yearB);
+                    const noiA = revA - cogsA - expA;
+                    const noiB = revB - cogsB - expB;
+                    const noiDollarChange = noiB - noiA;
+                    const noiPctChange = calcGrowthRate(noiB, noiA);
+                    const marginA = revA !== 0 ? (noiA / revA) * 100 : null;
+                    const marginB = revB !== 0 ? (noiB / revB) * 100 : null;
+                    return (
+                      <>
+                        <TableRow className="bg-primary/10 font-bold border-t-2">
+                          <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
+                          <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : noiA >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA ? formatCurrency(noiA, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : noiB >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataB ? formatCurrency(noiB, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${noiDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA && hasDataB ? formatCurrency(noiDollarChange, { dash: true }) : 'N/A'}
+                          </TableCell>
+                          <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${noiPctChange !== null && noiPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA && hasDataB ? (noiPctChange !== null ? `${noiPctChange >= 0 ? '+' : ''}${noiPctChange.toFixed(1)}%` : '—') : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow className="bg-primary/5">
+                          <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-3 py-1.5">Operating Margin</TableCell>
+                          <TableCell className={`text-right text-xs bg-primary/5 px-3 py-1.5 tabular-nums ${marginA !== null && marginA >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataA ? formatPercent(marginA, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className={`text-right text-xs bg-primary/5 px-3 py-1.5 tabular-nums ${marginB !== null && marginB >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasDataB ? formatPercent(marginB, { dash: true }) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground bg-primary/5 px-3 py-1.5 tabular-nums">—</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground bg-primary/5 px-3 py-1.5 tabular-nums">
+                            {marginA !== null && marginB !== null ? `${(marginB - marginA).toFixed(1)}pp` : '—'}
+                          </TableCell>
+                        </TableRow>
+                      </>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+              </div>
+            ) : displayMode === 'monthly' ? (
               <Table className="w-full table-fixed">
                 <colgroup>
                   <col style={{ width: '15%', minWidth: '140px' }} />
@@ -1395,23 +1707,37 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </Table>
             ) : (
               <div className="overflow-x-auto">
-              <Table style={{ width: yearRange.length <= 3 ? 'auto' : '100%', minWidth: yearRange.length <= 3 ? `${240 + yearRange.length * 140}px` : undefined }}>
+              {(() => {
+                const anyGrowthOn = showCategoryGrowth || showDepartmentGrowth || showLineItemGrowth;
+                const showGrowthCols = viewMode === 'all' && anyGrowthOn;
+                return (
+              <Table style={{ width: yearRange.length <= 3 ? 'auto' : '100%', minWidth: yearRange.length <= 3 ? `${240 + yearRange.length * (showGrowthCols ? 200 : 140)}px` : undefined }}>
                 <colgroup>
                   <col style={{ width: '240px', minWidth: '180px' }} />
-                  {yearRange.map((year) => (
-                    <col key={year} style={{ width: yearRange.length <= 3 ? '140px' : undefined, minWidth: '120px' }} />
+                  {yearRange.map((year, yi) => (
+                    <Fragment key={year}>
+                      <col style={{ width: yearRange.length <= 3 ? '140px' : undefined, minWidth: '120px' }} />
+                      {showGrowthCols && yi > 0 && (
+                        <col style={{ width: '70px', minWidth: '60px' }} />
+                      )}
+                    </Fragment>
                   ))}
                 </colgroup>
                 <TableHeader>
                   <TableRow className="border-b-2">
                     <TableHead className="sticky left-0 z-20 bg-white dark:bg-background border-r px-3 py-2.5 text-xs uppercase tracking-wider text-muted-foreground">Line Item</TableHead>
-                    {yearRange.map((year) => {
+                    {yearRange.map((year, yi) => {
                       const hasData = availableYears.includes(String(year));
                       return (
-                        <TableHead key={year} className={`text-center px-3 py-2.5 font-bold text-sm ${!hasData ? 'text-muted-foreground/50' : ''}`}>
-                          {year}
-                          {hasData && <div className="w-1 h-1 rounded-full bg-green-500 mx-auto mt-1" />}
-                        </TableHead>
+                        <Fragment key={year}>
+                          <TableHead className={`text-center px-3 py-2.5 font-bold text-sm ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                            {year}
+                            {hasData && <div className="w-1 h-1 rounded-full bg-green-500 mx-auto mt-1" />}
+                          </TableHead>
+                          {showGrowthCols && yi > 0 && (
+                            <TableHead className="text-center px-1 py-2.5 text-[10px] text-muted-foreground bg-muted/10">YoY %</TableHead>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </TableRow>
@@ -1423,36 +1749,46 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         <>
                           <TableRow className="bg-muted font-bold border-t-2">
                             <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">Gross Profit</TableCell>
-                            {yearRange.map((year) => {
+                            {yearRange.map((year, yi) => {
                               const revenue = getAnnualCategoryTotal('Revenue', year);
                               const cogs = getAnnualCategoryTotal('COGS', year);
                               const gp = revenue - cogs;
                               const hasData = availableYears.includes(String(year));
+                              const prevYear = yi > 0 ? yearRange[yi - 1] : null;
+                              const prevGp = prevYear !== null ? getAnnualCategoryTotal('Revenue', prevYear) - getAnnualCategoryTotal('COGS', prevYear) : null;
+                              const prevHasData = prevYear !== null ? availableYears.includes(String(prevYear)) : false;
+                              const growth = prevGp !== null ? calcGrowthRate(gp, prevGp) : null;
                               return (
-                                <TableCell 
-                                  key={year} 
-                                  className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}
-                                >
-                                  {hasData ? formatCurrency(gp, { dash: true }) : '-'}
-                                </TableCell>
+                                <Fragment key={year}>
+                                  <TableCell className={`text-right text-sm font-bold bg-muted px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                                    {hasData ? formatCurrency(gp, { dash: true }) : '-'}
+                                  </TableCell>
+                                  {showGrowthCols && yi > 0 && (
+                                    <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">
+                                      {hasData && prevHasData ? (growth !== null ? <span className={growth >= 0 ? 'text-green-600' : 'text-red-600'}>{growth >= 0 ? '+' : ''}{growth.toFixed(1)}%</span> : '—') : 'N/A'}
+                                    </TableCell>
+                                  )}
+                                </Fragment>
                               );
                             })}
                           </TableRow>
                           <TableRow className="bg-muted/30">
                             <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-3 py-1.5">Gross Margin</TableCell>
-                            {yearRange.map((year) => {
+                            {yearRange.map((year, yi) => {
                               const revenue = getAnnualCategoryTotal('Revenue', year);
                               const cogs = getAnnualCategoryTotal('COGS', year);
                               const gp = revenue - cogs;
                               const margin = revenue !== 0 ? (gp / revenue) * 100 : null;
                               const hasData = availableYears.includes(String(year));
                               return (
-                                <TableCell 
-                                  key={year} 
-                                  className={`text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums ${!hasData ? 'opacity-50' : ''}`}
-                                >
-                                  {hasData ? formatPercent(margin, { dash: true }) : '-'}
-                                </TableCell>
+                                <Fragment key={year}>
+                                  <TableCell className={`text-right text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 tabular-nums ${!hasData ? 'opacity-50' : ''}`}>
+                                    {hasData ? formatPercent(margin, { dash: true }) : '-'}
+                                  </TableCell>
+                                  {showGrowthCols && yi > 0 && (
+                                    <TableCell className="bg-muted/10 px-1 py-1.5" />
+                                  )}
+                                </Fragment>
                               );
                             })}
                           </TableRow>
@@ -1472,16 +1808,24 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                             {category}
                           </div>
                         </TableCell>
-                        {yearRange.map((year) => {
+                        {yearRange.map((year, yi) => {
                           const total = getAnnualCategoryTotal(category, year);
                           const hasData = availableYears.includes(String(year));
+                          const prevYear = yi > 0 ? yearRange[yi - 1] : null;
+                          const prevTotal = prevYear !== null ? getAnnualCategoryTotal(category, prevYear) : null;
+                          const prevHasData = prevYear !== null ? availableYears.includes(String(prevYear)) : false;
+                          const growth = prevTotal !== null ? calcGrowthRate(total, prevTotal) : null;
                           return (
-                            <TableCell 
-                              key={year} 
-                              className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}
-                            >
-                              {hasData ? formatCurrency(total, { dash: true }) : '-'}
-                            </TableCell>
+                            <Fragment key={year}>
+                              <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                                {hasData ? formatCurrency(total, { dash: true }) : '-'}
+                              </TableCell>
+                              {showGrowthCols && yi > 0 && (
+                                <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">
+                                  {showCategoryGrowth && hasData && prevHasData ? (growth !== null ? <span className={growth >= 0 ? 'text-green-600' : 'text-red-600'}>{growth >= 0 ? '+' : ''}{growth.toFixed(1)}%</span> : '—') : ''}
+                                </TableCell>
+                              )}
+                            </Fragment>
                           );
                         })}
                       </TableRow>
@@ -1527,16 +1871,24 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     />
                                   </div>
                                 </TableCell>
-                                {yearRange.map((year) => {
+                                {yearRange.map((year, yi) => {
                                   const deptTotal = deptSubcats.reduce((sum: number, sub: string) => sum + getAnnualSubcategoryAmount(category, sub, year), 0);
                                   const hasData = availableYears.includes(String(year));
+                                  const prevYear = yi > 0 ? yearRange[yi - 1] : null;
+                                  const prevDeptTotal = prevYear !== null ? deptSubcats.reduce((sum: number, sub: string) => sum + getAnnualSubcategoryAmount(category, sub, prevYear), 0) : null;
+                                  const prevHasData = prevYear !== null ? availableYears.includes(String(prevYear)) : false;
+                                  const growth = prevDeptTotal !== null ? calcGrowthRate(deptTotal, prevDeptTotal) : null;
                                   return (
-                                    <TableCell
-                                      key={year}
-                                      className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}
-                                    >
-                                      {hasData ? formatCurrency(deptTotal, { dash: true }) : '-'}
-                                    </TableCell>
+                                    <Fragment key={year}>
+                                      <TableCell className={`text-right text-xs font-medium text-muted-foreground bg-slate-50 dark:bg-slate-900 px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                                        {hasData ? formatCurrency(deptTotal, { dash: true }) : '-'}
+                                      </TableCell>
+                                      {showGrowthCols && yi > 0 && (
+                                        <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-1.5 tabular-nums">
+                                          {showDepartmentGrowth && hasData && prevHasData ? (growth !== null ? <span className={growth >= 0 ? 'text-green-600' : 'text-red-600'}>{growth >= 0 ? '+' : ''}{growth.toFixed(1)}%</span> : '—') : ''}
+                                        </TableCell>
+                                      )}
+                                    </Fragment>
                                   );
                                 })}
                               </TableRow>
@@ -1564,16 +1916,24 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       )}
                                     </div>
                                   </TableCell>
-                                  {yearRange.map((year) => {
+                                  {yearRange.map((year, yi) => {
                                     const amount = getAnnualSubcategoryAmount(category, subcategory, year);
                                     const hasData = availableYears.includes(String(year));
+                                    const prevYear = yi > 0 ? yearRange[yi - 1] : null;
+                                    const prevAmount = prevYear !== null ? getAnnualSubcategoryAmount(category, subcategory, prevYear) : null;
+                                    const prevHasData = prevYear !== null ? availableYears.includes(String(prevYear)) : false;
+                                    const growth = prevAmount !== null ? calcGrowthRate(amount, prevAmount) : null;
                                     return (
-                                      <TableCell 
-                                        key={year} 
-                                        className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}
-                                      >
-                                        {hasData && amount !== 0 ? formatCurrency(amount, { dash: true }) : '-'}
-                                      </TableCell>
+                                      <Fragment key={year}>
+                                        <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                                          {hasData && amount !== 0 ? formatCurrency(amount, { dash: true }) : '-'}
+                                        </TableCell>
+                                        {showGrowthCols && yi > 0 && (
+                                          <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-1.5 tabular-nums">
+                                            {showLineItemGrowth && hasData && prevHasData && amount !== 0 ? (growth !== null ? <span className={growth >= 0 ? 'text-green-600' : 'text-red-600'}>{growth >= 0 ? '+' : ''}{growth.toFixed(1)}%</span> : '—') : ''}
+                                          </TableCell>
+                                        )}
+                                      </Fragment>
                                     );
                                   })}
                                 </TableRow>
@@ -1587,26 +1947,34 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
                   <TableRow className="bg-primary/10 font-bold border-t-2">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-blue-50 dark:bg-blue-950 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm">{config?.bottomLineMetric === 'ebitda' ? 'EBITDA' : 'NOI'}</TableCell>
-                    {yearRange.map((year) => {
+                    {yearRange.map((year, yi) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
                       const expenses = getAnnualCategoryTotal('Expenses', year);
                       const noi = revenue - cogs - expenses;
                       const hasData = availableYears.includes(String(year));
+                      const prevYear = yi > 0 ? yearRange[yi - 1] : null;
+                      const prevNoi = prevYear !== null ? getAnnualCategoryTotal('Revenue', prevYear) - getAnnualCategoryTotal('COGS', prevYear) - getAnnualCategoryTotal('Expenses', prevYear) : null;
+                      const prevHasData = prevYear !== null ? availableYears.includes(String(prevYear)) : false;
+                      const growth = prevNoi !== null ? calcGrowthRate(noi, prevNoi) : null;
                       return (
-                        <TableCell 
-                          key={year} 
-                          className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                        >
-                          {hasData ? formatCurrency(noi, { dash: true }) : '-'}
-                        </TableCell>
+                        <Fragment key={year}>
+                          <TableCell className={`text-right text-sm font-bold bg-primary/10 px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : noi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasData ? formatCurrency(noi, { dash: true }) : '-'}
+                          </TableCell>
+                          {showGrowthCols && yi > 0 && (
+                            <TableCell className="text-right text-[10px] bg-muted/10 px-1 py-2 tabular-nums">
+                              {hasData && prevHasData ? (growth !== null ? <span className={growth >= 0 ? 'text-green-600' : 'text-red-600'}>{growth >= 0 ? '+' : ''}{growth.toFixed(1)}%</span> : '—') : 'N/A'}
+                            </TableCell>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </TableRow>
 
                   <TableRow className="bg-primary/5">
                     <TableCell className="whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] text-xs text-muted-foreground px-3 py-1.5">Operating Margin</TableCell>
-                    {yearRange.map((year) => {
+                    {yearRange.map((year, yi) => {
                       const revenue = getAnnualCategoryTotal('Revenue', year);
                       const cogs = getAnnualCategoryTotal('COGS', year);
                       const expenses = getAnnualCategoryTotal('Expenses', year);
@@ -1614,17 +1982,21 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       const margin = revenue !== 0 ? (noi / revenue) * 100 : null;
                       const hasData = availableYears.includes(String(year));
                       return (
-                        <TableCell 
-                          key={year} 
-                          className={`text-right text-xs bg-primary/5 px-3 py-1.5 tabular-nums ${!hasData ? 'opacity-50' : margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                        >
-                          {hasData ? formatPercent(margin, { dash: true }) : '-'}
-                        </TableCell>
+                        <Fragment key={year}>
+                          <TableCell className={`text-right text-xs bg-primary/5 px-3 py-1.5 tabular-nums ${!hasData ? 'opacity-50' : margin !== null && margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {hasData ? formatPercent(margin, { dash: true }) : '-'}
+                          </TableCell>
+                          {showGrowthCols && yi > 0 && (
+                            <TableCell className="bg-muted/10 px-1 py-1.5" />
+                          )}
+                        </Fragment>
                       );
                     })}
                   </TableRow>
                 </TableBody>
               </Table>
+                );
+              })()}
               </div>
             )}
           </div>
