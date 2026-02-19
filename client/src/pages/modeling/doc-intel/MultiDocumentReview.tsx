@@ -166,10 +166,10 @@ export function MultiDocumentReview({
   // Check if ALL non-excluded items are fully classified with both category AND department (Requirement I)
   const allItemsClassified = useMemo(() => {
     if (totalItems === 0) return false;
-    // Only check items that are not excluded - excluded items don't need classification
-    const nonExcludedItems = allItems.filter(item => item.status !== 'excluded');
-    if (nonExcludedItems.length === 0) return false;
-    return nonExcludedItems.every(item => {
+    // Only check confirmed items - excluded and rejected items don't need classification
+    const itemsNeedingClassification = allItems.filter(item => item.status !== 'excluded' && item.status !== 'rejected');
+    if (itemsNeedingClassification.length === 0) return false;
+    return itemsNeedingClassification.every(item => {
       // Check category tier (using correct field names)
       const hasCategory = item.categoryTierConfirmed || item.categoryTierSuggested;
       if (!hasCategory) return false;
@@ -558,7 +558,7 @@ export function MultiDocumentReview({
           {!allItemsClassified && totalItems > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              All items must have Category AND Department selected to enable "Apply to Model".
+              All confirmed items must have Category AND Department selected to enable "Apply to Model". Rejected/excluded items are skipped.
             </p>
           )}
           {allItemsClassified && !allItemsProcessed && totalPending > 0 && (

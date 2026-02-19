@@ -131,6 +131,7 @@ const defaultProfitCenters: ProfitCenterConfig[] = [
   { id: 'pc_fuel_dock', name: 'Fuel Dock', isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
   { id: 'pc_marina_amenities', name: 'Marina & Amenities', isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
   { id: 'pc_ships_store', name: "Ship's Store", isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
+  { id: 'pc_commercial_leases', name: 'Commercial Leases', isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
   { id: 'pc_service', name: 'Service', isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
   { id: 'pc_parts', name: 'Parts', isEnabled: false, icon: <Container className="h-4 w-4" /> },
   { id: 'pc_boat_club', name: 'Boat Club', isEnabled: false, icon: <Users className="h-4 w-4" /> },
