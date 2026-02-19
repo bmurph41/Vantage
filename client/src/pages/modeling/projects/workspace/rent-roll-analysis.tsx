@@ -49,6 +49,7 @@ import {
 } from 'recharts';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import UtilizationSection from '@/components/utilization/UtilizationSection';
 
 interface RentRollAnalysisProps {
   projectId: string;
@@ -655,7 +656,7 @@ function LeaseListSection({ units, loading }: { units: RentRollUnit[]; loading: 
 
 export default function RentRollAnalysis({ projectId, projectName, onTabChange }: RentRollAnalysisProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
-  const [activeView, setActiveView] = useState<'dashboard' | 'leases' | 'analytics'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'leases' | 'analytics' | 'utilization'>('dashboard');
 
   const { data: analysis, isLoading } = useQuery<AnalysisData>({
     queryKey: ['/api/modeling-rent-roll/projects', projectId, 'analysis'],
@@ -729,6 +730,10 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
           <TabsTrigger value="analytics" className="gap-2">
             <TrendingUp className="h-4 w-4" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="utilization" className="gap-2">
+            <Percent className="h-4 w-4" />
+            Utilization
           </TabsTrigger>
         </TabsList>
 
@@ -848,6 +853,10 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
           </div>
 
           <DockBreakdownTable breakdown={data.dockBreakdown} />
+        </TabsContent>
+
+        <TabsContent value="utilization" className="space-y-6 mt-4">
+          <UtilizationSection projectId={projectId} />
         </TabsContent>
       </Tabs>
     </div>

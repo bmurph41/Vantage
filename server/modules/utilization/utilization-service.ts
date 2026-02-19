@@ -527,14 +527,31 @@ export async function getSummary(
   periodStart: string,
   periodEnd: string,
   assetClass: AssetClass = 'marina',
-  mode: UtilizationMode = 'contracted'
+  mode: UtilizationMode = 'contracted',
+  unitTypes?: string[]
 ): Promise<UtilizationSummary> {
-  if (isWholeMonth(periodStart, periodEnd)) {
+  if (!unitTypes?.length && isWholeMonth(periodStart, periodEnd)) {
     const cached = await fetchSnapshotSummary(propertyId, periodStart, periodEnd, mode);
     if (cached) return cached;
   }
 
-  return computeRealUtilization(propertyId, periodStart, periodEnd, assetClass, mode);
+  return computeRealUtilization(propertyId, periodStart, periodEnd, assetClass, mode, unitTypes);
+}
+
+export async function fetchByType(
+  propertyId: string,
+  periodStart: string,
+  periodEnd: string,
+  assetClass: AssetClass = 'marina',
+  mode: UtilizationMode = 'contracted',
+  unitTypes?: string[]
+): Promise<UnitTypeBreakdown[]> {
+  const summary = await getSummary(propertyId, periodStart, periodEnd, assetClass, mode);
+  let results = summary.byUnitType;
+  if (unitTypes?.length) {
+    results = results.filter(ut => unitTypes.includes(ut.unitType));
+  }
+  return results;
 }
 
 export { generateMockSummary } from './utilization-service-mock';

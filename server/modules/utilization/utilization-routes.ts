@@ -4,6 +4,7 @@ import {
   getSummary,
   recomputeSnapshots,
   fetchBandBreakdown,
+  fetchByType,
 } from './utilization-service';
 import { requireRole } from '../../middleware/rbac';
 import type { AssetClass } from './utilization-config';
@@ -39,12 +40,35 @@ export function createUtilizationRouter(): Router {
       const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
       const assetClass = (req.query.assetClass as AssetClass) || 'marina';
       const mode = (req.query.mode as UtilizationMode) || 'contracted';
+      const unitTypes = req.query.unitTypes ? (req.query.unitTypes as string).split(',') : undefined;
 
-      const summary = await getSummary(propertyId, periodStart, periodEnd, assetClass, mode);
+      const summary = await getSummary(propertyId, periodStart, periodEnd, assetClass, mode, unitTypes);
       res.json(summary);
     } catch (error: any) {
       console.error('[Utilization] Error computing summary:', error);
       res.status(500).json({ error: 'Failed to compute utilization summary' });
+    }
+  });
+
+  router.get('/by-type', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const assetClass = (req.query.assetClass as AssetClass) || 'marina';
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+      const unitTypes = req.query.unitTypes ? (req.query.unitTypes as string).split(',') : undefined;
+
+      const byType = await fetchByType(propertyId, periodStart, periodEnd, assetClass, mode, unitTypes);
+      res.json({ propertyId, periodStart, periodEnd, assetClass, mode, byUnitType: byType });
+    } catch (error: any) {
+      console.error('[Utilization] Error fetching by-type breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch unit type breakdown' });
     }
   });
 
@@ -59,8 +83,12 @@ export function createUtilizationRouter(): Router {
       const periodStart = (req.query.periodStart as string) || startOfMonth(now);
       const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
       const mode = (req.query.mode as UtilizationMode) || 'contracted';
+      const unitTypes = req.query.unitTypes ? (req.query.unitTypes as string).split(',') : undefined;
 
-      const bands = await fetchBandBreakdown(propertyId, periodStart, periodEnd, mode);
+      let bands = await fetchBandBreakdown(propertyId, periodStart, periodEnd, mode);
+      if (unitTypes?.length) {
+        bands = bands.filter((b: any) => unitTypes.includes(b.unitType));
+      }
       res.json({ propertyId, periodStart, periodEnd, mode, bands });
     } catch (error: any) {
       console.error('[Utilization] Error fetching band breakdown:', error);
