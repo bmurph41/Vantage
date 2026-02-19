@@ -108,6 +108,7 @@ export async function promotePnlFactsToActuals(
             month,
             category,
             subcategory,
+            department,
             lineItemDescription: lineDesc,
             amount: String(amount),
             dataSource: 'doc_intel',
@@ -125,6 +126,7 @@ export async function promotePnlFactsToActuals(
             ],
             set: {
               amount: sql`EXCLUDED.amount`,
+              department: sql`EXCLUDED.department`,
               dataSource: sql`EXCLUDED.data_source`,
               sourceRecordId: sql`EXCLUDED.source_record_id`,
               updatedAt: sql`NOW()`,

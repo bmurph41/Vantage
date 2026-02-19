@@ -704,6 +704,7 @@ Respond with JSON only in this exact format:
           month: options.month || 0,
           category: item.category,
           subcategory: item.subcategory,
+          department: (item as any).department || null,
           description: item.description,
           amount: item.amount.toString(),
           dataSource: 'document_intelligence',

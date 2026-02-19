@@ -289,6 +289,9 @@ export class ProFormaEngineService {
     const excludeSet = new Set(
       pnlOverrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
     );
+    const deptOverrideMap: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
+      .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
     const actuals = allActuals.filter(a => !excludeSet.has(a.subcategory || ''));
     
     // ========================================
@@ -427,7 +430,7 @@ export class ProFormaEngineService {
       const amount = parseFloat(actual.amount?.toString() || '0');
       const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
       const category = actual.category || 'Other';
-      const dept = (actual as any).department || inferDepartment(subcat, category);
+      const dept = deptOverrideMap[subcat] || (actual as any).department || inferDepartment(subcat, category);
       
       if (category === 'Revenue' || (actual as any).isRevenue) {
         if (!revenueBySubcat[subcat]) {
@@ -1409,12 +1412,16 @@ export class ProFormaEngineService {
     }
 
     const { modelingPnlOverrides } = await import('@shared/schema');
+    const { inferDepartment: inferDeptFn } = await import('../utils/department-mapping');
     const pnlOverrides = await db.select()
       .from(modelingPnlOverrides)
       .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
     const excludeSet = new Set(
       pnlOverrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
     );
+    const deptOverrideMap: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
+      .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
 
     const allActuals = await db.select()
       .from(modelingActuals)
@@ -1427,6 +1434,7 @@ export class ProFormaEngineService {
 
     const lineItems: Record<string, Record<number, number>> = {};
     const categories: Record<string, string> = {};
+    const departments: Record<string, string> = {};
 
     for (const actual of relevantActuals) {
       const key = actual.subcategory || actual.category || 'Other';
@@ -1436,6 +1444,7 @@ export class ProFormaEngineService {
       if (!lineItems[key]) {
         lineItems[key] = {};
         categories[key] = actual.category || 'Other';
+        departments[key] = deptOverrideMap[key] || actual.department || inferDeptFn(key, actual.category || 'Other');
       }
       
       lineItems[key][month] = (lineItems[key][month] || 0) + amount;
@@ -1452,6 +1461,7 @@ export class ProFormaEngineService {
       const item = {
         name,
         category: categories[name],
+        department: departments[name],
         monthlyAmounts,
         total
       };

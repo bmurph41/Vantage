@@ -22766,7 +22766,7 @@ Current context: Project ${req.params.projectId}`;
 
         const key = `${item.category}-${subcategory}`;
         if (!acc[key]) {
-          const dept = deptOverrideMap[subcategory] || inferDepartment(subcategory, item.category);
+          const dept = deptOverrideMap[subcategory] || item.department || inferDepartment(subcategory, item.category);
           acc[key] = {
             category: item.category,
             subcategory,
@@ -22852,7 +22852,7 @@ Current context: Project ${req.params.projectId}`;
 
           const key = `${item.category}-${subcategory}`;
           if (!acc[key]) {
-            const dept = deptOverrideMap[subcategory] || inferDepartmentFn(subcategory, item.category);
+            const dept = deptOverrideMap[subcategory] || item.department || inferDepartmentFn(subcategory, item.category);
             acc[key] = {
               category: item.category,
               subcategory,

@@ -2133,6 +2133,9 @@ Respond with JSON only:
 
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');
 
+      const { inferDepartment: inferDeptForActual } = await import('../utils/department-mapping');
+      const inferredDept = (item as any).department || inferDeptForActual(subcategory, plCategory);
+
       if (isAnnualPeriod) {
         const monthlyAmount = amount / 12;
         for (let m = 1; m <= 12; m++) {
@@ -2145,6 +2148,7 @@ Respond with JSON only:
               month: m,
               category: plCategory,
               subcategory: subcategory,
+              department: inferredDept,
               lineItemDescription: item.rawText,
               amount: String(Math.round(monthlyAmount * 100) / 100),
               dataSource: 'doc_intel',
@@ -2163,6 +2167,7 @@ Respond with JSON only:
               ],
               set: {
                 amount: String(Math.round(monthlyAmount * 100) / 100),
+                department: inferredDept,
                 updatedAt: new Date(),
               }
             })
@@ -2181,7 +2186,6 @@ Respond with JSON only:
           importedActuals.push(actualRecord);
         }
       } else {
-        // Insert into modelingActuals
         const [actualRecord] = await db
           .insert(modelingActuals)
           .values({
@@ -2191,6 +2195,7 @@ Respond with JSON only:
             month,
             category: plCategory,
             subcategory: subcategory,
+            department: inferredDept,
             lineItemDescription: item.rawText,
             amount: String(amount),
             dataSource: 'doc_intel',
@@ -2209,6 +2214,7 @@ Respond with JSON only:
             ],
             set: {
               amount: String(amount),
+              department: inferredDept,
               updatedAt: new Date(),
             }
           })

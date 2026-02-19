@@ -592,6 +592,8 @@ export class QuickBooksService {
         transactionsProcessed++;
 
         const categoryMapping = this.mapQuickBooksAccountToCategory(row.account, row.type);
+        const { inferDepartment } = await import('../utils/department-mapping');
+        const dept = inferDepartment(categoryMapping.subcategory, categoryMapping.category);
         
         await db.insert(modelingActuals).values({
           orgId,
@@ -600,6 +602,7 @@ export class QuickBooksService {
           month,
           category: categoryMapping.category,
           subcategory: categoryMapping.subcategory,
+          department: dept,
           description: row.account,
           amount: row.amount.toString(),
           dataSource: 'quickbooks',
