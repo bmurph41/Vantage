@@ -25313,3 +25313,77 @@ export const insertWaitlistOfferSchema = createInsertSchema(waitlistOffers).omit
 export const selectWaitlistOfferSchema = createSelectSchema(waitlistOffers);
 export type InsertWaitlistOffer = z.infer<typeof insertWaitlistOfferSchema>;
 export type WaitlistOffer = typeof waitlistOffers.$inferSelect;
+
+// ── Phase 7: Pricing Ladder Recommendations ──
+
+export const pricingRuleStatusEnum = pgEnum("pricing_rule_status", ["active", "paused", "archived"]);
+export const pricingRecStatusEnum = pgEnum("pricing_rec_status", ["pending", "accepted", "dismissed", "implemented"]);
+export const pricingRecActionEnum = pgEnum("pricing_rec_action", ["increase", "decrease", "hold"]);
+
+export const pricingRules = pgTable('pricing_rules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description'),
+  status: pricingRuleStatusEnum('status').notNull().default('active'),
+  priority: integer('priority').notNull().default(0),
+  unitType: varchar('unit_type', { length: 50 }),
+  bandKey: varchar('band_key', { length: 20 }),
+  conditions: jsonb('conditions').$type<{
+    metric: string;
+    operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    value: number;
+    windowDays?: number;
+  }[]>().notNull(),
+  action: pricingRecActionEnum('action').notNull().default('increase'),
+  adjustmentPct: decimal('adjustment_pct', { precision: 8, scale: 2 }).notNull().default('5'),
+  cooldownDays: integer('cooldown_days').notNull().default(90),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('pr_org_idx').on(table.orgId),
+  statusIdx: index('pr_status_idx').on(table.status),
+}));
+
+export const pricingRecommendations = pgTable('pricing_recommendations', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  ruleId: varchar('rule_id').notNull().references(() => pricingRules.id, { onDelete: 'cascade' }),
+  unitType: varchar('unit_type', { length: 50 }),
+  bandKey: varchar('band_key', { length: 20 }),
+  action: pricingRecActionEnum('action').notNull(),
+  adjustmentPct: decimal('adjustment_pct', { precision: 8, scale: 2 }).notNull(),
+  status: pricingRecStatusEnum('status').notNull().default('pending'),
+  drivers: jsonb('drivers').$type<{
+    metric: string;
+    currentValue: number;
+    threshold: number;
+    operator: string;
+    windowDays?: number;
+    satisfied: boolean;
+  }[]>().notNull(),
+  summary: text('summary').notNull(),
+  evaluatedAt: timestamp('evaluated_at').defaultNow().notNull(),
+  resolvedAt: timestamp('resolved_at'),
+  resolvedBy: varchar('resolved_by'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('prec_org_idx').on(table.orgId),
+  propertyIdx: index('prec_property_idx').on(table.propertyId),
+  ruleIdx: index('prec_rule_idx').on(table.ruleId),
+  statusIdx: index('prec_status_idx').on(table.status),
+  propertyStatusIdx: index('prec_property_status_idx').on(table.propertyId, table.status),
+}));
+
+export const insertPricingRuleSchema = createInsertSchema(pricingRules).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectPricingRuleSchema = createSelectSchema(pricingRules);
+export type InsertPricingRule = z.infer<typeof insertPricingRuleSchema>;
+export type PricingRule = typeof pricingRules.$inferSelect;
+
+export const insertPricingRecommendationSchema = createInsertSchema(pricingRecommendations).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectPricingRecommendationSchema = createSelectSchema(pricingRecommendations);
+export type InsertPricingRecommendation = z.infer<typeof insertPricingRecommendationSchema>;
+export type PricingRecommendation = typeof pricingRecommendations.$inferSelect;
