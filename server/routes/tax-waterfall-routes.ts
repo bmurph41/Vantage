@@ -428,14 +428,120 @@ router.put("/projects/:projectId/tax-inputs", async (req: Request, res: Response
   } catch (err) { next(err); }
 });
 
-// ── Calculate (STUB — 501 Not Implemented) ──────────────────────────────────
+// ── Calculate ──────────────────────────────────────────────────────────────
 
-router.post("/projects/:projectId/calculate", async (_req: Request, res: Response) => {
-  res.status(501).json({
-    ok: false,
-    error: "NOT_IMPLEMENTED",
-    message: "Tax & Waterfall engine not implemented yet.",
-  });
+router.post("/projects/:projectId/calculate", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = getOrgId(req);
+    if (!await verifyProjectAccess(projectId, orgId)) return res.status(404).json({ error: "Project not found" });
+
+    const [settings] = await db.select().from(projectTaxSettings)
+      .where(eq(projectTaxSettings.projectId, projectId));
+
+    const taxSettingsData = {
+      enabled: settings?.enabled ?? false,
+      taxMode: (settings?.taxMode ?? 'flat') as 'flat' | 'split' | 'advanced',
+      taxTiming: (settings?.taxTiming ?? 'annual') as 'monthly' | 'quarterly' | 'annual',
+      taxInteractionMode: (settings?.taxInteractionMode ?? 'waterfall_pre_tax') as 'waterfall_pre_tax' | 'waterfall_after_tax' | 'tax_distribution_layer',
+      defaultTaxProfileId: settings?.defaultTaxProfileId ?? null,
+    };
+
+    const partnersRows = await db.select().from(projectPartners)
+      .where(eq(projectPartners.projectId, projectId));
+
+    const contribRows = await db.select().from(projectEquityContributions)
+      .where(eq(projectEquityContributions.projectId, projectId));
+
+    const configRows = await db.select().from(waterfallConfigs)
+      .where(and(eq(waterfallConfigs.projectId, projectId), eq(waterfallConfigs.isActive, true)));
+    const activeConfig = configRows[0];
+    let tierRows: any[] = [];
+    if (activeConfig) {
+      tierRows = await db.select().from(waterfallTiers)
+        .where(eq(waterfallTiers.waterfallConfigId, activeConfig.id))
+        .orderBy(asc(waterfallTiers.tierOrder));
+    }
+
+    const [taxInputsRow] = await db.select().from(projectTaxInputs)
+      .where(eq(projectTaxInputs.projectId, projectId));
+
+    let profilesMap = new Map<string, any>();
+    if (partnersRows.length > 0) {
+      const profileIds = partnersRows.map(p => p.taxProfileId).filter(Boolean);
+      if (profileIds.length > 0) {
+        const profiles = await db.select().from(taxProfiles)
+          .where(eq(taxProfiles.userId, getUserId(req)));
+        for (const p of profiles) profilesMap.set(p.id, p);
+      }
+    }
+
+    const { runCoordinator } = await import('../services/taxWaterfall/coordinator');
+    const { getProjectCashflowTimeline } = await import('../services/taxWaterfall/adapters/getProjectCashflowTimeline');
+    const { ZERO, parseCentsStr } = await import('../services/taxWaterfall/money');
+
+    const partners = partnersRows.map(p => {
+      const contribs = contribRows.filter(c => c.partnerId === p.id);
+      const totalContributed = contribs.reduce((s, c) => s + parseCentsStr(c.amountCents), ZERO);
+      const profile = p.taxProfileId ? profilesMap.get(p.taxProfileId) : null;
+
+      return {
+        partnerId: p.id,
+        name: p.name,
+        role: p.role as any,
+        ownershipPercent: p.ownershipPercent ? parseFloat(p.ownershipPercent) : 0,
+        taxProfile: profile ? {
+          id: profile.id,
+          filingType: profile.filingType,
+          effectiveTaxRate: profile.effectiveTaxRate ? parseFloat(profile.effectiveTaxRate) : null,
+          ordinaryRate: profile.ordinaryRate ? parseFloat(profile.ordinaryRate) : null,
+          ltcgRate: profile.ltcgRate ? parseFloat(profile.ltcgRate) : null,
+          recaptureRate: profile.recaptureRate ? parseFloat(profile.recaptureRate) : null,
+          niitRate: profile.niitRate ? parseFloat(profile.niitRate) : null,
+          stateRate: profile.stateRate ? parseFloat(profile.stateRate) : null,
+          localRate: profile.localRate ? parseFloat(profile.localRate) : null,
+        } : null,
+        equityContributedCents: totalContributed,
+      };
+    });
+
+    const taxInputsData = {
+      annualDepreciationCents: parseCentsStr(taxInputsRow?.annualDepreciationCents),
+      depreciationMethod: taxInputsRow?.depreciationMethod ?? 'manual',
+      amortizationAnnualCents: parseCentsStr(taxInputsRow?.amortizationAnnualCents),
+      interestDeductible: taxInputsRow?.interestDeductible ?? true,
+      saleCostBasisCents: parseCentsStr(taxInputsRow?.saleCostBasisCents),
+      accumulatedDepreciationCents: parseCentsStr(taxInputsRow?.accumulatedDepreciationCents),
+    };
+
+    const tiers = tierRows.map(t => ({
+      tierOrder: t.tierOrder,
+      tierType: t.tierType as any,
+      prefRate: t.prefRate ? parseFloat(t.prefRate) : null,
+      catchUpTargetGpShare: t.catchUpTargetGpShare ? parseFloat(t.catchUpTargetGpShare) : null,
+      irrHurdle: t.irrHurdle ? parseFloat(t.irrHurdle) : null,
+      equityMultipleHurdle: t.equityMultipleHurdle ? parseFloat(t.equityMultipleHurdle) : null,
+      lpSplit: t.lpSplit ? parseFloat(t.lpSplit) : null,
+      gpSplit: t.gpSplit ? parseFloat(t.gpSplit) : null,
+      notes: t.notes,
+    }));
+
+    const timeframe = taxSettingsData.taxTiming === 'monthly' ? 'monthly' : 'annual';
+    const periodsPerYear = timeframe === 'monthly' ? 12 : 1;
+
+    const cashflowTimeline = await getProjectCashflowTimeline(projectId, { timeframe });
+
+    const result = runCoordinator(
+      cashflowTimeline,
+      partners,
+      tiers,
+      taxInputsData,
+      taxSettingsData,
+      periodsPerYear,
+    );
+
+    res.json(result);
+  } catch (err) { next(err); }
 });
 
 export default router;
