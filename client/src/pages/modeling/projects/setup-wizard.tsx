@@ -942,11 +942,11 @@ function ProfitCentersSlide({ payload, updateNestedPayload }: SlideProps) {
   const profitCenters = [
     {
       key: "commercialTenants",
-      label: "Commercial Tenants",
+      label: "Commercial Leases",
       icon: Building2,
       description: "Leasable commercial space",
       fields: [
-        { key: "numberOfSuites", label: "Number of Suites", type: "number" },
+        { key: "numberOfSuites", label: "Number of Commercial Leases", type: "number" },
         { key: "totalSqFt", label: "Total Sq Ft", type: "number" },
       ],
     },

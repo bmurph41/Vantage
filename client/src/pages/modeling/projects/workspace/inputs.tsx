@@ -230,6 +230,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [winterMonths, setWinterMonths] = useState<number[]>([11, 12, 1, 2, 3]);
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
   const [profitCenters, setProfitCenters] = useState<ProfitCenterConfig[]>(defaultProfitCenters);
+  const [commercialLeaseCount, setCommercialLeaseCount] = useState<string>('');
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
   const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
@@ -275,6 +276,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       winterMonths,
       departments: storageSettings,
       profitCenters: profitCenterSettings,
+      commercialLeaseCount: parseInt(commercialLeaseCount) || 0,
       acreage,
       ownership,
     };
@@ -322,6 +324,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           ...item,
           isEnabled: config.profitCenters[item.id]?.isEnabled ?? item.isEnabled
         })));
+      }
+      if (config.commercialLeaseCount != null) {
+        setCommercialLeaseCount(String(config.commercialLeaseCount || ''));
       }
       if ((config as any).acreage) {
         setAcreage((config as any).acreage);
@@ -378,7 +383,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, profitCenters, acreage, ownership]);
+  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, profitCenters, commercialLeaseCount, acreage, ownership]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -1328,24 +1333,39 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           <CardContent className="pt-0 px-4 pb-4">
             <div className="space-y-1">
               {profitCenters.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center gap-2 py-1.5 px-2 rounded ${
-                    item.isEnabled 
-                      ? 'bg-muted/30' 
-                      : 'opacity-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={item.isEnabled}
-                    onChange={() => toggleProfitCenterEnabled(item.id)}
-                    className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
-                  />
-                  <span className="text-xs">{item.icon}</span>
-                  <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
-                    {item.name}
-                  </span>
+                <div key={item.id}>
+                  <div
+                    className={`flex items-center gap-2 py-1.5 px-2 rounded ${
+                      item.isEnabled 
+                        ? 'bg-muted/30' 
+                        : 'opacity-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.isEnabled}
+                      onChange={() => toggleProfitCenterEnabled(item.id)}
+                      className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
+                    />
+                    <span className="text-xs">{item.icon}</span>
+                    <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  {item.id === 'pc_commercial_leases' && item.isEnabled && (
+                    <div className="ml-8 mt-1 mb-1 flex items-center gap-2">
+                      <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Number of Leases</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={commercialLeaseCount}
+                        onChange={(e) => setCommercialLeaseCount(e.target.value)}
+                        placeholder="0"
+                        className="h-6 w-16 text-xs px-2"
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
