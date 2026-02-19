@@ -24907,3 +24907,145 @@ export const budgetTargets = pgTable('budget_targets', {
 export type BudgetTarget = typeof budgetTargets.$inferSelect;
 export const insertBudgetTargetSchema = createInsertSchema(budgetTargets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertBudgetTarget = z.infer<typeof insertBudgetTargetSchema>;
+// ============================================================================
+// TAX & DISTRIBUTIONS MODULE (Phase A — Scaffold)
+// ============================================================================
+
+export const twFilingTypeEnum = pgEnum("tw_filing_type", ["individual", "corporation", "partnership", "trust", "reit", "other"]);
+export const twTaxModeEnum = pgEnum("tw_tax_mode", ["flat", "split", "advanced"]);
+export const twTaxTimingEnum = pgEnum("tw_tax_timing", ["monthly", "quarterly", "annual"]);
+export const twTaxInteractionModeEnum = pgEnum("tw_tax_interaction_mode", ["waterfall_pre_tax", "waterfall_after_tax", "tax_distribution_layer"]);
+export const twPartnerRoleEnum = pgEnum("tw_partner_role", ["lp", "gp", "co_gp", "mezz", "other"]);
+export const twEntityTypeEnum = pgEnum("tw_entity_type", ["individual", "entity"]);
+export const twWaterfallTemplateEnum = pgEnum("tw_waterfall_template", ["straight_split", "pref_catchup", "irr_hurdles", "custom"]);
+export const twTierTypeEnum = pgEnum("tw_tier_type", ["return_of_capital", "preferred_return", "catch_up", "split", "tax_distribution"]);
+export const twDepreciationMethodEnum = pgEnum("tw_depreciation_method", ["manual", "simple_building_life", "schedule"]);
+
+export const taxProfiles = pgTable('tax_profiles', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  filingType: twFilingTypeEnum('filing_type').notNull().default('individual'),
+  jurisdictionCountry: text('jurisdiction_country').notNull().default('US'),
+  jurisdictionState: text('jurisdiction_state'),
+  effectiveTaxRate: decimal('effective_tax_rate', { precision: 8, scale: 6 }),
+  ordinaryRate: decimal('ordinary_rate', { precision: 8, scale: 6 }),
+  ltcgRate: decimal('ltcg_rate', { precision: 8, scale: 6 }),
+  recaptureRate: decimal('recapture_rate', { precision: 8, scale: 6 }),
+  niitRate: decimal('niit_rate', { precision: 8, scale: 6 }),
+  stateRate: decimal('state_rate', { precision: 8, scale: 6 }),
+  localRate: decimal('local_rate', { precision: 8, scale: 6 }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('tax_profiles_user_idx').on(table.userId),
+}));
+
+export type TaxProfile = typeof taxProfiles.$inferSelect;
+export const insertTaxProfileSchema = createInsertSchema(taxProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaxProfile = z.infer<typeof insertTaxProfileSchema>;
+
+export const projectTaxSettings = pgTable('project_tax_settings', {
+  projectId: varchar('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
+  enabled: boolean('enabled').notNull().default(false),
+  taxMode: twTaxModeEnum('tax_mode').notNull().default('flat'),
+  taxTiming: twTaxTimingEnum('tax_timing').notNull().default('annual'),
+  taxInteractionMode: twTaxInteractionModeEnum('tax_interaction_mode').notNull().default('waterfall_pre_tax'),
+  defaultTaxProfileId: varchar('default_tax_profile_id').references(() => taxProfiles.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type ProjectTaxSettings = typeof projectTaxSettings.$inferSelect;
+export const insertProjectTaxSettingsSchema = createInsertSchema(projectTaxSettings).omit({ createdAt: true, updatedAt: true });
+export type InsertProjectTaxSettings = z.infer<typeof insertProjectTaxSettingsSchema>;
+
+export const projectPartners = pgTable('project_partners', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  role: twPartnerRoleEnum('role').notNull().default('lp'),
+  entityType: twEntityTypeEnum('entity_type').notNull().default('individual'),
+  taxProfileId: varchar('tax_profile_id').references(() => taxProfiles.id),
+  ownershipPercent: decimal('ownership_percent', { precision: 8, scale: 4 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('project_partners_project_idx').on(table.projectId),
+}));
+
+export type ProjectPartner = typeof projectPartners.$inferSelect;
+export const insertProjectPartnerSchema = createInsertSchema(projectPartners).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProjectPartner = z.infer<typeof insertProjectPartnerSchema>;
+
+export const projectEquityContributions = pgTable('project_equity_contributions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  partnerId: varchar('partner_id').notNull().references(() => projectPartners.id, { onDelete: 'cascade' }),
+  date: date('date').notNull(),
+  amountCents: decimal('amount_cents', { precision: 18, scale: 0 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('equity_contributions_project_idx').on(table.projectId),
+  partnerIdx: index('equity_contributions_partner_idx').on(table.partnerId),
+}));
+
+export type ProjectEquityContribution = typeof projectEquityContributions.$inferSelect;
+export const insertProjectEquityContributionSchema = createInsertSchema(projectEquityContributions).omit({ id: true, createdAt: true });
+export type InsertProjectEquityContribution = z.infer<typeof insertProjectEquityContributionSchema>;
+
+export const waterfallConfigs = pgTable('waterfall_configs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  templateType: twWaterfallTemplateEnum('template_type').notNull().default('straight_split'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('waterfall_configs_project_idx').on(table.projectId),
+}));
+
+export type WaterfallConfig = typeof waterfallConfigs.$inferSelect;
+export const insertWaterfallConfigSchema = createInsertSchema(waterfallConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWaterfallConfig = z.infer<typeof insertWaterfallConfigSchema>;
+
+export const waterfallTiers = pgTable('waterfall_tiers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  waterfallConfigId: varchar('waterfall_config_id').notNull().references(() => waterfallConfigs.id, { onDelete: 'cascade' }),
+  tierOrder: integer('tier_order').notNull(),
+  tierType: twTierTypeEnum('tier_type').notNull(),
+  prefRate: decimal('pref_rate', { precision: 8, scale: 6 }),
+  catchUpTargetGpShare: decimal('catch_up_target_gp_share', { precision: 8, scale: 6 }),
+  irrHurdle: decimal('irr_hurdle', { precision: 8, scale: 6 }),
+  equityMultipleHurdle: decimal('equity_multiple_hurdle', { precision: 8, scale: 4 }),
+  lpSplit: decimal('lp_split', { precision: 8, scale: 4 }),
+  gpSplit: decimal('gp_split', { precision: 8, scale: 4 }),
+  notes: text('notes'),
+}, (table) => ({
+  configIdx: index('waterfall_tiers_config_idx').on(table.waterfallConfigId),
+}));
+
+export type WaterfallTier = typeof waterfallTiers.$inferSelect;
+export const insertWaterfallTierSchema = createInsertSchema(waterfallTiers).omit({ id: true });
+export type InsertWaterfallTier = z.infer<typeof insertWaterfallTierSchema>;
+
+export const projectTaxInputs = pgTable('project_tax_inputs', {
+  projectId: varchar('project_id').primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
+  annualDepreciationCents: decimal('annual_depreciation_cents', { precision: 18, scale: 0 }),
+  depreciationMethod: twDepreciationMethodEnum('depreciation_method').notNull().default('manual'),
+  buildingBasisCents: decimal('building_basis_cents', { precision: 18, scale: 0 }),
+  buildingLifeYears: integer('building_life_years'),
+  bonusDepreciationPercent: decimal('bonus_depreciation_percent', { precision: 8, scale: 6 }),
+  amortizationAnnualCents: decimal('amortization_annual_cents', { precision: 18, scale: 0 }),
+  interestDeductible: boolean('interest_deductible').notNull().default(true),
+  saleCostBasisCents: decimal('sale_cost_basis_cents', { precision: 18, scale: 0 }),
+  accumulatedDepreciationCents: decimal('accumulated_depreciation_cents', { precision: 18, scale: 0 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type ProjectTaxInputs = typeof projectTaxInputs.$inferSelect;
+export const insertProjectTaxInputsSchema = createInsertSchema(projectTaxInputs).omit({ createdAt: true, updatedAt: true });
+export type InsertProjectTaxInputs = z.infer<typeof insertProjectTaxInputsSchema>;
