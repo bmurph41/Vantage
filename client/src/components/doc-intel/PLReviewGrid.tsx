@@ -321,8 +321,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       const count = updates.itemIds.length;
       if (status === "confirmed") {
         setBulkOpLabel(`Confirming ${count} item${count !== 1 ? "s" : ""}…`);
-      } else if (status === "excluded") {
-        setBulkOpLabel(`Excluding ${count} item${count !== 1 ? "s" : ""}…`);
+      } else if (status === "rejected") {
+        setBulkOpLabel(`Rejecting ${count} item${count !== 1 ? "s" : ""}…`);
       } else if (updates.updates.categoryTierConfirmed) {
         setBulkOpLabel(`Updating category for ${count} item${count !== 1 ? "s" : ""}…`);
       } else if (updates.updates.expenseDeptConfirmed || updates.updates.revenueCogsDeptConfirmed) {
@@ -468,11 +468,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     });
   };
 
-  const openExcludeDialog = (item: ExtractedItem) => {
+  const openRejectDialog = (item: ExtractedItem) => {
     setExcludeDialog({ open: true, item, reason: "" });
   };
 
-  const confirmExclude = async () => {
+  const confirmReject = async () => {
     if (!excludeDialog.item) return;
     
     const itemId = excludeDialog.item.id;
@@ -481,16 +481,16 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     await updateItemMutation.mutateAsync({
       itemId,
       updates: { 
-        status: "excluded",
+        status: "rejected",
         reviewNotes: reason || undefined,
       },
     });
     
     toast({ 
-      title: "Excluded", 
+      title: "Rejected", 
       description: reason 
-        ? "Item excluded. Reason saved for future AI training." 
-        : "Item excluded from import." 
+        ? "Item rejected. Reason saved for future AI training." 
+        : "Item rejected from import." 
     });
     
     setExcludeDialog({ open: false, item: null, reason: "" });
@@ -519,10 +519,10 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     });
   };
 
-  const handleBulkExclude = () => {
+  const handleBulkReject = () => {
     bulkUpdateMutation.mutate({
       itemIds: Array.from(selectedIds),
-      updates: { status: "excluded" },
+      updates: { status: "rejected" },
     });
   };
 
@@ -547,7 +547,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     if (!groupedData?.lineItems) return [];
     const validIds: string[] = [];
     for (const li of groupedData.lineItems) {
-      if (li.status === "confirmed" || li.status === "excluded") continue;
+      if (li.status === "confirmed" || li.status === "excluded" || li.status === "rejected") continue;
       const firstItem = li.monthlyData[0];
       if (!firstItem) continue;
       const tier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
@@ -591,11 +591,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     }
   };
 
-  const handleExcludeAllPending = () => {
+  const handleRejectAllPending = () => {
     if (visiblePendingItems.length === 0) return;
     bulkUpdateMutation.mutate({
       itemIds: visiblePendingItems.map((i) => i.id),
-      updates: { status: "excluded" },
+      updates: { status: "rejected" },
     });
   };
 
@@ -873,13 +873,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => openExcludeDialog(item)}
-                      disabled={updateItemMutation.isPending || item.status === "excluded"}
+                      onClick={() => openRejectDialog(item)}
+                      disabled={updateItemMutation.isPending || item.status === "rejected"}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Exclude</TooltipContent>
+                  <TooltipContent>Reject</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -923,6 +923,7 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   }
 
   const confirmedCount = items.filter((i) => i.status === "confirmed").length;
+  const rejectedCount = items.filter((i) => i.status === "rejected").length;
   const excludedCount = items.filter((i) => i.status === "excluded").length;
   const pendingCount = items.filter((i) => i.status === "pending" || i.status === "needs_review").length;
 
@@ -937,9 +938,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             <Badge variant="outline" className="bg-yellow-50">
               {pendingCount} pending
             </Badge>
-            <Badge variant="outline" className="bg-gray-50">
-              {excludedCount} excluded
+            <Badge variant="outline" className="bg-red-50">
+              {rejectedCount} rejected
             </Badge>
+            {excludedCount > 0 && (
+              <Badge variant="outline" className="bg-gray-50">
+                {excludedCount} excluded
+              </Badge>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -994,16 +1000,16 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           <Button
             size="sm"
             variant="outline"
-            onClick={handleExcludeAllPending}
+            onClick={handleRejectAllPending}
             disabled={bulkUpdateMutation.isPending || visiblePendingItems.length === 0}
             className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
           >
-            {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Excluding") ? (
+            {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Rejecting") ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <X className="h-4 w-4 mr-1" />
             )}
-            Exclude All ({visiblePendingItems.length})
+            Reject All ({visiblePendingItems.length})
           </Button>
         </div>
         <div className="flex items-center gap-2">
@@ -1051,15 +1057,15 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBulkExclude}
+                onClick={handleBulkReject}
                 disabled={bulkUpdateMutation.isPending}
               >
-                {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Excluding") ? (
+                {bulkUpdateMutation.isPending && bulkOpLabel.startsWith("Rejecting") ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 ) : (
                   <X className="h-4 w-4 mr-1" />
                 )}
-                Exclude
+                Reject
               </Button>
             </>
           )}
@@ -1257,13 +1263,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                           className="h-8 text-red-100 bg-red-600/80 hover:bg-red-600"
                           onClick={() => {
                             if (allIds.length > 0) {
-                              bulkUpdateMutation.mutate({ itemIds: allIds, updates: { status: 'excluded' } });
+                              bulkUpdateMutation.mutate({ itemIds: allIds, updates: { status: 'rejected' } });
                               setSelectedRowKeys(new Set());
                             }
                           }}
                         >
                           <X className="h-4 w-4 mr-1" />
-                          Exclude Selected
+                          Reject Selected
                         </Button>
                       </>
                     );
@@ -1326,6 +1332,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                           className={
                             lineItem.status === "excluded"
                               ? "opacity-50 bg-muted/30"
+                              : lineItem.status === "rejected"
+                              ? "opacity-60 bg-red-50/30 dark:bg-red-950/20"
                               : lineItem.status === "confirmed"
                               ? "bg-green-50/30 dark:bg-green-950/20"
                               : ""
@@ -1685,16 +1693,16 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                         const itemIds = lineItem.monthlyData.map((m) => m.id);
                                         bulkUpdateMutation.mutate({
                                           itemIds,
-                                          updates: { status: "excluded" },
+                                          updates: { status: "rejected" },
                                           silent: true,
                                         });
                                       }}
-                                      disabled={bulkUpdateMutation.isPending || lineItem.status === "excluded"}
+                                      disabled={bulkUpdateMutation.isPending || lineItem.status === "rejected"}
                                     >
                                       <X className="h-3.5 w-3.5" />
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent>Exclude all months</TooltipContent>
+                                  <TooltipContent>Reject all months</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
                             </div>
@@ -1768,11 +1776,11 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                           onClick={() => {
                                             bulkUpdateMutation.mutate({
                                               itemIds: [month.id],
-                                              updates: { status: "excluded" },
+                                              updates: { status: "rejected" },
                                               silent: true,
                                             });
                                           }}
-                                          disabled={bulkUpdateMutation.isPending || month.status === "excluded"}
+                                          disabled={bulkUpdateMutation.isPending || month.status === "rejected"}
                                         >
                                           <X className="h-3.5 w-3.5" />
                                         </Button>
@@ -1798,9 +1806,9 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       <Dialog open={excludeDialog.open} onOpenChange={(open) => !open && setExcludeDialog({ open: false, item: null, reason: "" })}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Exclude Line Item</DialogTitle>
+            <DialogTitle>Reject Line Item</DialogTitle>
             <DialogDescription>
-              Why are you excluding this item? This helps train the AI to recognize similar items in the future.
+              Why are you rejecting this item? This helps train the AI to recognize similar items in the future.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1813,16 +1821,16 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="exclude-reason">Reason (optional)</Label>
+              <Label htmlFor="reject-reason">Reason (optional)</Label>
               <Textarea
-                id="exclude-reason"
+                id="reject-reason"
                 placeholder="e.g., This is a subtotal row, not an actual expense"
                 value={excludeDialog.reason}
                 onChange={(e) => setExcludeDialog((prev) => ({ ...prev, reason: e.target.value }))}
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">
-                Adding a reason helps the AI learn to automatically exclude similar items.
+                Adding a reason helps the AI learn to automatically reject similar items.
               </p>
             </div>
           </div>
@@ -1835,13 +1843,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
             </Button>
             <Button
               variant="destructive"
-              onClick={confirmExclude}
+              onClick={confirmReject}
               disabled={updateItemMutation.isPending}
             >
               {updateItemMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Exclude Item
+              Reject Item
             </Button>
           </DialogFooter>
         </DialogContent>
