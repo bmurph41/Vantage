@@ -16,6 +16,7 @@ import UtilizationByTypeTable from './UtilizationByTypeTable';
 import UtilizationByBandChart from './UtilizationByBandChart';
 import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
 import OfflineBreakdownTable from './OfflineBreakdownTable';
+import CompressionChart from './CompressionChart';
 import WaitlistPanel from './WaitlistPanel';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
@@ -307,6 +308,12 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         periodStart={periodStart}
         periodEnd={periodEnd}
         mode={utilMode}
+      />
+
+      <CompressionChart
+        propertyId={effectivePropertyId}
+        mode={utilMode}
+        unitTypes={selectedUnitTypes.length > 0 ? selectedUnitTypes : undefined}
       />
 
       <WaitlistPanel propertyId={effectivePropertyId} />

@@ -734,4 +734,141 @@ export async function getOfflineBreakdown(
   return computeOfflineBreakdown(blocks, units, occupancy, period, primaryDenom);
 }
 
+import type { CompressionAnalytics, DailyUtilizationPoint, DayOfWeekAverage } from './utilization-types';
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export async function computeCompressionAnalytics(
+  propertyId: string,
+  periodStart: string,
+  periodEnd: string,
+  threshold: number = 90,
+  mode: UtilizationMode = 'contracted',
+  unitTypes?: string[]
+): Promise<CompressionAnalytics> {
+  const [rawUnits, offlineBlocks] = await Promise.all([
+    fetchInventoryUnits(propertyId, unitTypes),
+    fetchOfflineBlocks(propertyId, periodStart, periodEnd),
+  ]);
+
+  const availableUnits = rawUnits.filter(u => u.isAvailable);
+  const availableUnitIds = new Set(availableUnits.map(u => u.id));
+
+  let occupancy: OccupancyEvent[];
+  if (mode === 'physical') {
+    const presenceEvents = await fetchPresenceEvents(propertyId, periodStart, periodEnd, unitTypes);
+    occupancy = presenceToOccupancyEvents(presenceEvents);
+  } else {
+    occupancy = await fetchOccupancyEvents(propertyId, periodStart, periodEnd, unitTypes);
+  }
+
+  const start = new Date(periodStart);
+  const end = new Date(periodEnd);
+  const dailySeries: DailyUtilizationPoint[] = [];
+
+  const current = new Date(start);
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const dayOfWeek = current.getDay();
+
+    const offlineUnitIds = new Set<string>();
+    for (const block of offlineBlocks) {
+      const blockStart = new Date(block.startDate);
+      const blockEnd = block.endDate ? new Date(block.endDate) : end;
+      if (current >= blockStart && current <= blockEnd) {
+        if (block.scopeType === 'unit' && block.unitId) {
+          offlineUnitIds.add(block.unitId);
+        } else if (block.scopeType === 'unit_type') {
+          for (const u of availableUnits) {
+            if (u.unitType === block.scopeKey) offlineUnitIds.add(u.id);
+          }
+        } else if (block.scopeType === 'band') {
+          for (const u of availableUnits) {
+            if (u.bandKey === block.scopeKey) offlineUnitIds.add(u.id);
+          }
+        } else if (block.scopeType === 'property') {
+          for (const u of availableUnits) offlineUnitIds.add(u.id);
+        }
+      }
+    }
+
+    const dayAvailableCount = availableUnits.filter(u => !offlineUnitIds.has(u.id)).length;
+
+    const occupiedUnitIds = new Set<string>();
+    for (const occ of occupancy) {
+      if (!availableUnitIds.has(occ.unitId)) continue;
+      if (offlineUnitIds.has(occ.unitId)) continue;
+      const occStart = new Date(occ.startDate);
+      const occEnd = occ.endDate ? new Date(occ.endDate) : end;
+      if (current >= occStart && current <= occEnd) {
+        occupiedUnitIds.add(occ.unitId);
+      }
+    }
+
+    const occupiedCount = occupiedUnitIds.size;
+    const utilizationPct = dayAvailableCount > 0
+      ? Math.round((occupiedCount / dayAvailableCount) * 10000) / 100
+      : 0;
+
+    dailySeries.push({
+      date: dateStr,
+      dayOfWeek,
+      dayLabel: DAY_LABELS[dayOfWeek],
+      totalUnits: dayAvailableCount,
+      occupiedUnits: occupiedCount,
+      utilizationPct: Math.min(utilizationPct, 100),
+    });
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  const dayOfWeekBuckets: Record<number, number[]> = {};
+  for (let i = 0; i < 7; i++) dayOfWeekBuckets[i] = [];
+  for (const dp of dailySeries) {
+    dayOfWeekBuckets[dp.dayOfWeek].push(dp.utilizationPct);
+  }
+
+  const dayOfWeekAverages: DayOfWeekAverage[] = [];
+  for (let i = 0; i < 7; i++) {
+    const vals = dayOfWeekBuckets[i];
+    const avg = vals.length > 0
+      ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
+      : 0;
+    dayOfWeekAverages.push({
+      dayOfWeek: i,
+      dayLabel: DAY_LABELS[i],
+      avgUtilizationPct: avg,
+      sampleCount: vals.length,
+    });
+  }
+
+  const compressionDays = dailySeries.filter(d => d.utilizationPct >= threshold).length;
+  const totalDays = dailySeries.length;
+  const compressionDaysPct = totalDays > 0
+    ? Math.round((compressionDays / totalDays) * 10000) / 100
+    : 0;
+
+  const allPcts = dailySeries.map(d => d.utilizationPct);
+  const avgUtilizationPct = allPcts.length > 0
+    ? Math.round((allPcts.reduce((s, v) => s + v, 0) / allPcts.length) * 100) / 100
+    : 0;
+  const peakUtilizationPct = allPcts.length > 0 ? Math.max(...allPcts) : 0;
+  const peakDate = dailySeries.find(d => d.utilizationPct === peakUtilizationPct)?.date ?? null;
+
+  return {
+    propertyId,
+    periodStart,
+    periodEnd,
+    threshold,
+    totalDays,
+    compressionDays,
+    compressionDaysPct,
+    avgUtilizationPct,
+    peakUtilizationPct,
+    peakDate,
+    dailySeries,
+    dayOfWeekAverages,
+  };
+}
+
 export { generateMockSummary } from './utilization-service-mock';

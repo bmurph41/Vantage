@@ -7,6 +7,7 @@ import {
   fetchByType,
   fetchDrilldownEvents,
   getOfflineBreakdown,
+  computeCompressionAnalytics,
 } from './utilization-service';
 import { requireRole } from '../../middleware/rbac';
 import type { AssetClass } from './utilization-config';
@@ -139,6 +140,30 @@ export function createUtilizationRouter(): Router {
     } catch (error: any) {
       console.error('[Utilization] Error fetching offline breakdown:', error);
       res.status(500).json({ error: 'Failed to fetch offline breakdown' });
+    }
+  });
+
+  router.get('/compression', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const threshold = req.query.threshold ? parseInt(req.query.threshold as string, 10) : 90;
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+      const unitTypes = req.query.unitTypes ? (req.query.unitTypes as string).split(',') : undefined;
+
+      const analytics = await computeCompressionAnalytics(
+        propertyId, periodStart, periodEnd, threshold, mode, unitTypes
+      );
+      res.json(analytics);
+    } catch (error: any) {
+      console.error('[Utilization] Error computing compression analytics:', error);
+      res.status(500).json({ error: 'Failed to compute compression analytics' });
     }
   });
 
