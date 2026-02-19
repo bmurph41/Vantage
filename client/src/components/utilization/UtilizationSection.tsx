@@ -18,6 +18,7 @@ import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
 import OfflineBreakdownTable from './OfflineBreakdownTable';
 import CompressionChart from './CompressionChart';
 import PricingRecommendationsPanel from './PricingRecommendationsPanel';
+import UnderutilizationInsights from './UnderutilizationInsights';
 import WaitlistPanel from './WaitlistPanel';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
@@ -315,6 +316,12 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         propertyId={effectivePropertyId}
         mode={utilMode}
         unitTypes={selectedUnitTypes.length > 0 ? selectedUnitTypes : undefined}
+      />
+
+      <UnderutilizationInsights
+        propertyId={effectivePropertyId}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
       />
 
       <PricingRecommendationsPanel propertyId={effectivePropertyId} />

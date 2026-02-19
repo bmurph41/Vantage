@@ -9,6 +9,7 @@ import {
   getOfflineBreakdown,
   computeCompressionAnalytics,
 } from './utilization-service';
+import { diagnoseUnderutilization } from './diagnosis-engine';
 import { requireRole } from '../../middleware/rbac';
 import type { AssetClass } from './utilization-config';
 import type { UtilizationMode } from './utilization-types';
@@ -193,6 +194,27 @@ export function createUtilizationRouter(): Router {
     } catch (error: any) {
       console.error('[Utilization] Error recomputing snapshots:', error);
       res.status(500).json({ error: 'Failed to recompute snapshots' });
+    }
+  });
+
+  router.get('/diagnosis', async (req: any, res) => {
+    try {
+      const orgId = req.user?.organizationId;
+      if (!orgId) return res.status(403).json({ error: 'Organization context required.' });
+
+      const propertyId = req.query.propertyId as string;
+      const periodStart = req.query.periodStart as string;
+      const periodEnd = req.query.periodEnd as string;
+
+      if (!propertyId || !periodStart || !periodEnd) {
+        return res.status(400).json({ error: 'propertyId, periodStart, and periodEnd are required' });
+      }
+
+      const diagnoses = await diagnoseUnderutilization(propertyId, orgId, periodStart, periodEnd);
+      res.json({ diagnoses, count: diagnoses.length });
+    } catch (error: any) {
+      console.error('[Utilization] Diagnosis error:', error);
+      res.status(500).json({ error: 'Failed to compute underutilization diagnosis' });
     }
   });
 

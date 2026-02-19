@@ -43,6 +43,7 @@ function toInventoryUnit(row: any): InventoryUnit {
     widthFt: row.widthFt ? parseFloat(row.widthFt) : null,
     depthFt: row.depthFt ? parseFloat(row.depthFt) : null,
     sqft: row.sqft ? parseFloat(row.sqft) : null,
+    capacityAttributes: row.capacityAttributes ?? {},
     isAvailable: row.isAvailable,
     isOffline: row.isOffline,
     offlineReasonCode: row.offlineReasonCode ?? undefined,

@@ -18,6 +18,7 @@ export interface InventoryUnit {
   widthFt: number | null;
   depthFt: number | null;
   sqft: number | null;
+  capacityAttributes?: Record<string, any>;
   isAvailable: boolean;
   isOffline: boolean;
   offlineReasonCode?: string;
