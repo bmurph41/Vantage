@@ -848,6 +848,52 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
               </CardDescription>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {viewMode === 'single' && displayMode === 'annual' && (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showNormalized ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowNormalized(!showNormalized)}
+                          className="h-8 text-xs"
+                        >
+                          {showNormalized ? <Eye className="h-3 w-3 mr-1" /> : <EyeOff className="h-3 w-3 mr-1" />}
+                          Normalized
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Toggle between raw and normalized (addback-adjusted) view</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {allAddbacks.length > 0 && (
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                          <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                          {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent className="w-[380px] sm:w-[420px]">
+                        <SheetHeader>
+                          <SheetTitle className="flex items-center gap-2">
+                            <ArrowUpCircle className="h-5 w-5 text-amber-600" />
+                            Addbacks Manager
+                          </SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">
+                          <AddbacksTrackerPanel
+                            addbacks={allAddbacks}
+                            onToggle={(id, isActive) => toggleAddback({ addbackId: id, isActive })}
+                            onDelete={(id) => deleteAddback(id)}
+                            isPending={addbackPending}
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
+                </>
+              )}
               {displayMode === 'monthly' && viewMode === 'single' && (
                 <>
                   <TooltipProvider>
@@ -968,6 +1014,48 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                       <TooltipContent>Show year-over-year growth at line item level</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={showNormalized ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowNormalized(!showNormalized)}
+                          className="h-8 text-xs"
+                        >
+                          {showNormalized ? <Eye className="h-3 w-3 mr-1" /> : <EyeOff className="h-3 w-3 mr-1" />}
+                          Normalized
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Toggle between raw and normalized (addback-adjusted) view</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {allAddbacks.length > 0 && (
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                          <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                          {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent className="w-[380px] sm:w-[420px]">
+                        <SheetHeader>
+                          <SheetTitle className="flex items-center gap-2">
+                            <ArrowUpCircle className="h-5 w-5 text-amber-600" />
+                            Addbacks Manager
+                          </SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">
+                          <AddbacksTrackerPanel
+                            addbacks={allAddbacks}
+                            onToggle={(id, isActive) => toggleAddback({ addbackId: id, isActive })}
+                            onDelete={(id) => deleteAddback(id)}
+                            isPending={addbackPending}
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
                 </>
               )}
             </div>
@@ -1044,7 +1132,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           );
                         })()}
                         <TableRow
-                          className="bg-muted/50 cursor-pointer hover:bg-muted"
+                          className="bg-muted/50 cursor-pointer hover:bg-muted group"
                           onClick={() => toggleCategory(category)}
                         >
                           <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
@@ -1055,11 +1143,43 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                               )}
                               {category}
+                              {isCategoryAddedBack(category) && (
+                                <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
+                                  <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                  Added Back
+                                </Badge>
+                              )}
                               {showCategoryGrowth && catPctChange !== null && hasDataA && hasDataB && (
                                 <Badge variant="outline" className={`ml-2 text-[10px] ${catPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
                                   {catPctChange >= 0 ? '+' : ''}{catPctChange.toFixed(1)}%
                                 </Badge>
                               )}
+                              <AddbackEditor
+                                scope="category"
+                                lineItemKey={category}
+                                lineItemLabel={`${category} (Entire Category)`}
+                                category={category}
+                                year={yearB}
+                                existingAddback={getAnyAddback(category, 'category')}
+                                isActive={isCategoryAddedBack(category)}
+                                onSave={(data) => createOrUpdateAddback(data)}
+                                onToggle={() => toggleCategoryAddback(category)}
+                                onDelete={(id) => deleteAddback(id)}
+                                isPending={addbackPending}
+                                trigger={
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                  >
+                                    {isCategoryAddedBack(category) ? (
+                                      <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
+                                    ) : (
+                                      <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                  </Button>
+                                }
+                              />
                             </div>
                           </TableCell>
                           <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
@@ -1132,15 +1252,48 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   const subDollarChange = subAmountB - subAmountA;
                                   const subPctChange = calcGrowthRate(subAmountB, subAmountA);
                                   return (
-                                    <TableRow key={`${category}-${subcategory}`}>
+                                    <TableRow key={`${category}-${subcategory}`} className={`group ${(isLineItemAddedBack(subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
                                       <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-xs truncate max-w-[240px]">
                                         <div className="flex items-center gap-1">
                                           <span>{getDisplayName(subcategory, 'line_item', category, department)}</span>
+                                          {isLineItemAddedBack(subcategory) && (
+                                            <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
+                                              <ArrowUpCircle className="h-2.5 w-2.5 mr-0.5" />
+                                              Addback
+                                            </Badge>
+                                          )}
                                           {showLineItemGrowth && subPctChange !== null && hasDataA && hasDataB && (
                                             <Badge variant="outline" className={`ml-1 text-[10px] ${subPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
                                               {subPctChange >= 0 ? '+' : ''}{subPctChange.toFixed(1)}%
                                             </Badge>
                                           )}
+                                          <AddbackEditor
+                                            scope="line_item"
+                                            lineItemKey={subcategory}
+                                            lineItemLabel={subcategory}
+                                            category={category}
+                                            department={department}
+                                            year={yearB}
+                                            existingAddback={getAnyAddback(subcategory, 'line_item')}
+                                            isActive={isLineItemAddedBack(subcategory)}
+                                            onSave={(data) => createOrUpdateAddback(data)}
+                                            onToggle={() => toggleLineItemAddback(subcategory, subcategory, category, undefined, department)}
+                                            onDelete={(id) => deleteAddback(id)}
+                                            isPending={addbackPending}
+                                            trigger={
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                              >
+                                                {isLineItemAddedBack(subcategory) ? (
+                                                  <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                                ) : (
+                                                  <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                                )}
+                                              </Button>
+                                            }
+                                          />
                                         </div>
                                       </TableCell>
                                       <TableCell className={`text-right text-xs px-3 py-1.5 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
@@ -1795,7 +1948,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         </>
                       )}
                       <TableRow 
-                        className="bg-muted/50 cursor-pointer hover:bg-muted"
+                        className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
                         <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
@@ -1806,6 +1959,38 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                             )}
                             {category}
+                            {isCategoryAddedBack(category) && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
+                                <ArrowUpCircle className="h-3 w-3 mr-1" />
+                                Added Back
+                              </Badge>
+                            )}
+                            <AddbackEditor
+                              scope="category"
+                              lineItemKey={category}
+                              lineItemLabel={`${category} (Entire Category)`}
+                              category={category}
+                              year={yearRange.length > 0 ? yearRange[yearRange.length - 1] : undefined}
+                              existingAddback={getAnyAddback(category, 'category')}
+                              isActive={isCategoryAddedBack(category)}
+                              onSave={(data) => createOrUpdateAddback(data)}
+                              onToggle={() => toggleCategoryAddback(category)}
+                              onDelete={(id) => deleteAddback(id)}
+                              isPending={addbackPending}
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                >
+                                  {isCategoryAddedBack(category) ? (
+                                    <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
+                                  ) : (
+                                    <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              }
+                            />
                           </div>
                         </TableCell>
                         {yearRange.map((year, yi) => {
@@ -1894,26 +2079,61 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               </TableRow>
 
                               {expandedDepartments.has(`${category}-${department}`) && deptSubcats.map((subcategory: string) => (
-                                <TableRow key={`${category}-${subcategory}`}>
+                                <TableRow key={`${category}-${subcategory}`} className={`group ${(isLineItemAddedBack(subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
                                   <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-xs truncate max-w-[240px]">
-                                    <div className="flex flex-col">
-                                      <InlineEditableName
-                                        originalName={subcategory}
-                                        displayName={getDisplayName(subcategory, 'line_item', category, department)}
-                                        isOverridden={hasOverride(subcategory, 'line_item', category, department)}
-                                        suggestion={getOrgDefaultSuggestion(subcategory, 'line_item')}
-                                        isPending={overridePending}
-                                        onSave={async (newName) => {
-                                          await saveOverride({ scope: 'line_item', originalName: subcategory, displayName: newName, category, department });
-                                        }}
-                                        onRevert={hasOverride(subcategory, 'line_item', category, department) ? async () => {
-                                          const override = getOverride(subcategory, 'line_item', category, department);
-                                          if (override) await deleteOverride(override.id);
-                                        } : undefined}
-                                      />
-                                      {hasOverride(subcategory, 'line_item', category, department) && (
-                                        <span className="text-[10px] text-muted-foreground/60">{subcategory}</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex flex-col">
+                                        <InlineEditableName
+                                          originalName={subcategory}
+                                          displayName={getDisplayName(subcategory, 'line_item', category, department)}
+                                          isOverridden={hasOverride(subcategory, 'line_item', category, department)}
+                                          suggestion={getOrgDefaultSuggestion(subcategory, 'line_item')}
+                                          isPending={overridePending}
+                                          onSave={async (newName) => {
+                                            await saveOverride({ scope: 'line_item', originalName: subcategory, displayName: newName, category, department });
+                                          }}
+                                          onRevert={hasOverride(subcategory, 'line_item', category, department) ? async () => {
+                                            const override = getOverride(subcategory, 'line_item', category, department);
+                                            if (override) await deleteOverride(override.id);
+                                          } : undefined}
+                                        />
+                                        {hasOverride(subcategory, 'line_item', category, department) && (
+                                          <span className="text-[10px] text-muted-foreground/60">{subcategory}</span>
+                                        )}
+                                      </div>
+                                      {isLineItemAddedBack(subcategory) && (
+                                        <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
+                                          <ArrowUpCircle className="h-2.5 w-2.5 mr-0.5" />
+                                          Addback
+                                        </Badge>
                                       )}
+                                      <AddbackEditor
+                                        scope="line_item"
+                                        lineItemKey={subcategory}
+                                        lineItemLabel={subcategory}
+                                        category={category}
+                                        department={department}
+                                        year={yearRange.length > 0 ? yearRange[yearRange.length - 1] : undefined}
+                                        existingAddback={getAnyAddback(subcategory, 'line_item')}
+                                        isActive={isLineItemAddedBack(subcategory)}
+                                        onSave={(data) => createOrUpdateAddback(data)}
+                                        onToggle={() => toggleLineItemAddback(subcategory, subcategory, category, undefined, department)}
+                                        onDelete={(id) => deleteAddback(id)}
+                                        isPending={addbackPending}
+                                        trigger={
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                          >
+                                            {isLineItemAddedBack(subcategory) ? (
+                                              <ArrowUpCircle className="h-3 w-3 text-amber-600" />
+                                            ) : (
+                                              <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+                                            )}
+                                          </Button>
+                                        }
+                                      />
                                     </div>
                                   </TableCell>
                                   {yearRange.map((year, yi) => {
