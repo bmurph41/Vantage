@@ -21118,6 +21118,9 @@ Current context: Project ${req.params.projectId}`;
           config.commercialLeaseCount = cm.profitCenters.commercialTenants.numberOfSuites;
         }
       }
+      if (cm.seasonality?.profile && !cm.config?.seasonalityProfile) {
+        config.seasonalityProfile = cm.seasonality.profile;
+      }
       if (cm.underwriting?.holdPeriodYears && !cm.config?.holdPeriod) {
         config.holdPeriod = cm.underwriting.holdPeriodYears;
       }

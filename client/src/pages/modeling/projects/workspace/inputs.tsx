@@ -55,7 +55,9 @@ import {
   KeyRound,
   ChevronDown,
   ChevronRight,
-  Trash2
+  Trash2,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import {
   Dialog,
@@ -231,6 +233,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
   const [profitCenters, setProfitCenters] = useState<ProfitCenterConfig[]>(defaultProfitCenters);
   const [commercialLeaseCount, setCommercialLeaseCount] = useState<string>('');
+  const [seasonalityProfile, setSeasonalityProfile] = useState<string | null>(null);
+  const [seasonalityBannerDismissed, setSeasonalityBannerDismissed] = useState(false);
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
   const [newProfitCenterSection, setNewProfitCenterSection] = useState<'storage' | 'designated'>('designated');
@@ -274,6 +278,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       bottomLineMetric,
       seasonMonths,
       winterMonths,
+      seasonalityProfile,
       departments: storageSettings,
       profitCenters: profitCenterSettings,
       commercialLeaseCount: parseInt(commercialLeaseCount) || 0,
@@ -288,6 +293,9 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       setCashFlowGranularity(config.cashFlowGranularity || 'annual');
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
       setWinterMonths(config.winterMonths || [11, 12, 1, 2, 3]);
+      const profile = (config as any).seasonalityProfile || null;
+      setSeasonalityProfile(profile);
+      const profileDefault: SeasonalityOption[] | null = profile === 'year_round' ? ['annual'] : profile === 'seasonal' ? ['seasonal'] : null;
       if (config.departments) {
         const enabledDesignatedIds = new Set<string>();
         Object.entries(config.departments).forEach(([key, dept]: [string, any]) => {
@@ -298,7 +306,12 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
         setStorageTypes(prev => prev.map(item => {
           const dept = config.departments[item.id];
-          if (!dept) return item;
+          if (!dept) {
+            if (profileDefault) {
+              return { ...item, seasons: profileDefault };
+            }
+            return item;
+          }
           let seasons = dept.seasons;
           if (!seasons && typeof dept.isYearRound === 'boolean') {
             seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
@@ -318,6 +331,8 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             designatedSpaceIds: dsIds,
           };
         }));
+      } else if (profileDefault) {
+        setStorageTypes(prev => prev.map(item => ({ ...item, seasons: profileDefault })));
       }
       if (config.profitCenters) {
         setProfitCenters(prev => prev.map(item => ({
@@ -383,7 +398,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, profitCenters, commercialLeaseCount, acreage, ownership]);
+  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, profitCenters, commercialLeaseCount, acreage, ownership, seasonalityProfile]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -1120,9 +1135,27 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             </div>
             <CardDescription className="text-[11px]">
               {storageTypes.filter(s => s.isEnabled).length} of {storageTypes.length} enabled
+              {seasonalityProfile && (
+                <span className="ml-1.5">
+                  — Project default: <span className="font-medium text-foreground">{seasonalityProfile === 'year_round' ? 'Year-Round' : 'Seasonal'}</span>
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0 px-4 pb-4">
+            {seasonalityProfile && !seasonalityBannerDismissed && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 mb-3">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                    All storage types defaulted to <span className="font-semibold">{seasonalityProfile === 'year_round' ? 'Year-Round' : 'Seasonal'}</span> based on the project setup. Please verify the seasonality for each storage type is correct.
+                  </p>
+                </div>
+                <button onClick={() => setSeasonalityBannerDismissed(true)} className="shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             <div className="space-y-0.5">
               {storageTypes.map((item) => (
                 <div key={item.id} className={`rounded border ${item.isEnabled ? 'border-border' : 'border-transparent opacity-50'}`}>
