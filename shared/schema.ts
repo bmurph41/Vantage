@@ -24756,3 +24756,154 @@ export const assetClassAssumptionSets = pgTable('asset_class_assumption_sets', {
   assetClassIdx: index('assumption_sets_asset_class_idx').on(table.assetClass),
   orgIdx: index('assumption_sets_org_idx').on(table.orgId),
 }));
+
+// ============================================================================
+// BUDGETING MODULE
+// ============================================================================
+
+export const budgetTypeEnum = pgEnum("budget_type", ["OPERATING_PL", "BALANCE_SHEET", "CASHFLOW"]);
+export const budgetScopeTypeEnum = pgEnum("budget_scope_type", ["PORTFOLIO", "MARINA"]);
+export const budgetStatusEnum = pgEnum("budget_status", ["DRAFT", "LOCKED", "ARCHIVED"]);
+export const budgetDimensionTypeEnum = pgEnum("budget_dimension_type", ["NONE", "MARINA", "DEPARTMENT", "PROFIT_CENTER"]);
+export const budgetLineTypeEnum = pgEnum("budget_line_type", ["REVENUE", "COGS", "OPEX", "OTHER_INCOME", "OTHER_EXPENSE"]);
+export const actualsSourceEnum = pgEnum("actuals_source", ["SEED", "QBO", "UPLOAD", "MANUAL"]);
+export const budgetTargetComparatorEnum = pgEnum("budget_target_comparator", ["GTE", "LTE"]);
+
+export const budgets = pgTable('budgets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  orgId: varchar('org_id').references(() => organizations.id),
+  name: text('name').notNull(),
+  fiscalYear: integer('fiscal_year').notNull(),
+  type: budgetTypeEnum('type').notNull().default('OPERATING_PL'),
+  scopeType: budgetScopeTypeEnum('scope_type').notNull().default('PORTFOLIO'),
+  scopeMarinaId: varchar('scope_marina_id'),
+  currency: text('currency').notNull().default('USD'),
+  status: budgetStatusEnum('status').notNull().default('DRAFT'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('budgets_user_idx').on(table.userId),
+  orgIdx: index('budgets_org_idx').on(table.orgId),
+  yearIdx: index('budgets_year_idx').on(table.fiscalYear),
+}));
+
+export type Budget = typeof budgets.$inferSelect;
+export const insertBudgetSchema = createInsertSchema(budgets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudget = z.infer<typeof insertBudgetSchema>;
+
+export const budgetVersions = pgTable('budget_versions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar('budget_id').notNull().references(() => budgets.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  budgetIdx: index('budget_versions_budget_idx').on(table.budgetId),
+}));
+
+export type BudgetVersion = typeof budgetVersions.$inferSelect;
+export const insertBudgetVersionSchema = createInsertSchema(budgetVersions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetVersion = z.infer<typeof insertBudgetVersionSchema>;
+
+export const budgetDimensions = pgTable('budget_dimensions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  budgetId: varchar('budget_id').notNull().references(() => budgets.id, { onDelete: 'cascade' }),
+  dimensionType: budgetDimensionTypeEnum('dimension_type').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type BudgetDimension = typeof budgetDimensions.$inferSelect;
+export const insertBudgetDimensionSchema = createInsertSchema(budgetDimensions).omit({ id: true, createdAt: true });
+export type InsertBudgetDimension = z.infer<typeof insertBudgetDimensionSchema>;
+
+export const budgetLines = pgTable('budget_lines', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  budgetVersionId: varchar('budget_version_id').notNull().references(() => budgetVersions.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  lineType: budgetLineTypeEnum('line_type').notNull(),
+  accountKey: text('account_key').notNull(),
+  displayName: text('display_name').notNull(),
+  parentAccountKey: text('parent_account_key'),
+  dimensionMarinaId: varchar('dimension_marina_id'),
+  dimensionDepartment: text('dimension_department'),
+  dimensionProfitCenter: text('dimension_profit_center'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  versionIdx: index('budget_lines_version_idx').on(table.budgetVersionId),
+  accountIdx: index('budget_lines_account_idx').on(table.accountKey),
+}));
+
+export type BudgetLine = typeof budgetLines.$inferSelect;
+export const insertBudgetLineSchema = createInsertSchema(budgetLines).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetLine = z.infer<typeof insertBudgetLineSchema>;
+
+export const budgetAmounts = pgTable('budget_amounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  budgetLineId: varchar('budget_line_id').notNull().references(() => budgetLines.id, { onDelete: 'cascade' }),
+  periodStart: date('period_start').notNull(),
+  amount: decimal('amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  lineIdx: index('budget_amounts_line_idx').on(table.budgetLineId),
+  periodIdx: index('budget_amounts_period_idx').on(table.periodStart),
+  uniqueLinePeriod: uniqueIndex('budget_amounts_line_period_uniq').on(table.budgetLineId, table.periodStart),
+}));
+
+export type BudgetAmount = typeof budgetAmounts.$inferSelect;
+export const insertBudgetAmountSchema = createInsertSchema(budgetAmounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetAmount = z.infer<typeof insertBudgetAmountSchema>;
+
+export const actualsFacts = pgTable('actuals_facts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  orgId: varchar('org_id').references(() => organizations.id),
+  periodStart: date('period_start').notNull(),
+  lineType: budgetLineTypeEnum('line_type').notNull(),
+  accountKey: text('account_key').notNull(),
+  dimensionMarinaId: varchar('dimension_marina_id'),
+  dimensionDepartment: text('dimension_department'),
+  dimensionProfitCenter: text('dimension_profit_center'),
+  amount: decimal('amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  source: actualsSourceEnum('source').notNull().default('SEED'),
+  sourceRef: text('source_ref'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('actuals_facts_user_idx').on(table.userId),
+  orgIdx: index('actuals_facts_org_idx').on(table.orgId),
+  periodIdx: index('actuals_facts_period_idx').on(table.periodStart),
+  accountIdx: index('actuals_facts_account_idx').on(table.accountKey),
+  marinaIdx: index('actuals_facts_marina_idx').on(table.dimensionMarinaId),
+}));
+
+export type ActualsFact = typeof actualsFacts.$inferSelect;
+export const insertActualsFactSchema = createInsertSchema(actualsFacts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertActualsFact = z.infer<typeof insertActualsFactSchema>;
+
+export const budgetTargets = pgTable('budget_targets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  orgId: varchar('org_id').references(() => organizations.id),
+  fiscalYear: integer('fiscal_year').notNull(),
+  scopeType: budgetScopeTypeEnum('scope_type').notNull().default('PORTFOLIO'),
+  scopeMarinaId: varchar('scope_marina_id'),
+  kpiKey: text('kpi_key').notNull(),
+  targetValue: decimal('target_value', { precision: 10, scale: 4 }).notNull(),
+  comparator: budgetTargetComparatorEnum('comparator').notNull().default('GTE'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('budget_targets_user_idx').on(table.userId),
+  orgIdx: index('budget_targets_org_idx').on(table.orgId),
+  yearIdx: index('budget_targets_year_idx').on(table.fiscalYear),
+}));
+
+export type BudgetTarget = typeof budgetTargets.$inferSelect;
+export const insertBudgetTargetSchema = createInsertSchema(budgetTargets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetTarget = z.infer<typeof insertBudgetTargetSchema>;
