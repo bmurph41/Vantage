@@ -17,6 +17,7 @@ import UtilizationByBandChart from './UtilizationByBandChart';
 import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
 import OfflineBreakdownTable from './OfflineBreakdownTable';
 import CompressionChart from './CompressionChart';
+import PricingRecommendationsPanel from './PricingRecommendationsPanel';
 import WaitlistPanel from './WaitlistPanel';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
@@ -315,6 +316,8 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         mode={utilMode}
         unitTypes={selectedUnitTypes.length > 0 ? selectedUnitTypes : undefined}
       />
+
+      <PricingRecommendationsPanel propertyId={effectivePropertyId} />
 
       <WaitlistPanel propertyId={effectivePropertyId} />
 

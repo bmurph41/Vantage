@@ -443,6 +443,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { createWaitlistRouter } = await import('./modules/utilization/waitlist-routes');
   app.use("/api/waitlist", authenticateUser, createWaitlistRouter());
 
+  // Pricing recommendations module routes
+  const { createPricingRouter } = await import('./modules/utilization/pricing-routes');
+  app.use("/api/pricing", authenticateUser, createPricingRouter());
+
   // Payroll module routes
   app.use("/api/payroll", authenticateUser, payrollRouter);
   app.use("/api/payroll/permissions", authenticateUser, permissionsRouter);
