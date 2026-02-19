@@ -117,12 +117,12 @@ type StorageTypeConfig = {
 const storageDefaults = { capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const, hasDesignatedSpaces: false, designatedSpaceIds: [] as string[] };
 
 const defaultStorageTypes: StorageTypeConfig[] = [
-  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: true, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
+  { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
   { id: 'lift_slips', name: 'Lift Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" />, ...storageDefaults },
   { id: 'moorings', name: 'Moorings', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
   { id: 'dinghies', name: 'Dinghies', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Sailboat className="h-4 w-4" />, ...storageDefaults },
   { id: 'jet_skis', name: 'Jet Skis', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Waves className="h-4 w-4" />, ...storageDefaults },
-  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', seasons: ['annual'], isEnabled: true, icon: <Warehouse className="h-4 w-4" />, ...storageDefaults },
+  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Warehouse className="h-4 w-4" />, ...storageDefaults },
   { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Container className="h-4 w-4" />, ...storageDefaults },
   { id: 'land_storage', name: 'Land Storage', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <MapPin className="h-4 w-4" />, ...storageDefaults },
   { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" />, ...storageDefaults },

@@ -21143,26 +21143,59 @@ Current context: Project ${req.params.projectId}`;
       }
       if (cm.storageMix?.items && Object.keys(config.departments).length === 0) {
         const depts: Record<string, any> = {};
+        const isYearRound = cm.seasonality?.profile === 'year_round';
+        const wizardStorageIds = new Set<string>();
         for (const item of cm.storageMix.items) {
-          if (item.storageType && item.count > 0) {
-            const isYearRound = cm.seasonality?.profile === 'year_round';
+          if (item.storageType) {
+            wizardStorageIds.add(item.storageType);
+            const count = parseInt(String(item.count)) || 0;
+            const occMode = item.occupancyInputMode || 'percentage';
+            let occupiedCount = '';
+            let occupancyPercent = '';
+            if (occMode === 'count' && item.occupiedCount != null && item.occupiedCount !== '') {
+              occupiedCount = String(item.occupiedCount);
+              if (count > 0) {
+                occupancyPercent = String(Math.round((parseInt(String(item.occupiedCount)) / count) * 100));
+              }
+            } else if (item.currentOccupancy != null && item.currentOccupancy !== '') {
+              occupancyPercent = String(item.currentOccupancy);
+              if (count > 0) {
+                occupiedCount = String(Math.round((parseFloat(String(item.currentOccupancy)) / 100) * count));
+              }
+            }
             depts[item.storageType] = {
               isEnabled: true,
               section: 'storage',
               seasons: isYearRound ? ['annual'] : ['seasonal'],
-              capacity: String(item.count || ''),
+              capacity: count > 0 ? String(count) : '',
               leasable: '',
-              occupiedCount: item.occupancyInputMode === 'count' ? String(item.occupiedCount || '') : '',
-              occupancyPercent: item.occupancyInputMode === 'percentage' ? String(item.currentOccupancy || '') : '',
-              occupancyInputMode: item.occupancyInputMode || 'percentage',
+              occupiedCount,
+              occupancyPercent,
+              occupancyInputMode: occMode,
               hasDesignatedSpaces: false,
               designatedSpaceIds: [],
             };
           }
         }
-        if (Object.keys(depts).length > 0) {
-          config.departments = depts;
+        const allKnownStorageTypes = [
+          'wet_slips', 'lift_slips', 'moorings', 'dinghies', 'jet_skis',
+          'dry_racks_indoor', 'dry_racks_outdoor', 'land_storage',
+          'boats_on_trailers', 'trailers', 'carports', 'houseboats',
+          'liveaboards', 'rv_sites'
+        ];
+        for (const stId of allKnownStorageTypes) {
+          if (!wizardStorageIds.has(stId)) {
+            depts[stId] = {
+              isEnabled: false,
+              section: 'storage',
+              seasons: isYearRound ? ['annual'] : ['seasonal'],
+              capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '',
+              occupancyInputMode: 'percentage',
+              hasDesignatedSpaces: false, designatedSpaceIds: [],
+            };
+          }
         }
+        config.departments = depts;
       }
       
       res.json(config);
