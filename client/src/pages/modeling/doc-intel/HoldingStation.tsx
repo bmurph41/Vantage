@@ -1,28 +1,22 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { 
   Upload, 
   FileSpreadsheet, 
   FileText, 
-  Trash2, 
   AlertTriangle, 
   CheckCircle2, 
-  Clock, 
-  MoreVertical,
   X,
   Loader2,
   Brain,
   Plus,
   Eye,
-  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -32,12 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,19 +33,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { DocIntelUpload, CustomDocumentType } from "@shared/schema";
+import type { DocIntelUpload } from "@shared/schema";
 
 function getCsrfToken(): string {
   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
@@ -78,6 +56,7 @@ type DocType = "pnl" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" 
 interface HoldingStationProps {
   projectId: string;
   onReviewDocuments: (uploadIds: string[]) => void;
+  onUploadComplete?: () => void;
 }
 
 interface StagedFile {
@@ -127,14 +106,11 @@ const BUILTIN_DOC_TYPES: Record<string, { label: string; icon: typeof FileSpread
   other: { label: "Other", icon: FileText },
 };
 
-export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationProps) {
+export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete }: HoldingStationProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [newCustomTypeName, setNewCustomTypeName] = useState("");
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
   // Explicit state to track when processing has just completed - shows prominent Review CTA
@@ -155,10 +131,6 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
       );
       return hasProcessingDocs ? 2000 : false;
     },
-  });
-
-  const { data: customDocTypes = [] } = useQuery<CustomDocumentType[]>({
-    queryKey: ["/api/doc-intel/custom-document-types"],
   });
 
   // Check if ALL documents are ready for review (parsed or reviewing status)
@@ -233,37 +205,6 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
     },
   });
 
-  const retryParseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/modeling/projects/${projectId}/documents/${id}/retry`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
-      toast({ title: "Retrying", description: "Document has been queued for re-processing." });
-    },
-    onError: (error: any) => {
-      toast({ title: "Retry failed", description: error.message || "Could not retry parsing", variant: "destructive" });
-    },
-  });
-
-  const deleteDocumentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/modeling/projects/${projectId}/documents/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents", "holding"] });
-      setDeleteConfirmId(null);
-      setDeleteConfirmName("");
-      toast({ title: "Deleted", description: "Document has been removed." });
-    },
-    onError: (error: any) => {
-      toast({ title: "Delete failed", description: error.message || "Could not delete document", variant: "destructive" });
-      setDeleteConfirmId(null);
-      setDeleteConfirmName("");
-    },
-  });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const now = new Date();
@@ -442,8 +383,11 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
     setIsProcessing(false);
     setProcessingMessage("");
     
-    // If we successfully processed documents, set flag to show prominent Review CTA
-    if (uploadedIds.length > 0) {
+    // If we successfully processed P&L documents, switch to the Review tab
+    const hasPnlDocs = pendingFiles.some((f) => f.docType === "pnl");
+    if (uploadedIds.length > 0 && hasPnlDocs && onUploadComplete) {
+      onUploadComplete();
+    } else if (uploadedIds.length > 0) {
       setProcessingJustCompleted(true);
     }
   };
@@ -454,38 +398,6 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
     onReviewDocuments(readyDocIds);
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const handleBatchDelete = async () => {
-    for (const id of selectedIds) {
-      await deleteDocumentMutation.mutateAsync(id);
-    }
-    setSelectedIds(new Set());
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const getDocTypeLabel = (docType: string) => {
-    if (BUILTIN_DOC_TYPES[docType]) {
-      return BUILTIN_DOC_TYPES[docType].label;
-    }
-    const custom = customDocTypes.find(t => t.id === docType || t.name === docType);
-    return custom?.name || docType;
-  };
 
   const currentYear = new Date().getFullYear();
   const yearOptions = ["T12", ...Array.from({ length: 10 }, (_, i) => (currentYear - i).toString())];
@@ -768,132 +680,6 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
         </CardContent>
       </Card>
 
-      {/* Document Queue Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5" />
-                Document Queue
-                {processingDocuments.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    {processingDocuments.length} processing
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Documents awaiting or completed AI processing
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddTypeDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Type
-              </Button>
-              {selectedIds.size > 0 && (
-                <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete ({selectedIds.size})
-                </Button>
-              )}
-              {/* REVIEW ALL BUTTON - Only visible when all docs are ready */}
-              {allDocumentsReady && parsedDocuments.length > 0 && (
-                <Button onClick={handleReviewAll}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Review All ({parsedDocuments.length})
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : holdingQueue.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">No Documents Yet</p>
-              <p className="text-sm">Upload your first document to get started with AI-powered analysis.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {holdingQueue.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <Checkbox
-                    checked={selectedIds.has(doc.id)}
-                    onCheckedChange={() => toggleSelect(doc.id)}
-                  />
-                  <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{doc.originalName}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{getDocTypeLabel(doc.docType || "other")}</span>
-                      {doc.year && <span>• {doc.year}</span>}
-                      <span>• {formatFileSize(doc.fileSize)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant={
-                        doc.status === "parsed" || doc.status === "reviewing" ? "default" : 
-                        doc.status === "error" ? "destructive" : "secondary"
-                      } 
-                      className="text-xs"
-                    >
-                      {doc.status === "uploaded" && <Clock className="h-3 w-3 mr-1" />}
-                      {doc.status === "processing" && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                      {(doc.status === "parsed" || doc.status === "reviewing") && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                      {doc.status === "error" && <AlertTriangle className="h-3 w-3 mr-1" />}
-                      {doc.status === "uploaded" ? "Queued" : 
-                       doc.status === "processing" ? "Processing..." : 
-                       doc.status === "parsed" || doc.status === "reviewing" ? "Ready" :
-                       doc.status === "error" ? "Error" :
-                       doc.status}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {(doc.status === "uploaded" || doc.status === "processing" || doc.status === "error") && (
-                          <DropdownMenuItem 
-                            onClick={() => retryParseMutation.mutate(doc.id)}
-                            disabled={retryParseMutation.isPending}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Retry Processing
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => {
-                          setDeleteConfirmId(doc.id);
-                          setDeleteConfirmName(doc.originalName || "this document");
-                        }}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Add Custom Type Dialog */}
       <Dialog open={showAddTypeDialog} onOpenChange={setShowAddTypeDialog}>
         <DialogContent>
@@ -934,43 +720,6 @@ export function HoldingStation({ projectId, onReviewDocuments }: HoldingStationP
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => {
-        if (!open) {
-          setDeleteConfirmId(null);
-          setDeleteConfirmName("");
-        }
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Document</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleteConfirmId) {
-                  deleteDocumentMutation.mutate(deleteConfirmId);
-                }
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleteDocumentMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
