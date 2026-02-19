@@ -1972,6 +1972,25 @@ Respond with JSON only:
 
     console.log('[DocIntel Import] Found', items.length, 'confirmed items');
 
+    if (fiscalYear) {
+      const existingForYear = await db.select({ id: modelingActuals.id })
+        .from(modelingActuals)
+        .where(and(
+          eq(modelingActuals.modelingProjectId, projectId),
+          eq(modelingActuals.year, fiscalYear),
+          eq(modelingActuals.dataSource, 'doc_intel')
+        ));
+      if (existingForYear.length > 0) {
+        console.log('[DocIntel Import] Clearing', existingForYear.length, 'existing doc_intel actuals for year', fiscalYear);
+        await db.delete(modelingActuals)
+          .where(and(
+            eq(modelingActuals.modelingProjectId, projectId),
+            eq(modelingActuals.year, fiscalYear),
+            eq(modelingActuals.dataSource, 'doc_intel')
+          ));
+      }
+    }
+
     // Fetch all categories for lookups
     const allCategories = await this.getCategories(orgId);
     const categoryMap = new Map(allCategories.map(c => [c.id, c]));

@@ -1359,6 +1359,39 @@ export class ProFormaEngineService {
 
 
   /**
+   * Get all available historical years for a project, sorted chronologically.
+   */
+  async getHistoricalYears(projectId: string, orgId: string): Promise<number[]> {
+    const results = await db.selectDistinct({ year: modelingActuals.year })
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, projectId),
+        eq(modelingActuals.orgId, orgId)
+      ));
+    return results.map(r => r.year).filter((y): y is number => y !== null).sort((a, b) => a - b);
+  }
+
+  /**
+   * Get multi-year historical P&L data for a project.
+   * Returns all available years with line items, chronologically ordered.
+   */
+  async getMultiYearHistoricalPL(projectId: string, orgId: string): Promise<any> {
+    const years = await this.getHistoricalYears(projectId, orgId);
+    if (years.length === 0) {
+      return { years: [], yearData: {}, mostRecentYear: null };
+    }
+    const yearData: Record<number, any> = {};
+    for (const y of years) {
+      yearData[y] = await this.getHistoricalPL(projectId, orgId, y);
+    }
+    return {
+      years,
+      yearData,
+      mostRecentYear: years[years.length - 1]
+    };
+  }
+
+  /**
    * Get historical P&L data for a project.
    * Used for base year determination and actuals display.
    */

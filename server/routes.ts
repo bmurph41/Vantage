@@ -22027,7 +22027,27 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Project Workspace - Historical P&L with data binding
+  // Project Workspace - Multi-Year Historical P&L
+  app.get('/api/modeling/projects/:projectId/historical-pl', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const multiYearData = await proFormaEngineService.getMultiYearHistoricalPL(projectId, orgId);
+      res.json(multiYearData);
+    } catch (error: any) {
+      console.error('Failed to fetch multi-year historical P&L:', error);
+      res.status(500).json({ error: 'Failed to fetch multi-year historical P&L' });
+    }
+  });
+
+  // Project Workspace - Historical P&L with data binding (single year)
   app.get('/api/modeling/projects/:projectId/historical-pl/:year', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

@@ -166,22 +166,11 @@ export function MultiDocumentReview({
   // Check if ALL non-excluded items are fully classified with both category AND department (Requirement I)
   const allItemsClassified = useMemo(() => {
     if (totalItems === 0) return false;
-    // Only check confirmed items - excluded and rejected items don't need classification
-    const itemsNeedingClassification = allItems.filter(item => item.status !== 'excluded' && item.status !== 'rejected');
-    if (itemsNeedingClassification.length === 0) return false;
-    return itemsNeedingClassification.every(item => {
-      // Check category tier (using correct field names)
+    const confirmedItems = allItems.filter(item => item.status === 'confirmed');
+    if (confirmedItems.length === 0) return false;
+    return confirmedItems.every(item => {
       const hasCategory = item.categoryTierConfirmed || item.categoryTierSuggested;
-      if (!hasCategory) return false;
-      
-      // Check department based on category tier
-      const tier = item.categoryTierConfirmed || item.categoryTierSuggested;
-      if (tier === 'expense') {
-        return !!(item.expenseDeptConfirmed || item.expenseDeptSuggested);
-      } else {
-        // Revenue or Cost of Goods
-        return !!(item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
-      }
+      return !!hasCategory;
     });
   }, [allItems, totalItems]);
 
@@ -558,7 +547,7 @@ export function MultiDocumentReview({
           {!allItemsClassified && totalItems > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              All confirmed items must have Category AND Department selected to enable "Apply to Model". Rejected/excluded items are skipped.
+              All confirmed items must have a Category (Revenue/Expense/COGS) selected to enable "Apply to Model".
             </p>
           )}
           {allItemsClassified && !allItemsProcessed && totalPending > 0 && (
