@@ -19,7 +19,13 @@ import {
   RefreshCw,
   Download,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle,
+  ShieldAlert,
+  ShieldCheck,
+  Info,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import {
   BarChart,
@@ -38,8 +44,8 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from 'recharts';
-import { formatCurrency, formatPercent } from '@/lib/utils';
-import type { ScenarioComparisonData } from '@/types/modeling';
+import { formatCurrency } from '@/lib/utils';
+import type { ScenarioComparisonData, ScenarioComparisonScenario, ScenarioComparisonMetric } from '@/types/modeling';
 
 interface ScenarioComparisonChartsProps {
   projectId: string;
@@ -48,135 +54,31 @@ interface ScenarioComparisonChartsProps {
 
 const SCENARIO_COLORS: Record<string, string> = {
   base: '#3b82f6',
-  upside: '#10b981',
-  downside: '#ef4444',
+  aggressive: '#10b981',
+  conservative: '#ef4444',
   custom: '#8b5cf6',
 };
 
+const SEVERITY_CONFIG: Record<string, { icon: any; bg: string; border: string; text: string }> = {
+  high: { icon: ShieldAlert, bg: 'bg-red-50 dark:bg-red-950/30', border: 'border-red-200 dark:border-red-800', text: 'text-red-700 dark:text-red-400' },
+  medium: { icon: AlertTriangle, bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-400' },
+  low: { icon: Info, bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-200 dark:border-blue-800', text: 'text-blue-700 dark:text-blue-400' },
+};
+
 export default function ScenarioComparisonCharts({ projectId, onTabChange }: ScenarioComparisonChartsProps) {
-  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['base', 'upside', 'downside']);
+  const [selectedScenarios, setSelectedScenarios] = useState<string[]>(['base', 'aggressive', 'conservative']);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const { data: comparisonData, isLoading, refetch } = useQuery<ScenarioComparisonData>({
-    queryKey: ['/api/modeling/projects', projectId, 'scenario-comparison', selectedScenarios.join(',')],
-    queryFn: async () => {
-      const response = await fetch(`/api/modeling/projects/${projectId}/scenario-comparison`);
-      if (!response.ok) {
-        return generateSimulatedData();
-      }
-      return response.json();
-    },
+  const { data: comparisonData, isLoading, isError, refetch } = useQuery<ScenarioComparisonData>({
+    queryKey: ['/api/modeling/projects', projectId, 'scenario-comparison'],
   });
 
-  const generateSimulatedData = () => {
-    const scenarios = [
-      {
-        id: 'base',
-        name: 'Base Case',
-        description: 'Conservative assumptions based on historical performance',
-        color: '#3b82f6',
-        metrics: {
-          purchasePrice: 15000000,
-          noi: 975000,
-          capRate: 6.5,
-          irr: 18.5,
-          equityMultiple: 2.1,
-          cashOnCash: 8.2,
-          exitValue: 18500000,
-          totalRevenue: 2200000,
-          totalExpenses: 1225000,
-          noiMargin: 44.3,
-        },
-        yearlyData: Array.from({ length: 5 }, (_, i) => ({
-          year: i + 1,
-          revenue: Math.round(2200000 * Math.pow(1.03, i + 1)),
-          noi: Math.round(975000 * Math.pow(1.02, i + 1)),
-          occupancy: 92 + i * 0.5,
-        })),
-        revenueBreakdown: [
-          { name: 'Slip Rentals', value: 1210000 },
-          { name: 'Dry Storage', value: 440000 },
-          { name: 'Fuel Sales', value: 330000 },
-          { name: 'Other', value: 220000 },
-        ]
-      },
-      {
-        id: 'upside',
-        name: 'Upside Case',
-        description: 'Optimistic scenario with value-add initiatives',
-        color: '#10b981',
-        metrics: {
-          purchasePrice: 15000000,
-          noi: 1150000,
-          capRate: 6.5,
-          irr: 24.2,
-          equityMultiple: 2.65,
-          cashOnCash: 9.8,
-          exitValue: 22000000,
-          totalRevenue: 2600000,
-          totalExpenses: 1450000,
-          noiMargin: 44.2,
-        },
-        yearlyData: Array.from({ length: 5 }, (_, i) => ({
-          year: i + 1,
-          revenue: Math.round(2600000 * Math.pow(1.05, i + 1)),
-          noi: Math.round(1150000 * Math.pow(1.04, i + 1)),
-          occupancy: 94 + i * 0.5,
-        })),
-        revenueBreakdown: [
-          { name: 'Slip Rentals', value: 1430000 },
-          { name: 'Dry Storage', value: 520000 },
-          { name: 'Fuel Sales', value: 390000 },
-          { name: 'Other', value: 260000 },
-        ]
-      },
-      {
-        id: 'downside',
-        name: 'Downside Case',
-        description: 'Stress test with adverse market conditions',
-        color: '#ef4444',
-        metrics: {
-          purchasePrice: 15000000,
-          noi: 820000,
-          capRate: 6.5,
-          irr: 12.8,
-          equityMultiple: 1.75,
-          cashOnCash: 6.5,
-          exitValue: 14500000,
-          totalRevenue: 1900000,
-          totalExpenses: 1080000,
-          noiMargin: 43.2,
-        },
-        yearlyData: Array.from({ length: 5 }, (_, i) => ({
-          year: i + 1,
-          revenue: Math.round(1900000 * Math.pow(1.015, i + 1)),
-          noi: Math.round(820000 * Math.pow(1.01, i + 1)),
-          occupancy: 88 + i * 0.3,
-        })),
-        revenueBreakdown: [
-          { name: 'Slip Rentals', value: 1045000 },
-          { name: 'Dry Storage', value: 380000 },
-          { name: 'Fuel Sales', value: 285000 },
-          { name: 'Other', value: 190000 },
-        ]
-      }
-    ];
-    
-    const comparisonMetrics = [
-      { id: 'purchasePrice', name: 'Purchase Price', unit: 'currency', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.purchasePrice, variance: 0 })) },
-      { id: 'noi', name: 'Exit Year NOI', unit: 'currency', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.noi, variance: ((s.metrics.noi - 975000) / 975000) * 100 })) },
-      { id: 'capRate', name: 'Entry Cap Rate', unit: 'percent', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.capRate, variance: 0 })) },
-      { id: 'irr', name: 'IRR', unit: 'percent', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.irr, variance: s.metrics.irr - 18.5 })) },
-      { id: 'equityMultiple', name: 'Equity Multiple', unit: 'multiple', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.equityMultiple, variance: ((s.metrics.equityMultiple - 2.1) / 2.1) * 100 })) },
-      { id: 'cashOnCash', name: 'Cash-on-Cash', unit: 'percent', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.cashOnCash, variance: s.metrics.cashOnCash - 8.2 })) },
-      { id: 'exitValue', name: 'Exit Value', unit: 'currency', scenarios: scenarios.map(s => ({ id: s.id, value: s.metrics.exitValue, variance: ((s.metrics.exitValue - 18500000) / 18500000) * 100 })) },
-    ];
-    
-    return { projectId, scenarios, comparisonMetrics };
-  };
+  const scenarios = useMemo(() => {
+    if (!comparisonData?.scenarios) return [];
+    return comparisonData.scenarios.filter((s: any) => selectedScenarios.includes(s.id));
+  }, [comparisonData, selectedScenarios]);
 
-  const scenarios = comparisonData?.scenarios || [];
-  const baseScenario = scenarios.find((s: any) => s.id === 'base');
+  const allScenarios = comparisonData?.scenarios || [];
 
   const toggleScenario = (scenarioId: string) => {
     setSelectedScenarios(prev => {
@@ -195,16 +97,15 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
 
   const yearlyComparisonData = useMemo(() => {
     if (!scenarios.length) return [];
-    
-    const years = scenarios[0]?.yearlyData?.map((d: any) => d.year) || [];
-    return years.map((year: number) => {
-      const dataPoint: any = { year };
+    const maxYears = Math.max(...scenarios.map((s: any) => s.yearlyData?.length || 0));
+    return Array.from({ length: maxYears }, (_, i) => {
+      const dataPoint: any = { year: i + 1 };
       scenarios.forEach((scenario: any) => {
-        const yearData = scenario.yearlyData.find((d: any) => d.year === year);
+        const yearData = scenario.yearlyData?.[i];
         if (yearData) {
           dataPoint[`${scenario.id}_revenue`] = yearData.revenue;
           dataPoint[`${scenario.id}_noi`] = yearData.noi;
-          dataPoint[`${scenario.id}_occupancy`] = yearData.occupancy;
+          dataPoint[`${scenario.id}_cashFlow`] = yearData.cashFlow;
         }
       });
       return dataPoint;
@@ -213,13 +114,23 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
 
   const radarData = useMemo(() => {
     if (!scenarios.length) return [];
-    
+    const allValues: Record<string, number[]> = {
+      revenue: [], noi: [], noiMargin: [], irr: [], equityMultiple: [],
+    };
+    scenarios.forEach((s: any) => {
+      allValues.revenue.push(s.metrics.totalRevenue);
+      allValues.noi.push(s.metrics.noi);
+      allValues.noiMargin.push(s.metrics.noiMargin);
+      allValues.irr.push(s.metrics.irr);
+      allValues.equityMultiple.push(s.metrics.equityMultiple);
+    });
+
     const metrics = [
-      { key: 'revenue', label: 'Revenue', max: 10000000 },
-      { key: 'noi', label: 'NOI', max: 6000000 },
-      { key: 'noiMargin', label: 'NOI Margin', max: 70 },
-      { key: 'irr', label: 'IRR', max: 25 },
-      { key: 'equityMultiple', label: 'Equity Multiple', max: 3 },
+      { key: 'revenue', label: 'Revenue', max: Math.max(...allValues.revenue, 1) * 1.2 },
+      { key: 'noi', label: 'NOI', max: Math.max(...allValues.noi, 1) * 1.2 },
+      { key: 'noiMargin', label: 'NOI Margin', max: Math.max(...allValues.noiMargin, 1) * 1.2 },
+      { key: 'irr', label: 'IRR', max: Math.max(...allValues.irr, 1) * 1.2 },
+      { key: 'equityMultiple', label: 'Equity Multiple', max: Math.max(...allValues.equityMultiple, 1) * 1.2 },
     ];
 
     return metrics.map(metric => {
@@ -230,7 +141,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                      metric.key === 'noiMargin' ? scenario.metrics.noiMargin :
                      metric.key === 'irr' ? scenario.metrics.irr :
                      scenario.metrics.equityMultiple;
-        dataPoint[scenario.id] = (value / metric.max) * 100;
+        dataPoint[scenario.id] = metric.max > 0 ? (value / metric.max) * 100 : 0;
       });
       return dataPoint;
     });
@@ -238,26 +149,33 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
 
   const revenueComparisonData = useMemo(() => {
     if (!scenarios.length) return [];
-    
-    const categories = scenarios[0]?.revenueBreakdown?.map((r: any) => r.name) || [];
-    return categories.map((category: string) => {
+    const categorySet = new Set<string>();
+    scenarios.forEach((s: any) => s.revenueBreakdown?.forEach((r: any) => categorySet.add(r.name)));
+    return Array.from(categorySet).map(category => {
       const dataPoint: any = { category };
       scenarios.forEach((scenario: any) => {
-        const item = scenario.revenueBreakdown.find((r: any) => r.name === category);
+        const item = scenario.revenueBreakdown?.find((r: any) => r.name === category);
         dataPoint[scenario.id] = item?.value || 0;
       });
       return dataPoint;
     });
   }, [scenarios]);
 
+  const allRisks = useMemo(() => {
+    return allScenarios.flatMap((s: any) =>
+      (s.risks || []).map((r: any) => ({ ...r, scenarioId: s.id, scenarioName: s.name }))
+    );
+  }, [allScenarios]);
+
   const getVariance = (scenarioValue: number, baseValue: number) => {
     if (!baseValue) return 0;
-    return ((scenarioValue - baseValue) / baseValue) * 100;
+    return ((scenarioValue - baseValue) / Math.abs(baseValue)) * 100;
   };
 
   const formatMetricValue = (value: number, unit: string) => {
     if (unit === 'currency') return formatCurrency(value);
     if (unit === 'percent') return `${value.toFixed(1)}%`;
+    if (unit === 'multiple') return `${value.toFixed(2)}x`;
     return value.toFixed(2);
   };
 
@@ -272,6 +190,23 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
     );
   }
 
+  if (isError || !comparisonData?.scenarios?.length) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <GitCompare className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Scenario Data Available</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+            Configure your project with financial data and scenario assumptions to see side-by-side comparisons.
+          </p>
+          <Button variant="outline" onClick={() => onTabChange?.('case-config')}>
+            Configure Scenarios
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -281,7 +216,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
             Scenario Comparison
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Side-by-side analysis of different investment scenarios
+            Side-by-side financial projections and risk analysis
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -289,34 +224,36 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-4">
-        {['base', 'upside', 'downside'].map(scenarioId => {
-          const scenario = scenarios.find((s: any) => s.id === scenarioId);
-          const isSelected = selectedScenarios.includes(scenarioId);
-          
+        {allScenarios.map((scenario: any) => {
+          const isSelected = selectedScenarios.includes(scenario.id);
+          const riskCount = scenario.risks?.length || 0;
           return (
             <div
-              key={scenarioId}
+              key={scenario.id}
               className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
                 isSelected ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'
               }`}
-              onClick={() => toggleScenario(scenarioId)}
+              onClick={() => toggleScenario(scenario.id)}
             >
               <Checkbox checked={isSelected} />
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: SCENARIO_COLORS[scenarioId] }}
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: scenario.color || SCENARIO_COLORS[scenario.id] }}
               />
               <div>
-                <p className="font-medium">{scenario?.name || scenarioId}</p>
-                <p className="text-xs text-muted-foreground">{scenario?.description}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{scenario.name}</p>
+                  {riskCount > 0 && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 text-amber-600 border-amber-300">
+                      {riskCount} risk{riskCount > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{scenario.description}</p>
               </div>
             </div>
           );
@@ -324,11 +261,19 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-lg">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="revenue">Revenue Mix</TabsTrigger>
+          <TabsTrigger value="risks" className="relative">
+            Risks
+            {allRisks.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300">
+                {allRisks.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -349,8 +294,8 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                         key={scenario.id}
                         name={scenario.name}
                         dataKey={scenario.id}
-                        stroke={SCENARIO_COLORS[scenario.id]}
-                        fill={SCENARIO_COLORS[scenario.id]}
+                        stroke={scenario.color || SCENARIO_COLORS[scenario.id]}
+                        fill={scenario.color || SCENARIO_COLORS[scenario.id]}
                         fillOpacity={0.2}
                       />
                     ))}
@@ -370,24 +315,23 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                 <div className="space-y-4">
                   {metricsComparisonData.slice(0, 5).map((metric: any) => {
                     const baseValue = metric.scenarios.find((s: any) => s.id === 'base')?.value || 0;
-                    
                     return (
-                      <div key={metric.metric} className="space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground">{metric.metric}</p>
-                        <div className="grid grid-cols-3 gap-2">
+                      <div key={metric.id || metric.metric} className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">{metric.name || metric.metric}</p>
+                        <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${scenarios.length}, minmax(0, 1fr))` }}>
                           {scenarios.map((scenario: any) => {
-                            const value = metric.scenarios.find((s: any) => s.id === scenario.id)?.value || 0;
+                            const metricScenario = metric.scenarios.find((s: any) => s.id === scenario.id);
+                            const value = metricScenario?.value || 0;
                             const variance = scenario.id !== 'base' ? getVariance(value, baseValue) : 0;
-                            
                             return (
-                              <div 
+                              <div
                                 key={scenario.id}
                                 className="p-3 rounded-lg border"
-                                style={{ borderColor: SCENARIO_COLORS[scenario.id] + '40' }}
+                                style={{ borderColor: (scenario.color || SCENARIO_COLORS[scenario.id]) + '40' }}
                               >
                                 <p className="text-xs text-muted-foreground">{scenario.name}</p>
-                                <p className="font-bold">{formatMetricValue(value, metric.unit)}</p>
-                                {scenario.id !== 'base' && (
+                                <p className="font-bold tabular-nums">{formatMetricValue(value, metric.unit)}</p>
+                                {scenario.id !== 'base' && variance !== 0 && (
                                   <p className={`text-xs flex items-center gap-1 ${
                                     variance >= 0 ? 'text-green-600' : 'text-red-600'
                                   }`}>
@@ -416,9 +360,9 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
               <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={yearlyComparisonData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tickFormatter={(v) => `Yr ${v}`} />
                   <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number) => formatCurrency(value)}
                     labelFormatter={(label) => `Year ${label}`}
                   />
@@ -429,7 +373,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                       type="monotone"
                       dataKey={`${scenario.id}_noi`}
                       name={`${scenario.name} NOI`}
-                      stroke={SCENARIO_COLORS[scenario.id]}
+                      stroke={scenario.color || SCENARIO_COLORS[scenario.id]}
                       strokeWidth={2}
                       dot={{ r: 4 }}
                     />
@@ -438,6 +382,30 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          {allRisks.filter((r: any) => r.severity === 'high').length > 0 && (
+            <Card className="border-red-200 dark:border-red-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <ShieldAlert className="h-5 w-5" />
+                  Critical Risk Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {allRisks.filter((r: any) => r.severity === 'high').map((risk: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                      <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-red-800 dark:text-red-300">{risk.scenarioName}</p>
+                        <p className="text-xs text-red-700 dark:text-red-400">{risk.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="metrics" className="space-y-6 mt-6">
@@ -450,54 +418,56 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Metric</TableHead>
+                    <TableHead className="w-[180px]">Metric</TableHead>
                     {scenarios.map((scenario: any) => (
                       <TableHead key={scenario.id} className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: SCENARIO_COLORS[scenario.id] }}
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: scenario.color || SCENARIO_COLORS[scenario.id] }}
                           />
                           {scenario.name}
                         </div>
                       </TableHead>
                     ))}
-                    <TableHead className="text-center">Variance (vs Base)</TableHead>
+                    {scenarios.length > 1 && (
+                      <TableHead className="text-center">Variance (vs Base)</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {metricsComparisonData.map((metric: any) => {
                     const baseValue = metric.scenarios.find((s: any) => s.id === 'base')?.value || 0;
-                    
                     return (
-                      <TableRow key={metric.metric}>
-                        <TableCell className="font-medium">{metric.metric}</TableCell>
+                      <TableRow key={metric.id || metric.metric}>
+                        <TableCell className="font-medium">{metric.name || metric.metric}</TableCell>
                         {scenarios.map((scenario: any) => {
                           const value = metric.scenarios.find((s: any) => s.id === scenario.id)?.value || 0;
                           return (
-                            <TableCell key={scenario.id} className="text-center font-mono">
+                            <TableCell key={scenario.id} className="text-center tabular-nums">
                               {formatMetricValue(value, metric.unit)}
                             </TableCell>
                           );
                         })}
-                        <TableCell className="text-center">
-                          <div className="flex justify-center gap-4">
-                            {scenarios.filter((s: any) => s.id !== 'base').map((scenario: any) => {
-                              const value = metric.scenarios.find((s: any) => s.id === scenario.id)?.value || 0;
-                              const variance = getVariance(value, baseValue);
-                              
-                              return (
-                                <Badge 
-                                  key={scenario.id}
-                                  variant={variance >= 0 ? 'default' : 'destructive'}
-                                  className="min-w-[60px]"
-                                >
-                                  {variance >= 0 ? '+' : ''}{variance.toFixed(1)}%
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        </TableCell>
+                        {scenarios.length > 1 && (
+                          <TableCell className="text-center">
+                            <div className="flex justify-center gap-2">
+                              {scenarios.filter((s: any) => s.id !== 'base').map((scenario: any) => {
+                                const value = metric.scenarios.find((s: any) => s.id === scenario.id)?.value || 0;
+                                const variance = getVariance(value, baseValue);
+                                return (
+                                  <Badge
+                                    key={scenario.id}
+                                    variant={variance >= 0 ? 'default' : 'destructive'}
+                                    className="min-w-[60px] tabular-nums"
+                                  >
+                                    {variance >= 0 ? '+' : ''}{variance.toFixed(1)}%
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -506,14 +476,14 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className={`grid gap-6`} style={{ gridTemplateColumns: `repeat(${Math.min(scenarios.length, 3)}, minmax(0, 1fr))` }}>
             {scenarios.map((scenario: any) => (
               <Card key={scenario.id}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: SCENARIO_COLORS[scenario.id] }}
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: scenario.color || SCENARIO_COLORS[scenario.id] }}
                     />
                     <CardTitle className="text-lg">{scenario.name}</CardTitle>
                   </div>
@@ -523,20 +493,22 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Revenue Growth</span>
-                      <span className="font-bold">{(scenario.assumptions?.revenueGrowth ?? 0).toFixed(1)}%</span>
+                      <span className="font-bold tabular-nums">{(scenario.assumptions?.revenueGrowth ?? 0).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Expense Growth</span>
-                      <span className="font-bold">{(scenario.assumptions?.expenseGrowth ?? 0).toFixed(1)}%</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                      <span className="text-sm">Starting Occupancy</span>
-                      <span className="font-bold">{(scenario.assumptions?.occupancyStart ?? 0).toFixed(0)}%</span>
+                      <span className="font-bold tabular-nums">{(scenario.assumptions?.expenseGrowth ?? 0).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
                       <span className="text-sm">Exit Cap Rate</span>
-                      <span className="font-bold">{(scenario.assumptions?.exitCapRate ?? 0).toFixed(1)}%</span>
+                      <span className="font-bold tabular-nums">{(scenario.assumptions?.exitCapRate ?? 0).toFixed(1)}%</span>
                     </div>
+                    {scenario.metrics?.minDscr != null && (
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="text-sm">Min DSCR</span>
+                        <span className="font-bold tabular-nums">{scenario.metrics.minDscr.toFixed(2)}x</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -555,7 +527,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart data={yearlyComparisonData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="year" />
+                    <XAxis dataKey="year" tickFormatter={(v) => `Yr ${v}`} />
                     <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(1)}M`} />
                     <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
@@ -564,7 +536,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                         key={scenario.id}
                         dataKey={`${scenario.id}_revenue`}
                         name={scenario.name}
-                        fill={SCENARIO_COLORS[scenario.id]}
+                        fill={scenario.color || SCENARIO_COLORS[scenario.id]}
                       />
                     ))}
                   </BarChart>
@@ -574,24 +546,24 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Occupancy Trend</CardTitle>
-                <CardDescription>Occupancy rate projection by scenario</CardDescription>
+                <CardTitle className="text-lg">Cash Flow Trend</CardTitle>
+                <CardDescription>Levered cash flow projection by scenario</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={350}>
                   <LineChart data={yearlyComparisonData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="year" />
-                    <YAxis domain={[70, 100]} tickFormatter={(val) => `${val}%`} />
-                    <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
+                    <XAxis dataKey="year" tickFormatter={(v) => `Yr ${v}`} />
+                    <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(2)}M`} />
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
                     <Legend />
                     {scenarios.map((scenario: any) => (
                       <Line
                         key={scenario.id}
                         type="monotone"
-                        dataKey={`${scenario.id}_occupancy`}
-                        name={scenario.name}
-                        stroke={SCENARIO_COLORS[scenario.id]}
+                        dataKey={`${scenario.id}_cashFlow`}
+                        name={`${scenario.name} Cash Flow`}
+                        stroke={scenario.color || SCENARIO_COLORS[scenario.id]}
                         strokeWidth={2}
                         dot={{ r: 4 }}
                       />
@@ -611,7 +583,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={yearlyComparisonData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="year" />
+                  <XAxis dataKey="year" tickFormatter={(v) => `Yr ${v}`} />
                   <YAxis tickFormatter={(val) => `$${(val / 1000000).toFixed(2)}M`} />
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
@@ -620,7 +592,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                       key={scenario.id}
                       dataKey={`${scenario.id}_noi`}
                       name={`${scenario.name} NOI`}
-                      fill={SCENARIO_COLORS[scenario.id]}
+                      fill={scenario.color || SCENARIO_COLORS[scenario.id]}
                     />
                   ))}
                 </BarChart>
@@ -630,70 +602,168 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
         </TabsContent>
 
         <TabsContent value="revenue" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Revenue Mix by Scenario</CardTitle>
-              <CardDescription>Revenue breakdown comparison across scenarios</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={revenueComparisonData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
-                  <YAxis type="category" dataKey="category" width={100} />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  {scenarios.map((scenario: any) => (
-                    <Bar
-                      key={scenario.id}
-                      dataKey={scenario.id}
-                      name={scenario.name}
-                      fill={SCENARIO_COLORS[scenario.id]}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            {scenarios.map((scenario: any) => (
-              <Card key={scenario.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: SCENARIO_COLORS[scenario.id] }}
-                    />
-                    <CardTitle className="text-lg">{scenario.name}</CardTitle>
-                  </div>
-                  <CardDescription>Revenue breakdown</CardDescription>
+          {revenueComparisonData.length > 0 ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Revenue Mix by Scenario</CardTitle>
+                  <CardDescription>Revenue breakdown comparison across scenarios</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {scenario.revenueBreakdown.map((item: any) => (
-                      <div key={item.name} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-2 h-2 rounded-full" 
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-sm">{item.name}</span>
-                        </div>
-                        <span className="font-medium">{formatCurrency(item.value)}</span>
-                      </div>
-                    ))}
-                    <div className="pt-2 border-t flex justify-between">
-                      <span className="font-medium">Total</span>
-                      <span className="font-bold">
-                        {formatCurrency(scenario.revenueBreakdown.reduce((sum: number, r: any) => sum + r.value, 0))}
-                      </span>
-                    </div>
-                  </div>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={revenueComparisonData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                      <XAxis type="number" tickFormatter={(val) => `$${(val / 1000).toFixed(0)}K`} />
+                      <YAxis type="category" dataKey="category" width={120} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                      {scenarios.map((scenario: any) => (
+                        <Bar
+                          key={scenario.id}
+                          dataKey={scenario.id}
+                          name={scenario.name}
+                          fill={scenario.color || SCENARIO_COLORS[scenario.id]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+
+              <div className={`grid gap-6`} style={{ gridTemplateColumns: `repeat(${Math.min(scenarios.length, 3)}, minmax(0, 1fr))` }}>
+                {scenarios.map((scenario: any) => (
+                  <Card key={scenario.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: scenario.color || SCENARIO_COLORS[scenario.id] }}
+                        />
+                        <CardTitle className="text-lg">{scenario.name}</CardTitle>
+                      </div>
+                      <CardDescription>Revenue breakdown</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {(scenario.revenueBreakdown || []).map((item: any) => (
+                          <div key={item.name} className="flex items-center justify-between">
+                            <span className="text-sm truncate mr-2">{item.name}</span>
+                            <span className="font-medium tabular-nums shrink-0">{formatCurrency(item.value)}</span>
+                          </div>
+                        ))}
+                        <div className="pt-2 border-t flex justify-between">
+                          <span className="font-medium">Total</span>
+                          <span className="font-bold tabular-nums">
+                            {formatCurrency((scenario.revenueBreakdown || []).reduce((sum: number, r: any) => sum + r.value, 0))}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No revenue breakdown data available.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="risks" className="space-y-6 mt-6">
+          {allRisks.length > 0 ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {['high', 'medium', 'low'].map(severity => {
+                  const count = allRisks.filter((r: any) => r.severity === severity).length;
+                  const config = SEVERITY_CONFIG[severity];
+                  const Icon = config.icon;
+                  return (
+                    <Card key={severity} className={`${config.border}`}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${config.bg}`}>
+                            <Icon className={`h-5 w-5 ${config.text}`} />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold">{count}</p>
+                            <p className="text-sm text-muted-foreground capitalize">{severity} Severity</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {allScenarios.map((scenario: any) => {
+                const scenarioRisks = scenario.risks || [];
+                if (scenarioRisks.length === 0) return null;
+                return (
+                  <Card key={scenario.id}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: scenario.color || SCENARIO_COLORS[scenario.id] }}
+                        />
+                        {scenario.name}
+                        <Badge variant="outline" className="ml-2">
+                          {scenarioRisks.length} risk{scenarioRisks.length > 1 ? 's' : ''}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>{scenario.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {scenarioRisks.map((risk: any, i: number) => {
+                          const config = SEVERITY_CONFIG[risk.severity] || SEVERITY_CONFIG.low;
+                          const Icon = config.icon;
+                          return (
+                            <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${config.bg} ${config.border}`}>
+                              <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${config.text}`} />
+                              <div>
+                                <p className={`text-sm font-medium ${config.text}`}>{risk.message}</p>
+                                <p className="text-xs text-muted-foreground mt-1 capitalize">{risk.severity} severity</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {allScenarios.some((s: any) => !s.risks?.length) && (
+                <Card className="border-green-200 dark:border-green-800">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-700 dark:text-green-400">No Risks Detected</p>
+                        <p className="text-sm text-muted-foreground">
+                          {allScenarios.filter((s: any) => !s.risks?.length).map((s: any) => s.name).join(', ')} — all metrics within acceptable thresholds
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card className="border-green-200 dark:border-green-800">
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <ShieldCheck className="h-12 w-12 text-green-500 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">All Clear</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  No risk flags detected across any scenario. All key metrics (IRR, NOI margin, equity multiple, DSCR) are within acceptable thresholds.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -22092,6 +22092,145 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  app.get('/api/modeling/projects/:projectId/scenario-comparison', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
+      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+
+      const scenarioTypes = ['base', 'aggressive', 'conservative'];
+      const scenarioLabels: Record<string, { name: string; description: string }> = {
+        base: { name: 'Base Case', description: 'Conservative assumptions based on historical performance' },
+        aggressive: { name: 'Upside Case', description: 'Optimistic scenario with value-add initiatives' },
+        conservative: { name: 'Downside Case', description: 'Stress test with adverse market conditions' },
+      };
+
+      const proFormaResults = await Promise.all(
+        scenarioTypes.map(async (st) => {
+          try {
+            const pf = await proFormaEngineService.generateProForma(projectId, orgId, st);
+            return { scenarioType: st, data: pf, error: null };
+          } catch (err: any) {
+            return { scenarioType: st, data: null, error: err.message };
+          }
+        })
+      );
+
+      const safe = (v: number) => (isFinite(v) ? v : 0);
+
+      const scenarios = proFormaResults
+        .filter(r => r.data)
+        .map(r => {
+          const pf = r.data!;
+          const m = pf.metrics;
+          const noiMargin = (pf.revenue.totals?.[0] ?? 0) > 0
+            ? (safe(pf.noi?.[0] ?? 0) / pf.revenue.totals[0]) * 100
+            : 0;
+
+          const revenueBreakdown = pf.revenue.lineItems.map(li => ({
+            name: li.name || li.subcategory || li.department || 'Other',
+            value: li.projections?.[0] ?? li.baseAmount ?? 0,
+          })).filter(r => r.value > 0);
+
+          const irr = safe(m.irr);
+          const eqMult = safe(m.equityMultiple);
+          const exitVal = safe(m.exitValue);
+          const purchasePrice = safe(m.purchasePrice);
+
+          const risks: Array<{ id: string; severity: 'low' | 'medium' | 'high'; message: string }> = [];
+          if (irr < 10) risks.push({ id: 'low_irr', severity: 'high', message: `IRR of ${irr.toFixed(1)}% is below 10% threshold` });
+          else if (irr < 15) risks.push({ id: 'moderate_irr', severity: 'medium', message: `IRR of ${irr.toFixed(1)}% is below 15% target` });
+          if (noiMargin < 30) risks.push({ id: 'thin_margin', severity: 'high', message: `NOI margin of ${noiMargin.toFixed(1)}% is below 30%` });
+          else if (noiMargin < 40) risks.push({ id: 'moderate_margin', severity: 'medium', message: `NOI margin of ${noiMargin.toFixed(1)}% is below 40%` });
+          if (eqMult < 1.5) risks.push({ id: 'low_equity', severity: 'high', message: `Equity multiple of ${eqMult.toFixed(2)}x is below 1.5x` });
+          if (m.minDscr !== undefined && isFinite(m.minDscr) && m.minDscr < 1.2) risks.push({ id: 'low_dscr', severity: 'high', message: `Min DSCR of ${m.minDscr.toFixed(2)}x is below 1.2x` });
+          if (exitVal < purchasePrice && purchasePrice > 0) risks.push({ id: 'value_loss', severity: 'high', message: 'Exit value is below purchase price' });
+
+          const label = scenarioLabels[r.scenarioType] || { name: r.scenarioType, description: '' };
+
+          return {
+            id: r.scenarioType,
+            name: label.name,
+            description: label.description,
+            color: r.scenarioType === 'base' ? '#3b82f6' : r.scenarioType === 'aggressive' ? '#10b981' : '#ef4444',
+            metrics: {
+              purchasePrice: purchasePrice,
+              noi: safe(m.year1Noi),
+              stabilizedNoi: safe(m.stabilizedNoi),
+              capRate: safe(m.goingInCapRate),
+              exitCapRate: safe(m.exitCapRate),
+              irr,
+              unleveredIrr: safe(m.unleveredIrr),
+              equityMultiple: eqMult,
+              cashOnCash: purchasePrice > 0 ? safe((pf.leveredCashFlow?.[0] ?? 0) / purchasePrice) * 100 : 0,
+              exitValue: exitVal,
+              totalRevenue: pf.revenue.totals?.[0] ?? 0,
+              totalExpenses: pf.expenses.totals?.[0] ?? 0,
+              noiMargin: safe(noiMargin),
+              totalReturn: safe(m.totalReturn),
+              minDscr: m.minDscr !== undefined ? safe(m.minDscr) : undefined,
+              avgDscr: m.avgDscr !== undefined ? safe(m.avgDscr) : undefined,
+            },
+            assumptions: {
+              revenueGrowth: m.revenueGrowthRate,
+              expenseGrowth: m.expenseGrowthRate,
+              exitCapRate: m.exitCapRate,
+            },
+            yearlyData: (pf.annualProjections || []).map(ap => ({
+              year: (ap.yearIndex ?? 0) + 1,
+              label: ap.label || `Year ${(ap.yearIndex ?? 0) + 1}`,
+              revenue: safe(ap.revenue),
+              expenses: safe(ap.expenses),
+              noi: safe(ap.noi),
+              cashFlow: safe(ap.leveredCashFlow),
+              debtService: safe(ap.debtService),
+            })),
+            revenueBreakdown,
+            risks,
+          };
+        });
+
+      const baseMetrics = scenarios.find(s => s.id === 'base')?.metrics;
+      const metricDefs = [
+        { id: 'purchasePrice', name: 'Purchase Price', unit: 'currency' },
+        { id: 'noi', name: 'Year 1 NOI', unit: 'currency' },
+        { id: 'capRate', name: 'Going-In Cap Rate', unit: 'percent' },
+        { id: 'irr', name: 'Levered IRR', unit: 'percent' },
+        { id: 'equityMultiple', name: 'Equity Multiple', unit: 'multiple' },
+        { id: 'exitValue', name: 'Exit Value', unit: 'currency' },
+        { id: 'noiMargin', name: 'NOI Margin', unit: 'percent' },
+        { id: 'totalReturn', name: 'Total Return', unit: 'currency' },
+      ];
+
+      const comparisonMetrics = metricDefs.map(md => ({
+        id: md.id,
+        name: md.name,
+        unit: md.unit,
+        metric: md.name,
+        scenarios: scenarios.map(s => {
+          const val = (s.metrics as any)[md.id] ?? 0;
+          const baseVal = baseMetrics ? (baseMetrics as any)[md.id] ?? 0 : val;
+          return {
+            id: s.id,
+            value: val,
+            variance: baseVal !== 0 && s.id !== 'base' ? ((val - baseVal) / Math.abs(baseVal)) * 100 : 0,
+          };
+        }),
+      }));
+
+      res.json({ projectId, scenarios, comparisonMetrics });
+    } catch (error: any) {
+      console.error('Failed to generate scenario comparison:', error);
+      res.status(500).json({ error: 'Failed to generate scenario comparison' });
+    }
+  });
+
   // Project Workspace - Executive Summary with real-time calculations
   app.get('/api/modeling/projects/:projectId/executive-summary/:scenario', authenticateUser, async (req: any, res) => {
     try {

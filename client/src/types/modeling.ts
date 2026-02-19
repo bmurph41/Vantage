@@ -107,27 +107,61 @@ export interface ProFormaChartData {
 export interface ScenarioComparisonScenario {
   id: string;
   name: string;
-  irr?: number;
-  equityMultiple?: number;
-  noi?: number;
-  exitValue?: number;
+  description?: string;
+  color?: string;
+  metrics: {
+    purchasePrice: number;
+    noi: number;
+    stabilizedNoi: number;
+    capRate: number;
+    exitCapRate: number;
+    irr: number;
+    unleveredIrr: number;
+    equityMultiple: number;
+    cashOnCash: number;
+    exitValue: number;
+    totalRevenue: number;
+    totalExpenses: number;
+    noiMargin: number;
+    totalReturn: number;
+    minDscr?: number;
+    avgDscr?: number;
+  };
   assumptions?: {
     revenueGrowth?: number;
     expenseGrowth?: number;
-    occupancyStart?: number;
     exitCapRate?: number;
-    growthRates?: Record<string, number>;
   };
+  yearlyData?: Array<{
+    year: number;
+    label?: string;
+    revenue: number;
+    expenses: number;
+    noi: number;
+    cashFlow: number;
+    debtService: number;
+  }>;
+  revenueBreakdown?: Array<{ name: string; value: number }>;
+  risks?: Array<{ id: string; severity: 'low' | 'medium' | 'high'; message: string }>;
   [key: string]: unknown;
+}
+
+export interface ScenarioComparisonMetric {
+  id: string;
+  name: string;
+  unit: 'currency' | 'percent' | 'multiple';
+  metric?: string;
+  scenarios: Array<{
+    id: string;
+    value: number;
+    variance: number;
+  }>;
 }
 
 export interface ScenarioComparisonData {
   projectId?: string;
   scenarios?: ScenarioComparisonScenario[];
-  comparisonMetrics?: Array<{
-    metric: string;
-    values: Record<string, number>;
-  }>;
+  comparisonMetrics?: ScenarioComparisonMetric[];
   [key: string]: unknown;
 }
 
