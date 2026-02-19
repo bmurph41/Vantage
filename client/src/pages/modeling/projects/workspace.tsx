@@ -42,6 +42,7 @@ import {
   Download,
   Save,
   Check,
+  Receipt,
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject } from '@shared/schema';
@@ -83,6 +84,7 @@ import SensitivityTornado from './workspace/sensitivity-tornado';
 import ValidationWarnings from './workspace/validation-warnings';
 import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 import PropertyTaxTab from './workspace/property-tax';
+import TaxAndDistributionsPage from './workspace/tax-distributions';
 
 interface TabItem {
   value: string;
@@ -133,6 +135,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'exit', label: 'Exit Strategy', icon: Target },
       { value: 'dcf', label: 'DCF', icon: Calculator },
       { value: 'returns', label: 'Returns', icon: TrendingUp },
+      { value: 'tax-dist', label: 'Tax & Distributions', icon: Receipt },
     ],
   },
   {
@@ -586,6 +589,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="export" className="space-y-6">
           <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        <TabsContent value="tax-dist" className="space-y-6">
+          <TaxAndDistributionsPage projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>
     </div>
