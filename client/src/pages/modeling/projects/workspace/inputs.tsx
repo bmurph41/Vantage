@@ -57,7 +57,8 @@ import {
   ChevronRight,
   Trash2,
   AlertTriangle,
-  X
+  X,
+  Link2
 } from 'lucide-react';
 import {
   Dialog,
@@ -98,6 +99,11 @@ const DESIGNATED_SPACE_OPTIONS: DesignatedSpaceOption[] = [
   { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-3.5 w-3.5" /> },
 ];
 
+type MultiSlipGroup = {
+  id: string;
+  slipsUsed: number;
+};
+
 type StorageTypeConfig = {
   id: string;
   name: string;
@@ -112,9 +118,10 @@ type StorageTypeConfig = {
   occupancyInputMode: 'percentage' | 'count';
   hasDesignatedSpaces: boolean;
   designatedSpaceIds: string[];
+  multiSlipGroups: MultiSlipGroup[];
 };
 
-const storageDefaults = { capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const, hasDesignatedSpaces: false, designatedSpaceIds: [] as string[] };
+const storageDefaults = { capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const, hasDesignatedSpaces: false, designatedSpaceIds: [] as string[], multiSlipGroups: [] as MultiSlipGroup[] };
 
 const defaultStorageTypes: StorageTypeConfig[] = [
   { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
@@ -258,7 +265,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const getCurrentData = () => {
     const storageSettings: Record<string, any> = {};
     storageTypes.forEach(item => {
-      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage', capacity: item.capacity, leasable: item.leasable, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode, hasDesignatedSpaces: item.hasDesignatedSpaces, designatedSpaceIds: item.designatedSpaceIds };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage', capacity: item.capacity, leasable: item.leasable, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode, hasDesignatedSpaces: item.hasDesignatedSpaces, designatedSpaceIds: item.designatedSpaceIds, multiSlipGroups: item.multiSlipGroups };
       if (item.hasDesignatedSpaces && item.designatedSpaceIds.length > 0) {
         item.designatedSpaceIds.forEach(dsId => {
           storageSettings[dsId] = { seasons: item.seasons, isEnabled: true, section: 'designated', capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage', parentStorageId: item.id };
@@ -329,6 +336,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             occupancyInputMode: dept.occupancyInputMode ?? item.occupancyInputMode,
             hasDesignatedSpaces: hasDS,
             designatedSpaceIds: dsIds,
+            multiSlipGroups: dept.multiSlipGroups ?? item.multiSlipGroups,
           };
         }));
       } else if (profileDefault) {
@@ -459,6 +467,38 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
         ? item.designatedSpaceIds.filter(id => id !== dsId)
         : [...item.designatedSpaceIds, dsId];
       return { ...item, designatedSpaceIds: ids, hasDesignatedSpaces: ids.length > 0 || item.hasDesignatedSpaces };
+    }));
+  };
+
+  const computeLeasable = (capacity: string, groups: MultiSlipGroup[]): string => {
+    const cap = parseInt(capacity) || 0;
+    if (cap <= 0) return '';
+    const extraSlips = groups.reduce((sum, g) => sum + Math.max(0, g.slipsUsed - 1), 0);
+    return String(Math.max(0, cap - extraSlips));
+  };
+
+  const addMultiSlipGroup = (storageId: string) => {
+    setStorageTypes(prev => prev.map(item => {
+      if (item.id !== storageId) return item;
+      const newGroup: MultiSlipGroup = { id: `msg_${Date.now()}`, slipsUsed: 2 };
+      const groups = [...item.multiSlipGroups, newGroup];
+      return { ...item, multiSlipGroups: groups, leasable: computeLeasable(item.capacity, groups) };
+    }));
+  };
+
+  const updateMultiSlipGroup = (storageId: string, groupId: string, slipsUsed: number) => {
+    setStorageTypes(prev => prev.map(item => {
+      if (item.id !== storageId) return item;
+      const groups = item.multiSlipGroups.map(g => g.id === groupId ? { ...g, slipsUsed } : g);
+      return { ...item, multiSlipGroups: groups, leasable: computeLeasable(item.capacity, groups) };
+    }));
+  };
+
+  const removeMultiSlipGroup = (storageId: string, groupId: string) => {
+    setStorageTypes(prev => prev.map(item => {
+      if (item.id !== storageId) return item;
+      const groups = item.multiSlipGroups.filter(g => g.id !== groupId);
+      return { ...item, multiSlipGroups: groups, leasable: computeLeasable(item.capacity, groups) };
     }));
   };
 
@@ -1202,19 +1242,41 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                                   updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * capNum).toString();
                                 }
                               }
+                              if (item.multiSlipGroups.length > 0) {
+                                updates.leasable = computeLeasable(cap, item.multiSlipGroups);
+                              }
                               updateStorageField(item.id, 'storage', updates);
                             }}
                             className="h-6 w-full text-[10px] px-1.5"
                           />
                         </div>
                         <div className="space-y-0.5">
-                          <span className="text-[10px] text-muted-foreground">Leasable</span>
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[10px] text-muted-foreground">Leasable</span>
+                            {item.multiSlipGroups.length > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Link2 className="h-2.5 w-2.5 text-blue-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-[10px] max-w-[180px]">
+                                    Auto-calculated from capacity minus multi-slip groupings
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <Input
                             type="number"
-                            value={item.leasable}
+                            value={item.multiSlipGroups.length > 0 ? computeLeasable(item.capacity, item.multiSlipGroups) : item.leasable}
                             placeholder="0"
-                            onChange={(e) => updateStorageField(item.id, 'storage', { leasable: e.target.value })}
-                            className="h-6 w-full text-[10px] px-1.5"
+                            readOnly={item.multiSlipGroups.length > 0}
+                            onChange={(e) => {
+                              if (item.multiSlipGroups.length === 0) {
+                                updateStorageField(item.id, 'storage', { leasable: e.target.value });
+                              }
+                            }}
+                            className={`h-6 w-full text-[10px] px-1.5 ${item.multiSlipGroups.length > 0 ? 'bg-muted/50 text-muted-foreground cursor-not-allowed' : ''}`}
                           />
                         </div>
                         <div className="space-y-0.5 col-span-2">
@@ -1289,6 +1351,65 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                             />
                           )}
                         </div>
+                      </div>
+
+                      <div className="ml-6 space-y-1">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => addMultiSlipGroup(item.id)}
+                        >
+                          <Link2 className="h-3 w-3" />
+                          <Plus className="h-2.5 w-2.5" />
+                          <span>Multi-Slip Tenant</span>
+                          {item.multiSlipGroups.length > 0 && (
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
+                              {item.multiSlipGroups.length}
+                            </Badge>
+                          )}
+                        </button>
+                        {item.multiSlipGroups.length > 0 && (
+                          <div className="ml-4 space-y-1">
+                            <div className="text-[9px] text-muted-foreground italic">
+                              e.g. Catamarans or oversized boats using multiple slips
+                            </div>
+                            {item.multiSlipGroups.map((group, idx) => (
+                              <div key={group.id} className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-muted-foreground w-14 shrink-0">Boat {idx + 1}</span>
+                                <span className="text-[10px] text-muted-foreground">uses</span>
+                                <Select
+                                  value={String(group.slipsUsed)}
+                                  onValueChange={(val) => updateMultiSlipGroup(item.id, group.id, parseInt(val))}
+                                >
+                                  <SelectTrigger className="h-5 w-12 text-[10px] px-1.5">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[2, 3, 4, 5, 6].map(n => (
+                                      <SelectItem key={n} value={String(n)} className="text-[10px]">{n}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <span className="text-[10px] text-muted-foreground">slips</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMultiSlipGroup(item.id, group.id)}
+                                  className="text-muted-foreground hover:text-destructive transition-colors ml-auto"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-1.5 pt-0.5 border-t border-dashed border-border">
+                              <span className="text-[10px] font-medium text-foreground">
+                                {computeLeasable(item.capacity, item.multiSlipGroups) || '—'} leasable
+                              </span>
+                              <span className="text-[9px] text-muted-foreground">
+                                of {item.capacity || '0'} physical
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="ml-6">
