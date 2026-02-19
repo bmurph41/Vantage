@@ -1,11 +1,20 @@
 import { Router } from 'express';
-import { generateMockSummary } from './utilization-service';
+import { generateMockSummary } from './utilization-service-mock';
+import {
+  getSummary,
+  recomputeSnapshots,
+  fetchBandBreakdown,
+} from './utilization-service';
+import { requireRole } from '../../middleware/rbac';
+import type { AssetClass } from './utilization-config';
+import type { UtilizationMode } from './utilization-types';
+import { startOfMonth, endOfMonth } from './overlap';
 
 export function createUtilizationRouter(): Router {
   const router = Router();
 
   router.get('/ping', (_req, res) => {
-    res.json({ ok: true, module: 'utilization', version: '0.1.0' });
+    res.json({ ok: true, module: 'utilization', version: '1.0.0' });
   });
 
   router.get('/mock-summary', (_req, res) => {
@@ -15,6 +24,76 @@ export function createUtilizationRouter(): Router {
     } catch (error: any) {
       console.error('[Utilization] Error generating mock summary:', error);
       res.status(500).json({ error: 'Failed to generate mock summary' });
+    }
+  });
+
+  router.get('/summary', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const assetClass = (req.query.assetClass as AssetClass) || 'marina';
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+
+      const summary = await getSummary(propertyId, periodStart, periodEnd, assetClass, mode);
+      res.json(summary);
+    } catch (error: any) {
+      console.error('[Utilization] Error computing summary:', error);
+      res.status(500).json({ error: 'Failed to compute utilization summary' });
+    }
+  });
+
+  router.get('/by-band', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+
+      const bands = await fetchBandBreakdown(propertyId, periodStart, periodEnd, mode);
+      res.json({ propertyId, periodStart, periodEnd, mode, bands });
+    } catch (error: any) {
+      console.error('[Utilization] Error fetching band breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch band breakdown' });
+    }
+  });
+
+  router.post('/recompute', requireRole('owner', 'admin'), async (req: any, res) => {
+    try {
+      const { propertyId, startMonth, endMonth, assetClass, mode } = req.body;
+
+      if (!propertyId || !startMonth || !endMonth) {
+        return res.status(400).json({ error: 'propertyId, startMonth, and endMonth are required' });
+      }
+
+      const orgId = req.user?.organizationId;
+      if (!orgId) {
+        return res.status(403).json({ error: 'Organization context required. Must be authenticated.' });
+      }
+
+      const result = await recomputeSnapshots(
+        orgId,
+        propertyId,
+        startMonth,
+        endMonth,
+        assetClass || 'marina',
+        mode || 'contracted'
+      );
+
+      res.json({ ok: true, ...result });
+    } catch (error: any) {
+      console.error('[Utilization] Error recomputing snapshots:', error);
+      res.status(500).json({ error: 'Failed to recompute snapshots' });
     }
   });
 

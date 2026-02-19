@@ -25049,3 +25049,145 @@ export const projectTaxInputs = pgTable('project_tax_inputs', {
 export type ProjectTaxInputs = typeof projectTaxInputs.$inferSelect;
 export const insertProjectTaxInputsSchema = createInsertSchema(projectTaxInputs).omit({ createdAt: true, updatedAt: true });
 export type InsertProjectTaxInputs = z.infer<typeof insertProjectTaxInputsSchema>;
+
+// ============================================
+// Universal Capacity Utilization Module
+// ============================================
+
+export const utilAssetClassEnum = pgEnum("util_asset_class", ["marina", "hotel", "rv_park", "storage_unit", "industrial", "parking"]);
+export const utilOfflineScopeEnum = pgEnum("util_offline_scope", ["unit", "band", "unit_type", "property"]);
+export const utilSnapshotModeEnum = pgEnum("util_snapshot_mode", ["contracted", "physical"]);
+
+export const utilInventoryUnits = pgTable('util_inventory_units', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  assetClass: utilAssetClassEnum('asset_class').notNull().default('marina'),
+  unitCode: varchar('unit_code', { length: 50 }).notNull(),
+  unitType: varchar('unit_type', { length: 50 }).notNull(),
+  bandKey: varchar('band_key', { length: 20 }),
+  lengthFt: decimal('length_ft', { precision: 8, scale: 2 }),
+  widthFt: decimal('width_ft', { precision: 8, scale: 2 }),
+  depthFt: decimal('depth_ft', { precision: 8, scale: 2 }),
+  sqft: decimal('sqft', { precision: 10, scale: 2 }),
+  capacityAttributes: jsonb('capacity_attributes').$type<Record<string, any>>().default({}),
+  isAvailable: boolean('is_available').default(true).notNull(),
+  isOffline: boolean('is_offline').default(false).notNull(),
+  offlineReasonCode: varchar('offline_reason_code', { length: 50 }),
+  sourceTable: varchar('source_table', { length: 50 }),
+  sourceId: varchar('source_id'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('util_inv_org_idx').on(table.orgId),
+  propertyTypeIdx: index('util_inv_property_type_idx').on(table.propertyId, table.unitType),
+  propertyIdx: index('util_inv_property_idx').on(table.propertyId),
+  assetClassIdx: index('util_inv_asset_class_idx').on(table.assetClass),
+  bandIdx: index('util_inv_band_idx').on(table.bandKey),
+  sourceIdx: index('util_inv_source_idx').on(table.sourceTable, table.sourceId),
+}));
+
+export const utilOccupancyEvents = pgTable('util_occupancy_events', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  unitId: varchar('unit_id').notNull().references(() => utilInventoryUnits.id, { onDelete: 'cascade' }),
+  unitType: varchar('unit_type', { length: 50 }).notNull(),
+  leaseId: varchar('lease_id'),
+  tenantId: varchar('tenant_id'),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'),
+  status: varchar('status', { length: 30 }).notNull().default('active'),
+  isContracted: boolean('is_contracted').default(true).notNull(),
+  ratePlan: jsonb('rate_plan').$type<Record<string, any>>(),
+  priceTerms: jsonb('price_terms').$type<Record<string, any>>(),
+  monthlyRevenue: decimal('monthly_revenue', { precision: 12, scale: 2 }).notNull().default('0'),
+  annualRevenue: decimal('annual_revenue', { precision: 14, scale: 2 }).notNull().default('0'),
+  sourceTable: varchar('source_table', { length: 50 }),
+  sourceId: varchar('source_id'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('util_occ_org_idx').on(table.orgId),
+  propertyTypeIdx: index('util_occ_property_type_idx').on(table.propertyId, table.unitType),
+  propertyDatesIdx: index('util_occ_property_dates_idx').on(table.propertyId, table.startDate, table.endDate),
+  unitIdx: index('util_occ_unit_idx').on(table.unitId),
+  statusIdx: index('util_occ_status_idx').on(table.status),
+  sourceIdx: index('util_occ_source_idx').on(table.sourceTable, table.sourceId),
+}));
+
+export const utilOfflineBlocks = pgTable('util_offline_blocks', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  scopeType: utilOfflineScopeEnum('scope_type').notNull().default('unit'),
+  scopeKey: varchar('scope_key', { length: 100 }).notNull(),
+  unitId: varchar('unit_id').references(() => utilInventoryUnits.id, { onDelete: 'cascade' }),
+  startDate: date('start_date').notNull(),
+  endDate: date('end_date'),
+  reasonCode: varchar('reason_code', { length: 50 }).notNull(),
+  reasonDescription: text('reason_description'),
+  createdBy: varchar('created_by'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('util_offline_org_idx').on(table.orgId),
+  propertyIdx: index('util_offline_property_idx').on(table.propertyId),
+  scopeIdx: index('util_offline_scope_idx').on(table.scopeType, table.scopeKey),
+  unitIdx: index('util_offline_unit_idx').on(table.unitId),
+  datesIdx: index('util_offline_dates_idx').on(table.startDate, table.endDate),
+}));
+
+export const utilSnapshots = pgTable('util_snapshots', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  assetClass: utilAssetClassEnum('asset_class').notNull().default('marina'),
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  unitType: varchar('unit_type', { length: 50 }),
+  bandKey: varchar('band_key', { length: 20 }),
+  mode: utilSnapshotModeEnum('mode').notNull().default('contracted'),
+  totalUnits: integer('total_units').notNull().default(0),
+  occupiedUnits: integer('occupied_units').notNull().default(0),
+  offlineUnits: integer('offline_units').notNull().default(0),
+  availableUnits: integer('available_units').notNull().default(0),
+  unitUtilPct: decimal('unit_util_pct', { precision: 7, scale: 4 }).notNull().default('0'),
+  totalCapacity: decimal('total_capacity', { precision: 12, scale: 2 }).notNull().default('0'),
+  occupiedCapacity: decimal('occupied_capacity', { precision: 12, scale: 2 }).notNull().default('0'),
+  offlineCapacity: decimal('offline_capacity', { precision: 12, scale: 2 }).notNull().default('0'),
+  weightedUtilPct: decimal('weighted_util_pct', { precision: 7, scale: 4 }).notNull().default('0'),
+  revenue: decimal('revenue', { precision: 14, scale: 2 }).notNull().default('0'),
+  revenuePerAvailCapTime: decimal('revenue_per_avail_cap_time', { precision: 10, scale: 4 }).notNull().default('0'),
+  offlineCapacityTime: decimal('offline_capacity_time', { precision: 14, scale: 2 }).notNull().default('0'),
+  churnMoveIns: integer('churn_move_ins').default(0),
+  churnMoveOuts: integer('churn_move_outs').default(0),
+  metadata: jsonb('metadata').$type<Record<string, any>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('util_snap_org_idx').on(table.orgId),
+  propertyPeriodIdx: index('util_snap_property_period_idx').on(table.propertyId, table.periodStart, table.periodEnd),
+  lookupIdx: uniqueIndex('util_snap_lookup_idx').on(table.propertyId, table.periodStart, table.periodEnd, table.unitType, table.bandKey, table.mode),
+  assetClassIdx: index('util_snap_asset_class_idx').on(table.assetClass),
+  modeIdx: index('util_snap_mode_idx').on(table.mode),
+}));
+
+export const insertUtilInventoryUnitSchema = createInsertSchema(utilInventoryUnits).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectUtilInventoryUnitSchema = createSelectSchema(utilInventoryUnits);
+export type InsertUtilInventoryUnit = z.infer<typeof insertUtilInventoryUnitSchema>;
+export type UtilInventoryUnit = typeof utilInventoryUnits.$inferSelect;
+
+export const insertUtilOccupancyEventSchema = createInsertSchema(utilOccupancyEvents).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectUtilOccupancyEventSchema = createSelectSchema(utilOccupancyEvents);
+export type InsertUtilOccupancyEvent = z.infer<typeof insertUtilOccupancyEventSchema>;
+export type UtilOccupancyEvent = typeof utilOccupancyEvents.$inferSelect;
+
+export const insertUtilOfflineBlockSchema = createInsertSchema(utilOfflineBlocks).omit({ id: true, createdAt: true, updatedAt: true });
+export const selectUtilOfflineBlockSchema = createSelectSchema(utilOfflineBlocks);
+export type InsertUtilOfflineBlock = z.infer<typeof insertUtilOfflineBlockSchema>;
+export type UtilOfflineBlock = typeof utilOfflineBlocks.$inferSelect;
+
+export const insertUtilSnapshotSchema = createInsertSchema(utilSnapshots).omit({ id: true, createdAt: true });
+export const selectUtilSnapshotSchema = createSelectSchema(utilSnapshots);
+export type InsertUtilSnapshot = z.infer<typeof insertUtilSnapshotSchema>;
+export type UtilSnapshot = typeof utilSnapshots.$inferSelect;

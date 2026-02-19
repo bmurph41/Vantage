@@ -32,9 +32,8 @@ export const ASSET_CLASS_CONFIG: Record<AssetClass, AssetClassConfig> = {
           { key: '0_25', label: "Up to 25'", minFt: 0, maxFt: 25 },
           { key: '26_35', label: "26'–35'", minFt: 26, maxFt: 35 },
           { key: '36_45', label: "36'–45'", minFt: 36, maxFt: 45 },
-          { key: '46_55', label: "46'–55'", minFt: 46, maxFt: 55 },
-          { key: '56_65', label: "56'–65'", minFt: 56, maxFt: 65 },
-          { key: '66_plus', label: "66'+", minFt: 66 },
+          { key: '46_60', label: "46'–60'", minFt: 46, maxFt: 60 },
+          { key: '61_plus', label: "61'+", minFt: 61 },
         ],
       },
       lift_slip: {
@@ -43,9 +42,11 @@ export const ASSET_CLASS_CONFIG: Record<AssetClass, AssetClassConfig> = {
         capacityWeightField: 'length_ft',
         supportsTransient: false,
         defaultBands: [
-          { key: '0_30', label: "Up to 30'", minFt: 0, maxFt: 30 },
-          { key: '31_40', label: "31'–40'", minFt: 31, maxFt: 40 },
-          { key: '41_plus', label: "41'+", minFt: 41 },
+          { key: '0_25', label: "Up to 25'", minFt: 0, maxFt: 25 },
+          { key: '26_35', label: "26'–35'", minFt: 26, maxFt: 35 },
+          { key: '36_45', label: "36'–45'", minFt: 36, maxFt: 45 },
+          { key: '46_60', label: "46'–60'", minFt: 46, maxFt: 60 },
+          { key: '61_plus', label: "61'+", minFt: 61 },
         ],
       },
       dry_rack: {

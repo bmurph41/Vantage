@@ -437,7 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", authenticateUser, bulkEmailRoutes);
   // Utilization module routes
   const { createUtilizationRouter } = await import('./modules/utilization/utilization-routes');
-  app.use("/api/utilization", createUtilizationRouter());
+  app.use("/api/utilization", authenticateUser, createUtilizationRouter());
 
   // Payroll module routes
   app.use("/api/payroll", authenticateUser, payrollRouter);
