@@ -178,7 +178,7 @@ export default function Portfolio() {
   const [selectedMarina, setSelectedMarina] = useState<OwnedMarina | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [marinaToDelete, setMarinaToDelete] = useState<OwnedMarina | null>(null);
-  const [mapSource, setMapSource] = useState<'properties' | 'pipeline' | 'all'>('all');
+  const [mapSource, setMapSource] = useState<'owned' | 'pipeline' | 'all'>('all');
 
   useEffect(() => {
     const newTab = searchParams.get("tab");
@@ -497,13 +497,13 @@ export default function Portfolio() {
                     className="h-7 text-xs"
                     onClick={() => setMapSource('all')}
                   >
-                    All Assets
+                    All
                   </Button>
                   <Button
-                    variant={mapSource === 'properties' ? 'default' : 'ghost'}
+                    variant={mapSource === 'owned' ? 'default' : 'ghost'}
                     size="sm"
                     className="h-7 text-xs"
-                    onClick={() => setMapSource('properties')}
+                    onClick={() => setMapSource('owned')}
                   >
                     <Building2 className="h-3.5 w-3.5 mr-1" />
                     Owned
@@ -523,18 +523,19 @@ export default function Portfolio() {
             <CardContent className="p-0">
               <MarinaMapEmbed
                 key={mapSource}
-                source={mapSource === 'all' ? 'all' : mapSource}
-                sourceLabel={mapSource === 'all' ? 'Portfolio Assets' : mapSource === 'properties' ? 'Owned Marinas' : 'Pipeline Deals'}
+                source={mapSource}
+                baseUrl="/api/portfolio/map-locations"
+                sourceLabel={mapSource === 'all' ? 'Portfolio Assets' : mapSource === 'owned' ? 'Owned Marinas' : 'Pipeline Deals'}
                 height="calc(100vh - 420px)"
                 showSearch={true}
                 showStateFilter={true}
                 showSourceFilter={false}
                 showLayerToggles={mapSource === 'all'}
                 showListPanel={true}
-                emptyMessage={mapSource === 'properties' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No portfolio assets with location data found'}
+                emptyMessage={mapSource === 'owned' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No portfolio assets with location data found'}
                 onLocationClick={(loc) => {
-                  if (loc.source === 'property' && loc.id) {
-                    navigate(`/crm/properties/${loc.id}`);
+                  if (loc.source === 'owned' && loc.id) {
+                    navigate(`/portfolio/${loc.id}`);
                   } else if (loc.source === 'pipeline' && loc.id) {
                     navigate(`/crm/deals/${loc.id}`);
                   }

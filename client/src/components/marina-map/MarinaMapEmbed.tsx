@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 export interface MarinaLocation {
   id: string;
-  source: 'property' | 'project' | 'comp' | 'rate_comp' | 'listing' | 'pipeline';
+  source: 'property' | 'project' | 'comp' | 'rate_comp' | 'listing' | 'pipeline' | 'owned';
   name: string;
   address: string | null;
   city: string | null;
@@ -51,6 +51,7 @@ export const SOURCE_COLORS: Record<string, string> = {
   rate_comp: '#34A853',
   listing: '#9C27B0',
   pipeline: '#FF5722',
+  owned: '#2E7D32',
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   rate_comp: 'Rate Comps',
   listing: 'Listings',
   pipeline: 'Pipeline Deals',
+  owned: 'Owned Marinas',
 };
 
 const SOURCE_ICONS: Record<string, typeof Anchor> = {
@@ -69,6 +71,7 @@ const SOURCE_ICONS: Record<string, typeof Anchor> = {
   rate_comp: BarChart3,
   listing: ShoppingCart,
   pipeline: Anchor,
+  owned: Building2,
 };
 
 const mapContainerStyle = { width: '100%', height: '100%' };
@@ -103,7 +106,8 @@ export function createMarkerIcon(
 }
 
 export interface MarinaMapEmbedProps {
-  source: 'properties' | 'projects' | 'comps' | 'rate_comps' | 'listings' | 'pipeline' | 'all';
+  source: 'properties' | 'projects' | 'comps' | 'rate_comps' | 'listings' | 'pipeline' | 'all' | 'owned';
+  baseUrl?: string;
   markerColor?: string;
   sourceLabel?: string;
   height?: string;
@@ -118,6 +122,7 @@ export interface MarinaMapEmbedProps {
 
 export default function MarinaMapEmbed({
   source,
+  baseUrl = '/api/marina-map/locations',
   markerColor,
   sourceLabel,
   height = 'calc(100vh - 280px)',
@@ -137,7 +142,7 @@ export default function MarinaMapEmbed({
   const [sourceFilter, setSourceFilter] = useState<string>(source);
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<MarinaLocation | null>(null);
-  const [visibleSources, setVisibleSources] = useState<Set<string>>(new Set(['property', 'project', 'comp', 'rate_comp', 'listing', 'pipeline']));
+  const [visibleSources, setVisibleSources] = useState<Set<string>>(new Set(['property', 'project', 'comp', 'rate_comp', 'listing', 'pipeline', 'owned']));
   const [viewMode, setViewMode] = useState<'map' | 'split'>(showListPanel ? 'split' : 'map');
   const [listExpanded, setListExpanded] = useState(true);
 
@@ -153,8 +158,8 @@ export default function MarinaMapEmbed({
     if (stateFilter && stateFilter !== 'all') params.set('state', stateFilter);
     if (debouncedSearch) params.set('search', debouncedSearch);
     const qs = params.toString();
-    return `/api/marina-map/locations${qs ? `?${qs}` : ''}`;
-  }, [sourceFilter, source, showSourceFilter, stateFilter, debouncedSearch]);
+    return `${baseUrl}${qs ? `?${qs}` : ''}`;
+  }, [sourceFilter, source, showSourceFilter, stateFilter, debouncedSearch, baseUrl]);
 
   const { data, isLoading, error } = useQuery<MapResponse>({
     queryKey: [queryUrl],

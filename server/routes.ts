@@ -17063,6 +17063,141 @@ Current context: Project ${req.params.projectId}`;
   // PORTFOLIO ENDPOINTS  
   // ========================================
 
+  app.get('/api/portfolio/map-locations', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const source = (req.query.source as string) || 'all';
+      const stateFilter = req.query.state as string | undefined;
+      const searchFilter = req.query.search as string | undefined;
+      const results: any[] = [];
+
+      if (source === 'all' || source === 'owned') {
+        const ownedRows = await db
+          .select({
+            assetId: ownedAssets.id,
+            propertyId: ownedAssets.propertyId,
+            status: ownedAssets.status,
+            acquisitionPrice: ownedAssets.acquisitionPrice,
+            keyMetrics: ownedAssets.keyMetrics,
+            title: crmProperties.title,
+            address: crmProperties.address,
+            city: crmProperties.city,
+            state: crmProperties.state,
+            zipCode: crmProperties.zipCode,
+            coordinates: crmProperties.coordinates,
+            wetSlips: crmProperties.wetSlips,
+            drySlips: crmProperties.drySlips,
+            totalCapacity: crmProperties.totalCapacity,
+          })
+          .from(ownedAssets)
+          .leftJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
+          .where(and(
+            eq(ownedAssets.orgId, orgId),
+            ...(stateFilter ? [eq(crmProperties.state, stateFilter)] : []),
+            ...(searchFilter ? [ilike(crmProperties.title, `%${searchFilter}%`)] : []),
+          ))
+          .limit(500);
+
+        for (const r of ownedRows) {
+          const coords = r.coordinates as any;
+          const metrics = (r.keyMetrics || {}) as Record<string, any>;
+          results.push({
+            id: r.assetId,
+            source: 'owned' as const,
+            name: r.title || 'Unknown Marina',
+            address: r.address,
+            city: r.city,
+            state: r.state,
+            zipCode: r.zipCode,
+            lat: coords?.lat ? Number(coords.lat) : null,
+            lng: coords?.lng ? Number(coords.lng) : null,
+            price: r.acquisitionPrice ? Number(r.acquisitionPrice) : null,
+            slips: r.totalCapacity ?? (((r.wetSlips ?? 0) + (r.drySlips ?? 0)) || null),
+            status: r.status || 'under_management',
+            metrics: {
+              occupancy: metrics.occupancy,
+              annualRevenue: metrics.annualRevenue,
+              propertyId: r.propertyId,
+            },
+          });
+        }
+      }
+
+      if (source === 'all' || source === 'pipeline') {
+        const { dealWorkspaces } = await import('@shared/schema');
+        const pipelineStages = ['lead', 'qualified', 'proposal', 'negotiation'];
+        const dealConditions: any[] = [
+          eq(crmDeals.orgId, orgId),
+          inArray(crmDeals.stage, pipelineStages),
+        ];
+        if (searchFilter) dealConditions.push(ilike(crmDeals.title, `%${searchFilter}%`));
+
+        const dealRows = await db.select({
+          deal: crmDeals,
+          property: crmProperties,
+        }).from(crmDeals)
+          .leftJoin(dealWorkspaces, eq(dealWorkspaces.dealId, crmDeals.id))
+          .leftJoin(crmProperties, eq(dealWorkspaces.propertyId, crmProperties.id))
+          .where(and(...dealConditions))
+          .limit(500);
+
+        for (const row of dealRows) {
+          const d = row.deal;
+          const p = row.property;
+          const coords = p?.coordinates as any;
+          const lat = coords?.lat ? Number(coords.lat) : null;
+          const lng = coords?.lng ? Number(coords.lng) : null;
+          const city = p?.city || d.city || null;
+          const state = p?.state || d.state || null;
+          if (stateFilter && state !== stateFilter) continue;
+          results.push({
+            id: d.id,
+            source: 'pipeline' as const,
+            name: d.title,
+            address: p?.address || null,
+            city,
+            state,
+            zipCode: p?.zipCode || null,
+            lat,
+            lng,
+            price: d.amount ? Number(d.amount) : null,
+            slips: p ? (p.totalCapacity ?? (((p.wetSlips ?? 0) + (p.drySlips ?? 0)) || null)) : null,
+            status: d.stage,
+            metrics: {
+              stage: d.stage,
+              priority: d.priority,
+              amount: d.amount ? Number(d.amount) : null,
+              probability: d.probability,
+              propertyName: p?.title || null,
+            },
+          });
+        }
+      }
+
+      const bySource: Record<string, number> = {};
+      const byState: Record<string, number> = {};
+      let withCoords = 0;
+      for (const loc of results) {
+        bySource[loc.source] = (bySource[loc.source] || 0) + 1;
+        if (loc.state) byState[loc.state] = (byState[loc.state] || 0) + 1;
+        if (loc.lat && loc.lng) withCoords++;
+      }
+
+      res.json({
+        locations: results,
+        stats: {
+          total: results.length,
+          withCoordinates: withCoords,
+          bySource,
+          byState,
+        },
+      });
+    } catch (error: any) {
+      console.error('PORTFOLIO_MAP_ERROR:', error?.message || error);
+      res.status(500).json({ error: 'Failed to fetch portfolio map locations' });
+    }
+  });
+
   // Get portfolio marinas (owned properties) with real operational data
   app.get('/api/portfolio/marinas', authenticateUser, async (req: any, res) => {
     try {
