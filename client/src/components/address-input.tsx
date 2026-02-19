@@ -16,6 +16,7 @@ export interface AddressComponents {
   lat?: number;
   lng?: number;
   source?: 'google' | 'manual';
+  name?: string;
 }
 
 const US_STATES: Record<string, string> = {
@@ -184,7 +185,7 @@ export function AddressInput({
   onChange,
   onAddressSelect,
   label = 'Address',
-  placeholder = 'Start typing an address...',
+  placeholder = 'Search by name or address...',
   disabled = false,
   required = false,
   className = '',
@@ -231,6 +232,7 @@ export function AddressInput({
       lat: place.geometry?.location?.lat(),
       lng: place.geometry?.location?.lng(),
       source: 'google',
+      name: place.name || undefined,
     };
 
     place.address_components?.forEach((component) => {
@@ -299,9 +301,8 @@ export function AddressInput({
 
     try {
       autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-        types: ['address'],
         componentRestrictions: { country: countries },
-        fields: ['address_components', 'formatted_address', 'geometry', 'place_id'],
+        fields: ['address_components', 'formatted_address', 'geometry', 'place_id', 'name'],
       });
 
       if (biasCenter) {
