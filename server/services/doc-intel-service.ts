@@ -1844,8 +1844,33 @@ Respond with JSON only:
       updatedAt: new Date(),
     };
 
+    // Also write new-system tier fields so import can read them consistently
+    try {
+      const allCats = await this.getCategories(orgId);
+      const matchedCat = allCats.find((c: any) => c.id === categoryId);
+      if (matchedCat?.categoryType) {
+        const tierMap: Record<string, string> = {
+          revenue: 'revenue', cogs: 'cogs', cost_of_goods_sold: 'cogs',
+          expense: 'expense', expenses: 'expense', opex: 'expense',
+          operating_expenses: 'expense', payroll: 'expense', other_expense: 'expense',
+        };
+        const tier = tierMap[matchedCat.categoryType.toLowerCase()];
+        if (tier) {
+          updateData.categoryTierConfirmed = tier;
+        }
+      }
+    } catch (e) {
+      console.warn('[DocIntel] Could not look up category type for tier bridging:', e);
+    }
+
     if (department) {
       updateData.departmentConfirmed = department;
+      const tier = updateData.categoryTierConfirmed || '';
+      if (tier === 'revenue' || tier === 'cogs') {
+        updateData.revenueCogsDeptConfirmed = department;
+      } else if (tier === 'expense') {
+        updateData.expenseDeptConfirmed = department;
+      }
     }
 
     const [item] = await db
@@ -2014,24 +2039,28 @@ Respond with JSON only:
       let plCategory: string | null = null;
       let subcategory: string = 'Uncategorized';
 
-      // First try to use categoryConfirmed with full category lookup
-      if (item.categoryConfirmed) {
+      let categorySource = 'none';
+
+      // Priority 1: User-confirmed tier (from PLReviewGrid — most direct user selection)
+      if (item.categoryTierConfirmed) {
+        const mappedTier = tierMapping[item.categoryTierConfirmed.toLowerCase()];
+        if (mappedTier) {
+          plCategory = mappedTier;
+          subcategory = item.rawText?.substring(0, 100) || 'Uncategorized';
+          categorySource = 'categoryTierConfirmed';
+        }
+      }
+
+      // Priority 2: Legacy categoryConfirmed UUID lookup (from old confirm path)
+      if (!plCategory && item.categoryConfirmed) {
         const category = categoryMap.get(item.categoryConfirmed);
         if (category) {
           const mappedTier = tierMapping[category.categoryType?.toLowerCase() || ''];
           if (mappedTier) {
             plCategory = mappedTier;
             subcategory = category.name || 'Uncategorized';
+            categorySource = 'categoryConfirmed';
           }
-        }
-      }
-      
-      // If no category or category lookup failed, try tier confirmation
-      if (!plCategory && item.categoryTierConfirmed) {
-        const mappedTier = tierMapping[item.categoryTierConfirmed.toLowerCase()];
-        if (mappedTier) {
-          plCategory = mappedTier;
-          subcategory = item.rawText?.substring(0, 100) || 'Uncategorized';
         }
       }
       
@@ -2104,8 +2133,11 @@ Respond with JSON only:
           }
         }
 
-        console.log('[DocIntel Import] Inferred tier from raw text:', item.rawText?.substring(0, 50), '->', plCategory);
+        categorySource = 'raw_text_inference';
+        console.log('[DocIntel Import] WARNING: Inferred tier from raw text (no user confirmation):', item.rawText?.substring(0, 50), '->', plCategory);
       }
+
+      console.log(`[DocIntel Import] Item "${item.rawText?.substring(0, 40)}" → category: ${plCategory} (source: ${categorySource})`);
 
       // Parse periodKey (YYYY-MM or YYYY-ANNUAL) or use fiscalYear
       let year = fiscalYear || new Date().getFullYear();
@@ -2132,8 +2164,31 @@ Respond with JSON only:
 
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');
 
+      // Resolve department: prioritize user-confirmed fields, then fall back to inference
       const { inferDepartment: inferDeptForActual } = await import('../utils/department-mapping');
-      const inferredDept = (item as any).department || inferDeptForActual(subcategory, plCategory);
+      let inferredDept: string;
+      let deptSource = 'inferred';
+
+      // Check tier-specific confirmed departments first (from PLReviewGrid)
+      // Note: plCategory is "Revenue"/"COGS"/"Expenses" but tier fields use lowercase
+      const tierLower = plCategory?.toLowerCase() || '';
+      if ((tierLower === 'revenue' || tierLower === 'cogs') && item.revenueCogsDeptConfirmed) {
+        inferredDept = item.revenueCogsDeptConfirmed;
+        deptSource = 'revenueCogsDeptConfirmed';
+      } else if ((tierLower === 'expenses' || tierLower === 'expense') && item.expenseDeptConfirmed) {
+        inferredDept = item.expenseDeptConfirmed;
+        deptSource = 'expenseDeptConfirmed';
+      } else if (item.departmentConfirmed) {
+        // Legacy confirm path
+        inferredDept = item.departmentConfirmed;
+        deptSource = 'departmentConfirmed';
+      } else {
+        // No user confirmation — fall back to heuristic inference
+        inferredDept = inferDeptForActual(subcategory, plCategory);
+        deptSource = 'inferred';
+      }
+
+      console.log(`[DocIntel Import] Item "${item.rawText?.substring(0, 40)}" → dept: ${inferredDept} (source: ${deptSource})`);
 
       if (isAnnualPeriod) {
         const monthlyAmount = amount / 12;

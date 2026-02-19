@@ -253,7 +253,7 @@ export function MultiDocumentReview({
     },
   });
 
-  // NEW: Mutation to persist category/department immediately (Requirement H)
+  // Mutation to persist category/department immediately via doc-intel PATCH endpoint
   const updateItemMutation = useMutation({
     mutationFn: async ({ uploadId, itemId, categoryId, department }: { 
       uploadId: string; 
@@ -261,10 +261,35 @@ export function MultiDocumentReview({
       categoryId?: string; 
       department?: string 
     }) => {
-      return apiRequest("PATCH", `/api/modeling/projects/${projectId}/documents/${uploadId}/items/${itemId}`, { 
-        categoryId, 
-        department 
-      });
+      const updates: Record<string, any> = {};
+
+      if (categoryId) {
+        updates.categoryConfirmed = categoryId;
+        const cat = categories.find(c => c.id === categoryId);
+        if (cat?.categoryType) {
+          const tierMap: Record<string, string> = {
+            revenue: 'revenue', cogs: 'cogs', cost_of_goods_sold: 'cogs',
+            expense: 'expense', expenses: 'expense', opex: 'expense',
+            operating_expenses: 'expense', payroll: 'expense', other_expense: 'expense',
+          };
+          const tier = tierMap[cat.categoryType.toLowerCase()];
+          if (tier) {
+            updates.categoryTierConfirmed = tier;
+          }
+        }
+      }
+
+      if (department) {
+        updates.departmentConfirmed = department;
+        const tier = updates.categoryTierConfirmed || '';
+        if (tier === 'revenue' || tier === 'cogs') {
+          updates.revenueCogsDeptConfirmed = department;
+        } else if (tier === 'expense') {
+          updates.expenseDeptConfirmed = department;
+        }
+      }
+
+      return apiRequest("PATCH", `/api/doc-intel/items/${itemId}`, updates);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ 
