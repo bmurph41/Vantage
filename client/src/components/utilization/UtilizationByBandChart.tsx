@@ -28,8 +28,16 @@ interface BandData {
   weightedUtilPct: number;
 }
 
+interface OfflineBandData {
+  bandKey: string;
+  offlineUnits: number;
+  offlineCapacityTime: number;
+  estimatedLostRevenue: number;
+}
+
 interface UtilizationByBandChartProps {
   bands: BandData[];
+  offlineBands?: OfflineBandData[];
   viewMode: 'unit' | 'weighted';
   loading: boolean;
   onBarClick?: (bandKey: string) => void;
@@ -50,23 +58,46 @@ function getBarColor(pct: number): string {
   return '#ef4444';
 }
 
+function formatCurrency(value: number): string {
+  if (value === 0) return '$0';
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
 export default function UtilizationByBandChart({
   bands,
+  offlineBands,
   viewMode,
   loading,
   onBarClick,
 }: UtilizationByBandChartProps) {
+  const offlineBandMap = useMemo(() => {
+    const map = new Map<string, OfflineBandData>();
+    if (offlineBands) {
+      for (const ob of offlineBands) {
+        map.set(ob.bandKey, ob);
+      }
+    }
+    return map;
+  }, [offlineBands]);
+
   const chartData = useMemo(() => {
     if (!bands || bands.length === 0) return [];
-    return bands.map(b => ({
-      name: b.bandLabel || BAND_LABELS[b.bandKey] || b.bandKey,
-      bandKey: b.bandKey,
-      utilization: viewMode === 'unit' ? b.unitUtilPct : b.weightedUtilPct,
-      occupied: viewMode === 'unit' ? b.occupiedUnits : b.occupiedCapacity,
-      total: viewMode === 'unit' ? b.totalUnits : b.totalCapacity,
-      offline: b.offlineUnits,
-    }));
-  }, [bands, viewMode]);
+    return bands.map(b => {
+      const ob = offlineBandMap.get(b.bandKey);
+      return {
+        name: b.bandLabel || BAND_LABELS[b.bandKey] || b.bandKey,
+        bandKey: b.bandKey,
+        utilization: viewMode === 'unit' ? b.unitUtilPct : b.weightedUtilPct,
+        occupied: viewMode === 'unit' ? b.occupiedUnits : b.occupiedCapacity,
+        total: viewMode === 'unit' ? b.totalUnits : b.totalCapacity,
+        offline: b.offlineUnits,
+        offlineCapTime: ob?.offlineCapacityTime ?? 0,
+        offlineLostRev: ob?.estimatedLostRevenue ?? 0,
+      };
+    });
+  }, [bands, viewMode, offlineBandMap]);
 
   if (loading) {
     return (
@@ -129,16 +160,35 @@ export default function UtilizationByBandChart({
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value: number, name: string) => {
-                  if (name === 'utilization') return [`${value.toFixed(1)}%`, 'Utilization'];
-                  return [value, name];
-                }}
-                labelFormatter={(label) => `Size Band: ${label}`}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid hsl(var(--border))',
-                  backgroundColor: 'hsl(var(--card))',
-                  color: 'hsl(var(--foreground))',
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0]?.payload;
+                  if (!data) return null;
+                  return (
+                    <div style={{
+                      borderRadius: '8px',
+                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'hsl(var(--card))',
+                      color: 'hsl(var(--foreground))',
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                    }}>
+                      <p style={{ fontWeight: 600, marginBottom: 4 }}>Size Band: {data.name}</p>
+                      <p>Utilization: {data.utilization.toFixed(1)}%</p>
+                      <p>Occupied: {data.occupied} / {data.total}</p>
+                      {data.offline > 0 && (
+                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid hsl(var(--border))' }}>
+                          <p style={{ color: '#f59e0b', fontWeight: 500 }}>Offline: {data.offline} units</p>
+                          {data.offlineCapTime > 0 && (
+                            <p style={{ color: '#f59e0b' }}>Cap-Time Lost: {data.offlineCapTime.toLocaleString()}</p>
+                          )}
+                          {data.offlineLostRev > 0 && (
+                            <p style={{ color: '#ef4444' }}>Est. Lost Rev: {formatCurrency(data.offlineLostRev)}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
                 }}
               />
               <Bar

@@ -28,6 +28,7 @@ import {
   computeEconomicUtilization,
   computeUnitTypeBreakdown,
   computeChurn,
+  computeOfflineBreakdown,
 } from './utilization-engine';
 import { daysBetween, startOfMonth, endOfMonth, fractionOfPeriod } from './overlap';
 
@@ -690,6 +691,47 @@ export async function fetchByType(
     results = results.filter(ut => unitTypes.includes(ut.unitType));
   }
   return results;
+}
+
+import type { OfflineBlock, OfflineCapacityKPI } from './utilization-types';
+
+function toOfflineBlock(row: any): OfflineBlock {
+  return {
+    id: row.id,
+    propertyId: row.propertyId,
+    scopeType: row.scopeType,
+    scopeKey: row.scopeKey,
+    unitId: row.unitId ?? null,
+    startDate: row.startDate,
+    endDate: row.endDate ?? null,
+    reasonCode: row.reasonCode,
+    reasonDescription: row.reasonDescription ?? null,
+    estimatedRevenueLoss: row.estimatedRevenueLoss ? parseFloat(row.estimatedRevenueLoss) : null,
+  };
+}
+
+export async function getOfflineBreakdown(
+  propertyId: string,
+  periodStart: string,
+  periodEnd: string,
+  assetClass: AssetClass = 'marina',
+  mode: UtilizationMode = 'contracted'
+): Promise<OfflineCapacityKPI> {
+  const config = getAssetClassConfig(assetClass);
+  if (!config) throw new Error(`Unknown asset class: ${assetClass}`);
+
+  const totalDays = daysBetween(periodStart, periodEnd);
+  const period = { startDate: periodStart, endDate: periodEnd, totalDays };
+  const primaryDenom = Object.values(config.unitTypes)[0]?.denomType ?? 'count';
+
+  const [units, rawBlocks, occupancy] = await Promise.all([
+    fetchInventoryUnits(propertyId),
+    fetchOfflineBlocks(propertyId, periodStart, periodEnd),
+    fetchOccupancyEvents(propertyId, periodStart, periodEnd),
+  ]);
+
+  const blocks: OfflineBlock[] = rawBlocks.map(toOfflineBlock);
+  return computeOfflineBreakdown(blocks, units, occupancy, period, primaryDenom);
 }
 
 export { generateMockSummary } from './utilization-service-mock';

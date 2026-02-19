@@ -10,6 +10,8 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRightLeft,
+  ShieldOff,
+  DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,9 +45,18 @@ interface ChurnMetrics {
   avgTenureMonths: number | null;
 }
 
+interface OfflineKPI {
+  totalOfflineBlocks: number;
+  totalOfflineUnits: number;
+  totalOfflineDays: number;
+  totalOfflineCapacityTime: number;
+  totalEstimatedLostRevenue: number;
+}
+
 interface UtilizationSummaryCardProps {
   overall: UtilizationOverall | null;
   churn: ChurnMetrics | null;
+  offlineKPI?: OfflineKPI | null;
   viewMode: 'unit' | 'weighted';
   loading: boolean;
   onCardClick?: (metric: string) => void;
@@ -97,17 +108,25 @@ function MetricTile({
   );
 }
 
+function formatCurrency(value: number): string {
+  if (value === 0) return '$0';
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
 export default function UtilizationSummaryCard({
   overall,
   churn,
+  offlineKPI,
   viewMode,
   loading,
   onCardClick,
 }: UtilizationSummaryCardProps) {
   if (loading || !overall) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {[1, 2, 3, 4, 5].map(i => (
           <Card key={i}>
             <CardContent className="pt-6">
               <Skeleton className="h-4 w-24 mb-2" />
@@ -132,10 +151,12 @@ export default function UtilizationSummaryCard({
   const utilColor = utilPct >= 90 ? 'text-green-600' : utilPct >= 70 ? 'text-amber-600' : 'text-red-600';
 
   const netAbsorption = churn?.netAbsorption ?? 0;
+  const lostRevenue = offlineKPI?.totalEstimatedLostRevenue ?? 0;
+  const offlineBlocks = offlineKPI?.totalOfflineBlocks ?? 0;
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <MetricTile
           title={utilLabel}
           value={`${utilPct.toFixed(1)}%`}
@@ -154,11 +175,24 @@ export default function UtilizationSummaryCard({
           onClick={() => onCardClick?.('units')}
         />
         <MetricTile
-          title="Offline Units"
+          title="Offline Capacity"
           value={overall.unitUtil.offlineUnits}
-          subtitle={overall.unitUtil.offlineUnits > 0 ? 'Under maintenance or blocked' : 'All units available'}
-          icon={AlertTriangle}
-          color={overall.unitUtil.offlineUnits > 0 ? 'text-amber-600' : undefined}
+          subtitle={offlineBlocks > 0
+            ? `${offlineBlocks} block${offlineBlocks !== 1 ? 's' : ''} | ${formatCurrency(lostRevenue)} est. lost`
+            : 'All units operational'}
+          icon={ShieldOff}
+          color={overall.unitUtil.offlineUnits > 0 ? 'text-amber-600' : 'text-green-600'}
+          loading={false}
+          onClick={() => onCardClick?.('offline')}
+        />
+        <MetricTile
+          title="Est. Lost Revenue"
+          value={formatCurrency(lostRevenue)}
+          subtitle={lostRevenue > 0
+            ? `From ${offlineKPI?.totalOfflineUnits ?? 0} offline unit${(offlineKPI?.totalOfflineUnits ?? 0) !== 1 ? 's' : ''}`
+            : 'No revenue impact'}
+          icon={DollarSign}
+          color={lostRevenue > 0 ? 'text-red-600' : 'text-green-600'}
           loading={false}
           onClick={() => onCardClick?.('offline')}
         />

@@ -25056,6 +25056,7 @@ export type InsertProjectTaxInputs = z.infer<typeof insertProjectTaxInputsSchema
 
 export const utilAssetClassEnum = pgEnum("util_asset_class", ["marina", "hotel", "rv_park", "storage_unit", "industrial", "parking"]);
 export const utilOfflineScopeEnum = pgEnum("util_offline_scope", ["unit", "band", "unit_type", "property"]);
+export const utilOfflineReasonEnum = pgEnum("util_offline_reason", ["dredging", "storm", "repair", "upgrade", "power_outage", "condemnation", "owner_use", "other"]);
 export const utilSnapshotModeEnum = pgEnum("util_snapshot_mode", ["contracted", "physical"]);
 
 export const utilInventoryUnits = pgTable('util_inventory_units', {
@@ -25125,7 +25126,8 @@ export const utilOfflineBlocks = pgTable('util_offline_blocks', {
   unitId: varchar('unit_id').references(() => utilInventoryUnits.id, { onDelete: 'cascade' }),
   startDate: date('start_date').notNull(),
   endDate: date('end_date'),
-  reasonCode: varchar('reason_code', { length: 50 }).notNull(),
+  reasonCode: utilOfflineReasonEnum('reason_code').notNull().default('other'),
+  estimatedRevenueLoss: decimal('estimated_revenue_loss', { precision: 14, scale: 2 }),
   reasonDescription: text('reason_description'),
   createdBy: varchar('created_by'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

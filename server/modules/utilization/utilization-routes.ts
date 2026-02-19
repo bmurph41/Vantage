@@ -6,6 +6,7 @@ import {
   fetchBandBreakdown,
   fetchByType,
   fetchDrilldownEvents,
+  getOfflineBreakdown,
 } from './utilization-service';
 import { requireRole } from '../../middleware/rbac';
 import type { AssetClass } from './utilization-config';
@@ -117,6 +118,27 @@ export function createUtilizationRouter(): Router {
     } catch (error: any) {
       console.error('[Utilization] Error fetching drilldown events:', error);
       res.status(500).json({ error: 'Failed to fetch drilldown events' });
+    }
+  });
+
+  router.get('/offline-breakdown', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const assetClass = (req.query.assetClass as AssetClass) || 'marina';
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+
+      const breakdown = await getOfflineBreakdown(propertyId, periodStart, periodEnd, assetClass, mode);
+      res.json({ propertyId, periodStart, periodEnd, ...breakdown });
+    } catch (error: any) {
+      console.error('[Utilization] Error fetching offline breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch offline breakdown' });
     }
   });
 

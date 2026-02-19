@@ -8,10 +8,15 @@ import type {
   UnitTypeBreakdown,
   ChurnMetrics,
   UtilizationPeriod,
+  OfflineBlock,
+  OfflineReasonCode,
+  OfflineReasonSummary,
+  OfflineCapacityKPI,
 } from './utilization-types';
+import { OFFLINE_REASON_LABELS } from './utilization-types';
 import type { DenomType, UnitTypeConfig } from './utilization-config';
 import { getUnitTypeConfig, getBandForLength, type AssetClass } from './utilization-config';
-import { daysBetween, fractionOfPeriod } from './overlap';
+import { daysBetween, overlapDays, fractionOfPeriod } from './overlap';
 
 export function computeUnitUtilization(
   units: InventoryUnit[],
@@ -205,5 +210,176 @@ export function computeChurn(
     moveOuts,
     netAbsorption: moveIns - moveOuts,
     avgTenureMonths,
+  };
+}
+
+export function computeOfflineBreakdown(
+  offlineBlocks: OfflineBlock[],
+  units: InventoryUnit[],
+  occupancy: OccupancyEvent[],
+  period: UtilizationPeriod,
+  denomType: DenomType
+): OfflineCapacityKPI {
+  const getWeight = (unit: InventoryUnit): number => {
+    switch (denomType) {
+      case 'lf': return unit.lengthFt ?? 1;
+      case 'sqft': return unit.sqft ?? 1;
+      default: return 1;
+    }
+  };
+
+  const unitMap = new Map(units.map(u => [u.id, u]));
+
+  const occupiedUnitRevenue = new Map<string, number>();
+  for (const occ of occupancy) {
+    const fraction = fractionOfPeriod(occ.startDate, occ.endDate, period.startDate, period.endDate);
+    const periodMonths = period.totalDays / 30.44;
+    const rev = occ.monthlyRevenue * periodMonths * fraction;
+    occupiedUnitRevenue.set(occ.unitId, (occupiedUnitRevenue.get(occ.unitId) ?? 0) + rev);
+  }
+
+  const occupiedUnitsCount = occupiedUnitRevenue.size || 1;
+  const totalOccupiedRevenue = Array.from(occupiedUnitRevenue.values()).reduce((s, v) => s + v, 0);
+  const avgRevenuePerUnit = totalOccupiedRevenue / occupiedUnitsCount;
+
+  const availableCapacity = units.filter(u => !u.isOffline).reduce((s, u) => s + getWeight(u), 0);
+  const totalAvailableCapTime = availableCapacity * period.totalDays;
+  const avgEffectiveRatePerCapTime = totalAvailableCapTime > 0 ? totalOccupiedRevenue / totalAvailableCapTime : 0;
+
+  const resolveAffectedUnits = (block: OfflineBlock): InventoryUnit[] => {
+    if (block.scopeType === 'unit' && block.unitId) {
+      const u = unitMap.get(block.unitId);
+      return u ? [u] : [];
+    }
+    if (block.scopeType === 'band') {
+      return units.filter(u => u.bandKey === block.scopeKey);
+    }
+    if (block.scopeType === 'unit_type') {
+      return units.filter(u => u.unitType === block.scopeKey);
+    }
+    if (block.scopeType === 'property') {
+      return [...units];
+    }
+    return [];
+  };
+
+  const reasonMap = new Map<OfflineReasonCode, {
+    blockCount: number;
+    totalOfflineDays: number;
+    offlineCapacityTime: number;
+    estimatedLostRevenue: number;
+    unitIds: Set<string>;
+  }>();
+
+  const unitTypeMap = new Map<string, {
+    offlineUnitIds: Set<string>;
+    offlineCapacityTime: number;
+    estimatedLostRevenue: number;
+  }>();
+
+  const bandMap = new Map<string, {
+    offlineUnitIds: Set<string>;
+    offlineCapacityTime: number;
+    estimatedLostRevenue: number;
+  }>();
+
+  let totalOfflineBlocks = 0;
+  const allOfflineUnitIds = new Set<string>();
+  let totalOfflineDays = 0;
+  let totalOfflineCapacityTime = 0;
+  let totalEstimatedLostRevenue = 0;
+
+  for (const block of offlineBlocks) {
+    totalOfflineBlocks++;
+    const blockEnd = block.endDate || period.endDate;
+    const days = overlapDays(block.startDate, blockEnd, period.startDate, period.endDate);
+    if (days <= 0) continue;
+
+    const affectedUnits = resolveAffectedUnits(block);
+
+    let blockCapTime = 0;
+    let blockLostRevenue = 0;
+
+    for (const unit of affectedUnits) {
+      allOfflineUnitIds.add(unit.id);
+      const weight = getWeight(unit);
+      const capTime = weight * days;
+      blockCapTime += capTime;
+
+      const lostRev = block.estimatedRevenueLoss != null
+        ? block.estimatedRevenueLoss / Math.max(affectedUnits.length, 1)
+        : capTime * avgEffectiveRatePerCapTime;
+      blockLostRevenue += lostRev;
+
+      const utKey = unit.unitType;
+      if (!unitTypeMap.has(utKey)) {
+        unitTypeMap.set(utKey, { offlineUnitIds: new Set(), offlineCapacityTime: 0, estimatedLostRevenue: 0 });
+      }
+      const utEntry = unitTypeMap.get(utKey)!;
+      utEntry.offlineUnitIds.add(unit.id);
+      utEntry.offlineCapacityTime += capTime;
+      utEntry.estimatedLostRevenue += lostRev;
+
+      const bKey = unit.bandKey;
+      if (bKey) {
+        if (!bandMap.has(bKey)) {
+          bandMap.set(bKey, { offlineUnitIds: new Set(), offlineCapacityTime: 0, estimatedLostRevenue: 0 });
+        }
+        const bEntry = bandMap.get(bKey)!;
+        bEntry.offlineUnitIds.add(unit.id);
+        bEntry.offlineCapacityTime += capTime;
+        bEntry.estimatedLostRevenue += lostRev;
+      }
+    }
+
+    totalOfflineDays += days;
+    totalOfflineCapacityTime += blockCapTime;
+    totalEstimatedLostRevenue += blockLostRevenue;
+
+    const rc = block.reasonCode as OfflineReasonCode;
+    if (!reasonMap.has(rc)) {
+      reasonMap.set(rc, { blockCount: 0, totalOfflineDays: 0, offlineCapacityTime: 0, estimatedLostRevenue: 0, unitIds: new Set() });
+    }
+    const entry = reasonMap.get(rc)!;
+    entry.blockCount++;
+    entry.totalOfflineDays += days;
+    entry.offlineCapacityTime += blockCapTime;
+    entry.estimatedLostRevenue += blockLostRevenue;
+    for (const u of affectedUnits) entry.unitIds.add(u.id);
+  }
+
+  const byReason: OfflineReasonSummary[] = Array.from(reasonMap.entries()).map(([rc, data]) => ({
+    reasonCode: rc,
+    reasonLabel: OFFLINE_REASON_LABELS[rc] || rc,
+    blockCount: data.blockCount,
+    totalOfflineDays: data.totalOfflineDays,
+    offlineCapacityTime: Math.round(data.offlineCapacityTime * 100) / 100,
+    estimatedLostRevenue: Math.round(data.estimatedLostRevenue * 100) / 100,
+    unitIds: Array.from(data.unitIds),
+  })).sort((a, b) => b.estimatedLostRevenue - a.estimatedLostRevenue);
+
+  const byUnitType = Array.from(unitTypeMap.entries()).map(([ut, data]) => ({
+    unitType: ut,
+    offlineUnits: data.offlineUnitIds.size,
+    offlineCapacityTime: Math.round(data.offlineCapacityTime * 100) / 100,
+    estimatedLostRevenue: Math.round(data.estimatedLostRevenue * 100) / 100,
+  }));
+
+  const byBand = Array.from(bandMap.entries()).map(([bk, data]) => ({
+    bandKey: bk,
+    offlineUnits: data.offlineUnitIds.size,
+    offlineCapacityTime: Math.round(data.offlineCapacityTime * 100) / 100,
+    estimatedLostRevenue: Math.round(data.estimatedLostRevenue * 100) / 100,
+  }));
+
+  return {
+    totalOfflineBlocks,
+    totalOfflineUnits: allOfflineUnitIds.size,
+    totalOfflineDays,
+    totalOfflineCapacityTime: Math.round(totalOfflineCapacityTime * 100) / 100,
+    totalEstimatedLostRevenue: Math.round(totalEstimatedLostRevenue * 100) / 100,
+    byReason,
+    byUnitType,
+    byBand,
   };
 }

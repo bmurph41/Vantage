@@ -142,6 +142,63 @@ export interface UtilizationTrendPoint {
   revPACapTime: number;
 }
 
+export type OfflineReasonCode = 'dredging' | 'storm' | 'repair' | 'upgrade' | 'power_outage' | 'condemnation' | 'owner_use' | 'other';
+
+export const OFFLINE_REASON_LABELS: Record<OfflineReasonCode, string> = {
+  dredging: 'Dredging',
+  storm: 'Storm Damage',
+  repair: 'Repair',
+  upgrade: 'Upgrade',
+  power_outage: 'Power Outage',
+  condemnation: 'Condemnation',
+  owner_use: 'Owner Use',
+  other: 'Other',
+};
+
+export interface OfflineBlock {
+  id: string;
+  propertyId: string;
+  scopeType: string;
+  scopeKey: string;
+  unitId: string | null;
+  startDate: string;
+  endDate: string | null;
+  reasonCode: OfflineReasonCode;
+  reasonDescription: string | null;
+  estimatedRevenueLoss: number | null;
+}
+
+export interface OfflineReasonSummary {
+  reasonCode: OfflineReasonCode;
+  reasonLabel: string;
+  blockCount: number;
+  totalOfflineDays: number;
+  offlineCapacityTime: number;
+  estimatedLostRevenue: number;
+  unitIds: string[];
+}
+
+export interface OfflineCapacityKPI {
+  totalOfflineBlocks: number;
+  totalOfflineUnits: number;
+  totalOfflineDays: number;
+  totalOfflineCapacityTime: number;
+  totalEstimatedLostRevenue: number;
+  byReason: OfflineReasonSummary[];
+  byUnitType: Array<{
+    unitType: string;
+    offlineUnits: number;
+    offlineCapacityTime: number;
+    estimatedLostRevenue: number;
+  }>;
+  byBand: Array<{
+    bandKey: string;
+    offlineUnits: number;
+    offlineCapacityTime: number;
+    estimatedLostRevenue: number;
+  }>;
+}
+
 export interface MockSummaryResponse {
   propertyId: string;
   propertyName: string;

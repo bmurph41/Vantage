@@ -15,6 +15,7 @@ import UtilizationSummaryCard from './UtilizationSummaryCard';
 import UtilizationByTypeTable from './UtilizationByTypeTable';
 import UtilizationByBandChart from './UtilizationByBandChart';
 import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
+import OfflineBreakdownTable from './OfflineBreakdownTable';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
 type UtilizationMode = 'contracted' | 'physical';
@@ -144,6 +145,25 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
     enabled: !!effectivePropertyId,
   });
 
+  const offlineQueryParams = useMemo(() => {
+    return new URLSearchParams({
+      propertyId: effectivePropertyId,
+      periodStart,
+      periodEnd,
+      mode: utilMode,
+    }).toString();
+  }, [effectivePropertyId, periodStart, periodEnd, utilMode]);
+
+  const { data: offlineData } = useQuery({
+    queryKey: ['/api/utilization/offline-breakdown', effectivePropertyId, periodStart, periodEnd, utilMode],
+    queryFn: async () => {
+      const res = await fetch(`/api/utilization/offline-breakdown?${offlineQueryParams}`);
+      if (!res.ok) throw new Error('Failed to fetch offline breakdown');
+      return res.json();
+    },
+    enabled: !!effectivePropertyId,
+  });
+
   const handleCardClick = (metric: string) => {
     setDrilldownMetric(metric);
     setDrilldownOpen(true);
@@ -258,6 +278,7 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
       <UtilizationSummaryCard
         overall={summaryData?.overall ?? null}
         churn={summaryData?.churn ?? null}
+        offlineKPI={offlineData ?? null}
         viewMode={viewMode}
         loading={summaryLoading}
         onCardClick={handleCardClick}
@@ -273,11 +294,19 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
 
         <UtilizationByBandChart
           bands={byBandData?.bands ?? []}
+          offlineBands={offlineData?.byBand ?? []}
           viewMode={viewMode}
           loading={byBandLoading}
           onBarClick={handleBandBarClick}
         />
       </div>
+
+      <OfflineBreakdownTable
+        propertyId={effectivePropertyId}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
+        mode={utilMode}
+      />
 
       <UtilizationDrilldownDrawer
         open={drilldownOpen}
