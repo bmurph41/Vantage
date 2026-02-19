@@ -77,6 +77,25 @@ interface WorkspaceInputsProps {
 // NEW: Seasonality types - 'annual' = year-round, 'seasonal' = in-season, 'winter' = winter season
 type SeasonalityOption = 'annual' | 'seasonal' | 'winter';
 
+type DesignatedSpaceOption = {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+};
+
+const DESIGNATED_SPACE_OPTIONS: DesignatedSpaceOption[] = [
+  { id: 'boat_sales', name: 'Boat Sales', icon: <Store className="h-3.5 w-3.5" /> },
+  { id: 'service', name: 'Service', icon: <Wrench className="h-3.5 w-3.5" /> },
+  { id: 'commercial_tenants', name: 'Commercial Tenants', icon: <Building2 className="h-3.5 w-3.5" /> },
+  { id: 'rental_boats', name: 'Rental Boats', icon: <Ship className="h-3.5 w-3.5" /> },
+  { id: 'boat_club', name: 'Boat Club', icon: <Users className="h-3.5 w-3.5" /> },
+  { id: 'fuel_dock', name: 'Fuel Dock', icon: <Fuel className="h-3.5 w-3.5" /> },
+  { id: 'liveaboard_designated', name: 'Liveaboard', icon: <Anchor className="h-3.5 w-3.5" /> },
+  { id: 'transient', name: 'Transient', icon: <Anchor className="h-3.5 w-3.5" /> },
+  { id: 'restaurant', name: 'Restaurant', icon: <Utensils className="h-3.5 w-3.5" /> },
+  { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-3.5 w-3.5" /> },
+];
+
 type StorageTypeConfig = {
   id: string;
   name: string;
@@ -85,12 +104,15 @@ type StorageTypeConfig = {
   isEnabled: boolean;
   icon: React.ReactNode;
   capacity: string;
+  leasable: string;
   occupiedCount: string;
   occupancyPercent: string;
   occupancyInputMode: 'percentage' | 'count';
+  hasDesignatedSpaces: boolean;
+  designatedSpaceIds: string[];
 };
 
-const storageDefaults = { capacity: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const };
+const storageDefaults = { capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage' as const, hasDesignatedSpaces: false, designatedSpaceIds: [] as string[] };
 
 const defaultStorageTypes: StorageTypeConfig[] = [
   { id: 'wet_slips', name: 'Wet Slips', section: 'storage', seasons: ['seasonal'], isEnabled: true, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
@@ -109,18 +131,6 @@ const defaultStorageTypes: StorageTypeConfig[] = [
   { id: 'rv_sites', name: 'RV Sites', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Car className="h-4 w-4" />, ...storageDefaults },
 ];
 
-const defaultDesignatedSpaces: StorageTypeConfig[] = [
-  { id: 'boat_sales', name: 'Boat Sales', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Store className="h-4 w-4" />, ...storageDefaults },
-  { id: 'service', name: 'Service', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Wrench className="h-4 w-4" />, ...storageDefaults },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Building2 className="h-4 w-4" />, ...storageDefaults },
-  { id: 'rental_boats', name: 'Rental Boats', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" />, ...storageDefaults },
-  { id: 'boat_club', name: 'Boat Club', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Users className="h-4 w-4" />, ...storageDefaults },
-  { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <Fuel className="h-4 w-4" />, ...storageDefaults },
-  { id: 'liveaboard_designated', name: 'Liveaboard', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
-  { id: 'transient', name: 'Transient', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
-  { id: 'restaurant', name: 'Restaurant', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Utensils className="h-4 w-4" />, ...storageDefaults },
-  { id: 'ship_store', name: 'Ship Store', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <ShoppingCart className="h-4 w-4" />, ...storageDefaults },
-];
 
 type ProfitCenterConfig = {
   id: string;
@@ -219,7 +229,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   // NEW: Winter months state
   const [winterMonths, setWinterMonths] = useState<number[]>([11, 12, 1, 2, 3]);
   const [storageTypes, setStorageTypes] = useState<StorageTypeConfig[]>(defaultStorageTypes);
-  const [designatedSpaces, setDesignatedSpaces] = useState<StorageTypeConfig[]>(defaultDesignatedSpaces);
   const [profitCenters, setProfitCenters] = useState<ProfitCenterConfig[]>(defaultProfitCenters);
   const [showAddProfitCenterDialog, setShowAddProfitCenterDialog] = useState(false);
   const [newProfitCenterName, setNewProfitCenterName] = useState('');
@@ -244,10 +253,12 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
   const getCurrentData = () => {
     const storageSettings: Record<string, any> = {};
     storageTypes.forEach(item => {
-      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage', capacity: item.capacity, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode };
-    });
-    designatedSpaces.forEach(item => {
-      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'designated', capacity: item.capacity, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode };
+      storageSettings[item.id] = { seasons: item.seasons, isEnabled: item.isEnabled, section: 'storage', capacity: item.capacity, leasable: item.leasable, occupiedCount: item.occupiedCount, occupancyPercent: item.occupancyPercent, occupancyInputMode: item.occupancyInputMode, hasDesignatedSpaces: item.hasDesignatedSpaces, designatedSpaceIds: item.designatedSpaceIds };
+      if (item.hasDesignatedSpaces && item.designatedSpaceIds.length > 0) {
+        item.designatedSpaceIds.forEach(dsId => {
+          storageSettings[dsId] = { seasons: item.seasons, isEnabled: true, section: 'designated', capacity: '', leasable: '', occupiedCount: '', occupancyPercent: '', occupancyInputMode: 'percentage', parentStorageId: item.id };
+        });
+      }
     });
 
     const profitCenterSettings: Record<string, { isEnabled: boolean }> = {};
@@ -276,6 +287,13 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       setSeasonMonths(config.seasonMonths || [4, 5, 6, 7, 8, 9, 10]);
       setWinterMonths(config.winterMonths || [11, 12, 1, 2, 3]);
       if (config.departments) {
+        const enabledDesignatedIds = new Set<string>();
+        Object.entries(config.departments).forEach(([key, dept]: [string, any]) => {
+          if (dept.section === 'designated' && dept.isEnabled) {
+            enabledDesignatedIds.add(key);
+          }
+        });
+
         setStorageTypes(prev => prev.map(item => {
           const dept = config.departments[item.id];
           if (!dept) return item;
@@ -283,31 +301,19 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
           if (!seasons && typeof dept.isYearRound === 'boolean') {
             seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
           }
+          const dsIds = dept.designatedSpaceIds ?? item.designatedSpaceIds;
+          const hasDS = dept.hasDesignatedSpaces ?? (dsIds && dsIds.length > 0) ?? item.hasDesignatedSpaces;
           return {
             ...item,
             seasons: seasons ?? item.seasons,
             isEnabled: dept.isEnabled ?? item.isEnabled,
             capacity: dept.capacity ?? item.capacity,
+            leasable: dept.leasable ?? item.leasable,
             occupiedCount: dept.occupiedCount ?? item.occupiedCount,
             occupancyPercent: dept.occupancyPercent ?? item.occupancyPercent,
             occupancyInputMode: dept.occupancyInputMode ?? item.occupancyInputMode,
-          };
-        }));
-        setDesignatedSpaces(prev => prev.map(item => {
-          const dept = config.departments[item.id];
-          if (!dept) return item;
-          let seasons = dept.seasons;
-          if (!seasons && typeof dept.isYearRound === 'boolean') {
-            seasons = dept.isYearRound ? ['annual'] : ['seasonal'];
-          }
-          return {
-            ...item,
-            seasons: seasons ?? item.seasons,
-            isEnabled: dept.isEnabled ?? item.isEnabled,
-            capacity: dept.capacity ?? item.capacity,
-            occupiedCount: dept.occupiedCount ?? item.occupiedCount,
-            occupancyPercent: dept.occupancyPercent ?? item.occupancyPercent,
-            occupancyInputMode: dept.occupancyInputMode ?? item.occupancyInputMode,
+            hasDesignatedSpaces: hasDS,
+            designatedSpaceIds: dsIds,
           };
         }));
       }
@@ -372,7 +378,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
     if (config) {
       triggerAutosave(getCurrentData());
     }
-  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, designatedSpaces, profitCenters, acreage, ownership]);
+  }, [holdPeriod, startDate, cashFlowGranularity, bottomLineMetric, seasonMonths, winterMonths, storageTypes, profitCenters, acreage, ownership]);
 
   const toggleSeasonMonth = (month: number) => {
     setSeasonMonths(prev => 
@@ -413,28 +419,27 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       return { ...item, seasons: newSeasons };
     });
 
-    if (section === 'storage') {
-      setStorageTypes(updateFn);
-    } else {
-      setDesignatedSpaces(updateFn);
-    }
+    setStorageTypes(updateFn);
   };
 
-  const toggleItemEnabled = (itemId: string, section: 'storage' | 'designated') => {
-    if (section === 'storage') {
-      setStorageTypes(prev => prev.map(item => 
-        item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
-      ));
-    } else {
-      setDesignatedSpaces(prev => prev.map(item => 
-        item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
-      ));
-    }
+  const toggleItemEnabled = (itemId: string, _section?: 'storage' | 'designated') => {
+    setStorageTypes(prev => prev.map(item => 
+      item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item
+    ));
   };
 
-  const updateStorageField = (itemId: string, section: 'storage' | 'designated', updates: Partial<StorageTypeConfig>) => {
-    const setter = section === 'storage' ? setStorageTypes : setDesignatedSpaces;
-    setter(prev => prev.map(item => item.id === itemId ? { ...item, ...updates } : item));
+  const updateStorageField = (itemId: string, _section: 'storage' | 'designated', updates: Partial<StorageTypeConfig>) => {
+    setStorageTypes(prev => prev.map(item => item.id === itemId ? { ...item, ...updates } : item));
+  };
+
+  const toggleDesignatedSpace = (storageId: string, dsId: string) => {
+    setStorageTypes(prev => prev.map(item => {
+      if (item.id !== storageId) return item;
+      const ids = item.designatedSpaceIds.includes(dsId)
+        ? item.designatedSpaceIds.filter(id => id !== dsId)
+        : [...item.designatedSpaceIds, dsId];
+      return { ...item, designatedSpaceIds: ids, hasDesignatedSpaces: ids.length > 0 || item.hasDesignatedSpaces };
+    }));
   };
 
   const toggleProfitCenterEnabled = (itemId: string) => {
@@ -468,26 +473,21 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
 
     const id = newProfitCenterName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
-    const allItems = [...storageTypes, ...designatedSpaces];
-    if (allItems.some(item => item.id === id || item.name.toLowerCase() === newProfitCenterName.toLowerCase())) {
+    if (storageTypes.some(item => item.id === id || item.name.toLowerCase() === newProfitCenterName.toLowerCase())) {
       return;
     }
 
     const newItem: StorageTypeConfig = {
       id,
       name: newProfitCenterName.trim(),
-      section: newProfitCenterSection,
+      section: 'storage',
       seasons: ['seasonal'],
       isEnabled: true,
       icon: <CircleDot className="h-4 w-4" />,
       ...storageDefaults,
     };
 
-    if (newProfitCenterSection === 'storage') {
-      setStorageTypes(prev => [...prev, newItem]);
-    } else {
-      setDesignatedSpaces(prev => [...prev, newItem]);
-    }
+    setStorageTypes(prev => [...prev, newItem]);
 
     setNewProfitCenterName('');
     setShowAddProfitCenterDialog(false);
@@ -1101,7 +1101,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Warehouse className="h-4 w-4" />
-                Storage Types
+                Storage & Spaces
               </CardTitle>
               <Button 
                 variant="outline" 
@@ -1118,21 +1118,19 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0 px-4 pb-4">
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {storageTypes.map((item) => (
-                <div key={item.id}>
+                <div key={item.id} className={`rounded border ${item.isEnabled ? 'border-border' : 'border-transparent opacity-50'}`}>
                   <div
-                    className={`flex items-center justify-between py-1.5 px-2 rounded ${
-                      item.isEnabled 
-                        ? 'bg-muted/30' 
-                        : 'opacity-50'
+                    className={`flex items-center justify-between py-1.5 px-2 rounded-t ${
+                      item.isEnabled ? 'bg-muted/30' : ''
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <input
                         type="checkbox"
                         checked={item.isEnabled}
-                        onChange={() => toggleItemEnabled(item.id, 'storage')}
+                        onChange={() => toggleItemEnabled(item.id)}
                         className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
                       />
                       <span className="text-xs">{item.icon}</span>
@@ -1147,136 +1145,157 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                     )}
                   </div>
                   {item.isEnabled && (
-                    <div className="flex items-center gap-2 px-2 py-1 ml-6">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground w-12">Capacity</span>
-                        <Input
-                          type="number"
-                          value={item.capacity}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const cap = e.target.value;
-                            const updates: Partial<StorageTypeConfig> = { capacity: cap };
-                            const capNum = parseInt(cap);
-                            if (capNum > 0) {
-                              if (item.occupancyInputMode === 'count' && item.occupiedCount) {
-                                updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / capNum) * 100).toString();
-                              } else if (item.occupancyInputMode === 'percentage' && item.occupancyPercent) {
-                                updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * capNum).toString();
-                              }
-                            }
-                            updateStorageField(item.id, 'storage', updates);
-                          }}
-                          className="h-6 w-16 text-[10px] px-1.5"
-                        />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground w-12">Occupied</span>
-                        <div className="flex rounded-md border border-border overflow-hidden mr-1">
-                          <button
-                            type="button"
-                            className={`px-1 py-0 text-[9px] font-medium transition-colors ${
-                              item.occupancyInputMode === 'count'
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-background text-muted-foreground hover:bg-muted"
-                            }`}
-                            onClick={() => {
-                              const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'count' };
-                              if (item.occupancyPercent && item.capacity) {
-                                updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * parseInt(item.capacity)).toString();
+                    <div className="px-2 pb-2 space-y-1.5">
+                      <div className="grid grid-cols-4 gap-1.5 ml-6">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] text-muted-foreground">Capacity</span>
+                          <Input
+                            type="number"
+                            value={item.capacity}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const cap = e.target.value;
+                              const updates: Partial<StorageTypeConfig> = { capacity: cap };
+                              const capNum = parseInt(cap);
+                              if (capNum > 0) {
+                                if (item.occupancyInputMode === 'count' && item.occupiedCount) {
+                                  updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / capNum) * 100).toString();
+                                } else if (item.occupancyInputMode === 'percentage' && item.occupancyPercent) {
+                                  updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * capNum).toString();
+                                }
                               }
                               updateStorageField(item.id, 'storage', updates);
                             }}
-                          >
-                            #
-                          </button>
-                          <button
-                            type="button"
-                            className={`px-1 py-0 text-[9px] font-medium transition-colors ${
-                              item.occupancyInputMode === 'percentage'
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-background text-muted-foreground hover:bg-muted"
-                            }`}
-                            onClick={() => {
-                              const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'percentage' };
-                              if (item.occupiedCount && item.capacity) {
-                                updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / parseInt(item.capacity)) * 100).toString();
-                              }
-                              updateStorageField(item.id, 'storage', updates);
-                            }}
-                          >
-                            %
-                          </button>
+                            className="h-6 w-full text-[10px] px-1.5"
+                          />
                         </div>
-                        {item.occupancyInputMode === 'count' ? (
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] text-muted-foreground">Leasable</span>
                           <Input
                             type="number"
-                            value={item.occupiedCount}
+                            value={item.leasable}
                             placeholder="0"
-                            onChange={(e) => {
-                              const occ = e.target.value;
-                              const updates: Partial<StorageTypeConfig> = { occupiedCount: occ };
-                              if (occ && item.capacity && parseInt(item.capacity) > 0) {
-                                updates.occupancyPercent = Math.round((parseInt(occ) / parseInt(item.capacity)) * 100).toString();
-                              }
-                              updateStorageField(item.id, 'storage', updates);
-                            }}
-                            className="h-6 w-14 text-[10px] px-1.5"
+                            onChange={(e) => updateStorageField(item.id, 'storage', { leasable: e.target.value })}
+                            className="h-6 w-full text-[10px] px-1.5"
                           />
-                        ) : (
-                          <Input
-                            type="number"
-                            value={item.occupancyPercent}
-                            placeholder="0"
-                            onChange={(e) => {
-                              const pct = e.target.value;
-                              const updates: Partial<StorageTypeConfig> = { occupancyPercent: pct };
-                              if (pct && item.capacity && parseInt(item.capacity) > 0) {
-                                updates.occupiedCount = Math.round((parseFloat(pct) / 100) * parseInt(item.capacity)).toString();
-                              }
-                              updateStorageField(item.id, 'storage', updates);
-                            }}
-                            className="h-6 w-14 text-[10px] px-1.5"
-                          />
+                        </div>
+                        <div className="space-y-0.5 col-span-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground">Occupancy</span>
+                            <div className="flex rounded-md border border-border overflow-hidden">
+                              <button
+                                type="button"
+                                className={`px-1 py-0 text-[9px] font-medium transition-colors ${
+                                  item.occupancyInputMode === 'percentage'
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-muted-foreground hover:bg-muted"
+                                }`}
+                                onClick={() => {
+                                  const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'percentage' };
+                                  if (item.occupiedCount && item.capacity) {
+                                    updates.occupancyPercent = Math.round((parseInt(item.occupiedCount) / parseInt(item.capacity)) * 100).toString();
+                                  }
+                                  updateStorageField(item.id, 'storage', updates);
+                                }}
+                              >
+                                %
+                              </button>
+                              <button
+                                type="button"
+                                className={`px-1 py-0 text-[9px] font-medium transition-colors ${
+                                  item.occupancyInputMode === 'count'
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-background text-muted-foreground hover:bg-muted"
+                                }`}
+                                onClick={() => {
+                                  const updates: Partial<StorageTypeConfig> = { occupancyInputMode: 'count' };
+                                  if (item.occupancyPercent && item.capacity) {
+                                    updates.occupiedCount = Math.round((parseFloat(item.occupancyPercent) / 100) * parseInt(item.capacity)).toString();
+                                  }
+                                  updateStorageField(item.id, 'storage', updates);
+                                }}
+                              >
+                                #
+                              </button>
+                            </div>
+                          </div>
+                          {item.occupancyInputMode === 'count' ? (
+                            <Input
+                              type="number"
+                              value={item.occupiedCount}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const occ = e.target.value;
+                                const updates: Partial<StorageTypeConfig> = { occupiedCount: occ };
+                                if (occ && item.capacity && parseInt(item.capacity) > 0) {
+                                  updates.occupancyPercent = Math.round((parseInt(occ) / parseInt(item.capacity)) * 100).toString();
+                                }
+                                updateStorageField(item.id, 'storage', updates);
+                              }}
+                              className="h-6 w-full text-[10px] px-1.5"
+                            />
+                          ) : (
+                            <Input
+                              type="number"
+                              value={item.occupancyPercent}
+                              placeholder="0"
+                              onChange={(e) => {
+                                const pct = e.target.value;
+                                const updates: Partial<StorageTypeConfig> = { occupancyPercent: pct };
+                                if (pct && item.capacity && parseInt(item.capacity) > 0) {
+                                  updates.occupiedCount = Math.round((parseFloat(pct) / 100) * parseInt(item.capacity)).toString();
+                                }
+                                updateStorageField(item.id, 'storage', updates);
+                              }}
+                              className="h-6 w-full text-[10px] px-1.5"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="ml-6">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => updateStorageField(item.id, 'storage', { hasDesignatedSpaces: !item.hasDesignatedSpaces })}
+                        >
+                          {item.hasDesignatedSpaces ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                          <MapPin className="h-3 w-3" />
+                          <span>Designated Spaces</span>
+                          {item.designatedSpaceIds.length > 0 && (
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5">
+                              {item.designatedSpaceIds.length}
+                            </Badge>
+                          )}
+                        </button>
+                        {item.hasDesignatedSpaces && (
+                          <div className="mt-1 ml-4 flex flex-wrap gap-1">
+                            {DESIGNATED_SPACE_OPTIONS.map(ds => {
+                              const isSelected = item.designatedSpaceIds.includes(ds.id);
+                              return (
+                                <button
+                                  key={ds.id}
+                                  type="button"
+                                  onClick={() => toggleDesignatedSpace(item.id, ds.id)}
+                                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
+                                    isSelected
+                                      ? 'bg-primary/10 border-primary/30 text-primary font-medium'
+                                      : 'border-border text-muted-foreground hover:bg-muted'
+                                  }`}
+                                >
+                                  {ds.icon}
+                                  {ds.name}
+                                  {isSelected && <Check className="h-2.5 w-2.5" />}
+                                </button>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <Separator className="my-2" />
-
-            <h4 className="text-[10px] font-semibold mb-1.5 text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <MapPin className="h-3 w-3" />
-              Designated Spaces
-            </h4>
-            <div className="space-y-1">
-              {designatedSpaces.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center justify-between py-1.5 px-2 rounded ${
-                    item.isEnabled 
-                      ? 'bg-muted/30' 
-                      : 'opacity-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={item.isEnabled}
-                      onChange={() => toggleItemEnabled(item.id, 'designated')}
-                      className="h-3.5 w-3.5 rounded border-muted-foreground/50 cursor-pointer"
-                    />
-                    <span className="text-xs">{item.icon}</span>
-                    <span className={`text-xs truncate ${!item.isEnabled && 'text-muted-foreground'}`}>
-                      {item.name}
-                    </span>
-                  </div>
-                  {item.isEnabled && (
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {renderSeasonalitySelector(item, 'designated')}
                     </div>
                   )}
                 </div>
@@ -1351,21 +1370,6 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
                 onChange={(e) => setNewProfitCenterName(e.target.value)}
                 placeholder="e.g., Charter Services, Boat Wash"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="profit-center-section">Category</Label>
-              <Select 
-                value={newProfitCenterSection} 
-                onValueChange={(v) => setNewProfitCenterSection(v as 'storage' | 'designated')}
-              >
-                <SelectTrigger id="profit-center-section">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="storage">Storage Type</SelectItem>
-                  <SelectItem value="designated">Designated Space</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>
