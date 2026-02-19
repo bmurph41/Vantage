@@ -190,6 +190,7 @@ const defaultWizardStorageTypes: WizardStorageType[] = [
   { id: 'boats_on_trailers', name: 'Boats on Trailers', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'ship' },
   { id: 'trailers', name: 'Trailers', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'car' },
   { id: 'houseboats', name: 'Houseboats', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'home' },
+  { id: 'liveaboards', name: 'Liveaboards', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'anchor' },
   { id: 'rv_sites', name: 'RV Sites', section: 'storage', isEnabled: false, count: '', occupancy: '', iconName: 'car' },
 ];
 

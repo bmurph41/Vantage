@@ -164,6 +164,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
     'Dry Rack - Indoor',
     'Dry Rack - Outdoor',
     'Houseboat',
+    'Liveaboard',
     'Land Storage',
     'Boat on Trailer',
     'Trailer Only',

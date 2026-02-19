@@ -201,6 +201,7 @@ export const STORAGE_TYPE_LABELS: Record<string, string> = {
   trailer: 'Trailers',
   carport: 'Carports',
   houseboat: 'Houseboats',
+  liveaboard: 'Liveaboards',
   rv_site: 'RV Sites',
   cabin: 'Cabins',
   sales: 'Sales',

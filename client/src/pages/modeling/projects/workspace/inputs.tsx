@@ -105,6 +105,7 @@ const defaultStorageTypes: StorageTypeConfig[] = [
   { id: 'trailers', name: 'Trailers', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Car className="h-4 w-4" />, ...storageDefaults },
   { id: 'carports', name: 'Carports', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Home className="h-4 w-4" />, ...storageDefaults },
   { id: 'houseboats', name: 'Houseboats', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Home className="h-4 w-4" />, ...storageDefaults },
+  { id: 'liveaboards', name: 'Liveaboards', section: 'storage', seasons: ['annual'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
   { id: 'rv_sites', name: 'RV Sites', section: 'storage', seasons: ['seasonal'], isEnabled: false, icon: <Car className="h-4 w-4" />, ...storageDefaults },
 ];
 
@@ -115,6 +116,7 @@ const defaultDesignatedSpaces: StorageTypeConfig[] = [
   { id: 'rental_boats', name: 'Rental Boats', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Ship className="h-4 w-4" />, ...storageDefaults },
   { id: 'boat_club', name: 'Boat Club', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Users className="h-4 w-4" />, ...storageDefaults },
   { id: 'fuel_dock', name: 'Fuel Dock', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <Fuel className="h-4 w-4" />, ...storageDefaults },
+  { id: 'liveaboard_designated', name: 'Liveaboard', section: 'designated', seasons: ['annual'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
   { id: 'transient', name: 'Transient', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Anchor className="h-4 w-4" />, ...storageDefaults },
   { id: 'restaurant', name: 'Restaurant', section: 'designated', seasons: ['seasonal'], isEnabled: false, icon: <Utensils className="h-4 w-4" />, ...storageDefaults },
   { id: 'ship_store', name: 'Ship Store', section: 'designated', seasons: ['seasonal'], isEnabled: true, icon: <ShoppingCart className="h-4 w-4" />, ...storageDefaults },

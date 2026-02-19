@@ -413,6 +413,9 @@ const storageTypesConfig = [
   { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, locations: [
     { id: 'houseboats_dock', name: 'Houseboat Dock' },
   ]},
+  { id: 'liveaboards', name: 'Liveaboards', icon: <Anchor className="h-4 w-4" />, locations: [
+    { id: 'liveaboards_dock', name: 'Liveaboard Dock' },
+  ]},
   { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, locations: [
     { id: 'rv_sites_main', name: 'RV Park' },
   ]},
@@ -431,6 +434,7 @@ const storageTypeCategories = [
   { id: 'trailers', name: 'Trailers', icon: <Car className="h-4 w-4" />, section: 'storage' },
   { id: 'carports', name: 'Carports', icon: <Home className="h-4 w-4" />, section: 'storage' },
   { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, section: 'storage' },
+  { id: 'liveaboards', name: 'Liveaboards', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
   { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, section: 'storage' },
 ];
 
@@ -441,6 +445,7 @@ const designatedSpaceCategories = [
   { id: 'rental_boats', name: 'Rental Boats', icon: <Ship className="h-4 w-4" />, section: 'designated' },
   { id: 'boat_club', name: 'Boat Club', icon: <Users className="h-4 w-4" />, section: 'designated' },
   { id: 'fuel_dock', name: 'Fuel Dock', icon: <Fuel className="h-4 w-4" />, section: 'designated' },
+  { id: 'liveaboard_designated', name: 'Liveaboard', icon: <Anchor className="h-4 w-4" />, section: 'designated' },
   { id: 'transient', name: 'Transient', icon: <Anchor className="h-4 w-4" />, section: 'designated' },
   { id: 'restaurant', name: 'Restaurant', icon: <Utensils className="h-4 w-4" />, section: 'designated' },
   { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-4 w-4" />, section: 'designated' },

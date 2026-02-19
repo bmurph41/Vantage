@@ -40,6 +40,7 @@ export const STORAGE_TYPES = [
   'Trailers',
   'Carports',
   'Houseboats',
+  'Liveaboards',
   'RV Sites',
   'Cabins',
   'Sales',

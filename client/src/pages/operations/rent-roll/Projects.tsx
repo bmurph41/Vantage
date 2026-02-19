@@ -67,6 +67,7 @@ const STORAGE_TYPES = [
   "Dry Rack - Indoor",
   "Dry Rack - Outdoor",
   "Houseboat",
+  "Liveaboard",
   "Land Storage",
   "Boat on Trailer",
   "Trailer Only",

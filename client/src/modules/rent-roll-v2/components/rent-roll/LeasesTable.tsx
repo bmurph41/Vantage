@@ -1880,6 +1880,7 @@ export default function LeasesTable({ onEditLease, locationId }: LeasesTableProp
                     <SelectItem value="Dry Rack - Indoor">Dry Rack - Indoor</SelectItem>
                     <SelectItem value="Dry Rack - Outdoor">Dry Rack - Outdoor</SelectItem>
                     <SelectItem value="Houseboat">Houseboat</SelectItem>
+                    <SelectItem value="Liveaboard">Liveaboard</SelectItem>
                     <SelectItem value="Land Storage">Land Storage</SelectItem>
                     <SelectItem value="Boat on Trailer">Boat on Trailer</SelectItem>
                     <SelectItem value="Trailer Only">Trailer Only</SelectItem>

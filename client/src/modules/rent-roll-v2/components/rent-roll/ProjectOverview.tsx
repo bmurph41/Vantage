@@ -23,7 +23,7 @@ import { ProjectAvgLeaseValueModal } from "./ProjectAvgLeaseValueModal";
 
 const STORAGE_TYPES = [
   "Wet Slip", "Lift Slip", "Mooring", "Jet Ski", "Dry Rack - Indoor",
-  "Dry Rack - Outdoor", "Houseboat", "Land Storage", "Boat on Trailer",
+  "Dry Rack - Outdoor", "Houseboat", "Liveaboard", "Land Storage", "Boat on Trailer",
   "Trailer Only", "Carport", "RV Site", "Other",
 ];
 
