@@ -523,21 +523,29 @@ export default function Portfolio() {
             <CardContent className="p-0">
               <MarinaMapEmbed
                 key={mapSource}
-                source={mapSource}
-                baseUrl="/api/portfolio/map-locations"
-                sourceLabel={mapSource === 'all' ? 'Portfolio Assets' : mapSource === 'owned' ? 'Owned Marinas' : 'Pipeline Deals'}
+                source={mapSource === 'owned' ? 'owned' : mapSource === 'pipeline' ? 'pipeline' : 'all'}
+                baseUrl={mapSource === 'owned' || mapSource === 'pipeline' ? '/api/portfolio/map-locations' : '/api/marina-map/locations'}
+                sourceLabel={mapSource === 'all' ? 'All Marina Assets' : mapSource === 'owned' ? 'Owned Marinas' : 'Pipeline Deals'}
                 height="calc(100vh - 420px)"
                 showSearch={true}
                 showStateFilter={true}
                 showSourceFilter={false}
                 showLayerToggles={mapSource === 'all'}
                 showListPanel={true}
-                emptyMessage={mapSource === 'owned' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No portfolio assets with location data found'}
+                emptyMessage={mapSource === 'owned' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No marina assets with location data found'}
                 onLocationClick={(loc) => {
                   if (loc.source === 'owned' && loc.id) {
                     navigate(`/portfolio/${loc.id}`);
                   } else if (loc.source === 'pipeline' && loc.id) {
                     navigate(`/crm/deals/${loc.id}`);
+                  } else if (loc.source === 'property' && loc.id) {
+                    navigate(`/crm/properties/${loc.id}`);
+                  } else if (loc.source === 'comp' && loc.id) {
+                    navigate(`/analysis/sales-comps/${loc.id}`);
+                  } else if (loc.source === 'rate_comp' && loc.id) {
+                    navigate(`/analysis/rate-comps/${loc.id}`);
+                  } else if (loc.source === 'project' && loc.id) {
+                    navigate(`/modeling/${loc.id}`);
                   }
                 }}
               />
