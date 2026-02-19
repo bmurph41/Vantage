@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   returnsLedger,
   returnsValuation,
@@ -336,6 +336,191 @@ router.post("/seed/:modelId", async (req: Request, res: Response, next: NextFunc
     await db.insert(loanBalanceTimeline).values(loanEntries);
 
     res.json({ message: "Seed data created successfully", seeded: true, entries: ledgerEntries.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/compare-models", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+
+    const schema = z.object({
+      projectIds: z.array(z.string()).min(2, 'Select at least 2 projects').max(10, 'Maximum 10 projects'),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Invalid request' });
+    }
+    const { projectIds } = parsed.data;
+
+    const projects = await db.select().from(modelingProjects).where(
+      and(eq(modelingProjects.orgId, orgId), inArray(modelingProjects.id, projectIds))
+    );
+
+    if (projects.length < 2) {
+      return res.status(404).json({ error: 'Not enough projects found' });
+    }
+
+    const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
+
+    const results = await Promise.all(projects.map(async (project) => {
+      try {
+        const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
+        const m = proForma.metrics;
+        const capitalAppreciation = m.exitValue - m.purchasePrice;
+        const capitalAppreciationPct = m.purchasePrice > 0 ? (capitalAppreciation / m.purchasePrice) * 100 : 0;
+        const totalEquity = m.purchasePrice - (m.debtSchedule?.totalDebtAtClose || 0);
+        const gainOnSale = m.netExitProceeds - totalEquity;
+        const cashOnCashY1 = totalEquity > 0 && proForma.noi[0] ? ((proForma.noi[0] - (m.totalDebtService ? m.totalDebtService / proForma.years.length : 0)) / totalEquity) * 100 : 0;
+
+        return {
+          projectId: project.id,
+          projectName: project.marinaName || project.name,
+          purchasePrice: m.purchasePrice,
+          exitValue: m.exitValue,
+          leveredIRR: m.irr,
+          unleveredIRR: m.unleveredIrr,
+          equityMultiple: m.equityMultiple,
+          unleveredEquityMultiple: m.unleveredEquityMultiple,
+          totalReturn: m.totalReturn,
+          capitalAppreciation,
+          capitalAppreciationPct,
+          gainOnSale,
+          goingInCapRate: m.goingInCapRate,
+          exitCapRate: m.exitCapRate,
+          year1Noi: m.year1Noi,
+          stabilizedNoi: m.stabilizedNoi,
+          totalEquity,
+          cashOnCashY1,
+          ltv: m.ltv || 0,
+          dscr: m.avgDscr || 0,
+          debtYield: m.debtYield || 0,
+          projectionYears: proForma.years.length,
+          noiByYear: proForma.noi,
+          years: proForma.years,
+          netExitProceeds: m.netExitProceeds,
+          sellingFees: m.sellingFees,
+          loanPayoff: m.loanPayoff,
+        };
+      } catch (e) {
+        return {
+          projectId: project.id,
+          projectName: project.marinaName || project.name,
+          error: 'Failed to generate pro forma',
+        };
+      }
+    }));
+
+    res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/portfolio-simulation", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+
+    const schema = z.object({
+      includeProjectIds: z.array(z.string()).min(1, 'Select at least one project'),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Invalid request' });
+    }
+    const { includeProjectIds } = parsed.data;
+
+    const projects = await db.select().from(modelingProjects).where(
+      and(eq(modelingProjects.orgId, orgId), inArray(modelingProjects.id, includeProjectIds))
+    );
+
+    if (projects.length === 0) {
+      return res.status(404).json({ error: 'No projects found for the provided IDs' });
+    }
+
+    const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
+
+    let portfolioTotalEquity = 0;
+    let portfolioTotalReturn = 0;
+    let portfolioTotalPurchasePrice = 0;
+    let portfolioTotalExitValue = 0;
+    let portfolioTotalNOIY1 = 0;
+    let portfolioTotalGainOnSale = 0;
+    const assetDetails: any[] = [];
+
+    for (const project of projects) {
+      try {
+        const proForma = await proFormaEngineService.generateProForma(project.id, orgId, 'base');
+        const m = proForma.metrics;
+        const totalEquity = m.purchasePrice - (m.debtSchedule?.totalDebtAtClose || 0);
+        const gainOnSale = m.netExitProceeds - totalEquity;
+
+        portfolioTotalEquity += totalEquity;
+        portfolioTotalReturn += m.totalReturn;
+        portfolioTotalPurchasePrice += m.purchasePrice;
+        portfolioTotalExitValue += m.exitValue;
+        portfolioTotalNOIY1 += proForma.noi[0] || 0;
+        portfolioTotalGainOnSale += gainOnSale;
+
+        assetDetails.push({
+          projectId: project.id,
+          projectName: project.marinaName || project.name,
+          purchasePrice: m.purchasePrice,
+          exitValue: m.exitValue,
+          totalEquity,
+          leveredIRR: m.irr,
+          unleveredIRR: m.unleveredIrr,
+          equityMultiple: m.equityMultiple,
+          totalReturn: m.totalReturn,
+          gainOnSale,
+          year1Noi: proForma.noi[0] || 0,
+          weight: 0,
+        });
+      } catch (e) {
+        assetDetails.push({
+          projectId: project.id,
+          projectName: project.marinaName || project.name,
+          error: 'Failed to generate pro forma',
+        });
+      }
+    }
+
+    for (const asset of assetDetails) {
+      if (!asset.error && portfolioTotalEquity > 0) {
+        asset.weight = (asset.totalEquity / portfolioTotalEquity) * 100;
+      }
+    }
+
+    const portfolioEquityMultiple = portfolioTotalEquity > 0 ? portfolioTotalReturn / portfolioTotalEquity : 0;
+    const portfolioCapitalAppreciation = portfolioTotalExitValue - portfolioTotalPurchasePrice;
+    const portfolioCapitalAppreciationPct = portfolioTotalPurchasePrice > 0
+      ? (portfolioCapitalAppreciation / portfolioTotalPurchasePrice) * 100 : 0;
+    const portfolioGoingInCapRate = portfolioTotalPurchasePrice > 0
+      ? (portfolioTotalNOIY1 / portfolioTotalPurchasePrice) * 100 : 0;
+
+    const weightedIRR = assetDetails.reduce((sum, a) => {
+      if (a.error || !a.weight) return sum;
+      return sum + (a.leveredIRR * a.weight / 100);
+    }, 0);
+
+    res.json({
+      portfolio: {
+        totalEquity: portfolioTotalEquity,
+        totalReturn: portfolioTotalReturn,
+        totalPurchasePrice: portfolioTotalPurchasePrice,
+        totalExitValue: portfolioTotalExitValue,
+        equityMultiple: portfolioEquityMultiple,
+        capitalAppreciation: portfolioCapitalAppreciation,
+        capitalAppreciationPct: portfolioCapitalAppreciationPct,
+        goingInCapRate: portfolioGoingInCapRate,
+        totalGainOnSale: portfolioTotalGainOnSale,
+        weightedIRR,
+        totalNOIY1: portfolioTotalNOIY1,
+        assetCount: assetDetails.filter(a => !a.error).length,
+      },
+      assets: assetDetails,
+    });
   } catch (err) {
     next(err);
   }
