@@ -75,7 +75,12 @@ export function AddbackEditor({
     } else {
       setReason('one_time');
       setNotes('');
-      setCustomAmount('');
+      if (scope === 'line_item' && currentValue != null && currentValue !== 0 && open) {
+        setCustomAmount('0');
+        setUseCurrentValue(false);
+      } else {
+        setCustomAmount('');
+      }
     }
   }, [existingAddback, open]);
 
@@ -231,7 +236,7 @@ export function AddbackEditor({
                   ? 'This value will replace the original amount for this month in the normalized view. Leave blank to zero it out.'
                   : scope === 'category'
                     ? 'This value will replace the original total for the entire category in the normalized view. Leave blank to zero it out.'
-                    : 'This value will replace the original annual total for this line item in the normalized view. Leave blank to zero it out.'}
+                    : 'This replaces the annual total for ALL months in this line item. The value is distributed evenly across months. Enter $0 to eliminate it entirely, or enter an adjusted total.'}
               </p>
             </div>
           </div>
@@ -241,7 +246,7 @@ export function AddbackEditor({
               Notes <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Textarea
-              placeholder="Why is this being added back?"
+              placeholder={scope === 'line_item' ? "Why is this being added back? This note applies to all months." : "Why is this being added back?"}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="text-xs h-16 resize-none"

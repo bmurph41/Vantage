@@ -75,7 +75,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
-import { useModelingAddbacks } from '@/hooks/useModelingAddbacks';
+import { useModelingAddbacks, ADDBACK_REASONS } from '@/hooks/useModelingAddbacks';
 import { useModelingPnlOverrides, VALID_DEPARTMENTS } from '@/hooks/useModelingPnlOverrides';
 import { AddbackEditor } from '@/components/modeling/AddbackEditor';
 import { AddbacksTrackerPanel } from '@/components/modeling/AddbacksTracker';
@@ -1726,21 +1726,42 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     const rawValue = item.monthlyData[month] || 0;
                                     const displayValue = getAdjustedMonthlyValue(item, month, idx);
                                     const isCellAddedBack = isMonthCellAddedBack(item.subcategory, parseInt(selectedYear), idx + 1);
+                                    const isLineAddedBack = isLineItemAddedBack(item.subcategory);
+                                    const lineAddback = isLineAddedBack ? getAddbackForLineItem(item.subcategory) : null;
+                                    const isAnyAddback = isCellAddedBack || isLineAddedBack;
                                     const yearNum = parseInt(selectedYear);
                                     const monthNum = idx + 1;
                                     return (
                                       <TableCell 
                                         key={month} 
-                                        className={`text-right relative group/cell whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isCellAddedBack ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
+                                        className={`text-right relative group/cell whitespace-nowrap px-2 py-1 ${!isSeasonalMonth(idx) ? 'bg-muted/30 text-muted-foreground' : ''} ${isAnyAddback ? 'bg-amber-50/70 dark:bg-amber-950/20' : ''}`}
                                       >
                                         <div className="flex items-center justify-end gap-0.5">
-                                          <span className={`text-xs ${isCellAddedBack && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
+                                          <span className={`text-xs ${isAnyAddback && displayValue !== rawValue ? 'text-amber-700 dark:text-amber-400 font-medium' : ''}`}>
                                             {formatCurrency(displayValue, { dash: true })}
                                           </span>
+                                          {isLineAddedBack && !isCellAddedBack && lineAddback && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span className="shrink-0 cursor-help">
+                                                  <ArrowUpCircle className="h-2.5 w-2.5 text-amber-500" />
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="max-w-[220px]">
+                                                <p className="text-xs font-medium">Addback (All Months)</p>
+                                                {lineAddback.reason && (
+                                                  <p className="text-[11px] text-muted-foreground">{ADDBACK_REASONS.find(r => r.value === lineAddback.reason)?.label || lineAddback.reason}</p>
+                                                )}
+                                                {lineAddback.notes && (
+                                                  <p className="text-[11px] italic mt-0.5">{lineAddback.notes}</p>
+                                                )}
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
                                           {isCellAddedBack && (
                                             <Flag className="h-2.5 w-2.5 text-amber-500 shrink-0" />
                                           )}
-                                          {!isCellAddedBack && (
+                                          {!isAnyAddback && (
                                             <AddbackEditor
                                               scope="month_cell"
                                               lineItemKey={item.subcategory}
