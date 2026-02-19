@@ -84,6 +84,7 @@ export interface MonthlyProjection {
   managementFee: number;
   reserves: number;
   debtService: number;
+  cashFlowBeforeDebtService: number;
   leveredCashFlow: number;
   isActual?: boolean;
   isForecast?: boolean;
@@ -103,6 +104,7 @@ export interface AnnualProjection {
   managementFee: number;
   reserves: number;
   debtService: number;
+  cashFlowBeforeDebtService: number;
   leveredCashFlow: number;
   monthCount: number;
 }
@@ -176,6 +178,8 @@ export interface ProFormaData {
   reservesMonthly: Record<string, number>;
   debtService: number[];
   debtServiceMonthly: Record<string, number>;
+  cashFlowBeforeDebtService: number[];
+  cashFlowBeforeDebtServiceMonthly: Record<string, number>;
   leveredCashFlow: number[];
   leveredCashFlowMonthly: Record<string, number>;
   
@@ -859,6 +863,7 @@ export class ProFormaEngineService {
     const managementFeeMonthly: Record<string, number> = {};
     const reservesMonthly: Record<string, number> = {};
     const debtServiceMonthly: Record<string, number> = {};
+    const cashFlowBeforeDebtServiceMonthly: Record<string, number> = {};
     const leveredCashFlowMonthly: Record<string, number> = {};
     const cashFlowMonthly: Record<string, number> = {};
     
@@ -873,7 +878,8 @@ export class ProFormaEngineService {
       const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(revTotal * capexPct);
       const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(revTotal * reservesPct);
       const debtSvc = 0; // Will be updated after debt integration
-      const levCf = noiVal - mgmtFee - capexVal - reserveVal - debtSvc;
+      const cfBeforeDebt = noiVal - mgmtFee - capexVal - reserveVal;
+      const levCf = cfBeforeDebt - debtSvc;
       
       revenueTotalsMonthly[period.key] = revTotal;
       cogsTotalsMonthly[period.key] = cogsTotal;
@@ -884,6 +890,7 @@ export class ProFormaEngineService {
       managementFeeMonthly[period.key] = mgmtFee;
       reservesMonthly[period.key] = reserveVal;
       debtServiceMonthly[period.key] = debtSvc;
+      cashFlowBeforeDebtServiceMonthly[period.key] = cfBeforeDebt;
       leveredCashFlowMonthly[period.key] = levCf;
       cashFlowMonthly[period.key] = levCf;
     }
@@ -914,6 +921,9 @@ export class ProFormaEngineService {
       year.monthIndices.reduce((sum, mi) => sum + (reservesMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
     const debtServiceArr = annualPeriods.map(() => 0); // Updated after debt integration
+    const cashFlowBeforeDebtService = annualPeriods.map(year =>
+      year.monthIndices.reduce((sum, mi) => sum + (cashFlowBeforeDebtServiceMonthly[monthlyPeriods[mi].key] || 0), 0)
+    );
     const leveredCashFlow = annualPeriods.map(year =>
       year.monthIndices.reduce((sum, mi) => sum + (leveredCashFlowMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
@@ -939,6 +949,7 @@ export class ProFormaEngineService {
       managementFee: managementFeeMonthly[period.key] || 0,
       reserves: reservesMonthly[period.key] || 0,
       debtService: debtServiceMonthly[period.key] || 0,
+      cashFlowBeforeDebtService: cashFlowBeforeDebtServiceMonthly[period.key] || 0,
       leveredCashFlow: leveredCashFlowMonthly[period.key] || 0,
       isActual: period.isActual ?? false,
       isForecast: period.isForecast ?? true,
@@ -958,6 +969,7 @@ export class ProFormaEngineService {
       managementFee: managementFeeArr[i] || 0,
       reserves: reservesArr[i] || 0,
       debtService: debtServiceArr[i] || 0,
+      cashFlowBeforeDebtService: cashFlowBeforeDebtService[i] || 0,
       leveredCashFlow: leveredCashFlow[i] || 0,
       monthCount: year.monthCount,
     }));
@@ -1053,11 +1065,13 @@ export class ProFormaEngineService {
           // Update projection detail arrays with debt service
           for (const mp of monthlyProjections) {
             mp.debtService = debtServiceMonthly[mp.periodKey] || 0;
+            mp.cashFlowBeforeDebtService = cashFlowBeforeDebtServiceMonthly[mp.periodKey] || 0;
             mp.leveredCashFlow = leveredCashFlowMonthly[mp.periodKey] || 0;
             mp.cashFlow = cashFlowMonthly[mp.periodKey] || 0;
           }
           for (let i = 0; i < annualProjections.length; i++) {
             annualProjections[i].debtService = debtServiceArr[i] || 0;
+            annualProjections[i].cashFlowBeforeDebtService = cashFlowBeforeDebtService[i] || 0;
             annualProjections[i].leveredCashFlow = leveredCashFlow[i] || 0;
             annualProjections[i].cashFlow = cashFlow[i] || 0;
           }
@@ -1164,6 +1178,8 @@ export class ProFormaEngineService {
       reservesMonthly,
       debtService: debtServiceArr,
       debtServiceMonthly,
+      cashFlowBeforeDebtService,
+      cashFlowBeforeDebtServiceMonthly,
       leveredCashFlow,
       leveredCashFlowMonthly,
       

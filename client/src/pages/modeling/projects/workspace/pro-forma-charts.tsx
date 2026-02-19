@@ -56,7 +56,7 @@ const METRIC_DEFINITIONS = [
   { id: 'capRate', label: 'Cap Rate', color: '#f59e0b', format: 'percent' as const },
   { id: 'cashOnCash', label: 'Cash-on-Cash', color: '#ec4899', format: 'percent' as const },
   { id: 'debtService', label: 'Debt Service', color: '#6366f1', format: 'currency' as const },
-  { id: 'leveredCF', label: 'Levered Cash Flow', color: '#14b8a6', format: 'currency' as const },
+  { id: 'leveredCF', label: 'Cash Flow After Debt Service', color: '#14b8a6', format: 'currency' as const },
 ];
 
 const COMPARE_CHART_TYPES = [

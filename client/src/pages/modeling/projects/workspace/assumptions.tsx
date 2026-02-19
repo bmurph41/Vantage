@@ -1633,7 +1633,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
             <SectionCard
               title="Below-the-Line Cash Flow"
-              description="Items deducted from NOI to calculate Levered Cash Flow"
+              description="Items deducted from NOI to calculate Cash Flow After Debt Service"
               accent="blue"
               icon={DollarSign}
             >
@@ -1771,7 +1771,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-2.5 rounded-lg">
-                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Levered Cash Flow = NOI − Mgmt Fee − CapEx − Reserves − Debt Service</p>
+                  <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300">Cash Flow After Debt Service = NOI − Mgmt Fee − CapEx − Reserves − Debt Service</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Debt Service auto-calculated from Capital Stack.</p>
                 </div>
               </div>
