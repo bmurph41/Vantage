@@ -1,12 +1,13 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, LayoutDashboard, FileText, Calculator, History } from "lucide-react";
+import { BookOpen, LayoutDashboard, FileText, Calculator, History, DollarSign } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const BookkeepingDashboard = lazy(() => import("./bookkeeping/Dashboard"));
 const BookkeepingStatements = lazy(() => import("./bookkeeping/Statements"));
 const BookkeepingChartOfAccounts = lazy(() => import("./bookkeeping/ChartOfAccounts"));
 const BookkeepingSyncHistory = lazy(() => import("./bookkeeping/SyncHistory"));
+const BudgetingTabbed = lazy(() => import("./BudgetingTabbed"));
 
 type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
 
@@ -58,6 +59,13 @@ export default function BookkeepingTabbed() {
       icon: History,
       component: BookkeepingSyncHistory,
       description: "Data synchronization logs",
+    },
+    {
+      id: "budgeting",
+      label: "Budgeting",
+      icon: DollarSign,
+      component: BudgetingTabbed,
+      description: "Create budgets, track actuals, and analyze variance",
     },
   ];
 

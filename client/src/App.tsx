@@ -1121,11 +1121,10 @@ function Router() {
         )}
       </Route>
       <Route path="/operations/budgeting">
-        {() => (
-          <UnifiedLayout>
-            <BudgetingTabbed />
-          </UnifiedLayout>
-        )}
+        {() => {
+          window.location.href = '/operations/bookkeeping?tab=budgeting';
+          return null;
+        }}
       </Route>
       {/* Marketing - Standalone Route */}
       <Route path="/marketing">
