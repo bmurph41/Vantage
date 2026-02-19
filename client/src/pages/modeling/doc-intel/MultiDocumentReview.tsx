@@ -51,6 +51,7 @@ interface MultiDocumentReviewProps {
   onClose: () => void;
   onComplete: () => void;
   onTabChange?: (tab: string) => void;
+  initialDocumentId?: string | null;
 }
 
 interface DocumentItemsState {
@@ -110,11 +111,14 @@ export function MultiDocumentReview({
   categories, 
   onClose, 
   onComplete,
-  onTabChange 
+  onTabChange,
+  initialDocumentId,
 }: MultiDocumentReviewProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
-  const [activeDocumentId, setActiveDocumentId] = useState(uploads[0]?.id || "");
+  const [activeDocumentId, setActiveDocumentId] = useState(
+    (initialDocumentId && uploads.some(u => u.id === initialDocumentId) ? initialDocumentId : uploads[0]?.id) || ""
+  );
   const [documentItems, setDocumentItems] = useState<DocumentItemsState>({});
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected' | 'excluded'>('pending');
   const [searchText, setSearchText] = useState("");

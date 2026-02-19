@@ -34,8 +34,8 @@ export default function DocumentIntelligence() {
   const [activeTab, setActiveTab] = useState("holding");
   
   // Multi-document review state
-  const [reviewingDocumentIds, setReviewingDocumentIds] = useState<string[]>([]);
   const [isMultiReviewMode, setIsMultiReviewMode] = useState(false);
+  const [initialDocumentId, setInitialDocumentId] = useState<string | null>(null);
 
   // Read upload parameter from URL on mount
   useEffect(() => {
@@ -55,11 +55,10 @@ export default function DocumentIntelligence() {
       }
     }
     
-    // Handle comma-separated list of upload IDs
     if (uploadParam) {
       const ids = uploadParam.split(',').filter(Boolean);
       if (ids.length > 0) {
-        setReviewingDocumentIds(ids);
+        setInitialDocumentId(ids[0]);
         setIsMultiReviewMode(true);
       }
     }
@@ -132,11 +131,11 @@ export default function DocumentIntelligence() {
 
   /**
    * Called from HoldingStation when user clicks "Review All"
-   * Enters multi-document review mode with tabs
+   * Enters multi-document review mode showing ALL project documents as tabs
    */
   const handleReviewDocuments = (documentIds: string[]) => {
     if (documentIds.length === 0) return;
-    setReviewingDocumentIds(documentIds);
+    setInitialDocumentId(documentIds[0]);
     setIsMultiReviewMode(true);
   };
 
@@ -144,7 +143,7 @@ export default function DocumentIntelligence() {
    * Exit multi-document review mode
    */
   const handleCloseMultiReview = () => {
-    setReviewingDocumentIds([]);
+    setInitialDocumentId(null);
     setIsMultiReviewMode(false);
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
   };
@@ -154,7 +153,7 @@ export default function DocumentIntelligence() {
    * Navigates to the Historical P&L page to view imported data
    */
   const handleReviewComplete = () => {
-    setReviewingDocumentIds([]);
+    setInitialDocumentId(null);
     setIsMultiReviewMode(false);
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "documents"] });
     queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId, "actuals"] });
@@ -181,17 +180,16 @@ export default function DocumentIntelligence() {
     );
   };
 
-  // MULTI-DOCUMENT REVIEW MODE
-  if (isMultiReviewMode && reviewingDocumentIds.length > 0) {
-    const reviewUploads = uploads.filter(u => reviewingDocumentIds.includes(u.id));
-    
+  // MULTI-DOCUMENT REVIEW MODE - show ALL project documents as tabs
+  if (isMultiReviewMode && uploads.length > 0) {
     return (
       <MultiDocumentReview
         projectId={projectId!}
-        uploads={reviewUploads}
+        uploads={uploads}
         categories={categories}
         onClose={handleCloseMultiReview}
         onComplete={handleReviewComplete}
+        initialDocumentId={initialDocumentId}
       />
     );
   }
