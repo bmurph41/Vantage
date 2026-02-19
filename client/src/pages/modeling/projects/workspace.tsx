@@ -117,7 +117,6 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { value: 'inputs', label: 'Inputs & Assumptions', icon: Settings2 },
       { value: 'uploads', label: 'Uploads', icon: Upload },
-      { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'property-tax', label: 'Property Tax', icon: Building2 },
       { value: 'storage-leases', label: 'Storage Leases', icon: Anchor },
       { value: 'commercial-leases', label: 'Commercial Leases', icon: Building2 },
@@ -129,6 +128,7 @@ const TAB_GROUPS: TabGroup[] = [
     label: 'Financial Model',
     icon: Calculator,
     tabs: [
+      { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'proforma', label: 'Pro Forma', icon: BarChart3 },
       { value: 'pricing', label: 'Pricing', icon: DollarSign },
       { value: 'capital', label: 'Capital Stack', icon: Building2 },
