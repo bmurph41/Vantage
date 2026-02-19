@@ -16716,6 +16716,7 @@ export const modelingActuals = pgTable('modeling_actuals', {
   // Category classification (matches P&L structure)
   category: text('category').notNull(), // 'Revenue', 'COGS', 'Expenses'
   subcategory: text('subcategory').notNull(), // e.g., 'Wet Slips', 'Fuel Sales', 'Payroll'
+  department: text('department'), // e.g., 'Storage', 'Fuel', 'Payroll' — persisted from classification
   lineItemDescription: text('line_item_description'),
 
   // Amounts
