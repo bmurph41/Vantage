@@ -49,6 +49,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 - **Admin Panel**: Enterprise admin dashboard for customer and organization management, usage metrics, audit trails, and user onboarding.
 - **Data Governance & Benchmarking Framework**: Manages legal documents, allows benchmark opt-in/out, stores de-identified benchmark aggregates with cohort suppression, and uses guardrails for data privacy.
 - **Demographics & Market Intelligence**: Integrates real-time Census Bureau ACS data and FRED API economic indicators. Provides components for market trend analysis, business environment, market potential, and site suitability.
+- **Universal Capacity Utilization Module** (Phase 0): `server/modules/utilization/` — Multi-asset-class utilization engine supporting marina, hotel, RV park, storage unit, industrial, and parking. Includes config map with denomType/capacityWeightField per unit type, size band definitions, pure calculation functions (unit/weighted/economic utilization), date overlap helpers, and mock endpoints at `/api/utilization/ping` and `/api/utilization/mock-summary`. Phase 0 is additive scaffold only — no schema changes, no UI, no auth requirement.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Neon serverless hosting, Drizzle ORM, schema-first, Drizzle Kit for migrations.
