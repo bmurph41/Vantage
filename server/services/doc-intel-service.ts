@@ -1935,8 +1935,7 @@ Respond with JSON only:
       const hasTierSuggestion = item.categoryTierSuggested;
       const hasDeptSuggestion = item.revenueCogsDeptSuggested || item.expenseDeptSuggested;
       
-      if (item.status === 'pending' && hasConfidence && hasTierSuggestion) {
-        // Auto-confirm by copying suggested values to confirmed
+      if (item.status === 'pending' && hasConfidence && hasTierSuggestion && hasDeptSuggestion) {
         await db
           .update(docIntelExtractedItems)
           .set({
@@ -2861,6 +2860,18 @@ Respond with JSON only:
     if (updates.reviewNotes !== undefined) updateData.reviewNotes = updates.reviewNotes;
     
     if (updates.status === 'confirmed') {
+      const effectiveTier = updates.categoryTierConfirmed || item.categoryTierConfirmed || item.categoryTierSuggested;
+      const effectiveDept = effectiveTier === 'expense'
+        ? (updates.expenseDeptConfirmed || item.expenseDeptConfirmed || item.expenseDeptSuggested)
+        : (updates.revenueCogsDeptConfirmed || item.revenueCogsDeptConfirmed || item.revenueCogsDeptSuggested);
+      
+      if (!effectiveTier) {
+        throw new Error('Cannot confirm: Category (Revenue/COGS/Expense) must be set before confirming.');
+      }
+      if (!effectiveDept) {
+        throw new Error('Cannot confirm: Department must be set before confirming.');
+      }
+      
       updateData.confirmedBy = userId;
       updateData.confirmedAt = new Date();
     }

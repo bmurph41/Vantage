@@ -364,8 +364,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
       }
       setBulkOpLabel("");
     },
-    onError: () => {
+    onError: (error: any) => {
       setBulkOpLabel("");
+      toast({
+        title: "Cannot Confirm",
+        description: error.message || "Items must have both Category and Department set before confirming.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -1336,7 +1341,20 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               ? "opacity-60 bg-red-50/30 dark:bg-red-950/20"
                               : lineItem.status === "confirmed"
                               ? "bg-green-50/30 dark:bg-green-950/20"
-                              : ""
+                              : (() => {
+                                  const first = lineItem.monthlyData[0];
+                                  if (!first) return "";
+                                  const oTier = optimisticCategories[rowKey];
+                                  const sTier = (first.categoryTierConfirmed || first.categoryTierSuggested) as CategoryTier | null;
+                                  const tier = oTier || sTier;
+                                  const oDept = optimisticDepartments[rowKey];
+                                  const sDept = tier === "expense"
+                                    ? (first.expenseDeptConfirmed || first.expenseDeptSuggested)
+                                    : (first.revenueCogsDeptConfirmed || first.revenueCogsDeptSuggested);
+                                  const dept = oDept || sDept;
+                                  if (!tier || !dept) return "bg-amber-50/40 dark:bg-amber-950/20 border-l-2 border-l-amber-400";
+                                  return "";
+                                })()
                           }
                         >
                           <TableCell className="p-2 sticky left-0 z-10 bg-background">
@@ -1409,9 +1427,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                     });
                                   }}
                                 >
-                                  <SelectTrigger className="h-7 w-[90px] text-xs">
+                                  <SelectTrigger className={`h-7 w-[90px] text-xs ${!currentTier && lineItem.status === 'pending' ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/30' : ''}`}>
                                     <SelectValue placeholder="Select...">
-                                      {currentTier ? CATEGORY_TIER_LABELS[currentTier] : "Select..."}
+                                      {currentTier ? CATEGORY_TIER_LABELS[currentTier] : (
+                                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                                          <AlertCircle className="h-3 w-3" />
+                                          Required
+                                        </span>
+                                      )}
                                     </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1433,9 +1456,13 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                               const optimisticTier = optimisticCategories[rowKey];
                               const serverTier = (firstItem.categoryTierConfirmed || firstItem.categoryTierSuggested) as CategoryTier | null;
                               const currentTier = optimisticTier || serverTier;
-                              if (!currentTier) return <span className="text-xs text-muted-foreground">-</span>;
+                              if (!currentTier) return (
+                                <span className="text-xs text-amber-500 flex items-center gap-0.5">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Set category first
+                                </span>
+                              );
                               const deptOptions = getFilteredDeptOptionsForTier(currentTier, enabledRevCogsDepts);
-                              // Use optimistic state for department
                               const optimisticDept = optimisticDepartments[rowKey];
                               const serverDept = currentTier === "expense"
                                 ? (firstItem.expenseDeptConfirmed || firstItem.expenseDeptSuggested)
@@ -1445,7 +1472,6 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                 <Select
                                   value={currentDept || ""}
                                   onValueChange={(v) => {
-                                    // Optimistic update
                                     setOptimisticDepartments(prev => ({ ...prev, [rowKey]: v }));
                                     const itemIds = lineItem.monthlyData.map((m) => m.id);
                                     const updates = currentTier === "expense"
@@ -1459,9 +1485,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                                     });
                                   }}
                                 >
-                                  <SelectTrigger className="h-7 w-[100px] text-xs">
+                                  <SelectTrigger className={`h-7 w-[100px] text-xs ${!currentDept && lineItem.status === 'pending' ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/30' : ''}`}>
                                     <SelectValue placeholder="Select...">
-                                      {currentDept ? getDeptLabel(currentTier, currentDept) : "Select..."}
+                                      {currentDept ? getDeptLabel(currentTier, currentDept) : (
+                                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                                          <AlertCircle className="h-3 w-3" />
+                                          Required
+                                        </span>
+                                      )}
                                     </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>

@@ -25511,14 +25511,17 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { categoryId, amount, department } = req.body;
       
       if (!categoryId) {
-        return res.status(400).json({ error: 'categoryId is required' });
+        return res.status(400).json({ error: 'Cannot confirm: Category is required.' });
+      }
+      if (!department) {
+        return res.status(400).json({ error: 'Cannot confirm: Department is required.' });
       }
       
       const item = await docIntelService.confirmItem(orgId, itemId, categoryId, userId, amount, department);
       res.json(item);
     } catch (error: any) {
       console.error('Failed to confirm item:', error);
-      res.status(500).json({ error: 'Failed to confirm item' });
+      res.status(500).json({ error: error.message || 'Failed to confirm item' });
     }
   });
 
@@ -25602,6 +25605,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       res.json({ ...item, _propagation: propagation });
     } catch (error: any) {
+      if (error.message?.startsWith('Cannot confirm:')) {
+        return res.status(400).json({ error: error.message });
+      }
       console.error('Failed to update item:', error);
       res.status(500).json({ error: 'Failed to update item' });
     }
@@ -25619,7 +25625,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'itemIds array required' });
       }
       
-      const results = await docIntelService.bulkUpdateExtractedItems(orgId, itemIds, updates, userId);
+      let results: any[];
+      try {
+        results = await docIntelService.bulkUpdateExtractedItems(orgId, itemIds, updates, userId);
+      } catch (bulkError: any) {
+        if (bulkError.message?.startsWith('Cannot confirm:')) {
+          return res.status(400).json({ error: bulkError.message });
+        }
+        throw bulkError;
+      }
 
       const allAffectedUploadIds = new Set<string>();
       let totalPropagated = 0;
