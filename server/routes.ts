@@ -14099,20 +14099,66 @@ Current context: Project ${req.params.projectId}`;
         await Promise.all(geocodePromises);
       }
 
-      const withCoordinates = results.filter(r => r.lat != null && r.lng != null).length;
+      const deduped: any[] = [];
+      if (source === 'all') {
+        const grouped = new Map<string, any[]>();
+        for (const r of results) {
+          const normName = (r.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+          const latBucket = r.lat != null ? Math.round(r.lat * 10) : 'none';
+          const lngBucket = r.lng != null ? Math.round(r.lng * 10) : 'none';
+          const key = `${normName}|${(r.city || '').toLowerCase()}|${(r.state || '').toUpperCase()}|${latBucket}|${lngBucket}`;
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key)!.push(r);
+        }
+        for (const items of grouped.values()) {
+          if (items.length === 1) {
+            deduped.push(items[0]);
+          } else {
+            const primary = items.reduce((best: any, cur: any) => {
+              if (cur.lat != null && best.lat == null) return cur;
+              if (cur.price != null && best.price == null) return cur;
+              return best;
+            }, items[0]);
+            const sources = items.map((i: any) => ({
+              id: i.id,
+              source: i.source,
+              name: i.name,
+              price: i.price,
+              status: i.status,
+              metrics: i.metrics,
+            }));
+            deduped.push({
+              ...primary,
+              groupedSources: sources,
+              groupCount: items.length,
+            });
+          }
+        }
+      } else {
+        deduped.push(...results);
+      }
+
+      const withCoordinates = deduped.filter(r => r.lat != null && r.lng != null).length;
       const bySource: Record<string, number> = { property: 0, project: 0, comp: 0, rate_comp: 0, listing: 0, pipeline: 0 };
       const byState: Record<string, number> = {};
-      for (const r of results) {
-        bySource[r.source] = (bySource[r.source] || 0) + 1;
+      for (const r of deduped) {
+        if (r.groupedSources) {
+          for (const gs of r.groupedSources) {
+            bySource[gs.source] = (bySource[gs.source] || 0) + 1;
+          }
+        } else {
+          bySource[r.source] = (bySource[r.source] || 0) + 1;
+        }
         if (r.state) {
           byState[r.state] = (byState[r.state] || 0) + 1;
         }
       }
 
       res.json({
-        locations: results,
+        locations: deduped,
         stats: {
-          total: results.length,
+          total: deduped.length,
+          totalRaw: results.length,
           withCoordinates,
           needsGeocoding: needsGeocoding.length,
           geocodedThisRequest: Math.min(needsGeocoding.length, 25),

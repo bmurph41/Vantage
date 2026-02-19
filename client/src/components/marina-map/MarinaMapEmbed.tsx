@@ -16,6 +16,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+export interface GroupedSource {
+  id: string;
+  source: string;
+  price: number | null;
+  status: string | null;
+  metrics: Record<string, any>;
+}
+
 export interface MarinaLocation {
   id: string;
   source: 'property' | 'project' | 'comp' | 'rate_comp' | 'listing' | 'pipeline' | 'owned';
@@ -30,6 +38,8 @@ export interface MarinaLocation {
   slips: number | null;
   status: string | null;
   metrics: Record<string, any>;
+  groupedSources?: GroupedSource[];
+  groupCount?: number;
 }
 
 interface MapStats {
@@ -432,6 +442,22 @@ export default function MarinaMapEmbed({
                     {selectedLocation.address && (
                       <p className="text-xs text-gray-600 mb-2">{selectedLocation.address}</p>
                     )}
+                    {selectedLocation.groupedSources && selectedLocation.groupedSources.length > 1 && (
+                      <div className="border-t pt-2 mt-1 mb-2">
+                        <p className="text-xs font-medium text-gray-700 mb-1">Appears in {selectedLocation.groupCount} modules:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedLocation.groupedSources.map((gs) => (
+                            <span
+                              key={`${gs.source}-${gs.id}`}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SOURCE_COLORS[gs.source] || '#666' }} />
+                              {SOURCE_LABELS[gs.source] || gs.source}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs border-t pt-2 mt-1">
                       {selectedLocation.price && (
                         <div>
@@ -451,7 +477,7 @@ export default function MarinaMapEmbed({
                           <span className="font-medium capitalize">{selectedLocation.status}</span>
                         </div>
                       )}
-                      {!isSingleSource && (
+                      {!isSingleSource && !selectedLocation.groupedSources && (
                         <div>
                           <span className="text-gray-500">Source: </span>
                           <span className="font-medium">{SOURCE_LABELS[selectedLocation.source]}</span>
@@ -472,13 +498,28 @@ export default function MarinaMapEmbed({
                     </div>
                     {onLocationClick && (
                       <div className="mt-2 pt-2 border-t">
-                        <button
-                          onClick={() => handleLocationClick(selectedLocation)}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          View Details
-                        </button>
+                        {selectedLocation.groupedSources && selectedLocation.groupedSources.length > 1 ? (
+                          <div className="space-y-1">
+                            {selectedLocation.groupedSources.map((gs) => (
+                              <button
+                                key={`${gs.source}-${gs.id}`}
+                                onClick={() => handleLocationClick({ ...selectedLocation, id: gs.id, source: gs.source as any })}
+                                className="w-full text-left text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                View {SOURCE_LABELS[gs.source] || gs.source}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleLocationClick(selectedLocation)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View Details
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -558,7 +599,7 @@ export default function MarinaMapEmbed({
                               <p className="text-xs text-muted-foreground truncate">
                                 {[loc.city, loc.state].filter(Boolean).join(', ') || loc.address || 'No location'}
                               </p>
-                              <div className="flex items-center gap-3 mt-1 text-xs">
+                              <div className="flex items-center gap-3 mt-1 text-xs flex-wrap">
                                 {loc.price && (
                                   <span className="font-medium text-green-600">{formatCurrency(loc.price)}</span>
                                 )}
@@ -567,11 +608,23 @@ export default function MarinaMapEmbed({
                                     <Ship className="inline h-3 w-3 mr-0.5" />{loc.slips} slips
                                   </span>
                                 )}
-                                {!isSingleSource && (
+                                {!isSingleSource && loc.groupedSources && loc.groupedSources.length > 1 ? (
+                                  loc.groupedSources.map((gs) => (
+                                    <span
+                                      key={`${gs.source}-${gs.id}`}
+                                      className="inline-flex items-center gap-0.5"
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SOURCE_COLORS[gs.source] || '#666' }} />
+                                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
+                                        {SOURCE_LABELS[gs.source]?.split(' ')[0]}
+                                      </Badge>
+                                    </span>
+                                  ))
+                                ) : !isSingleSource ? (
                                   <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
                                     {SOURCE_LABELS[loc.source]?.split(' ')[0]}
                                   </Badge>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </div>
