@@ -5,10 +5,12 @@ import {
   utilOccupancyEvents,
   utilOfflineBlocks,
   utilSnapshots,
+  utilPresenceEvents,
 } from '../../../shared/schema';
 import type {
   InventoryUnit,
   OccupancyEvent,
+  PresenceEvent,
   UnitUtilization,
   WeightedUtilization,
   EconomicUtilization,
@@ -141,6 +143,56 @@ function applyOfflineBlocks(
   }));
 }
 
+function toPresenceEvent(row: any): PresenceEvent {
+  return {
+    id: row.id,
+    unitId: row.unitId,
+    unitType: row.unitType,
+    timestampStart: row.timestampStart instanceof Date ? row.timestampStart.toISOString() : row.timestampStart,
+    timestampEnd: row.timestampEnd instanceof Date ? row.timestampEnd.toISOString() : row.timestampEnd ?? null,
+    source: row.source,
+    confidence: parseFloat(row.confidence ?? '1'),
+    metadata: row.metadata ?? {},
+  };
+}
+
+export async function fetchPresenceEvents(
+  propertyId: string,
+  periodStart: string,
+  periodEnd: string,
+  unitTypes?: string[]
+): Promise<PresenceEvent[]> {
+  const periodStartTs = new Date(periodStart);
+  const periodEndTs = new Date(periodEnd + 'T23:59:59');
+
+  const conditions = [
+    eq(utilPresenceEvents.propertyId, propertyId),
+    lte(utilPresenceEvents.timestampStart, periodEndTs),
+    or(
+      isNull(utilPresenceEvents.timestampEnd),
+      gte(utilPresenceEvents.timestampEnd, periodStartTs)
+    ),
+  ];
+  if (unitTypes?.length) {
+    conditions.push(inArray(utilPresenceEvents.unitType, unitTypes));
+  }
+  const rows = await db.select().from(utilPresenceEvents).where(and(...conditions));
+  return rows.map(toPresenceEvent);
+}
+
+function presenceToOccupancyEvents(presenceEvents: PresenceEvent[]): OccupancyEvent[] {
+  return presenceEvents.map(pe => ({
+    unitId: pe.unitId,
+    leaseId: null,
+    tenantId: null,
+    startDate: pe.timestampStart.slice(0, 10),
+    endDate: pe.timestampEnd ? pe.timestampEnd.slice(0, 10) : null,
+    isContracted: false,
+    monthlyRevenue: 0,
+    annualRevenue: 0,
+  }));
+}
+
 export async function computeRealUtilization(
   propertyId: string,
   periodStart: string,
@@ -155,13 +207,27 @@ export async function computeRealUtilization(
   const totalDays = daysBetween(periodStart, periodEnd);
   const period: UtilizationPeriod = { startDate: periodStart, endDate: periodEnd, totalDays };
 
-  const [rawUnits, occupancy, offlineBlocks] = await Promise.all([
+  const [rawUnits, offlineBlocks] = await Promise.all([
     fetchInventoryUnits(propertyId, unitTypes),
-    fetchOccupancyEvents(propertyId, periodStart, periodEnd, unitTypes),
     fetchOfflineBlocks(propertyId, periodStart, periodEnd),
   ]);
 
   const units = applyOfflineBlocks(rawUnits, offlineBlocks, periodStart, periodEnd);
+
+  let occupancy: OccupancyEvent[];
+  let insufficientData = false;
+  let insufficientDataReason: string | undefined;
+
+  if (mode === 'physical') {
+    const presenceEvents = await fetchPresenceEvents(propertyId, periodStart, periodEnd, unitTypes);
+    if (presenceEvents.length === 0 && units.length > 0) {
+      insufficientData = true;
+      insufficientDataReason = 'No physical presence data available for this period. Install sensors, cameras, or AIS receivers to collect presence data.';
+    }
+    occupancy = presenceToOccupancyEvents(presenceEvents);
+  } else {
+    occupancy = await fetchOccupancyEvents(propertyId, periodStart, periodEnd, unitTypes);
+  }
 
   const primaryDenom = Object.values(config.unitTypes)[0]?.denomType ?? 'count';
 
@@ -202,6 +268,7 @@ export async function computeRealUtilization(
     assetClass,
     period,
     mode,
+    ...(insufficientData ? { insufficientData, insufficientDataReason } : {}),
     overall: {
       unitUtil: overallUnitUtil,
       weightedUtil: overallWeightedUtil,
@@ -210,6 +277,77 @@ export async function computeRealUtilization(
     byUnitType,
     churn,
     generatedAt: new Date().toISOString(),
+  };
+}
+
+export async function fetchDrilldownEvents(
+  propertyId: string,
+  periodStart: string,
+  periodEnd: string,
+  mode: UtilizationMode,
+  unitType?: string,
+  bandKey?: string,
+  unitTypes?: string[]
+): Promise<{
+  events: any[];
+  offlineBlocks: any[];
+  insufficientData?: boolean;
+}> {
+  const [rawUnits, offlineBlocks] = await Promise.all([
+    fetchInventoryUnits(propertyId, unitTypes),
+    fetchOfflineBlocks(propertyId, periodStart, periodEnd),
+  ]);
+
+  let filteredUnits = rawUnits;
+  if (unitType) {
+    filteredUnits = filteredUnits.filter(u => u.unitType === unitType);
+  }
+  if (bandKey) {
+    filteredUnits = filteredUnits.filter(u => u.bandKey === bandKey);
+  }
+  const filteredUnitIds = new Set(filteredUnits.map(u => u.id));
+
+  const relevantOffline = offlineBlocks.filter((ob: any) => {
+    if (ob.scopeType === 'unit') return filteredUnitIds.has(ob.unitId);
+    if (ob.scopeType === 'unit_type') return ob.scopeKey === unitType;
+    if (ob.scopeType === 'band') return ob.scopeKey === bandKey;
+    if (ob.scopeType === 'property') return true;
+    return false;
+  });
+
+  if (mode === 'physical') {
+    const presenceEvents = await fetchPresenceEvents(propertyId, periodStart, periodEnd, unitTypes);
+    const filtered = presenceEvents.filter(pe => filteredUnitIds.has(pe.unitId));
+    return {
+      events: filtered.map(pe => ({
+        id: pe.id,
+        unitId: pe.unitId,
+        unitType: pe.unitType,
+        startDate: pe.timestampStart,
+        endDate: pe.timestampEnd,
+        source: pe.source,
+        confidence: pe.confidence,
+        type: 'presence',
+      })),
+      offlineBlocks: relevantOffline,
+      ...(filtered.length === 0 && filteredUnits.length > 0 ? { insufficientData: true } : {}),
+    };
+  }
+
+  const occupancy = await fetchOccupancyEvents(propertyId, periodStart, periodEnd, unitTypes);
+  const filtered = occupancy.filter(o => filteredUnitIds.has(o.unitId));
+  return {
+    events: filtered.map(o => ({
+      id: o.unitId + '_' + o.startDate,
+      unitId: o.unitId,
+      startDate: o.startDate,
+      endDate: o.endDate,
+      leaseId: o.leaseId,
+      tenantId: o.tenantId,
+      monthlyRevenue: o.monthlyRevenue,
+      type: 'occupancy',
+    })),
+    offlineBlocks: relevantOffline,
   };
 }
 

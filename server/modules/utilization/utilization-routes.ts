@@ -5,6 +5,7 @@ import {
   recomputeSnapshots,
   fetchBandBreakdown,
   fetchByType,
+  fetchDrilldownEvents,
 } from './utilization-service';
 import { requireRole } from '../../middleware/rbac';
 import type { AssetClass } from './utilization-config';
@@ -93,6 +94,29 @@ export function createUtilizationRouter(): Router {
     } catch (error: any) {
       console.error('[Utilization] Error fetching band breakdown:', error);
       res.status(500).json({ error: 'Failed to fetch band breakdown' });
+    }
+  });
+
+  router.get('/drilldown-events', async (req, res) => {
+    try {
+      const propertyId = req.query.propertyId as string;
+      if (!propertyId) {
+        return res.status(400).json({ error: 'propertyId is required' });
+      }
+
+      const now = new Date();
+      const periodStart = (req.query.periodStart as string) || startOfMonth(now);
+      const periodEnd = (req.query.periodEnd as string) || endOfMonth(now);
+      const mode = (req.query.mode as UtilizationMode) || 'contracted';
+      const unitType = req.query.unitType as string | undefined;
+      const bandKey = req.query.bandKey as string | undefined;
+      const unitTypes = req.query.unitTypes ? (req.query.unitTypes as string).split(',') : undefined;
+
+      const result = await fetchDrilldownEvents(propertyId, periodStart, periodEnd, mode, unitType, bandKey, unitTypes);
+      res.json({ propertyId, periodStart, periodEnd, mode, ...result });
+    } catch (error: any) {
+      console.error('[Utilization] Error fetching drilldown events:', error);
+      res.status(500).json({ error: 'Failed to fetch drilldown events' });
     }
   });
 

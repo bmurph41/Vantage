@@ -34,6 +34,17 @@ export interface OccupancyEvent {
   annualRevenue: number;
 }
 
+export interface PresenceEvent {
+  id: string;
+  unitId: string;
+  unitType: string;
+  timestampStart: string;
+  timestampEnd: string | null;
+  source: string;
+  confidence: number;
+  metadata: Record<string, any>;
+}
+
 export interface UnitUtilization {
   totalUnits: number;
   occupiedUnits: number;
@@ -84,6 +95,8 @@ export interface UtilizationSummary {
   assetClass: AssetClass;
   period: UtilizationPeriod;
   mode: UtilizationMode;
+  insufficientData?: boolean;
+  insufficientDataReason?: string;
   overall: {
     unitUtil: UnitUtilization;
     weightedUtil: WeightedUtilization;

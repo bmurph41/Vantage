@@ -25191,3 +25191,30 @@ export const insertUtilSnapshotSchema = createInsertSchema(utilSnapshots).omit({
 export const selectUtilSnapshotSchema = createSelectSchema(utilSnapshots);
 export type InsertUtilSnapshot = z.infer<typeof insertUtilSnapshotSchema>;
 export type UtilSnapshot = typeof utilSnapshots.$inferSelect;
+
+export const utilPresenceSourceEnum = pgEnum("util_presence_source", ["ais", "camera", "sensor", "manual", "wifi", "bluetooth"]);
+
+export const utilPresenceEvents = pgTable('util_presence_events', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar('org_id').notNull().references(() => organizations.id),
+  propertyId: varchar('property_id').notNull(),
+  unitId: varchar('unit_id').notNull().references(() => utilInventoryUnits.id, { onDelete: 'cascade' }),
+  unitType: varchar('unit_type', { length: 50 }).notNull(),
+  timestampStart: timestamp('timestamp_start').notNull(),
+  timestampEnd: timestamp('timestamp_end'),
+  source: utilPresenceSourceEnum('source').notNull().default('manual'),
+  confidence: decimal('confidence', { precision: 5, scale: 4 }).default('1.0000'),
+  metadata: jsonb('metadata').$type<Record<string, any>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index('util_presence_org_idx').on(table.orgId),
+  propertyIdx: index('util_presence_property_idx').on(table.propertyId),
+  unitIdx: index('util_presence_unit_idx').on(table.unitId),
+  propertyDatesIdx: index('util_presence_property_dates_idx').on(table.propertyId, table.timestampStart, table.timestampEnd),
+  sourceIdx: index('util_presence_source_idx').on(table.source),
+}));
+
+export const insertUtilPresenceEventSchema = createInsertSchema(utilPresenceEvents).omit({ id: true, createdAt: true });
+export const selectUtilPresenceEventSchema = createSelectSchema(utilPresenceEvents);
+export type InsertUtilPresenceEvent = z.infer<typeof insertUtilPresenceEventSchema>;
+export type UtilPresenceEvent = typeof utilPresenceEvents.$inferSelect;

@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -10,13 +9,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Activity, Filter, RefreshCw } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Activity, FileText, Eye, AlertTriangle } from 'lucide-react';
 import UtilizationSummaryCard from './UtilizationSummaryCard';
 import UtilizationByTypeTable from './UtilizationByTypeTable';
 import UtilizationByBandChart from './UtilizationByBandChart';
+import UtilizationDrilldownDrawer from './UtilizationDrilldownDrawer';
 
 type PeriodPreset = 'monthly' | 'quarterly' | 'seasonal' | 't12' | 'custom';
+type UtilizationMode = 'contracted' | 'physical';
 
 const MARINA_UNIT_TYPES = [
   { value: 'wet_slip', label: 'Wet Slip' },
@@ -90,6 +91,7 @@ interface UtilizationSectionProps {
 export default function UtilizationSection({ projectId, propertyId }: UtilizationSectionProps) {
   const [period, setPeriod] = useState<PeriodPreset>('monthly');
   const [viewMode, setViewMode] = useState<'unit' | 'weighted'>('unit');
+  const [utilMode, setUtilMode] = useState<UtilizationMode>('contracted');
   const [selectedUnitTypes, setSelectedUnitTypes] = useState<string[]>([]);
   const [drilldownOpen, setDrilldownOpen] = useState(false);
   const [drilldownMetric, setDrilldownMetric] = useState<string>('');
@@ -102,18 +104,18 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
       propertyId: effectivePropertyId,
       periodStart,
       periodEnd,
-      mode: 'contracted',
+      mode: utilMode,
     });
     if (selectedUnitTypes.length > 0) {
       params.set('unitTypes', selectedUnitTypes.join(','));
     }
     return params.toString();
-  }, [effectivePropertyId, periodStart, periodEnd, selectedUnitTypes]);
+  }, [effectivePropertyId, periodStart, periodEnd, selectedUnitTypes, utilMode]);
 
   const unitTypesKey = selectedUnitTypes.join(',');
 
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['/api/utilization/summary', effectivePropertyId, periodStart, periodEnd, unitTypesKey],
+    queryKey: ['/api/utilization/summary', effectivePropertyId, periodStart, periodEnd, unitTypesKey, utilMode],
     queryFn: async () => {
       const res = await fetch(`/api/utilization/summary?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch utilization summary');
@@ -123,7 +125,7 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
   });
 
   const { data: byTypeData, isLoading: byTypeLoading } = useQuery({
-    queryKey: ['/api/utilization/by-type', effectivePropertyId, periodStart, periodEnd, unitTypesKey],
+    queryKey: ['/api/utilization/by-type', effectivePropertyId, periodStart, periodEnd, unitTypesKey, utilMode],
     queryFn: async () => {
       const res = await fetch(`/api/utilization/by-type?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch by-type data');
@@ -133,7 +135,7 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
   });
 
   const { data: byBandData, isLoading: byBandLoading } = useQuery({
-    queryKey: ['/api/utilization/by-band', effectivePropertyId, periodStart, periodEnd, unitTypesKey],
+    queryKey: ['/api/utilization/by-band', effectivePropertyId, periodStart, periodEnd, unitTypesKey, utilMode],
     queryFn: async () => {
       const res = await fetch(`/api/utilization/by-band?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch by-band data');
@@ -163,6 +165,8 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
     );
   };
 
+  const insufficientData = summaryData?.insufficientData === true;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -177,6 +181,19 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={utilMode} onValueChange={(v) => setUtilMode(v as UtilizationMode)}>
+            <TabsList className="h-8">
+              <TabsTrigger value="contracted" className="text-xs gap-1 px-3">
+                <FileText className="h-3.5 w-3.5" />
+                Financial (Contracted)
+              </TabsTrigger>
+              <TabsTrigger value="physical" className="text-xs gap-1 px-3">
+                <Eye className="h-3.5 w-3.5" />
+                Operational (Physical)
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Period" />
@@ -224,6 +241,20 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         </div>
       </div>
 
+      {insufficientData && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+          <CardContent className="pt-4 pb-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-400">Insufficient Physical Presence Data</p>
+              <p className="text-xs text-amber-700 dark:text-amber-500 mt-1">
+                {summaryData?.insufficientDataReason || 'No physical presence data available. Metrics shown as zero. Switch to Financial (Contracted) mode for lease-based utilization, or install sensors/cameras to collect physical presence data.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <UtilizationSummaryCard
         overall={summaryData?.overall ?? null}
         churn={summaryData?.churn ?? null}
@@ -248,27 +279,16 @@ export default function UtilizationSection({ projectId, propertyId }: Utilizatio
         />
       </div>
 
-      <Sheet open={drilldownOpen} onOpenChange={setDrilldownOpen}>
-        <SheetContent className="sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Drilldown Details</SheetTitle>
-            <SheetDescription>
-              Detailed view for: {drilldownMetric || 'selected metric'}
-            </SheetDescription>
-          </SheetHeader>
-          <div className="mt-6 space-y-4">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Detailed drilldown will be available in Phase 3.
-                  <br />
-                  <span className="text-xs">Selected: {drilldownMetric}</span>
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <UtilizationDrilldownDrawer
+        open={drilldownOpen}
+        onOpenChange={setDrilldownOpen}
+        drilldownMetric={drilldownMetric}
+        propertyId={effectivePropertyId}
+        periodStart={periodStart}
+        periodEnd={periodEnd}
+        mode={utilMode}
+        unitTypes={selectedUnitTypes.length > 0 ? selectedUnitTypes : undefined}
+      />
     </div>
   );
 }
