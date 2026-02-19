@@ -387,7 +387,11 @@ export class ProFormaEngineService {
     const { inferDepartment, departmentToAssumptionKey, storageSubcategoryToTypeKey } = await import('../utils/department-mapping');
     
     // Below-the-line assumptions
+    // belowTheLineBasis: 'revenue' (default, industry standard) or 'noi'
+    // - 'revenue': management fee, capex reserves as % of gross revenue
+    // - 'noi': management fee, capex reserves as % of NOI
     const belowTheLine = assumptions.belowTheLine || {};
+    const belowTheLineBasis: 'revenue' | 'noi' = belowTheLine.basis || 'revenue';
     const managementFeePct = (belowTheLine.managementFeePct || 0) / 100;
     const capexPct = (belowTheLine.capexPct ?? 2) / 100;
     const capexAmount = belowTheLine.capexAmount || 0;
@@ -876,9 +880,10 @@ export class ProFormaEngineService {
       
       const gp = revTotal - cogsTotal;
       const noiVal = gp - expTotal;
-      const mgmtFee = Math.round(revTotal * managementFeePct);
-      const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(revTotal * capexPct);
-      const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(revTotal * reservesPct);
+      const pctBasis = belowTheLineBasis === 'noi' ? noiVal : revTotal;
+      const mgmtFee = Math.round(pctBasis * managementFeePct);
+      const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(pctBasis * capexPct);
+      const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(pctBasis * reservesPct);
       const debtSvc = 0; // Will be updated after debt integration
       const cfBeforeDebt = noiVal - mgmtFee - capexVal - reserveVal;
       const levCf = cfBeforeDebt - debtSvc;
@@ -1089,7 +1094,9 @@ export class ProFormaEngineService {
     
     // Exit waterfall
     const sellingFees = Math.round(exitValue * sellingFeePct);
-    const lastScheduleEntry = debtSchedule?.schedule?.[debtSchedule.schedule.length - 1];
+    const lastProjectionPeriodKey = monthlyPeriods[monthlyPeriods.length - 1]?.key;
+    const exitPeriodDebt = debtSchedule?.schedule?.find(p => p.periodKey === lastProjectionPeriodKey);
+    const lastScheduleEntry = exitPeriodDebt || debtSchedule?.schedule?.[debtSchedule.schedule.length - 1];
     const loanPayoff = Math.round(lastScheduleEntry?.totalBalance || 0);
     const loanExitFees = Math.round(loanPayoff * loanExitFeePct);
     const workingCapitalRecovery = Math.round(workingCapitalAmount * workingCapitalRecoveryPct);

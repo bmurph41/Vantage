@@ -32,19 +32,26 @@ export function calculateXNPV(rate: number, cashFlows: DatedCashFlow[]): number 
 
 /**
  * Calculate XIRR (Extended Internal Rate of Return)
- * IRR that accounts for exact cash flow dates using Newton-Raphson method
+ * IRR that accounts for exact cash flow dates using Newton-Raphson method.
+ * 
+ * Unified with shared/exit/irr-calculator.ts — same algorithm, tolerance,
+ * iteration count, and rate bounds. This version returns 0 instead of null
+ * on failure since downstream consumers (pro forma engine) expect a number.
+ * 
+ * Standard: 365.25-day year fraction, Newton-Raphson with derivative guard,
+ * rate clamped to [-0.99, 100], tolerance 1e-7, max 1000 iterations.
  * 
  * @param cashFlows - Array of cash flows with dates (must have at least one positive and one negative)
  * @param guess - Initial guess for IRR (default 0.1 = 10%)
- * @param maxIterations - Maximum iterations for convergence
- * @param tolerance - Convergence tolerance
- * @returns Annual IRR as decimal (e.g., 0.15 for 15%)
+ * @param maxIterations - Maximum iterations for convergence (default 1000)
+ * @param tolerance - Convergence tolerance (default 1e-7)
+ * @returns Annual IRR as decimal (e.g., 0.15 for 15%), or 0 if unsolvable
  */
 export function calculateXIRR(
   cashFlows: DatedCashFlow[],
   guess: number = 0.1,
-  maxIterations: number = 100,
-  tolerance: number = 0.00001
+  maxIterations: number = 1000,
+  tolerance: number = 0.0000001
 ): number {
   if (cashFlows.length < 2) return 0;
   
@@ -74,8 +81,12 @@ export function calculateXIRR(
       npvDerivative -= t * cf / (factor * (1 + rate));
     }
     
-    if (Math.abs(npvDerivative) < 1e-10) {
-      break;
+    if (Math.abs(npv) < tolerance) {
+      return rate;
+    }
+    
+    if (Math.abs(npvDerivative) < tolerance) {
+      return 0;
     }
     
     const newRate = rate - npv / npvDerivative;
@@ -84,16 +95,14 @@ export function calculateXIRR(
       return newRate;
     }
     
-    if (newRate < -0.99) {
-      rate = -0.99;
-    } else if (newRate > 10) {
-      rate = 10;
-    } else {
-      rate = newRate;
+    if (newRate < -0.99 || newRate > 100) {
+      return 0;
     }
+    
+    rate = newRate;
   }
   
-  return rate;
+  return 0;
 }
 
 /**
