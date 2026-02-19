@@ -85,6 +85,7 @@ import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import returnsRoutes from "./routes/returns-routes";
+import budgetRoutes from "./routes/budget-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import searchRoutes from "./routes/search-routes";
 import bulkEmailRoutes from "./routes/bulk-email-routes";
@@ -477,6 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
   app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
+  app.use("/api/budgets", authenticateUser, enforceTenant, budgetRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
   app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
