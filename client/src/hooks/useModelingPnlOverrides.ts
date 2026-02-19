@@ -20,7 +20,7 @@ export interface PnlOverride {
 export const VALID_DEPARTMENTS = [
   'Storage', 'Fuel', "Ship's Store", 'Service', 'Boat Sales',
   'Boat Brokerage', 'Payroll', 'Marina & Amenities', 'General',
-  'Boat Rentals', 'Boat Club', 'Boat Finance', 'Commercial',
+  'Boat Rentals', 'Boat Club', 'Boat Finance', 'Commercial', 'Commercial Leases',
   'F&B', 'Restaurant', 'RV Park', 'Hospitality', 'Parts', 'Miscellaneous',
 ];
 

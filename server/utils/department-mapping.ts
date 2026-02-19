@@ -71,6 +71,9 @@ export function inferDepartment(subcategory: string, category?: string): string 
   if (lower.includes('launch') || lower.includes('haul') || lower.includes('electric') || lower.includes('power') || lower.includes('amenity') || lower.includes('dockside') || lower.includes('marina income'))
     return 'Marina & Amenities';
 
+  if (lower.includes('commercial lease') || lower.includes('commercial tenant') || lower.includes('commercial rent') || lower.includes('tenant lease') || lower.includes('tenant rent'))
+    return 'Commercial Leases';
+
   return 'General';
 }
 
@@ -95,11 +98,17 @@ const LEGACY_DEPARTMENT_MAP: Record<string, string> = {
   'service': 'Service',
   'storage': 'Storage',
   'general': 'General',
+  'commercial leases': 'Commercial Leases',
+  'commercial_leases': 'Commercial Leases',
+  'commercial': 'Commercial Leases',
+  'commercial tenant': 'Commercial Leases',
+  'commercial tenants': 'Commercial Leases',
 };
 
 const VALID_DEPARTMENTS = new Set([
   'Storage', 'Fuel', "Ship's Store", 'Service', 'Boat Sales',
   'Boat Brokerage', 'Payroll', 'Marina & Amenities', 'General',
+  'Commercial Leases',
 ]);
 
 export function normalizeDepartment(dept: string): string {
@@ -137,6 +146,7 @@ export function departmentToAssumptionKey(department: string): string {
     case 'Boat Finance': return 'boat_finance';
     case 'Marina & Amenities': return 'marina_amenities';
     case 'Commercial': return 'commercial_tenants';
+    case 'Commercial Leases': return 'commercial_leases';
     case 'F&B': return 'restaurant';
     case 'Restaurant': return 'restaurant';
     case 'RV Park': return 'rv_sites';

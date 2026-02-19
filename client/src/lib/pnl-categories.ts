@@ -8,6 +8,7 @@ export type RevenueCogsDept =
   | "service" 
   | "parts" 
   | "third_party_leases" 
+  | "commercial_leases" 
   | "boat_club" 
   | "boat_rentals" 
   | "boat_sales" 
@@ -52,6 +53,7 @@ export const REVENUE_COGS_DEPT_LABELS: Record<RevenueCogsDept, string> = {
   service: "Service",
   parts: "Parts",
   third_party_leases: "Third-Party Leases",
+  commercial_leases: "Commercial Leases",
   boat_club: "Boat Club",
   boat_rentals: "Boat Rentals",
   boat_sales: "Boat Sales",
@@ -126,6 +128,7 @@ export const PROFIT_CENTER_TO_DEPT: Record<string, RevenueCogsDept> = {
   pc_boat_sales: "boat_sales",
   pc_boat_finance: "boat_finance",
   pc_boat_brokerage: "boat_brokerage",
+  pc_commercial_leases: "commercial_leases",
   pc_fb: "fb",
   pc_rv_park: "rv_park",
   pc_hospitality: "hospitality_lodging",

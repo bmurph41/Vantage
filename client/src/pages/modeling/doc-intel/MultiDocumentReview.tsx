@@ -66,6 +66,7 @@ const DEPARTMENTS = [
   { value: "boat_sales", label: "Boat Sales" },
   { value: "service_dept", label: "Service Department" },
   { value: "storage", label: "Storage" },
+  { value: "commercial_leases", label: "Commercial Leases" },
   { value: "admin", label: "Administration" },
   { value: "other", label: "Other" },
 ];
