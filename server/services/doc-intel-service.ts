@@ -550,7 +550,7 @@ class DocIntelService {
     return true;
   }
 
-  async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number, multiYears?: number[]): Promise<ParsedLineItem[]> {
+  async parseExcelFile(filePath: string, granularity: string = 'monthly', fiscalYear?: number, multiYears?: number[], targetSheetIndex?: number | null): Promise<ParsedLineItem[]> {
     const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer);
     const items: ParsedLineItem[] = [];
@@ -559,6 +559,9 @@ class DocIntelService {
     const yearForPeriod = fiscalYear || new Date().getFullYear();
 
     for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
+      if (targetSheetIndex != null && sheetIndex !== targetSheetIndex) {
+        continue;
+      }
       const sheetName = workbook.SheetNames[sheetIndex];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
@@ -1040,7 +1043,11 @@ class DocIntelService {
           }
         }
       } else {
-        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear, multiYears || undefined);
+        const targetSheetIndex = (upload.periodMetadata as any)?.sheetIndex ?? null;
+        if (targetSheetIndex != null) {
+          console.log(`[DocIntelService] Processing only sheet index ${targetSheetIndex} ("${(upload.periodMetadata as any)?.sheetName || 'unknown'}")`);
+        }
+        parsedItems = await this.parseExcelFile(upload.storagePath, granularity, fiscalYear, multiYears || undefined, targetSheetIndex);
       }
       
       const extractedItems: DocIntelExtractedItem[] = [];

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
+import * as XLSX from "xlsx";
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -12,7 +13,9 @@ import {
   Brain,
   Plus,
   Eye,
+  Layers,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,6 +78,27 @@ interface StagedFile {
   progress: number;
   errorMessage?: string;
   uploadId?: string;
+  sheetName?: string;
+  sheetIndex?: number;
+}
+
+interface SheetSelection {
+  index: number;
+  name: string;
+  selected: boolean;
+  docType: DocType;
+  year: string;
+  isT12: boolean;
+  t12StartMonth?: string;
+  t12StartYear?: string;
+  t12EndMonth?: string;
+  t12EndYear?: string;
+  rowCount: number;
+}
+
+interface PendingExcelFile {
+  file: File;
+  sheets: SheetSelection[];
 }
 
 const MONTHS = [
@@ -113,8 +137,9 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
   const [showAddTypeDialog, setShowAddTypeDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState("");
-  // Explicit state to track when processing has just completed - shows prominent Review CTA
   const [processingJustCompleted, setProcessingJustCompleted] = useState(false);
+  const [pendingExcelFile, setPendingExcelFile] = useState<PendingExcelFile | null>(null);
+  const [showSheetSelector, setShowSheetSelector] = useState(false);
 
   // Fetch documents from server
   const { data: holdingQueue = [], isLoading, refetch } = useQuery<DocIntelUpload[]>({
@@ -177,6 +202,12 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
         if (stagedFile.t12EndMonth) formData.append("t12EndMonth", stagedFile.t12EndMonth);
         if (stagedFile.t12EndYear) formData.append("t12EndYear", stagedFile.t12EndYear);
       }
+      if (stagedFile.sheetName != null) {
+        formData.append("sheetName", stagedFile.sheetName);
+      }
+      if (stagedFile.sheetIndex != null) {
+        formData.append("sheetIndex", String(stagedFile.sheetIndex));
+      }
 
       const csrfToken = await ensureCsrfToken();
       const headers: Record<string, string> = {};
@@ -206,37 +237,101 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
   });
 
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const isExcelFile = (file: File) => {
+    return file.name.match(/\.(xlsx|xls)$/i) || 
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel';
+  };
+
+  const readExcelSheets = async (file: File): Promise<SheetSelection[]> => {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
     const now = new Date();
-    const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => {
-      const isT12 = guessIsT12(file.name);
-      const base: StagedFile = {
-        file,
-        id: crypto.randomUUID(),
-        displayName: file.name,
-        docType: guessDocType(file.name),
-        year: isT12 ? "T12" : now.getFullYear().toString(),
-        isT12,
-        status: "pending" as const,
-        progress: 0,
-      };
-      if (isT12) {
-        const parsed = parseDateRange(file.name);
-        if (parsed) {
-          base.t12StartMonth = parsed.startMonth;
-          base.t12StartYear = parsed.startYear;
-          base.t12EndMonth = parsed.endMonth;
-          base.t12EndYear = parsed.endYear;
-        } else {
-          base.t12StartMonth = (now.getMonth() + 1).toString();
-          base.t12StartYear = (now.getFullYear() - 1).toString();
-          base.t12EndMonth = (now.getMonth() + 1).toString();
-          base.t12EndYear = now.getFullYear().toString();
-        }
+    return workbook.SheetNames.map((name, index) => {
+      const worksheet = workbook.Sheets[name];
+      const range = worksheet['!ref'];
+      let rowCount = 0;
+      if (range) {
+        const decoded = XLSX.utils.decode_range(range);
+        rowCount = decoded.e.r - decoded.s.r + 1;
       }
-      return base;
+      const guessedType = guessDocType(name);
+      return {
+        index,
+        name,
+        selected: false,
+        docType: guessedType,
+        year: now.getFullYear().toString(),
+        isT12: false,
+        rowCount,
+      };
     });
-    setStagedFiles((prev) => [...prev, ...newStagedFiles]);
+  };
+
+  const createStagedFile = (file: File, sheetName?: string, sheetIndex?: number): StagedFile => {
+    const now = new Date();
+    const displayName = sheetName ? `${file.name} → ${sheetName}` : file.name;
+    const nameToGuess = sheetName || file.name;
+    const isT12 = guessIsT12(nameToGuess);
+    const base: StagedFile = {
+      file,
+      id: crypto.randomUUID(),
+      displayName,
+      docType: guessDocType(nameToGuess),
+      year: isT12 ? "T12" : now.getFullYear().toString(),
+      isT12,
+      status: "pending" as const,
+      progress: 0,
+      sheetName,
+      sheetIndex,
+    };
+    if (isT12) {
+      const parsed = parseDateRange(nameToGuess);
+      if (parsed) {
+        base.t12StartMonth = parsed.startMonth;
+        base.t12StartYear = parsed.startYear;
+        base.t12EndMonth = parsed.endMonth;
+        base.t12EndYear = parsed.endYear;
+      } else {
+        base.t12StartMonth = (now.getMonth() + 1).toString();
+        base.t12StartYear = (now.getFullYear() - 1).toString();
+        base.t12EndMonth = (now.getMonth() + 1).toString();
+        base.t12EndYear = now.getFullYear().toString();
+      }
+    }
+    return base;
+  };
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const nonExcelFiles: File[] = [];
+    const excelFiles: File[] = [];
+
+    for (const file of acceptedFiles) {
+      if (isExcelFile(file)) {
+        excelFiles.push(file);
+      } else {
+        nonExcelFiles.push(file);
+      }
+    }
+
+    if (nonExcelFiles.length > 0) {
+      const newStaged = nonExcelFiles.map(f => createStagedFile(f));
+      setStagedFiles(prev => [...prev, ...newStaged]);
+    }
+
+    for (const excelFile of excelFiles) {
+      try {
+        const sheets = await readExcelSheets(excelFile);
+        if (sheets.length > 1) {
+          setPendingExcelFile({ file: excelFile, sheets });
+          setShowSheetSelector(true);
+        } else {
+          setStagedFiles(prev => [...prev, createStagedFile(excelFile)]);
+        }
+      } catch {
+        setStagedFiles(prev => [...prev, createStagedFile(excelFile)]);
+      }
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -276,6 +371,41 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
       return "invoice";
     }
     return "other";
+  };
+
+  const confirmSheetSelection = () => {
+    if (!pendingExcelFile) return;
+    const selected = pendingExcelFile.sheets.filter(s => s.selected);
+    if (selected.length === 0) {
+      toast({ title: "No sheets selected", description: "Please select at least one sheet to import.", variant: "destructive" });
+      return;
+    }
+    const newStaged = selected.map(sheet => {
+      const staged = createStagedFile(pendingExcelFile.file, sheet.name, sheet.index);
+      staged.docType = sheet.docType;
+      staged.year = sheet.isT12 ? "T12" : sheet.year;
+      staged.isT12 = sheet.isT12;
+      if (sheet.isT12) {
+        staged.t12StartMonth = sheet.t12StartMonth;
+        staged.t12StartYear = sheet.t12StartYear;
+        staged.t12EndMonth = sheet.t12EndMonth;
+        staged.t12EndYear = sheet.t12EndYear;
+      }
+      return staged;
+    });
+    setStagedFiles(prev => [...prev, ...newStaged]);
+    setShowSheetSelector(false);
+    setPendingExcelFile(null);
+  };
+
+  const updateSheetSelection = (index: number, updates: Partial<SheetSelection>) => {
+    setPendingExcelFile(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sheets: prev.sheets.map(s => s.index === index ? { ...s, ...updates } : s),
+      };
+    });
   };
 
   const updateStagedFile = (id: string, updates: Partial<StagedFile>) => {
@@ -524,7 +654,15 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
                   >
                     <FileSpreadsheet className="h-8 w-8 text-green-600 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{staged.displayName}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-sm truncate">{staged.displayName}</p>
+                        {staged.sheetName && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 shrink-0">
+                            <Layers className="h-2.5 w-2.5" />
+                            Sheet
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {formatFileSize(staged.file.size)}
                       </p>
@@ -679,6 +817,122 @@ export function HoldingStation({ projectId, onReviewDocuments, onUploadComplete 
           )}
         </CardContent>
       </Card>
+
+      {/* Sheet Selector Dialog */}
+      <Dialog open={showSheetSelector} onOpenChange={(open) => {
+        if (!open) {
+          setShowSheetSelector(false);
+          setPendingExcelFile(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Select Sheets to Import
+            </DialogTitle>
+            <DialogDescription>
+              This Excel file contains {pendingExcelFile?.sheets.length || 0} sheets. Select which ones to process and set the document type and year for each.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingExcelFile && (
+            <div className="space-y-1 py-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground border-b">
+                <div className="w-6" />
+                <div className="flex-1 font-medium">Sheet Name</div>
+                <div className="w-16 text-center">Rows</div>
+                <div className="w-32 text-center">Doc Type</div>
+                <div className="w-20 text-center">Year</div>
+              </div>
+              {pendingExcelFile.sheets.map((sheet) => (
+                <div
+                  key={sheet.index}
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-md transition-colors ${
+                    sheet.selected ? 'bg-primary/5 border border-primary/20' : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <Checkbox
+                    checked={sheet.selected}
+                    onCheckedChange={(checked) => updateSheetSelection(sheet.index, { selected: !!checked })}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm font-medium ${!sheet.selected && 'text-muted-foreground'}`}>
+                      {sheet.name}
+                    </span>
+                  </div>
+                  <div className="w-16 text-center">
+                    <span className="text-xs text-muted-foreground">{sheet.rowCount}</span>
+                  </div>
+                  <div className="w-32">
+                    <Select
+                      value={sheet.docType}
+                      onValueChange={(v) => updateSheetSelection(sheet.index, { docType: v as DocType, selected: true })}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(BUILTIN_DOC_TYPES).map(([key, { label }]) => (
+                          <SelectItem key={key} value={key} className="text-xs">{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-20">
+                    <Select
+                      value={sheet.isT12 ? "T12" : sheet.year}
+                      onValueChange={(v) => {
+                        const now = new Date();
+                        if (v === "T12") {
+                          updateSheetSelection(sheet.index, {
+                            isT12: true,
+                            selected: true,
+                            t12StartMonth: (now.getMonth() + 1).toString(),
+                            t12StartYear: (now.getFullYear() - 1).toString(),
+                            t12EndMonth: (now.getMonth() + 1).toString(),
+                            t12EndYear: now.getFullYear().toString(),
+                          });
+                        } else {
+                          updateSheetSelection(sheet.index, { year: v, isT12: false, selected: true });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {yearOptions.map((y) => (
+                          <SelectItem key={y} value={y} className="text-xs">
+                            {y === "T12" ? <span className="font-semibold text-primary">T12</span> : y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  {pendingExcelFile.sheets.filter(s => s.selected).length} of {pendingExcelFile.sheets.length} sheets selected
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowSheetSelector(false); setPendingExcelFile(null); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSheetSelection}
+              disabled={!pendingExcelFile?.sheets.some(s => s.selected)}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Import Selected Sheets ({pendingExcelFile?.sheets.filter(s => s.selected).length || 0})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Custom Type Dialog */}
       <Dialog open={showAddTypeDialog} onOpenChange={setShowAddTypeDialog}>

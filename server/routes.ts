@@ -25264,12 +25264,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         } catch { multiYears = null; }
       }
       const dataGranularity = req.body.dataGranularity === 'annual' ? 'annual' : 'monthly';
-      const periodMetadata = isT12 ? {
-        t12StartMonth: req.body.t12StartMonth ? parseInt(req.body.t12StartMonth) : null,
-        t12StartYear: req.body.t12StartYear ? parseInt(req.body.t12StartYear) : null,
-        t12EndMonth: req.body.t12EndMonth ? parseInt(req.body.t12EndMonth) : null,
-        t12EndYear: req.body.t12EndYear ? parseInt(req.body.t12EndYear) : null,
-      } : null;
+      const sheetIndex = req.body.sheetIndex != null ? parseInt(req.body.sheetIndex) : null;
+      const sheetName = req.body.sheetName || null;
+      const periodMetadata: any = {};
+      if (isT12) {
+        periodMetadata.t12StartMonth = req.body.t12StartMonth ? parseInt(req.body.t12StartMonth) : null;
+        periodMetadata.t12StartYear = req.body.t12StartYear ? parseInt(req.body.t12StartYear) : null;
+        periodMetadata.t12EndMonth = req.body.t12EndMonth ? parseInt(req.body.t12EndMonth) : null;
+        periodMetadata.t12EndYear = req.body.t12EndYear ? parseInt(req.body.t12EndYear) : null;
+      }
+      if (sheetIndex != null) {
+        periodMetadata.sheetIndex = sheetIndex;
+        periodMetadata.sheetName = sheetName;
+      }
+      const finalPeriodMetadata = Object.keys(periodMetadata).length > 0 ? periodMetadata : null;
 
       let holdingTagsList = holdingTags;
       if (isT12 && !holdingTagsList.includes('T12')) {
@@ -25301,7 +25309,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           isT12: isT12,
           isMultiYear: isMultiYear,
           multiYears: multiYears,
-          periodMetadata: periodMetadata,
+          periodMetadata: finalPeriodMetadata,
           rentRollSubType: rentRollSubType,
         },
         checkProjectOnly,
