@@ -37,6 +37,7 @@ import {
   DollarSign,
   TrendingUp,
   MapPin,
+  Map,
   Anchor,
   Users,
   Plus,
@@ -52,6 +53,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { MarinaModal } from "@/components/portfolio/MarinaModal";
+import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
@@ -176,6 +178,7 @@ export default function Portfolio() {
   const [selectedMarina, setSelectedMarina] = useState<OwnedMarina | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [marinaToDelete, setMarinaToDelete] = useState<OwnedMarina | null>(null);
+  const [mapSource, setMapSource] = useState<'properties' | 'pipeline' | 'all'>('all');
 
   useEffect(() => {
     const newTab = searchParams.get("tab");
@@ -346,6 +349,10 @@ export default function Portfolio() {
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="map" data-testid="tab-map" className="flex items-center gap-1.5">
+            <Map className="h-3.5 w-3.5" />
+            Map
+          </TabsTrigger>
           <TabsTrigger value="financials" data-testid="tab-financials">Financials</TabsTrigger>
           <TabsTrigger value="performance" data-testid="tab-performance">Performance</TabsTrigger>
         </TabsList>
@@ -466,6 +473,73 @@ export default function Portfolio() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Map className="h-5 w-5" />
+                    Portfolio Map
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    View owned marinas and pipeline deals on the map
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <Button
+                    variant={mapSource === 'all' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setMapSource('all')}
+                  >
+                    All Assets
+                  </Button>
+                  <Button
+                    variant={mapSource === 'properties' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setMapSource('properties')}
+                  >
+                    <Building2 className="h-3.5 w-3.5 mr-1" />
+                    Owned
+                  </Button>
+                  <Button
+                    variant={mapSource === 'pipeline' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setMapSource('pipeline')}
+                  >
+                    <Anchor className="h-3.5 w-3.5 mr-1" />
+                    Pipeline
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <MarinaMapEmbed
+                key={mapSource}
+                source={mapSource === 'all' ? 'all' : mapSource}
+                sourceLabel={mapSource === 'all' ? 'Portfolio Assets' : mapSource === 'properties' ? 'Owned Marinas' : 'Pipeline Deals'}
+                height="calc(100vh - 420px)"
+                showSearch={true}
+                showStateFilter={true}
+                showSourceFilter={false}
+                showLayerToggles={mapSource === 'all'}
+                showListPanel={true}
+                emptyMessage={mapSource === 'properties' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No portfolio assets with location data found'}
+                onLocationClick={(loc) => {
+                  if (loc.source === 'property' && loc.id) {
+                    navigate(`/crm/properties/${loc.id}`);
+                  } else if (loc.source === 'pipeline' && loc.id) {
+                    navigate(`/crm/deals/${loc.id}`);
+                  }
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>

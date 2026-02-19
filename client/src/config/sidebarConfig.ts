@@ -50,7 +50,6 @@ import {
   ListTree,
   GitMerge,
   Sparkles,
-  Globe,
 } from 'lucide-react';
 
 import { FEATURE_MODULES, FeatureModule } from './featureModules';
@@ -324,7 +323,7 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'marinalytics',
     label: 'Market Intelligence',
     icon: BarChart3,
-    matchRoutes: ['/marinalytics', '/analytics', '/docktalk', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis', '/marina-map'],
+    matchRoutes: ['/marinalytics', '/analytics', '/docktalk', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis'],
     requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
     children: [
       {
@@ -350,13 +349,6 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Percent,
         matchRoutes: ['/marinalytics/rate-comps', '/rate-comps'],
         requiredModules: [FEATURE_MODULES.ANALYTICS_COMPS],
-      },
-      {
-        id: 'marina-map',
-        label: 'Marina Map',
-        href: '/marinalytics/marina-map',
-        icon: Globe,
-        matchRoutes: ['/marinalytics/marina-map'],
       },
       {
         id: 'demographics',
