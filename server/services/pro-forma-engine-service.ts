@@ -196,10 +196,12 @@ export interface ProFormaData {
     purchasePrice: number;
     exitValue: number;
     totalReturn: number;
-    irr: number;  // XIRR-based annualized IRR as percentage (e.g., 15 for 15%)
+    irr: number;  // Levered XIRR-based annualized IRR as percentage (e.g., 15 for 15%)
     irrAnnualized: number;  // Same as irr (always XIRR annualized)
     irrDisplayPreference: IrrDisplayPreference;
+    unleveredIrr: number;  // Unlevered XIRR - IRR on total purchase price using pre-debt cash flows
     equityMultiple: number;
+    unleveredEquityMultiple: number;  // Equity multiple on total investment (no leverage)
     year1Noi: number;
     year3Noi: number;
     stabilizedNoi: number;
@@ -1093,13 +1095,13 @@ export class ProFormaEngineService {
     const workingCapitalRecovery = Math.round(workingCapitalAmount * workingCapitalRecoveryPct);
     const netExitProceeds = exitValue - sellingFees - loanPayoff - loanExitFees + workingCapitalRecovery;
     
-    // XIRR calculation using dated monthly levered cash flows
+    // LEVERED XIRR: Uses equity invested and cash flows after debt service
     const loanProceeds = debtSchedule?.totalDebtAtClose || 0;
     const totalEquityInvested = purchasePrice - loanProceeds + workingCapitalAmount;
-    const datedCashFlows: DatedCashFlow[] = [
+    const leveredDatedCashFlows: DatedCashFlow[] = [
       { date: projectionStartDate, amount: -totalEquityInvested }
     ];
-    let totalDistributions = 0;
+    let totalLeveredDistributions = 0;
     for (let i = 0; i < monthlyPeriods.length; i++) {
       const period = monthlyPeriods[i];
       let cf = leveredCashFlowMonthly[period.key] || 0;
@@ -1108,15 +1110,40 @@ export class ProFormaEngineService {
         cf += netExitProceeds;
       }
       
-      totalDistributions += cf;
-      datedCashFlows.push({ date: period.date, amount: cf });
+      totalLeveredDistributions += cf;
+      leveredDatedCashFlows.push({ date: period.date, amount: cf });
     }
     
-    const xirrResult = calculateXIRR(datedCashFlows, 0.1);
-    const annualizedIrr = Math.round(xirrResult * 10000) / 100;
+    const leveredXirrResult = calculateXIRR(leveredDatedCashFlows, 0.1);
+    const annualizedIrr = Math.round(leveredXirrResult * 10000) / 100;
     
-    // Equity multiple
-    const equityMultiple = totalEquityInvested > 0 ? (totalDistributions / totalEquityInvested) : 0;
+    // Levered equity multiple
+    const equityMultiple = totalEquityInvested > 0 ? (totalLeveredDistributions / totalEquityInvested) : 0;
+    
+    // UNLEVERED XIRR: Uses total purchase price and cash flows before debt service (NOI - MgmtFee - CapEx - Reserves)
+    const totalUnleveredInvestment = purchasePrice + workingCapitalAmount;
+    const unleveredNetExitProceeds = exitValue - sellingFees + workingCapitalRecovery;
+    const unleveredDatedCashFlows: DatedCashFlow[] = [
+      { date: projectionStartDate, amount: -totalUnleveredInvestment }
+    ];
+    let totalUnleveredDistributions = 0;
+    for (let i = 0; i < monthlyPeriods.length; i++) {
+      const period = monthlyPeriods[i];
+      let cf = cashFlowBeforeDebtServiceMonthly[period.key] || 0;
+      
+      if (i === monthlyPeriods.length - 1) {
+        cf += unleveredNetExitProceeds;
+      }
+      
+      totalUnleveredDistributions += cf;
+      unleveredDatedCashFlows.push({ date: period.date, amount: cf });
+    }
+    
+    const unleveredXirrResult = calculateXIRR(unleveredDatedCashFlows, 0.1);
+    const unleveredIrr = Math.round(unleveredXirrResult * 10000) / 100;
+    
+    // Unlevered equity multiple
+    const unleveredEquityMultiple = totalUnleveredInvestment > 0 ? (totalUnleveredDistributions / totalUnleveredInvestment) : 0;
     
     // ========================================
     // 10. RETURN COMPLETE PRO FORMA
@@ -1193,11 +1220,13 @@ export class ProFormaEngineService {
         expenseGrowthRate: flatExpenseGrowthRate * 100,
         purchasePrice,
         exitValue,
-        totalReturn: totalDistributions,
+        totalReturn: totalLeveredDistributions,
         irr: annualizedIrr,
         irrAnnualized: annualizedIrr,
         irrDisplayPreference: 'annualized' as IrrDisplayPreference,
+        unleveredIrr,
         equityMultiple,
+        unleveredEquityMultiple,
         year1Noi,
         year3Noi,
         stabilizedNoi,

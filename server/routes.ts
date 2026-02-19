@@ -21804,6 +21804,10 @@ Current context: Project ${req.params.projectId}`;
         purchasePrice: proForma.metrics.purchasePrice,
         totalUnits: project.totalUnits,
         acreage: project.acreage,
+        leveredIRR: proForma.metrics.irr,
+        unleveredIRR: proForma.metrics.unleveredIrr,
+        equityMultiple: proForma.metrics.equityMultiple,
+        unleveredEquityMultiple: proForma.metrics.unleveredEquityMultiple,
         metrics: {
           goingInCapRate: proForma.metrics.goingInCapRate,
           exitCapRate: proForma.metrics.exitCapRate,
