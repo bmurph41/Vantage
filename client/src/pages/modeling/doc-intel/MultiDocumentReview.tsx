@@ -187,8 +187,8 @@ export function MultiDocumentReview({
     return map;
   }, [uploads, queryDataMap]);
 
-  // Apply button enabled when ANY confirmed items have categories — allows partial apply across documents
-  const canApplyToModel = readyToImport.classified > 0;
+  // Apply button enabled when no pending items remain and at least one confirmed item has a category
+  const canApplyToModel = readyToImport.classified > 0 && totalPending === 0;
 
   // Current document items
   const currentItems = documentItems[activeDocumentId] || [];
@@ -561,7 +561,7 @@ export function MultiDocumentReview({
                 onClick={handleApplyToModel}
                 disabled={!canApplyToModel || isApplying}
                 className={canApplyToModel ? "" : "opacity-50"}
-                title={!canApplyToModel ? "Confirm and categorize items to enable Apply to Model" : `Apply ${readyToImport.classified} items from ${Object.values(documentReadiness).filter(d => d.classified > 0).length} document(s)`}
+                title={!canApplyToModel ? (totalPending > 0 ? `${totalPending} item${totalPending !== 1 ? 's' : ''} still pending — confirm, reject, or exclude all items first` : "Confirm and categorize items to enable Apply to Model") : `Apply ${readyToImport.classified} items from ${Object.values(documentReadiness).filter(d => d.classified > 0).length} document(s)`}
               >
                 {isApplying ? (
                   <>
@@ -593,10 +593,10 @@ export function MultiDocumentReview({
               {readyToImport.unclassified} confirmed item{readyToImport.unclassified !== 1 ? 's' : ''} still need a category. They will be skipped during import.
             </p>
           )}
-          {totalPending > 0 && canApplyToModel && (
-            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-2">
+          {totalPending > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              {totalPending} item{totalPending !== 1 ? 's' : ''} still pending — you can apply what's ready now and come back for the rest.
+              {totalPending} item{totalPending !== 1 ? 's are' : ' is'} still pending. Confirm, reject, or exclude all items before applying to model.
             </p>
           )}
           {canApplyToModel && (
