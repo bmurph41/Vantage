@@ -21095,10 +21095,71 @@ Current context: Project ${req.params.projectId}`;
       const config = { ...configDefault, ...(cm.config || {}) };
 
       if (cm.profitCenters && !config.profitCenters) {
-        config.profitCenters = cm.profitCenters;
+        const wizardToInputsKeyMap: Record<string, string> = {
+          commercialTenants: 'pc_commercial_leases',
+          fuelSales: 'pc_fuel_dock',
+          shipStore: 'pc_ships_store',
+          serviceDepartment: 'pc_service',
+          boatRentals: 'pc_rental_boats',
+          boatClub: 'pc_boat_club',
+          boatSales: 'pc_boat_sales',
+        };
+        const translated: Record<string, any> = {};
+        for (const [wizardKey, wizardVal] of Object.entries(cm.profitCenters)) {
+          const inputsKey = wizardToInputsKeyMap[wizardKey];
+          if (inputsKey && wizardVal && typeof wizardVal === 'object') {
+            translated[inputsKey] = { isEnabled: (wizardVal as any).enabled ?? false };
+          }
+        }
+        if (Object.keys(translated).length > 0) {
+          config.profitCenters = translated;
+        }
+        if (cm.profitCenters.commercialTenants?.enabled && cm.profitCenters.commercialTenants?.numberOfSuites) {
+          config.commercialLeaseCount = cm.profitCenters.commercialTenants.numberOfSuites;
+        }
       }
-      if (cm.storageMix && !config.storageMix) {
-        config.storageMix = cm.storageMix;
+      if (cm.underwriting?.holdPeriodYears && !cm.config?.holdPeriod) {
+        config.holdPeriod = cm.underwriting.holdPeriodYears;
+      }
+      if (cm.seasonality?.seasonStartMonth && cm.seasonality?.seasonEndMonth && !cm.config?.seasonMonths) {
+        const start = parseInt(String(cm.seasonality.seasonStartMonth), 10);
+        const end = parseInt(String(cm.seasonality.seasonEndMonth), 10);
+        if (!isNaN(start) && !isNaN(end) && start >= 1 && start <= 12 && end >= 1 && end <= 12) {
+          const months: number[] = [];
+          if (start <= end) {
+            for (let m = start; m <= end; m++) months.push(m);
+          } else {
+            for (let m = start; m <= 12; m++) months.push(m);
+            for (let m = 1; m <= end; m++) months.push(m);
+          }
+          config.seasonMonths = months;
+        }
+      }
+      if (cm.storageMix && !config.departments) {
+        config.departments = {};
+      }
+      if (cm.storageMix?.items && Object.keys(config.departments).length === 0) {
+        const depts: Record<string, any> = {};
+        for (const item of cm.storageMix.items) {
+          if (item.storageType && item.count > 0) {
+            const isYearRound = cm.seasonality?.profile === 'year_round';
+            depts[item.storageType] = {
+              isEnabled: true,
+              section: 'storage',
+              seasons: isYearRound ? ['annual'] : ['seasonal'],
+              capacity: String(item.count || ''),
+              leasable: '',
+              occupiedCount: item.occupancyInputMode === 'count' ? String(item.occupiedCount || '') : '',
+              occupancyPercent: item.occupancyInputMode === 'percentage' ? String(item.currentOccupancy || '') : '',
+              occupancyInputMode: item.occupancyInputMode || 'percentage',
+              hasDesignatedSpaces: false,
+              designatedSpaceIds: [],
+            };
+          }
+        }
+        if (Object.keys(depts).length > 0) {
+          config.departments = depts;
+        }
       }
       
       res.json(config);
