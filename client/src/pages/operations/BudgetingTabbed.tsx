@@ -94,59 +94,55 @@ export default function BudgetingTabbed() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-white dark:bg-gray-900 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Budgeting</h1>
-            <p className="text-sm text-muted-foreground mt-1">Create budgets, track actuals, and analyze variance</p>
-          </div>
-          <div className="flex gap-2">
-            <SeedActualsButton />
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Budget
-            </Button>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Budgeting</h2>
+          <p className="text-sm text-muted-foreground mt-1">Create budgets, track actuals, and analyze variance</p>
+        </div>
+        <div className="flex gap-2">
+          <SeedActualsButton />
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Budget
+          </Button>
         </div>
       </div>
 
-      <div className="px-6 py-4">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="list">Budgets</TabsTrigger>
-            <TabsTrigger value="editor" disabled={!selectedBudget}>Editor</TabsTrigger>
-            <TabsTrigger value="bva" disabled={!selectedBudget}>Budget vs Actual</TabsTrigger>
-          </TabsList>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="list">Budgets</TabsTrigger>
+          <TabsTrigger value="editor" disabled={!selectedBudget}>Editor</TabsTrigger>
+          <TabsTrigger value="bva" disabled={!selectedBudget}>Budget vs Actual</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="list" className="mt-4">
-            <BudgetList
-              onSelect={(b) => {
-                setSelectedBudget(b);
-                const primary = b.versions?.find(v => v.isPrimary) || b.versions?.[0];
-                setSelectedVersion(primary || null);
-                setTab("editor");
-              }}
-              onBva={(b) => {
-                setSelectedBudget(b);
-                setTab("bva");
-              }}
-            />
-          </TabsContent>
+        <TabsContent value="list" className="mt-4">
+          <BudgetList
+            onSelect={(b) => {
+              setSelectedBudget(b);
+              const primary = b.versions?.find(v => v.isPrimary) || b.versions?.[0];
+              setSelectedVersion(primary || null);
+              setTab("editor");
+            }}
+            onBva={(b) => {
+              setSelectedBudget(b);
+              setTab("bva");
+            }}
+          />
+        </TabsContent>
 
-          <TabsContent value="editor" className="mt-4">
-            {selectedBudget && selectedVersion && (
-              <BudgetEditor budget={selectedBudget} version={selectedVersion} />
-            )}
-          </TabsContent>
+        <TabsContent value="editor" className="mt-4">
+          {selectedBudget && selectedVersion && (
+            <BudgetEditor budget={selectedBudget} version={selectedVersion} />
+          )}
+        </TabsContent>
 
-          <TabsContent value="bva" className="mt-4">
-            {selectedBudget && (
-              <BudgetVsActual budgetId={selectedBudget.id} />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
+        <TabsContent value="bva" className="mt-4">
+          {selectedBudget && (
+            <BudgetVsActual budgetId={selectedBudget.id} />
+          )}
+        </TabsContent>
+      </Tabs>
 
       <CreateBudgetDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(b) => {
         setSelectedBudget(b.budget);
@@ -165,7 +161,11 @@ function SeedActualsButton() {
       return res.json();
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       toast({ title: data.seeded ? "Actuals seeded" : "Already seeded", description: data.message });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to seed actuals", description: error.message, variant: "destructive" });
     },
   });
 
@@ -189,6 +189,9 @@ function BudgetList({ onSelect, onBva }: { onSelect: (b: Budget) => void; onBva:
       queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
       toast({ title: "Budget deleted" });
     },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete budget", description: error.message, variant: "destructive" });
+    },
   });
 
   const statusMutation = useMutation({
@@ -196,8 +199,12 @@ function BudgetList({ onSelect, onBva }: { onSelect: (b: Budget) => void; onBva:
       const res = await apiRequest("PATCH", `/api/budgets/${id}`, { status });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+      toast({ title: `Budget ${data.status === "LOCKED" ? "locked" : "unlocked"}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
     },
   });
 
@@ -307,6 +314,9 @@ function CreateBudgetDialog({ open, onOpenChange, onCreated }: {
       onCreated(data);
       setName("");
     },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create budget", description: error.message, variant: "destructive" });
+    },
   });
 
   return (
@@ -373,7 +383,8 @@ function BudgetEditor({ budget, version }: { budget: Budget; version: BudgetVers
   const { data: gridData, isLoading } = useQuery<GridData>({
     queryKey: ["/api/budgets/version", version.id, "grid"],
     queryFn: async () => {
-      const res = await fetch(`/api/budgets/version/${version.id}/grid`);
+      const res = await fetch(`/api/budgets/version/${version.id}/grid`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load grid data");
       return res.json();
     },
   });
@@ -398,7 +409,10 @@ function BudgetEditor({ budget, version }: { budget: Budget; version: BudgetVers
       queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "grid"] });
       setEditedCells({});
       setHasChanges(false);
-      toast({ title: "Budget saved", description: `${Object.keys(editedCells).length} cells updated` });
+      toast({ title: "Budget saved", description: "All changes have been saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save budget", description: error.message, variant: "destructive" });
     },
   });
 
@@ -584,7 +598,8 @@ function BudgetVsActual({ budgetId }: { budgetId: string }) {
   const { data, isLoading } = useQuery<BvaData>({
     queryKey: ["/api/budgets/bva", budgetId],
     queryFn: async () => {
-      const res = await fetch(`/api/budgets/bva/${budgetId}`);
+      const res = await fetch(`/api/budgets/bva/${budgetId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load budget vs actual data");
       return res.json();
     },
   });
