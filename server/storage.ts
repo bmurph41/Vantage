@@ -3041,12 +3041,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCrmLeadsForOrg(orgId: string): Promise<CrmLead[]> {
-    return db.select().from(crmLeads).where(eq(crmLeads.assignedToId, orgId)).orderBy(desc(crmLeads.createdAt));
+    return db.select().from(crmLeads).where(eq(crmLeads.orgId, orgId)).orderBy(desc(crmLeads.createdAt));
   }
 
   async getCrmLeadsByStatus(orgId: string, status: string): Promise<CrmLead[]> {
     return db.select().from(crmLeads)
-      .where(and(eq(crmLeads.assignedToId, orgId), eq(crmLeads.leadStatus, status)))
+      .where(and(eq(crmLeads.orgId, orgId), eq(crmLeads.leadStatus, status)))
       .orderBy(desc(crmLeads.createdAt));
   }
 
