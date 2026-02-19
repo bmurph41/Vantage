@@ -52,3 +52,6 @@ INTEGRATIONS_PLATFORM_ENABLED = "true"
 FINANCIAL_KERNEL_UI_ENABLED = "true"
 CONNECTOR_QBO_ENABLED = "true"
 LISTING_INGESTION_V2 = "true"
+
+[userenv.production]
+NODE_OPTIONS = "--max-old-space-size=4096"
