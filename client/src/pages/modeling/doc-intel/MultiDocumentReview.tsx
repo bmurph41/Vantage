@@ -164,22 +164,30 @@ export function MultiDocumentReview({
   const totalExcluded = allItems.filter(i => i.status === "excluded").length;
   const totalItems = allItems.length;
 
-  // Check if all items are processed (no pending items)
-  const allItemsProcessed = totalPending === 0 && totalItems > 0;
-
-  // Check if ALL non-excluded items are fully classified with both category AND department (Requirement I)
-  const allItemsClassified = useMemo(() => {
-    if (totalItems === 0) return false;
+  // Count confirmed items with valid categories (ready to import)
+  const readyToImport = useMemo(() => {
     const confirmedItems = allItems.filter(item => item.status === 'confirmed');
-    if (confirmedItems.length === 0) return false;
-    return confirmedItems.every(item => {
+    const classified = confirmedItems.filter(item => {
       const hasCategory = item.categoryTierConfirmed || item.categoryTierSuggested;
       return !!hasCategory;
     });
-  }, [allItems, totalItems]);
+    return { total: confirmedItems.length, classified: classified.length, unclassified: confirmedItems.length - classified.length };
+  }, [allItems]);
 
-  // Apply button enabled only when ALL items classified AND at least one confirmed (Requirement I)
-  const canApplyToModel = allItemsClassified && totalConfirmed > 0;
+  // Per-document readiness
+  const documentReadiness = useMemo(() => {
+    const map: Record<string, { confirmed: number; classified: number; pending: number }> = {};
+    uploads.forEach(upload => {
+      const items = queryDataMap[upload.id] || [];
+      const confirmed = items.filter(i => i.status === 'confirmed');
+      const classified = confirmed.filter(i => !!(i.categoryTierConfirmed || i.categoryTierSuggested));
+      map[upload.id] = { confirmed: confirmed.length, classified: classified.length, pending: items.filter(i => i.status === 'pending').length };
+    });
+    return map;
+  }, [uploads, queryDataMap]);
+
+  // Apply button enabled when ANY confirmed items have categories — allows partial apply across documents
+  const canApplyToModel = readyToImport.classified > 0;
 
   // Current document items
   const currentItems = documentItems[activeDocumentId] || [];
@@ -287,26 +295,25 @@ export function MultiDocumentReview({
     },
   });
 
-  // Apply all documents to model - only writes CONFIRMED items (Requirement I)
+  // Apply all documents to model - imports CONFIRMED items with valid categories from ALL documents together
   const handleApplyToModel = async () => {
     if (!canApplyToModel) return;
 
     setIsApplying(true);
     let totalImported = 0;
     let errors = 0;
+    let docsImported = 0;
 
     for (const upload of uploads) {
-      const items = documentItems[upload.id] || [];
-      // Only import CONFIRMED items (Requirement I)
-      const confirmedCount = items.filter(i => i.status === "confirmed").length;
+      const readiness = documentReadiness[upload.id];
+      if (!readiness || readiness.classified === 0) continue;
 
-      if (confirmedCount > 0) {
-        try {
-          const result = await importMutation.mutateAsync(upload.id);
-          totalImported += result.imported;
-        } catch {
-          errors++;
-        }
+      try {
+        const result = await importMutation.mutateAsync(upload.id);
+        totalImported += result.imported;
+        docsImported++;
+      } catch {
+        errors++;
       }
     }
 
@@ -315,7 +322,7 @@ export function MultiDocumentReview({
     if (errors === 0) {
       toast({ 
         title: "Applied to Model", 
-        description: `${totalImported} confirmed line items imported from ${uploads.length} documents.` 
+        description: `${totalImported} confirmed line items imported from ${docsImported} document${docsImported !== 1 ? 's' : ''}.` 
       });
       
       // Invalidate Historical tab caches so fresh data loads
@@ -528,7 +535,7 @@ export function MultiDocumentReview({
                 onClick={handleApplyToModel}
                 disabled={!canApplyToModel || isApplying}
                 className={canApplyToModel ? "" : "opacity-50"}
-                title={!allItemsClassified ? "Classify all items (Category + Department) before applying" : undefined}
+                title={!canApplyToModel ? "Confirm and categorize items to enable Apply to Model" : `Apply ${readyToImport.classified} items from ${Object.values(documentReadiness).filter(d => d.classified > 0).length} document(s)`}
               >
                 {isApplying ? (
                   <>
@@ -538,7 +545,7 @@ export function MultiDocumentReview({
                 ) : (
                   <>
                     <Download className="h-4 w-4 mr-2" />
-                    Apply to Model
+                    Apply to Model{readyToImport.classified > 0 ? ` (${readyToImport.classified})` : ''}
                   </>
                 )}
               </Button>
@@ -548,22 +555,28 @@ export function MultiDocumentReview({
             value={totalItems > 0 ? ((totalConfirmed + totalRejected) / totalItems) * 100 : 0} 
             className="h-3"
           />
-          {!allItemsClassified && totalItems > 0 && (
+          {readyToImport.classified === 0 && totalItems > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              All confirmed items must have a Category (Revenue/Expense/COGS) selected to enable "Apply to Model".
+              Confirm items and assign a Category (Revenue/Expense/COGS) to enable "Apply to Model".
             </p>
           )}
-          {allItemsClassified && !allItemsProcessed && totalPending > 0 && (
+          {readyToImport.unclassified > 0 && readyToImport.classified > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              {totalPending} items still pending. Confirm or reject all items before applying.
+              {readyToImport.unclassified} confirmed item{readyToImport.unclassified !== 1 ? 's' : ''} still need a category. They will be skipped during import.
+            </p>
+          )}
+          {totalPending > 0 && canApplyToModel && (
+            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              {totalPending} item{totalPending !== 1 ? 's' : ''} still pending — you can apply what's ready now and come back for the rest.
             </p>
           )}
           {canApplyToModel && (
             <p className="text-sm text-green-600 dark:text-green-400 mt-2 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
-              All items reviewed! Ready to apply {totalConfirmed} confirmed items to the model.
+              Ready to apply {readyToImport.classified} confirmed item{readyToImport.classified !== 1 ? 's' : ''} across {Object.values(documentReadiness).filter(d => d.classified > 0).length} document{Object.values(documentReadiness).filter(d => d.classified > 0).length !== 1 ? 's' : ''} to the model.
             </p>
           )}
         </CardContent>
@@ -574,6 +587,8 @@ export function MultiDocumentReview({
         <TabsList className="w-full justify-start overflow-x-auto">
           {uploads.map((upload) => {
             const stats = getDocumentStats(upload.id);
+            const readiness = documentReadiness[upload.id];
+            const hasReadyItems = readiness && readiness.classified > 0;
             const isComplete = stats.pending === 0 && stats.total > 0;
             return (
               <TabsTrigger 
@@ -587,6 +602,10 @@ export function MultiDocumentReview({
                 </span>
                 {isComplete ? (
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : hasReadyItems ? (
+                  <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                    {readiness.classified} ready
+                  </Badge>
                 ) : stats.pending > 0 ? (
                   <Badge variant="secondary" className="text-xs">
                     {stats.pending}
