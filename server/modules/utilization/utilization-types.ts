@@ -199,6 +199,37 @@ export interface OfflineCapacityKPI {
   }>;
 }
 
+export interface DailyUtilizationPoint {
+  date: string;
+  dayOfWeek: number;
+  dayLabel: string;
+  totalUnits: number;
+  occupiedUnits: number;
+  utilizationPct: number;
+}
+
+export interface DayOfWeekAverage {
+  dayOfWeek: number;
+  dayLabel: string;
+  avgUtilizationPct: number;
+  sampleCount: number;
+}
+
+export interface CompressionAnalytics {
+  propertyId: string;
+  periodStart: string;
+  periodEnd: string;
+  threshold: number;
+  totalDays: number;
+  compressionDays: number;
+  compressionDaysPct: number;
+  avgUtilizationPct: number;
+  peakUtilizationPct: number;
+  peakDate: string | null;
+  dailySeries: DailyUtilizationPoint[];
+  dayOfWeekAverages: DayOfWeekAverage[];
+}
+
 export interface MockSummaryResponse {
   propertyId: string;
   propertyName: string;
