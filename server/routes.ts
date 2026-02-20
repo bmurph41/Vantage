@@ -20399,13 +20399,13 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { projectId } = req.params;
-      const { lineItemKey, category, overrideType, overrideDepartment, notes } = req.body;
+      const { lineItemKey, category, overrideType, overrideDepartment, overrideCategory, notes } = req.body;
 
       if (!lineItemKey || !overrideType) {
         return res.status(400).json({ error: 'lineItemKey and overrideType are required' });
       }
-      if (overrideType === 'department' && !overrideDepartment) {
-        return res.status(400).json({ error: 'overrideDepartment is required for department overrides' });
+      if (overrideType === 'department' && !overrideDepartment && !overrideCategory) {
+        return res.status(400).json({ error: 'overrideDepartment or overrideCategory is required for department overrides' });
       }
 
       const project = await storage.getModelingProject(projectId, orgId);
@@ -20427,7 +20427,8 @@ Current context: Project ${req.params.projectId}`;
         [result] = await db.update(modelingPnlOverrides)
           .set({
             category: category || existing.category,
-            overrideDepartment: overrideDepartment || existing.overrideDepartment,
+            overrideDepartment: overrideDepartment !== undefined ? (overrideDepartment || existing.overrideDepartment) : existing.overrideDepartment,
+            overrideCategory: overrideCategory !== undefined ? (overrideCategory || null) : existing.overrideCategory,
             notes: notes !== undefined ? notes : existing.notes,
             isActive: true,
             updatedAt: new Date(),
@@ -20442,6 +20443,7 @@ Current context: Project ${req.params.projectId}`;
           category: category || null,
           overrideType,
           overrideDepartment: overrideDepartment || null,
+          overrideCategory: overrideCategory || null,
           isActive: true,
           notes: notes || null,
           createdBy: userId,
@@ -20452,6 +20454,41 @@ Current context: Project ${req.params.projectId}`;
     } catch (error: any) {
       console.error('Failed to upsert P&L override:', error);
       res.status(500).json({ error: 'Failed to save P&L override' });
+    }
+  });
+
+  app.patch('/api/modeling/projects/:projectId/pnl-overrides/:overrideId/clear-category', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, overrideId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { modelingPnlOverrides } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const [existing] = await db.select()
+        .from(modelingPnlOverrides)
+        .where(and(eq(modelingPnlOverrides.id, overrideId), eq(modelingPnlOverrides.orgId, orgId)));
+
+      if (!existing) return res.status(404).json({ error: 'Override not found' });
+
+      if (existing.overrideDepartment) {
+        const [updated] = await db.update(modelingPnlOverrides)
+          .set({ overrideCategory: null, updatedAt: new Date() })
+          .where(eq(modelingPnlOverrides.id, overrideId))
+          .returning();
+        res.json(updated);
+      } else {
+        const [deleted] = await db.delete(modelingPnlOverrides)
+          .where(eq(modelingPnlOverrides.id, overrideId))
+          .returning();
+        res.json({ success: true });
+      }
+    } catch (error: any) {
+      console.error('Failed to clear category override:', error);
+      res.status(500).json({ error: 'Failed to clear category override' });
     }
   });
 

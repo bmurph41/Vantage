@@ -292,7 +292,18 @@ export class ProFormaEngineService {
     const deptOverrideMap: Record<string, string> = {};
     pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
       .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
-    const actuals = allActuals.filter(a => !excludeSet.has(a.subcategory || ''));
+    const categoryOverrideMap: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideCategory)
+      .forEach(o => { categoryOverrideMap[o.lineItemKey] = o.overrideCategory!; });
+    const actuals = allActuals
+      .filter(a => !excludeSet.has(a.subcategory || ''))
+      .map(a => {
+        const catOverride = categoryOverrideMap[a.subcategory || ''];
+        if (catOverride) {
+          return { ...a, category: catOverride };
+        }
+        return a;
+      });
     
     // ========================================
     // 2. BUILD TIMELINE (no more hardcoded years!)
@@ -1422,6 +1433,9 @@ export class ProFormaEngineService {
     const deptOverrideMap: Record<string, string> = {};
     pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
       .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
+    const categoryOverrideMap2: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideCategory)
+      .forEach(o => { categoryOverrideMap2[o.lineItemKey] = o.overrideCategory!; });
 
     const allActuals = await db.select()
       .from(modelingActuals)
@@ -1443,7 +1457,7 @@ export class ProFormaEngineService {
       
       if (!lineItems[key]) {
         lineItems[key] = {};
-        categories[key] = actual.category || 'Other';
+        categories[key] = categoryOverrideMap2[key] || actual.category || 'Other';
         departments[key] = deptOverrideMap[key] || actual.department || inferDeptFn(key, actual.category || 'Other');
       }
       

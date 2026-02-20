@@ -10,6 +10,7 @@ export interface PnlOverride {
   category: string | null;
   overrideType: 'department' | 'exclude';
   overrideDepartment: string | null;
+  overrideCategory: string | null;
   isActive: boolean;
   notes: string | null;
   createdBy: string | null;
@@ -50,6 +51,7 @@ export function useModelingPnlOverrides(projectId: string) {
       category?: string;
       overrideType: 'department' | 'exclude';
       overrideDepartment?: string;
+      overrideCategory?: string;
       notes?: string;
     }) => {
       const res = await apiRequest('POST', `/api/modeling/projects/${projectId}/pnl-overrides`, data);
@@ -57,7 +59,9 @@ export function useModelingPnlOverrides(projectId: string) {
     },
     onSuccess: (_, variables) => {
       invalidate();
-      if (variables.overrideType === 'department') {
+      if (variables.overrideCategory) {
+        toast({ title: 'Category Updated', description: `Moved "${variables.lineItemKey}" to ${variables.overrideCategory}.` });
+      } else if (variables.overrideType === 'department') {
         toast({ title: 'Department Updated', description: `Moved "${variables.lineItemKey}" to ${variables.overrideDepartment}.` });
       } else {
         toast({ title: 'Line Item Excluded', description: `"${variables.lineItemKey}" has been excluded from P&L.` });
@@ -91,6 +95,16 @@ export function useModelingPnlOverrides(projectId: string) {
     });
   };
 
+  const moveToCategory = (lineItemKey: string, targetCategory: string, sourceCategory?: string, targetDepartment?: string) => {
+    upsertMutation.mutate({
+      lineItemKey,
+      category: sourceCategory,
+      overrideType: 'department',
+      overrideCategory: targetCategory,
+      overrideDepartment: targetDepartment,
+    });
+  };
+
   const excludeLineItem = (lineItemKey: string, category?: string) => {
     upsertMutation.mutate({
       lineItemKey,
@@ -117,6 +131,29 @@ export function useModelingPnlOverrides(projectId: string) {
     }
   };
 
+  const clearCategoryOverrideMutation = useMutation({
+    mutationFn: async (overrideId: string) => {
+      const res = await apiRequest('PATCH', `/api/modeling/projects/${projectId}/pnl-overrides/${overrideId}/clear-category`);
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({ title: 'Category Restored', description: 'Line item restored to its original category.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to clear category override', variant: 'destructive' });
+    },
+  });
+
+  const removeCategoryOverride = (lineItemKey: string) => {
+    const override = (overridesQuery.data || []).find(
+      o => o.lineItemKey === lineItemKey && o.overrideType === 'department' && o.isActive && o.overrideCategory
+    );
+    if (override) {
+      clearCategoryOverrideMutation.mutate(override.id);
+    }
+  };
+
   const isExcluded = (lineItemKey: string): boolean => {
     return (overridesQuery.data || []).some(
       o => o.lineItemKey === lineItemKey && o.overrideType === 'exclude' && o.isActive
@@ -130,6 +167,13 @@ export function useModelingPnlOverrides(projectId: string) {
     return override?.overrideDepartment || null;
   };
 
+  const getCategoryOverride = (lineItemKey: string): string | null => {
+    const override = (overridesQuery.data || []).find(
+      o => o.lineItemKey === lineItemKey && o.overrideType === 'department' && o.isActive && o.overrideCategory
+    );
+    return override?.overrideCategory || null;
+  };
+
   const getExcludedItems = (): PnlOverride[] => {
     return (overridesQuery.data || []).filter(o => o.overrideType === 'exclude' && o.isActive);
   };
@@ -138,12 +182,15 @@ export function useModelingPnlOverrides(projectId: string) {
     overrides: overridesQuery.data || [],
     isLoading: overridesQuery.isLoading,
     moveToDepartment,
+    moveToCategory,
     excludeLineItem,
     restoreLineItem,
     removeDepartmentOverride,
+    removeCategoryOverride,
     isExcluded,
     getDepartmentOverride,
+    getCategoryOverride,
     getExcludedItems,
-    isPending: upsertMutation.isPending || deleteMutation.isPending,
+    isPending: upsertMutation.isPending || deleteMutation.isPending || clearCategoryOverrideMutation.isPending,
   };
 }

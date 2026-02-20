@@ -60,7 +60,8 @@ import {
   Flag,
   MoreHorizontal,
   FolderInput,
-  Undo2
+  Undo2,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -183,10 +184,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
   const {
     moveToDepartment,
+    moveToCategory,
     excludeLineItem,
     restoreLineItem,
     removeDepartmentOverride,
+    removeCategoryOverride,
     getDepartmentOverride,
+    getCategoryOverride,
     getExcludedItems,
     isPending: overridesPending,
   } = useModelingPnlOverrides(projectId);
@@ -375,14 +379,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     : (plData?.lineItems || emptyData);
 
   const groupedData = lineItems.reduce((acc: Record<string, Record<string, PLLineItem[]>>, item: PLLineItem) => {
+    const catOverride = getCategoryOverride(item.subcategory);
+    const effectiveCategory = catOverride || item.category;
     const dept = item.department || 'General';
-    if (!acc[item.category]) {
-      acc[item.category] = {};
+    if (!acc[effectiveCategory]) {
+      acc[effectiveCategory] = {};
     }
-    if (!acc[item.category][dept]) {
-      acc[item.category][dept] = [];
+    if (!acc[effectiveCategory][dept]) {
+      acc[effectiveCategory][dept] = [];
     }
-    acc[item.category][dept].push(item);
+    acc[effectiveCategory][dept].push(item);
     return acc;
   }, {} as Record<string, Record<string, PLLineItem[]>>);
 
@@ -477,14 +483,15 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       const year = Number(yearStr);
       if (!dataByYear[year]) continue;
       for (const item of (items as any[])) {
-        const cat = item.category || 'Expenses';
         const subcat = item.subcategory || 'Other';
+        const catOverride = getCategoryOverride(subcat);
+        const cat = catOverride || item.category || 'Expenses';
         if (!dataByYear[year][cat]) dataByYear[year][cat] = {};
         dataByYear[year][cat][subcat] = (dataByYear[year][cat][subcat] || 0) + (item.annualTotal || 0);
       }
     }
     return dataByYear;
-  }, [allYearsActualsData, yearRange]);
+  }, [allYearsActualsData, yearRange, getCategoryOverride]);
 
   const annualSubcatDeptMap = useMemo(() => {
     if (!allYearsActualsData?.byYear) return {};
@@ -1704,6 +1711,36 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                               )}
                                             </DropdownMenuSubContent>
                                           </DropdownMenuSub>
+                                          <DropdownMenuSub>
+                                            <DropdownMenuSubTrigger>
+                                              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                                              Move to Category
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuSubContent>
+                                              {['Revenue', 'COGS', 'Expenses'].filter(c => c !== category).map(cat => (
+                                                <DropdownMenuItem
+                                                  key={cat}
+                                                  onClick={() => moveToCategory(item.subcategory, cat, category, department)}
+                                                  disabled={overridesPending}
+                                                >
+                                                  {cat}
+                                                </DropdownMenuItem>
+                                              ))}
+                                              {getCategoryOverride(item.subcategory) && (
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem
+                                                    onClick={() => removeCategoryOverride(item.subcategory)}
+                                                    disabled={overridesPending}
+                                                    className="text-muted-foreground"
+                                                  >
+                                                    <Undo2 className="h-3.5 w-3.5 mr-2" />
+                                                    Restore Original Category
+                                                  </DropdownMenuItem>
+                                                </>
+                                              )}
+                                            </DropdownMenuSubContent>
+                                          </DropdownMenuSub>
                                           <DropdownMenuSeparator />
                                           <DropdownMenuItem
                                             onClick={() => excludeLineItem(item.subcategory, category)}
@@ -1715,10 +1752,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
-                                      {getDepartmentOverride(item.subcategory) && (
+                                      {(getDepartmentOverride(item.subcategory) || getCategoryOverride(item.subcategory)) && (
                                         <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-300 shrink-0">
                                           <FolderInput className="h-2.5 w-2.5 mr-0.5" />
-                                          Moved
+                                          {getCategoryOverride(item.subcategory) ? `→ ${getCategoryOverride(item.subcategory)}` : 'Moved'}
                                         </Badge>
                                       )}
                                     </div>
