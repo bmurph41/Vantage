@@ -486,7 +486,9 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                     <div>
                       <div className="font-medium">{upload.originalName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {upload.stats?.confirmed || 0} line items imported
+                        {upload.stats
+                          ? `${upload.stats.confirmed} of ${upload.stats.total} line items imported`
+                          : 'Import complete'}
                       </div>
                     </div>
                   </div>

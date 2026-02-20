@@ -42,6 +42,7 @@ import {
   Building2,
   Calendar,
   Calculator,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface DebtInputsProps {
@@ -139,6 +140,12 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
 
   const { data: schedule, isLoading: scheduleLoading } = useQuery<ScheduleRow[]>({
     queryKey: ['/api/modeling/projects', projectId, 'loans', loan?.id, 'schedule'],
+    enabled: !!loan?.id,
+  });
+
+  // Debt Summary (lightweight capital stack from canonical engine)
+  const { data: debtSummary, isLoading: summaryLoading } = useQuery<DebtSummary>({
+    queryKey: ["/api/modeling/projects", projectId, "debt-summary"],
     enabled: !!loan?.id,
   });
 
@@ -582,82 +589,114 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Capital Stack</CardTitle>
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <span>Capital Stack</span>
+                {debtSummary && !summaryLoading && (
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-normal">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Synced
+                  </span>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Senior Debt</span>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">{formatCurrency(loanAmount)}</p>
-                    {totalBasis > 0 && (
-                      <p className="text-xs text-muted-foreground">{debtPct.toFixed(1)}%</p>
+              {summaryLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-2.5 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-2.5 w-full" />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Senior Debt</span>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">{formatCurrency(debtSummary?.totalDebt ?? loanAmount)}</p>
+                        <p className="text-xs text-muted-foreground">{debtSummary ? (debtSummary.debtPct * 100).toFixed(1) : debtPct.toFixed(1)}%</p>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(debtSummary ? debtSummary.debtPct * 100 : debtPct, 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Equity Required</span>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold">{formatCurrency(debtSummary?.totalEquity ?? Math.max(equityRequired, 0))}</p>
+                        <p className="text-xs text-muted-foreground">{debtSummary ? (debtSummary.equityPct * 100).toFixed(1) : equityPct.toFixed(1)}%</p>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-600 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(Math.max(debtSummary ? debtSummary.equityPct * 100 : equityPct, 0), 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {purchasePrice && purchasePrice > 0 && (
+                    <div className="flex items-center justify-between pt-1 border-t">
+                      <span className="text-xs text-muted-foreground">Purchase Price</span>
+                      <span className="text-xs font-medium">{formatCurrency(purchasePrice)}</span>
+                    </div>
+                  )}
+
+                  {debtSummary?.annualDebtService != null && debtSummary.annualDebtService > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Annual Debt Service</span>
+                      <span className="text-xs font-medium">{formatCurrency(debtSummary.annualDebtService)}</span>
+                    </div>
+                  )}
+
+                  {debtSummary?.blendedRate != null && debtSummary.blendedRate > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Blended Rate</span>
+                      <span className="text-xs font-medium">{(debtSummary.blendedRate * 100).toFixed(2)}%</span>
+                    </div>
+                  )}
+
+                  <div className="border-t pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">LTV</span>
+                      <Badge variant={(debtSummary?.ltv ?? ltvValue / 100) > 0.75 ? "destructive" : "secondary"} className="text-xs">
+                        {debtSummary ? (debtSummary.ltv * 100).toFixed(1) : ltvValue.toFixed(1)}%
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">DSCR (Yr 1)</span>
+                      {debtSummary?.dscr != null ? (
+                        <Badge
+                          variant={debtSummary.dscr < 1.0 ? "destructive" : debtSummary.dscr < 1.2 ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {debtSummary.dscr === Infinity ? "\u221e" : `${debtSummary.dscr.toFixed(2)}x`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          Needs NOI
+                        </Badge>
+                      )}
+                    </div>
+
+                    {debtSummary?.debtYield != null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Debt Yield</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {(debtSummary.debtYield * 100).toFixed(2)}%
+                        </Badge>
+                      </div>
                     )}
                   </div>
-                </div>
-
-                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(debtPct, 100)}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Equity Required</span>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">{formatCurrency(Math.max(equityRequired, 0))}</p>
-                    {totalBasis > 0 && (
-                      <p className="text-xs text-muted-foreground">{equityPct.toFixed(1)}%</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-emerald-600 h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(Math.max(equityPct, 0), 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {totalFees > 0 && (
-                <div className="flex items-center justify-between pt-1 border-t">
-                  <span className="text-xs text-muted-foreground">Closing Costs</span>
-                  <span className="text-xs font-medium">{formatCurrency(totalFees)}</span>
-                </div>
+                </>
               )}
-
-              {purchasePrice && purchasePrice > 0 && (
-                <div className="flex items-center justify-between border-t pt-1">
-                  <span className="text-xs text-muted-foreground">Purchase Price</span>
-                  <span className="text-xs font-medium">{formatCurrency(purchasePrice)}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between border-t pt-1">
-                <span className="text-xs font-medium">Total Basis</span>
-                <span className="text-sm font-bold">{formatCurrency(totalBasis)}</span>
-              </div>
-
-              <div className="border-t pt-3 space-y-2">
-                {ltvValue > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">LTV</span>
-                    <Badge variant={ltvValue > 75 ? 'destructive' : 'secondary'} className="text-xs">
-                      {ltvValue.toFixed(1)}%
-                    </Badge>
-                  </div>
-                )}
-                {firstYearDS > 0 && purchasePrice && purchasePrice > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">DSCR (Yr 1)</span>
-                    <Badge variant="secondary" className="text-xs">
-                      --
-                    </Badge>
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
         </div>

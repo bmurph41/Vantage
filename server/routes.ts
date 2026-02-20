@@ -25266,7 +25266,45 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         uploads = uploads.filter((u: any) => u.holdingStatus === holdingStatus);
       }
       
-      res.json(uploads);
+      const uploadIds = uploads.map((u: any) => u.id);
+      let statsMap: Record<string, { total: number; pending: number; confirmed: number; rejected: number; needsReview: number; highConfidence: number; lowConfidence: number }> = {};
+      if (uploadIds.length > 0) {
+        const { docIntelExtractedItems } = await import('@shared/schema');
+        const { sql, inArray, and: andOp, eq: eqOp } = await import('drizzle-orm');
+        const statsRows = await db.select({
+          uploadId: docIntelExtractedItems.uploadId,
+          total: sql<number>`count(*)::int`,
+          pending: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'pending')::int`,
+          confirmed: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'confirmed')::int`,
+          rejected: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'rejected')::int`,
+          highConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric >= 0.8)::int`,
+          lowConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric < 0.8)::int`,
+        })
+          .from(docIntelExtractedItems)
+          .where(andOp(
+            eqOp(docIntelExtractedItems.orgId, orgId),
+            inArray(docIntelExtractedItems.uploadId, uploadIds)
+          ))
+          .groupBy(docIntelExtractedItems.uploadId);
+        for (const row of statsRows) {
+          statsMap[row.uploadId] = {
+            total: row.total,
+            pending: row.pending,
+            confirmed: row.confirmed,
+            rejected: row.rejected,
+            needsReview: row.pending,
+            highConfidence: row.highConfidence,
+            lowConfidence: row.lowConfidence,
+          };
+        }
+      }
+      
+      const enriched = uploads.map((u: any) => ({
+        ...u,
+        stats: statsMap[u.id] || null,
+      }));
+      
+      res.json(enriched);
     } catch (error: any) {
       console.error('Failed to fetch document uploads:', error);
       res.status(500).json({ error: 'Failed to fetch document uploads' });
@@ -28454,6 +28492,64 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       });
     } catch (error: any) {
       console.error("Failed to compute debt summary:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Canonical debt payoff at exit month (for exit scenario auto-population)
+  app.get("/api/modeling/projects/:projectId/debt-payoff", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const exitMonth = parseInt(req.query.exitMonth as string) || 60;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+
+      const projectLoans = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+
+      if (projectLoans.length === 0) {
+        return res.json({
+          hasDebt: false, exitMonth, outstandingBalance: 0,
+          prepaymentPenalty: 0, exitFees: 0, totalPayoff: 0, loanPayoffs: [],
+        });
+      }
+
+      const { computeProjectExitDebt } = await import("@shared/debt/exit-adapter");
+      type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+      const engineInputs: DebtEngineInput[] = projectLoans.map((loan: any) => ({
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths,
+        amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        underwritingFee: loan.underwritingFee ? parseFloat(loan.underwritingFee) : undefined,
+        legalFee: loan.legalFee ? parseFloat(loan.legalFee) : undefined,
+        appraisalFee: loan.appraisalFee ? parseFloat(loan.appraisalFee) : undefined,
+        otherClosingCosts: loan.otherClosingCosts ? parseFloat(loan.otherClosingCosts) : undefined,
+        annualServicingFee: loan.annualServicingFee ? parseFloat(loan.annualServicingFee) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as "none" | "stepdown" | "yield_maint" | "defeasance",
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      }));
+
+      const payoff = computeProjectExitDebt(engineInputs, exitMonth - 1);
+
+      res.json({ hasDebt: true, exitMonth, ...payoff });
+    } catch (error: any) {
+      console.error("Failed to compute debt payoff:", error);
       res.status(500).json({ error: error.message });
     }
   });
