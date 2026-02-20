@@ -446,7 +446,7 @@ export default function UnifiedSidebar() {
       <button
         onClick={onToggle}
         className={cn(
-          "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors",
+          "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors",
           isActive 
             ? "bg-blue-600 text-white hover:bg-blue-700" 
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -714,7 +714,7 @@ export default function UnifiedSidebar() {
             <Link href="/om">
               <div
                 className={cn(
-                  "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors cursor-pointer",
+                  "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                   location.startsWith('/om')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -789,7 +789,7 @@ export default function UnifiedSidebar() {
             <Link href="/marinamatch">
               <div
                 className={cn(
-                  "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors cursor-pointer",
+                  "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                   location.startsWith('/marinamatch')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -825,7 +825,7 @@ export default function UnifiedSidebar() {
             <Link href="/docktalk">
               <div
                 className={cn(
-                  "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors cursor-pointer",
+                  "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                   location.startsWith('/docktalk')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -883,7 +883,7 @@ export default function UnifiedSidebar() {
                 <Link href="/admin/customers">
                   <div
                     className={cn(
-                      "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors cursor-pointer",
+                      "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                       location.startsWith('/admin')
                         ? "bg-blue-600 text-white hover:bg-blue-700" 
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -924,7 +924,7 @@ export default function UnifiedSidebar() {
             <Link href="/settings/integrations">
               <div
                 className={cn(
-                  "flex items-center justify-between w-full px-4 py-2.5 text-[13px] font-medium transition-colors cursor-pointer",
+                  "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                   location.startsWith('/settings/integrations')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
