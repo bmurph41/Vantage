@@ -28553,6 +28553,128 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ── Phase 4: Refinance Analysis ──
+  app.post("/api/modeling/projects/:projectId/debt-refi", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { loanId, triggerMonthIndex, newLoanTerms, cashOutAllowed, propertyValueAtRefi, maxLtvPct, refiFees, maxCashOut } = req.body;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const [loan] = await db.select().from(loansTable)
+        .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .limit(1);
+      if (!loan) return res.status(404).json({ error: "Loan not found" });
+
+      const { computeRefiPlan, compareRefiVsHold } = await import("@shared/debt/refi-engine");
+      type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+      const existingLoan: DebtEngineInput = {
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths, amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as any,
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      };
+
+      const refiConfig = { triggerMonthIndex, newLoanTerms, cashOutAllowed, propertyValueAtRefi, maxLtvPct, refiFees, maxCashOut };
+      const plan = computeRefiPlan(existingLoan, refiConfig);
+      const comparison = compareRefiVsHold(existingLoan, refiConfig, loan.termMonths - 1);
+
+      res.json({ plan: { ...plan, mergedSchedule: undefined, annualSummary: plan.annualSummary }, comparison });
+    } catch (error: any) {
+      console.error("Failed to compute refi plan:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Phase 5: Stress Testing ──
+  app.post("/api/modeling/projects/:projectId/debt-stress-test", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const projectLoans = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+
+      if (projectLoans.length === 0) return res.json({ error: "No loans configured" });
+
+      const { computeStressTest } = await import("@shared/debt/stress-test-engine");
+      type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+      const engineInputs: DebtEngineInput[] = projectLoans.map((loan: any) => ({
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths, amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as any,
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      }));
+
+      const result = computeStressTest(engineInputs, {
+        rateShocksBps: req.body.rateShocksBps || [0, 50, 100, 150, 200],
+        noiDrops: req.body.noiDrops || [0, -0.05, -0.10, -0.15, -0.20],
+        baseNoi: req.body.baseNoi || parseFloat(project.purchasePrice?.toString() || "0") * 0.065,
+        propertyValue: req.body.propertyValue || parseFloat(project.purchasePrice?.toString() || "0"),
+        noiGrowthRate: req.body.noiGrowthRate,
+        minDscrThreshold: req.body.minDscrThreshold,
+        maxLtvThreshold: req.body.maxLtvThreshold,
+        exitMonthIndex: req.body.exitMonthIndex,
+        ioExtensionMonths: req.body.ioExtensionMonths,
+        altAmortMonths: req.body.altAmortMonths,
+      });
+
+      res.json({ ...result, scenarios: result.scenarios.map(s => ({ ...s, annualSummary: undefined })) });
+    } catch (error: any) {
+      console.error("Failed to run stress test:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Phase 6: Fund Waterfall ──
+  app.post("/api/modeling/projects/:projectId/fund-waterfall", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { computeSimpleWaterfall } = await import("@shared/debt/fund-waterfall-adapter");
+      const result = computeSimpleWaterfall(req.body.cashflows, req.body.config);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Failed to compute fund waterfall:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
   // ============================================================================
   // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
   // ============================================================================

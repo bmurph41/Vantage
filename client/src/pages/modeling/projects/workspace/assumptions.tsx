@@ -889,7 +889,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
 
       setBelowTheLine(assumptions.belowTheLine || { managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions(assumptions.exitAssumptions || { sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
-      setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : 7);
+      const dealPricingCap = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
+      const fallbackCap = dealPricingCap && !isNaN(Number(dealPricingCap)) && Number(dealPricingCap) > 0 ? Number(dealPricingCap) : 7;
+      setExitCapRateValue(activeScenario?.exitCapRate ? parseFloat(activeScenario.exitCapRate) * 100 : fallbackCap);
       setHasChanges(false);
     } else {
       setGrowthRates(getDefaultGrowthRates(activeScenarioType));
@@ -899,10 +901,12 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       setStorageGrowth(getDefaultStorageGrowth(activeScenarioType));
       setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
       setExitAssumptions({ sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
-      setExitCapRateValue(7);
+      const dealPricingCapElse = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
+      const fallbackCapElse = dealPricingCapElse && !isNaN(Number(dealPricingCapElse)) && Number(dealPricingCapElse) > 0 ? Number(dealPricingCapElse) : 7;
+      setExitCapRateValue(fallbackCapElse);
       setHasChanges(false);
     }
-  }, [activeScenario, activeScenarioType, holdPeriod]);
+  }, [activeScenario, activeScenarioType, holdPeriod, project]);
 
   function getDefaultGrowthRateValue(scenarioType: ScenarioType): number {
     const baseRates: Record<ScenarioType, number> = { base: 3, aggressive: 5, conservative: 1.5, custom: 3 };

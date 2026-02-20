@@ -106,6 +106,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   });
   const activeScenario = scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
 
+  const { data: dcfProject } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId],
+    enabled: !!projectId,
+  });
+
   // Real-time input state
   const [liveInputs, setLiveInputs] = useState({
     purchasePrice: 5000000,
@@ -124,8 +129,16 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       if (capRatePercent > 0 && Math.abs(capRatePercent - liveInputs.exitCapRate) > 0.01) {
         setLiveInputs(prev => ({ ...prev, exitCapRate: capRatePercent }));
       }
+    } else {
+      const dealPricingCap = dcfProject?.customMetrics?.dealPricing?.exitCapRate;
+      if (dealPricingCap && !isNaN(Number(dealPricingCap)) && Number(dealPricingCap) > 0) {
+        const dpCapRate = Number(dealPricingCap);
+        if (Math.abs(dpCapRate - liveInputs.exitCapRate) > 0.01) {
+          setLiveInputs(prev => ({ ...prev, exitCapRate: dpCapRate }));
+        }
+      }
     }
-  }, [activeScenario?.exitCapRate]);
+  }, [activeScenario?.exitCapRate, dcfProject?.customMetrics?.dealPricing?.exitCapRate]);
 
   useEffect(() => {
     if (sharedHoldPeriod && sharedHoldPeriod !== liveInputs.holdPeriod) {

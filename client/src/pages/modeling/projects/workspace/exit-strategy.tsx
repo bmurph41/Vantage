@@ -82,13 +82,25 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
   const holdPeriod = config?.holdPeriod || 5;
   const purchasePrice = Number(project?.purchasePrice) || 0;
 
+  const dealPricingExitCapRate = (() => {
+    const cm = (project as any)?.customMetrics;
+    const dp = cm?.dealPricing;
+    if (dp?.exitCapRate !== undefined && dp.exitCapRate !== null && !isNaN(Number(dp.exitCapRate)) && Number(dp.exitCapRate) > 0) {
+      return Number(dp.exitCapRate);
+    }
+    return null;
+  })();
+
   const currentScenario: ScenarioConfig = activeCase ? {
     name: activeCase.name,
     description: activeCase.description || '',
     revenueGrowth: parseFloat(activeCase.revenueGrowthRate || '0') * 100,
     expenseGrowth: parseFloat(activeCase.expenseGrowthRate || '0') * 100,
-    exitCapRate: parseFloat(activeCase.exitCapRate || '0') * 100 || 7.5,
-  } : defaultScenarios.base;
+    exitCapRate: parseFloat(activeCase.exitCapRate || '0') * 100 || dealPricingExitCapRate || 7.5,
+  } : {
+    ...defaultScenarios.base,
+    exitCapRate: dealPricingExitCapRate || defaultScenarios.base.exitCapRate,
+  };
 
   const exitCapRate = currentScenario.exitCapRate || 7.5;
   const year1NOI = proForma?.year1NOI || Number(project?.ebitda) || 0;
