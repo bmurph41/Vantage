@@ -14,12 +14,23 @@ import {
 type LineItem = {
   accountCode: string;
   accountName: string;
-  period: string;
-  amount: number;
-  confidence: number;
+  period: string | null;
+  amount: string | number | null;
+  confidence: string | number;
   method: string;
   status: string;
 };
+
+function parseAmount(val: string | number | null | undefined): number {
+  const n = parseFloat(String(val ?? '0'));
+  return isNaN(n) ? 0 : n;
+}
+
+function parseConfidence(val: string | number | null): number {
+  const n = parseFloat(String(val ?? '0'));
+  if (isNaN(n)) return 0;
+  return n <= 1 ? n * 100 : n;
+}
 
 type ProfitCenterData = {
   profitCenter: { id: string; code: string; name: string };
@@ -77,7 +88,7 @@ const SECTION_CONFIG = {
 
 function SectionTable({ items, label, config }: { items: LineItem[]; label: string; config: { color: string; textColor: string } }) {
   if (items.length === 0) return null;
-  const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const subtotal = items.reduce((sum, item) => sum + parseAmount(item.amount), 0);
 
   return (
     <div className="mb-4">
@@ -96,20 +107,24 @@ function SectionTable({ items, label, config }: { items: LineItem[]; label: stri
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item, idx) => (
+          {items.map((item, idx) => {
+            const amt = parseAmount(item.amount);
+            const conf = parseConfidence(item.confidence);
+            return (
             <TableRow key={`${item.accountCode}-${item.period}-${idx}`}>
               <TableCell className="font-mono text-xs">{item.accountCode}</TableCell>
               <TableCell>{item.accountName}</TableCell>
-              <TableCell>{item.period}</TableCell>
-              <TableCell className="text-right font-medium">{currencyFormatter.format(item.amount)}</TableCell>
+              <TableCell>{item.period || "—"}</TableCell>
+              <TableCell className="text-right font-medium">{currencyFormatter.format(amt)}</TableCell>
               <TableCell>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getConfidenceBg(item.confidence)} ${getConfidenceColor(item.confidence)}`}>
-                  {Math.round(item.confidence)}%
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getConfidenceBg(conf)} ${getConfidenceColor(conf)}`}>
+                  {Math.round(conf)}%
                 </span>
               </TableCell>
               <TableCell>{getStatusBadge(item.status)}</TableCell>
             </TableRow>
-          ))}
+            );
+          })}
           <TableRow className="bg-muted/50 font-semibold">
             <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
             <TableCell className="text-right">{currencyFormatter.format(subtotal)}</TableCell>
@@ -174,9 +189,9 @@ function generateCSV(data: DepartmentalPLResponse) {
           section.type,
           item.accountCode,
           item.accountName,
-          item.period,
-          String(item.amount),
-          String(item.confidence),
+          item.period || "",
+          String(parseAmount(item.amount)),
+          String(parseConfidence(item.confidence)),
           item.method,
           item.status,
         ]);

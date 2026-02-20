@@ -25398,10 +25398,10 @@ export type PricingRecommendation = typeof pricingRecommendations.$inferSelect;
 export const coaAssetClassEnum = pgEnum('coa_asset_class', ['MARINA', 'MULTIFAMILY', 'STR', 'SELF_STORAGE', 'RETAIL', 'OFFICE', 'LAUNDROMAT', 'OTHER']);
 export const coaStatementTypeEnum = pgEnum('coa_statement_type', ['REVENUE', 'COGS', 'OPEX', 'OTHER']);
 export const coaMappingMethodEnum = pgEnum('coa_mapping_method', ['EXACT_ALIAS', 'RULES', 'EMBEDDING', 'LLM', 'MANUAL']);
-export const coaReviewStatusEnum = pgEnum('coa_review_status', ['AUTO_MAPPED', 'NEEDS_REVIEW', 'APPROVED', 'OVERRIDDEN']);
+export const coaReviewStatusEnum = pgEnum('coa_review_status', ['AUTO_MAPPED', 'NEEDS_REVIEW', 'APPROVED', 'OVERRIDDEN', 'DISMISSED']);
 export const coaRuleTypeEnum = pgEnum('coa_rule_type', ['KEYWORD', 'REGEX', 'VENDOR', 'CLASS_LOCATION', 'COMPOSITE']);
 export const coaAliasSourceEnum = pgEnum('coa_alias_source', ['USER_CONFIRMATION', 'ADMIN_SEED']);
-export const coaMappingActionEnum = pgEnum('coa_mapping_action', ['AUTO_MAP', 'APPROVE', 'OVERRIDE', 'BULK_APPROVE']);
+export const coaMappingActionEnum = pgEnum('coa_mapping_action', ['AUTO_MAP', 'APPROVE', 'OVERRIDE', 'BULK_APPROVE', 'DISMISS']);
 
 export const taxonomyPacks = pgTable('coa_taxonomy_packs', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),

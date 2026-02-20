@@ -20,12 +20,22 @@ import {
   overrideMapping,
   approveMapping,
   bulkApprove,
+  dismissMapping,
   getTaxonomyTree,
   getMappingQueue,
   invalidatePackCache,
 } from '../services/coa-mapping-engine';
 
 const router = Router();
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+const remapCooldowns = new Map<string, number>();
+const REMAP_COOLDOWN_MS = 30_000;
 
 function getAuthContext(req: Request): { userId: string; orgId: string } | null {
   const userId = (req as any).userId || (req as any).user?.id;
@@ -42,8 +52,11 @@ async function verifyUploadOwnership(uploadId: string, orgId: string): Promise<b
   return !!upload;
 }
 
-router.get('/api/coa-taxonomy/tree', async (_req: Request, res: Response) => {
+router.get('/api/coa-taxonomy/tree', async (req: Request, res: Response) => {
   try {
+    const auth = getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Authentication required' });
+
     const tree = await getTaxonomyTree();
     res.json(tree);
   } catch (error: any) {
@@ -52,8 +65,11 @@ router.get('/api/coa-taxonomy/tree', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/api/coa-taxonomy/packs', async (_req: Request, res: Response) => {
+router.get('/api/coa-taxonomy/packs', async (req: Request, res: Response) => {
   try {
+    const auth = getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Authentication required' });
+
     const packs = await db.select().from(taxonomyPacks).orderBy(desc(taxonomyPacks.createdAt));
     res.json(packs);
   } catch (error: any) {
@@ -63,6 +79,9 @@ router.get('/api/coa-taxonomy/packs', async (_req: Request, res: Response) => {
 
 router.get('/api/coa-taxonomy/canonical-accounts', async (req: Request, res: Response) => {
   try {
+    const auth = getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Authentication required' });
+
     const { packId, statementType, profitCenterId } = req.query;
     let conditions = [];
 
@@ -84,6 +103,7 @@ router.get('/api/coa-taxonomy/canonical-accounts', async (req: Request, res: Res
 router.post('/api/coa-taxonomy/map-upload/:uploadId', async (req: Request, res: Response) => {
   try {
     const { uploadId } = req.params;
+    if (!isValidUUID(uploadId)) return res.status(400).json({ error: 'Invalid upload ID format' });
     const auth = getAuthContext(req);
     if (!auth) return res.status(401).json({ error: 'Authentication required' });
 
@@ -115,8 +135,17 @@ router.post('/api/coa-taxonomy/map-upload/:uploadId', async (req: Request, res: 
 router.post('/api/coa-taxonomy/remap-upload/:uploadId', async (req: Request, res: Response) => {
   try {
     const { uploadId } = req.params;
+    if (!isValidUUID(uploadId)) return res.status(400).json({ error: 'Invalid upload ID format' });
     const auth = getAuthContext(req);
     if (!auth) return res.status(401).json({ error: 'Authentication required' });
+
+    const cooldownKey = `${auth.orgId}:${uploadId}`;
+    const lastRemap = remapCooldowns.get(cooldownKey);
+    if (lastRemap && Date.now() - lastRemap < REMAP_COOLDOWN_MS) {
+      const waitSec = Math.ceil((REMAP_COOLDOWN_MS - (Date.now() - lastRemap)) / 1000);
+      return res.status(429).json({ error: `Please wait ${waitSec}s before remapping again` });
+    }
+    remapCooldowns.set(cooldownKey, Date.now());
 
     const owns = await verifyUploadOwnership(uploadId, auth.orgId);
     if (!owns) return res.status(403).json({ error: 'Access denied' });
@@ -159,6 +188,7 @@ router.get('/api/coa-taxonomy/mapping-queue', async (req: Request, res: Response
     const { uploadId, status, limit, offset } = req.query;
 
     if (uploadId) {
+      if (!isValidUUID(uploadId as string)) return res.status(400).json({ error: 'Invalid upload ID format' });
       const owns = await verifyUploadOwnership(uploadId as string, auth.orgId);
       if (!owns) return res.status(403).json({ error: 'Access denied' });
     }
@@ -168,6 +198,7 @@ router.get('/api/coa-taxonomy/mapping-queue', async (req: Request, res: Response
       status as any,
       parseInt(limit as string) || 100,
       parseInt(offset as string) || 0,
+      auth.orgId,
     );
     res.json(items);
   } catch (error: any) {
@@ -178,10 +209,10 @@ router.get('/api/coa-taxonomy/mapping-queue', async (req: Request, res: Response
 
 router.post('/api/coa-taxonomy/approve/:mappedItemId', async (req: Request, res: Response) => {
   try {
+    const { mappedItemId } = req.params;
+    if (!isValidUUID(mappedItemId)) return res.status(400).json({ error: 'Invalid mapped item ID format' });
     const auth = getAuthContext(req);
     if (!auth) return res.status(401).json({ error: 'Authentication required' });
-
-    const { mappedItemId } = req.params;
     const { createAlias } = req.body || {};
 
     const result = await approveMapping(mappedItemId, auth.userId, auth.orgId, createAlias === true);
@@ -201,6 +232,13 @@ router.post('/api/coa-taxonomy/override', async (req: Request, res: Response) =>
 
     if (!extractedItemId || !canonicalAccountId || !profitCenterId) {
       return res.status(400).json({ error: 'Missing required fields: extractedItemId, canonicalAccountId, profitCenterId' });
+    }
+
+    if (!isValidUUID(extractedItemId) || !isValidUUID(canonicalAccountId) || !isValidUUID(profitCenterId)) {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    if (subCenterId && !isValidUUID(subCenterId)) {
+      return res.status(400).json({ error: 'Invalid sub-center ID format' });
     }
 
     const result = await overrideMapping(
@@ -235,6 +273,22 @@ router.post('/api/coa-taxonomy/bulk-approve', async (req: Request, res: Response
     res.json({ approved, total: mappedItemIds.length });
   } catch (error: any) {
     console.error('[COA Taxonomy] Error bulk approving:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/api/coa-taxonomy/dismiss/:mappedItemId', async (req: Request, res: Response) => {
+  try {
+    const { mappedItemId } = req.params;
+    if (!isValidUUID(mappedItemId)) return res.status(400).json({ error: 'Invalid mapped item ID format' });
+    const auth = getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Authentication required' });
+    const { reason } = req.body || {};
+
+    const result = await dismissMapping(mappedItemId, auth.userId, auth.orgId, reason);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[COA Taxonomy] Error dismissing:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -296,6 +350,7 @@ router.get('/api/coa-taxonomy/audit-log', async (req: Request, res: Response) =>
 router.get('/api/coa-taxonomy/departmental-pl/:uploadId', async (req: Request, res: Response) => {
   try {
     const { uploadId } = req.params;
+    if (!isValidUUID(uploadId)) return res.status(400).json({ error: 'Invalid upload ID format' });
     const auth = getAuthContext(req);
     if (!auth) return res.status(401).json({ error: 'Authentication required' });
 
@@ -371,6 +426,7 @@ router.get('/api/coa-taxonomy/stats', async (req: Request, res: Response) => {
     const { uploadId } = req.query;
 
     if (uploadId) {
+      if (!isValidUUID(uploadId as string)) return res.status(400).json({ error: 'Invalid upload ID format' });
       const owns = await verifyUploadOwnership(uploadId as string, auth.orgId);
       if (!owns) return res.status(403).json({ error: 'Access denied' });
     }
@@ -406,6 +462,7 @@ router.get('/api/coa-taxonomy/stats', async (req: Request, res: Response) => {
       needsReview: stats['NEEDS_REVIEW'] || 0,
       approved: stats['APPROVED'] || 0,
       overridden: stats['OVERRIDDEN'] || 0,
+      dismissed: stats['DISMISSED'] || 0,
       total: Object.values(stats).reduce((a, b) => a + b, 0),
     });
   } catch (error: any) {

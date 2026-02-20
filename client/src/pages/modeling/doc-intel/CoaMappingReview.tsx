@@ -26,16 +26,18 @@ type MappedItem = {
   id: string;
   extractedItemId: string;
   rawLabel: string;
-  canonicalAccountId: string | null;
-  canonicalAccountName: string | null;
-  canonicalAccountCode: string | null;
-  profitCenterId: string | null;
-  profitCenterName: string | null;
-  subCenterId: string | null;
-  confidence: number;
+  amount: string | null;
+  period: string | null;
+  categoryTier: string | null;
+  canonicalAccount: { id: string; code: string; name: string; statementType: string } | null;
+  profitCenter: { id: string; code: string; name: string } | null;
+  subCenter: { id: string; code: string; name: string } | null;
+  confidence: string;
   method: string;
-  status: string;
-  statementType: string | null;
+  explanation: string | null;
+  reviewedStatus: string;
+  reviewedAt: string | null;
+  candidates: any[];
 };
 
 type MappingStats = {
@@ -43,13 +45,8 @@ type MappingStats = {
   needsReview: number;
   approved: number;
   overridden: number;
+  dismissed: number;
   total: number;
-};
-
-type ProfitCenter = {
-  id: string;
-  name: string;
-  subCenters: { id: string; name: string }[];
 };
 
 type CanonicalAccount = {
@@ -61,10 +58,23 @@ type CanonicalAccount = {
   subCenterId: string | null;
 };
 
-type TaxonomyTree = {
-  profitCenters: ProfitCenter[];
+type ProfitCenterNode = {
+  id: string;
+  name: string;
+  code: string;
+  subCenters: { id: string; name: string }[];
   accounts: CanonicalAccount[];
 };
+
+type TaxonomyTree = {
+  pack: { id: string; name: string; assetClass: string; version: string };
+  profitCenters: ProfitCenterNode[];
+};
+
+function parseConfidence(val: string | number | null): number {
+  const n = parseFloat(String(val ?? '0'));
+  return isNaN(n) ? 0 : n <= 1 ? n * 100 : n;
+}
 
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
@@ -72,6 +82,7 @@ const STATUS_FILTERS = [
   { value: "AUTO_MAPPED", label: "Auto-Mapped" },
   { value: "APPROVED", label: "Approved" },
   { value: "OVERRIDDEN", label: "Overridden" },
+  { value: "DISMISSED", label: "Dismissed" },
 ];
 
 function getConfidenceColor(confidence: number) {
@@ -110,10 +121,11 @@ function getStatusBadge(status: string) {
     NEEDS_REVIEW: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
     APPROVED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
     OVERRIDDEN: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+    DISMISSED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   };
   return (
     <Badge variant="outline" className={`border-0 ${variants[status] || ""}`}>
-      {status.replace("_", " ")}
+      {status.replace(/_/g, " ")}
     </Badge>
   );
 }
@@ -128,6 +140,9 @@ export default function CoaMappingReview() {
   const [selectedProfitCenter, setSelectedProfitCenter] = useState("");
   const [selectedAccount, setSelectedAccount] = useState("");
   const [createAliasMap, setCreateAliasMap] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const { data: stats, isLoading: statsLoading } = useQuery<MappingStats>({
     queryKey: ['/api/coa-taxonomy/stats', uploadId],
@@ -226,6 +241,20 @@ export default function CoaMappingReview() {
     },
   });
 
+  const dismissMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      return apiRequest("POST", `/api/coa-taxonomy/dismiss/${id}`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/coa-taxonomy/mapping-queue', uploadId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/coa-taxonomy/stats', uploadId] });
+      toast({ title: "Dismissed", description: "Mapping has been dismissed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to dismiss", variant: "destructive" });
+    },
+  });
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -235,23 +264,25 @@ export default function CoaMappingReview() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === queue.length) {
+    if (selectedIds.size === paginatedQueue.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(queue.map((item) => item.id)));
+      setSelectedIds(new Set(paginatedQueue.map((item) => item.id)));
     }
   };
 
+  const allAccounts: CanonicalAccount[] = taxonomy?.profitCenters.flatMap(pc => pc.accounts) || [];
+
   const openOverrideDialog = (item: MappedItem) => {
     setOverrideItem(item);
-    setSelectedProfitCenter(item.profitCenterId || "");
+    setSelectedProfitCenter(item.profitCenter?.id || "");
     setSelectedAccount("");
     setOverrideDialogOpen(true);
   };
 
   const handleOverrideSubmit = () => {
     if (!overrideItem || !selectedAccount || !selectedProfitCenter) return;
-    const account = taxonomy?.accounts.find((a) => a.id === selectedAccount);
+    const account = allAccounts.find((a) => a.id === selectedAccount);
     overrideMutation.mutate({
       extractedItemId: overrideItem.extractedItemId,
       canonicalAccountId: selectedAccount,
@@ -261,11 +292,26 @@ export default function CoaMappingReview() {
     });
   };
 
-  const filteredAccounts = taxonomy?.accounts.filter(
+  const filteredAccounts = allAccounts.filter(
     (a) => a.profitCenterId === selectedProfitCenter
-  ) || [];
+  );
 
   const isLoading = statsLoading || queueLoading;
+
+  const filteredQueue = queue.filter((item) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      item.rawLabel.toLowerCase().includes(q) ||
+      (item.canonicalAccount?.name || "").toLowerCase().includes(q) ||
+      (item.canonicalAccount?.code || "").toLowerCase().includes(q) ||
+      (item.profitCenter?.name || "").toLowerCase().includes(q)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedQueue = filteredQueue.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -319,7 +365,7 @@ export default function CoaMappingReview() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Auto-Mapped</CardTitle>
@@ -354,6 +400,14 @@ export default function CoaMappingReview() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Dismissed</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.dismissed}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
             </CardHeader>
             <CardContent>
@@ -373,20 +427,40 @@ export default function CoaMappingReview() {
         </TabsList>
       </Tabs>
 
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by account name, code, or profit center..."
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-10 pr-4 py-2 text-sm border rounded-md bg-background"
+          />
+        </div>
+        {filteredQueue.length !== queue.length && (
+          <span className="text-sm text-muted-foreground">
+            {filteredQueue.length} of {queue.length} items
+          </span>
+        )}
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : queue.length === 0 ? (
+          ) : paginatedQueue.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="font-medium">No items found</p>
               <p className="text-sm mt-1">
-                {activeFilter === "all"
-                  ? "No mapped items for this upload."
-                  : `No items with status "${activeFilter.replace("_", " ")}".`}
+                {searchQuery
+                  ? `No items matching "${searchQuery}".`
+                  : activeFilter === "all"
+                    ? "No mapped items for this upload."
+                    : `No items with status "${activeFilter.replace(/_/g, " ")}".`}
               </p>
             </div>
           ) : (
@@ -409,7 +483,7 @@ export default function CoaMappingReview() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {queue.map((item) => (
+                {paginatedQueue.map((item) => (
                   <TableRow key={item.id} className="group">
                     <TableCell>
                       <Checkbox
@@ -421,36 +495,36 @@ export default function CoaMappingReview() {
                       {item.rawLabel}
                     </TableCell>
                     <TableCell>
-                      {item.canonicalAccountName ? (
+                      {item.canonicalAccount ? (
                         <div>
-                          <span className="font-medium">{item.canonicalAccountName}</span>
-                          {item.canonicalAccountCode && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({item.canonicalAccountCode})
-                            </span>
-                          )}
+                          <span className="font-medium">{item.canonicalAccount.name}</span>
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({item.canonicalAccount.code})
+                          </span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground italic">Unmapped</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      {item.profitCenterName || (
+                      {item.profitCenter?.name || (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
+                      {(() => { const conf = parseConfidence(item.confidence); return (
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getConfidenceBg(item.confidence)} ${getConfidenceColor(item.confidence)}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getConfidenceBg(conf)} ${getConfidenceColor(conf)}`}
                       >
-                        {Math.round(item.confidence)}%
+                        {Math.round(conf)}%
                       </span>
+                      ); })()}
                     </TableCell>
                     <TableCell>{getMethodBadge(item.method)}</TableCell>
-                    <TableCell>{getStatusBadge(item.status)}</TableCell>
+                    <TableCell>{getStatusBadge(item.reviewedStatus)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {item.status !== "APPROVED" && (
+                        {item.reviewedStatus !== "APPROVED" && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -474,6 +548,18 @@ export default function CoaMappingReview() {
                           <ChevronDown className="h-3.5 w-3.5 mr-1" />
                           Override
                         </Button>
+                        {item.reviewedStatus !== "DISMISSED" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                            onClick={() => dismissMutation.mutate({ id: item.id })}
+                            disabled={dismissMutation.isPending}
+                          >
+                            <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                            Dismiss
+                          </Button>
+                        )}
                         <div className="flex items-center gap-1">
                           <Checkbox
                             id={`alias-${item.id}`}
@@ -498,6 +584,31 @@ export default function CoaMappingReview() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t px-4 py-3">
+              <span className="text-sm text-muted-foreground">
+                Page {safePage} of {totalPages} ({filteredQueue.length} items)
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

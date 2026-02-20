@@ -11,6 +11,7 @@ import {
   coaMappedLineItems,
   coaMappingAuditLog,
   docIntelExtractedItems,
+  docIntelUploads,
   type TaxonomyPack,
   type CoaProfitCenter,
   type CoaSubCenter,
@@ -467,6 +468,15 @@ export async function persistMappingResults(
   return persisted;
 }
 
+async function verifyExtractedItemOrg(extractedItemId: string, orgId: string): Promise<boolean> {
+  const result = await db.select({ id: docIntelExtractedItems.id })
+    .from(docIntelExtractedItems)
+    .innerJoin(docIntelUploads, eq(docIntelExtractedItems.uploadId, docIntelUploads.id))
+    .where(and(eq(docIntelExtractedItems.id, extractedItemId), eq(docIntelUploads.orgId, orgId)))
+    .limit(1);
+  return result.length > 0;
+}
+
 export async function overrideMapping(
   extractedItemId: string,
   canonicalAccountId: string,
@@ -476,6 +486,9 @@ export async function overrideMapping(
   orgId: string,
   createAlias: boolean = false,
 ): Promise<CoaMappedLineItem> {
+  const ownsItem = await verifyExtractedItemOrg(extractedItemId, orgId);
+  if (!ownsItem) throw new Error('Access denied: item does not belong to your organization');
+
   const cached = await loadActivePack();
   const account = cached.acctMap.get(canonicalAccountId);
   if (!account) throw new Error('Invalid canonical account ID');
@@ -572,12 +585,25 @@ export async function overrideMapping(
   return updated;
 }
 
+async function verifyMappedItemOrg(mappedItemId: string, orgId: string): Promise<boolean> {
+  const result = await db.select({ id: coaMappedLineItems.id })
+    .from(coaMappedLineItems)
+    .innerJoin(docIntelExtractedItems, eq(coaMappedLineItems.extractedItemId, docIntelExtractedItems.id))
+    .innerJoin(docIntelUploads, eq(docIntelExtractedItems.uploadId, docIntelUploads.id))
+    .where(and(eq(coaMappedLineItems.id, mappedItemId), eq(docIntelUploads.orgId, orgId)))
+    .limit(1);
+  return result.length > 0;
+}
+
 export async function approveMapping(
   mappedItemId: string,
   userId: string,
   orgId: string,
   createAlias: boolean = false,
 ): Promise<CoaMappedLineItem> {
+  const ownsItem = await verifyMappedItemOrg(mappedItemId, orgId);
+  if (!ownsItem) throw new Error('Access denied: mapped item does not belong to your organization');
+
   const [existing] = await db.select().from(coaMappedLineItems)
     .where(eq(coaMappedLineItems.id, mappedItemId))
     .limit(1);
@@ -664,6 +690,48 @@ export async function bulkApprove(
   return approved;
 }
 
+export async function dismissMapping(
+  mappedItemId: string,
+  userId: string,
+  orgId: string,
+  reason?: string,
+): Promise<CoaMappedLineItem> {
+  const ownsItem = await verifyMappedItemOrg(mappedItemId, orgId);
+  if (!ownsItem) throw new Error('Access denied: mapped item does not belong to your organization');
+
+  const [existing] = await db.select().from(coaMappedLineItems)
+    .where(eq(coaMappedLineItems.id, mappedItemId))
+    .limit(1);
+
+  if (!existing) throw new Error('Mapped item not found');
+
+  const [updated] = await db.update(coaMappedLineItems)
+    .set({
+      reviewedStatus: 'DISMISSED',
+      reviewedByUserId: userId,
+      reviewedAt: new Date(),
+      updatedAt: new Date(),
+      explanation: reason ? `Dismissed: ${reason}` : 'Dismissed by user',
+    })
+    .where(eq(coaMappedLineItems.id, mappedItemId))
+    .returning();
+
+  await db.insert(coaMappingAuditLog).values({
+    userId,
+    orgId,
+    extractedItemId: existing.extractedItemId,
+    oldMapping: {
+      canonicalAccountId: existing.canonicalAccountId,
+      profitCenterId: existing.profitCenterId,
+      status: existing.reviewedStatus,
+    } as any,
+    newMapping: { status: 'DISMISSED', reason: reason || null } as any,
+    action: 'DISMISS',
+  });
+
+  return updated;
+}
+
 export async function getTaxonomyTree() {
   const cached = await loadActivePack();
   return {
@@ -681,6 +749,7 @@ export async function getMappingQueue(
   status?: 'AUTO_MAPPED' | 'NEEDS_REVIEW' | 'APPROVED' | 'OVERRIDDEN',
   limit: number = 100,
   offset: number = 0,
+  orgId?: string,
 ) {
   let conditions = [];
   if (status) {
@@ -690,21 +759,22 @@ export async function getMappingQueue(
   const query = db.select({
     mapping: coaMappedLineItems,
     extractedItem: docIntelExtractedItems,
+    upload: { orgId: docIntelUploads.orgId },
   })
     .from(coaMappedLineItems)
-    .innerJoin(docIntelExtractedItems, eq(coaMappedLineItems.extractedItemId, docIntelExtractedItems.id));
+    .innerJoin(docIntelExtractedItems, eq(coaMappedLineItems.extractedItemId, docIntelExtractedItems.id))
+    .innerJoin(docIntelUploads, eq(docIntelExtractedItems.uploadId, docIntelUploads.id));
+
+  if (orgId) {
+    conditions.push(eq(docIntelUploads.orgId, orgId));
+  }
+
+  if (uploadId) {
+    conditions.push(eq(docIntelExtractedItems.uploadId, uploadId));
+  }
 
   let baseQuery;
-  if (uploadId) {
-    if (conditions.length > 0) {
-      baseQuery = query.where(and(
-        eq(docIntelExtractedItems.uploadId, uploadId),
-        ...conditions,
-      ));
-    } else {
-      baseQuery = query.where(eq(docIntelExtractedItems.uploadId, uploadId));
-    }
-  } else if (conditions.length > 0) {
+  if (conditions.length > 0) {
     baseQuery = query.where(and(...conditions));
   } else {
     baseQuery = query;
