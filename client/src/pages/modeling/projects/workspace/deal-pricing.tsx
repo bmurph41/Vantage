@@ -1395,7 +1395,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <div>
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 text-indigo-600" />
-                    <span className="text-sm font-semibold text-foreground">AI Deal Recommendation</span>
+                    <span className="text-sm font-semibold text-foreground">Deal Recommendation</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Institutional-grade Buy/Pass signal based on pricing + exit strategy analysis
