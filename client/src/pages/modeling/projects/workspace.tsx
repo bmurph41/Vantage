@@ -75,7 +75,7 @@ import MonteCarloPage from './workspace/monte-carlo';
 import RentRollDataTab from './workspace/rent-roll-data';
 import RentRollAnalysis from './workspace/rent-roll-analysis';
 import ModelReturns from './workspace/model-returns';
-import LeaseListPage from '@/components/leases/LeaseListPage';
+import CommercialLeasesWorkspace from './workspace/commercial-leases';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
@@ -636,7 +636,13 @@ export default function ProjectWorkspace() {
           </div>
           <div className="overflow-x-auto">
             <TabsList className="inline-flex" data-testid="tabs-workspace">
-              {currentGroup.tabs.map((tab) => {
+              {currentGroup.tabs.filter((tab) => {
+                if (tab.value === 'commercial-leases') {
+                  const cm = project?.customMetrics as any;
+                  return cm?.profitCenters?.commercialTenants?.enabled === true;
+                }
+                return true;
+              }).map((tab) => {
                 const TabIcon = tab.icon;
                 return (
                   <TabsTrigger
@@ -725,7 +731,15 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="commercial-leases" className="space-y-6">
-          <LeaseListPage projectId={projectId!} />
+          {(project?.customMetrics as any)?.profitCenters?.commercialTenants?.enabled ? (
+            <CommercialLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
+          ) : (
+            <Card className="p-8 text-center">
+              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Commercial Leases Not Enabled</h2>
+              <p className="text-muted-foreground">Enable Commercial Tenants in the Setup Wizard to use this feature.</p>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="profit" className="space-y-6">

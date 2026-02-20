@@ -1356,8 +1356,18 @@ export class ProFormaEngineService {
       }
 
       if (tenantRows.length > 0) {
-        const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
-        addRevenue('Commercial Tenants', totalRev, 'Commercial');
+        let syncEnabled = true;
+        try {
+          const [proj] = await db.select({ customMetrics: modelingProjects.customMetrics })
+            .from(modelingProjects)
+            .where(eq(modelingProjects.id, projectId));
+          const cfg = (proj?.customMetrics as any) || {};
+          syncEnabled = cfg.commercialLeaseSyncEnabled !== false;
+        } catch {}
+        if (syncEnabled) {
+          const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
+          addRevenue('Commercial Tenants', totalRev, 'Commercial');
+        }
       }
 
       if (bkRows.length > 0) {

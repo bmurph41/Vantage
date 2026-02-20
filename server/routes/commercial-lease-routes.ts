@@ -8,8 +8,8 @@
 
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { modelingProjects } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { modelingProjects, asmpCommercialTenants } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import * as storage from "../services/lease-storage";
 
 const router = Router();
@@ -599,6 +599,75 @@ router.post("/projects/:projectId/import", async (req: Request, res: Response) =
 });
 
 // ============================================================================
+// PRO FORMA SYNC STATUS + TOGGLE
+// ============================================================================
+
+router.get("/projects/:projectId/sync-status", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const [project] = await db.select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId));
+
+    const config = (project?.customMetrics as any) || {};
+    const syncEnabled = config.commercialLeaseSyncEnabled !== false;
+    const lastSyncedAt = config.commercialLeaseLastSyncedAt || null;
+
+    const countResult = await db.select({ count: sql`count(*)::int` })
+      .from(asmpCommercialTenants)
+      .where(eq(asmpCommercialTenants.projectId, projectId));
+    const monthsSynced = (countResult[0] as any)?.count || 0;
+
+    res.json({ syncEnabled, lastSyncedAt, monthsSynced });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/projects/:projectId/sync-toggle", async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { projectId } = req.params;
+    if (!await requireProjectInOrg(projectId, orgId)) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const { syncEnabled } = req.body;
+
+    const [project] = await db.select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId));
+    const config = (project?.customMetrics as any) || {};
+    config.commercialLeaseSyncEnabled = !!syncEnabled;
+
+    await db.update(modelingProjects)
+      .set({ customMetrics: config, updatedAt: new Date() })
+      .where(eq(modelingProjects.id, projectId));
+
+    if (syncEnabled) {
+      try {
+        const { syncLeaseRollupToAssumptions } = await import("../services/commercial-lease-bridge");
+        await syncLeaseRollupToAssumptions(projectId, orgId);
+        config.commercialLeaseLastSyncedAt = new Date().toISOString();
+        await db.update(modelingProjects)
+          .set({ customMetrics: config })
+          .where(eq(modelingProjects.id, projectId));
+      } catch (syncErr) {
+        console.warn("[CommercialLeaseEngine] Auto-sync after toggle-on failed:", syncErr);
+      }
+    }
+
+    res.json({ syncEnabled: !!syncEnabled });
+  } catch (e: any) {
+    console.error("[CommercialLeaseEngine] Sync toggle error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================================
 // PRO FORMA BRIDGE — sync lease rollup into asmpCommercialTenants
 // ============================================================================
 
@@ -611,6 +680,16 @@ router.post("/projects/:projectId/sync-to-proforma", async (req: Request, res: R
     }
     const { syncLeaseRollupToAssumptions } = await import("../services/commercial-lease-bridge");
     const result = await syncLeaseRollupToAssumptions(projectId, orgId);
+
+    const [project] = await db.select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId));
+    const config = (project?.customMetrics as any) || {};
+    config.commercialLeaseLastSyncedAt = new Date().toISOString();
+    await db.update(modelingProjects)
+      .set({ customMetrics: config })
+      .where(eq(modelingProjects.id, projectId));
+
     res.json(result);
   } catch (e: any) {
     console.error("[CommercialLeaseEngine] Sync error:", e);

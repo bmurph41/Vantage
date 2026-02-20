@@ -1,3 +1,4 @@
+import { syncLoansToCapitalStack, clearDebtFromCapitalStack } from "./services/loan-to-capital-stack-sync";
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
@@ -12264,8 +12265,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to retrieve company acquisitions" });
     }
   });
-
-
   app.get("/api/companies/:id/brokered-comps", async (req: any, res) => {
     try {
       const { orgId } = req.user || {};
@@ -20366,8 +20365,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to delete addback' });
     }
   });
-
-
   // ============================================================================
   // P&L LINE ITEM OVERRIDES - Department moves and exclusions
   // ============================================================================
@@ -28210,8 +28207,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: 'Failed to apply capital stack template' });
     }
   });
-
-
   // ============================================================================
   // LOANS - Phase 1 Debt Engine (Single Loan CRUD + Schedule Computation)
   // ============================================================================
@@ -28251,6 +28246,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         projectId,
         orgId,
       }).returning();
+      // Sync: push new loan into capital stack
+      try {
+        await syncLoansToCapitalStack(projectId, orgId, userId);
+      } catch (syncErr) {
+        console.warn("[Loan→CapStack Sync] Failed on create:", syncErr);
+      }
       res.json(loan);
     } catch (error: any) {
       console.error('Failed to create loan:', error);
@@ -28272,6 +28273,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         .set({ ...req.body, updatedAt: new Date() })
         .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
         .returning();
+      // Sync: push updated loan into capital stack
+      try {
+        await syncLoansToCapitalStack(projectId, orgId, req.user.id);
+      } catch (syncErr) {
+        console.warn("[Loan→CapStack Sync] Failed on update:", syncErr);
+      }
       if (!updated) return res.status(404).json({ error: 'Loan not found' });
       res.json(updated);
     } catch (error: any) {
@@ -28289,6 +28296,18 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
       const { loans: loansTable } = await import('@shared/schema');
+      // Sync: re-sync or clear capital stack
+      try {
+        const remainingLoans = await db.select().from(loansTable)
+          .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)));
+        if (remainingLoans.length === 0) {
+          await clearDebtFromCapitalStack(projectId, orgId);
+        } else {
+          await syncLoansToCapitalStack(projectId, orgId);
+        }
+      } catch (syncErr) {
+        console.warn("[Loan→CapStack Sync] Failed on delete:", syncErr);
+      }
       const { eq, and } = await import('drizzle-orm');
       await db.delete(loansTable)
         .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)));
@@ -28363,6 +28382,78 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       });
     } catch (error: any) {
       console.error('Failed to compute loan schedule:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Lightweight capital stack summary from loans (for debt-inputs widget)
+  app.get("/api/modeling/projects/:projectId/debt-summary", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+
+      const projectLoans = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+
+      const purchasePrice = parseFloat(project.purchasePrice?.toString() || "0");
+
+      if (projectLoans.length === 0) {
+        return res.json({
+          hasDebt: false,
+          totalUses: purchasePrice,
+          totalDebt: 0,
+          totalEquity: purchasePrice,
+          debtPct: 0,
+          equityPct: 1,
+          ltv: 0,
+          dscr: null,
+          debtYield: null,
+          monthlyDebtService: 0,
+          annualDebtService: 0,
+          year1EndingBalance: 0,
+          blendedRate: 0,
+        });
+      }
+
+      const { computeCapitalStackSummary } = await import("@shared/debt/debt-engine");
+      type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+      const engineInputs: DebtEngineInput[] = projectLoans.map((loan: any) => ({
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths,
+        amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        underwritingFee: loan.underwritingFee ? parseFloat(loan.underwritingFee) : undefined,
+        legalFee: loan.legalFee ? parseFloat(loan.legalFee) : undefined,
+        appraisalFee: loan.appraisalFee ? parseFloat(loan.appraisalFee) : undefined,
+        otherClosingCosts: loan.otherClosingCosts ? parseFloat(loan.otherClosingCosts) : undefined,
+        annualServicingFee: loan.annualServicingFee ? parseFloat(loan.annualServicingFee) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as "none" | "stepdown" | "yield_maint" | "defeasance",
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      }));
+
+      const summary = computeCapitalStackSummary(engineInputs, purchasePrice);
+
+      res.json({
+        hasDebt: true,
+        ...summary,
+      });
+    } catch (error: any) {
+      console.error("Failed to compute debt summary:", error);
       res.status(500).json({ error: error.message });
     }
   });

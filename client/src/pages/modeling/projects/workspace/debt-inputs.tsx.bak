@@ -78,22 +78,6 @@ interface ScheduleRow {
   endingBalance: number;
 }
 
-
-interface DebtSummary {
-  hasDebt: boolean;
-  totalUses: number;
-  totalDebt: number;
-  totalEquity: number;
-  debtPct: number;
-  equityPct: number;
-  ltv: number;
-  dscr: number | null;
-  debtYield: number | null;
-  monthlyDebtService: number;
-  annualDebtService: number;
-  year1EndingBalance: number;
-  blendedRate: number;
-}
 const LOAN_TYPES = [
   { value: 'acquisition', label: 'Acquisition' },
   { value: 'bridge', label: 'Bridge' },
