@@ -130,6 +130,34 @@ export async function buildCoaCode(
   return coaCodeCache?.get(fallbackKey) || `${majorGroup === 'Revenue' ? 'REV' : majorGroup === 'COGS' ? 'COGS' : 'OPEX'}_MISCELLANEOUS`;
 }
 
+// P&L synonym dictionary for marina-specific terms
+const PNL_SYNONYMS: Record<string, string> = {
+  'wages': 'compensation', 'salaries': 'compensation', 'salary': 'compensation',
+  'payroll': 'compensation', 'labor': 'compensation', 'personnel': 'compensation',
+  'repairs': 'maintenance', 'repair': 'maintenance', 'upkeep': 'maintenance',
+  'maint': 'maintenance', 'r&m': 'maintenance',
+  'ins': 'insurance', 'insur': 'insurance',
+  'electric': 'electricity', 'elec': 'electricity',
+  'trash': 'waste removal', 'garbage': 'waste removal',
+  'income': 'revenue', 'sales': 'revenue',
+  'rental': 'rent', 'rentals': 'rent',
+  'dockage': 'slip revenue', 'wharfage': 'slip revenue',
+  'moorage': 'slip revenue', 'berthage': 'slip revenue',
+  'gas': 'fuel', 'gasoline': 'fuel', 'diesel': 'fuel',
+  'office': 'admin', 'administrative': 'admin',
+  'g&a': 'admin', 'gen admin': 'admin',
+  'legal': 'professional services', 'accounting': 'professional services',
+};
+
+function applySynonyms(text: string): string {
+  let result = text;
+  for (const [syn, canonical] of Object.entries(PNL_SYNONYMS)) {
+    const regex = new RegExp('\\b' + syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    result = result.replace(regex, canonical);
+  }
+  return result;
+}
+
 function normalizeLabel(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 }
@@ -177,24 +205,36 @@ export async function findAliasMatch(rawText: string, sectionHint?: 'income' | '
     }
   }
 
-  // Fuzzy match
-  const words = normalized.split(' ').filter(w => w.length > 2);
+  // Token-set ratio matching (order-independent, synonym-aware)
+  const inputTokens = new Set(normalized.split(' ').filter(w => w.length > 2));
   let bestMatch: { coaCode: string; confidence: number } | null = null;
 
   for (const [aliasLabel, aliasData] of aliasCache.entries()) {
-    let matchCount = 0;
-    for (const word of words) {
-      if (aliasLabel.includes(word)) matchCount++;
-    }
-    if (matchCount > 0) {
-      const score = matchCount / Math.max(words.length, aliasLabel.split(' ').length);
-      if (!bestMatch || score > bestMatch.confidence) {
-        bestMatch = { coaCode: aliasData.coaCode, confidence: score * 0.8 };
+    const aliasTokens = new Set(aliasLabel.split(' ').filter(w => w.length > 2));
+    if (aliasTokens.size === 0 || inputTokens.size === 0) continue;
+    
+    let intersection = 0;
+    for (const token of inputTokens) {
+      if (aliasTokens.has(token)) intersection++;
+      else {
+        for (const at of aliasTokens) {
+          if (at.startsWith(token) || token.startsWith(at)) { intersection += 0.7; break; }
+        }
       }
+    }
+    
+    const union = new Set([...inputTokens, ...aliasTokens]).size;
+    const jaccard = union > 0 ? intersection / union : 0;
+    const minSize = Math.min(inputTokens.size, aliasTokens.size);
+    const overlap = minSize > 0 ? intersection / minSize : 0;
+    const score = (jaccard * 0.4 + overlap * 0.6) * 0.85;
+    
+    if (score > (bestMatch?.confidence || 0)) {
+      bestMatch = { coaCode: aliasData.coaCode, confidence: score };
     }
   }
 
-  if (bestMatch && bestMatch.confidence > 0.4) {
+  if (bestMatch && bestMatch.confidence > 0.55) {
     const canonical = canonicalCache.get(bestMatch.coaCode);
     if (canonical) {
       return {
@@ -385,7 +425,7 @@ export async function learnAlias(
       normalizedLabel: normalized,
       canonicalCoaCode,
       source: 'user_learned',
-      confidence: '0.95',
+      confidence: '0.88',  // AI-learned: below user threshold
       timesUsed: 1,
       lastUsedAt: new Date(),
     })

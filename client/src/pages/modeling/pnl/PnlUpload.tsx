@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
+import { useLocation } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface PnlJob {
   id: string;
@@ -53,7 +55,13 @@ export default function PnlUpload() {
   const [yearHint, setYearHint] = useState<string>("");
   const [statementType, setStatementType] = useState<string>("pnl");
   const [jobId, setJobId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Fetch available modeling projects for association
+  const { data: projects = [] } = useQuery<Array<{id: string; name: string}>>({
+    queryKey: ['/api/modeling/projects'],
+  });
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -62,6 +70,7 @@ export default function PnlUpload() {
       form.append("file", file);
       if (yearHint) form.append("yearHint", yearHint);
       form.append("statementType", statementType);
+      if (selectedProjectId) form.append("modelingProjectId", selectedProjectId);
       
       const res = await fetch("/api/pnl/upload", {
         method: "POST",
@@ -168,7 +177,7 @@ export default function PnlUpload() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="yearHint">Fiscal Year (optional)</Label>
               <Select value={yearHint} onValueChange={setYearHint}>
@@ -195,6 +204,22 @@ export default function PnlUpload() {
                 <SelectContent>
                   <SelectItem value="pnl">P&L / Income Statement</SelectItem>
                   <SelectItem value="balance_sheet">Balance Sheet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="projectId">Link to Project</Label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger id="projectId">
+                  <SelectValue placeholder="None (standalone)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None (standalone)</SelectItem>
+                  {projects.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

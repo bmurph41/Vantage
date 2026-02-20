@@ -30,8 +30,6 @@ import {
   deleteKeywordRule,
   updateKeywordRule,
 } from './department-verification-service';
-import { pnlFileStorage } from './pnl-file-storage';
-import { purgePnlDocument, purgeAllPnlDataForProject } from './pnl-document-purge';
 import { pnlDepartmentVerifications } from '@shared/schema';
 
 const router = Router();
@@ -115,13 +113,6 @@ router.post('/upload', upload.single('file'), async (req: any, res) => {
     runPnlPipeline(job.id).catch(err => {
       console.error(`P&L pipeline failed for job ${job.id}:`, err);
     });
-
-    // Persist file bytes to DB for durable storage
-    try {
-      await pnlFileStorage.persistToDb(doc.id, storagePath);
-    } catch (storageErr: any) {
-      console.warn('[P&L Upload] Failed to persist file to DB:', storageErr.message);
-    }
 
     res.json({ documentId: doc.id, jobId: job.id });
   } catch (error: any) {
@@ -401,25 +392,12 @@ router.get('/facts', async (req: any, res) => {
 
 router.get('/documents', async (req: any, res) => {
   try {
-    const { orgId, userId } = getAuthContext(req);
-    const projectId = req.query.modelingProjectId as string | undefined;
-    const myDocsOnly = req.query.mine === 'true';
-
-    const conditions: any[] = [eq(pnlDocuments.orgId, orgId)];
-    if (projectId) {
-      conditions.push(eq(pnlDocuments.modelingProjectId, projectId));
-    }
-    if (myDocsOnly) {
-      conditions.push(eq(pnlDocuments.uploadedByUserId, userId));
-    }
+    const { orgId } = getAuthContext(req);
 
     const docs = await db.query.pnlDocuments.findMany({
-      where: and(...conditions),
+      where: eq(pnlDocuments.orgId, orgId),
       orderBy: [desc(pnlDocuments.createdAt)],
       limit: 100,
-      columns: {
-        fileData: false,
-      },
     });
 
     res.json({ documents: docs });
@@ -1142,121 +1120,6 @@ router.post('/promote-to-actuals', async (req: any, res) => {
     res.json(result);
   } catch (error: any) {
     console.error('Promote to actuals error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-// ─── Download original file ───────────────────────────────────
-router.get('/documents/:documentId/download', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const documentId = String(req.params.documentId);
-    const doc = await db.query.pnlDocuments.findFirst({
-      where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
-    });
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
-    const { buffer, filename, mimeType } = await pnlFileStorage.getFileBuffer(documentId);
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
-  } catch (error: any) {
-    console.error('Download error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Re-promote: rebuild actuals from existing pnlFacts ───────
-router.post('/re-promote', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const { modelingProjectId } = req.body;
-    if (!modelingProjectId) return res.status(400).json({ error: 'modelingProjectId is required' });
-
-    const { modelingActuals } = await import('@shared/schema');
-    const { promotePnlFactsToActuals } = await import('./promote-to-actuals');
-
-    await db.delete(modelingActuals)
-      .where(and(
-        eq(modelingActuals.modelingProjectId, modelingProjectId),
-        eq(modelingActuals.dataSource, 'doc_intel')
-      ));
-
-    const result = await promotePnlFactsToActuals(orgId, modelingProjectId);
-    res.json({
-      ...result,
-      message: result.promoted > 0
-        ? `Successfully re-promoted ${result.promoted} line items`
-        : 'No P&L facts found to promote. You may need to re-upload documents.',
-    });
-  } catch (error: any) {
-    console.error('Re-promote error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ─── Re-parse: re-run pipeline from stored file ───────────────
-router.post('/documents/:documentId/reparse', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const documentId = String(req.params.documentId);
-    const doc = await db.query.pnlDocuments.findFirst({
-      where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
-    });
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
-
-    await pnlFileStorage.ensureOnDisk(documentId);
-
-    const [job] = await db
-      .insert(pnlJobs)
-      .values({
-        orgId,
-        assetId: doc.assetId ?? null,
-        documentId: doc.id,
-        status: 'queued',
-        stage: 'ingest',
-        parserVersion: 'v2',
-        mapperVersion: 'v1',
-      })
-      .returning();
-
-    runPnlPipeline(job.id).catch(err => {
-      console.error(`P&L re-parse failed for job ${job.id}:`, err);
-    });
-
-    res.json({ documentId: doc.id, jobId: job.id, message: 'Re-parse started' });
-  } catch (error: any) {
-    console.error('Re-parse error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-router.delete('/documents/:documentId', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const documentId = String(req.params.documentId);
-    const doc = await db.query.pnlDocuments.findFirst({
-      where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
-    });
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
-    const result = await purgePnlDocument(documentId, orgId);
-    res.json({ success: true, message: 'Document and all related data permanently deleted', ...result });
-  } catch (error: any) {
-    console.error('Delete document error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.delete('/projects/:projectId/purge', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const projectId = String(req.params.projectId);
-    const result = await purgeAllPnlDataForProject(projectId, orgId);
-    res.json({ success: true, message: 'All P&L pipeline data purged for this project', ...result });
-  } catch (error: any) {
-    console.error('Purge project error:', error);
     res.status(500).json({ error: error.message });
   }
 });

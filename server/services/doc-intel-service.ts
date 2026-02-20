@@ -1332,16 +1332,24 @@ class DocIntelService {
       }
     }
 
-    // Second pass: AI categorization for items without pattern matches
+    // Second pass: AI categorization — chunked to prevent token limits
     if (uncategorizedItems.length > 0) {
       console.log(`[Doc Intel] Running AI categorization for ${uncategorizedItems.length} uncategorized items`);
       
       const allCategories = await this.getCategories(orgId);
-      const aiResults = await this.aiCategorizeItems(
-        uncategorizedItems.map(i => ({ id: i.id, rawText: i.rawText, amount: i.amount })),
-        allCategories,
-        enabledDepartments
-      );
+      const AI_BATCH_SIZE = 50;
+      const aiResults = new Map<string, { categoryId: string; tier: string; department: string; confidence: number }>();
+      
+      for (let batchStart = 0; batchStart < uncategorizedItems.length; batchStart += AI_BATCH_SIZE) {
+        const batch = uncategorizedItems.slice(batchStart, batchStart + AI_BATCH_SIZE);
+        console.log(`[Doc Intel] AI batch ${Math.floor(batchStart / AI_BATCH_SIZE) + 1}/${Math.ceil(uncategorizedItems.length / AI_BATCH_SIZE)}: ${batch.length} items`);
+        const batchResults = await this.aiCategorizeItems(
+          batch.map(i => ({ id: i.id, rawText: i.rawText, amount: i.amount })),
+          allCategories,
+          enabledDepartments
+        );
+        for (const [key, val] of batchResults.entries()) aiResults.set(key, val);
+      }
 
       for (const item of uncategorizedItems) {
         const aiResult = aiResults.get(item.id);
@@ -1425,7 +1433,8 @@ class DocIntelService {
     
     // Built-in patterns for summary/total rows that should always be excluded
     const builtInExclusionPatterns: Array<{ pattern: RegExp; reason: string }> = [
-      { pattern: /\btotal\b/i, reason: 'Summary/total row' },
+      { pattern: /^total\s/i, reason: 'Summary/total row (starts with Total)' },
+      { pattern: /^\s*total$/i, reason: 'Standalone Total row' },
       { pattern: /^gross\s*profit/i, reason: 'Gross Profit summary line' },
       { pattern: /^gross\s*revenue/i, reason: 'Gross Revenue summary line' },
       { pattern: /\bgross\s*revenue\b/i, reason: 'Gross Revenue summary line' },
@@ -1471,7 +1480,16 @@ class DocIntelService {
       ? `For revenue/cogs, ONLY use these enabled departments: ${enabledDepartments.join(', ')}. Do NOT use departments not in this list.`
       : `For revenue/cogs use: storage/fuel/marina_amenities/ship_store_retail/service/parts/boat_club/boat_rentals/boat_sales/boat_brokerage/boat_finance/fb/rv_park/hospitality_lodging/miscellaneous`;
 
+    const totalPositive = items.reduce((s, i) => s + Math.max(0, parseFloat(i.amount || '0')), 0);
+    const totalNegative = items.reduce((s, i) => s + Math.min(0, parseFloat(i.amount || '0')), 0);
+    
     const prompt = `You are a marina/boat storage financial analyst. Categorize these P&L line items.
+
+CONTEXT:
+- Positive amounts are typically Revenue or COGS
+- Negative amounts are typically Expenses  
+- Total positive: $${Math.round(totalPositive).toLocaleString()}
+- Total negative: $${Math.round(Math.abs(totalNegative)).toLocaleString()}
 
 Categories available (tier indicates Revenue, COGS, or Expense):
 ${JSON.stringify(categoryList.slice(0, 50), null, 2)}

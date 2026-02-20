@@ -372,7 +372,7 @@ router.post("/compare-models", async (req: Request, res: Response, next: NextFun
         const capitalAppreciationPct = m.purchasePrice > 0 ? (capitalAppreciation / m.purchasePrice) * 100 : 0;
         const totalEquity = m.purchasePrice - (m.debtSchedule?.totalDebtAtClose || 0);
         const gainOnSale = m.netExitProceeds - totalEquity;
-        const cashOnCashY1 = totalEquity > 0 && proForma.noi[0] ? ((proForma.noi[0] - (m.totalDebtService ? m.totalDebtService / proForma.years.length : 0)) / totalEquity) * 100 : 0;
+        const cashOnCashY1 = totalEquity > 0 && proForma.leveredCashFlow?.[0] != null ? (proForma.leveredCashFlow[0] / totalEquity) * 100 : (totalEquity > 0 && proForma.noi[0] ? (proForma.noi[0] / totalEquity) * 100 : 0);
 
         return {
           projectId: project.id,

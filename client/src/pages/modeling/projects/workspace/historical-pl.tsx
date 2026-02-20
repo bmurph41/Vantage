@@ -6,6 +6,7 @@ import { inferDepartmentClient } from '@/lib/department-inference';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { RevenueSourceToggle } from '@/components/modeling/RevenueSourceToggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -272,6 +273,20 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     queryKey: ['/api/modeling/projects', projectId, 'config'],
   });
 
+  // Revenue source config for department badges
+  const { data: revenueSourceConfig } = useQuery<{ departments: Array<{ dept: string; label: string; hasProfitCenterData: boolean; source: string }>; revenueSourceByDept: Record<string, string> }>({
+    queryKey: [`/api/modeling/projects/${projectId}/revenue-source-config`],
+    enabled: !!projectId,
+  });
+
+  const getRevenueSource = (department: string): string | null => {
+    if (!revenueSourceConfig) return null;
+    const match = revenueSourceConfig.departments.find(d => d.dept === department || d.label === department);
+    if (!match || !match.hasProfitCenterData) return null;
+    return match.source;
+  };
+
+
   // Get valuator project context to determine if this is an owned marina or acquisition
   const { data: projectContext } = useQuery<{ projectType?: string; marinaId?: string }>({
     queryKey: [`/api/operations/projects/${projectId}/context`],
@@ -305,6 +320,30 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       toast({
         title: 'Sync Failed',
         description: error.message || 'Failed to sync operations data',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const reimportMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', `/api/modeling/projects/${projectId}/reimport-actuals`);
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/years`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/actuals/multi-year?years=${yearRange.join(',')}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      toast({
+        title: 'Actuals Refreshed',
+        description: `Re-imported ${result.totalImported} line items from ${result.uploads?.length || 0} documents.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Refresh Failed',
+        description: error.message || 'Failed to refresh actuals from documents',
         variant: 'destructive'
       });
     }
@@ -812,6 +851,26 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             </DialogContent>
           </Dialog>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => reimportMutation.mutate()}
+            disabled={reimportMutation.isPending}
+            title="Re-derive actuals from all confirmed document classifications"
+          >
+            {reimportMutation.isPending ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Actuals
+              </>
+            )}
+          </Button>
+
           <Button variant="outline" size="sm" data-testid="button-export-pl">
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -1071,7 +1130,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
           <div className="overflow-x-auto relative isolate">
-            {viewMode === 'compare' ? (
+            {/* Revenue Source Toggle */}
+      <RevenueSourceToggle projectId={projectId} />
+
+      {viewMode === 'compare' ? (
               <div className="overflow-x-auto">
               <Table style={{ minWidth: '700px' }}>
                 <colgroup>
@@ -1143,8 +1205,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           className="bg-muted/50 cursor-pointer hover:bg-muted group"
                           onClick={() => toggleCategory(category)}
                         >
-                          <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
-                            <div className="flex items-center gap-1.5">
+                          <TableCell className="font-bold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
+                            <div className="flex items-center gap-1.5 group/addback">
                               {expandedCategories.has(category) ? (
                                 <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                               ) : (
@@ -1178,7 +1240,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                    className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                   >
                                     {isCategoryAddedBack(category) ? (
                                       <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
@@ -1190,16 +1252,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               />
                             </div>
                           </TableCell>
-                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
+                          <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasDataA ? 'text-muted-foreground/50' : ''}`}>
                             {hasDataA ? formatCurrency(catTotalA, { dash: true }) : '-'}
                           </TableCell>
-                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
+                          <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasDataB ? 'text-muted-foreground/50' : ''}`}>
                             {hasDataB ? formatCurrency(catTotalB, { dash: true }) : '-'}
                           </TableCell>
-                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${catDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${catDollarChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {hasDataA && hasDataB ? formatCurrency(catDollarChange, { dash: true }) : 'N/A'}
                           </TableCell>
-                          <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${catPctChange !== null && catPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${catPctChange !== null && catPctChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {hasDataA && hasDataB ? (catPctChange !== null ? `${catPctChange >= 0 ? '+' : ''}${catPctChange.toFixed(1)}%` : '—') : 'N/A'}
                           </TableCell>
                         </TableRow>
@@ -1232,7 +1294,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       ) : (
                                         <ChevronRight className="h-3 w-3 shrink-0" />
                                       )}
-                                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{getDisplayName(department, 'department')}</span>
+                                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{getDisplayName(department, 'department')}</span>
+                                      {getRevenueSource(department) && (
+                                        <span className={`ml-1.5 inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium ${
+                                          getRevenueSource(department) === 'profit_center'
+                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                        }`}>
+                                          {getRevenueSource(department) === 'profit_center' ? 'PC' : 'P\u0026L'}
+                                        </span>
+                                      )}
                                       {showDepartmentGrowth && deptPctChange !== null && hasDataA && hasDataB && (
                                         <Badge variant="outline" className={`ml-1 text-[10px] ${deptPctChange >= 0 ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}`}>
                                           {deptPctChange >= 0 ? '+' : ''}{deptPctChange.toFixed(1)}%
@@ -1261,8 +1332,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                   const subPctChange = calcGrowthRate(subAmountB, subAmountA);
                                   return (
                                     <TableRow key={`${category}-${subcategory}`} className={`group ${(isLineItemAddedBack(subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
-                                      <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-xs truncate max-w-[240px]">
-                                        <div className="flex items-center gap-1">
+                                      <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-[11px] truncate max-w-[240px]">
+                                        <div className="flex items-center gap-1 group/addback">
                                           <span>{getDisplayName(subcategory, 'line_item', category, department)}</span>
                                           {isLineItemAddedBack(subcategory) && (
                                             <Badge variant="outline" className="ml-1 text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-300">
@@ -1292,7 +1363,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                                className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                               >
                                                 {isLineItemAddedBack(subcategory) ? (
                                                   <ArrowUpCircle className="h-3 w-3 text-amber-600" />
@@ -1454,8 +1525,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] overflow-hidden text-ellipsis px-3 py-1.5 text-sm">
-                          <div className="flex items-center gap-1.5">
+                        <TableCell className="font-bold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] overflow-hidden text-ellipsis px-3 py-1.5 text-sm">
+                          <div className="flex items-center gap-1.5 group/addback">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                             ) : (
@@ -1484,7 +1555,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                 >
                                   {isCategoryAddedBack(category) ? (
                                     <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
@@ -1546,7 +1617,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                     isOverridden={hasOverride(department, 'department')}
                                     suggestion={getOrgDefaultSuggestion(department, 'department')}
                                     isPending={overridePending}
-                                    className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                                     onSave={async (newName) => {
                                       await saveOverride({ scope: 'department', originalName: department, displayName: newName, category });
                                     }}
@@ -1555,17 +1626,26 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       if (override) await deleteOverride(override.id);
                                     } : undefined}
                                   />
+                                  {getRevenueSource(department) && (
+                                    <span className={`ml-1.5 inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium ${
+                                      getRevenueSource(department) === 'profit_center'
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                    }`}>
+                                      {getRevenueSource(department) === 'profit_center' ? 'PC' : 'P&L'}
+                                    </span>
+                                  )}
                                 </div>
                               </TableCell>
                               {months.map((month, idx) => {
                                 const deptTotal = deptItems.reduce((sum: number, item: PLLineItem) => sum + getAdjustedMonthlyValue(item, month, idx), 0);
                                 return (
-                                  <TableCell key={month} className={`text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground ${!isSeasonalMonth(idx) ? 'bg-slate-50 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                                  <TableCell key={month} className={`text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground/80 ${!isSeasonalMonth(idx) ? 'bg-slate-50 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-800'}`}>
                                     {formatCurrency(deptTotal, { dash: true })}
                                   </TableCell>
                                 );
                               })}
-                              <TableCell className="text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800">
+                              <TableCell className="text-right whitespace-nowrap px-2 py-1 text-xs font-medium text-muted-foreground/80 bg-slate-100 dark:bg-slate-800">
                                 {formatCurrency(deptItems.reduce((sum: number, item: PLLineItem) => {
                                   return months.reduce((itemSum, month, idx) => itemSum + getAdjustedMonthlyValue(item, month, idx), 0);
                                 }, 0), { dash: true })}
@@ -1577,7 +1657,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                               return (
                                 <TableRow key={item.id} className={`group ${(isLineItemAddedBack(item.subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
                                   <TableCell className="pl-9 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] w-[15%] min-w-[140px] max-w-[200px] overflow-hidden text-ellipsis px-3 py-1 text-xs">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 group/addback">
                                       {SourceIcon && (
                                         <SourceIcon className="h-3 w-3 text-muted-foreground" />
                                       )}
@@ -1624,7 +1704,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(item.subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(item.subcategory) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                           >
                                             {isLineItemAddedBack(item.subcategory) ? (
                                               <ArrowUpCircle className="h-3 w-3 text-amber-600" />
@@ -1641,7 +1721,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className={`h-5 px-1 shrink-0 text-[10px] ${hasAnyMonthAddback(item.subcategory, parseInt(selectedYear)) ? 'opacity-100 text-amber-600' : 'opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-amber-600'}`}
+                                                className={`h-5 px-1 shrink-0 text-[10px] ${hasAnyMonthAddback(item.subcategory, parseInt(selectedYear)) ? 'opacity-100 text-amber-600' : 'opacity-0 group-hover/addback:opacity-100 text-muted-foreground hover:text-amber-600'}`}
                                                 disabled={addbackPending}
                                                 onClick={async (e) => {
                                                   e.stopPropagation();
@@ -1675,7 +1755,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover:opacity-100"
+                                            className="h-5 w-5 p-0 shrink-0 opacity-0 group-hover/addback:opacity-100"
                                           >
                                             <MoreHorizontal className="h-3 w-3 text-muted-foreground" />
                                           </Button>
@@ -2010,8 +2090,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                         className="bg-muted/50 cursor-pointer hover:bg-muted group"
                         onClick={() => toggleCategory(category)}
                       >
-                        <TableCell className="font-semibold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
-                          <div className="flex items-center gap-1.5">
+                        <TableCell className="font-bold whitespace-nowrap sticky left-0 z-10 bg-muted border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-2 text-sm overflow-hidden text-ellipsis">
+                          <div className="flex items-center gap-1.5 group/addback">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                             ) : (
@@ -2040,7 +2120,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                  className={`h-6 w-6 p-0 ml-auto ${isCategoryAddedBack(category) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                 >
                                   {isCategoryAddedBack(category) ? (
                                     <ArrowUpCircle className="h-3.5 w-3.5 text-amber-600" />
@@ -2061,7 +2141,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           const growth = prevTotal !== null ? calcGrowthRate(total, prevTotal) : null;
                           return (
                             <Fragment key={year}>
-                              <TableCell className={`text-right font-semibold text-sm px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
+                              <TableCell className={`text-right font-bold text-sm px-3 py-2 tabular-nums ${!hasData ? 'text-muted-foreground/50' : ''}`}>
                                 {hasData ? formatCurrency(total, { dash: true }) : '-'}
                               </TableCell>
                               {showGrowthCols && yi > 0 && (
@@ -2104,7 +2184,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                       isOverridden={hasOverride(department, 'department')}
                                       suggestion={getOrgDefaultSuggestion(department, 'department')}
                                       isPending={overridePending}
-                                      className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                                      className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                                       onSave={async (newName) => {
                                         await saveOverride({ scope: 'department', originalName: department, displayName: newName, category });
                                       }}
@@ -2113,6 +2193,15 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                         if (override) await deleteOverride(override.id);
                                       } : undefined}
                                     />
+                                    {getRevenueSource(department) && (
+                                      <span className={`ml-1.5 inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium ${
+                                        getRevenueSource(department) === 'profit_center'
+                                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                      }`}>
+                                        {getRevenueSource(department) === 'profit_center' ? 'PC' : 'P&L'}
+                                      </span>
+                                    )}
                                   </div>
                                 </TableCell>
                                 {yearRange.map((year, yi) => {
@@ -2139,8 +2228,8 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
                               {expandedDepartments.has(`${category}-${department}`) && deptSubcats.map((subcategory: string) => (
                                 <TableRow key={`${category}-${subcategory}`} className={`group ${(isLineItemAddedBack(subcategory) || isCategoryAddedBack(category)) && showNormalized ? 'opacity-50 line-through' : ''}`}>
-                                  <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-xs truncate max-w-[240px]">
-                                    <div className="flex items-center gap-2">
+                                  <TableCell className="pl-10 whitespace-nowrap sticky left-0 z-10 bg-background border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] px-3 py-1.5 text-[11px] truncate max-w-[240px]">
+                                    <div className="flex items-center gap-2 group/addback">
                                       <div className="flex flex-col">
                                         <InlineEditableName
                                           originalName={subcategory}
@@ -2183,7 +2272,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                            className={`h-5 w-5 p-0 ml-auto shrink-0 ${isLineItemAddedBack(subcategory) ? 'opacity-100' : 'opacity-0 group-hover/addback:opacity-100'}`}
                                           >
                                             {isLineItemAddedBack(subcategory) ? (
                                               <ArrowUpCircle className="h-3 w-3 text-amber-600" />

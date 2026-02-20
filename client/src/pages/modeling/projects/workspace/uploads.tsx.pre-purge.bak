@@ -62,7 +62,6 @@ interface UploadWithStats extends DocIntelUpload {
     needsReview: number;
     highConfidence: number;
     lowConfidence: number;
-    imported: number;
   };
 }
 
@@ -108,7 +107,6 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const [, navigate] = useLocation();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
-  const [purgeEntirely, setPurgeEntirely] = useState(true);
   const [vdrSectionOpen, setVdrSectionOpen] = useState(true);
   const [importingDocId, setImportingDocId] = useState<string | null>(null);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
@@ -143,18 +141,16 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   
 
   const deleteMutation = useMutation({
-    mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}?purge=${purgeEntirely}`),
+    mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
       setDeleteConfirmId(null);
       setDeleteConfirmName("");
-      setPurgeEntirely(true);
       toast({ title: 'Deleted', description: 'Document has been removed.' });
     },
     onError: () => {
       setDeleteConfirmId(null);
       setDeleteConfirmName("");
-      setPurgeEntirely(true);
       toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
     },
   });
@@ -436,12 +432,6 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                           <Progress value={getProgressValue(upload)} className="h-1.5" />
                         </div>
                       )}
-                      {upload.stats && (upload.stats.imported || 0) > 0 && (
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                          <span className="text-xs text-green-600">{upload.stats.imported} items imported to Historical P&L</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
@@ -497,7 +487,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                       <div className="font-medium">{upload.originalName}</div>
                       <div className="text-sm text-muted-foreground">
                         {upload.stats
-                          ? `${upload.stats.confirmed} confirmed, ${upload.stats.imported || 0} imported to P&L${upload.stats.confirmed > 0 && (upload.stats.imported || 0) < upload.stats.confirmed ? ' ⚠️' : ' ✓'}`
+                          ? `${upload.stats.confirmed} of ${upload.stats.total} line items imported`
                           : 'Import complete'}
                       </div>
                     </div>
@@ -548,21 +538,8 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Are you sure you want to delete &ldquo;{deleteConfirmName}&rdquo;? This action cannot be undone.</p>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={purgeEntirely}
-                    onChange={(e) => setPurgeEntirely(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300"
-                  />
-                  <span className="text-sm">
-                    <strong>Remove from platform entirely</strong> — deletes the document, all extracted financial data, P&amp;L facts, and related actuals. Re-uploading this file will be treated as a fresh upload.
-                  </span>
-                </label>
-              </div>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteConfirmName}"? This action cannot be undone and will permanently remove the document and all its extracted data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

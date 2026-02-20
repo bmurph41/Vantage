@@ -80,6 +80,9 @@ const eventTypeConfig: Record<string, { label: string; icon: any; color: string 
   project_updated: { label: 'Project Updated', icon: Edit3, color: 'text-blue-500' },
   assumptions_updated: { label: 'Assumptions Updated', icon: Edit3, color: 'text-blue-500' },
   config_updated: { label: 'Config Updated', icon: Edit3, color: 'text-blue-500' },
+  revenue_source_toggled: { label: 'Revenue Source Changed', icon: RefreshCw, color: 'text-indigo-500' },
+  document_purged: { label: 'Document Purged', icon: Trash2, color: 'text-red-500' },
+  actuals_reimported: { label: 'Actuals Re-imported', icon: RefreshCw, color: 'text-green-500' },
 };
 
 const entityTypeLabels: Record<string, string> = {
@@ -87,6 +90,9 @@ const entityTypeLabels: Record<string, string> = {
   project: 'Project',
   assumptions: 'Assumptions',
   config: 'Configuration',
+  project_config: 'Project Config',
+  document: 'Document',
+  actuals: 'Actuals',
 };
 
 export default function AuditTrailViewer({ projectId }: AuditTrailViewerProps) {

@@ -27,6 +27,8 @@ import type { ModelingProject } from '@shared/schema';
 import type { ProjectConfig, ProjectAssumptions } from '@/types/modeling';
 import { LiveDataStatusPanel } from '@/components/modeling/LiveDataStatusPanel';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
+import { lazy, Suspense } from 'react';
+const ValidationWarnings = lazy(() => import('./validation-warnings'));
 import { MarketRatesSummary } from '@/components/modeling/MarketRatesSummary';
 
 interface WorkspaceOverviewProps {
@@ -52,6 +54,11 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     queryKey: ['/api/modeling/projects', project.id, 'documents'],
   });
 
+  const { data: actualsYears = [] } = useQuery<string[]>({
+    queryKey: ['/api/modeling/projects', project.id, 'actuals/years'],
+    enabled: !!project.id,
+  });
+
   const { data: assumptions } = useQuery<ProjectAssumptions | null>({
     queryKey: ['/api/modeling/projects', project.id, 'assumptions'],
   });
@@ -69,8 +76,9 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
   const hasConfig = config?.holdPeriod && config?.seasonMonths?.length > 0;
   const hasUploads = uploads.length > 0;
   const hasCompletedUploads = uploads.some((u: any) => u.status === 'completed');
+  const hasReviewedUploads = uploads.some((u: any) => u.stats?.imported > 0);
   const hasAssumptions = assumptions?.growthRates && Object.keys(assumptions.growthRates).length > 0;
-  const hasHistoricalData = hasCompletedUploads;
+  const hasHistoricalData = actualsYears.length > 0;
   const hasProForma = proForma && (Array.isArray(proForma) ? proForma.length > 0 : proForma?.years?.length > 0 || proForma?.rows?.length > 0);
   const hasScenarios = Array.isArray(scenarios) && scenarios.length > 0;
   const hasMultipleScenarios = Array.isArray(scenarios) && scenarios.length >= 2;
@@ -89,10 +97,10 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     {
       id: 'uploads',
       title: 'Upload Documents',
-      description: 'Upload P&L statements and rent rolls for AI parsing',
+      description: uploads.length > 0 ? `${uploads.length} document${uploads.length > 1 ? 's' : ''} uploaded${hasReviewedUploads ? ', imported to P&L' : ''}` : 'Upload P&L statements and rent rolls for AI parsing',
       tab: 'uploads',
       icon: <Upload className="h-5 w-5" />,
-      status: hasCompletedUploads ? 'complete' : hasUploads ? 'in-progress' : 'pending',
+      status: hasReviewedUploads ? 'complete' : hasCompletedUploads ? 'in-progress' : hasUploads ? 'in-progress' : 'pending',
     },
     {
       id: 'assumptions',
@@ -105,10 +113,10 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
     {
       id: 'historical',
       title: 'Review Historical P&L',
-      description: 'Verify categorized historical data by month',
+      description: actualsYears.length > 0 ? `Historical data for ${actualsYears.join(', ')}` : 'Verify categorized historical data by month',
       tab: 'historical',
       icon: <FileSpreadsheet className="h-5 w-5" />,
-      status: hasHistoricalData ? 'complete' : hasAssumptions ? 'in-progress' : 'pending',
+      status: hasHistoricalData ? 'complete' : hasReviewedUploads ? 'in-progress' : 'pending',
     },
     {
       id: 'proforma',
@@ -184,6 +192,11 @@ export default function WorkspaceOverview({ project, onTabChange }: WorkspaceOve
   return (
     <div className="space-y-6">
       <WorkflowNavigation currentTab="overview" onNavigate={onTabChange} />
+
+      {/* Validation Warnings Summary */}
+      <Suspense fallback={null}>
+        <ValidationWarnings projectId={project.id} compact onTabChange={onTabChange} />
+      </Suspense>
       
       {/* Zilculator-Style KPI Cards */}
       <div className="grid gap-3 md:grid-cols-4">

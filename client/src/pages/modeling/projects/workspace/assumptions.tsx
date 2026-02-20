@@ -647,6 +647,9 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     capexAmount: 0,
     reservesPct: 0,
     reservesAmount: 0,
+    managementFeeLinePosition: 'below' as 'above' | 'below',
+    capexLinePosition: 'below' as 'above' | 'below',
+    reservesLinePosition: 'below' as 'above' | 'below',
   });
   const [exitAssumptions, setExitAssumptions] = useState({
     sellingFeePct: 2,
@@ -887,7 +890,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
         ),
       });
 
-      setBelowTheLine(assumptions.belowTheLine || { managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
+      setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0, managementFeeLinePosition: 'below', capexLinePosition: 'below', reservesLinePosition: 'below', ...assumptions.belowTheLine });
       setExitAssumptions(assumptions.exitAssumptions || { sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
       const dealPricingCap = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
       const fallbackCap = dealPricingCap && !isNaN(Number(dealPricingCap)) && Number(dealPricingCap) > 0 ? Number(dealPricingCap) : 7;
@@ -899,7 +902,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
       setOccupancy(getDefaultOccupancy(years));
       setMargins(getDefaultMargins());
       setStorageGrowth(getDefaultStorageGrowth(activeScenarioType));
-      setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0 });
+      setBelowTheLine({ managementFeePct: 0, capexPct: 2, capexAmount: 0, reservesPct: 0, reservesAmount: 0, managementFeeLinePosition: 'below', capexLinePosition: 'below', reservesLinePosition: 'below' });
       setExitAssumptions({ sellingFeePct: 2, loanExitFeePct: 0, workingCapitalRecoveryPct: 100, workingCapitalAmount: 0 });
       const dealPricingCapElse = (project as any)?.customMetrics?.dealPricing?.exitCapRate;
       const fallbackCapElse = dealPricingCapElse && !isNaN(Number(dealPricingCapElse)) && Number(dealPricingCapElse) > 0 ? Number(dealPricingCapElse) : 7;
@@ -1673,6 +1676,22 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                           disabled={isScenarioLocked}
                         />
                         <span className="text-[10px] text-muted-foreground">% of Gross Revenue</span>
+                        <button
+                          type="button"
+                          className={`ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                            belowTheLine.managementFeeLinePosition === 'above'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                          }`}
+                          onClick={() => {
+                            setBelowTheLine(prev => ({ ...prev, managementFeeLinePosition: prev.managementFeeLinePosition === 'above' ? 'below' : 'above' }));
+                            setHasChanges(true); changesSinceSaveRef.current = true; hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                          title="Toggle whether this item is deducted before NOI (above the line) or after NOI (below the line)"
+                        >
+                          {belowTheLine.managementFeeLinePosition === 'above' ? '↑ Above NOI' : '↓ Below NOI'}
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
@@ -1695,6 +1714,22 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                           disabled={isScenarioLocked}
                         />
                         <span className="text-[10px] text-muted-foreground">% of Revenue</span>
+                        <button
+                          type="button"
+                          className={`ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                            belowTheLine.capexLinePosition === 'above'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                          }`}
+                          onClick={() => {
+                            setBelowTheLine(prev => ({ ...prev, capexLinePosition: prev.capexLinePosition === 'above' ? 'below' : 'above' }));
+                            setHasChanges(true); changesSinceSaveRef.current = true; hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                          title="Toggle whether this item is deducted before NOI (above the line) or after NOI (below the line)"
+                        >
+                          {belowTheLine.capexLinePosition === 'above' ? '↑ Above NOI' : '↓ Below NOI'}
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-white dark:bg-slate-800/50 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">
@@ -1717,6 +1752,22 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                           disabled={isScenarioLocked}
                         />
                         <span className="text-[10px] text-muted-foreground">% of Revenue</span>
+                        <button
+                          type="button"
+                          className={`ml-auto text-[9px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                            belowTheLine.reservesLinePosition === 'above'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400'
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                          }`}
+                          onClick={() => {
+                            setBelowTheLine(prev => ({ ...prev, reservesLinePosition: prev.reservesLinePosition === 'above' ? 'below' : 'above' }));
+                            setHasChanges(true); changesSinceSaveRef.current = true; hasChangesRef.current = true;
+                          }}
+                          disabled={isScenarioLocked}
+                          title="Toggle whether this item is deducted before NOI (above the line) or after NOI (below the line)"
+                        >
+                          {belowTheLine.reservesLinePosition === 'above' ? '↑ Above NOI' : '↓ Below NOI'}
+                        </button>
                       </div>
                     </div>
                   </div>

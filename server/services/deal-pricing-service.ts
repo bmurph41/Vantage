@@ -246,6 +246,78 @@ class DealPricingService {
     };
   }
 
+
+  /**
+   * Solve for purchase price using ACTUAL Pro Forma cash flows.
+   * Bisection finds price where IRR matches target.
+   */
+  solveForPriceFromProForma(
+    proFormaData: ProFormaCashFlowData,
+    targetIRR: number,
+    exitValue: number
+  ): PricingResult {
+    const { noiProjections, leveredCashFlows, loanProceeds, loanPayoffAtExit,
+            sellingFeePct, workingCapitalAmount, workingCapitalRecoveryPct,
+            year1NOI, baseRevenue, baseExpenses, holdPeriod } = proFormaData;
+
+    let low = 100_000;
+    let high = exitValue * 3;
+    let bestPrice = (low + high) / 2;
+    let bestIRR = 0;
+
+    for (let iter = 0; iter < 200; iter++) {
+      const testPrice = Math.round((low + high) / 2);
+      const equity = testPrice - loanProceeds;
+      if (equity <= 0) { low = testPrice; continue; }
+
+      const cashFlows: number[] = [-equity];
+      for (let yr = 0; yr < holdPeriod; yr++) {
+        const annualCF = leveredCashFlows[yr] || 0;
+        if (yr === holdPeriod - 1) {
+          const sellingFees = exitValue * sellingFeePct;
+          const workingCapRecovery = workingCapitalAmount * workingCapitalRecoveryPct;
+          const netExit = exitValue - sellingFees - loanPayoffAtExit + workingCapRecovery;
+          cashFlows.push(annualCF + netExit);
+        } else {
+          cashFlows.push(annualCF);
+        }
+      }
+
+      const irr = this.calculateIRR(cashFlows);
+      bestIRR = irr;
+      bestPrice = testPrice;
+      if (Math.abs(irr - targetIRR) < 0.0005) break;
+      if (irr > targetIRR) low = testPrice; else high = testPrice;
+    }
+
+    bestPrice = roundDownToThousand(bestPrice);
+    const equity = bestPrice - loanProceeds;
+    const year1CapRate = bestPrice > 0 ? (year1NOI / bestPrice) * 100 : 0;
+    const sellingFees = exitValue * sellingFeePct;
+    const netExitProceeds = exitValue - sellingFees - loanPayoffAtExit;
+    const totalCFs = leveredCashFlows.reduce((s, cf) => s + cf, 0);
+    const totalProfit = netExitProceeds - equity + totalCFs;
+    const equityMultiple = equity > 0 ? (totalProfit + equity) / equity : 0;
+    const avgCashOnCash = equity > 0 ? (totalCFs / holdPeriod / equity) * 100 : 0;
+
+    return {
+      purchasePrice: bestPrice,
+      year1CapRate,
+      exitCapRate: exitValue > 0 && noiProjections[holdPeriod - 1] ? (noiProjections[holdPeriod - 1] / exitValue) * 100 : 0,
+      irr: bestIRR * 100,
+      equityMultiple: Math.round(equityMultiple * 100) / 100,
+      moic: Math.round(equityMultiple * 100) / 100,
+      averageCashOnCash: Math.round(avgCashOnCash * 100) / 100,
+      noiByYear: noiProjections,
+      cashFlowsByYear: leveredCashFlows,
+      exitValue,
+      totalProfit: Math.round(totalProfit),
+      netExitProceeds: Math.round(netExitProceeds),
+      totalEquityInvested: Math.round(equity),
+      usedProFormaData: true,
+    };
+  }
+
   solveForPriceFromCapRate(
     year1NOI: number,
     targetCapRate: number

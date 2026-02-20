@@ -414,11 +414,6 @@ export class ProFormaEngineService {
     const reservesPct = (belowTheLine.reservesPct || 0) / 100;
     const reservesAmount = belowTheLine.reservesAmount || 0;
     
-    // Above/below line position for each item (default: 'below' = after NOI)
-    const mgmtFeeLinePos: 'above' | 'below' = belowTheLine.managementFeeLinePosition || 'below';
-    const capexLinePos: 'above' | 'below' = belowTheLine.capexLinePosition || 'below';
-    const reservesLinePos: 'above' | 'below' = belowTheLine.reservesLinePosition || 'below';
-    
     // Exit assumptions
     const exitAssumptions = assumptions.exitAssumptions || {};
     const sellingFeePct = (exitAssumptions.sellingFeePct ?? 2) / 100;
@@ -896,23 +891,13 @@ export class ProFormaEngineService {
       const expTotal = expenseLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0);
       
       const gp = revTotal - cogsTotal;
-      const rawNoi = gp - expTotal;
-      const pctBasis = belowTheLineBasis === 'noi' ? rawNoi : revTotal;
+      const noiVal = gp - expTotal;
+      const pctBasis = belowTheLineBasis === 'noi' ? noiVal : revTotal;
       const mgmtFee = Math.round(pctBasis * managementFeePct);
       const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(pctBasis * capexPct);
       const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(pctBasis * reservesPct);
-      
-      // Items marked 'above' are deducted before NOI; 'below' items deducted after
-      const aboveLineMgmt = mgmtFeeLinePos === 'above' ? mgmtFee : 0;
-      const aboveLineCapex = capexLinePos === 'above' ? capexVal : 0;
-      const aboveLineReserves = reservesLinePos === 'above' ? reserveVal : 0;
-      const noiVal = rawNoi - aboveLineMgmt - aboveLineCapex - aboveLineReserves;
-      
-      const belowLineMgmt = mgmtFeeLinePos === 'below' ? mgmtFee : 0;
-      const belowLineCapex = capexLinePos === 'below' ? capexVal : 0;
-      const belowLineReserves = reservesLinePos === 'below' ? reserveVal : 0;
       const debtSvc = 0; // Will be updated after debt integration
-      const cfBeforeDebt = noiVal - belowLineMgmt - belowLineCapex - belowLineReserves;
+      const cfBeforeDebt = noiVal - mgmtFee - capexVal - reserveVal;
       const levCf = cfBeforeDebt - debtSvc;
       
       revenueTotalsMonthly[period.key] = revTotal;
@@ -944,10 +929,7 @@ export class ProFormaEngineService {
       year.monthIndices.reduce((sum, mi) => sum + (expenseTotalsMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
     
-    // Roll up from noiMonthly (which already reflects above-the-line deductions)
-    const noi = annualPeriods.map(year =>
-      year.monthIndices.reduce((sum, mi) => sum + (noiMonthly[monthlyPeriods[mi].key] || 0), 0)
-    );
+    const noi = grossProfit.map((gp, i) => gp - expenseTotals[i]);
     const capex = annualPeriods.map(year =>
       year.monthIndices.reduce((sum, mi) => sum + (capexMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
@@ -965,12 +947,7 @@ export class ProFormaEngineService {
       year.monthIndices.reduce((sum, mi) => sum + (leveredCashFlowMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
     const cashFlow = leveredCashFlow.slice(); // Backward compat
-    const noiBelowLine = annualPeriods.map((_, i) => {
-      const belMgmt = mgmtFeeLinePos === 'below' ? managementFeeArr[i] : 0;
-      const belCapex = capexLinePos === 'below' ? capex[i] : 0;
-      const belReserves = reservesLinePos === 'below' ? reservesArr[i] : 0;
-      return belMgmt + belCapex + belReserves + debtServiceArr[i];
-    });
+    const noiBelowLine = annualPeriods.map((_, i) => managementFeeArr[i] + capex[i] + reservesArr[i] + debtServiceArr[i]);
     
     // ========================================
     // 8. BUILD PROJECTION DETAIL ARRAYS
@@ -1087,11 +1064,10 @@ export class ProFormaEngineService {
             const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
             debtServiceMonthly[period.key] = Math.round(ds.payment);
             const noiVal = noiMonthly[period.key] || 0;
-            // Only subtract below-the-line items (above-line already in noiVal)
-            const belMgmt = mgmtFeeLinePos === 'below' ? (managementFeeMonthly[period.key] || 0) : 0;
-            const belCapex = capexLinePos === 'below' ? (capexMonthly[period.key] || 0) : 0;
-            const belReserves = reservesLinePos === 'below' ? (reservesMonthly[period.key] || 0) : 0;
-            const newLevCf = noiVal - belMgmt - belCapex - belReserves - Math.round(ds.payment);
+            const mgmtFee = managementFeeMonthly[period.key] || 0;
+            const capexVal = capexMonthly[period.key] || 0;
+            const reserveVal = reservesMonthly[period.key] || 0;
+            const newLevCf = noiVal - mgmtFee - capexVal - reserveVal - Math.round(ds.payment);
             leveredCashFlowMonthly[period.key] = newLevCf;
             cashFlowMonthly[period.key] = newLevCf;
           }
@@ -1102,10 +1078,7 @@ export class ProFormaEngineService {
             debtServiceArr[i] = year.monthIndices.reduce((sum, mi) => sum + (debtServiceMonthly[monthlyPeriods[mi].key] || 0), 0);
             leveredCashFlow[i] = year.monthIndices.reduce((sum, mi) => sum + (leveredCashFlowMonthly[monthlyPeriods[mi].key] || 0), 0);
             cashFlow[i] = leveredCashFlow[i];
-            const belMgmtD = mgmtFeeLinePos === 'below' ? managementFeeArr[i] : 0;
-            const belCapexD = capexLinePos === 'below' ? capex[i] : 0;
-            const belReservesD = reservesLinePos === 'below' ? reservesArr[i] : 0;
-            noiBelowLine[i] = belMgmtD + belCapexD + belReservesD + debtServiceArr[i];
+            noiBelowLine[i] = managementFeeArr[i] + capex[i] + reservesArr[i] + debtServiceArr[i];
           }
           
           // Update projection detail arrays with debt service
@@ -1143,10 +1116,9 @@ export class ProFormaEngineService {
             const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
             debtServiceMonthly[period.key] = Math.round(ds.payment);
             const noiVal = noiMonthly[period.key] || 0;
-            const belMgmt = mgmtFeeLinePos === 'below' ? (managementFeeMonthly[period.key] || 0) : 0;
-            const belCapex = capexLinePos === 'below' ? (capexMonthly[period.key] || 0) : 0;
-            const belReserves = reservesLinePos === 'below' ? (reservesMonthly[period.key] || 0) : 0;
-            leveredCashFlowMonthly[period.key] = Math.round(noiVal - belMgmt - belCapex - belReserves - ds.payment);
+            const mgmtFee = managementFeeMonthly[period.key] || 0;
+            const capexVal = capexMonthly[period.key] || 0;
+            leveredCashFlowMonthly[period.key] = Math.round(noiVal - mgmtFee - capexVal - ds.payment);
           }
           console.log("[Pro Forma] Canonical debt engine used (direct from loans)");
         }
@@ -1306,12 +1278,6 @@ export class ProFormaEngineService {
         stabilizedNoi,
         stabilizedNoiYear: stabilizedYearIndex + 1,
         stabilizedNoiMode,
-        // Line position configuration
-        linePositions: {
-          managementFee: mgmtFeeLinePos,
-          capex: capexLinePos,
-          reserves: reservesLinePos,
-        },
         // Exit waterfall
         netExitProceeds,
         sellingFees,
@@ -1346,32 +1312,6 @@ export class ProFormaEngineService {
     cogsBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>,
     expensesBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>
   ): Promise<void> {
-    // ── Read per-department revenue source toggle ──────────────
-    let revenueSourceByDept: Record<string, string> = {};
-    try {
-      const [proj] = await db.select({ customMetrics: modelingProjects.customMetrics })
-        .from(modelingProjects)
-        .where(eq(modelingProjects.id, projectId));
-      const cfg = (proj?.customMetrics as any) || {};
-      revenueSourceByDept = cfg.revenueSourceByDept || {};
-    } catch {}
-
-    const useProfitCenter = (dept: string): boolean => {
-      return revenueSourceByDept[dept] !== 'pnl_actuals';
-    };
-
-    const removePnlActualsForDept = (dept: string) => {
-      for (const [key, entry] of Object.entries(revenueBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete revenueBySubcat[key];
-      }
-      for (const [key, entry] of Object.entries(cogsBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete cogsBySubcat[key];
-      }
-      for (const [key, entry] of Object.entries(expensesBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete expensesBySubcat[key];
-      }
-    };
-
     const addRevenue = (name: string, amount: number, dept?: string) => {
       if (amount <= 0) return;
       const key = `PC: ${name}`;
@@ -1402,58 +1342,60 @@ export class ProFormaEngineService {
         db.select().from(asmpBookkeeping).where(eq(asmpBookkeeping.projectId, projectId)),
       ]);
 
-      if (fuelRows.length > 0 && useProfitCenter('Fuel')) {
-        removePnlActualsForDept('Fuel');
+      if (fuelRows.length > 0) {
         const totalRev = fuelRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = fuelRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Fuel Sales', totalRev, 'Fuel');
         addCOGS('Fuel Sales', totalCogs, 'Fuel');
       }
 
-      if (storeRows.length > 0 && useProfitCenter('Ship Store')) {
-        removePnlActualsForDept('Ship Store');
+      if (storeRows.length > 0) {
         const totalRev = storeRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = storeRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Ship Store', totalRev, 'Ship Store');
         addCOGS('Ship Store', totalCogs, 'Ship Store');
       }
 
-      if (serviceRows.length > 0 && useProfitCenter('Service')) {
-        removePnlActualsForDept('Service');
+      if (serviceRows.length > 0) {
         const totalRev = serviceRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
         const totalCogs = serviceRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Service Department', totalRev, 'Service');
         addCOGS('Service Department', totalCogs, 'Service');
       }
 
-      if (rentalRows.length > 0 && useProfitCenter('Boat Rentals')) {
-        removePnlActualsForDept('Boat Rentals');
+      if (rentalRows.length > 0) {
         const totalRev = rentalRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         addRevenue('Boat Rentals', totalRev, 'Boat Rentals');
       }
 
-      if (clubRows.length > 0 && useProfitCenter('Boat Club')) {
-        removePnlActualsForDept('Boat Club');
+      if (clubRows.length > 0) {
         const totalRev = clubRows.reduce((s, r) => s + Number(r.monthlyRecurringRevenue || 0), 0);
         addRevenue('Boat Club', totalRev, 'Boat Club');
       }
 
-      if (salesRows.length > 0 && useProfitCenter('Boat Sales')) {
-        removePnlActualsForDept('Boat Sales');
+      if (salesRows.length > 0) {
         const totalRev = salesRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = salesRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Boat Sales', totalRev, 'Boat Sales');
         addCOGS('Boat Sales', totalCogs, 'Boat Sales');
       }
 
-      if (tenantRows.length > 0 && useProfitCenter('Commercial')) {
-        removePnlActualsForDept('Commercial');
-        const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
-        addRevenue('Commercial Tenants', totalRev, 'Commercial');
+      if (tenantRows.length > 0) {
+        let syncEnabled = true;
+        try {
+          const [proj] = await db.select({ customMetrics: modelingProjects.customMetrics })
+            .from(modelingProjects)
+            .where(eq(modelingProjects.id, projectId));
+          const cfg = (proj?.customMetrics as any) || {};
+          syncEnabled = cfg.commercialLeaseSyncEnabled !== false;
+        } catch {}
+        if (syncEnabled) {
+          const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
+          addRevenue('Commercial Tenants', totalRev, 'Commercial');
+        }
       }
 
-      if (bkRows.length > 0 && useProfitCenter('Bookkeeping')) {
-        removePnlActualsForDept('Bookkeeping');
+      if (bkRows.length > 0) {
         const totalRevOverride = bkRows.reduce((s, r) => s + Number(r.revenueTotalOverride || 0), 0);
         const totalExpOverride = bkRows.reduce((s, r) => s + Number(r.expenseTotalOverride || 0), 0);
         if (totalRevOverride > 0) addRevenue('Bookkeeping Revenue', totalRevOverride, 'Bookkeeping');

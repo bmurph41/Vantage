@@ -774,6 +774,133 @@ export class CapitalStackService {
     return Math.round(totalRemaining * 100) / 100;
   }
 
+  /**
+   * Generate projections using ACTUAL Pro Forma engine output.
+   * Ensures Capital Stack shows the same numbers as the Pro Forma tab.
+   */
+  async generateProjectionsFromProForma(
+    orgId: string,
+    capitalStackId: string,
+    proFormaData: ProFormaProjectionData
+  ): Promise<ProjectionResult[]> {
+    const stack = await this.getCapitalStackWithDetails(orgId, capitalStackId);
+    if (!stack) throw new Error('Capital stack not found');
+
+    const holdPeriod = proFormaData.holdPeriod;
+    const totalEquity = parseFloat(stack.totalEquity?.toString() || '0');
+    const purchasePrice = proFormaData.purchasePrice;
+
+    await db.delete(capitalStackProjections)
+      .where(and(
+        eq(capitalStackProjections.orgId, orgId),
+        eq(capitalStackProjections.capitalStackId, capitalStackId)
+      ));
+
+    const results: ProjectionResult[] = [];
+    const cashFlows: number[] = [-totalEquity];
+    let cumulativeCashFlow = 0;
+
+    for (let year = 1; year <= holdPeriod; year++) {
+      const yearIdx = year - 1;
+      const noi = proFormaData.noi[yearIdx] || 0;
+      const grossRevenue = proFormaData.revenue[yearIdx] || 0;
+      const operatingExpenses = proFormaData.expenses[yearIdx] || 0;
+      const capex = proFormaData.capex[yearIdx] || 0;
+      const ncf = noi - capex;
+
+      const { totalDebtService, totalPrincipal, totalInterest } = 
+        this.calculateTotalDebtService(stack.debtTranches, year);
+
+      const cashFlowBeforeDebt = proFormaData.cashFlowBeforeDebtService[yearIdx] || ncf;
+      const cashFlowAfterDebt = proFormaData.leveredCashFlow[yearIdx] || (cashFlowBeforeDebt - totalDebtService);
+
+      const { lpDistribution, gpDistribution } = this.calculateWaterfallDistribution(
+        cashFlowAfterDebt, stack.equityLayers, year, totalEquity
+      );
+
+      const totalDistribution = lpDistribution + gpDistribution;
+      const dscr = totalDebtService > 0 ? noi / totalDebtService : 0;
+      const totalDebt = stack.debtTranches.reduce(
+        (sum, t) => sum + parseFloat(t.principal?.toString() || '0'), 0
+      );
+      const debtYield = totalDebt > 0 ? (noi / totalDebt) * 100 : 0;
+      cumulativeCashFlow += cashFlowAfterDebt;
+
+      let exitValue: number | null = null;
+      let loanPayoff: number | null = null;
+      let netSaleProceeds: number | null = null;
+
+      if (year === holdPeriod) {
+        exitValue = proFormaData.exitValue;
+        loanPayoff = this.calculateRemainingBalance(stack.debtTranches, holdPeriod);
+        netSaleProceeds = exitValue - (loanPayoff || 0);
+        cumulativeCashFlow += netSaleProceeds;
+      }
+
+      const equityMultiple = totalEquity > 0 ? cumulativeCashFlow / totalEquity : 0;
+      const cashOnCash = totalEquity > 0 ? (cashFlowAfterDebt / totalEquity) * 100 : 0;
+      cashFlows.push(year === holdPeriod ? cashFlowAfterDebt + (netSaleProceeds || 0) : cashFlowAfterDebt);
+
+      results.push({
+        year,
+        grossRevenue: Math.round(grossRevenue * 100) / 100,
+        operatingExpenses: Math.round(operatingExpenses * 100) / 100,
+        noi: Math.round(noi * 100) / 100,
+        capex: Math.round(capex * 100) / 100,
+        ncf: Math.round(ncf * 100) / 100,
+        totalDebtService: Math.round(totalDebtService * 100) / 100,
+        principalPaydown: Math.round(totalPrincipal * 100) / 100,
+        interestExpense: Math.round(totalInterest * 100) / 100,
+        cashFlowBeforeDebt: Math.round(cashFlowBeforeDebt * 100) / 100,
+        cashFlowAfterDebt: Math.round(cashFlowAfterDebt * 100) / 100,
+        lpDistribution: Math.round(lpDistribution * 100) / 100,
+        gpDistribution: Math.round(gpDistribution * 100) / 100,
+        totalDistribution: Math.round(totalDistribution * 100) / 100,
+        dscr: Math.round(dscr * 100) / 100,
+        debtYield: Math.round(debtYield * 100) / 100,
+        exitValue: exitValue ? Math.round(exitValue * 100) / 100 : null,
+        loanPayoff: loanPayoff ? Math.round(loanPayoff * 100) / 100 : null,
+        netSaleProceeds: netSaleProceeds ? Math.round(netSaleProceeds * 100) / 100 : null,
+        cumulativeCashFlow: Math.round(cumulativeCashFlow * 100) / 100,
+        equityMultiple: Math.round(equityMultiple * 100) / 100,
+        irr: null,
+        cashOnCash: Math.round(cashOnCash * 100) / 100
+      });
+    }
+
+    const irr = this.calculateIRR(cashFlows);
+    for (const p of results) {
+      p.irr = irr !== null ? Math.round(irr * 10000) / 100 : null;
+      await db.insert(capitalStackProjections).values({
+        orgId, capitalStackId,
+        year: p.year,
+        grossRevenue: String(p.grossRevenue),
+        operatingExpenses: String(p.operatingExpenses),
+        noi: String(p.noi),
+        capex: String(p.capex),
+        ncf: String(p.ncf),
+        totalDebtService: String(p.totalDebtService),
+        principalPaydown: String(p.principalPaydown),
+        interestExpense: String(p.interestExpense),
+        cashFlowBeforeDebt: String(p.cashFlowBeforeDebt),
+        cashFlowAfterDebt: String(p.cashFlowAfterDebt),
+        lpDistribution: String(p.lpDistribution),
+        gpDistribution: String(p.gpDistribution),
+        totalDistribution: String(p.totalDistribution),
+        dscr: String(p.dscr),
+        debtYield: String(p.debtYield),
+        exitValue: p.exitValue ? String(p.exitValue) : null,
+        loanPayoff: p.loanPayoff ? String(p.loanPayoff) : null,
+        netSaleProceeds: p.netSaleProceeds ? String(p.netSaleProceeds) : null,
+        cumulativeCashFlow: String(p.cumulativeCashFlow),
+        equityMultiple: String(p.equityMultiple),
+        irr: irr !== null ? String(Math.round(irr * 10000) / 100) : null,
+        cashOnCash: String(p.cashOnCash),
+      });
+    }
+    return results;
+  }
+
   calculateIRR(cashFlows: number[], guess: number = 0.1, maxIterations: number = 100, tolerance: number = 0.0001): number | null {
     if (cashFlows.length < 2) return null;
 

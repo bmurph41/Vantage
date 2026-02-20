@@ -47,6 +47,21 @@ export async function promotePnlFactsToActuals(
 
   const yearsSet = new Set<number>();
 
+  // DEDUP: Clear existing actuals for these documents before re-promoting
+  for (const docId of docIds) {
+    try {
+      await db.execute(
+        sql`DELETE FROM modeling_actuals 
+             WHERE modeling_project_id = ${modelingProjectId} 
+             AND org_id = ${orgId}
+             AND source = 'pnl_pipeline'
+             AND notes LIKE '%' || ${docId} || '%'`
+      );
+    } catch (e) {
+      console.warn('[Promote] Dedup cleanup skipped:', (e as Error).message);
+    }
+  }
+
   for (const docId of docIds) {
     const facts = await db.select()
       .from(pnlFacts)
@@ -57,16 +72,30 @@ export async function promotePnlFactsToActuals(
       continue;
     }
 
+    // ========================================
+    // FIX: Build lookup maps for BOTH resolvedDepartment AND resolvedBucket
+    // from the user-confirmed parsedStatements data. These represent
+    // what the user explicitly approved during the review step and
+    // MUST take priority over COA seed defaults.
+    // ========================================
     const parsedStmts = await db.select()
       .from(pnlParsedStatements)
       .where(eq(pnlParsedStatements.documentId, docId));
+    
     const resolvedDeptMap: Record<string, string> = {};
+    const resolvedBucketMap: Record<string, string> = {};
+    
     for (const ps of parsedStmts) {
       const pj = ps.parsedJson as any;
       if (pj?.rows) {
         for (const row of pj.rows) {
-          if (row.mapping?.resolvedDepartment && row.mapping?.canonicalLineItemId) {
-            resolvedDeptMap[row.mapping.canonicalLineItemId] = row.mapping.resolvedDepartment;
+          if (row.mapping?.canonicalLineItemId) {
+            if (row.mapping.resolvedDepartment) {
+              resolvedDeptMap[row.mapping.canonicalLineItemId] = row.mapping.resolvedDepartment;
+            }
+            if (row.mapping.resolvedBucket) {
+              resolvedBucketMap[row.mapping.canonicalLineItemId] = row.mapping.resolvedBucket;
+            }
           }
         }
       }
@@ -81,13 +110,38 @@ export async function promotePnlFactsToActuals(
         }
 
         const coaEntry = coaLookup[canonical.coaCode];
-        const category = coaEntry
-          ? sectionToCategory(coaEntry.section)
-          : majorGroupToCategory(canonical.majorGroup);
+        
+        // ========================================
+        // FIX: User-confirmed bucket (resolvedBucket) is FIRST priority for category.
+        // This ensures that what the user saw and approved during document review
+        // is exactly what appears in Historical P&L and Pro Forma.
+        //
+        // Fallback chain:
+        //   1. User-confirmed resolvedBucket from review
+        //   2. COA seed section → category mapping
+        //   3. Canonical majorGroup → category mapping
+        // ========================================
+        const pipelineBucket = resolvedBucketMap[fact.canonicalLineItemId];
+        const category = pipelineBucket
+          ? normalizeBucketToCategory(pipelineBucket)
+          : coaEntry
+            ? sectionToCategory(coaEntry.section)
+            : majorGroupToCategory(canonical.majorGroup);
+        
         const subcategory = canonical.displayName;
+        
+        // ========================================
+        // FIX: User-confirmed resolvedDepartment is FIRST priority for department.
+        //
+        // Fallback chain:
+        //   1. User-confirmed resolvedDepartment from review
+        //   2. COA seed department
+        //   3. Canonical subcategoryGroup
+        //   4. inferDepartment() heuristic
+        // ========================================
         const pipelineDept = resolvedDeptMap[fact.canonicalLineItemId];
-        const rawDepartment = coaEntry?.department
-          || pipelineDept
+        const rawDepartment = pipelineDept
+          || coaEntry?.department
           || canonical.subcategoryGroup
           || inferDepartment(fact.sourceLabel || subcategory, category);
         const department = normalizeDepartment(rawDepartment);
@@ -142,4 +196,20 @@ export async function promotePnlFactsToActuals(
 
   result.years = Array.from(yearsSet).sort();
   return result;
+}
+
+/**
+ * Normalize a resolvedBucket string (from the review pipeline) into
+ * the canonical category values used in modelingActuals.
+ * 
+ * The review pipeline stores buckets as "Revenue", "COGS", "Expense"
+ * but modelingActuals needs consistent casing.
+ */
+function normalizeBucketToCategory(bucket: string): string {
+  const lower = bucket.toLowerCase().trim();
+  if (lower === 'revenue') return 'Revenue';
+  if (lower === 'cogs' || lower === 'cost of goods sold' || lower === 'cost_of_goods_sold') return 'COGS';
+  if (lower === 'expense' || lower === 'expenses' || lower === 'opex' || lower === 'operating expenses') return 'Expenses';
+  if (lower === 'payroll') return 'Expenses'; // Payroll → Expenses for consistency with waterfall
+  return bucket; // Return as-is if no match
 }

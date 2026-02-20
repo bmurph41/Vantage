@@ -18,7 +18,6 @@ import { detectHeaderAndPeriods, type PeriodCell } from './periodDetect';
 import { validateParsedStatement, type ValidationResult, type ValidationStatus } from './validate';
 import * as XLSX from 'xlsx';
 import fs from 'fs/promises';
-import { pnlFileStorage } from './pnl-file-storage';
 
 const PARSER_VERSION = 'v2';
 
@@ -554,12 +553,9 @@ export async function processPnlJob(jobId: string): Promise<void> {
 
     log(jobId, `Parsing document ${doc.id}, mime=${doc.mimeType}`);
 
-    // Ensure file is on disk — auto-restores from DB if disk was wiped
-    const resolvedPath = await pnlFileStorage.ensureOnDisk(doc.id);
-
     const parsed = await parseDocumentToStatement(
       doc.id,
-      resolvedPath,
+      doc.storagePath,
       doc.mimeType,
       doc.yearHint,
       jobId

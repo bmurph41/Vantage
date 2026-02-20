@@ -5,6 +5,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RevenueSourceToggle } from '@/components/modeling/RevenueSourceToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -228,7 +229,7 @@ function InlineGrowthEditor({
     <div className="w-72 space-y-3">
       <div className="flex items-center gap-2">
         <BarChart3 className="h-4 w-4 text-primary" />
-        <h4 className="text-sm font-semibold">{departmentName} {typeLabel} Growth Rate</h4>
+        <h4 className="text-sm font-bold">{departmentName} {typeLabel} Growth Rate</h4>
       </div>
 
       <div className="flex items-center gap-2">
@@ -518,6 +519,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   // Derive the baseline period from the pro forma engine's latest historical year,
   // falling back to document-based periods
   const latestHistoricalYear = proFormaData?.latestHistoricalYear;
+  const linePositions = (proFormaData as any)?.metrics?.linePositions || { managementFee: 'below', capex: 'below', reserves: 'below' };
 
   const baselinePeriod = useMemo((): DocumentPeriod | null => {
     // First check if we have a period from documents matching the engine's baseline year
@@ -893,7 +895,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Pro Forma Projections</h2>
+          <h2 className="text-xl font-bold">Pro Forma Projections</h2>
           <p className="text-sm text-muted-foreground">
             {hasHistoricalData 
               ? `${holdPeriod}-year projections based on ${baselinePeriod?.label || 'historical'} data with growth assumptions`
@@ -973,6 +975,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           <ExportPdfButton contentRef={pdfRef} filename="pro-forma-projections" title="Pro Forma Projections" />
         </div>
       </div>
+
+      {/* Revenue Source Toggle */}
+      <RevenueSourceToggle projectId={projectId} />
 
       {/* Document Status Banner */}
       {!hasHistoricalData && (
@@ -1512,7 +1517,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         onClick={() => toggleCategory(category)}
                         data-testid={`row-category-${category.toLowerCase()}`}
                       >
-                        <TableCell className="font-semibold sticky left-0 bg-muted z-10">
+                        <TableCell className="font-bold text-sm sticky left-0 bg-muted z-10">
                           <div className="flex items-center gap-2">
                             {expandedCategories.has(category) ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1525,13 +1530,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
                         {/* Historical totals - blue tint for actuals */}
                         {showHistorical && priorPeriods.map(period => (
-                          <TableCell key={period.id} className="text-right font-semibold bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
+                          <TableCell key={period.id} className="text-right font-bold bg-blue-50/60 dark:bg-blue-950/20 text-blue-900 dark:text-blue-100">
                             {formatCurrency(getCategoryTotal(category, period.id), { dash: true })}
                           </TableCell>
                         ))}
 
                         {/* Baseline total */}
-                        <TableCell className="text-right font-semibold bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
+                        <TableCell className="text-right font-bold bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">
                           {formatCurrency(baselineTotal, { dash: true })}
                         </TableCell>
 
@@ -1543,7 +1548,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                             return (
                               <TableCell 
                                 key={monthIndex} 
-                                className={`text-right font-semibold ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
+                                className={`text-right font-bold ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}
                               >
                                 {formatCurrency(value, { dash: true })}
                               </TableCell>
@@ -1552,7 +1557,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                         ) : (
                           // Annual totals
                           years.map((_, i) => (
-                            <TableCell key={i} className="text-right font-semibold">
+                            <TableCell key={i} className="text-right font-bold">
                               {formatCurrency(getCategoryProjectedTotal(category, i), { dash: true })}
                             </TableCell>
                           ))
@@ -1688,7 +1693,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                               const baselineValue = baselinePeriod ? (values.historical[baselinePeriod.id] || 0) : 0;
                               return (
                                 <TableRow key={itemName} className="text-sm group">
-                                  <TableCell className="pl-10 sticky left-0 bg-background z-10">
+                                  <TableCell className="pl-10 text-[11px] sticky left-0 bg-background z-10">
                                     <div className="flex items-center gap-1">
                                       <span className="truncate">{itemName}</span>
                                       {getDepartmentOverride(itemName) && (
@@ -1807,6 +1812,92 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                   );
                 })}
 
+                {/* Above-the-Line Items (if any) */}
+                {(linePositions.managementFee === 'above' || linePositions.capex === 'above' || linePositions.reserves === 'above') && (
+                  <>
+                    <TableRow className="border-t bg-amber-50/30 dark:bg-amber-950/10">
+                      <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 py-1">
+                        Above-the-Line Adjustments
+                      </TableCell>
+                    </TableRow>
+                    {linePositions.managementFee === 'above' && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-amber-700 dark:text-amber-400 text-[11px]">Management Fee ↑</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.managementFee, { dash: true })})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.managementFee, { dash: true })})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+                    {linePositions.capex === 'above' && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-amber-700 dark:text-amber-400 text-[11px]">Capital Expenditures ↑</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.capex, { dash: true })})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.capex, { dash: true })})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+                    {linePositions.reserves === 'above' && (
+                      <TableRow>
+                        <TableCell className="sticky left-0 bg-background z-10 pl-6 text-amber-700 dark:text-amber-400 text-[11px]">Replacement Reserves ↑</TableCell>
+                        {showHistorical && priorPeriods.map(period => (
+                          <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
+                        ))}
+                        <TableCell className="text-right text-muted-foreground bg-blue-50 dark:bg-blue-950/30 border-x border-blue-200 dark:border-blue-800">-</TableCell>
+                        {viewMode === 'monthly' ? (
+                          months.map((_, monthIndex) => {
+                            const summary = calculateMonthSummary(selectedYearInt, monthIndex);
+                            return (
+                              <TableCell key={monthIndex} className={`text-right text-red-500 text-[11px] ${isSeasonalMonth(monthIndex) ? 'bg-green-50 dark:bg-green-950/30' : ''}`}>
+                                ({formatCurrency(summary.reserves, { dash: true })})
+                              </TableCell>
+                            );
+                          })
+                        ) : (
+                          years.map((_, i) => {
+                            const summary = calculateYearSummary(i);
+                            return <TableCell key={i} className="text-right text-red-500 text-[11px]">({formatCurrency(summary.reserves, { dash: true })})</TableCell>;
+                          })
+                        )}
+                        <TableCell className="text-right text-muted-foreground">-</TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                )}
+
                 {/* Net Operating Income Row */}
                 <TableRow className="bg-primary/10 font-bold">
                   <TableCell className="sticky left-0 bg-primary/10 z-10">Net Operating Income</TableCell>
@@ -1910,13 +2001,15 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 </TableRow>
 
                 <>
-                  <TableRow className="border-t-2 bg-muted/30">
-                    <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-1">
-                      Below-the-Line Adjustments
-                    </TableCell>
-                  </TableRow>
+                  {(linePositions.managementFee === 'below' || linePositions.capex === 'below' || linePositions.reserves === 'below') && (
+                    <TableRow className="border-t-2 bg-muted/30">
+                      <TableCell colSpan={100} className="sticky left-0 z-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground py-1">
+                        Below-the-Line Adjustments
+                      </TableCell>
+                    </TableRow>
+                  )}
 
-                  <TableRow>
+                  {linePositions.managementFee === 'below' && <TableRow>
                     <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Management Fee</TableCell>
                     {showHistorical && priorPeriods.map(period => (
                       <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
@@ -1938,9 +2031,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
-                  </TableRow>
+                  </TableRow>}
 
-                  <TableRow>
+                  {linePositions.capex === 'below' && <TableRow>
                     <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Capital Expenditures</TableCell>
                     {showHistorical && priorPeriods.map(period => (
                       <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
@@ -1962,9 +2055,9 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
-                  </TableRow>
+                  </TableRow>}
 
-                  <TableRow>
+                  {linePositions.reserves === 'below' && <TableRow>
                     <TableCell className="sticky left-0 bg-background z-10 pl-6 text-muted-foreground">Replacement Reserves</TableCell>
                     {showHistorical && priorPeriods.map(period => (
                       <TableCell key={period.id} className="text-right text-muted-foreground bg-blue-50/60 dark:bg-blue-950/20">-</TableCell>
@@ -1986,7 +2079,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                       })
                     )}
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
-                  </TableRow>
+                  </TableRow>}
 
                   <TableRow className="bg-amber-50/50 dark:bg-amber-950/10 font-semibold border-t">
                     <TableCell className="sticky left-0 bg-amber-50/50 dark:bg-amber-950/10 z-10">Cash Flow Before Debt Service</TableCell>

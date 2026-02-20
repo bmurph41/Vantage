@@ -31,7 +31,6 @@ import {
   updateKeywordRule,
 } from './department-verification-service';
 import { pnlFileStorage } from './pnl-file-storage';
-import { purgePnlDocument, purgeAllPnlDataForProject } from './pnl-document-purge';
 import { pnlDepartmentVerifications } from '@shared/schema';
 
 const router = Router();
@@ -56,7 +55,7 @@ router.post('/upload', upload.single('file'), async (req: any, res) => {
 
     const schema = z.object({
       assetId: z.string().optional(),
-      modelingProjectId: z.string().optional(),
+      modelingProjectId: z.string().min(1, 'modelingProjectId is required'),
       statementType: z.string().optional().default('pnl'),
       yearHint: z.coerce.number().int().optional(),
     });
@@ -1228,35 +1227,6 @@ router.post('/documents/:documentId/reparse', async (req: any, res) => {
     res.json({ documentId: doc.id, jobId: job.id, message: 'Re-parse started' });
   } catch (error: any) {
     console.error('Re-parse error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-router.delete('/documents/:documentId', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const documentId = String(req.params.documentId);
-    const doc = await db.query.pnlDocuments.findFirst({
-      where: and(eq(pnlDocuments.id, documentId), eq(pnlDocuments.orgId, orgId)),
-    });
-    if (!doc) return res.status(404).json({ error: 'Document not found' });
-    const result = await purgePnlDocument(documentId, orgId);
-    res.json({ success: true, message: 'Document and all related data permanently deleted', ...result });
-  } catch (error: any) {
-    console.error('Delete document error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.delete('/projects/:projectId/purge', async (req: any, res) => {
-  try {
-    const { orgId } = getAuthContext(req);
-    const projectId = String(req.params.projectId);
-    const result = await purgeAllPnlDataForProject(projectId, orgId);
-    res.json({ success: true, message: 'All P&L pipeline data purged for this project', ...result });
-  } catch (error: any) {
-    console.error('Purge project error:', error);
     res.status(500).json({ error: error.message });
   }
 });

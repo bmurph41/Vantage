@@ -100,71 +100,12 @@ export default function ValidationWarnings({ projectId, compact = false, onTabCh
   const { data: validationResult, isLoading, refetch } = useQuery<ValidationResult>({
     queryKey: ['/api/modeling/projects', projectId, 'validation-warnings'],
     queryFn: async () => {
-      const response = await fetch(`/api/modeling/projects/${projectId}/validation-warnings`);
-      if (!response.ok) {
-        return generateSimulatedValidation();
-      }
+      const response = await fetch(`/api/modeling/projects/${projectId}/validation-warnings`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch validation');
       return response.json();
     },
   });
 
-  const generateSimulatedValidation = (): ValidationResult => {
-    const warnings: ValidationWarning[] = [
-      {
-        id: '1',
-        severity: 'warning',
-        category: 'cap_rate',
-        title: 'Cap Rate Below Market Average',
-        message: 'The going-in cap rate of 4.8% is below the typical range for marina properties (5.5% - 8.5%).',
-        recommendation: 'Consider verifying comp data and market conditions. A lower cap rate may be justified for premium locations.',
-        value: '4.8%',
-        threshold: '5.5% - 8.5%',
-        field: 'year1CapRate'
-      },
-      {
-        id: '2',
-        severity: 'info',
-        category: 'expense_ratio',
-        title: 'Expense Ratio Slightly High',
-        message: 'Operating expense ratio of 52% is above the industry benchmark of 40-50%.',
-        recommendation: 'Review expense line items for potential optimization opportunities.',
-        value: '52%',
-        threshold: '40% - 50%',
-        field: 'expenseRatio'
-      },
-      {
-        id: '3',
-        severity: 'warning',
-        category: 'inputs',
-        title: 'Missing Exit Cap Rate',
-        message: 'Exit cap rate is not specified. Using default assumption of entry cap + 50bps.',
-        recommendation: 'Set an explicit exit cap rate based on market outlook and hold period assumptions.',
-        field: 'exitCapRate'
-      },
-      {
-        id: '4',
-        severity: 'info',
-        category: 'revenue',
-        title: 'Revenue Growth Above Historical',
-        message: 'Projected revenue growth of 5.5% exceeds 3-year historical average of 3.2%.',
-        recommendation: 'Document assumptions supporting accelerated growth projections.',
-        value: '5.5%',
-        threshold: '3.2% historical',
-        field: 'revenueGrowthRate'
-      }
-    ];
-
-    return {
-      isValid: true,
-      score: 78,
-      warnings,
-      summary: {
-        critical: warnings.filter(w => w.severity === 'critical').length,
-        warning: warnings.filter(w => w.severity === 'warning').length,
-        info: warnings.filter(w => w.severity === 'info').length
-      }
-    };
-  };
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev =>

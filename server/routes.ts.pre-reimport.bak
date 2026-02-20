@@ -22442,110 +22442,6 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
-  // CAPITAL STACK: Pro Forma-Fed Projections (Single Source of Truth)
-  // ============================================================================
-  app.post('/api/capital-stack/:capitalStackId/projections/from-pro-forma', authenticateUser, enforceTenant, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const { capitalStackId } = req.params;
-      const { projectId, scenario = 'base' } = req.body;
-      if (!projectId) return res.status(400).json({ error: 'projectId is required' });
-      
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
-      const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
-      
-      const proFormaData = {
-        noi: proForma.noi,
-        revenue: proForma.revenue.totals,
-        expenses: proForma.expenses.totals,
-        capex: proForma.capex,
-        leveredCashFlow: proForma.leveredCashFlow,
-        cashFlowBeforeDebtService: proForma.cashFlowBeforeDebtService,
-        managementFee: proForma.managementFee,
-        reserves: proForma.reserves,
-        holdPeriod: proForma.holdPeriod,
-        purchasePrice: proForma.metrics.purchasePrice,
-        exitValue: proForma.metrics.exitValue,
-      };
-      
-      const { capitalStackService } = await import('./services/capital-stack-service');
-      const projections = await capitalStackService.generateProjectionsFromProForma(orgId, capitalStackId, proFormaData);
-      
-      res.json({
-        projections,
-        source: 'pro_forma',
-        scenario,
-        proFormaMetrics: {
-          irr: proForma.metrics.irr,
-          unleveredIrr: proForma.metrics.unleveredIrr,
-          equityMultiple: proForma.metrics.equityMultiple,
-          exitValue: proForma.metrics.exitValue,
-          goingInCapRate: proForma.metrics.goingInCapRate,
-        }
-      });
-    } catch (error: any) {
-      console.error('Failed Pro Forma-fed projections:', error);
-      res.status(500).json({ error: error.message || 'Failed to generate projections' });
-    }
-  });
-
-  // ============================================================================
-  // DEAL PRICING: Pro Forma-Fed Price Solving (Single Source of Truth)
-  // ============================================================================
-  app.post('/api/deal-pricing/solve-from-pro-forma', authenticateUser, enforceTenant, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const { projectId, scenario = 'base', targetMetric, targetValue } = req.body;
-      if (!projectId || !targetMetric || targetValue === undefined) {
-        return res.status(400).json({ error: 'projectId, targetMetric, and targetValue are required' });
-      }
-      
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
-      const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
-      const m = proForma.metrics;
-      
-      const { dealPricingService } = await import('./services/deal-pricing-service');
-      let result: any;
-      
-      if (targetMetric === 'irr') {
-        const proFormaCashFlows = {
-          noiProjections: proForma.noi,
-          leveredCashFlows: proForma.leveredCashFlow,
-          loanProceeds: m.debtSchedule?.totalDebtAtClose || 0,
-          loanPayoffAtExit: m.loanPayoff || 0,
-          sellingFeePct: m.sellingFees && m.exitValue ? m.sellingFees / m.exitValue : 0.02,
-          workingCapitalAmount: m.workingCapitalRecovery || 0,
-          workingCapitalRecoveryPct: 1.0,
-          year1NOI: proForma.noi[0] || 0,
-          baseRevenue: proForma.revenue.totals[0] || 0,
-          baseExpenses: proForma.expenses.totals[0] || 0,
-          holdPeriod: proForma.holdPeriod,
-        };
-        result = dealPricingService.solveForPriceFromProForma(proFormaCashFlows, targetValue / 100, m.exitValue);
-      } else if (targetMetric === 'cap_rate') {
-        result = {
-          purchasePrice: dealPricingService.solveForPriceFromCapRate(proForma.noi[0] || 0, targetValue),
-          metricType: 'cap_rate',
-          year1CapRate: targetValue,
-        };
-      }
-      
-      res.json({
-        ...result,
-        source: 'pro_forma',
-        proFormaMetrics: {
-          irr: m.irr, unleveredIrr: m.unleveredIrr,
-          equityMultiple: m.equityMultiple, exitValue: m.exitValue,
-          year1Noi: m.year1Noi, noiByYear: proForma.noi,
-        }
-      });
-    } catch (error: any) {
-      console.error('Failed Pro Forma-fed pricing:', error);
-      res.status(500).json({ error: error.message || 'Failed to solve pricing' });
-    }
-  });
-
-  // ============================================================================
   // MONTE CARLO SIMULATION - Stochastic Analysis Engine
   // ============================================================================
 
@@ -25371,7 +25267,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       
       const uploadIds = uploads.map((u: any) => u.id);
-      let statsMap: Record<string, { total: number; pending: number; confirmed: number; rejected: number; needsReview: number; highConfidence: number; lowConfidence: number; imported: number }> = {};
+      let statsMap: Record<string, { total: number; pending: number; confirmed: number; rejected: number; needsReview: number; highConfidence: number; lowConfidence: number }> = {};
       if (uploadIds.length > 0) {
         const { docIntelExtractedItems } = await import('@shared/schema');
         const { sql, inArray, and: andOp, eq: eqOp } = await import('drizzle-orm');
@@ -25383,7 +25279,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           rejected: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'rejected')::int`,
           highConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric >= 0.8)::int`,
           lowConfidence: sql<number>`count(*) filter (where ${docIntelExtractedItems.confidenceScore}::numeric < 0.8)::int`,
-          imported: sql<number>`count(*) filter (where ${docIntelExtractedItems.targetRecordId} is not null)::int`,
         })
           .from(docIntelExtractedItems)
           .where(andOp(
@@ -25400,7 +25295,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
             needsReview: row.pending,
             highConfidence: row.highConfidence,
             lowConfidence: row.lowConfidence,
-            imported: row.imported || 0,
           };
         }
       }
@@ -25663,25 +25557,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (purgeEntirely) {
         const { purgeDocIntelUpload } = await import('./services/pnl/pnl-document-purge');
         const result = await purgeDocIntelUpload(uploadId, orgId, projectId);
-
-        // Audit trail
-        try {
-          const { modelingAuditLog } = await import('@shared/schema');
-          await db.insert(modelingAuditLog).values({
-            orgId,
-            modelingProjectId: projectId,
-            eventType: 'document_purged',
-            entityType: 'document',
-            entityId: uploadId,
-            newValue: result,
-            changedFields: ['pnlDocuments', 'pnlFacts', 'modelingActuals', 'docIntelUploads'],
-            userId: req.user.id,
-            userEmail: req.user.email || null,
-          });
-        } catch (auditErr) {
-          console.warn('[Audit] Failed to log purge:', auditErr);
-        }
-
         res.json({ success: true, purged: true, ...result });
       } else {
         await docIntelService.deleteUpload(orgId, uploadId);
@@ -25718,44 +25593,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         db.select({ id: asmpBookkeeping.id }).from(asmpBookkeeping).where(eq(asmpBookkeeping.projectId, projectId)).limit(1),
       ]);
 
-      // Compute PC revenue totals
-      const pcAmounts: Record<string, number> = {};
-      pcAmounts['Fuel'] = fuel.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
-      pcAmounts['Ship Store'] = store.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
-      pcAmounts['Service'] = service.reduce((s: number, r: any) => s + Number(r.totalRevenue || 0), 0);
-      pcAmounts['Boat Rentals'] = rentals.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
-      pcAmounts['Boat Club'] = club.reduce((s: number, r: any) => s + Number(r.monthlyRecurringRevenue || 0), 0);
-      pcAmounts['Boat Sales'] = sales.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
-      pcAmounts['Commercial'] = tenants.reduce((s: number, r: any) => s + Number(r.totalRevenue || 0), 0);
-      pcAmounts['Bookkeeping'] = bk.reduce((s: number, r: any) => s + Number(r.revenueTotalOverride || 0), 0);
-
-      // Compute P&L actuals totals per department
-      const { modelingActuals } = await import('@shared/schema');
-      const pnlRows = await db.select({
-        department: modelingActuals.department,
-        total: sql<number>`sum(${modelingActuals.amount}::numeric)::float`,
-      })
-        .from(modelingActuals)
-        .where(and(
-          eq(modelingActuals.modelingProjectId, projectId),
-          eq(modelingActuals.category, 'Revenue')
-        ))
-        .groupBy(modelingActuals.department);
-
-      const pnlAmounts: Record<string, number> = {};
-      for (const row of pnlRows) {
-        if (row.department) pnlAmounts[row.department] = Math.round(row.total || 0);
-      }
-
       const departments = [
-        { dept: 'Fuel', label: 'Fuel Sales', hasProfitCenterData: fuel.length > 0, source: revenueSourceByDept['Fuel'] || 'profit_center', pcAmount: pcAmounts['Fuel'] || 0, pnlAmount: pnlAmounts['Fuel'] || 0 },
-        { dept: 'Ship Store', label: 'Ship Store', hasProfitCenterData: store.length > 0, source: revenueSourceByDept['Ship Store'] || 'profit_center', pcAmount: pcAmounts['Ship Store'] || 0, pnlAmount: pnlAmounts['Ship Store'] || 0 },
-        { dept: 'Service', label: 'Service Department', hasProfitCenterData: service.length > 0, source: revenueSourceByDept['Service'] || 'profit_center', pcAmount: pcAmounts['Service'] || 0, pnlAmount: pnlAmounts['Service'] || 0 },
-        { dept: 'Boat Rentals', label: 'Boat Rentals', hasProfitCenterData: rentals.length > 0, source: revenueSourceByDept['Boat Rentals'] || 'profit_center', pcAmount: pcAmounts['Boat Rentals'] || 0, pnlAmount: pnlAmounts['Boat Rentals'] || 0 },
-        { dept: 'Boat Club', label: 'Boat Club', hasProfitCenterData: club.length > 0, source: revenueSourceByDept['Boat Club'] || 'profit_center', pcAmount: pcAmounts['Boat Club'] || 0, pnlAmount: pnlAmounts['Boat Club'] || 0 },
-        { dept: 'Boat Sales', label: 'Boat Sales', hasProfitCenterData: sales.length > 0, source: revenueSourceByDept['Boat Sales'] || 'profit_center', pcAmount: pcAmounts['Boat Sales'] || 0, pnlAmount: pnlAmounts['Boat Sales'] || 0 },
-        { dept: 'Commercial', label: 'Commercial Tenants', hasProfitCenterData: tenants.length > 0, source: revenueSourceByDept['Commercial'] || 'profit_center', pcAmount: pcAmounts['Commercial'] || 0, pnlAmount: pnlAmounts['Commercial'] || 0 },
-        { dept: 'Bookkeeping', label: 'Bookkeeping', hasProfitCenterData: bk.length > 0, source: revenueSourceByDept['Bookkeeping'] || 'profit_center', pcAmount: pcAmounts['Bookkeeping'] || 0, pnlAmount: pnlAmounts['Bookkeeping'] || 0 },
+        { dept: 'Fuel', label: 'Fuel Sales', hasProfitCenterData: fuel.length > 0, source: revenueSourceByDept['Fuel'] || 'profit_center' },
+        { dept: 'Ship Store', label: 'Ship Store', hasProfitCenterData: store.length > 0, source: revenueSourceByDept['Ship Store'] || 'profit_center' },
+        { dept: 'Service', label: 'Service Department', hasProfitCenterData: service.length > 0, source: revenueSourceByDept['Service'] || 'profit_center' },
+        { dept: 'Boat Rentals', label: 'Boat Rentals', hasProfitCenterData: rentals.length > 0, source: revenueSourceByDept['Boat Rentals'] || 'profit_center' },
+        { dept: 'Boat Club', label: 'Boat Club', hasProfitCenterData: club.length > 0, source: revenueSourceByDept['Boat Club'] || 'profit_center' },
+        { dept: 'Boat Sales', label: 'Boat Sales', hasProfitCenterData: sales.length > 0, source: revenueSourceByDept['Boat Sales'] || 'profit_center' },
+        { dept: 'Commercial', label: 'Commercial Tenants', hasProfitCenterData: tenants.length > 0, source: revenueSourceByDept['Commercial'] || 'profit_center' },
+        { dept: 'Bookkeeping', label: 'Bookkeeping', hasProfitCenterData: bk.length > 0, source: revenueSourceByDept['Bookkeeping'] || 'profit_center' },
       ];
 
       res.json({ departments, revenueSourceByDept });
@@ -25783,93 +25629,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const updatedMetrics = { ...existingMetrics, revenueSourceByDept };
       await storage.updateModelingProject(projectId, { customMetrics: updatedMetrics, updatedBy: userId }, orgId);
 
-      // Audit trail
-      try {
-        const { modelingAuditLog } = await import('@shared/schema');
-        await db.insert(modelingAuditLog).values({
-          orgId,
-          modelingProjectId: projectId,
-          eventType: 'revenue_source_toggled',
-          entityType: 'project_config',
-          entityId: projectId,
-          previousValue: existingMetrics.revenueSourceByDept || {},
-          newValue: revenueSourceByDept,
-          changedFields: Object.keys(revenueSourceByDept),
-          userId,
-          userEmail: req.user.email || null,
-        });
-      } catch (auditErr) {
-        console.warn('[Audit] Failed to log revenue source change:', auditErr);
-      }
-
       res.json({ success: true, revenueSourceByDept });
     } catch (error: any) {
       console.error('Failed to update revenue source config:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // ─── Model Validation Warnings (data-driven) ────
-  app.get('/api/modeling/projects/:projectId/validation-warnings', authenticateUser, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const { projectId } = req.params;
-      const warnings: Array<{id: string; severity: string; category: string; title: string; message: string; recommendation?: string; value?: string; threshold?: string}> = [];
-      let warnId = 0;
-      const warn = (severity: string, category: string, title: string, message: string, recommendation?: string, value?: string, threshold?: string) => {
-        warnings.push({ id: String(++warnId), severity, category, title, message, recommendation, value, threshold });
-      };
-
-      const { modelingActuals, docIntelUploads, docIntelExtractedItems } = await import('@shared/schema');
-
-      const actualsCount = await db.select({ count: sql<number>`count(*)::int` })
-        .from(modelingActuals)
-        .where(and(eq(modelingActuals.modelingProjectId, projectId), eq(modelingActuals.orgId, orgId)));
-      if ((actualsCount[0]?.count || 0) === 0) {
-        warn('warning', 'inputs', 'No Historical Data', 'No actuals imported yet. Upload and review P&L documents first.', 'Go to Uploads tab.');
-      }
-
-      const uploads = await db.select({ id: docIntelUploads.id, name: docIntelUploads.originalName })
-        .from(docIntelUploads).where(and(eq(docIntelUploads.modelingProjectId, projectId), eq(docIntelUploads.orgId, orgId)));
-      for (const upload of uploads) {
-        const itemStats = await db.select({
-          confirmed: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'confirmed')::int`,
-          imported: sql<number>`count(*) filter (where ${docIntelExtractedItems.targetRecordId} is not null)::int`,
-          pending: sql<number>`count(*) filter (where ${docIntelExtractedItems.status} = 'pending')::int`,
-        }).from(docIntelExtractedItems).where(eq(docIntelExtractedItems.uploadId, upload.id));
-        const s = itemStats[0] || { confirmed: 0, imported: 0, pending: 0 };
-        if (s.confirmed > 0 && s.imported === 0)
-          warn('critical', 'inputs', 'Confirmed Items Not Imported', (upload.name||'Document')+' has '+s.confirmed+' confirmed items not yet imported.', 'Click Refresh Actuals on Historical P&L.', s.confirmed+' confirmed', '0 imported');
-        if (s.pending > 5)
-          warn('info', 'inputs', 'Items Pending Review', (upload.name||'Document')+' has '+s.pending+' items pending review.', 'Review remaining items.');
-      }
-
-      const noDept = await db.select({ count: sql<number>`count(*)::int` })
-        .from(modelingActuals)
-        .where(and(eq(modelingActuals.modelingProjectId, projectId), or(isNull(modelingActuals.department), eq(modelingActuals.department, ''))));
-      if ((noDept[0]?.count || 0) > 0)
-        warn('warning', 'inputs', 'Missing Department Assignments', (noDept[0]?.count||0)+' actuals have no department.', 'Review doc-intel classifications and re-import.', (noDept[0]?.count||0)+' items', 'All assigned');
-
-      const project = await storage.getModelingProject(projectId, orgId);
-      const cm = (project?.customMetrics as any) || {};
-      const rsbd = cm.revenueSourceByDept || {};
-      for (const [dept, src] of Object.entries(rsbd)) {
-        if (src !== 'pnl_actuals') continue;
-        const da = await db.select({ count: sql<number>`count(*)::int` })
-          .from(modelingActuals).where(and(eq(modelingActuals.modelingProjectId, projectId), eq(modelingActuals.department, dept), eq(modelingActuals.category, 'Revenue')));
-        if ((da[0]?.count || 0) === 0)
-          warn('warning', 'revenue', dept+' Set to P&L but No Data', dept+' uses P&L actuals but has no revenue data.', 'Upload P&L data or switch to Profit Center.');
-      }
-
-      const negRev = await db.select({ count: sql<number>`count(*)::int` })
-        .from(modelingActuals).where(and(eq(modelingActuals.modelingProjectId, projectId), eq(modelingActuals.category, 'Revenue'), sql`${modelingActuals.amount}::numeric < -1000`));
-      if ((negRev[0]?.count || 0) > 3)
-        warn('warning', 'inputs', 'Negative Revenue Items', (negRev[0]?.count||0)+' revenue items are large negatives (possible miscategorized expenses).', 'Review in doc-intel.');
-
-      const score = Math.max(0, 100 - warnings.filter(w=>w.severity==='critical').length*20 - warnings.filter(w=>w.severity==='warning').length*10 - warnings.filter(w=>w.severity==='info').length*2);
-      res.json({ isValid: warnings.filter(w=>w.severity==='critical').length===0, score, warnings, summary: { critical: warnings.filter(w=>w.severity==='critical').length, warning: warnings.filter(w=>w.severity==='warning').length, info: warnings.filter(w=>w.severity==='info').length } });
-    } catch (error: any) {
-      console.error('Failed to generate validation warnings:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -26107,32 +25869,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         );
       }
 
-      // Auto-reimport if classification changed on already-imported items
-      let _reimported = false;
-      if (hasClassificationChange && item.targetRecordId) {
-        try {
-          const upload = await db.select({
-            id: docIntelUploads.id,
-            projectId: docIntelUploads.modelingProjectId,
-            year: docIntelUploads.year,
-          })
-            .from(docIntelUploads)
-            .where(eq(docIntelUploads.id, item.uploadId))
-            .limit(1);
-
-          if (upload.length > 0 && upload[0].projectId) {
-            await docIntelService.importConfirmedItems(
-              orgId, item.uploadId, upload[0].projectId, userId, upload[0].year || undefined
-            );
-            _reimported = true;
-            console.log(`[AutoReimport] Re-imported upload ${item.uploadId} after classification change`);
-          }
-        } catch (reimportErr) {
-          console.warn('[AutoReimport] Failed:', reimportErr);
-        }
-      }
-
-      res.json({ ...item, _propagation: propagation, _reimported });
+      res.json({ ...item, _propagation: propagation });
     } catch (error: any) {
       if (error.message?.startsWith('Cannot confirm:')) {
         return res.status(400).json({ error: error.message });
@@ -26180,37 +25917,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         }
       }
 
-      // Auto-reimport if classification changed on already-imported items
-      let _reimported = false;
-      if (hasClassificationChange) {
-        try {
-          const importedItems = results.filter((r: any) => r.targetRecordId);
-          if (importedItems.length > 0) {
-            const upload = await db.select({
-              id: docIntelUploads.id,
-              projectId: docIntelUploads.modelingProjectId,
-              year: docIntelUploads.year,
-            })
-              .from(docIntelUploads)
-              .where(eq(docIntelUploads.id, uploadId))
-              .limit(1);
-
-            if (upload.length > 0 && upload[0].projectId) {
-              await docIntelService.importConfirmedItems(
-                orgId, uploadId, upload[0].projectId, userId, upload[0].year || undefined
-              );
-              _reimported = true;
-              console.log('[AutoReimport] Re-imported upload ' + uploadId + ' after bulk classification change');
-            }
-          }
-        } catch (reimportErr) {
-          console.warn('[AutoReimport] Bulk failed:', reimportErr);
-        }
-      }
-
       res.json({ 
-        updated: results.length,
-        _reimported,
+        updated: results.length, 
         _propagation: { 
           propagatedCount: totalPropagated, 
           affectedUploadIds: [...allAffectedUploadIds] 
@@ -26273,83 +25981,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     } catch (error: any) {
       console.error('Failed to import items:', error);
       res.status(500).json({ error: 'Failed to import items' });
-    }
-  });
-
-  // Re-import all confirmed doc-intel items for a project (re-derive actuals from current classifications)
-  app.post('/api/modeling/projects/:projectId/reimport-actuals', authenticateUser, async (req: any, res) => {
-    try {
-      const orgId = req.user.orgId;
-      const userId = req.user.id;
-      const { projectId } = req.params;
-
-      // Find all doc-intel uploads for this project that have imported items
-      const uploads = await db.select({
-        id: docIntelUploads.id,
-        year: docIntelUploads.year,
-      })
-        .from(docIntelUploads)
-        .where(and(
-          eq(docIntelUploads.modelingProjectId, projectId),
-          eq(docIntelUploads.orgId, orgId)
-        ));
-
-      let totalImported = 0;
-      const results: Array<{ uploadId: string; imported: number }> = [];
-
-      for (const upload of uploads) {
-        // Check if this upload has any confirmed items
-        const confirmedCount = await db.select({ id: docIntelExtractedItems.id })
-          .from(docIntelExtractedItems)
-          .where(and(
-            eq(docIntelExtractedItems.uploadId, upload.id),
-            eq(docIntelExtractedItems.status, 'confirmed')
-          ))
-          .limit(1);
-
-        if (confirmedCount.length > 0) {
-          const lines = await docIntelService.importConfirmedItems(
-            orgId, upload.id, projectId, userId, upload.year || undefined
-          );
-          totalImported += lines.length;
-          results.push({ uploadId: upload.id, imported: lines.length });
-        }
-      }
-
-      // Also run P&L pipeline promote (covers the other upload path)
-      let pnlPromoted = 0;
-      try {
-        const { promoteToActuals } = await import('./services/pnl/promote-to-actuals');
-        const promoteResult = await promoteToActuals(projectId, orgId);
-        pnlPromoted = promoteResult?.promoted || 0;
-      } catch (pnlErr) {
-        console.warn('[Reimport] P&L pipeline promote skipped:', pnlErr);
-      }
-
-      console.log(`[Reimport] Re-imported ${totalImported} doc-intel actuals + ${pnlPromoted} P&L pipeline actuals across ${results.length} uploads for project ${projectId}`);
-
-      // Audit trail
-      try {
-        const { modelingAuditLog } = await import('@shared/schema');
-        await db.insert(modelingAuditLog).values({
-          orgId,
-          modelingProjectId: projectId,
-          eventType: 'actuals_reimported',
-          entityType: 'actuals',
-          entityId: projectId,
-          newValue: { totalImported, pnlPromoted, uploadCount: results.length },
-          changedFields: ['modelingActuals'],
-          userId,
-          userEmail: req.user.email || null,
-        });
-      } catch (auditErr) {
-        console.warn('[Audit] Failed to log reimport:', auditErr);
-      }
-
-      res.json({ success: true, totalImported, pnlPromoted, uploads: results });
-    } catch (error: any) {
-      console.error('Failed to reimport actuals:', error);
-      res.status(500).json({ error: 'Failed to reimport actuals' });
     }
   });
   // Reprocess a completed document - reset to review state

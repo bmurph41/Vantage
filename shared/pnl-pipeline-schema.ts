@@ -30,6 +30,7 @@ export const pnlDocuments = pgTable('pnl_documents', {
   statementType: text('statement_type').notNull().default('pnl'),
   yearHint: integer('year_hint'),
   meta: jsonb('meta').notNull().default({}),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   orgShaUnique: unique('pnl_documents_org_sha_unique').on(table.orgId, table.sha256),
@@ -48,6 +49,7 @@ export const pnlJobs = pgTable('pnl_jobs', {
   lastError: jsonb('last_error').notNull().default({}),
   parserVersion: text('parser_version').notNull().default('v1'),
   mapperVersion: text('mapper_version').notNull().default('v1'),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -64,6 +66,7 @@ export const pnlParsedStatements = pgTable('pnl_parsed_statements', {
   jobId: varchar('job_id').notNull().references(() => pnlJobs.id, { onDelete: 'cascade' }),
   parsedJson: jsonb('parsed_json').notNull(),
   confidence: numeric('confidence', { precision: 5, scale: 4 }).notNull().default('0'),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   documentUnique: unique('pnl_parsed_statements_doc_unique').on(table.documentId),
@@ -80,6 +83,7 @@ export const pnlCanonicalLineItems = pgTable('pnl_canonical_line_items', {
   parentId: varchar('parent_id'),
   sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   orgKeyUnique: unique('pnl_canonical_line_items_org_key_unique').on(table.orgId, table.canonicalKey),
@@ -94,6 +98,7 @@ export const pnlLineItemAliases = pgTable('pnl_line_item_aliases', {
   vendorHint: text('vendor_hint'),
   canonicalLineItemId: varchar('canonical_line_item_id').notNull().references(() => pnlCanonicalLineItems.id, { onDelete: 'cascade' }),
   weight: integer('weight').notNull().default(10),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -118,6 +123,7 @@ export const pnlFacts = pgTable('pnl_facts', {
   extractionConfidence: numeric('extraction_confidence', { precision: 5, scale: 4 }).notNull().default('0'),
   mappingConfidence: numeric('mapping_confidence', { precision: 5, scale: 4 }).notNull().default('0'),
   mappingMethod: text('mapping_method').notNull().default('rule'),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   docLinePeriodUnique: unique('pnl_facts_doc_line_period_unique').on(
@@ -142,6 +148,7 @@ export const pnlReviewItems = pgTable('pnl_review_items', {
   confidence: numeric('confidence', { precision: 5, scale: 4 }).notNull().default('0'),
   status: text('status').notNull().default('needs_review'),
   resolvedBy: varchar('resolved_by'),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -239,6 +246,7 @@ export const pnlKeywordRules = pgTable('pnl_keyword_rules', {
   isActive: boolean('is_active').notNull().default(true),
   source: text('source').notNull().default('seed'),
   timesMatched: integer('times_matched').notNull().default(0),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -273,6 +281,7 @@ export const pnlDepartmentVerifications = pgTable('pnl_department_verifications'
   resolvedByUserId: varchar('resolved_by_user_id'),
   saveToKeywordBank: boolean('save_to_keyword_bank').notNull().default(false),
   keywordRuleId: varchar('keyword_rule_id').references(() => pnlKeywordRules.id, { onDelete: 'set null' }),
+  fileData: text('file_data'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 }, (table) => ({

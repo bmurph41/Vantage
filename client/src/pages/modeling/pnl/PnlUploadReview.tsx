@@ -87,6 +87,11 @@ interface ParsedStatement {
 export default function PnlUploadReview() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const { data: projects = [] } = useQuery<Array<{id: string; name: string}>>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "table">("table");
   const [yearHint, setYearHint] = useState<number>(new Date().getFullYear());
@@ -119,6 +124,7 @@ export default function PnlUploadReview() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("yearHint", String(yearHint));
+        if (selectedProjectId) formData.append("modelingProjectId", selectedProjectId);
       
       const response = await fetch("/api/pnl/upload", {
         method: "POST",
@@ -245,7 +251,24 @@ export default function PnlUploadReview() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
+
+      {/* Project Association */}
+      <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border mb-4">
+        <Label className="text-sm font-medium whitespace-nowrap">Link to Project:</Label>
+        <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+          <SelectTrigger className="w-[280px]">
+            <SelectValue placeholder="None (standalone upload)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">None (standalone)</SelectItem>
+            {projects.map((p: any) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>      <div className="flex items-center gap-4 mb-6">
         <Button 
           variant="ghost" 
           size="sm" 

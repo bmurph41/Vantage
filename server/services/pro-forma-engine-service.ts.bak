@@ -52,7 +52,6 @@ import {
   type Year1Mode,
   type T12Context
 } from '../utils/modeling-periods';
-import { loadCanonicalActuals } from './canonical-actuals-loader';
 
 // ============================================
 // TYPES
@@ -414,11 +413,6 @@ export class ProFormaEngineService {
     const reservesPct = (belowTheLine.reservesPct || 0) / 100;
     const reservesAmount = belowTheLine.reservesAmount || 0;
     
-    // Above/below line position for each item (default: 'below' = after NOI)
-    const mgmtFeeLinePos: 'above' | 'below' = belowTheLine.managementFeeLinePosition || 'below';
-    const capexLinePos: 'above' | 'below' = belowTheLine.capexLinePosition || 'below';
-    const reservesLinePos: 'above' | 'below' = belowTheLine.reservesLinePosition || 'below';
-    
     // Exit assumptions
     const exitAssumptions = assumptions.exitAssumptions || {};
     const sellingFeePct = (exitAssumptions.sellingFeePct ?? 2) / 100;
@@ -442,25 +436,35 @@ export class ProFormaEngineService {
     const latestHistoricalYear = actualsYears[0] || baseYear - 1;
     const historicalYears = actualsYears.filter(y => y < baseYear || actualsYears.length === 1 ? true : y <= latestHistoricalYear);
 
-    // FIX: Use shared canonical actuals loader for baseline aggregation.
-    // Guarantees identical category/department as getHistoricalPL().
-    const { items: baselineItems } = await loadCanonicalActuals(projectId, orgId, latestHistoricalYear);
-    
-    for (const item of baselineItems) {
-      const entry: ActualEntry = {
-        amount: item.total,
-        category: item.category,
-        subcategory: item.key,
-        department: item.department,
-        year: latestHistoricalYear,
-      };
+    for (const actual of actuals) {
+      if (actual.year !== latestHistoricalYear) continue;
       
-      if (item.category === 'Revenue') {
-        revenueBySubcat[item.key] = entry;
-      } else if (item.category === 'COGS') {
-        cogsBySubcat[item.key] = entry;
-      } else {
-        expensesBySubcat[item.key] = entry;
+      const amount = parseFloat(actual.amount?.toString() || '0');
+      const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
+      const rawCategory = actual.category || 'Other';
+      // Normalize category to handle case variants and alternate spellings
+      const categoryNorm = rawCategory.toLowerCase().trim();
+      const category = categoryNorm === 'revenue' ? 'Revenue'
+        : categoryNorm === 'cogs' || categoryNorm === 'cost_of_goods_sold' || categoryNorm === 'cost of goods sold' ? 'COGS'
+        : categoryNorm === 'expenses' || categoryNorm === 'expense' || categoryNorm === 'operating expenses' || categoryNorm === 'opex' || categoryNorm === 'payroll' ? 'Expenses'
+        : rawCategory;
+      const dept = deptOverrideMap[subcat] || (actual as any).department || inferDepartment(subcat, category);
+      
+      if (category === 'Revenue' || (actual as any).isRevenue) {
+        if (!revenueBySubcat[subcat]) {
+          revenueBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
+        }
+        revenueBySubcat[subcat].amount += amount;
+      } else if (category === 'COGS') {
+        if (!cogsBySubcat[subcat]) {
+          cogsBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
+        }
+        cogsBySubcat[subcat].amount += amount;
+      } else if (category === 'Expenses' || ['Operating Expenses', 'OpEx', 'Payroll'].includes(rawCategory)) {
+        if (!expensesBySubcat[subcat]) {
+          expensesBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
+        }
+        expensesBySubcat[subcat].amount += amount;
       }
     }
 
@@ -584,7 +588,7 @@ export class ProFormaEngineService {
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
     const actualsMonthsPerYearPerSubcat: Record<string, Record<number, Set<number>>> = {};
     for (const actual of actuals) {
-      const subcat = actual.subcategory || actual.category || 'Other';
+      const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
       const key = `${actual.year}-${String(actual.month).padStart(2, '0')}`;
       if (!actualsMonthlyLookup[subcat]) {
         actualsMonthlyLookup[subcat] = {};
@@ -896,23 +900,13 @@ export class ProFormaEngineService {
       const expTotal = expenseLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0);
       
       const gp = revTotal - cogsTotal;
-      const rawNoi = gp - expTotal;
-      const pctBasis = belowTheLineBasis === 'noi' ? rawNoi : revTotal;
+      const noiVal = gp - expTotal;
+      const pctBasis = belowTheLineBasis === 'noi' ? noiVal : revTotal;
       const mgmtFee = Math.round(pctBasis * managementFeePct);
       const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(pctBasis * capexPct);
       const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(pctBasis * reservesPct);
-      
-      // Items marked 'above' are deducted before NOI; 'below' items deducted after
-      const aboveLineMgmt = mgmtFeeLinePos === 'above' ? mgmtFee : 0;
-      const aboveLineCapex = capexLinePos === 'above' ? capexVal : 0;
-      const aboveLineReserves = reservesLinePos === 'above' ? reserveVal : 0;
-      const noiVal = rawNoi - aboveLineMgmt - aboveLineCapex - aboveLineReserves;
-      
-      const belowLineMgmt = mgmtFeeLinePos === 'below' ? mgmtFee : 0;
-      const belowLineCapex = capexLinePos === 'below' ? capexVal : 0;
-      const belowLineReserves = reservesLinePos === 'below' ? reserveVal : 0;
       const debtSvc = 0; // Will be updated after debt integration
-      const cfBeforeDebt = noiVal - belowLineMgmt - belowLineCapex - belowLineReserves;
+      const cfBeforeDebt = noiVal - mgmtFee - capexVal - reserveVal;
       const levCf = cfBeforeDebt - debtSvc;
       
       revenueTotalsMonthly[period.key] = revTotal;
@@ -944,10 +938,7 @@ export class ProFormaEngineService {
       year.monthIndices.reduce((sum, mi) => sum + (expenseTotalsMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
     
-    // Roll up from noiMonthly (which already reflects above-the-line deductions)
-    const noi = annualPeriods.map(year =>
-      year.monthIndices.reduce((sum, mi) => sum + (noiMonthly[monthlyPeriods[mi].key] || 0), 0)
-    );
+    const noi = grossProfit.map((gp, i) => gp - expenseTotals[i]);
     const capex = annualPeriods.map(year =>
       year.monthIndices.reduce((sum, mi) => sum + (capexMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
@@ -965,12 +956,7 @@ export class ProFormaEngineService {
       year.monthIndices.reduce((sum, mi) => sum + (leveredCashFlowMonthly[monthlyPeriods[mi].key] || 0), 0)
     );
     const cashFlow = leveredCashFlow.slice(); // Backward compat
-    const noiBelowLine = annualPeriods.map((_, i) => {
-      const belMgmt = mgmtFeeLinePos === 'below' ? managementFeeArr[i] : 0;
-      const belCapex = capexLinePos === 'below' ? capex[i] : 0;
-      const belReserves = reservesLinePos === 'below' ? reservesArr[i] : 0;
-      return belMgmt + belCapex + belReserves + debtServiceArr[i];
-    });
+    const noiBelowLine = annualPeriods.map((_, i) => managementFeeArr[i] + capex[i] + reservesArr[i] + debtServiceArr[i]);
     
     // ========================================
     // 8. BUILD PROJECTION DETAIL ARRAYS
@@ -1087,11 +1073,10 @@ export class ProFormaEngineService {
             const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
             debtServiceMonthly[period.key] = Math.round(ds.payment);
             const noiVal = noiMonthly[period.key] || 0;
-            // Only subtract below-the-line items (above-line already in noiVal)
-            const belMgmt = mgmtFeeLinePos === 'below' ? (managementFeeMonthly[period.key] || 0) : 0;
-            const belCapex = capexLinePos === 'below' ? (capexMonthly[period.key] || 0) : 0;
-            const belReserves = reservesLinePos === 'below' ? (reservesMonthly[period.key] || 0) : 0;
-            const newLevCf = noiVal - belMgmt - belCapex - belReserves - Math.round(ds.payment);
+            const mgmtFee = managementFeeMonthly[period.key] || 0;
+            const capexVal = capexMonthly[period.key] || 0;
+            const reserveVal = reservesMonthly[period.key] || 0;
+            const newLevCf = noiVal - mgmtFee - capexVal - reserveVal - Math.round(ds.payment);
             leveredCashFlowMonthly[period.key] = newLevCf;
             cashFlowMonthly[period.key] = newLevCf;
           }
@@ -1102,10 +1087,7 @@ export class ProFormaEngineService {
             debtServiceArr[i] = year.monthIndices.reduce((sum, mi) => sum + (debtServiceMonthly[monthlyPeriods[mi].key] || 0), 0);
             leveredCashFlow[i] = year.monthIndices.reduce((sum, mi) => sum + (leveredCashFlowMonthly[monthlyPeriods[mi].key] || 0), 0);
             cashFlow[i] = leveredCashFlow[i];
-            const belMgmtD = mgmtFeeLinePos === 'below' ? managementFeeArr[i] : 0;
-            const belCapexD = capexLinePos === 'below' ? capex[i] : 0;
-            const belReservesD = reservesLinePos === 'below' ? reservesArr[i] : 0;
-            noiBelowLine[i] = belMgmtD + belCapexD + belReservesD + debtServiceArr[i];
+            noiBelowLine[i] = managementFeeArr[i] + capex[i] + reservesArr[i] + debtServiceArr[i];
           }
           
           // Update projection detail arrays with debt service
@@ -1143,10 +1125,9 @@ export class ProFormaEngineService {
             const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
             debtServiceMonthly[period.key] = Math.round(ds.payment);
             const noiVal = noiMonthly[period.key] || 0;
-            const belMgmt = mgmtFeeLinePos === 'below' ? (managementFeeMonthly[period.key] || 0) : 0;
-            const belCapex = capexLinePos === 'below' ? (capexMonthly[period.key] || 0) : 0;
-            const belReserves = reservesLinePos === 'below' ? (reservesMonthly[period.key] || 0) : 0;
-            leveredCashFlowMonthly[period.key] = Math.round(noiVal - belMgmt - belCapex - belReserves - ds.payment);
+            const mgmtFee = managementFeeMonthly[period.key] || 0;
+            const capexVal = capexMonthly[period.key] || 0;
+            leveredCashFlowMonthly[period.key] = Math.round(noiVal - mgmtFee - capexVal - ds.payment);
           }
           console.log("[Pro Forma] Canonical debt engine used (direct from loans)");
         }
@@ -1306,12 +1287,6 @@ export class ProFormaEngineService {
         stabilizedNoi,
         stabilizedNoiYear: stabilizedYearIndex + 1,
         stabilizedNoiMode,
-        // Line position configuration
-        linePositions: {
-          managementFee: mgmtFeeLinePos,
-          capex: capexLinePos,
-          reserves: reservesLinePos,
-        },
         // Exit waterfall
         netExitProceeds,
         sellingFees,
@@ -1346,32 +1321,6 @@ export class ProFormaEngineService {
     cogsBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>,
     expensesBySubcat: Record<string, { amount: number; category: string; subcategory: string; department?: string }>
   ): Promise<void> {
-    // ── Read per-department revenue source toggle ──────────────
-    let revenueSourceByDept: Record<string, string> = {};
-    try {
-      const [proj] = await db.select({ customMetrics: modelingProjects.customMetrics })
-        .from(modelingProjects)
-        .where(eq(modelingProjects.id, projectId));
-      const cfg = (proj?.customMetrics as any) || {};
-      revenueSourceByDept = cfg.revenueSourceByDept || {};
-    } catch {}
-
-    const useProfitCenter = (dept: string): boolean => {
-      return revenueSourceByDept[dept] !== 'pnl_actuals';
-    };
-
-    const removePnlActualsForDept = (dept: string) => {
-      for (const [key, entry] of Object.entries(revenueBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete revenueBySubcat[key];
-      }
-      for (const [key, entry] of Object.entries(cogsBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete cogsBySubcat[key];
-      }
-      for (const [key, entry] of Object.entries(expensesBySubcat)) {
-        if (entry.department === dept && !key.startsWith('PC: ')) delete expensesBySubcat[key];
-      }
-    };
-
     const addRevenue = (name: string, amount: number, dept?: string) => {
       if (amount <= 0) return;
       const key = `PC: ${name}`;
@@ -1402,58 +1351,60 @@ export class ProFormaEngineService {
         db.select().from(asmpBookkeeping).where(eq(asmpBookkeeping.projectId, projectId)),
       ]);
 
-      if (fuelRows.length > 0 && useProfitCenter('Fuel')) {
-        removePnlActualsForDept('Fuel');
+      if (fuelRows.length > 0) {
         const totalRev = fuelRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = fuelRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Fuel Sales', totalRev, 'Fuel');
         addCOGS('Fuel Sales', totalCogs, 'Fuel');
       }
 
-      if (storeRows.length > 0 && useProfitCenter('Ship Store')) {
-        removePnlActualsForDept('Ship Store');
+      if (storeRows.length > 0) {
         const totalRev = storeRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = storeRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Ship Store', totalRev, 'Ship Store');
         addCOGS('Ship Store', totalCogs, 'Ship Store');
       }
 
-      if (serviceRows.length > 0 && useProfitCenter('Service')) {
-        removePnlActualsForDept('Service');
+      if (serviceRows.length > 0) {
         const totalRev = serviceRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
         const totalCogs = serviceRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Service Department', totalRev, 'Service');
         addCOGS('Service Department', totalCogs, 'Service');
       }
 
-      if (rentalRows.length > 0 && useProfitCenter('Boat Rentals')) {
-        removePnlActualsForDept('Boat Rentals');
+      if (rentalRows.length > 0) {
         const totalRev = rentalRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         addRevenue('Boat Rentals', totalRev, 'Boat Rentals');
       }
 
-      if (clubRows.length > 0 && useProfitCenter('Boat Club')) {
-        removePnlActualsForDept('Boat Club');
+      if (clubRows.length > 0) {
         const totalRev = clubRows.reduce((s, r) => s + Number(r.monthlyRecurringRevenue || 0), 0);
         addRevenue('Boat Club', totalRev, 'Boat Club');
       }
 
-      if (salesRows.length > 0 && useProfitCenter('Boat Sales')) {
-        removePnlActualsForDept('Boat Sales');
+      if (salesRows.length > 0) {
         const totalRev = salesRows.reduce((s, r) => s + Number(r.revenue || 0), 0);
         const totalCogs = salesRows.reduce((s, r) => s + Number(r.cogs || 0), 0);
         addRevenue('Boat Sales', totalRev, 'Boat Sales');
         addCOGS('Boat Sales', totalCogs, 'Boat Sales');
       }
 
-      if (tenantRows.length > 0 && useProfitCenter('Commercial')) {
-        removePnlActualsForDept('Commercial');
-        const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
-        addRevenue('Commercial Tenants', totalRev, 'Commercial');
+      if (tenantRows.length > 0) {
+        let syncEnabled = true;
+        try {
+          const [proj] = await db.select({ customMetrics: modelingProjects.customMetrics })
+            .from(modelingProjects)
+            .where(eq(modelingProjects.id, projectId));
+          const cfg = (proj?.customMetrics as any) || {};
+          syncEnabled = cfg.commercialLeaseSyncEnabled !== false;
+        } catch {}
+        if (syncEnabled) {
+          const totalRev = tenantRows.reduce((s, r) => s + Number(r.totalRevenue || 0), 0);
+          addRevenue('Commercial Tenants', totalRev, 'Commercial');
+        }
       }
 
-      if (bkRows.length > 0 && useProfitCenter('Bookkeeping')) {
-        removePnlActualsForDept('Bookkeeping');
+      if (bkRows.length > 0) {
         const totalRevOverride = bkRows.reduce((s, r) => s + Number(r.revenueTotalOverride || 0), 0);
         const totalExpOverride = bkRows.reduce((s, r) => s + Number(r.expenseTotalOverride || 0), 0);
         if (totalRevOverride > 0) addRevenue('Bookkeeping Revenue', totalRevOverride, 'Bookkeeping');
@@ -1501,9 +1452,6 @@ export class ProFormaEngineService {
   /**
    * Get historical P&L data for a project.
    * Used for base year determination and actuals display.
-   *
-   * FIX: Now uses shared canonical-actuals-loader to guarantee identical
-   * category/department resolution as generateProForma() baseline year.
    */
   async getHistoricalPL(projectId: string, orgId: string, year?: number): Promise<any> {
     const [project] = await db.select()
@@ -1518,25 +1466,108 @@ export class ProFormaEngineService {
       throw new Error('Project not found');
     }
 
-    const { categorized } = await loadCanonicalActuals(projectId, orgId, year);
+    const { modelingPnlOverrides } = await import('@shared/schema');
+    const { inferDepartment: inferDeptFn } = await import('../utils/department-mapping');
+    const pnlOverrides = await db.select()
+      .from(modelingPnlOverrides)
+      .where(and(eq(modelingPnlOverrides.projectId, projectId), eq(modelingPnlOverrides.orgId, orgId)));
+    const excludeSet = new Set(
+      pnlOverrides.filter(o => o.overrideType === 'exclude' && o.isActive).map(o => o.lineItemKey)
+    );
+    const deptOverrideMap: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
+      .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
+    const categoryOverrideMap2: Record<string, string> = {};
+    pnlOverrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideCategory)
+      .forEach(o => { categoryOverrideMap2[o.lineItemKey] = o.overrideCategory!; });
 
-    const toItems = (list: typeof categorized.revenueItems) =>
-      list.map(item => ({
-        name: item.key,
-        category: item.category,
-        department: item.department,
-        monthlyAmounts: Array.from({ length: 12 }, (_, i) => item.monthlyAmounts[i + 1] || 0),
-        total: item.total,
-      }));
+    const allActuals = await db.select()
+      .from(modelingActuals)
+      .where(eq(modelingActuals.modelingProjectId, projectId));
+    const actuals = allActuals.filter(a => !excludeSet.has(a.subcategory || ''));
+
+    const relevantActuals = year 
+      ? actuals.filter(a => a.year === year)
+      : actuals;
+
+    const lineItems: Record<string, Record<number, number>> = {};
+    const categories: Record<string, string> = {};
+    const departments: Record<string, string> = {};
+
+    for (const actual of relevantActuals) {
+      const key = actual.subcategory || actual.category || 'Other';
+      const month = actual.month || 1;
+      const amount = parseFloat(actual.amount?.toString() || '0');
+      
+      if (!lineItems[key]) {
+        lineItems[key] = {};
+        // Normalize category to canonical form
+        const rawCat = categoryOverrideMap2[key] || actual.category || 'Other';
+        const catNorm = rawCat.toLowerCase().trim();
+        const normalizedCat = catNorm === 'revenue' ? 'Revenue'
+          : catNorm === 'cogs' || catNorm === 'cost_of_goods_sold' || catNorm === 'cost of goods sold' ? 'COGS'
+          : catNorm === 'expenses' || catNorm === 'expense' || catNorm === 'operating expenses' || catNorm === 'opex' || catNorm === 'payroll' ? 'Expenses'
+          : rawCat;
+        categories[key] = normalizedCat;
+        departments[key] = deptOverrideMap[key] || actual.department || inferDeptFn(key, normalizedCat);
+      }
+      
+      lineItems[key][month] = (lineItems[key][month] || 0) + amount;
+    }
+
+    const revenueItems: any[] = [];
+    const cogsItems: any[] = [];
+    const expenseItems: any[] = [];
+
+    for (const [name, monthlyData] of Object.entries(lineItems)) {
+      const monthlyAmounts = Array.from({ length: 12 }, (_, i) => monthlyData[i + 1] || 0);
+      const total = monthlyAmounts.reduce((sum, v) => sum + v, 0);
+      
+      const item = {
+        name,
+        category: categories[name],
+        department: departments[name],
+        monthlyAmounts,
+        total
+      };
+
+      const cat = categories[name];
+      if (cat === 'Revenue') {
+        revenueItems.push(item);
+      } else if (cat === 'COGS') {
+        cogsItems.push(item);
+      } else if (cat === 'Expenses') {
+        expenseItems.push(item);
+      } else {
+        // Unknown category — log and default to expenses (conservative)
+        console.warn(`[Historical P&L] Unknown category "${cat}" for line item "${name}" — defaulting to Expenses`);
+        expenseItems.push(item);
+      }
+    }
+
+    const totalRevenue = revenueItems.reduce((sum, item) => sum + item.total, 0);
+    const totalCOGS = cogsItems.reduce((sum, item) => sum + item.total, 0);
+    const totalExpenses = expenseItems.reduce((sum, item) => sum + item.total, 0);
+    const grossProfit = totalRevenue - totalCOGS;
+    const netNoi = grossProfit - totalExpenses;
 
     return {
       year: year || new Date().getFullYear(),
-      revenue: { lineItems: toItems(categorized.revenueItems), total: categorized.totalRevenue },
-      cogs: { lineItems: toItems(categorized.cogsItems), total: categorized.totalCOGS },
-      grossProfit: categorized.grossProfit,
-      expenses: { lineItems: toItems(categorized.expenseItems), total: categorized.totalExpenses },
-      noi: categorized.noi,
-      lastUpdated: new Date().toISOString(),
+      revenue: {
+        lineItems: revenueItems,
+        total: totalRevenue
+      },
+      cogs: {
+        lineItems: cogsItems,
+        total: totalCOGS
+      },
+      grossProfit,
+      expenses: {
+        lineItems: expenseItems,
+        total: totalExpenses
+      },
+      noi: netNoi,
+      lastUpdated: new Date().toISOString()
     };
   }
 }

@@ -327,7 +327,7 @@ export default function UnifiedSidebar() {
       const content = (
         <div
           className={cn(
-            "flex items-center text-sm text-gray-400 cursor-not-allowed",
+            "flex items-center text-[13px] text-gray-400 cursor-not-allowed",
             sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5"
           )}
           data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
@@ -356,7 +356,7 @@ export default function UnifiedSidebar() {
         href={item.href}
         onClick={handleNavClick}
         className={cn(
-          "flex items-center text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
+          "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
           sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5",
           isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
         )}
@@ -446,7 +446,7 @@ export default function UnifiedSidebar() {
       <button
         onClick={onToggle}
         className={cn(
-          "flex items-center justify-between w-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors",
+          "flex items-center justify-between w-full px-4 py-2 text-sm font-bold uppercase tracking-wide transition-colors",
           isActive 
             ? "bg-blue-600 text-white hover:bg-blue-700" 
             : "text-gray-500 hover:text-gray-700"
@@ -454,7 +454,7 @@ export default function UnifiedSidebar() {
         data-testid={`toggle-${title.toLowerCase()}`}
       >
         <div className="flex items-center gap-2">
-          {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
+          {IconComponent && <IconComponent className="w-4 h-4" />}
           <span>{title}</span>
         </div>
         {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}

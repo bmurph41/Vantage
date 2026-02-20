@@ -795,10 +795,48 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
   }, [ledgerEntries, bucketFilter, sourceFilter]);
 
   const cumulativeSpend = spendToggle === 'equity'
-    ? metrics?.cumulativeSpendEquity
-    : metrics?.cumulativeSpendAllIn;
+    ? (effectiveMetrics?.cumulativeSpendEquity ?? metrics?.cumulativeSpendEquity)
+    : (effectiveMetrics?.cumulativeSpendAllIn ?? metrics?.cumulativeSpendAllIn);
 
   const hasData = ledgerEntries.length > 0;
+
+  // Bridge: derive dashboard-compatible metrics from pro forma when no ledger data
+  const effectiveMetrics = useMemo(() => {
+    if (hasData && metrics) return { ...metrics, source: 'ledger' as const };
+    if (!pf) return null;
+    
+    const m = pf.metrics || {};
+    const purchasePrice = pf.purchasePrice || 0;
+    const loanProceeds = m.debtSchedule?.totalDebtAtClose || 0;
+    const totalEquity = purchasePrice - loanProceeds;
+    const exitVal = pf.exitYear?.exitValue || m.exitValue || 0;
+    const totalReturn = m.totalReturn || 0;
+    const leveredCF1 = pf.yearOne?.noi || 0; // Approximate
+    
+    // Pro forma IRR values are already percentages — convert to decimal for formatPercentDecimal
+    const leveredIrrDecimal = (m.irr || 0) / 100;
+    const unleveredIrrDecimal = (m.unleveredIrr || 0) / 100;
+    
+    // Capital appreciation
+    const capAppreciation = exitVal - purchasePrice;
+    
+    // Gross leveraged gain = net exit proceeds - equity invested
+    const netExitProceeds = m.netExitProceeds || (exitVal - (exitVal * 0.02) - (m.debtSchedule?.schedule?.[m.debtSchedule.schedule.length-1]?.totalBalance || 0));
+    const grossLeveredGain = netExitProceeds - totalEquity + totalReturn;
+    
+    return {
+      cumulativeOperatingCF: totalReturn,
+      cumulativeCashIn: totalReturn > 0 ? totalReturn + Math.max(0, netExitProceeds) : 0,
+      cumulativeSpendEquity: -totalEquity,
+      cumulativeSpendAllIn: -purchasePrice,
+      grossGain: grossLeveredGain,
+      moic: totalEquity > 0 ? (m.equityMultiple || 0) : null,
+      roi: totalEquity > 0 ? ((m.equityMultiple || 1) - 1) : null,
+      irr: view === 'levered' ? leveredIrrDecimal : unleveredIrrDecimal,
+      loanBalanceMissing: !m.debtSchedule,
+      source: 'pro_forma' as const,
+    };
+  }, [hasData, metrics, pf, view]);
 
   const waterfallData = useMemo(() => {
     if (!attribution) return [];
@@ -903,7 +941,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
         </div>
       </div>
 
-      {!hasData && !seedMutation.isPending && activeTab === 'dashboard' && (
+      {!hasData && !pf && !seedMutation.isPending && activeTab === 'dashboard' && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
@@ -998,51 +1036,55 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
             </Card>
           )}
 
-          {hasData && (
+          {effectiveMetrics && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <KpiCard
                   title="Cumulative Op CF"
-                  value={formatCurrencyCompact(metrics?.cumulativeOperatingCF || 0)}
+                  value={formatCurrencyCompact(effectiveMetrics.cumulativeOperatingCF || 0)}
                   icon={Activity}
-                  trend={(metrics?.cumulativeOperatingCF || 0) >= 0 ? 'up' : 'down'}
+                  trend={(effectiveMetrics.cumulativeOperatingCF || 0) >= 0 ? 'up' : 'down'}
                 />
                 <KpiCard
                   title="Cash In"
-                  value={formatCurrencyCompact(metrics?.cumulativeCashIn || 0)}
+                  value={formatCurrencyCompact(effectiveMetrics.cumulativeCashIn || 0)}
                   icon={ArrowUpRight}
                   trend="up"
                 />
                 <KpiCard
                   title={spendToggle === 'equity' ? 'Equity Invested' : 'All-In Spend'}
-                  value={formatCurrencyCompact(Math.abs(cumulativeSpend || 0))}
+                  value={formatCurrencyCompact(Math.abs(
+                    spendToggle === 'equity'
+                      ? (effectiveMetrics.cumulativeSpendEquity || 0)
+                      : (effectiveMetrics.cumulativeSpendAllIn || 0)
+                  ))}
                   icon={Wallet}
                   trend="down"
                 />
                 <KpiCard
                   title="Gross Gain"
-                  value={formatCurrencyCompact(metrics?.grossGain || 0)}
+                  value={formatCurrencyCompact(effectiveMetrics.grossGain || 0)}
                   icon={TrendingUp}
-                  trend={(metrics?.grossGain || 0) >= 0 ? 'up' : 'down'}
+                  trend={(effectiveMetrics.grossGain || 0) >= 0 ? 'up' : 'down'}
                 />
                 <KpiCard
                   title="MOIC"
-                  value={formatMultiple(metrics?.moic)}
+                  value={formatMultiple(effectiveMetrics.moic)}
                   icon={Target}
-                  trend={metrics?.moic && metrics.moic > 1 ? 'up' : 'neutral'}
+                  trend={effectiveMetrics.moic && effectiveMetrics.moic > 1 ? 'up' : 'neutral'}
                 />
                 <KpiCard
                   title="ROI"
-                  value={formatPercentDecimal(metrics?.roi)}
+                  value={formatPercentDecimal(effectiveMetrics.roi)}
                   icon={Percent}
-                  trend={metrics?.roi && metrics.roi > 0 ? 'up' : 'neutral'}
+                  trend={effectiveMetrics.roi && effectiveMetrics.roi > 0 ? 'up' : 'neutral'}
                 />
                 <KpiCard
                   title="IRR"
-                  value={formatPercentDecimal(metrics?.irr)}
+                  value={formatPercentDecimal(effectiveMetrics.irr)}
                   subtitle={view === 'levered' ? 'Levered' : 'Unlevered'}
                   icon={TrendingUp}
-                  trend={metrics?.irr && metrics.irr > 0 ? 'up' : 'neutral'}
+                  trend={effectiveMetrics.irr && effectiveMetrics.irr > 0 ? 'up' : 'neutral'}
                 />
               </div>
 
@@ -1098,7 +1140,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
                 </Card>
               </div>
 
-              {metrics?.loanBalanceMissing && view === 'levered' && (
+              {effectiveMetrics?.loanBalanceMissing && view === 'levered' && (
                 <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
                   <CardContent className="p-3 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
                     <Landmark className="h-4 w-4 shrink-0" />
