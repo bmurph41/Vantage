@@ -609,7 +609,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="count" fill="#8b5cf6" name="Deals" />
+                    <Bar dataKey="count" fill="#8b5cf6" name="Deals" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -630,7 +630,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="count" fill="#f59e0b" name="Deals" />
+                    <Bar dataKey="count" fill="#f59e0b" name="Deals" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -651,7 +651,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="deals" fill="#3b82f6" name="Deals" />
+                    <Bar dataKey="deals" fill="#3b82f6" name="Deals" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -672,7 +672,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip formatter={(value) => formatPercent(value as number)} />
                     <Legend />
-                    <Bar dataKey="winRate" fill="#10b981" name="Win Rate %" />
+                    <Bar dataKey="winRate" fill="#10b981" name="Win Rate %" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -693,7 +693,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="deals" fill="#10b981" name="Deals" />
+                    <Bar dataKey="deals" fill="#10b981" name="Deals" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -714,7 +714,7 @@ export default function ModelingAnalytics() {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="deals" fill="#ef4444" name="Deals" />
+                    <Bar dataKey="deals" fill="#ef4444" name="Deals" maxBarSize={40} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

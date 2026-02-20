@@ -537,6 +537,8 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                         dataKey={`${scenario.id}_revenue`}
                         name={scenario.name}
                         fill={scenario.color || SCENARIO_COLORS[scenario.id]}
+                        maxBarSize={40}
+                        radius={[4, 4, 0, 0]}
                       />
                     ))}
                   </BarChart>
@@ -593,6 +595,8 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                       dataKey={`${scenario.id}_noi`}
                       name={`${scenario.name} NOI`}
                       fill={scenario.color || SCENARIO_COLORS[scenario.id]}
+                      maxBarSize={40}
+                      radius={[4, 4, 0, 0]}
                     />
                   ))}
                 </BarChart>
@@ -623,6 +627,8 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                           dataKey={scenario.id}
                           name={scenario.name}
                           fill={scenario.color || SCENARIO_COLORS[scenario.id]}
+                          maxBarSize={40}
+                          radius={[0, 4, 4, 0]}
                         />
                       ))}
                     </BarChart>
