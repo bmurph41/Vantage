@@ -51,7 +51,7 @@ import {
   Landmark,
   Anchor,
   Loader2
-} from 'lucide-react';
+, Users} from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -1011,6 +1011,112 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const annualDebtService = debtTranches.reduce((sum, t) => sum + parseNumber(t.annualDebtService), 0);
 
   const layerType = equityForm.watch('layerType');
+
+  // ── Smart Equity: Auto-calculate from purchase price & debt ──
+  const purchasePrice = parseNumber(stackDetails?.stack?.purchasePrice) || 0;
+  const computedEquity = Math.max(0, purchasePrice - totalDebt);
+  const hasComputedEquity = purchasePrice > 0;
+
+  // Dynamic partner rows for Partnership/JV structures
+  const [equityPartners, setEquityPartners] = useState<{
+    id: string;
+    name: string;
+    role: 'gp' | 'lp' | 'partner';
+    amount: string;
+    ownershipPct: string;
+  }[]>([]);
+
+  // Initialize partner rows when equity type changes
+  useEffect(() => {
+    if (layerType === 'solo' && !editingEquity) {
+      // Solo: auto-fill total equity and 100% ownership
+      if (hasComputedEquity) {
+        equityForm.setValue('commitmentAmount', String(Math.round(computedEquity)));
+      }
+      equityForm.setValue('ownershipPct', '100');
+      setEquityPartners([]);
+    } else if (layerType === 'partnership' && !editingEquity) {
+      // Partnership: 2 partners, split equity evenly
+      if (equityPartners.length === 0) {
+        const halfEquity = Math.round(computedEquity / 2);
+        setEquityPartners([
+          { id: crypto.randomUUID(), name: 'Partner 1', role: 'partner', amount: hasComputedEquity ? String(halfEquity) : '', ownershipPct: '50' },
+          { id: crypto.randomUUID(), name: 'Partner 2', role: 'partner', amount: hasComputedEquity ? String(halfEquity) : '', ownershipPct: '50' },
+        ]);
+      }
+      if (hasComputedEquity) {
+        equityForm.setValue('commitmentAmount', String(Math.round(computedEquity)));
+      }
+    } else if ((layerType === 'promote' || layerType === 'co_invest') && !editingEquity) {
+      // GP/LP structures: default GP 10% / LP 90%
+      if (equityPartners.length === 0) {
+        const gpAmount = Math.round(computedEquity * 0.1);
+        const lpAmount = Math.round(computedEquity * 0.9);
+        setEquityPartners([
+          { id: crypto.randomUUID(), name: 'GP Sponsor', role: 'gp', amount: hasComputedEquity ? String(gpAmount) : '', ownershipPct: '10' },
+          { id: crypto.randomUUID(), name: 'LP Investor', role: 'lp', amount: hasComputedEquity ? String(lpAmount) : '', ownershipPct: '90' },
+        ]);
+      }
+      if (hasComputedEquity) {
+        equityForm.setValue('commitmentAmount', String(Math.round(computedEquity)));
+      }
+    }
+  }, [layerType]);
+
+  // Reactively update commitment when debt or purchase price changes
+  useEffect(() => {
+    if (hasComputedEquity && !editingEquity) {
+      const currentType = equityForm.getValues('layerType');
+      equityForm.setValue('commitmentAmount', String(Math.round(computedEquity)));
+      
+      // Redistribute among partners
+      if (equityPartners.length > 0) {
+        setEquityPartners(prev => prev.map(p => {
+          const pct = parseFloat(p.ownershipPct) || 0;
+          return { ...p, amount: String(Math.round(computedEquity * pct / 100)) };
+        }));
+      }
+    }
+  }, [computedEquity]);
+
+  // Partner helper functions
+  const addEquityPartner = () => {
+    const remaining = 100 - equityPartners.reduce((s, p) => s + (parseFloat(p.ownershipPct) || 0), 0);
+    setEquityPartners([...equityPartners, {
+      id: crypto.randomUUID(),
+      name: layerType === 'promote' || layerType === 'co_invest'
+        ? `LP Investor ${equityPartners.filter(p => p.role === 'lp').length + 1}`
+        : `Partner ${equityPartners.length + 1}`,
+      role: layerType === 'promote' || layerType === 'co_invest' ? 'lp' : 'partner',
+      amount: hasComputedEquity ? String(Math.round(computedEquity * Math.max(0, remaining) / 100)) : '',
+      ownershipPct: String(Math.max(0, remaining).toFixed(1)),
+    }]);
+  };
+
+  const removeEquityPartner = (id: string) => {
+    if (equityPartners.length > 2) {
+      setEquityPartners(equityPartners.filter(p => p.id !== id));
+    }
+  };
+
+  const updateEquityPartner = (id: string, field: string, value: string) => {
+    setEquityPartners(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const updated = { ...p, [field]: value };
+      // When ownership % changes, recalc amount
+      if (field === 'ownershipPct' && hasComputedEquity) {
+        updated.amount = String(Math.round(computedEquity * (parseFloat(value) || 0) / 100));
+      }
+      // When amount changes, recalc ownership %
+      if (field === 'amount' && computedEquity > 0) {
+        updated.ownershipPct = ((parseFloat(value) || 0) / computedEquity * 100).toFixed(1);
+      }
+      return updated;
+    }));
+  };
+
+  const totalPartnerOwnership = equityPartners.reduce((s, p) => s + (parseFloat(p.ownershipPct) || 0), 0);
+  const totalPartnerAmount = equityPartners.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 
   return (
     <div className="space-y-6" ref={pdfRef}>
@@ -2618,6 +2724,32 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                       <DollarSign className="h-4 w-4 text-blue-600" />
                                       {layerType === 'solo' ? 'Your Equity Investment' : layerType === 'partnership' ? 'Partnership Equity' : 'Capital Contribution Details'}
                                     </h4>
+
+                                    {/* Auto-calculated equity summary */}
+                                    {hasComputedEquity && (
+                                      <div className="mb-4 p-3 bg-white rounded-lg border border-blue-200">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Info className="h-3.5 w-3.5 text-blue-500" />
+                                          <span className="text-xs font-medium text-blue-700">Auto-Calculated from Capital Stack</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 text-sm">
+                                          <div>
+                                            <span className="text-muted-foreground text-xs">Purchase Price</span>
+                                            <p className="font-semibold">${purchasePrice.toLocaleString()}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground text-xs">Total Debt</span>
+                                            <p className="font-semibold text-red-600">({totalDebt.toLocaleString()})</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground text-xs">Required Equity</span>
+                                            <p className="font-bold text-green-600">${computedEquity.toLocaleString()}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Total Equity + Ownership (always shown) */}
                                     <div className="grid grid-cols-3 gap-4">
                                       <FormField control={equityForm.control} name="commitmentAmount" render={({ field }) => (
                                         <FormItem>
@@ -2625,10 +2757,10 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                           <FormControl>
                                             <div className="relative">
                                               <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                              <Input {...field} type="number" placeholder="5,000,000" className="pl-9 bg-white" />
+                                              <Input {...field} type="number" placeholder="5,000,000" className={`pl-9 bg-white ${hasComputedEquity ? 'border-green-300 bg-green-50/30' : ''}`} />
                                             </div>
                                           </FormControl>
-                                          <FormDescription>{layerType === 'solo' || layerType === 'partnership' ? 'Purchase price minus debt' : 'Total committed capital'}</FormDescription>
+                                          <FormDescription>{hasComputedEquity ? 'Auto-filled: Purchase Price − Debt' : 'Total equity required'}</FormDescription>
                                           <FormMessage />
                                         </FormItem>
                                       )} />
@@ -2652,16 +2784,111 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                           <FormControl>
                                             <div className="relative">
                                               <Percent className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                              <Input {...field} type="number" step="0.01" placeholder="90" className="pl-9 bg-white" />
+                                              <Input {...field} type="number" step="0.01" placeholder="90" className={`pl-9 bg-white ${layerType === 'solo' ? 'border-green-300 bg-green-50/30' : ''}`}
+                                                readOnly={layerType === 'solo'} />
                                             </div>
                                           </FormControl>
-                                          <FormDescription>Enter as % (e.g., 90 for 90%)</FormDescription>
+                                          <FormDescription>{layerType === 'solo' ? 'Auto-set to 100%' : 'Enter as % (e.g., 90 for 90%)'}</FormDescription>
                                           <FormMessage />
                                         </FormItem>
                                       )} />
                                     </div>
 
-                                    {/* Funding Progress */}
+                                    {/* Dynamic Partner Rows — for Partnership/JV/GP-LP structures */}
+                                    {equityPartners.length > 0 && (
+                                      <div className="mt-4">
+                                        <div className="flex justify-between items-center mb-3">
+                                          <h5 className="text-sm font-medium flex items-center gap-2">
+                                            <Users className="h-4 w-4 text-blue-600" />
+                                            {layerType === 'partnership' ? 'Partners' : 'Equity Participants'}
+                                          </h5>
+                                          <Button type="button" variant="outline" size="sm" onClick={addEquityPartner} className="bg-white">
+                                            <Plus className="h-3.5 w-3.5 mr-1" /> Add {layerType === 'partnership' ? 'Partner' : 'Investor'}
+                                          </Button>
+                                        </div>
+                                        <div className="space-y-2">
+                                          {equityPartners.map((partner, idx) => (
+                                            <div key={partner.id} className="p-3 bg-white rounded-lg border flex items-center gap-3">
+                                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                                                <span className="text-xs font-bold text-blue-700">{idx + 1}</span>
+                                              </div>
+                                              <div className="flex-1 grid grid-cols-4 gap-3">
+                                                <div>
+                                                  <Label className="text-xs">Name</Label>
+                                                  <Input
+                                                    value={partner.name}
+                                                    onChange={(e) => updateEquityPartner(partner.id, 'name', e.target.value)}
+                                                    placeholder="Partner name"
+                                                    className="h-8 text-sm mt-1"
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <Label className="text-xs">Role</Label>
+                                                  <Select value={partner.role} onValueChange={(v) => updateEquityPartner(partner.id, 'role', v)}>
+                                                    <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                      {layerType === 'partnership' ? (
+                                                        <SelectItem value="partner">Partner</SelectItem>
+                                                      ) : (
+                                                        <>
+                                                          <SelectItem value="gp">GP</SelectItem>
+                                                          <SelectItem value="lp">LP</SelectItem>
+                                                        </>
+                                                      )}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                                <div>
+                                                  <Label className="text-xs">Amount ($)</Label>
+                                                  <Input
+                                                    type="number"
+                                                    value={partner.amount}
+                                                    onChange={(e) => updateEquityPartner(partner.id, 'amount', e.target.value)}
+                                                    placeholder="0"
+                                                    className="h-8 text-sm mt-1"
+                                                  />
+                                                </div>
+                                                <div className="flex items-end gap-1">
+                                                  <div className="flex-1">
+                                                    <Label className="text-xs">Ownership %</Label>
+                                                    <Input
+                                                      type="number"
+                                                      step="0.1"
+                                                      value={partner.ownershipPct}
+                                                      onChange={(e) => updateEquityPartner(partner.id, 'ownershipPct', e.target.value)}
+                                                      placeholder="0"
+                                                      className="h-8 text-sm mt-1"
+                                                    />
+                                                  </div>
+                                                  {equityPartners.length > 2 && (
+                                                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
+                                                      onClick={() => removeEquityPartner(partner.id)}>
+                                                      <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        {/* Partner totals validation */}
+                                        <div className={`mt-3 p-2 rounded-lg border text-xs flex justify-between items-center ${Math.abs(totalPartnerOwnership - 100) < 0.1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                                          <span>
+                                            Total: ${totalPartnerAmount.toLocaleString()} commitment / {totalPartnerOwnership.toFixed(1)}% ownership
+                                          </span>
+                                          {Math.abs(totalPartnerOwnership - 100) >= 0.1 && (
+                                            <span className="font-medium">⚠ Ownership must total 100%</span>
+                                          )}
+                                          {Math.abs(totalPartnerOwnership - 100) < 0.1 && (
+                                            <span className="font-medium">✓ Balanced</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Funding Progress (for advanced types) */}
+                                    {needsAdvancedTabs(layerType) && (
                                     <div className="mt-4 p-3 bg-white rounded-lg border">
                                       <div className="flex justify-between text-sm mb-2">
                                         <span className="text-muted-foreground">Funding Progress</span>
@@ -2680,6 +2907,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                         className="h-2"
                                       />
                                     </div>
+                                    )}
                                   </Card>
                                 </TabsContent>
 
