@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Cloud,
   CloudOff,
+  Car,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -194,6 +195,7 @@ interface WizardFormData {
     boatRentals: { enabled: boolean; fleetSize: string };
     boatClub: { enabled: boolean; memberCapacity: string; monthlyDues: string };
     boatSales: { enabled: boolean; expectedAnnualRevenue: string };
+    parkingLot: { enabled: boolean; totalSpaces: string; avgDailyRate: string };
   };
   financialScope: {
     historicalYears: number[];
@@ -268,6 +270,7 @@ const DEFAULT_FORM_DATA: WizardFormData = {
     boatRentals: { enabled: false, fleetSize: "" },
     boatClub: { enabled: false, memberCapacity: "", monthlyDues: "" },
     boatSales: { enabled: false, expectedAnnualRevenue: "" },
+    parkingLot: { enabled: false, totalSpaces: "", avgDailyRate: "" },
   },
   financialScope: {
     historicalYears: [],
@@ -995,6 +998,16 @@ function ProfitCentersSlide({ payload, updateNestedPayload }: SlideProps) {
       description: "New & used boat sales",
       fields: [{ key: "expectedAnnualRevenue", label: "Expected Annual Revenue ($)", type: "number" }],
     },
+    {
+      key: "parkingLot",
+      label: "Parking Lot",
+      icon: Car,
+      description: "Parking lot & surface lot revenue",
+      fields: [
+        { key: "totalSpaces", label: "Total Parking Spaces", type: "number" },
+        { key: "avgDailyRate", label: "Average Daily Rate ($)", type: "number" },
+      ],
+    },
   ];
 
   return (
@@ -1635,6 +1648,11 @@ export default function SetupWizard() {
             boatSales: {
               enabled: payload.profitCenters.boatSales.enabled,
               expectedAnnualRevenue: parseNumber(payload.profitCenters.boatSales.expectedAnnualRevenue),
+            },
+            parkingLot: {
+              enabled: payload.profitCenters.parkingLot.enabled,
+              totalSpaces: parseNumber(payload.profitCenters.parkingLot.totalSpaces),
+              avgDailyRate: parseNumber(payload.profitCenters.parkingLot.avgDailyRate),
             },
           },
           seasonality: {

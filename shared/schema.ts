@@ -23236,6 +23236,61 @@ export const asmpBookkeeping = pgTable("asmp_bookkeeping", {
 }));
 
 // ============================================================================
+// OPS_PARKING_LOT - Parking lot revenue actuals
+// ============================================================================
+export const opsParkingLot = pgTable("ops_parking_lot", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marinaId: varchar("marina_id").references(() => opsMarinas.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  modelingProjectId: varchar("modeling_project_id").references(() => modelingProjects.id, { onDelete: "cascade" }),
+  txnDate: date("txn_date").notNull(),
+  rateType: varchar("rate_type", { length: 30 }).notNull(),
+  spacesUsed: integer("spaces_used").notNull().default(1),
+  hours: decimal("hours", { precision: 8, scale: 2 }),
+  grossRevenue: decimal("gross_revenue", { precision: 14, scale: 2 }).notNull(),
+  dayType: varchar("day_type", { length: 20 }).default("weekday"),
+  source: opsDataSourceEnum("source").default("MANUAL"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  marinaDateIdx: index("ops_parking_lot_marina_date_idx").on(table.marinaId, table.txnDate),
+  orgIdx: index("ops_parking_lot_org_idx").on(table.orgId),
+  modelingProjectIdx: index("ops_parking_lot_modeling_project_idx").on(table.modelingProjectId),
+}));
+
+// ============================================================================
+// ASMP_PARKING_LOT - Parking lot assumptions for modeling
+// ============================================================================
+export const asmpParkingLot = pgTable("asmp_parking_lot", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => modelingProjects.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  periodMonth: date("period_month").notNull(),
+  totalSpaces: integer("total_spaces"),
+  coveredSpaces: integer("covered_spaces"),
+  uncoveredSpaces: integer("uncovered_spaces"),
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  dailyRate: decimal("daily_rate", { precision: 10, scale: 2 }),
+  monthlyRate: decimal("monthly_rate", { precision: 10, scale: 2 }),
+  eventRate: decimal("event_rate", { precision: 10, scale: 2 }),
+  weekdayOccupancyPct: decimal("weekday_occupancy_pct", { precision: 6, scale: 4 }),
+  weekendOccupancyPct: decimal("weekend_occupancy_pct", { precision: 6, scale: 4 }),
+  monthlyPassCount: integer("monthly_pass_count"),
+  growthPct: decimal("growth_pct", { precision: 6, scale: 4 }),
+  revenue: decimal("revenue", { precision: 14, scale: 2 }),
+  importedAt: timestamp("imported_at"),
+  importSource: varchar("import_source", { length: 20 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectMonthIdx: index("asmp_parking_lot_project_month_idx").on(table.projectId, table.periodMonth),
+  projectMonthUnique: unique().on(table.projectId, table.periodMonth),
+}));
+
+// ============================================================================
 // OPS_IMPORT_EVENTS - Track imports from actuals to assumptions
 // ============================================================================
 export const opsImportEvents = pgTable("ops_import_events", {
@@ -23425,6 +23480,22 @@ export const insertAsmpBookkeepingSchema = createInsertSchema(asmpBookkeeping).o
 });
 export type AsmpBookkeeping = typeof asmpBookkeeping.$inferSelect;
 export type InsertAsmpBookkeeping = z.infer<typeof insertAsmpBookkeepingSchema>;
+
+export const insertOpsParkingLotSchema = createInsertSchema(opsParkingLot).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsParkingLot = typeof opsParkingLot.$inferSelect;
+export type InsertOpsParkingLot = z.infer<typeof insertOpsParkingLotSchema>;
+
+export const insertAsmpParkingLotSchema = createInsertSchema(asmpParkingLot).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AsmpParkingLot = typeof asmpParkingLot.$inferSelect;
+export type InsertAsmpParkingLot = z.infer<typeof insertAsmpParkingLotSchema>;
 
 export const insertOpsImportEventSchema = createInsertSchema(opsImportEvents).omit({
   id: true,

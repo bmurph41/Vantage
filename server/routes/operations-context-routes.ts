@@ -5,6 +5,7 @@ import {
   opsPortfolios, opsMarinas, opsFuelTransactions, opsShipStoreSales,
   opsServiceWorkOrders, opsBoatRentals, opsBoatClubMemberships, opsBoatSales,
   opsCommercialLeases, opsBookkeepingGl, valuatorProjectContext, opsImportEvents,
+  opsParkingLot,
   asmpFuel, asmpShipStore, asmpService, asmpCommercialTenants, asmpBoatRentals,
   asmpBoatClub, asmpBoatSales, asmpBookkeeping, modelingProjects
 } from '@shared/schema';
@@ -84,6 +85,17 @@ const serviceWorkOrderSchema = z.object({
 const projectContextSchema = z.object({
   marinaId: z.string().uuid().optional().nullable(),
   projectType: z.enum(['OWNED', 'ACQUISITION', 'BROKER_LISTING']),
+});
+
+const parkingLotSchema = z.object({
+  txnDate: z.string(),
+  rateType: z.enum(['HOURLY', 'DAILY', 'MONTHLY', 'EVENT']),
+  spacesUsed: z.number().int().default(1),
+  hours: z.string().or(z.number()).optional().nullable().transform(v => v ? String(v) : null),
+  grossRevenue: z.string().or(z.number()).transform(v => String(v)),
+  dayType: z.enum(['weekday', 'weekend', 'holiday', 'event']).default('weekday'),
+  source: z.enum(['MANUAL', 'CSV_IMPORT', 'INTEGRATION']).default('MANUAL'),
+  notes: z.string().optional().nullable(),
 });
 
 const importActualsSchema = z.object({
@@ -2668,4 +2680,208 @@ router.get('/projects/:projectId/ops/rentals/summary', async (req: Request, res:
     res.status(500).json({ error: 'Failed to fetch rentals summary' });
   }
 });
+
+// ============================================================================
+// PARKING LOT CRUD
+// ============================================================================
+
+router.get('/projects/:projectId/ops/parking-lot', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+
+    await requireProjectInOrg(projectId, orgId);
+
+    let conditions: SQL<unknown>[] = [
+      eq(opsParkingLot.modelingProjectId, projectId),
+      eq(opsParkingLot.orgId, orgId),
+    ];
+
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsParkingLot.txnDate, startDate as string),
+        lte(opsParkingLot.txnDate, endDate as string)
+      );
+    }
+
+    const records = await db
+      .select()
+      .from(opsParkingLot)
+      .where(and(...conditions))
+      .orderBy(desc(opsParkingLot.txnDate));
+
+    res.json({ success: true, data: records });
+  } catch (error) {
+    console.error('Error fetching parking lot records:', error);
+    res.status(500).json({ error: 'Failed to fetch parking lot records' });
+  }
+});
+
+router.post('/projects/:projectId/ops/parking-lot', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = req.tenantId!;
+    const userId = req.userId;
+
+    await requireProjectInOrg(projectId, orgId);
+
+    const parsed = parkingLotSchema.parse(req.body);
+
+    const [record] = await db.insert(opsParkingLot).values({
+      id: randomUUID(),
+      orgId,
+      modelingProjectId: projectId,
+      marinaId: null,
+      txnDate: parsed.txnDate,
+      rateType: parsed.rateType,
+      spacesUsed: parsed.spacesUsed,
+      hours: parsed.hours,
+      grossRevenue: parsed.grossRevenue,
+      dayType: parsed.dayType,
+      source: 'MANUAL',
+      notes: parsed.notes || null,
+      createdBy: userId,
+    }).returning();
+
+    res.json({ success: true, data: record });
+  } catch (error: any) {
+    if (error?.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error creating parking lot record:', error);
+    res.status(500).json({ error: 'Failed to create parking lot record' });
+  }
+});
+
+router.put('/projects/:projectId/ops/parking-lot/:recordId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, recordId } = req.params;
+    const orgId = req.tenantId!;
+
+    await requireProjectInOrg(projectId, orgId);
+
+    const parsed = parkingLotSchema.partial().parse(req.body);
+
+    const updateData: any = { updatedAt: new Date() };
+    if (parsed.txnDate !== undefined) updateData.txnDate = parsed.txnDate;
+    if (parsed.rateType !== undefined) updateData.rateType = parsed.rateType;
+    if (parsed.spacesUsed !== undefined) updateData.spacesUsed = parsed.spacesUsed;
+    if (parsed.hours !== undefined) updateData.hours = parsed.hours;
+    if (parsed.grossRevenue !== undefined) updateData.grossRevenue = parsed.grossRevenue;
+    if (parsed.dayType !== undefined) updateData.dayType = parsed.dayType;
+    if (parsed.notes !== undefined) updateData.notes = parsed.notes || null;
+
+    const [updated] = await db.update(opsParkingLot)
+      .set(updateData)
+      .where(and(
+        eq(opsParkingLot.id, recordId),
+        eq(opsParkingLot.modelingProjectId, projectId),
+        eq(opsParkingLot.orgId, orgId)
+      ))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Parking lot record not found' });
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    if (error?.name === 'ZodError') {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error updating parking lot record:', error);
+    res.status(500).json({ error: 'Failed to update parking lot record' });
+  }
+});
+
+router.delete('/projects/:projectId/ops/parking-lot/:recordId', async (req: Request, res: Response) => {
+  try {
+    const { projectId, recordId } = req.params;
+    const orgId = req.tenantId!;
+
+    await requireProjectInOrg(projectId, orgId);
+
+    await db.delete(opsParkingLot)
+      .where(and(
+        eq(opsParkingLot.id, recordId),
+        eq(opsParkingLot.modelingProjectId, projectId),
+        eq(opsParkingLot.orgId, orgId)
+      ));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting parking lot record:', error);
+    res.status(500).json({ error: 'Failed to delete parking lot record' });
+  }
+});
+
+router.get('/projects/:projectId/ops/parking-lot/summary', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const { startDate, endDate } = req.query;
+    const orgId = req.tenantId!;
+
+    await requireProjectInOrg(projectId, orgId);
+
+    let conditions: SQL<unknown>[] = [
+      eq(opsParkingLot.modelingProjectId, projectId),
+      eq(opsParkingLot.orgId, orgId),
+    ];
+
+    if (startDate && endDate) {
+      conditions.push(
+        gte(opsParkingLot.txnDate, startDate as string),
+        lte(opsParkingLot.txnDate, endDate as string)
+      );
+    }
+
+    const byRateType = await db
+      .select({
+        rateType: opsParkingLot.rateType,
+        totalRevenue: sql<number>`COALESCE(SUM(${opsParkingLot.grossRevenue}), 0)`,
+        totalSpaces: sql<number>`COALESCE(SUM(${opsParkingLot.spacesUsed}), 0)`,
+        transactionCount: sql<number>`COUNT(*)`,
+      })
+      .from(opsParkingLot)
+      .where(and(...conditions))
+      .groupBy(opsParkingLot.rateType);
+
+    const byDayType = await db
+      .select({
+        dayType: opsParkingLot.dayType,
+        totalRevenue: sql<number>`COALESCE(SUM(${opsParkingLot.grossRevenue}), 0)`,
+        transactionCount: sql<number>`COUNT(*)`,
+      })
+      .from(opsParkingLot)
+      .where(and(...conditions))
+      .groupBy(opsParkingLot.dayType);
+
+    const totalResult = await db
+      .select({
+        totalRevenue: sql<number>`COALESCE(SUM(${opsParkingLot.grossRevenue}), 0)`,
+        totalSpaces: sql<number>`COALESCE(SUM(${opsParkingLot.spacesUsed}), 0)`,
+        transactionCount: sql<number>`COUNT(*)::int`,
+      })
+      .from(opsParkingLot)
+      .where(and(...conditions));
+
+    const totals = totalResult[0];
+
+    res.json({
+      success: true,
+      data: {
+        byRateType,
+        byDayType,
+        totalRevenue: Number(totals?.totalRevenue || 0),
+        totalSpaces: Number(totals?.totalSpaces || 0),
+        transactionCount: Number(totals?.transactionCount || 0),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching parking lot summary:', error);
+    res.status(500).json({ error: 'Failed to fetch parking lot summary' });
+  }
+});
+
 export default router;

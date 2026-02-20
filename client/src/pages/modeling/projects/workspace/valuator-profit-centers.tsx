@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp, BookOpen, Anchor, Building2, DollarSign, Sailboat } from "lucide-react";
+import { BarChart3, Fuel, ShoppingCart, Wrench, Ship, TrendingUp, BookOpen, Anchor, Building2, DollarSign, Sailboat, Car } from "lucide-react";
 import ValuatorFuelSalesTab from "./valuator-fuel-sales";
 import ValuatorShipStoreTab from "./valuator-ship-store";
 import ValuatorOperationsSummary from "./valuator-operations-summary";
@@ -11,6 +11,7 @@ import ValuatorServiceDeptTab from "./valuator-service-dept";
 import ValuatorBoatRentalsTab from "./valuator-boat-rentals";
 import ValuatorBookkeepingTab from "./valuator-bookkeeping";
 import ValuatorCommercialTenantsTab from "./valuator-commercial-tenants";
+import ValuatorParkingLotTab from "./valuator-parking-lot";
 import RentRollDataTab from "./rent-roll-data";
 import type { ProjectConfig } from "@/types/modeling";
 
@@ -36,6 +37,7 @@ const ANCILLARY_PROFIT_CENTER_TABS: ProfitCenterTab[] = [
   { id: "rentals", configKey: "boatRentals", label: "Boat Rentals", icon: Ship, component: ValuatorBoatRentalsTab },
   { id: "bookkeeping", configKey: "boatClub", label: "Boat Club", icon: Sailboat, component: ValuatorBookkeepingTab },
   { id: "boat-sales", configKey: "boatSales", label: "Boat Sales", icon: DollarSign, component: ValuatorBookkeepingTab },
+  { id: "parking-lot", configKey: "parkingLot", label: "Parking Lot", icon: Car, component: ValuatorParkingLotTab },
 ];
 
 function isProfitCenterEnabled(
