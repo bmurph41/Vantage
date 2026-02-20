@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { setGlobalRoundingDigits, setGlobalEbitdaRoundingDigits, setGlobalLineItemRoundingDigits, setGlobalPercentRoundingDecimals } from '@/lib/utils';
+import { setGlobalRoundingDigits, setGlobalEbitdaRoundingDigits, setGlobalLineItemRoundingDigits, setGlobalPercentRoundingDecimals, setGlobalDebtServiceRoundingDigits } from '@/lib/utils';
 
 interface DisplayPreferences {
   priceRoundingDigits: number;
   ebitdaRoundingDigits: number;
   lineItemRoundingDigits: number;
   percentRoundingDecimals: number;
+  debtServiceRoundingDigits: number;
   bottomLineMetric: 'noi' | 'ebitda';
 }
 
@@ -26,5 +27,8 @@ export function useDisplayPreferences() {
   setGlobalLineItemRoundingDigits(lineItemRoundingDigits);
   setGlobalPercentRoundingDecimals(percentRoundingDecimals);
 
-  return { roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, bottomLineMetric, metricLabel };
+  const debtServiceRoundingDigits = prefs?.debtServiceRoundingDigits ?? 0;
+  setGlobalDebtServiceRoundingDigits(debtServiceRoundingDigits);
+
+  return { roundingDigits, ebitdaRoundingDigits, lineItemRoundingDigits, percentRoundingDecimals, debtServiceRoundingDigits, bottomLineMetric, metricLabel };
 }

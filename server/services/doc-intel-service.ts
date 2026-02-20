@@ -1864,7 +1864,7 @@ Respond with JSON only:
       updatedAt: new Date(),
     };
 
-    // Also write new-system tier fields so import can read them consistently
+    // Write new-system tier fields so import can read them consistently
     try {
       const allCats = await this.getCategories(orgId);
       const matchedCat = allCats.find((c: any) => c.id === categoryId);
@@ -1878,9 +1878,14 @@ Respond with JSON only:
         if (tier) {
           updateData.categoryTierConfirmed = tier;
         }
+        // Persist the human-readable category name for subcategory grouping in Pro Forma
+        if (matchedCat.name) {
+          updateData.categoryNameConfirmed = matchedCat.name;
+        }
       }
     } catch (e) {
-      console.warn('[DocIntel] Could not look up category type for tier bridging:', e);
+      console.error('[DocIntel] FAILED to look up category type for tier bridging:', e);
+      // Fallback: still try to set tier from department context if available
     }
 
     if (department) {
@@ -2066,7 +2071,10 @@ Respond with JSON only:
         const mappedTier = tierMapping[item.categoryTierConfirmed.toLowerCase()];
         if (mappedTier) {
           plCategory = mappedTier;
-          subcategory = item.rawText?.substring(0, 100) || 'Uncategorized';
+          // Use confirmed category name if available, otherwise clean raw text
+          subcategory = (item as any).categoryNameConfirmed 
+            || item.rawText?.substring(0, 100)?.trim() 
+            || 'Uncategorized';
           categorySource = 'categoryTierConfirmed';
         }
       }

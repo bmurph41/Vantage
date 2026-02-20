@@ -37,6 +37,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { debtScheduleService, type DebtSchedule, type DSCRMetrics } from './debt-schedule-service';
+import { generateCanonicalDebtSchedule } from './canonical-debt-adapter';
 import {
   buildModelingPeriods,
   buildT12AwarePeriods,
@@ -440,7 +441,13 @@ export class ProFormaEngineService {
       
       const amount = parseFloat(actual.amount?.toString() || '0');
       const subcat = actual.subcategory || (actual as any).lineItem || 'Other';
-      const category = actual.category || 'Other';
+      const rawCategory = actual.category || 'Other';
+      // Normalize category to handle case variants and alternate spellings
+      const categoryNorm = rawCategory.toLowerCase().trim();
+      const category = categoryNorm === 'revenue' ? 'Revenue'
+        : categoryNorm === 'cogs' || categoryNorm === 'cost_of_goods_sold' || categoryNorm === 'cost of goods sold' ? 'COGS'
+        : categoryNorm === 'expenses' || categoryNorm === 'expense' || categoryNorm === 'operating expenses' || categoryNorm === 'opex' || categoryNorm === 'payroll' ? 'Expenses'
+        : rawCategory;
       const dept = deptOverrideMap[subcat] || (actual as any).department || inferDepartment(subcat, category);
       
       if (category === 'Revenue' || (actual as any).isRevenue) {
@@ -453,7 +460,7 @@ export class ProFormaEngineService {
           cogsBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
         }
         cogsBySubcat[subcat].amount += amount;
-      } else if (['Expenses', 'Operating Expenses', 'OpEx', 'Payroll'].includes(category)) {
+      } else if (category === 'Expenses' || ['Operating Expenses', 'OpEx', 'Payroll'].includes(rawCategory)) {
         if (!expensesBySubcat[subcat]) {
           expensesBySubcat[subcat] = { amount: 0, category, subcategory: subcat, department: dept, year: actual.year };
         }
@@ -1101,6 +1108,33 @@ export class ProFormaEngineService {
     } catch (debtError) {
       console.warn('Debt integration skipped:', debtError);
     }
+
+    // ── Canonical fallback: if bridge path failed or returned $0, try direct ──
+    if (!debtSchedule || debtSchedule.totalDebtAtClose === 0) {
+      try {
+        const canonicalSchedule = await generateCanonicalDebtSchedule(projectId, orgId, periods.holdPeriodMonths, projectionStartDate.getFullYear());
+        if (canonicalSchedule && canonicalSchedule.totalDebtAtClose > 0) {
+          debtSchedule = canonicalSchedule;
+          dscrMetrics = debtScheduleService.calculateDSCR(noiMonthly, debtSchedule);
+          minDscr = dscrMetrics.minDscr;
+          avgDscr = dscrMetrics.avgDscr;
+          totalDebtService = Object.values(debtSchedule.annualDebtService).reduce((a, b) => a + b, 0);
+          debtYield = debtScheduleService.calculateDebtYield(year1Noi, debtSchedule.totalDebtAtClose);
+          ltv = purchasePrice > 0 ? (debtSchedule.totalDebtAtClose / purchasePrice) * 100 : 0;
+          for (const period of monthlyPeriods) {
+            const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
+            debtServiceMonthly[period.key] = Math.round(ds.payment);
+            const noiVal = noiMonthly[period.key] || 0;
+            const mgmtFee = managementFeeMonthly[period.key] || 0;
+            const capexVal = capexMonthly[period.key] || 0;
+            leveredCashFlowMonthly[period.key] = Math.round(noiVal - mgmtFee - capexVal - ds.payment);
+          }
+          console.log("[Pro Forma] Canonical debt engine used (direct from loans)");
+        }
+      } catch (canonicalError) {
+        console.warn("[Pro Forma] Canonical debt fallback also failed:", canonicalError);
+      }
+    }
     
     // ========================================
     // 9b. EXIT WATERFALL & IRR CALCULATION
@@ -1467,8 +1501,15 @@ export class ProFormaEngineService {
       
       if (!lineItems[key]) {
         lineItems[key] = {};
-        categories[key] = categoryOverrideMap2[key] || actual.category || 'Other';
-        departments[key] = deptOverrideMap[key] || actual.department || inferDeptFn(key, actual.category || 'Other');
+        // Normalize category to canonical form
+        const rawCat = categoryOverrideMap2[key] || actual.category || 'Other';
+        const catNorm = rawCat.toLowerCase().trim();
+        const normalizedCat = catNorm === 'revenue' ? 'Revenue'
+          : catNorm === 'cogs' || catNorm === 'cost_of_goods_sold' || catNorm === 'cost of goods sold' ? 'COGS'
+          : catNorm === 'expenses' || catNorm === 'expense' || catNorm === 'operating expenses' || catNorm === 'opex' || catNorm === 'payroll' ? 'Expenses'
+          : rawCat;
+        categories[key] = normalizedCat;
+        departments[key] = deptOverrideMap[key] || actual.department || inferDeptFn(key, normalizedCat);
       }
       
       lineItems[key][month] = (lineItems[key][month] || 0) + amount;
@@ -1490,11 +1531,16 @@ export class ProFormaEngineService {
         total
       };
 
-      if (categories[name] === 'Revenue') {
+      const cat = categories[name];
+      if (cat === 'Revenue') {
         revenueItems.push(item);
-      } else if (categories[name] === 'COGS') {
+      } else if (cat === 'COGS') {
         cogsItems.push(item);
+      } else if (cat === 'Expenses') {
+        expenseItems.push(item);
       } else {
+        // Unknown category — log and default to expenses (conservative)
+        console.warn(`[Historical P&L] Unknown category "${cat}" for line item "${name}" — defaulting to Expenses`);
         expenseItems.push(item);
       }
     }

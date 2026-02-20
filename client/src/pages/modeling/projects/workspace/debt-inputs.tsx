@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -94,6 +95,15 @@ interface DebtSummary {
   annualDebtService: number;
   year1EndingBalance: number;
   blendedRate: number;
+  noiSource: string | null;
+  dscrTimeline: Array<{
+    year: number;
+    noi: number;
+    debtService: number;
+    dscr: number | null;
+    debtYield: number | null;
+    endingBalance: number;
+  }>;
 }
 const LOAN_TYPES = [
   { value: 'acquisition', label: 'Acquisition' },
@@ -129,7 +139,10 @@ function formatRateDisplay(decimal: number): string {
 
 export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps) {
   const { toast } = useToast();
+  useDisplayPreferences(); // Sync global rounding settings
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [loanAmountMode, setLoanAmountMode] = useState<"dollar" | "ltv">("dollar");
+  const [closingDaysOut, setClosingDaysOut] = useState("90");
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const { data: loans, isLoading: loansLoading } = useQuery<Loan[]>({
@@ -138,10 +151,17 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
 
   const loan = loans?.[0] ?? null;
 
-  const { data: schedule, isLoading: scheduleLoading } = useQuery<ScheduleRow[]>({
+  const { data: scheduleResponse, isLoading: scheduleLoading } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'loans', loan?.id, 'schedule'],
-    enabled: !!loan?.id,
+    enabled: !!loan?.id && (loan?.loanAmount ?? 0) > 0,
   });
+  const schedule: ScheduleRow[] | undefined = scheduleResponse?.annualDebtService?.map((yr: any) => ({
+    year: yr.year,
+    interest: yr.interest,
+    principal: yr.principal,
+    totalDebtService: yr.totalDebtService,
+    endingBalance: yr.endingBalance,
+  }));
 
   // Debt Summary (lightweight capital stack from canonical engine)
   const { data: debtSummary, isLoading: summaryLoading } = useQuery<DebtSummary>({
@@ -187,6 +207,7 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'loans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'debt-summary'] });
       if (loan?.id) {
         queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'loans', loan.id, 'schedule'] });
       }
@@ -242,6 +263,21 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
   const handleSwitchChange = (field: keyof Loan, value: boolean) => {
     updateLoan.mutate({ [field]: value });
   };
+
+  const computeProjectedClosing = useCallback((days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const handleLtvInput = useCallback((pctStr: string) => {
+    const pct = parseFloat(pctStr) || 0;
+    if (purchasePrice && purchasePrice > 0) {
+      const amount = Math.round(purchasePrice * (pct / 100));
+      debouncedUpdate("loanAmount", amount);
+    }
+  }, [purchasePrice, debouncedUpdate]);
 
   if (loansLoading) {
     return (
@@ -355,13 +391,39 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                   <Label className="text-xs flex items-center gap-1">
                     <DollarSign className="h-3 w-3" />
                     Loan Amount
+                    <div className="ml-auto flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                      <button
+                        type="button"
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${loanAmountMode === 'dollar' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setLoanAmountMode('dollar')}
+                      >$</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${loanAmountMode === 'ltv' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setLoanAmountMode('ltv')}
+                      >% LTV</button>
+                    </div>
                   </Label>
-                  <Input
-                    className="h-9"
-                    defaultValue={formatCurrencyInput(loan.loanAmount)}
-                    onBlur={(e) => handleCurrencyChange('loanAmount', e.target.value)}
-                    placeholder="0"
-                  />
+                  {loanAmountMode === 'dollar' ? (
+                    <Input
+                      className="h-9"
+                      defaultValue={formatCurrencyInput(loan.loanAmount)}
+                      onBlur={(e) => handleCurrencyChange('loanAmount', e.target.value)}
+                      placeholder="0"
+                    />
+                  ) : (
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        className="h-9 w-24"
+                        defaultValue={purchasePrice && purchasePrice > 0 && loan.loanAmount ? ((loan.loanAmount / purchasePrice) * 100).toFixed(1) : ''}
+                        onBlur={(e) => handleLtvInput(e.target.value)}
+                        placeholder="75"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        = {purchasePrice && purchasePrice > 0 && loan.loanAmount ? formatCurrency(loan.loanAmount) : '—'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
@@ -421,6 +483,28 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                       if (e.target.value) updateLoan.mutate({ startDate: e.target.value });
                     }}
                   />
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <Input
+                      className="h-7 w-14 text-xs text-center px-1"
+                      type="number"
+                      value={closingDaysOut}
+                      onChange={(e) => setClosingDaysOut(e.target.value)}
+                      min="1"
+                    />
+                    <Button
+                      type="button"
+                      variant={loan.startDate === computeProjectedClosing(parseInt(closingDaysOut) || 90) ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => {
+                        const date = computeProjectedClosing(parseInt(closingDaysOut) || 90);
+                        updateLoan.mutate({ startDate: date });
+                        toast({ title: `Closing set to ${date}` });
+                      }}
+                    >
+                      Projected Closing ({closingDaysOut}d)
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -566,14 +650,32 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                             <TableRow key={row.year}>
                               <TableCell className="text-xs py-1.5 px-3 font-medium">{row.year + 1}</TableCell>
                               <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(begBal)}</TableCell>
-                              <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(row.interest)}</TableCell>
-                              <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(row.principal)}</TableCell>
-                              <TableCell className="text-xs py-1.5 px-3 text-right font-medium">{formatCurrency(row.totalDebtService)}</TableCell>
+                              <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(row.interest, { context: 'debt' })}</TableCell>
+                              <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(row.principal, { context: 'debt' })}</TableCell>
+                              <TableCell className="text-xs py-1.5 px-3 text-right font-medium">{formatCurrency(row.totalDebtService, { context: 'debt' })}</TableCell>
                               <TableCell className="text-xs py-1.5 px-3 text-right">{formatCurrency(row.endingBalance)}</TableCell>
                             </TableRow>
                           );
                         })}
                       </TableBody>
+                      {schedule.length > 0 && (
+                        <tfoot>
+                          <TableRow className="border-t-2 bg-muted/50">
+                            <TableCell className="text-xs py-2 px-3 font-semibold">Total</TableCell>
+                            <TableCell className="text-xs py-2 px-3 text-right" />
+                            <TableCell className="text-xs py-2 px-3 text-right font-semibold">
+                              {formatCurrency(schedule.reduce((s, r) => s + (r.interest || 0), 0), { context: 'debt' })}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 px-3 text-right font-semibold">
+                              {formatCurrency(schedule.reduce((s, r) => s + (r.principal || 0), 0), { context: 'debt' })}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 px-3 text-right font-bold">
+                              {formatCurrency(schedule.reduce((s, r) => s + (r.totalDebtService || 0), 0), { context: 'debt' })}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 px-3 text-right" />
+                          </TableRow>
+                        </tfoot>
+                      )}
                     </Table>
                   </div>
                 ) : (
@@ -670,28 +772,59 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                       </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">DSCR (Yr 1)</span>
-                      {debtSummary?.dscr != null ? (
-                        <Badge
-                          variant={debtSummary.dscr < 1.0 ? "destructive" : debtSummary.dscr < 1.2 ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {debtSummary.dscr === Infinity ? "\u221e" : `${debtSummary.dscr.toFixed(2)}x`}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          Needs NOI
-                        </Badge>
-                      )}
-                    </div>
-
-                    {debtSummary?.debtYield != null && (
+                    {/* DSCR Timeline */}
+                    {debtSummary?.dscrTimeline && debtSummary.dscrTimeline.length > 0 ? (
+                      <div className="space-y-1.5 pt-1 border-t">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium">DSCR Coverage</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {debtSummary.noiSource === "pro_forma" ? "From Pro Forma" : "Manual"}
+                          </Badge>
+                        </div>
+                        <div className="space-y-0.5">
+                          {debtSummary.dscrTimeline.slice(0, 10).map((yr) => (
+                            <div key={yr.year} className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground w-10">Yr {yr.year}</span>
+                              <span className="text-muted-foreground font-mono text-[10px] flex-1 text-right mr-2">
+                                {yr.noi > 0 ? formatCurrency(yr.noi) : "\u2014"}
+                              </span>
+                              {yr.dscr != null ? (
+                                <Badge
+                                  variant={yr.dscr < 1.0 ? "destructive" : yr.dscr < 1.2 ? "default" : "secondary"}
+                                  className="text-[10px] w-14 justify-center"
+                                >
+                                  {yr.dscr.toFixed(2)}x
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px] w-14 text-center">\u2014</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {debtSummary.debtYield != null && (
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-xs text-muted-foreground">Debt Yield (Yr 1)</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {(debtSummary.debtYield * 100).toFixed(2)}%
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Debt Yield</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {(debtSummary.debtYield * 100).toFixed(2)}%
-                        </Badge>
+                        <span className="text-xs text-muted-foreground">DSCR</span>
+                        {debtSummary?.dscr != null ? (
+                          <Badge
+                            variant={debtSummary.dscr < 1.0 ? "destructive" : debtSummary.dscr < 1.2 ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {debtSummary.dscr.toFixed(2)}x
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Needs NOI
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>

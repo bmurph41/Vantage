@@ -141,6 +141,7 @@ type DisplayPreferences = {
   ebitdaRoundingDigits: number;
   lineItemRoundingDigits: number;
   percentRoundingDecimals: number;
+  debtServiceRoundingDigits: number;
   bottomLineMetric: 'noi' | 'ebitda';
   year1Mode: 'calendar_year_end' | 'next_12_months';
 };
@@ -173,6 +174,14 @@ const LINE_ITEM_ROUNDING_OPTIONS = [
   { value: 1, label: 'Nearest $10', example: '$47,820' },
   { value: 2, label: 'Nearest $100', example: '$47,800' },
   { value: 3, label: 'Nearest $1,000', example: '$48,000' },
+];
+
+const DEBT_SERVICE_ROUNDING_OPTIONS = [
+  { value: -1, label: 'No rounding', example: '$532,847' },
+  { value: 0, label: 'Nearest $1', example: '$532,847' },
+  { value: 1, label: 'Nearest $10', example: '$532,850' },
+  { value: 2, label: 'Nearest $100', example: '$532,800' },
+  { value: 3, label: 'Nearest $1,000', example: '$533,000' },
 ];
 
 const PERCENT_ROUNDING_OPTIONS = [
@@ -454,6 +463,14 @@ export default function ModelingSettings() {
                 onUpdate={(val) => updatePrefsMutation.mutate({ percentRoundingDecimals: val })}
                 isPending={updatePrefsMutation.isPending}
                 testId="select-rounding-percent"
+              />
+              <RoundingRow
+                label="Debt Service"
+                value={displayPrefs?.debtServiceRoundingDigits ?? 0}
+                options={DEBT_SERVICE_ROUNDING_OPTIONS}
+                onUpdate={(val) => updatePrefsMutation.mutate({ debtServiceRoundingDigits: val })}
+                isPending={updatePrefsMutation.isPending}
+                testId="select-rounding-debt"
               />
             </div>
           </CardContent>

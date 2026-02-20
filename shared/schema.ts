@@ -12744,6 +12744,7 @@ export const modelingDisplayPreferences = pgTable('modeling_display_preferences'
   ebitdaRoundingDigits: integer('ebitda_rounding_digits').notNull().default(0),
   lineItemRoundingDigits: integer('line_item_rounding_digits').notNull().default(0),
   percentRoundingDecimals: integer('percent_rounding_decimals').notNull().default(1),
+  debtServiceRoundingDigits: integer('debt_service_rounding_digits').notNull().default(0),
   bottomLineMetric: varchar('bottom_line_metric', { length: 10 }).notNull().default('noi'),
   year1Mode: varchar('year1_mode', { length: 30 }).notNull().default('calendar_year_end'),
   createdAt: timestamp('created_at').defaultNow(),

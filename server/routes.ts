@@ -28484,11 +28484,58 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
       }));
 
-      const summary = computeCapitalStackSummary(engineInputs, purchasePrice);
+      // Fetch NOI from Pro Forma for DSCR computation
+      let annualNoi: number | undefined;
+      let noiTimeline: { year: number; noi: number }[] = [];
+      try {
+        const { proFormaEngineService } = await import("./services/pro-forma-engine-service");
+        const proForma = await proFormaEngineService.generateProForma(projectId, orgId, "base");
+        if (proForma?.annualProjections?.length > 0) {
+          annualNoi = proForma.annualProjections[0]?.noi ?? proForma.annualProjections[0]?.netOperatingIncome;
+          noiTimeline = proForma.annualProjections.map((yr: any, i: number) => ({
+            year: i + 1,
+            noi: yr.noi ?? yr.netOperatingIncome ?? 0,
+          })).filter((y: any) => y.noi > 0);
+        }
+      } catch (noiErr) {
+        // Pro Forma not available yet
+      }
+
+      const summary = computeCapitalStackSummary(engineInputs, purchasePrice, 0, 0, 0, annualNoi);
+
+      // Build multi-year DSCR timeline
+      const { computeLoanSchedule: cls } = await import("@shared/debt/debt-engine");
+      const allScheds = engineInputs.map((inp: any) => cls(inp));
+      const mxLen = Math.max(...allScheds.map((s: any) => s.length));
+      const annualDS: Record<number, { ds: number; endBal: number }> = {};
+      for (let m = 0; m < mxLen; m++) {
+        let ds = 0, eb = 0;
+        for (const s of allScheds) { if (m < s.length) { ds += s[m].debtService; eb += s[m].endBal; } }
+        const yr = Math.floor(m / 12) + 1;
+        if (!annualDS[yr]) annualDS[yr] = { ds: 0, endBal: 0 };
+        annualDS[yr].ds += ds;
+        annualDS[yr].endBal = eb;
+      }
+
+      const dscrTimeline = Object.entries(annualDS).map(([yr, val]) => {
+        const yearNum = parseInt(yr);
+        const noiEntry = noiTimeline.find((n: any) => n.year === yearNum);
+        const noi = noiEntry?.noi ?? 0;
+        return {
+          year: yearNum,
+          noi: Math.round(noi),
+          debtService: Math.round(val.ds),
+          dscr: noi > 0 && val.ds > 0 ? Math.round((noi / val.ds) * 100) / 100 : null,
+          debtYield: noi > 0 && val.endBal > 0 ? Math.round((noi / val.endBal) * 10000) / 10000 : null,
+          endingBalance: Math.round(val.endBal),
+        };
+      });
 
       res.json({
         hasDebt: true,
         ...summary,
+        noiSource: noiTimeline.length > 0 ? "pro_forma" : null,
+        dscrTimeline,
       });
     } catch (error: any) {
       console.error("Failed to compute debt summary:", error);
@@ -28496,6 +28543,191 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+
+  // Consolidated merged schedule across all loans
+  app.get("/api/modeling/projects/:projectId/debt-schedule-all", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const projectLoans = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+
+      if (projectLoans.length === 0) return res.json({ loans: [], merged: [], annual: [] });
+
+      const { computeLoanSchedule, computeAnnualDebtService } = await import("@shared/debt/debt-engine");
+      type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+      const loanSchedules = projectLoans.map((loan: any) => {
+        const input: DebtEngineInput = {
+          loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+          termMonths: loan.termMonths, amortMonths: loan.amortMonths,
+          interestOnlyMonths: loan.interestOnlyMonths,
+          rateType: loan.rateType as "fixed" | "floating",
+          fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+          initialIndexBps: loan.initialIndexBps ?? undefined,
+          spreadBps: loan.spreadBps ?? undefined,
+          indexFloorBps: loan.indexFloorBps ?? undefined,
+          capitalizeOriginationFees: loan.capitalizeOriginationFees,
+          originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+          exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+          prepayType: (loan.prepayType || "none") as any,
+          stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+        };
+        return { loanId: loan.id, loanName: loan.loanName, schedule: computeLoanSchedule(input) };
+      });
+
+      const maxLen = Math.max(...loanSchedules.map((ls: any) => ls.schedule.length));
+      const merged = Array.from({ length: maxLen }, (_, m) => {
+        let ti = 0, tp = 0, tb = 0, te = 0;
+        for (const ls of loanSchedules) { const r = ls.schedule[m]; if (r) { ti += r.interest; tp += r.principal; tb += r.beginBal; te += r.endBal; } }
+        return { monthIndex: m, beginBal: Math.round(tb*100)/100, interest: Math.round(ti*100)/100, principal: Math.round(tp*100)/100, debtService: Math.round((ti+tp)*100)/100, endBal: Math.round(te*100)/100 };
+      });
+
+      const annual = computeAnnualDebtService(merged as any);
+      res.json({ loans: loanSchedules.map((ls: any) => ({ loanId: ls.loanId, loanName: ls.loanName, monthCount: ls.schedule.length })), merged, annual });
+    } catch (error: any) {
+      console.error("Failed to compute consolidated schedule:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  // Diagnostic: inspect actuals category distribution for a project
+  app.get("/api/modeling/projects/:projectId/actuals-diagnostic", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { modelingActuals } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const actuals = await db.select().from(modelingActuals)
+        .where(and(eq(modelingActuals.modelingProjectId, projectId), eq(modelingActuals.orgId, orgId)));
+      const byCategory: Record<string, { count: number; total: number; items: string[] }> = {};
+      const byDepartment: Record<string, { count: number; total: number }> = {};
+      const uncategorized: any[] = [];
+      for (const a of actuals) {
+        const cat = a.category || "MISSING";
+        const dept = a.department || "MISSING";
+        const amt = parseFloat(a.amount?.toString() || "0");
+        if (!byCategory[cat]) byCategory[cat] = { count: 0, total: 0, items: [] };
+        byCategory[cat].count++;
+        byCategory[cat].total += amt;
+        if (byCategory[cat].items.length < 5) byCategory[cat].items.push(a.subcategory || "?");
+        if (!byDepartment[dept]) byDepartment[dept] = { count: 0, total: 0 };
+        byDepartment[dept].count++;
+        byDepartment[dept].total += amt;
+        if (cat === "MISSING" || cat === "Other") uncategorized.push({ id: a.id, sub: a.subcategory, amt, dept });
+      }
+      const revenue = byCategory["Revenue"]?.total || 0;
+      const cogs = byCategory["COGS"]?.total || 0;
+      const expenses = byCategory["Expenses"]?.total || 0;
+      const impliedNoi = revenue - cogs - expenses;
+      res.json({
+        totalRecords: actuals.length,
+        years: [...new Set(actuals.map(a => a.year))].sort(),
+        categoryBreakdown: Object.entries(byCategory).map(([k, v]) => ({ category: k, ...v, total: Math.round(v.total) })),
+        departmentBreakdown: Object.entries(byDepartment).map(([k, v]) => ({ department: k, ...v, total: Math.round(v.total) })),
+        impliedAnnualNoi: Math.round(impliedNoi),
+        uncategorizedItems: uncategorized.slice(0, 20),
+        warnings: [
+          ...(!byCategory["Revenue"] ? ["NO REVENUE RECORDS — all income may be misclassified"] : []),
+          ...(byCategory["MISSING"] ? [`${byCategory["MISSING"].count} records with MISSING category`] : []),
+          ...(byCategory["Other"] ? [`${byCategory["Other"].count} records classified as Other — review needed`] : []),
+          ...(impliedNoi < 0 ? ["IMPLIED NOI IS NEGATIVE — likely classification issue"] : []),
+        ],
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  // Debt → Tax bridge: annual interest expense + depreciation for tax deductions
+  app.get("/api/modeling/projects/:projectId/debt-tax-bridge", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const holdYears = parseInt(req.query.holdYears as string) || 10;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: "Project not found" });
+      const { loans: loansTable } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const projectLoans = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+      const { computeLoanSchedule, computeAnnualDebtService } = await import("@shared/debt/debt-engine");
+      // Build annual interest from all loans
+      const allSchedules = projectLoans.map((loan: any) => computeLoanSchedule({
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths, amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as any,
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      }));
+      // Merge monthly → annual interest
+      const annualInterest: Record<number, number> = {};
+      const annualPrincipal: Record<number, number> = {};
+      const annualDS: Record<number, number> = {};
+      const annualEndBal: Record<number, number> = {};
+      for (const sched of allSchedules) {
+        for (let m = 0; m < sched.length; m++) {
+          const yr = Math.floor(m / 12) + 1;
+          annualInterest[yr] = (annualInterest[yr] || 0) + sched[m].interest;
+          annualPrincipal[yr] = (annualPrincipal[yr] || 0) + sched[m].principal;
+          annualDS[yr] = (annualDS[yr] || 0) + sched[m].debtService;
+          annualEndBal[yr] = sched[m].endBal;
+        }
+      }
+      // Fetch depreciation from tax inputs
+      const { projectTaxInputs: taxInputsTable } = await import("@shared/schema");
+      const [taxInputs] = await db.select().from(taxInputsTable)
+        .where(eq(taxInputsTable.projectId, projectId));
+      const purchasePrice = parseFloat(project.purchasePrice?.toString() || "0");
+      const buildingBasis = taxInputs?.buildingBasisCents ? parseFloat(taxInputs.buildingBasisCents) / 100 : purchasePrice * 0.8;
+      const buildingLife = taxInputs?.buildingLifeYears || 39;
+      const annualDepreciation = taxInputs?.annualDepreciationCents
+        ? parseFloat(taxInputs.annualDepreciationCents) / 100
+        : Math.round(buildingBasis / buildingLife);
+      const bonusDepPct = taxInputs?.bonusDepreciationPercent ? parseFloat(taxInputs.bonusDepreciationPercent) : 0;
+      const amortizationAnnual = taxInputs?.amortizationAnnualCents ? parseFloat(taxInputs.amortizationAnnualCents) / 100 : 0;
+      const interestDeductible = taxInputs?.interestDeductible !== false;
+      // Build year-by-year tax deductions
+      const timeline = Array.from({ length: holdYears }, (_, i) => {
+        const yr = i + 1;
+        const interest = Math.round((annualInterest[yr] || 0) * 100) / 100;
+        const principal = Math.round((annualPrincipal[yr] || 0) * 100) / 100;
+        const debtService = Math.round((annualDS[yr] || 0) * 100) / 100;
+        const endBal = Math.round((annualEndBal[yr] || 0) * 100) / 100;
+        const depreciation = yr === 1
+          ? Math.round((annualDepreciation + (buildingBasis * bonusDepPct)) * 100) / 100
+          : Math.round(annualDepreciation * 100) / 100;
+        const amortization = amortizationAnnual;
+        const interestDeduction = interestDeductible ? interest : 0;
+        const totalDeductions = interestDeduction + depreciation + amortization;
+        return { year: yr, interest, principal, debtService, endingBalance: endBal, depreciation, amortization, interestDeduction, totalDeductions };
+      });
+      const totals = {
+        totalInterest: timeline.reduce((s, r) => s + r.interest, 0),
+        totalPrincipal: timeline.reduce((s, r) => s + r.principal, 0),
+        totalDepreciation: timeline.reduce((s, r) => s + r.depreciation, 0),
+        totalAmortization: timeline.reduce((s, r) => s + r.amortization, 0),
+        totalDeductions: timeline.reduce((s, r) => s + r.totalDeductions, 0),
+      };
+      res.json({ holdYears, interestDeductible, buildingBasis, buildingLife, annualDepreciation, timeline, totals });
+    } catch (error: any) {
+      console.error("Failed to compute debt-tax bridge:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
   // Canonical debt payoff at exit month (for exit scenario auto-population)
   app.get("/api/modeling/projects/:projectId/debt-payoff", authenticateUser, async (req: any, res) => {
     try {

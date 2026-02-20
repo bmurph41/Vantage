@@ -80,6 +80,8 @@ const DEBT_TRANCHE_TYPES = [
 ];
 
 const EQUITY_LAYER_TYPES = [
+  { value: 'solo', label: 'Solo / Personal', description: 'You are the sole equity investor' },
+  { value: 'partnership', label: 'Partnership', description: 'Two or more partners splitting equity' },
   { value: 'common', label: 'Common Equity', description: 'Standard equity with no preferred returns' },
   { value: 'preferred', label: 'Preferred Equity', description: 'Priority distribution with fixed return' },
   { value: 'promote', label: 'GP Promote', description: 'Incentive allocation for sponsor' },
@@ -102,6 +104,8 @@ const PREFERRED_RETURN_TYPES = [
 ];
 
 const INVESTOR_TYPES = [
+  { value: 'principal', label: 'Principal / Owner' },
+  { value: 'partner', label: 'Partner' },
   { value: 'gp', label: 'General Partner (GP)' },
   { value: 'lp', label: 'Limited Partner (LP)' },
   { value: 'co_invest', label: 'Co-Investor' },
@@ -109,6 +113,10 @@ const INVESTOR_TYPES = [
   { value: 'family_office', label: 'Family Office' },
   { value: 'institutional', label: 'Institutional' },
 ];
+
+// Which equity types get which tabs
+const ADVANCED_EQUITY_TYPES = ['preferred', 'promote', 'co_invest'];
+const needsAdvancedTabs = (layerType: string) => ADVANCED_EQUITY_TYPES.includes(layerType);
 
 function formatDecimal(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '0';
@@ -754,10 +762,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   const createEquityMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/modeling/capital-stacks/${selectedStackId}/equity-layers`, {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('POST', `/api/modeling/capital-stacks/${selectedStackId}/equity-layers`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
@@ -774,10 +779,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   const updateEquityMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return apiRequest(`/api/modeling/equity-layers/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('PATCH', `/api/modeling/equity-layers/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
@@ -794,7 +796,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   const deleteEquityMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/modeling/equity-layers/${id}`, { method: 'DELETE' });
+      return apiRequest('DELETE', `/api/modeling/equity-layers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
@@ -2516,23 +2518,27 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           <Form {...equityForm}>
                             <form onSubmit={equityForm.handleSubmit(handleEquitySubmit)} className="space-y-0">
                               <Tabs defaultValue="investor" className="w-full">
-                                <TabsList className="grid w-full grid-cols-4 mb-4">
+                                <TabsList className={`grid w-full mb-4 ${needsAdvancedTabs(layerType) ? 'grid-cols-4' : 'grid-cols-2'}`}>
                                   <TabsTrigger value="investor" className="text-xs gap-1">
                                     <Briefcase className="h-3.5 w-3.5" />
-                                    Investor
+                                    {layerType === 'solo' ? 'Owner' : layerType === 'partnership' ? 'Partners' : 'Investor'}
                                   </TabsTrigger>
                                   <TabsTrigger value="contribution" className="text-xs gap-1">
                                     <DollarSign className="h-3.5 w-3.5" />
-                                    Contribution
+                                    {layerType === 'solo' || layerType === 'partnership' ? 'Equity' : 'Contribution'}
                                   </TabsTrigger>
-                                  <TabsTrigger value="returns" className="text-xs gap-1">
-                                    <TrendingUp className="h-3.5 w-3.5" />
-                                    Returns
-                                  </TabsTrigger>
-                                  <TabsTrigger value="promote" className="text-xs gap-1">
-                                    <PieChart className="h-3.5 w-3.5" />
-                                    Promote
-                                  </TabsTrigger>
+                                  {needsAdvancedTabs(layerType) && (
+                                    <TabsTrigger value="returns" className="text-xs gap-1">
+                                      <TrendingUp className="h-3.5 w-3.5" />
+                                      Returns
+                                    </TabsTrigger>
+                                  )}
+                                  {needsAdvancedTabs(layerType) && (
+                                    <TabsTrigger value="promote" className="text-xs gap-1">
+                                      <PieChart className="h-3.5 w-3.5" />
+                                      Promote
+                                    </TabsTrigger>
+                                  )}
                                 </TabsList>
 
                                 <TabsContent value="investor" className="space-y-4 mt-0">
@@ -2610,22 +2616,23 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                   <Card className="p-4 bg-blue-50/50">
                                     <h4 className="font-medium text-sm mb-4 flex items-center gap-2">
                                       <DollarSign className="h-4 w-4 text-blue-600" />
-                                      Capital Contribution Details
+                                      {layerType === 'solo' ? 'Your Equity Investment' : layerType === 'partnership' ? 'Partnership Equity' : 'Capital Contribution Details'}
                                     </h4>
                                     <div className="grid grid-cols-3 gap-4">
                                       <FormField control={equityForm.control} name="commitmentAmount" render={({ field }) => (
                                         <FormItem>
-                                          <FormLabel>Capital Commitment *</FormLabel>
+                                          <FormLabel>{layerType === 'solo' || layerType === 'partnership' ? 'Total Equity *' : 'Capital Commitment *'}</FormLabel>
                                           <FormControl>
                                             <div className="relative">
                                               <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                               <Input {...field} type="number" placeholder="5,000,000" className="pl-9 bg-white" />
                                             </div>
                                           </FormControl>
-                                          <FormDescription>Total committed capital</FormDescription>
+                                          <FormDescription>{layerType === 'solo' || layerType === 'partnership' ? 'Purchase price minus debt' : 'Total committed capital'}</FormDescription>
                                           <FormMessage />
                                         </FormItem>
                                       )} />
+                                      {needsAdvancedTabs(layerType) && (
                                       <FormField control={equityForm.control} name="fundedAmount" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Funded to Date</FormLabel>
@@ -2638,6 +2645,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                           <FormDescription>Capital already called</FormDescription>
                                         </FormItem>
                                       )} />
+                                      )}
                                       <FormField control={equityForm.control} name="ownershipPct" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Ownership Percentage *</FormLabel>

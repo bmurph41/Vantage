@@ -9,6 +9,7 @@ let _globalRoundingDigits = 0;
 let _globalEbitdaRoundingDigits = 0;
 let _globalLineItemRoundingDigits = 0;
 let _globalPercentRoundingDecimals = 1;
+let _globalDebtServiceRoundingDigits = 0;
 
 export function setGlobalRoundingDigits(digits: number) {
   _globalRoundingDigits = digits;
@@ -24,6 +25,12 @@ export function setGlobalLineItemRoundingDigits(digits: number) {
 
 export function setGlobalPercentRoundingDecimals(decimals: number) {
   _globalPercentRoundingDecimals = decimals;
+}
+export function setGlobalDebtServiceRoundingDigits(digits: number) {
+  _globalDebtServiceRoundingDigits = digits;
+}
+export function getGlobalDebtServiceRoundingDigits(): number {
+  return _globalDebtServiceRoundingDigits;
 }
 
 export function getGlobalRoundingDigits(): number {
@@ -50,7 +57,7 @@ function applyRounding(value: number, roundingDigits: number): number {
 
 export function formatCurrency(
   value: number | string | null | undefined,
-  options?: { roundingDigits?: number; dash?: boolean; context?: 'price' | 'ebitda' | 'lineItem' }
+  options?: { roundingDigits?: number; dash?: boolean; context?: 'price' | 'ebitda' | 'lineItem' | 'debt' }
 ): string {
   if (value === null || value === undefined) return options?.dash ? '-' : '$0';
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -62,6 +69,8 @@ export function formatCurrency(
     digits = _globalEbitdaRoundingDigits;
   } else if (options?.context === 'lineItem') {
     digits = _globalLineItemRoundingDigits;
+  } else if (options?.context === 'debt') {
+    digits = _globalDebtServiceRoundingDigits;
   } else {
     digits = _globalRoundingDigits;
   }
