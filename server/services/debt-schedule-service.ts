@@ -156,7 +156,7 @@ export class DebtScheduleService {
 
       return {
         tranche: t,
-        balance: parseFloat(t.amount?.toString() || '0'),
+        balance: parseFloat(t.principal?.toString() || '0'),
         ioPeriodsRemaining: (t.interestOnlyMonths || 0),
         baseRate,
         rate: baseRate,
@@ -265,12 +265,12 @@ export class DebtScheduleService {
     
     // Calculate summary metrics
     const totalDebtAtClose = tranches.reduce(
-      (sum, t) => sum + parseFloat(t.amount?.toString() || '0'), 0
+      (sum, t) => sum + parseFloat(t.principal?.toString() || '0'), 0
     );
     
     const blendedRate = totalDebtAtClose > 0
       ? tranches.reduce((sum, t) => {
-          const amount = parseFloat(t.amount?.toString() || '0');
+          const amount = parseFloat(t.principal?.toString() || '0');
           const rate = parseFloat(t.interestRate?.toString() || '0');
           return sum + (amount * rate);
         }, 0) / totalDebtAtClose
@@ -278,7 +278,7 @@ export class DebtScheduleService {
     
     const weightedAvgTermMonths = totalDebtAtClose > 0
       ? tranches.reduce((sum, t) => {
-          const amount = parseFloat(t.amount?.toString() || '0');
+          const amount = parseFloat(t.principal?.toString() || '0');
           const termMonths = (t.termYears || 10) * 12;
           return sum + (amount * termMonths);
         }, 0) / totalDebtAtClose

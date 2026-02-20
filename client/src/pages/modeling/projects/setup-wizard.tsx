@@ -25,6 +25,11 @@ import {
   Cloud,
   CloudOff,
   Car,
+  Upload,
+  FileSpreadsheet,
+  X,
+  Trash2,
+  FileText,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -114,6 +119,7 @@ const WIZARD_STEPS = [
   { id: "profit-centers", title: "Profit Centers", description: "Revenue streams" },
   { id: "financial-scope", title: "Financials", description: "Historical data" },
   { id: "underwriting", title: "Underwriting", description: "Assumptions" },
+  { id: "documents", title: "Documents", description: "Upload files" },
   { id: "review", title: "Review", description: "Create project" },
 ] as const;
 
@@ -126,6 +132,7 @@ const STEP_LABELS: Record<string, string> = {
   "profit-centers": "Profit Centers",
   "financial-scope": "Financial Scope",
   "underwriting": "Underwriting",
+  "documents": "Documents",
   "review": "Review",
 };
 
@@ -1294,6 +1301,173 @@ function UnderwritingSlide({ payload, updateNestedPayload }: SlideProps) {
 }
 
 // ============================================
+// DOCUMENTS SLIDE
+// ============================================
+
+interface WizardStagedFile {
+  id: string;
+  file: File;
+  label: string;
+  rentRollSubType: string;
+}
+
+const WIZARD_STORAGE_TYPE_LABELS: Record<string, string> = {
+  WET_SLIPS: "Wet Slips",
+  DRY_STACK: "Dry Stack Racks",
+  MOORINGS: "Moorings",
+  TRAILER_STORAGE: "Trailer Storage",
+  RV_STORAGE: "RV Storage",
+  SERVICE_BAYS: "Service Bays",
+};
+
+function DocumentsSlide({
+  payload,
+  stagedFiles,
+  onAddFiles,
+  onRemoveFile,
+  onUpdateSubType,
+}: {
+  payload: WizardFormData;
+  stagedFiles: WizardStagedFile[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (id: string) => void;
+  onUpdateSubType: (id: string, subType: string) => void;
+}) {
+  const storageTypes = payload.storageMix.items
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      value: item.storageType,
+      label: WIZARD_STORAGE_TYPE_LABELS[item.storageType] || item.storageType.replace(/_/g, ' '),
+    }));
+
+  const allStorageTypes = storageTypes.length > 0
+    ? storageTypes
+    : Object.entries(WIZARD_STORAGE_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    onAddFiles(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      onAddFiles(Array.from(e.target.files));
+    }
+    e.target.value = '';
+  };
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Upload Documents</h2>
+        <p className="text-muted-foreground mt-1">
+          Upload rent roll documents for your storage units. These will be sent to AI processing when the project is created.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5" />
+            Storage Rent Rolls
+          </CardTitle>
+          <CardDescription>
+            Drag and drop rent roll files here, or click to browse. Supported formats: Excel, CSV, PDF.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors border-muted-foreground/25 hover:border-primary/50"
+            onClick={() => document.getElementById('wizard-file-input')?.click()}
+          >
+            <input
+              id="wizard-file-input"
+              type="file"
+              multiple
+              accept=".xlsx,.xls,.csv,.pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+            <p className="font-medium">Drag & drop rent roll files here</p>
+            <p className="text-sm text-muted-foreground mt-1">or click to browse your files</p>
+            <p className="text-xs text-muted-foreground mt-3">
+              Supported formats: Excel (.xlsx, .xls), CSV, PDF
+            </p>
+          </div>
+
+          {stagedFiles.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium">Staged Files ({stagedFiles.length})</h4>
+              {stagedFiles.map((sf) => (
+                <div key={sf.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <div className="flex-shrink-0">
+                    {sf.file.name.endsWith('.pdf') ? (
+                      <FileText className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{sf.file.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(sf.file.size)}</p>
+                  </div>
+                  <Select
+                    value={sf.rentRollSubType}
+                    onValueChange={(v) => onUpdateSubType(sf.id, v)}
+                  >
+                    <SelectTrigger className="w-[160px] h-8 text-xs">
+                      <SelectValue placeholder="Storage type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allStorageTypes.map((st) => (
+                        <SelectItem key={st.value} value={st.value}>
+                          {st.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 flex-shrink-0"
+                    onClick={() => onRemoveFile(sf.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stagedFiles.length === 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                This step is optional. You can also upload documents later from the Storage Leases section in the workspace.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================
 // REVIEW SLIDE
 // ============================================
 
@@ -1301,10 +1475,12 @@ function ReviewSlide({
   payload,
   isCreating,
   error,
+  stagedDocumentCount,
 }: {
   payload: WizardFormData;
   isCreating: boolean;
   error: string | null;
+  stagedDocumentCount?: number;
 }) {
   return (
     <div className="space-y-6">
@@ -1432,6 +1608,19 @@ function ReviewSlide({
             </div>
           </CardContent>
         </Card>
+        {(stagedDocumentCount ?? 0) > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-semibold">
+                {stagedDocumentCount} rent roll{stagedDocumentCount !== 1 ? 's' : ''} staged
+              </p>
+              <p className="text-sm text-muted-foreground">Will be uploaded for AI processing</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {isCreating && (
@@ -1491,6 +1680,26 @@ export default function SetupWizard() {
   // State for project creation
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [wizardStagedFiles, setWizardStagedFiles] = useState<WizardStagedFile[]>([]);
+
+  const handleAddWizardFiles = useCallback((files: File[]) => {
+    const defaultSubType = 'WET_SLIPS';
+    const newFiles: WizardStagedFile[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      label: file.name,
+      rentRollSubType: defaultSubType,
+    }));
+    setWizardStagedFiles((prev) => [...prev, ...newFiles]);
+  }, []);
+
+  const handleRemoveWizardFile = useCallback((id: string) => {
+    setWizardStagedFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const handleUpdateWizardSubType = useCallback((id: string, subType: string) => {
+    setWizardStagedFiles((prev) => prev.map((f) => f.id === id ? { ...f, rentRollSubType: subType } : f));
+  }, []);
 
   // Initialize the draft persistence hook
   const {
@@ -1568,6 +1777,7 @@ export default function SetupWizard() {
       case "profit-centers":
       case "financial-scope":
       case "underwriting":
+      case "documents":
         return true;
       case "review":
         return !!payload.name && !!payload.assetType && !isCreating;
@@ -1711,6 +1921,39 @@ export default function SetupWizard() {
         throw new Error(result.error || result.details?.[0]?.message || "Failed to create project");
       }
 
+      if (result.id && wizardStagedFiles.length > 0) {
+        let uploadCount = 0;
+        for (const sf of wizardStagedFiles) {
+          try {
+            const formData = new FormData();
+            formData.append("file", sf.file);
+            formData.append("docType", "rent_roll");
+            formData.append("year", new Date().getFullYear().toString());
+            formData.append("dataGranularity", "monthly");
+            formData.append("rentRollSubType", sf.rentRollSubType);
+
+            const uploadHeaders: Record<string, string> = {};
+            if (csrfToken) uploadHeaders["X-CSRF-Token"] = csrfToken;
+
+            await fetch(`/api/modeling/projects/${result.id}/documents`, {
+              method: "POST",
+              body: formData,
+              headers: uploadHeaders,
+              credentials: "include",
+            });
+            uploadCount++;
+          } catch (err) {
+            console.error("[SETUP_WIZARD] Failed to upload file:", sf.file.name, err);
+          }
+        }
+        if (uploadCount > 0) {
+          toast({
+            title: "Documents uploaded",
+            description: `${uploadCount} rent roll${uploadCount > 1 ? 's' : ''} queued for AI processing.`,
+          });
+        }
+      }
+
       await onWizardSubmitSuccess("newProject", user?.id || null);
       await clearDraft();
 
@@ -1720,7 +1963,8 @@ export default function SetupWizard() {
       });
 
       if (result.id) {
-        setLocation(`/modeling/projects/${result.id}`);
+        const redirectTab = wizardStagedFiles.length > 0 ? '?tab=storage-leases' : '';
+        setLocation(`/modeling/projects/${result.id}${redirectTab}`);
       } else {
         setLocation("/modeling/projects");
       }
@@ -1735,7 +1979,7 @@ export default function SetupWizard() {
     } finally {
       setIsCreating(false);
     }
-  }, [payload, user?.id, clearDraft, toast, setLocation]);
+  }, [payload, user?.id, clearDraft, toast, setLocation, wizardStagedFiles]);
 
   // Handle next/submit
   const handleNext = useCallback(async () => {
@@ -1886,11 +2130,21 @@ export default function SetupWizard() {
                 updateNestedPayload={updateNestedPayload}
               />
             )}
+            {currentStepId === "documents" && (
+              <DocumentsSlide
+                payload={payload}
+                stagedFiles={wizardStagedFiles}
+                onAddFiles={handleAddWizardFiles}
+                onRemoveFile={handleRemoveWizardFile}
+                onUpdateSubType={handleUpdateWizardSubType}
+              />
+            )}
             {currentStepId === "review" && (
               <ReviewSlide
                 payload={payload}
                 isCreating={isCreating}
                 error={errorMessage}
+                stagedDocumentCount={wizardStagedFiles.length}
               />
             )}
           </motion.div>

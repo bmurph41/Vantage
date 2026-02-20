@@ -28,6 +28,9 @@ async function ensureCsrfToken(): Promise<string> {
 interface UploadDropzoneProps {
   projectId: string;
   onUploadComplete: (upload: DocIntelUpload) => void;
+  defaultDocType?: DocTypeEnum;
+  defaultRentRollSubType?: string;
+  lockDocType?: boolean;
 }
 
 interface CustomDocumentType {
@@ -160,7 +163,7 @@ const STORAGE_TYPE_LABELS: Record<string, string> = {
   rv_sites: "RV Sites",
 };
 
-export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzoneProps) {
+export function UploadDropzone({ projectId, onUploadComplete, defaultDocType, defaultRentRollSubType, lockDocType }: UploadDropzoneProps) {
   const { toast } = useToast();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -447,7 +450,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const now = new Date();
     const newStagedFiles: StagedFile[] = acceptedFiles.map((file) => {
-      const docType = guessDocType(file.name);
+      const docType = defaultDocType || guessDocType(file.name);
       const base: StagedFile = {
         id: crypto.randomUUID(),
         file,
@@ -456,6 +459,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
         customTypeName: "",
         year: now.getFullYear().toString(),
         dataGranularity: "monthly" as DataGranularity,
+        rentRollSubType: defaultRentRollSubType,
         status: "pending" as const,
         progress: 0,
       };
@@ -476,7 +480,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
       return base;
     });
     setStagedFiles((prev) => [...prev, ...newStagedFiles]);
-  }, []);
+  }, [defaultDocType, defaultRentRollSubType]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -635,6 +639,11 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <Label className="text-xs">Type</Label>
+                        {lockDocType ? (
+                          <div className="h-8 flex items-center px-2 text-xs border rounded-md bg-muted">
+                            {getDocTypeLabel(staged)}
+                          </div>
+                        ) : (
                         <Select
                           value={staged.docType === 't12' ? 'pnl' : getCurrentSelectValue(staged)}
                           onValueChange={(v) => handleDocTypeChange(staged.id, v)}
@@ -665,6 +674,7 @@ export function UploadDropzone({ projectId, onUploadComplete }: UploadDropzonePr
                             </div>
                           </SelectContent>
                         </Select>
+                        )}
                       </div>
                       <div>
                         <Label className="text-xs">Year</Label>

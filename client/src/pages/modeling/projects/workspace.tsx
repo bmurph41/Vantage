@@ -45,7 +45,7 @@ import {
   Receipt,
   type LucideIcon
 } from 'lucide-react';
-import type { ModelingProject } from '@shared/schema';
+import type { ModelingProject, DocIntelUpload } from '@shared/schema';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
 import { formatCurrency } from '@/lib/formatUtils';
@@ -86,6 +86,7 @@ import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 import PropertyTaxTab from './workspace/property-tax';
 import TaxAndDistributionsPage from './workspace/tax-distributions';
 import DebtInputs from './workspace/debt-inputs';
+import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 
 interface TabItem {
   value: string;
@@ -190,6 +191,158 @@ function getGroupForTab(tabValue: string): string {
   return TAB_TO_GROUP[tabValue] || 'overview';
 }
 
+const STORAGE_SUB_TYPES = [
+  'WET_SLIPS', 'DRY_STACK', 'MOORINGS', 'TRAILER_STORAGE', 'RV_STORAGE', 'SERVICE_BAYS',
+  'wet_slips', 'lift_slips', 'moorings', 'dinghies', 'jet_skis',
+  'dry_racks_indoor', 'dry_racks_outdoor', 'land_storage',
+  'boats_on_trailers', 'trailers', 'carports', 'houseboats', 'rv_sites',
+];
+
+interface UploadWithStats extends DocIntelUpload {
+  stats?: {
+    total: number;
+    pending: number;
+    confirmed: number;
+    rejected: number;
+    needsReview: number;
+    highConfidence: number;
+    lowConfidence: number;
+  };
+}
+
+function StorageLeaseUploads({ projectId }: { projectId: string }) {
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const { data: allUploads = [], isLoading } = useQuery<UploadWithStats[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'documents'],
+    enabled: !!projectId,
+    refetchInterval: 3000,
+  });
+
+  const storageUploads = allUploads.filter(
+    (u) => u.docType === 'rent_roll' && u.rentRollSubType && STORAGE_SUB_TYPES.includes(u.rentRollSubType)
+  );
+
+  const deleteMutation = useMutation({
+    mutationFn: (uploadId: string) => apiRequest('DELETE', `/api/modeling/projects/${projectId}/documents/${uploadId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+      toast({ title: 'Deleted', description: 'Document has been removed.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+    },
+  });
+
+  const handleUploadComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
+  };
+
+  const handleReview = (uploadId: string) => {
+    navigate(`/modeling/projects/${projectId}/doc-intel?upload=${uploadId}`);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      uploaded: { variant: 'secondary', label: 'Pending' },
+      processing: { variant: 'default', label: 'AI Processing' },
+      parsed: { variant: 'outline', label: 'Ready for Review' },
+      reviewing: { variant: 'default', label: 'In Review' },
+      completed: { variant: 'secondary', label: 'Completed' },
+      error: { variant: 'destructive', label: 'Error' },
+    };
+    const c = config[status] || config.uploaded;
+    return <Badge variant={c.variant}>{c.label}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold">Storage Rent Roll Uploads</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload rent roll documents for storage units. Files are automatically tagged as storage rent rolls and sent for AI processing.
+        </p>
+      </div>
+
+      <UploadDropzone
+        projectId={projectId}
+        onUploadComplete={handleUploadComplete}
+        defaultDocType="rent_roll"
+        lockDocType
+      />
+
+      {isLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      ) : storageUploads.length > 0 ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Uploaded Documents</CardTitle>
+            <CardDescription>{storageUploads.length} storage rent roll{storageUploads.length !== 1 ? 's' : ''}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {storageUploads.map((upload) => (
+                <div
+                  key={upload.id}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileSpreadsheet className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{upload.originalName || upload.filename}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {upload.rentRollSubType && (
+                          <span className="capitalize">{upload.rentRollSubType.replace(/_/g, ' ')}</span>
+                        )}
+                        {upload.year && <span>Year {upload.year}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {getStatusBadge(upload.status)}
+                    {(upload.status === 'parsed' || upload.status === 'reviewing') && (
+                      <Button variant="outline" size="sm" onClick={() => handleReview(upload.id)}>
+                        Review
+                      </Button>
+                    )}
+                    {upload.status === 'completed' && (
+                      <Button variant="ghost" size="sm" onClick={() => handleReview(upload.id)}>
+                        View
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(upload.id)}
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50 mb-3" />
+            <p className="font-medium text-muted-foreground">No storage rent rolls uploaded yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Drag and drop your rent roll files above, or upload them from the Setup Wizard
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { projectId: string; projectName: string; onTabChange: (tab: string) => void }) {
   const [subTab, setSubTab] = useState('lease-data');
   return (
@@ -199,6 +352,10 @@ function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { proje
           <FileSpreadsheet className="h-4 w-4" />
           Lease Data
         </TabsTrigger>
+        <TabsTrigger value="uploads" className="gap-2">
+          <Upload className="h-4 w-4" />
+          Uploads
+        </TabsTrigger>
         <TabsTrigger value="analysis" className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Rent Roll Analysis
@@ -206,6 +363,9 @@ function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { proje
       </TabsList>
       <TabsContent value="lease-data">
         <RentRollDataTab projectId={projectId} projectName={projectName} />
+      </TabsContent>
+      <TabsContent value="uploads">
+        <StorageLeaseUploads projectId={projectId} />
       </TabsContent>
       <TabsContent value="analysis">
         <RentRollAnalysis projectId={projectId} projectName={projectName} onTabChange={onTabChange} />

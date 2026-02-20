@@ -95,6 +95,13 @@ function getFileIcon(mimeType: string) {
   return <FileText className="h-5 w-5 text-muted-foreground" />;
 }
 
+const STORAGE_RENT_ROLL_SUB_TYPES = new Set([
+  'WET_SLIPS', 'DRY_STACK', 'MOORINGS', 'TRAILER_STORAGE', 'RV_STORAGE', 'SERVICE_BAYS',
+  'wet_slips', 'lift_slips', 'moorings', 'dinghies', 'jet_skis',
+  'dry_racks_indoor', 'dry_racks_outdoor', 'land_storage',
+  'boats_on_trailers', 'trailers', 'carports', 'houseboats', 'rv_sites',
+]);
+
 export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUploadsProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -223,8 +230,11 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
     return Math.round(((confirmed + rejected) / total) * 100);
   };
 
-  const completedUploads = uploads.filter(u => u.status === 'completed');
-  const pendingUploads = uploads.filter(u => u.status !== 'completed');
+  const nonStorageUploads = uploads.filter(
+    (u) => !(u.docType === 'rent_roll' && u.rentRollSubType && STORAGE_RENT_ROLL_SUB_TYPES.has(u.rentRollSubType))
+  );
+  const completedUploads = nonStorageUploads.filter(u => u.status === 'completed');
+  const pendingUploads = nonStorageUploads.filter(u => u.status !== 'completed');
 
   const vdrDocsByFolder = vdrDocuments.reduce<Record<string, VdrDocument[]>>((acc, doc) => {
     const folder = doc.folderName || 'Root';
