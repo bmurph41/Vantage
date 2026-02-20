@@ -59,7 +59,7 @@ function isProfitCenterEnabled(
   }
 
   const pcConfig = profitCenters[tab.configKey];
-  return pcConfig?.enabled === true;
+  return pcConfig?.isEnabled === true || pcConfig?.enabled === true;
 }
 
 export default function ValuatorProfitCenters({ projectId, projectName }: ValuatorProfitCentersProps) {

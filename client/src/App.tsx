@@ -289,6 +289,8 @@ const ExitScenarioComparison = lazy(() => import("@/pages/modeling/exit/Scenario
 
 // Document Intelligence
 const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
+const CoaMappingReview = lazy(() => import("@/pages/modeling/doc-intel/CoaMappingReview"));
+const DepartmentalPL = lazy(() => import("@/pages/modeling/doc-intel/DepartmentalPL"));
 
 // P&L Pipeline
 const PnlUpload = lazy(() => import("@/pages/modeling/pnl/PnlUpload"));
@@ -2074,6 +2076,24 @@ function Router() {
         {(params) => (
           <UnifiedLayout>
             <DocumentIntelligence {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* COA Mapping Review Route */}
+      <Route path="/modeling/doc-intel/:uploadId/coa-review">
+        {(params) => (
+          <UnifiedLayout>
+            <CoaMappingReview {...params} />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Departmental P&L Route */}
+      <Route path="/modeling/doc-intel/:uploadId/departmental-pl">
+        {(params) => (
+          <UnifiedLayout>
+            <DepartmentalPL {...params} />
           </UnifiedLayout>
         )}
       </Route>

@@ -25390,3 +25390,183 @@ export const insertPricingRecommendationSchema = createInsertSchema(pricingRecom
 export const selectPricingRecommendationSchema = createSelectSchema(pricingRecommendations);
 export type InsertPricingRecommendation = z.infer<typeof insertPricingRecommendationSchema>;
 export type PricingRecommendation = typeof pricingRecommendations.$inferSelect;
+
+// ============================================
+// COA Taxonomy & Mapping Engine Schema
+// ============================================
+
+export const coaAssetClassEnum = pgEnum('coa_asset_class', ['MARINA', 'MULTIFAMILY', 'STR', 'SELF_STORAGE', 'RETAIL', 'OFFICE', 'LAUNDROMAT', 'OTHER']);
+export const coaStatementTypeEnum = pgEnum('coa_statement_type', ['REVENUE', 'COGS', 'OPEX', 'OTHER']);
+export const coaMappingMethodEnum = pgEnum('coa_mapping_method', ['EXACT_ALIAS', 'RULES', 'EMBEDDING', 'LLM', 'MANUAL']);
+export const coaReviewStatusEnum = pgEnum('coa_review_status', ['AUTO_MAPPED', 'NEEDS_REVIEW', 'APPROVED', 'OVERRIDDEN']);
+export const coaRuleTypeEnum = pgEnum('coa_rule_type', ['KEYWORD', 'REGEX', 'VENDOR', 'CLASS_LOCATION', 'COMPOSITE']);
+export const coaAliasSourceEnum = pgEnum('coa_alias_source', ['USER_CONFIRMATION', 'ADMIN_SEED']);
+export const coaMappingActionEnum = pgEnum('coa_mapping_action', ['AUTO_MAP', 'APPROVE', 'OVERRIDE', 'BULK_APPROVE']);
+
+export const taxonomyPacks = pgTable('coa_taxonomy_packs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  assetClass: coaAssetClassEnum('asset_class'),
+  name: text('name').notNull(),
+  version: text('version').default('1.0.0'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type TaxonomyPack = typeof taxonomyPacks.$inferSelect;
+export const insertTaxonomyPackSchema = createInsertSchema(taxonomyPacks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaxonomyPack = z.infer<typeof insertTaxonomyPackSchema>;
+
+export const coaProfitCenters = pgTable('coa_profit_centers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  parentId: varchar('parent_id').references((): any => coaProfitCenters.id),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type CoaProfitCenter = typeof coaProfitCenters.$inferSelect;
+export const insertCoaProfitCenterSchema = createInsertSchema(coaProfitCenters).omit({ id: true, createdAt: true });
+export type InsertCoaProfitCenter = z.infer<typeof insertCoaProfitCenterSchema>;
+
+export const coaSubCenters = pgTable('coa_sub_centers', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  profitCenterId: varchar('profit_center_id').notNull().references(() => coaProfitCenters.id),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type CoaSubCenter = typeof coaSubCenters.$inferSelect;
+export const insertCoaSubCenterSchema = createInsertSchema(coaSubCenters).omit({ id: true, createdAt: true });
+export type InsertCoaSubCenter = z.infer<typeof insertCoaSubCenterSchema>;
+
+export const coaCanonicalAccounts = pgTable('coa_canonical_accounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  profitCenterId: varchar('profit_center_id').notNull().references(() => coaProfitCenters.id),
+  subCenterId: varchar('sub_center_id').references(() => coaSubCenters.id),
+  code: text('code').notNull(),
+  statementType: coaStatementTypeEnum('statement_type').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  keywords: text('keywords').array(),
+  drivers: text('drivers').array(),
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  packStatementIdx: index('coa_canonical_pack_statement_idx').on(table.packId, table.statementType),
+}));
+
+export type CoaCanonicalAccount = typeof coaCanonicalAccounts.$inferSelect;
+export const insertCoaCanonicalAccountSchema = createInsertSchema(coaCanonicalAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCoaCanonicalAccount = z.infer<typeof insertCoaCanonicalAccountSchema>;
+
+export const coaGlobalAliases = pgTable('coa_global_aliases', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  rawLabel: text('raw_label').notNull(),
+  normalizedLabel: text('normalized_label').notNull(),
+  canonicalAccountId: varchar('canonical_account_id').notNull().references(() => coaCanonicalAccounts.id),
+  confidenceHint: numeric('confidence_hint', { precision: 5, scale: 2 }).default('0.90'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  packNormalizedIdx: index('coa_global_alias_pack_normalized_idx').on(table.packId, table.normalizedLabel),
+}));
+
+export type CoaGlobalAlias = typeof coaGlobalAliases.$inferSelect;
+export const insertCoaGlobalAliasSchema = createInsertSchema(coaGlobalAliases).omit({ id: true, createdAt: true });
+export type InsertCoaGlobalAlias = z.infer<typeof insertCoaGlobalAliasSchema>;
+
+export const coaUserAliases = pgTable('coa_user_aliases', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id').notNull(),
+  orgId: varchar('org_id').notNull(),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  rawLabel: text('raw_label').notNull(),
+  normalizedLabel: text('normalized_label').notNull(),
+  canonicalAccountId: varchar('canonical_account_id').notNull().references(() => coaCanonicalAccounts.id),
+  profitCenterId: varchar('profit_center_id').notNull().references(() => coaProfitCenters.id),
+  subCenterId: varchar('sub_center_id').references(() => coaSubCenters.id),
+  createdFrom: coaAliasSourceEnum('created_from').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orgNormalizedIdx: index('coa_user_alias_org_normalized_idx').on(table.orgId, table.normalizedLabel),
+}));
+
+export type CoaUserAlias = typeof coaUserAliases.$inferSelect;
+export const insertCoaUserAliasSchema = createInsertSchema(coaUserAliases).omit({ id: true, createdAt: true });
+export type InsertCoaUserAlias = z.infer<typeof insertCoaUserAliasSchema>;
+
+export const coaMappingRules = pgTable('coa_mapping_rules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  name: text('name').notNull(),
+  priority: integer('priority').default(100),
+  ruleType: coaRuleTypeEnum('rule_type').notNull(),
+  pattern: text('pattern').notNull(),
+  excludes: text('excludes'),
+  requiredFields: text('required_fields').array(),
+  outputCanonicalAccountId: varchar('output_canonical_account_id').notNull().references(() => coaCanonicalAccounts.id),
+  outputProfitCenterId: varchar('output_profit_center_id').notNull().references(() => coaProfitCenters.id),
+  outputSubCenterId: varchar('output_sub_center_id').references(() => coaSubCenters.id),
+  baseConfidence: numeric('base_confidence', { precision: 5, scale: 2 }).default('0.85'),
+  explanationTemplate: text('explanation_template'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  packPriorityIdx: index('coa_mapping_rules_pack_priority_idx').on(table.packId, table.priority),
+}));
+
+export type CoaMappingRule = typeof coaMappingRules.$inferSelect;
+export const insertCoaMappingRuleSchema = createInsertSchema(coaMappingRules).omit({ id: true, createdAt: true });
+export type InsertCoaMappingRule = z.infer<typeof insertCoaMappingRuleSchema>;
+
+export const coaMappedLineItems = pgTable('coa_mapped_line_items', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  extractedItemId: varchar('extracted_item_id').notNull().unique().references(() => docIntelExtractedItems.id, { onDelete: 'cascade' }),
+  packId: varchar('pack_id').notNull().references(() => taxonomyPacks.id),
+  canonicalAccountId: varchar('canonical_account_id').notNull().references(() => coaCanonicalAccounts.id),
+  profitCenterId: varchar('profit_center_id').notNull().references(() => coaProfitCenters.id),
+  subCenterId: varchar('sub_center_id').references(() => coaSubCenters.id),
+  confidence: numeric('confidence', { precision: 5, scale: 4 }).notNull(),
+  method: coaMappingMethodEnum('method').notNull(),
+  explanation: text('explanation'),
+  candidates: jsonb('candidates'),
+  reviewedStatus: coaReviewStatusEnum('reviewed_status').notNull().default('NEEDS_REVIEW'),
+  reviewedByUserId: varchar('reviewed_by_user_id'),
+  reviewedAt: timestamp('reviewed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  extractedItemIdx: index('coa_mapped_extracted_item_idx').on(table.extractedItemId),
+  reviewedStatusIdx: index('coa_mapped_reviewed_status_idx').on(table.reviewedStatus),
+}));
+
+export type CoaMappedLineItem = typeof coaMappedLineItems.$inferSelect;
+export const insertCoaMappedLineItemSchema = createInsertSchema(coaMappedLineItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCoaMappedLineItem = z.infer<typeof insertCoaMappedLineItemSchema>;
+
+export const coaMappingAuditLog = pgTable('coa_mapping_audit_log', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar('user_id'),
+  orgId: varchar('org_id'),
+  extractedItemId: varchar('extracted_item_id'),
+  oldMapping: jsonb('old_mapping'),
+  newMapping: jsonb('new_mapping'),
+  action: coaMappingActionEnum('action').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type CoaMappingAuditLog = typeof coaMappingAuditLog.$inferSelect;
+export const insertCoaMappingAuditLogSchema = createInsertSchema(coaMappingAuditLog).omit({ id: true, createdAt: true });
+export type InsertCoaMappingAuditLog = z.infer<typeof insertCoaMappingAuditLogSchema>;

@@ -64,11 +64,11 @@ function getEnabledCenterKeys(config: ProjectConfig | undefined): string[] {
   const pc = config.profitCenters;
   if (pc && !Array.isArray(pc)) {
     for (const [key, val] of Object.entries(pc)) {
-      if (val?.enabled) keys.push(key);
+      if (val?.isEnabled || val?.enabled) keys.push(key);
     }
   } else if (Array.isArray(pc)) {
     for (const item of pc) {
-      if (item.enabled) keys.push(item.id);
+      if (item.isEnabled || item.enabled) keys.push(item.id);
     }
   }
 

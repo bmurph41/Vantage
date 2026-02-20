@@ -149,9 +149,9 @@ type ProfitCenterConfig = {
 };
 
 const defaultProfitCenters: ProfitCenterConfig[] = [
-  { id: 'pc_fuel_dock', name: 'Fuel Dock', isEnabled: true, icon: <Fuel className="h-4 w-4" /> },
-  { id: 'pc_marina_amenities', name: 'Marina & Amenities', isEnabled: true, icon: <Anchor className="h-4 w-4" /> },
-  { id: 'pc_ships_store', name: "Ship's Store", isEnabled: true, icon: <ShoppingCart className="h-4 w-4" /> },
+  { id: 'pc_fuel_dock', name: 'Fuel Dock', isEnabled: false, icon: <Fuel className="h-4 w-4" /> },
+  { id: 'pc_marina_amenities', name: 'Marina & Amenities', isEnabled: false, icon: <Anchor className="h-4 w-4" /> },
+  { id: 'pc_ships_store', name: "Ship's Store", isEnabled: false, icon: <ShoppingCart className="h-4 w-4" /> },
   { id: 'pc_commercial_leases', name: 'Commercial Leases', isEnabled: false, icon: <Building2 className="h-4 w-4" /> },
   { id: 'pc_service', name: 'Service', isEnabled: false, icon: <Wrench className="h-4 w-4" /> },
   { id: 'pc_parts', name: 'Parts', isEnabled: false, icon: <Container className="h-4 w-4" /> },
@@ -345,7 +345,7 @@ export default function WorkspaceInputs({ projectId, onTabChange }: WorkspaceInp
       if (config.profitCenters) {
         setProfitCenters(prev => prev.map(item => ({
           ...item,
-          isEnabled: config.profitCenters[item.id]?.isEnabled ?? item.isEnabled
+          isEnabled: config.profitCenters[item.id]?.isEnabled ?? false
         })));
       }
       if (config.commercialLeaseCount != null) {

@@ -12,6 +12,7 @@ import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron
 import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
 import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
 import { seedIntegrations } from "./integrations";
+import { seedMarinaTaxonomyPack } from "./services/coa-taxonomy-seed";
 import { docIntelService } from "./services/doc-intel-service";
 
 import { configureSecurityMiddleware } from "./middleware/security";
@@ -175,6 +176,10 @@ app.use(ddChecklistRouter);
       vdrFileService.initialize()
         .then(() => log('VDR file service initialized'))
         .catch((error) => log(`Failed to initialize VDR file service: ${error}`));
+
+      seedMarinaTaxonomyPack()
+        .then((packId) => log(`[COA] Marina taxonomy pack ready: ${packId}`))
+        .catch((error) => log(`[COA] Failed to seed taxonomy: ${error}`));
 
     });
   } catch (error) {

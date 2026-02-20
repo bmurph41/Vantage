@@ -262,6 +262,7 @@ import path from "path";
 import fs from "fs-extra";
 import { exitStudioRouter } from './routes/exit-studio-routes';
 import coaRoutes from './routes/coa-routes';
+import coaTaxonomyRoutes from './routes/coa-taxonomy-routes';
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -602,6 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authenticateUser, omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
   app.use(authenticateUser, coaRoutes);
+  app.use(authenticateUser, coaTaxonomyRoutes);
 
   // Entity Linking API (Phase 2B) - Cross-module relationship management
   registerEntityLinkingRoutes(app);
@@ -21104,16 +21106,24 @@ Current context: Project ${req.params.projectId}`;
           boatClub: 'pc_boat_club',
           boatSales: 'pc_boat_sales',
         };
+        const allKnownProfitCenterIds = [
+          'pc_fuel_dock', 'pc_marina_amenities', 'pc_ships_store',
+          'pc_commercial_leases', 'pc_service', 'pc_parts',
+          'pc_boat_club', 'pc_rental_boats', 'pc_boat_sales',
+          'pc_boat_finance', 'pc_boat_brokerage', 'pc_fb',
+          'pc_rv_park', 'pc_hospitality',
+        ];
         const translated: Record<string, any> = {};
+        for (const pcId of allKnownProfitCenterIds) {
+          translated[pcId] = { isEnabled: false };
+        }
         for (const [wizardKey, wizardVal] of Object.entries(cm.profitCenters)) {
           const inputsKey = wizardToInputsKeyMap[wizardKey];
           if (inputsKey && wizardVal && typeof wizardVal === 'object') {
             translated[inputsKey] = { isEnabled: (wizardVal as any).enabled ?? false };
           }
         }
-        if (Object.keys(translated).length > 0) {
-          config.profitCenters = translated;
-        }
+        config.profitCenters = translated;
         if (cm.profitCenters.commercialTenants?.enabled && cm.profitCenters.commercialTenants?.numberOfSuites) {
           config.commercialLeaseCount = cm.profitCenters.commercialTenants.numberOfSuites;
         }

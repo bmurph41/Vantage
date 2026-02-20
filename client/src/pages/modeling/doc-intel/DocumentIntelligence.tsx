@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { 
   ArrowLeft, Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, 
   Clock, Settings, Inbox, Trash2, Eye, Loader2, MoreVertical, RefreshCw,
-  FileText
+  FileText, ListChecks
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -411,6 +411,14 @@ export default function DocumentIntelligence() {
                               >
                                 <RefreshCw className="h-4 w-4 mr-2" />
                                 Retry Processing
+                              </DropdownMenuItem>
+                            )}
+                            {(doc.status === "parsed" || doc.status === "reviewing") && (
+                              <DropdownMenuItem asChild>
+                                <Link href={`/modeling/doc-intel/${doc.id}/coa-review`}>
+                                  <ListChecks className="h-4 w-4 mr-2" />
+                                  COA Mapping Review
+                                </Link>
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={() => {
