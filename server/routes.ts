@@ -22985,6 +22985,9 @@ Current context: Project ${req.params.projectId}`;
       const deptOverrideMap: Record<string, string> = {};
       overrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideDepartment)
         .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
+      const categoryOverrideMap: Record<string, string> = {};
+      overrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideCategory)
+        .forEach(o => { categoryOverrideMap[o.lineItemKey] = o.overrideCategory!; });
 
       const { inferDepartment: inferDepartmentFn } = await import('./utils/department-mapping');
       // Group each year's data
@@ -22994,11 +22997,12 @@ Current context: Project ${req.params.projectId}`;
           const subcategory = item.subcategory || '';
           if (excludeSet.has(subcategory)) return acc;
 
-          const key = `${item.category}-${subcategory}`;
+          const effectiveCategory = categoryOverrideMap[subcategory] || item.category;
+          const key = `${effectiveCategory}-${subcategory}`;
           if (!acc[key]) {
-            const dept = deptOverrideMap[subcategory] || item.department || inferDepartmentFn(subcategory, item.category);
+            const dept = deptOverrideMap[subcategory] || item.department || inferDepartmentFn(subcategory, effectiveCategory);
             acc[key] = {
-              category: item.category,
+              category: effectiveCategory,
               subcategory,
               department: dept,
               monthlyData: {},
@@ -28207,6 +28211,161 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+
+  // ============================================================================
+  // LOANS - Phase 1 Debt Engine (Single Loan CRUD + Schedule Computation)
+  // ============================================================================
+
+  // Get all loans for a project
+  app.get('/api/modeling/projects/:projectId/loans', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { loans: loansTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const result = await db.select().from(loansTable)
+        .where(and(eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .orderBy(loansTable.ordinal);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to fetch loans:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create a loan for a project
+  app.post('/api/modeling/projects/:projectId/loans', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { loans: loansTable } = await import('@shared/schema');
+      const [loan] = await db.insert(loansTable).values({
+        ...req.body,
+        projectId,
+        orgId,
+      }).returning();
+      res.json(loan);
+    } catch (error: any) {
+      console.error('Failed to create loan:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update a loan
+  app.patch('/api/modeling/projects/:projectId/loans/:loanId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, loanId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { loans: loansTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [updated] = await db.update(loansTable)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: 'Loan not found' });
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Failed to update loan:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete a loan
+  app.delete('/api/modeling/projects/:projectId/loans/:loanId', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, loanId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { loans: loansTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      await db.delete(loansTable)
+        .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete loan:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Compute loan schedule (on-demand, using canonical engine)
+  app.get('/api/modeling/projects/:projectId/loans/:loanId/schedule', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId, loanId } = req.params;
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const { loans: loansTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [loan] = await db.select().from(loansTable)
+        .where(and(eq(loansTable.id, loanId), eq(loansTable.projectId, projectId), eq(loansTable.orgId, orgId)));
+      if (!loan) return res.status(404).json({ error: 'Loan not found' });
+
+      const { computeLoanSchedule, computeLoanFeesAtClose, computeLoanPayoffAtExit, computeAnnualDebtService, computeDSCR, computeLTV } = await import('@shared/debt/debt-engine');
+
+      const loanInput = {
+        loanAmount: parseFloat(loan.loanAmount),
+        termMonths: loan.termMonths,
+        amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as 'fixed' | 'floating',
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        underwritingFee: loan.underwritingFee ? parseFloat(loan.underwritingFee) : undefined,
+        legalFee: loan.legalFee ? parseFloat(loan.legalFee) : undefined,
+        appraisalFee: loan.appraisalFee ? parseFloat(loan.appraisalFee) : undefined,
+        otherClosingCosts: loan.otherClosingCosts ? parseFloat(loan.otherClosingCosts) : undefined,
+        annualServicingFee: loan.annualServicingFee ? parseFloat(loan.annualServicingFee) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: loan.prepayType as 'none' | 'stepdown' | 'yield_maint' | 'defeasance',
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      };
+
+      const schedule = computeLoanSchedule(loanInput);
+      const fees = computeLoanFeesAtClose(loanInput);
+      const annualDS = computeAnnualDebtService(schedule);
+
+      // Compute exit payoff at end of term
+      const exitMonth = loan.termMonths - 1;
+      const payoff = computeLoanPayoffAtExit(loanInput, schedule, exitMonth);
+
+      // Compute DSCR and LTV using project data if available
+      const purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice) : 0;
+      const year1DS = annualDS[0]?.totalDebtService || 0;
+
+      res.json({
+        loan,
+        schedule,
+        fees,
+        annualDebtService: annualDS,
+        exitPayoff: payoff,
+        metrics: {
+          purchasePrice,
+          ltv: computeLTV(parseFloat(loan.loanAmount), purchasePrice),
+          year1DSCR: null, // Computed in client with NOI
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to compute loan schedule:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
   // ============================================================================
   // DEBT SCENARIOS - Debt Structure Analysis & Sensitivity Modeling
   // ============================================================================

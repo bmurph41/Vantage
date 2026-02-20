@@ -85,6 +85,7 @@ import ValidationWarnings from './workspace/validation-warnings';
 import ValuatorProfitCenters from './workspace/valuator-profit-centers';
 import PropertyTaxTab from './workspace/property-tax';
 import TaxAndDistributionsPage from './workspace/tax-distributions';
+import DebtInputs from './workspace/debt-inputs';
 
 interface TabItem {
   value: string;
@@ -116,11 +117,18 @@ const TAB_GROUPS: TabGroup[] = [
     icon: Database,
     tabs: [
       { value: 'inputs', label: 'Inputs & Assumptions', icon: Settings2 },
-      { value: 'uploads', label: 'Uploads', icon: Upload },
       { value: 'property-tax', label: 'Property Tax', icon: Building2 },
       { value: 'storage-leases', label: 'Storage Leases', icon: Anchor },
       { value: 'commercial-leases', label: 'Commercial Leases', icon: Building2 },
       { value: 'profit', label: 'Profit Centers', icon: Store },
+    ],
+  },
+  {
+    id: 'uploads',
+    label: 'Uploads',
+    icon: Upload,
+    tabs: [
+      { value: 'uploads', label: 'Document Uploads', icon: Upload },
     ],
   },
   {
@@ -131,6 +139,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'historical', label: 'Historical P&L', icon: FileSpreadsheet },
       { value: 'proforma', label: 'Pro Forma', icon: BarChart3 },
       { value: 'pricing', label: 'Pricing', icon: DollarSign },
+      { value: 'debt', label: 'Debt', icon: Briefcase },
       { value: 'capital', label: 'Capital Stack', icon: Building2 },
       { value: 'exit', label: 'Exit Strategy', icon: Target },
       { value: 'dcf', label: 'DCF', icon: Calculator },
@@ -525,6 +534,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
           <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        <TabsContent value="debt" className="space-y-6">
+          <DebtInputs projectId={projectId!} purchasePrice={project?.purchasePrice ? parseFloat(project.purchasePrice) : undefined} />
         </TabsContent>
 
         <TabsContent value="capital" className="space-y-6">

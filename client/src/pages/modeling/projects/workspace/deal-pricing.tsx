@@ -1250,17 +1250,6 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 </div>
               </div>
 
-              <div className="mt-4">
-                <Button 
-                  onClick={() => handleSavePurchasePrice(pricingData.purchasePrice, pricingData.year1CapRate)}
-                  disabled={saveMutation.isPending}
-                  className="w-full sm:w-auto"
-                  data-testid="button-save-from-price"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Price & Cap Rate to Project
-                </Button>
-              </div>
             </CardContent>
           </Card>
 

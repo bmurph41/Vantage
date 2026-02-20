@@ -338,6 +338,19 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     queryKey: ['/api/modeling/projects', projectId, 'actuals'],
   });
 
+  // Fetch available actuals years for historical trend columns
+  const { data: actualsYearsData } = useQuery<{ years: number[] }>({
+    queryKey: ['/api/modeling/projects', projectId, 'actuals', 'years'],
+  });
+
+  // Fetch multi-year actuals for prior historical periods
+  const availableActualsYears = actualsYearsData?.years || [];
+  const { data: multiYearActuals } = useQuery<{ byYear: Record<number, any[]> }>({
+    queryKey: ['/api/modeling/projects', projectId, 'actuals', 'multi-year', { years: availableActualsYears.join(',') }],
+    queryFn: () => fetch(`/api/modeling/projects/${projectId}/actuals/multi-year?years=${availableActualsYears.join(',')}`, { credentials: 'include' }).then(r => r.json()),
+    enabled: availableActualsYears.length > 0,
+  });
+
   // Fetch scenarios for inline growth rate editing
   const { data: scenarios = [] } = useQuery<any[]>({
     queryKey: ['/api/modeling/projects', projectId, 'scenarios'],
@@ -433,55 +446,74 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     }
   }, [years, selectedYear]);
 
-  // Process documents to determine available historical periods
+  // Process documents and actuals years to determine available historical periods
   const historicalPeriods = useMemo((): DocumentPeriod[] => {
-    if (!documents || documents.length === 0) {
-      return [];
-    }
-
     const periodsMap = new Map<string, DocumentPeriod>();
 
-    documents
-      .filter((doc: any) => doc.status === 'completed')
-      .forEach((doc: any) => {
-        const fiscalYear = doc.fiscalYear || doc.metadata?.fiscalYear;
-        const periodStart = doc.periodStart || doc.metadata?.periodStart;
-        const periodEnd = doc.periodEnd || doc.metadata?.periodEnd;
+    if (documents && documents.length > 0) {
+      documents
+        .filter((doc: any) => doc.status === 'completed')
+        .forEach((doc: any) => {
+          const fiscalYear = doc.fiscalYear || doc.metadata?.fiscalYear;
+          const periodStart = doc.periodStart || doc.metadata?.periodStart;
+          const periodEnd = doc.periodEnd || doc.metadata?.periodEnd;
 
-        if (fiscalYear || (periodStart && periodEnd)) {
-          const isT12 = periodStart && periodEnd ? isTrailing12(periodStart, periodEnd) : false;
-          const periodKey = isT12 
-            ? `t12-${periodEnd}` 
-            : fiscalYear?.toString() || new Date(periodEnd).getFullYear().toString();
+          if (fiscalYear || (periodStart && periodEnd)) {
+            const isT12 = periodStart && periodEnd ? isTrailing12(periodStart, periodEnd) : false;
+            const periodKey = isT12 
+              ? `t12-${periodEnd}` 
+              : fiscalYear?.toString() || new Date(periodEnd).getFullYear().toString();
 
-          if (!periodsMap.has(periodKey)) {
-            const endDate = periodEnd || `${fiscalYear}-12-31`;
-            const startDateCalc = periodStart || `${fiscalYear}-01-01`;
-            const period: DocumentPeriod = {
-              id: periodKey,
-              periodType: isT12 ? 'trailing_12' : 'calendar_year',
-              startDate: startDateCalc,
-              endDate: endDate,
-              year: fiscalYear || new Date(endDate).getFullYear(),
-              documentIds: [doc.id],
-              label: '',
-              shortLabel: '',
-              isT12
-            };
-            const labels = generatePeriodLabel(period);
-            period.label = labels.label;
-            period.shortLabel = labels.shortLabel;
-            periodsMap.set(periodKey, period);
-          } else {
-            periodsMap.get(periodKey)!.documentIds.push(doc.id);
+            if (!periodsMap.has(periodKey)) {
+              const endDate = periodEnd || `${fiscalYear}-12-31`;
+              const startDateCalc = periodStart || `${fiscalYear}-01-01`;
+              const period: DocumentPeriod = {
+                id: periodKey,
+                periodType: isT12 ? 'trailing_12' : 'calendar_year',
+                startDate: startDateCalc,
+                endDate: endDate,
+                year: fiscalYear || new Date(endDate).getFullYear(),
+                documentIds: [doc.id],
+                label: '',
+                shortLabel: '',
+                isT12
+              };
+              const labels = generatePeriodLabel(period);
+              period.label = labels.label;
+              period.shortLabel = labels.shortLabel;
+              periodsMap.set(periodKey, period);
+            } else {
+              periodsMap.get(periodKey)!.documentIds.push(doc.id);
+            }
           }
+        });
+    }
+
+    // Also create periods from actuals years (data from DB) even if no document metadata
+    if (availableActualsYears.length > 0) {
+      availableActualsYears.forEach((year: number) => {
+        const periodKey = year.toString();
+        if (!periodsMap.has(periodKey)) {
+          const period: DocumentPeriod = {
+            id: periodKey,
+            periodType: 'calendar_year',
+            startDate: `${year}-01-01`,
+            endDate: `${year}-12-31`,
+            year,
+            documentIds: [],
+            label: `${year} Actual`,
+            shortLabel: `${year}`,
+            isT12: false
+          };
+          periodsMap.set(periodKey, period);
         }
       });
+    }
 
     return Array.from(periodsMap.values()).sort((a, b) => 
       new Date(a.endDate).getTime() - new Date(b.endDate).getTime()
     );
-  }, [documents]);
+  }, [documents, availableActualsYears]);
 
   // Derive the baseline period from the pro forma engine's latest historical year,
   // falling back to document-based periods
@@ -561,6 +593,17 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       });
     }
 
+    // COGS line items from pro forma engine (separate from expenses)
+    if (proFormaData?.cogs?.lineItems) {
+      proFormaData.cogs.lineItems.forEach((item: any) => {
+        const name = item.name || 'Other';
+        data.COGS[name] = {
+          historical: baselinePeriod ? { [baselinePeriod.id]: item.baseAmount || 0 } : {},
+          projected: item.projections || Array(holdPeriod).fill(0)
+        };
+      });
+    }
+
     if (proFormaData?.expenses?.lineItems) {
       proFormaData.expenses.lineItems.forEach((item: any) => {
         const name = item.name || 'Other';
@@ -574,7 +617,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
 
     // Supplement with actuals data if pro forma didn't have certain line items
     if (actualsData?.grouped) {
-      actualsData.grouped.forEach((item: any) => {
+      (actualsData as any).grouped.forEach((item: any) => {
         const category = item.category as keyof typeof data;
         if (data[category]) {
           const lineItemName = item.subcategory || item.description || 'Other';
@@ -588,8 +631,28 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       });
     }
 
+    // Populate multi-year historical data for prior periods
+    if (multiYearActuals?.byYear) {
+      Object.entries(multiYearActuals.byYear).forEach(([yearStr, items]) => {
+        const year = Number(yearStr);
+        const periodKey = year.toString();
+        if (Array.isArray(items)) {
+          items.forEach((item: any) => {
+            const category = item.category as keyof typeof data;
+            if (data[category]) {
+              const lineItemName = item.subcategory || item.description || 'Other';
+              if (!data[category][lineItemName]) {
+                data[category][lineItemName] = { historical: {}, projected: Array(holdPeriod).fill(0) };
+              }
+              data[category][lineItemName].historical[periodKey] = item.annualTotal || 0;
+            }
+          });
+        }
+      });
+    }
+
     return data;
-  }, [actualsData, proFormaData, baselinePeriod, holdPeriod]);
+  }, [actualsData, proFormaData, baselinePeriod, holdPeriod, multiYearActuals]);
 
   const serverDeptMap = useMemo(() => {
     const map: Record<string, string> = {};

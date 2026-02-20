@@ -25642,3 +25642,80 @@ export const coaMappingAuditLog = pgTable('coa_mapping_audit_log', {
 export type CoaMappingAuditLog = typeof coaMappingAuditLog.$inferSelect;
 export const insertCoaMappingAuditLogSchema = createInsertSchema(coaMappingAuditLog).omit({ id: true, createdAt: true });
 export type InsertCoaMappingAuditLog = z.infer<typeof insertCoaMappingAuditLogSchema>;
+
+// ============================================
+// DEBT ENGINE - Phase 1 (Single Loan)
+// ============================================
+
+export const loanTypeEnum = pgEnum('loan_type', ['acquisition', 'bridge', 'perm']);
+export const loanStructureEnum = pgEnum('loan_structure', ['senior', 'mezz']);
+export const rateTypeEnum = pgEnum('rate_type', ['fixed', 'floating']);
+export const indexTypeEnum = pgEnum('index_type', ['sofr', 'treasury', 'prime']);
+export const loanAmountTypeEnum = pgEnum('loan_amount_type', ['amount', 'ltc', 'ltv']);
+export const prepayTypeEnum = pgEnum('prepay_type', ['none', 'stepdown', 'yield_maint', 'defeasance']);
+
+export const loans = pgTable('loans', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull(),
+  orgId: varchar('org_id').notNull(),
+  ordinal: integer('ordinal').default(1).notNull(),
+  loanName: text('loan_name').default('Acquisition Loan').notNull(),
+  loanType: loanTypeEnum('loan_type').default('acquisition').notNull(),
+  structure: loanStructureEnum('structure').default('senior').notNull(),
+  startDate: varchar('start_date'),
+  termMonths: integer('term_months').default(60).notNull(),
+  amortMonths: integer('amort_months').default(300).notNull(),
+  interestOnlyMonths: integer('interest_only_months').default(0).notNull(),
+  rateType: rateTypeEnum('rate_type').default('fixed').notNull(),
+  fixedRate: numeric('fixed_rate'),
+  indexType: indexTypeEnum('index_type'),
+  spreadBps: integer('spread_bps'),
+  indexFloorBps: integer('index_floor_bps'),
+  initialIndexBps: integer('initial_index_bps'),
+  loanAmountType: loanAmountTypeEnum('loan_amount_type').default('amount').notNull(),
+  loanAmount: numeric('loan_amount').notNull(),
+  capitalizeOriginationFees: boolean('capitalize_origination_fees').default(false).notNull(),
+  originationFeePct: numeric('origination_fee_pct'),
+  underwritingFee: numeric('underwriting_fee'),
+  legalFee: numeric('legal_fee'),
+  appraisalFee: numeric('appraisal_fee'),
+  otherClosingCosts: numeric('other_closing_costs'),
+  annualServicingFee: numeric('annual_servicing_fee'),
+  exitFeePct: numeric('exit_fee_pct'),
+  prepayType: prepayTypeEnum('prepay_type').default('none').notNull(),
+  stepdownScheduleJson: jsonb('stepdown_schedule_json'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('loans_project_idx').on(table.projectId),
+  orgIdx: index('loans_org_idx').on(table.orgId),
+}));
+
+export const loanSchedules = pgTable('loan_schedules', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  loanId: varchar('loan_id').notNull().references(() => loans.id, { onDelete: 'cascade' }),
+  monthIndex: integer('month_index').notNull(),
+  periodStart: varchar('period_start'),
+  periodEnd: varchar('period_end'),
+  beginBal: numeric('begin_bal').notNull(),
+  rateBps: integer('rate_bps').notNull(),
+  interest: numeric('interest').notNull(),
+  principal: numeric('principal').notNull(),
+  debtService: numeric('debt_service').notNull(),
+  endBal: numeric('end_bal').notNull(),
+}, (table) => ({
+  loanIdx: index('loan_schedules_loan_idx').on(table.loanId),
+  monthIdx: index('loan_schedules_month_idx').on(table.loanId, table.monthIndex),
+}));
+
+export const insertLoanSchema = createInsertSchema(loans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateLoanSchema = insertLoanSchema.partial();
+export type Loan = typeof loans.$inferSelect;
+export type InsertLoan = z.infer<typeof insertLoanSchema>;
+export type UpdateLoan = z.infer<typeof updateLoanSchema>;
+
+export type LoanSchedule = typeof loanSchedules.$inferSelect;
