@@ -447,7 +447,7 @@ export default function UnifiedSidebar() {
         onClick={onToggle}
         className={cn(
           "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors",
-          isActive 
+          expanded
             ? "bg-blue-600 text-white hover:bg-blue-700" 
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
