@@ -307,6 +307,8 @@ export default function Properties() {
     {
       key: 'property',
       header: 'Property',
+      sortable: true,
+      sortValue: (property) => property.title.toLowerCase(),
       render: (property) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
@@ -335,6 +337,8 @@ export default function Properties() {
     {
       key: 'type',
       header: 'Type',
+      sortable: true,
+      sortValue: (property) => property.type,
       render: (property) => (
         <Badge className={propertyTypeColors[property.type] || 'bg-gray-100 text-gray-800'}>
           {toTitleCase(property.type)}
@@ -344,6 +348,8 @@ export default function Properties() {
     {
       key: 'status',
       header: 'Status',
+      sortable: true,
+      sortValue: (property) => property.status,
       render: (property) => (
         <Badge className={statusColors[property.status] || 'bg-gray-100 text-gray-800'}>
           {toTitleCase(property.status)}
@@ -353,6 +359,8 @@ export default function Properties() {
     {
       key: 'price',
       header: 'Est. Price',
+      sortable: true,
+      sortValue: (property) => property.listingPrice ? parseFloat(property.listingPrice) : null,
       render: (property) => (
         <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
           <DollarSign className="w-3.5 h-3.5 text-gray-400" />
@@ -363,6 +371,8 @@ export default function Properties() {
     {
       key: 'location',
       header: 'Location',
+      sortable: true,
+      sortValue: (property) => property.address || null,
       render: (property) => property.address ? (
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />

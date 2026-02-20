@@ -49,9 +49,16 @@ import {
   Users,
   MapPin,
   Anchor,
-Clock,
+  Clock,
   Link2,
   Loader2,
+  Globe,
+  Briefcase,
+  TrendingUp,
+  Activity,
+  Target,
+  Hash,
+  Ship,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +70,7 @@ import UnifiedTimeline from "./unified-timeline";
 import { RelationshipStats } from "./relationship-stats";
 import { CustomFieldsEditor } from "./custom-fields-editor";
 import { NoteModal, TaskModal, CallModal, EmailRedirectModal } from "./action-modals";
+import { CollapsibleSection, EditableFieldRow, FieldRow } from "./collapsible-section";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -415,55 +423,149 @@ export function DetailDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl p-0 flex flex-col max-h-screen overflow-hidden">
-        <SheetHeader className="px-6 py-4 border-b">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <SheetTitle className="text-xl font-semibold">
-                {getEntityTitle()}
-              </SheetTitle>
-              <SheetDescription className="text-sm text-muted-foreground mt-1">
+        <SheetHeader className="px-6 py-4 border-b bg-gradient-to-b from-muted/40 to-background">
+          <div className="flex items-start gap-4">
+            {/* Avatar */}
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${
+              entityType === "contact" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" :
+              entityType === "company" ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300" :
+              entityType === "property" ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300" :
+              "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+            }`}>
+              {entityType === "contact" && (
+                <>
+                  {(entity?.firstName?.[0] || "").toUpperCase()}
+                  {(entity?.lastName?.[0] || "").toUpperCase()}
+                </>
+              )}
+              {entityType === "company" && <Building2 className="h-6 w-6" />}
+              {entityType === "property" && <Anchor className="h-6 w-6" />}
+              {entityType === "deal" && <DollarSign className="h-6 w-6" />}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <SheetTitle className="text-xl font-semibold truncate">
+                  {getEntityTitle()}
+                </SheetTitle>
+                {entityType === "contact" && entity?.contactType && (
+                  <Badge variant="secondary" className="text-xs capitalize">{entity.contactType.replace(/_/g, ' ')}</Badge>
+                )}
+                {entityType === "contact" && entity?.leadStatus && (
+                  <Badge variant={entity.leadStatus === 'hot' ? 'default' : 'outline'} className={`text-xs capitalize ${entity.leadStatus === 'hot' ? 'bg-red-500' : entity.leadStatus === 'warm' ? 'bg-yellow-500 text-black' : ''}`}>
+                    {entity.leadStatus}
+                  </Badge>
+                )}
+                {entityType === "company" && entity?.acquisitionInterest && (
+                  <Badge variant={entity.acquisitionInterest === 'hot' ? 'default' : 'outline'} className={`text-xs capitalize ${entity.acquisitionInterest === 'hot' ? 'bg-red-500' : entity.acquisitionInterest === 'warm' ? 'bg-yellow-500 text-black' : ''}`}>
+                    {entity.acquisitionInterest}
+                  </Badge>
+                )}
+                {entityType === "property" && entity?.status && (
+                  <Badge variant="secondary" className="text-xs capitalize">{entity.status.replace(/_/g, ' ')}</Badge>
+                )}
+                {entityType === "deal" && entity?.status && (
+                  <Badge variant={entity.status === 'won' ? 'default' : entity.status === 'lost' ? 'destructive' : 'secondary'} className="text-xs capitalize">
+                    {entity.status}
+                  </Badge>
+                )}
+              </div>
+              <SheetDescription className="text-sm text-muted-foreground mt-0.5 truncate">
                 {getEntitySubtitle()}
               </SheetDescription>
+
+              {/* Key Metrics Row */}
+              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                {entityType === "contact" && entity?.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    <a href={`mailto:${entity.email}`} className="hover:text-foreground hover:underline truncate max-w-[180px]">{entity.email}</a>
+                  </span>
+                )}
+                {entityType === "contact" && entity?.phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {entity.phone}
+                  </span>
+                )}
+                {entityType === "company" && entity?.website && (
+                  <span className="flex items-center gap-1">
+                    <Globe className="h-3 w-3" />
+                    <a href={entity.website.startsWith('http') ? entity.website : `https://${entity.website}`} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline truncate max-w-[180px]">{entity.website}</a>
+                  </span>
+                )}
+                {entityType === "company" && entity?.industry && (
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    {formatRole(entity.industry)}
+                  </span>
+                )}
+                {entityType === "property" && entity?.city && entity?.state && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {entity.city}, {entity.state}
+                  </span>
+                )}
+                {entityType === "property" && entity?.totalCapacity && (
+                  <span className="flex items-center gap-1">
+                    <Ship className="h-3 w-3" />
+                    {entity.totalCapacity} slips
+                  </span>
+                )}
+                {entityType === "deal" && entity?.amount && (
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    ${entity.amount.toLocaleString()}
+                  </span>
+                )}
+                {entity?.updatedAt && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(entity.updatedAt))} ago
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-1 flex-shrink-0">
               {isEditing ? (
                 <>
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
                     onClick={() => {
                       setIsEditing(false);
                       setEditData(entity);
                     }}
+                    title="Cancel"
                     data-testid="button-cancel-edit"
                   >
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
+                    <X className="h-4 w-4" />
                   </Button>
                   <Button
-                    size="sm"
+                    size="icon"
                     onClick={handleSave}
                     disabled={updateMutation.isPending}
+                    title="Save"
                     data-testid="button-save-edit"
                   >
-                    <Save className="h-4 w-4 mr-1" />
-                    Save
+                    <Save className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
                 <>
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="icon"
+                    variant="ghost"
                     onClick={() => setIsEditing(true)}
+                    title="Edit"
                     data-testid="button-edit"
                   >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="icon"
+                    variant="ghost"
                     onClick={() => {
                       const basePath = entityType === 'property' ? 'properties' : 
                                        entityType === 'company' ? 'companies' : 
@@ -474,14 +576,15 @@ export function DetailDrawer({
                     title="Open full page"
                     data-testid="button-open-full-page"
                   >
-                    <Maximize2 className="h-4 w-4 mr-1" />
-                    Full Page
+                    <Maximize2 className="h-4 w-4" />
                   </Button>
                   <Button
-                    size="sm"
-                    variant="destructive"
+                    size="icon"
+                    variant="ghost"
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
+                    title="Delete"
+                    className="text-destructive hover:text-destructive"
                     data-testid="button-delete"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -492,21 +595,21 @@ export function DetailDrawer({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex gap-2 mt-4">
-            <Button size="sm" variant="outline" data-testid="button-email" onClick={() => setEmailModalOpen(true)}>
-              <Mail className="h-4 w-4 mr-1" />
+          <div className="flex gap-1.5 mt-3">
+            <Button size="sm" variant="outline" className="h-8 text-xs" data-testid="button-email" onClick={() => setEmailModalOpen(true)}>
+              <Mail className="h-3.5 w-3.5 mr-1" />
               Email
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-call" onClick={() => setCallModalOpen(true)}>
-              <Phone className="h-4 w-4 mr-1" />
+            <Button size="sm" variant="outline" className="h-8 text-xs" data-testid="button-call" onClick={() => setCallModalOpen(true)}>
+              <Phone className="h-3.5 w-3.5 mr-1" />
               Call
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-note" onClick={() => setNoteModalOpen(true)}>
-              <StickyNote className="h-4 w-4 mr-1" />
+            <Button size="sm" variant="outline" className="h-8 text-xs" data-testid="button-note" onClick={() => setNoteModalOpen(true)}>
+              <StickyNote className="h-3.5 w-3.5 mr-1" />
               Note
             </Button>
-            <Button size="sm" variant="outline" data-testid="button-task" onClick={() => setTaskModalOpen(true)}>
-              <CheckSquare className="h-4 w-4 mr-1" />
+            <Button size="sm" variant="outline" className="h-8 text-xs" data-testid="button-task" onClick={() => setTaskModalOpen(true)}>
+              <CheckSquare className="h-3.5 w-3.5 mr-1" />
               Task
             </Button>
           </div>
@@ -534,7 +637,7 @@ export function DetailDrawer({
 
           <ScrollArea className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
             <div className="px-6 pb-6">
-              <TabsContent value="overview" className="mt-4 space-y-4">
+              <TabsContent value="overview" className="mt-4 space-y-3">
                 {isLoading ? (
                   <div className="text-center py-8 text-muted-foreground">Loading...</div>
                 ) : (
@@ -543,1033 +646,416 @@ export function DetailDrawer({
                       <RelationshipStats entityType={entityType} entityId={entityId} />
                     )}
                     
-                    {/* Contact Overview */}
+                    {/* Contact Overview - Collapsible Sections */}
                     {entityType === "contact" && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>First Name</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.firstName || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, firstName: e.target.value })
-                                }
-                                data-testid="input-firstName"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-firstName">
-                                {entity?.firstName || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Last Name</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.lastName || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, lastName: e.target.value })
-                                }
-                                data-testid="input-lastName"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-lastName">
-                                {entity?.lastName || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Email</Label>
-                          {isEditing ? (
-                            <Input
-                              type="email"
-                              value={editData.email || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, email: e.target.value })
-                              }
-                              data-testid="input-email"
+                      <div className="space-y-3">
+                        <CollapsibleSection title="About" icon={<User className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="First Name" isEditing={isEditing}
+                              value={<span data-testid="text-firstName">{entity?.firstName || "-"}</span>}
+                              editComponent={<Input value={editData.firstName || ""} onChange={(e) => setEditData({ ...editData, firstName: e.target.value })} data-testid="input-firstName" />}
                             />
-                          ) : (
-                            <div className="text-sm flex items-center gap-2" data-testid="text-email">
-                              {entity?.email || "-"}
-                              {entity?.email && (
-                                <a
-                                  href={`mailto:${entity.email}`}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Phone</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.phone || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, phone: e.target.value })
-                              }
-                              data-testid="input-phone"
+                            <EditableFieldRow label="Last Name" isEditing={isEditing}
+                              value={<span data-testid="text-lastName">{entity?.lastName || "-"}</span>}
+                              editComponent={<Input value={editData.lastName || ""} onChange={(e) => setEditData({ ...editData, lastName: e.target.value })} data-testid="input-lastName" />}
                             />
-                          ) : (
-                            <div className="text-sm flex items-center gap-2" data-testid="text-phone">
-                              {entity?.phone || "-"}
-                              {entity?.phone && (
-                                <a
-                                  href={`tel:${entity.phone}`}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Title</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.position || editData.title || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, position: e.target.value })
-                              }
-                              data-testid="input-title"
+                            <EditableFieldRow label="Title" isEditing={isEditing}
+                              value={<span data-testid="text-title">{entity?.title || "-"}</span>}
+                              editComponent={<Input value={editData.title || ""} onChange={(e) => setEditData({ ...editData, title: e.target.value })} data-testid="input-title" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-title">
-                              {entity?.position || entity?.title || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        {relatedCompany && (
-                          <div className="space-y-2">
-                            <Label>Company</Label>
-                            <div className="text-sm flex items-center gap-2" data-testid="text-company">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              {relatedCompany.name}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                          <Label>Lifecycle Stage</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.lifecycleStage || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, lifecycleStage: e.target.value })
+                            <EditableFieldRow label="Contact Type" isEditing={isEditing}
+                              value={
+                                entity?.contactType ? (
+                                  <Badge variant="secondary" className="capitalize text-xs" data-testid="text-contactType">{entity.contactType.replace(/_/g, ' ')}</Badge>
+                                ) : <span data-testid="text-contactType">-</span>
                               }
-                              data-testid="input-lifecycleStage"
+                              editComponent={
+                                <Select value={editData.contactType || ""} onValueChange={(v) => setEditData({ ...editData, contactType: v })}>
+                                  <SelectTrigger data-testid="select-contactType"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="owner">Owner</SelectItem>
+                                    <SelectItem value="broker">Broker</SelectItem>
+                                    <SelectItem value="investor">Investor</SelectItem>
+                                    <SelectItem value="marina_operator">Marina Operator</SelectItem>
+                                    <SelectItem value="vendor">Vendor</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
                             />
-                          ) : (
-                            <Badge variant="secondary" data-testid="badge-lifecycleStage">
-                              {entity?.lifecycleStage || entity?.contactTag || "Unknown"}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Lead & Communication</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Lead Source</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.leadSource || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, leadSource: e.target.value })
-                                }
-                                placeholder="website, referral, trade show..."
-                                data-testid="input-leadSource"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-leadSource">
-                                {entity?.leadSource || "-"}
-                              </div>
-                            )}
+                            <EditableFieldRow label="Lead Status" isEditing={isEditing}
+                              value={
+                                entity?.leadStatus ? (
+                                  <Badge variant={entity.leadStatus === 'hot' ? 'default' : 'outline'} className={`capitalize text-xs ${entity.leadStatus === 'hot' ? 'bg-red-500' : entity.leadStatus === 'warm' ? 'bg-yellow-500 text-black' : ''}`} data-testid="text-leadStatus">
+                                    {entity.leadStatus}
+                                  </Badge>
+                                ) : <span data-testid="text-leadStatus">-</span>
+                              }
+                              editComponent={
+                                <Select value={editData.leadStatus || ""} onValueChange={(v) => setEditData({ ...editData, leadStatus: v })}>
+                                  <SelectTrigger data-testid="select-leadStatus"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="new">New</SelectItem>
+                                    <SelectItem value="hot">Hot</SelectItem>
+                                    <SelectItem value="warm">Warm</SelectItem>
+                                    <SelectItem value="cold">Cold</SelectItem>
+                                    <SelectItem value="lost">Lost</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <EditableFieldRow label="Source" isEditing={isEditing}
+                              value={<span data-testid="text-source" className="capitalize">{entity?.source?.replace(/_/g, ' ') || "-"}</span>}
+                              editComponent={<Input value={editData.source || ""} onChange={(e) => setEditData({ ...editData, source: e.target.value })} data-testid="input-source" />}
+                            />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Preferred Contact</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.communicationPreference || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, communicationPreference: e.target.value })
-                                }
-                                placeholder="email, phone, text"
-                                data-testid="input-communicationPreference"
-                              />
-                            ) : (
-                              <div className="text-sm capitalize" data-testid="text-communicationPreference">
-                                {entity?.communicationPreference || "Email"}
-                              </div>
-                            )}
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Communication" icon={<Mail className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Email" isEditing={isEditing}
+                              value={
+                                entity?.email ? (
+                                  <a href={`mailto:${entity.email}`} className="text-blue-600 hover:underline flex items-center gap-1" data-testid="text-email">
+                                    {entity.email} <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : <span data-testid="text-email">-</span>
+                              }
+                              editComponent={<Input type="email" value={editData.email || ""} onChange={(e) => setEditData({ ...editData, email: e.target.value })} data-testid="input-email" />}
+                            />
+                            <EditableFieldRow label="Phone" isEditing={isEditing}
+                              value={<span data-testid="text-phone">{entity?.phone || "-"}</span>}
+                              editComponent={<Input value={editData.phone || ""} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} data-testid="input-phone" />}
+                            />
+                            <EditableFieldRow label="Preferred Contact" isEditing={isEditing}
+                              value={<span data-testid="text-communicationPreference" className="capitalize">{entity?.communicationPreference || "Email"}</span>}
+                              editComponent={<Input value={editData.communicationPreference || ""} onChange={(e) => setEditData({ ...editData, communicationPreference: e.target.value })} placeholder="email, phone, text" data-testid="input-communicationPreference" />}
+                            />
                           </div>
-                        </div>
+                        </CollapsibleSection>
 
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Social Profiles</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>LinkedIn</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.linkedinUrl || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, linkedinUrl: e.target.value })
-                                }
-                                placeholder="https://linkedin.com/in/..."
-                                data-testid="input-linkedinUrl"
-                              />
-                            ) : (
-                              <div className="text-sm flex items-center gap-2" data-testid="text-linkedinUrl">
-                                {entity?.linkedinUrl ? (
-                                  <a
-                                    href={entity.linkedinUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline flex items-center gap-1"
-                                  >
+                        <CollapsibleSection title="Social Profiles" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="LinkedIn" isEditing={isEditing}
+                              value={
+                                entity?.linkedinUrl ? (
+                                  <a href={entity.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1" data-testid="text-linkedinUrl">
                                     View Profile <ExternalLink className="h-3 w-3" />
                                   </a>
-                                ) : "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Twitter/X</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.twitterHandle || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, twitterHandle: e.target.value })
-                                }
-                                placeholder="@handle"
-                                data-testid="input-twitterHandle"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-twitterHandle">
-                                {entity?.twitterHandle ? `@${entity.twitterHandle.replace('@', '')}` : "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Address</h4>
-
-                        <div className="space-y-2">
-                          <Label>Street Address</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.address || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, address: e.target.value })
+                                ) : <span data-testid="text-linkedinUrl">-</span>
                               }
-                              data-testid="input-address"
+                              editComponent={<Input value={editData.linkedinUrl || ""} onChange={(e) => setEditData({ ...editData, linkedinUrl: e.target.value })} placeholder="https://linkedin.com/in/..." data-testid="input-linkedinUrl" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-address">
-                              {entity?.address || "-"}
-                            </div>
-                          )}
-                        </div>
+                            <EditableFieldRow label="Twitter/X" isEditing={isEditing}
+                              value={<span data-testid="text-twitterHandle">{entity?.twitterHandle ? `@${entity.twitterHandle.replace('@', '')}` : "-"}</span>}
+                              editComponent={<Input value={editData.twitterHandle || ""} onChange={(e) => setEditData({ ...editData, twitterHandle: e.target.value })} placeholder="@handle" data-testid="input-twitterHandle" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
 
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label>City</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.city || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, city: e.target.value })
-                                }
-                                data-testid="input-city"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-city">
-                                {entity?.city || "-"}
-                              </div>
-                            )}
+                        <CollapsibleSection title="Address" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Street Address" isEditing={isEditing}
+                              value={<span data-testid="text-address">{entity?.address || "-"}</span>}
+                              editComponent={<Input value={editData.address || ""} onChange={(e) => setEditData({ ...editData, address: e.target.value })} data-testid="input-address" />}
+                            />
+                            <EditableFieldRow label="City" isEditing={isEditing}
+                              value={<span data-testid="text-city">{entity?.city || "-"}</span>}
+                              editComponent={<Input value={editData.city || ""} onChange={(e) => setEditData({ ...editData, city: e.target.value })} data-testid="input-city" />}
+                            />
+                            <EditableFieldRow label="State" isEditing={isEditing}
+                              value={<span data-testid="text-state">{entity?.state || "-"}</span>}
+                              editComponent={<Input value={editData.state || ""} onChange={(e) => setEditData({ ...editData, state: e.target.value })} data-testid="input-state" />}
+                            />
+                            <EditableFieldRow label="Zip" isEditing={isEditing}
+                              value={<span data-testid="text-zipCode">{entity?.zipCode || "-"}</span>}
+                              editComponent={<Input value={editData.zipCode || ""} onChange={(e) => setEditData({ ...editData, zipCode: e.target.value })} data-testid="input-zipCode" />}
+                            />
                           </div>
-                          <div className="space-y-2">
-                            <Label>State</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.state || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, state: e.target.value })
-                                }
-                                data-testid="input-state"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-state">
-                                {entity?.state || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Zip</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.zipCode || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, zipCode: e.target.value })
-                                }
-                                data-testid="input-zipCode"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-zipCode">
-                                {entity?.zipCode || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        </CollapsibleSection>
 
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Personal Dates</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Birthday</Label>
-                            {isEditing ? (
-                              <Input
-                                type="date"
-                                value={editData.birthday || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, birthday: e.target.value })
-                                }
-                                data-testid="input-birthday"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-birthday">
-                                {entity?.birthday ? new Date(entity.birthday).toLocaleDateString() : "-"}
-                              </div>
-                            )}
+                        <CollapsibleSection title="Personal Dates" icon={<Calendar className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Birthday" isEditing={isEditing}
+                              value={<span data-testid="text-birthday">{entity?.birthday ? new Date(entity.birthday).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.birthday || ""} onChange={(e) => setEditData({ ...editData, birthday: e.target.value })} data-testid="input-birthday" />}
+                            />
+                            <EditableFieldRow label="Anniversary" isEditing={isEditing}
+                              value={<span data-testid="text-anniversary">{entity?.anniversary ? new Date(entity.anniversary).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.anniversary || ""} onChange={(e) => setEditData({ ...editData, anniversary: e.target.value })} data-testid="input-anniversary" />}
+                            />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Anniversary</Label>
-                            {isEditing ? (
-                              <Input
-                                type="date"
-                                value={editData.anniversary || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, anniversary: e.target.value })
-                                }
-                                data-testid="input-anniversary"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-anniversary">
-                                {entity?.anniversary ? new Date(entity.anniversary).toLocaleDateString() : "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        </CollapsibleSection>
                       </div>
                     )}
 
-                    {/* Company Overview */}
+                    {/* Company Overview - Collapsible Sections */}
                     {entityType === "company" && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Company Name</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.name || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, name: e.target.value })
-                              }
-                              data-testid="input-name"
+                      <div className="space-y-3">
+                        <CollapsibleSection title="About" icon={<Building2 className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Company Name" isEditing={isEditing}
+                              value={<span data-testid="text-name">{entity?.name || "-"}</span>}
+                              editComponent={<Input value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} data-testid="input-name" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-name">
-                              {entity?.name || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Website</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.website || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, website: e.target.value })
-                              }
-                              data-testid="input-website"
+                            <EditableFieldRow label="Role" isEditing={isEditing}
+                              value={<span data-testid="text-industry">{formatRole(entity?.industry)}</span>}
+                              editComponent={<Input value={editData.industry || ""} onChange={(e) => setEditData({ ...editData, industry: e.target.value })} data-testid="input-industry" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-website">
-                              {entity?.website || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Role</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.industry || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, industry: e.target.value })
-                              }
-                              data-testid="input-industry"
+                            <EditableFieldRow label="Phone" isEditing={isEditing}
+                              value={<span data-testid="text-phone">{getCompanyPhone()}</span>}
+                              editComponent={<Input value={editData.phone || ""} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} data-testid="input-phone" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-industry">
-                              {formatRole(entity?.industry)}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Phone</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.phone || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, phone: e.target.value })
+                            <EditableFieldRow label="Website" isEditing={isEditing}
+                              value={
+                                entity?.website ? (
+                                  <a href={entity.website.startsWith('http') ? entity.website : `https://${entity.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1" data-testid="text-website">
+                                    {entity.website} <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : <span data-testid="text-website">-</span>
                               }
-                              data-testid="input-phone"
+                              editComponent={<Input value={editData.website || ""} onChange={(e) => setEditData({ ...editData, website: e.target.value })} data-testid="input-website" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-phone">
-                              {getCompanyPhone()}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Website</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.website || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, website: e.target.value })
-                              }
-                              data-testid="input-website"
+                            <EditableFieldRow label="Size Tier" isEditing={isEditing}
+                              value={<span data-testid="text-size" className="capitalize">{entity?.size || "-"}</span>}
+                              editComponent={<Input value={editData.size || ""} onChange={(e) => setEditData({ ...editData, size: e.target.value })} placeholder="startup, small, medium, large, enterprise" data-testid="input-size" />}
                             />
-                          ) : (
-                            <div className="text-sm flex items-center gap-2" data-testid="text-website">
-                              {entity?.website || "-"}
-                              {entity?.website && (
-                                <a
-                                  href={entity.website}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Financial & Business</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Annual Revenue</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.annualRevenue || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, annualRevenue: e.target.value })
-                                }
-                                placeholder="$0"
-                                data-testid="input-annualRevenue"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-annualRevenue">
-                                {entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}
-                              </div>
-                            )}
                           </div>
-                          <div className="space-y-2">
-                            <Label>Marina Spend</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.annualMarinaSpend || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, annualMarinaSpend: e.target.value })
-                                }
-                                placeholder="$0"
-                                data-testid="input-annualMarinaSpend"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-annualMarinaSpend">
-                                {entity?.annualMarinaSpend ? `$${Number(entity.annualMarinaSpend).toLocaleString()}` : "-"}
-                              </div>
-                            )}
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Financial & Business" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Annual Revenue" isEditing={isEditing}
+                              value={<span data-testid="text-annualRevenue">{entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.annualRevenue || ""} onChange={(e) => setEditData({ ...editData, annualRevenue: e.target.value })} placeholder="$0" data-testid="input-annualRevenue" />}
+                            />
+                            <EditableFieldRow label="Marina Spend" isEditing={isEditing}
+                              value={<span data-testid="text-annualMarinaSpend">{entity?.annualMarinaSpend ? `$${Number(entity.annualMarinaSpend).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.annualMarinaSpend || ""} onChange={(e) => setEditData({ ...editData, annualMarinaSpend: e.target.value })} placeholder="$0" data-testid="input-annualMarinaSpend" />}
+                            />
                           </div>
-                        </div>
+                        </CollapsibleSection>
 
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Acquisition & Portfolio</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Acquisition Interest</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.acquisitionInterest || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, acquisitionInterest: e.target.value })
-                                }
-                                placeholder="hot, warm, cold, none"
-                                data-testid="input-acquisitionInterest"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-acquisitionInterest">
-                                <Badge variant={
-                                  entity?.acquisitionInterest === 'hot' ? 'default' :
-                                  entity?.acquisitionInterest === 'warm' ? 'secondary' : 'outline'
-                                } className={
-                                  entity?.acquisitionInterest === 'hot' ? 'bg-red-500' :
-                                  entity?.acquisitionInterest === 'warm' ? 'bg-yellow-500' : ''
-                                }>
+                        <CollapsibleSection title="Acquisition & Portfolio" icon={<Target className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Acquisition Interest" isEditing={isEditing}
+                              value={
+                                <Badge variant={entity?.acquisitionInterest === 'hot' ? 'default' : entity?.acquisitionInterest === 'warm' ? 'secondary' : 'outline'}
+                                  className={`capitalize text-xs ${entity?.acquisitionInterest === 'hot' ? 'bg-red-500' : entity?.acquisitionInterest === 'warm' ? 'bg-yellow-500 text-black' : ''}`}
+                                  data-testid="text-acquisitionInterest">
                                   {entity?.acquisitionInterest || "Unknown"}
                                 </Badge>
-                              </div>
-                            )}
+                              }
+                              editComponent={<Input value={editData.acquisitionInterest || ""} onChange={(e) => setEditData({ ...editData, acquisitionInterest: e.target.value })} placeholder="hot, warm, cold, none" data-testid="input-acquisitionInterest" />}
+                            />
+                            <EditableFieldRow label="Portfolio Size" isEditing={isEditing}
+                              value={<span data-testid="text-portfolioCount">{entity?.portfolioCount ? `${entity.portfolioCount} properties` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.portfolioCount || ""} onChange={(e) => setEditData({ ...editData, portfolioCount: parseInt(e.target.value) || 0 })} placeholder="0" data-testid="input-portfolioCount" />}
+                            />
+                            <FieldRow label="Number of Marinas" value={<span data-testid="text-numberOfMarinas" className="font-medium">{companyProperties?.length || 0}</span>} />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Portfolio Size</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.portfolioCount || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, portfolioCount: parseInt(e.target.value) || 0 })
-                                }
-                                placeholder="0"
-                                data-testid="input-portfolioCount"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-portfolioCount">
-                                {entity?.portfolioCount ? `${entity.portfolioCount} properties` : "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Number of Marinas</Label>
-                            <div className="text-sm font-medium" data-testid="text-numberOfMarinas">
-                              {companyProperties?.length || 0}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Size Tier</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.size || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, size: e.target.value })
-                                }
-                                placeholder="startup, small, medium, large, enterprise"
-                                data-testid="input-size"
-                              />
-                            ) : (
-                              <div className="text-sm capitalize" data-testid="text-size">
-                                {entity?.size || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        </CollapsibleSection>
                       </div>
                     )}
 
-                    {/* Deal Overview */}
+                    {/* Deal Overview - Collapsible Sections */}
                     {entityType === "deal" && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Deal Name</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.name || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, name: e.target.value })
-                              }
-                              data-testid="input-name"
+                      <div className="space-y-3">
+                        <CollapsibleSection title="Deal Details" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Deal Name" isEditing={isEditing}
+                              value={<span data-testid="text-name">{entity?.name || "-"}</span>}
+                              editComponent={<Input value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} data-testid="input-name" />}
                             />
-                          ) : (
-                            <div className="text-sm" data-testid="text-name">
-                              {entity?.name || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Amount</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.amount || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, amount: parseFloat(e.target.value) })
-                                }
-                                data-testid="input-amount"
-                              />
-                            ) : (
-                              <div className="text-sm flex items-center gap-1" data-testid="text-amount">
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                {entity?.amount?.toLocaleString() || "0"}
-                              </div>
+                            <EditableFieldRow label="Amount" isEditing={isEditing}
+                              value={<span data-testid="text-amount" className="font-medium text-green-600">${entity?.amount?.toLocaleString() || "0"}</span>}
+                              editComponent={<Input type="number" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) })} data-testid="input-amount" />}
+                            />
+                            <EditableFieldRow label="Close Date" isEditing={isEditing}
+                              value={<span data-testid="text-closeDate">{entity?.closeDate ? new Date(entity.closeDate).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.closeDate ? new Date(editData.closeDate).toISOString().split('T')[0] : ""} onChange={(e) => setEditData({ ...editData, closeDate: new Date(e.target.value) })} data-testid="input-closeDate" />}
+                            />
+                            <FieldRow label="Status" value={
+                              <Badge variant={entity?.status === 'won' ? 'default' : entity?.status === 'lost' ? 'destructive' : 'secondary'} data-testid="badge-status" className="capitalize">
+                                {entity?.status || "open"}
+                              </Badge>
+                            } />
+                            {relatedContact && (
+                              <FieldRow label="Primary Contact" value={
+                                <span className="flex items-center gap-1" data-testid="text-contact">
+                                  <User className="h-3 w-3 text-muted-foreground" />
+                                  {relatedContact.firstName} {relatedContact.lastName}
+                                </span>
+                              } />
                             )}
                           </div>
+                        </CollapsibleSection>
+                      </div>
+                    )}
 
-                          <div className="space-y-2">
-                            <Label>Close Date</Label>
-                            {isEditing ? (
-                              <Input
-                                type="date"
-                                value={editData.closeDate ? new Date(editData.closeDate).toISOString().split('T')[0] : ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, closeDate: new Date(e.target.value) })
-                                }
-                                data-testid="input-closeDate"
-                              />
-                            ) : (
-                              <div className="text-sm flex items-center gap-1" data-testid="text-closeDate">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                {entity?.closeDate ? new Date(entity.closeDate).toLocaleDateString() : "-"}
-                              </div>
-                            )}
+                    {/* Property Overview - Collapsible Sections */}
+                    {entityType === "property" && (
+                      <div className="space-y-3">
+                        <CollapsibleSection title="About" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Property Name" isEditing={isEditing}
+                              value={<span data-testid="text-title">{entity?.title || entity?.name || "-"}</span>}
+                              editComponent={<Input value={editData.title || ""} onChange={(e) => setEditData({ ...editData, title: e.target.value })} data-testid="input-title" />}
+                            />
+                            <EditableFieldRow label="Type" isEditing={isEditing}
+                              value={<span data-testid="text-type" className="capitalize">{entity?.type?.replace('_', ' ') || "Marina"}</span>}
+                              editComponent={
+                                <Select value={editData.type || "marina"} onValueChange={(v) => setEditData({ ...editData, type: v })}>
+                                  <SelectTrigger data-testid="select-type"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="marina">Marina</SelectItem>
+                                    <SelectItem value="boat_yard">Boat Yard</SelectItem>
+                                    <SelectItem value="marina_yard">Marina & Yard</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <EditableFieldRow label="Status" isEditing={isEditing}
+                              value={<Badge variant="secondary" data-testid="badge-status" className="capitalize">{entity?.status?.replace('_', ' ') || "Available"}</Badge>}
+                              editComponent={
+                                <Select value={editData.status || "target"} onValueChange={(v) => setEditData({ ...editData, status: v })}>
+                                  <SelectTrigger data-testid="select-status"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="target">Target</SelectItem>
+                                    <SelectItem value="for_sale">For Sale</SelectItem>
+                                    <SelectItem value="under_loi">Under LOI</SelectItem>
+                                    <SelectItem value="under_contract">Under Contract</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <FieldRow label="Owner" value={
+                              propertyContacts.length > 0 ? (
+                                <span className="text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                  onClick={() => {
+                                    const ownerContact = propertyContacts[0]?.contact;
+                                    if (ownerContact) { setLocation(`/crm/contacts/${ownerContact.id}`); onOpenChange(false); }
+                                  }}
+                                  data-testid="link-owner-contact">
+                                  <User className="h-3 w-3" />
+                                  {propertyContacts[0]?.contact?.firstName} {propertyContacts[0]?.contact?.lastName}
+                                </span>
+                              ) : <span className="text-muted-foreground">No owner assigned</span>
+                            } />
+                            <FieldRow label="Company" value={
+                              propertyCompanies.length > 0 ? (
+                                <span className="text-primary hover:underline cursor-pointer flex items-center gap-1"
+                                  onClick={() => {
+                                    const linkedCompany = propertyCompanies[0]?.company;
+                                    if (linkedCompany) { setLocation(`/crm/companies/${linkedCompany.id}`); onOpenChange(false); }
+                                  }}
+                                  data-testid="link-owner-company">
+                                  <Building2 className="h-3 w-3" />
+                                  {propertyCompanies[0]?.company?.name}
+                                </span>
+                              ) : <span className="text-muted-foreground">No company assigned</span>
+                            } />
+                            <EditableFieldRow label="Description" isEditing={isEditing}
+                              value={<span data-testid="text-description" className="text-xs">{entity?.description || "-"}</span>}
+                              editComponent={<Textarea value={editData.description || ""} onChange={(e) => setEditData({ ...editData, description: e.target.value })} rows={3} data-testid="input-description" />}
+                            />
                           </div>
-                        </div>
+                        </CollapsibleSection>
 
-                        <div className="space-y-2">
-                          <Label>Status</Label>
-                          <Badge
-                            variant={entity?.status === 'won' ? 'default' : entity?.status === 'lost' ? 'destructive' : 'secondary'}
-                            data-testid="badge-status"
-                          >
-                            {entity?.status || "open"}
-                          </Badge>
-                        </div>
+                        <CollapsibleSection title="Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Address" isEditing={isEditing}
+                              value={<span data-testid="text-address">{entity?.address || "-"}</span>}
+                              editComponent={<Input value={editData.address || ""} onChange={(e) => setEditData({ ...editData, address: e.target.value })} data-testid="input-address" />}
+                            />
+                            <EditableFieldRow label="City" isEditing={isEditing}
+                              value={<span data-testid="text-city">{entity?.city || "-"}</span>}
+                              editComponent={<Input value={editData.city || ""} onChange={(e) => setEditData({ ...editData, city: e.target.value })} data-testid="input-city" />}
+                            />
+                            <EditableFieldRow label="State" isEditing={isEditing}
+                              value={<span data-testid="text-state">{entity?.state || "-"}</span>}
+                              editComponent={<Input value={editData.state || ""} onChange={(e) => setEditData({ ...editData, state: e.target.value })} data-testid="input-state" />}
+                            />
+                            <EditableFieldRow label="Zip" isEditing={isEditing}
+                              value={<span data-testid="text-zipCode">{entity?.zipCode || "-"}</span>}
+                              editComponent={<Input value={editData.zipCode || ""} onChange={(e) => setEditData({ ...editData, zipCode: e.target.value })} data-testid="input-zipCode" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
 
-                        {relatedContact && (
-                          <div className="space-y-2">
-                            <Label>Primary Contact</Label>
-                            <div className="text-sm flex items-center gap-2" data-testid="text-contact">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              {relatedContact.firstName} {relatedContact.lastName}
-                            </div>
+                        <CollapsibleSection title="Marina Capacity" icon={<Ship className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Wet Slips" isEditing={isEditing}
+                              value={<span data-testid="text-wetSlips">{entity?.wetSlips || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.wetSlips || ""} onChange={(e) => setEditData({ ...editData, wetSlips: parseInt(e.target.value) || null })} data-testid="input-wetSlips" />}
+                            />
+                            <EditableFieldRow label="Dry Slips" isEditing={isEditing}
+                              value={<span data-testid="text-drySlips">{entity?.drySlips || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.drySlips || ""} onChange={(e) => setEditData({ ...editData, drySlips: parseInt(e.target.value) || null })} data-testid="input-drySlips" />}
+                            />
+                            <EditableFieldRow label="Moorings" isEditing={isEditing}
+                              value={<span data-testid="text-moorings">{entity?.moorings || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.moorings || ""} onChange={(e) => setEditData({ ...editData, moorings: parseInt(e.target.value) || null })} data-testid="input-moorings" />}
+                            />
+                            <EditableFieldRow label="Total Capacity" isEditing={isEditing}
+                              value={<span data-testid="text-totalCapacity">{entity?.totalCapacity || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.totalCapacity || ""} onChange={(e) => setEditData({ ...editData, totalCapacity: parseInt(e.target.value) || null })} data-testid="input-totalCapacity" />}
+                            />
+                            <EditableFieldRow label="Occupancy Rate" isEditing={isEditing}
+                              value={<span data-testid="text-occupancyRate">{entity?.occupancyRate ? `${entity.occupancyRate}%` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.occupancyRate || ""} onChange={(e) => setEditData({ ...editData, occupancyRate: e.target.value })} placeholder="0-100%" data-testid="input-occupancyRate" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Amenities" icon={<Hash className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}
+                          badge={entity?.amenities?.length ? <Badge variant="outline" className="ml-1 text-xs">{entity.amenities.length}</Badge> : undefined}>
+                          <div data-testid="text-amenities">
+                            {entity?.amenities && Array.isArray(entity.amenities) && entity.amenities.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {entity.amenities.map((amenity: string, idx: number) => (
+                                  <Badge key={idx} variant="outline" className="capitalize text-xs">{amenity.replace(/_/g, ' ')}</Badge>
+                                ))}
+                              </div>
+                            ) : <span className="text-sm text-muted-foreground">No amenities listed</span>}
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Financials" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Listing Price" isEditing={isEditing}
+                              value={<span data-testid="text-listingPrice" className="font-medium text-green-600">{entity?.listingPrice ? `$${Number(entity.listingPrice).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.listingPrice || ""} onChange={(e) => setEditData({ ...editData, listingPrice: e.target.value })} data-testid="input-listingPrice" />}
+                            />
+                            <EditableFieldRow label="Annual Revenue" isEditing={isEditing}
+                              value={<span data-testid="text-annualRevenue">{entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.annualRevenue || ""} onChange={(e) => setEditData({ ...editData, annualRevenue: e.target.value })} data-testid="input-annualRevenue" />}
+                            />
+                            <EditableFieldRow label="NOI Estimate" isEditing={isEditing}
+                              value={<span data-testid="text-noiEstimate">{entity?.noiEstimate ? `$${Number(entity.noiEstimate).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.noiEstimate || ""} onChange={(e) => setEditData({ ...editData, noiEstimate: e.target.value })} data-testid="input-noiEstimate" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+                      </div>
+                    )}
+
+                    {/* Activity Summary */}
+                    <div className="border rounded-lg bg-muted/30 p-3">
+                      <div className="text-xs text-muted-foreground space-y-1.5">
+                        {entity?.createdAt && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3" />
+                            Created {formatDistanceToNow(new Date(entity.createdAt))} ago
+                          </div>
+                        )}
+                        {entity?.updatedAt && (
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-3 w-3" />
+                            Last updated {formatDistanceToNow(new Date(entity.updatedAt))} ago
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {/* Property Overview */}
-                    {entityType === "property" && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Property Name</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.title || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, title: e.target.value })
-                              }
-                              data-testid="input-title"
-                            />
-                          ) : (
-                            <div className="text-sm" data-testid="text-title">
-                              {entity?.title || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Owner & Company Section */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Owner (Primary Contact)</Label>
-                            {propertyContacts.length > 0 ? (
-                              <div 
-                                className="text-sm text-primary hover:underline cursor-pointer flex items-center gap-2"
-                                onClick={() => {
-                                  const ownerContact = propertyContacts[0]?.contact;
-                                  if (ownerContact) {
-                                    setLocation(`/crm/contacts/${ownerContact.id}`);
-                                    onOpenChange(false);
-                                  }
-                                }}
-                                data-testid="link-owner-contact"
-                              >
-                                <User className="h-4 w-4" />
-                                {propertyContacts[0]?.contact?.firstName} {propertyContacts[0]?.contact?.lastName}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground">No owner assigned</div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Company</Label>
-                            {propertyCompanies.length > 0 ? (
-                              <div 
-                                className="text-sm text-primary hover:underline cursor-pointer flex items-center gap-2"
-                                onClick={() => {
-                                  const linkedCompany = propertyCompanies[0]?.company;
-                                  if (linkedCompany) {
-                                    setLocation(`/crm/companies/${linkedCompany.id}`);
-                                    onOpenChange(false);
-                                  }
-                                }}
-                                data-testid="link-owner-company"
-                              >
-                                <Building2 className="h-4 w-4" />
-                                {propertyCompanies[0]?.company?.name}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground">No company assigned</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Type</Label>
-                            {isEditing ? (
-                              <Select
-                                value={editData.type || "marina"}
-                                onValueChange={(value) =>
-                                  setEditData({ ...editData, type: value })
-                                }
-                              >
-                                <SelectTrigger data-testid="select-type">
-                                  <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="marina">Marina</SelectItem>
-                                  <SelectItem value="boat_yard">Boat Yard</SelectItem>
-                                  <SelectItem value="marina_yard">Marina & Yard</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <div className="text-sm capitalize" data-testid="text-type">
-                                {entity?.type?.replace('_', ' ') || "Marina"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Status</Label>
-                            {isEditing ? (
-                              <Select
-                                value={editData.status || "target"}
-                                onValueChange={(value) =>
-                                  setEditData({ ...editData, status: value })
-                                }
-                              >
-                                <SelectTrigger data-testid="select-status">
-                                  <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="target">Target</SelectItem>
-                                  <SelectItem value="for_sale">For Sale</SelectItem>
-                                  <SelectItem value="under_loi">Under LOI</SelectItem>
-                                  <SelectItem value="under_contract">Under Contract</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge variant="secondary" data-testid="badge-status">
-                                {entity?.status?.replace('_', ' ') || "Available"}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Location</h4>
-
-                        <div className="space-y-2">
-                          <Label>Address</Label>
-                          {isEditing ? (
-                            <Input
-                              value={editData.address || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, address: e.target.value })
-                              }
-                              data-testid="input-address"
-                            />
-                          ) : (
-                            <div className="text-sm" data-testid="text-address">
-                              {entity?.address || "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label>City</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.city || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, city: e.target.value })
-                                }
-                                data-testid="input-city"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-city">
-                                {entity?.city || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>State</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.state || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, state: e.target.value })
-                                }
-                                data-testid="input-state"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-state">
-                                {entity?.state || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Zip</Label>
-                            {isEditing ? (
-                              <Input
-                                value={editData.zipCode || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, zipCode: e.target.value })
-                                }
-                                data-testid="input-zipCode"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-zipCode">
-                                {entity?.zipCode || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Marina Capacity</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Wet Slips</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.wetSlips || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, wetSlips: parseInt(e.target.value) || null })
-                                }
-                                data-testid="input-wetSlips"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-wetSlips">
-                                {entity?.wetSlips || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Dry Slips</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.drySlips || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, drySlips: parseInt(e.target.value) || null })
-                                }
-                                data-testid="input-drySlips"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-drySlips">
-                                {entity?.drySlips || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Moorings</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.moorings || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, moorings: parseInt(e.target.value) || null })
-                                }
-                                data-testid="input-moorings"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-moorings">
-                                {entity?.moorings || "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Total Capacity</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.totalCapacity || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, totalCapacity: parseInt(e.target.value) || null })
-                                }
-                                data-testid="input-totalCapacity"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-totalCapacity">
-                                {entity?.totalCapacity || "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Occupancy Rate</Label>
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              value={editData.occupancyRate || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, occupancyRate: e.target.value })
-                              }
-                              placeholder="0-100%"
-                              data-testid="input-occupancyRate"
-                            />
-                          ) : (
-                            <div className="text-sm" data-testid="text-occupancyRate">
-                              {entity?.occupancyRate ? `${entity.occupancyRate}%` : "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Amenities</h4>
-
-                        <div className="text-sm" data-testid="text-amenities">
-                          {entity?.amenities && Array.isArray(entity.amenities) && entity.amenities.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {entity.amenities.map((amenity: string, idx: number) => (
-                                <Badge key={idx} variant="outline" className="capitalize">
-                                  {amenity.replace(/_/g, ' ')}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : "-"}
-                        </div>
-
-                        <Separator className="my-4" />
-                        <h4 className="text-sm font-medium text-muted-foreground mb-3">Financials</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Listing Price</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.listingPrice || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, listingPrice: e.target.value })
-                                }
-                                data-testid="input-listingPrice"
-                              />
-                            ) : (
-                              <div className="text-sm font-medium text-green-600" data-testid="text-listingPrice">
-                                {entity?.listingPrice ? `$${Number(entity.listingPrice).toLocaleString()}` : "-"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Annual Revenue</Label>
-                            {isEditing ? (
-                              <Input
-                                type="number"
-                                value={editData.annualRevenue || ""}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, annualRevenue: e.target.value })
-                                }
-                                data-testid="input-annualRevenue"
-                              />
-                            ) : (
-                              <div className="text-sm" data-testid="text-annualRevenue">
-                                {entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>NOI Estimate</Label>
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              value={editData.noiEstimate || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, noiEstimate: e.target.value })
-                              }
-                              data-testid="input-noiEstimate"
-                            />
-                          ) : (
-                            <div className="text-sm" data-testid="text-noiEstimate">
-                              {entity?.noiEstimate ? `$${Number(entity.noiEstimate).toLocaleString()}` : "-"}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          {isEditing ? (
-                            <Textarea
-                              value={editData.description || ""}
-                              onChange={(e) =>
-                                setEditData({ ...editData, description: e.target.value })
-                              }
-                              rows={3}
-                              data-testid="input-description"
-                            />
-                          ) : (
-                            <div className="text-sm" data-testid="text-description">
-                              {entity?.description || "-"}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <Separator className="my-4" />
-
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      {entity?.createdAt && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3 w-3" />
-                          Created {formatDistanceToNow(new Date(entity.createdAt))} ago
-                        </div>
-                      )}
-                      {entity?.updatedAt && (
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3 w-3" />
-                          Updated {formatDistanceToNow(new Date(entity.updatedAt))} ago
-                        </div>
-                      )}
                     </div>
                   </>
                 )}

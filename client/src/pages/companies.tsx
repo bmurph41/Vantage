@@ -407,6 +407,8 @@ export default function Companies() {
     {
       key: 'company',
       header: 'Company',
+      sortable: true,
+      sortValue: (company) => company.name.toLowerCase(),
       render: (company) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -432,6 +434,8 @@ export default function Companies() {
     {
       key: 'role',
       header: 'Role',
+      sortable: true,
+      sortValue: (company) => company.industry || null,
       render: (company) => company.industry ? (
         <Badge className={industryColors[company.industry] || industryColors[getIndustryCategory(company.industry)] || 'bg-gray-100 text-gray-800'}>
           {formatRole(company.industry)}
@@ -441,6 +445,8 @@ export default function Companies() {
     {
       key: 'size',
       header: 'Size',
+      sortable: true,
+      sortValue: (company) => company.size || null,
       render: (company) => company.size ? (
         <Badge className={sizeColors[getSizeCategory(company.size)] || 'bg-gray-100 text-gray-800'}>
           {company.size}
@@ -450,6 +456,8 @@ export default function Companies() {
     {
       key: 'marinas',
       header: '# Marinas',
+      sortable: true,
+      sortValue: (company) => company.portfolioCount || 0,
       render: (company) => (
         <span className="text-sm font-medium text-gray-900">{company.portfolioCount || 0}</span>
       )
@@ -457,6 +465,8 @@ export default function Companies() {
     {
       key: 'phone',
       header: 'Phone',
+      sortable: true,
+      sortValue: (company) => company.phone || null,
       render: (company) => company.phone ? (
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <Phone className="w-3.5 h-3.5 text-gray-400" />

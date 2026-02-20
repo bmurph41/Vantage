@@ -3,14 +3,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, AlertTriangle, User, Mail, Phone, Calendar, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -228,141 +220,120 @@ export default function PendingContacts() {
               Accept to create a new Contact record, or Remove if this is a duplicate
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40px]">
-                    <Checkbox
-                      checked={selectedIds.size === pendingItems.length && pendingItems.length > 0}
-                      onCheckedChange={toggleAll}
-                    />
-                  </TableHead>
-                  <TableHead>Full Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-center">Potential Duplicates</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingItems
-                  .map((pending) => (
-                    <TableRow
-                      key={pending.id}
-                      className={`cursor-pointer hover:bg-muted/50 ${selectedIds.has(pending.id) ? 'bg-muted/30' : ''}`}
-                      data-testid={`row-pending-contact-${pending.id}`}
-                      onClick={() => {
-                        setSelectedPending(pending);
-                        setShowDetailDialog(true);
-                      }}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(pending.id)}
-                          onCheckedChange={() => toggleSelection(pending.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2" data-testid={`text-contact-name-${pending.id}`}>
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          {pending.fullName}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground" data-testid={`text-contact-email-${pending.id}`}>
-                          {pending.email ? (
-                            <>
-                              <Mail className="h-3 w-3" />
-                              {pending.email}
-                            </>
-                          ) : (
-                            <span className="text-xs">N/A</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground" data-testid={`text-contact-phone-${pending.id}`}>
-                          {pending.phone ? (
-                            <>
-                              <Phone className="h-3 w-3" />
-                              {pending.phone}
-                            </>
-                          ) : (
-                            <span className="text-xs">N/A</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm" data-testid={`text-contact-source-${pending.id}`}>
-                          <FileText className="h-3 w-3 text-muted-foreground" />
-                          {pending.sourceType === 'sales_comp' && pending.sourceId ? (
-                            <a
-                              href={`/analysis/sales-comps`}
-                              className="text-blue-600 hover:underline text-xs"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Sales Comp
-                            </a>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              {pending.sourceType === 'dd_project' ? 'DD Project' : 
-                               pending.sourceType === 'sales_comp' ? 'Sales Comp' :
-                               pending.sourceType}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground" data-testid={`text-contact-created-${pending.id}`}>
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30">
+              <Checkbox
+                checked={selectedIds.size === pendingItems.length && pendingItems.length > 0}
+                onCheckedChange={toggleAll}
+              />
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+              </span>
+            </div>
+            <div className="divide-y">
+              {pendingItems.map((pending) => {
+                const hasDuplicates = pending.suggestedDuplicates?.length > 0;
+                const initials = `${(pending.firstName || '')[0] || ''}${(pending.lastName || '')[0] || ''}`.toUpperCase() || '?';
+                return (
+                  <div
+                    key={pending.id}
+                    className={`flex items-start gap-4 px-4 py-3.5 cursor-pointer transition-colors hover:bg-muted/40 ${selectedIds.has(pending.id) ? 'bg-blue-50/60 dark:bg-blue-950/30' : ''} ${hasDuplicates ? 'border-l-2 border-l-amber-400' : ''}`}
+                    data-testid={`row-pending-contact-${pending.id}`}
+                    onClick={() => {
+                      setSelectedPending(pending);
+                      setShowDetailDialog(true);
+                    }}
+                  >
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(pending.id)}
+                        onCheckedChange={() => toggleSelection(pending.id)}
+                      />
+                    </div>
+
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                      {initials}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold text-sm truncate" data-testid={`text-contact-name-${pending.id}`}>
+                          {pending.fullName || `${pending.firstName || ''} ${pending.lastName || ''}`.trim() || 'Unnamed'}
+                        </span>
+                        {pending.jobTitle && (
+                          <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                            {pending.jobTitle}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {pending.email && (
+                          <span className="flex items-center gap-1" data-testid={`text-contact-email-${pending.id}`}>
+                            <Mail className="h-3 w-3" />
+                            {pending.email}
+                          </span>
+                        )}
+                        {pending.phone && (
+                          <span className="flex items-center gap-1" data-testid={`text-contact-phone-${pending.id}`}>
+                            <Phone className="h-3 w-3" />
+                            {pending.phone}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1" data-testid={`text-contact-created-${pending.id}`}>
                           <Calendar className="h-3 w-3" />
                           {formatDate(pending.createdAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {pending.suggestedDuplicates?.length > 0 ? (
-                          <Badge variant="destructive" className="gap-1" data-testid={`badge-duplicates-${pending.id}`}>
-                            <AlertTriangle className="h-3 w-3" />
-                            {pending.suggestedDuplicates.length} Found
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Badge variant="outline" className="text-[10px] h-5" data-testid={`text-contact-source-${pending.id}`}>
+                          <FileText className="h-2.5 w-2.5 mr-1" />
+                          {pending.sourceType === 'dd_project' ? 'DD Project' : 
+                           pending.sourceType === 'sales_comp' ? 'Sales Comp' :
+                           pending.sourceType || 'Import'}
+                        </Badge>
+                        {hasDuplicates && (
+                          <Badge variant="destructive" className="text-[10px] h-5 gap-0.5" data-testid={`badge-duplicates-${pending.id}`}>
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            {pending.suggestedDuplicates.length} Duplicate{pending.suggestedDuplicates.length > 1 ? 's' : ''}
                           </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">None</span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReject(pending.id);
-                            }}
-                            disabled={rejectMutation.isPending}
-                            data-testid={`button-reject-contact-${pending.id}`}
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Remove
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAccept(pending);
-                            }}
-                            data-testid={`button-accept-contact-${pending.id}`}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Accept
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReject(pending.id);
+                        }}
+                        disabled={rejectMutation.isPending}
+                        data-testid={`button-reject-contact-${pending.id}`}
+                        title="Remove"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAccept(pending);
+                        }}
+                        data-testid={`button-accept-contact-${pending.id}`}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Accept
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       )}

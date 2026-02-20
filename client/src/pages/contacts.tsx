@@ -273,6 +273,8 @@ export default function Contacts() {
     {
       key: 'contact',
       header: 'Contact',
+      sortable: true,
+      sortValue: (contact) => `${contact.firstName} ${contact.lastName}`.toLowerCase(),
       render: (contact) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
@@ -295,6 +297,8 @@ export default function Contacts() {
     {
       key: 'email',
       header: 'Email',
+      sortable: true,
+      sortValue: (contact) => contact.email || null,
       render: (contact) => (
         <div className="flex items-center gap-1.5 text-sm text-gray-600">
           <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -305,6 +309,8 @@ export default function Contacts() {
     {
       key: 'phone',
       header: 'Phone',
+      sortable: true,
+      sortValue: (contact) => contact.phone || null,
       render: (contact) => (
         contact.phone ? (
           <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -317,6 +323,8 @@ export default function Contacts() {
     {
       key: 'company',
       header: 'Company',
+      sortable: true,
+      sortValue: (contact) => contact.company?.name || null,
       render: (contact) => (
         contact.company ? (
           <button
@@ -335,6 +343,8 @@ export default function Contacts() {
     {
       key: 'type',
       header: 'Type',
+      sortable: true,
+      sortValue: (contact) => contact.contactTag || null,
       render: (contact) => (
         <div className="flex flex-wrap gap-1">
           {contact.contactTag && (
