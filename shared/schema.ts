@@ -20198,6 +20198,7 @@ export const modelingPnlOverrides = pgTable("modeling_pnl_overrides", {
   category: text("category"),
   overrideType: pnlOverrideTypeEnum("override_type").notNull(),
   overrideDepartment: text("override_department"),
+  overrideCategory: text("override_category"),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
