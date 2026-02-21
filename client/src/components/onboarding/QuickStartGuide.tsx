@@ -64,12 +64,12 @@ const QUICK_START_STEPS: QuickStartStep[] = [
     category: "essential",
   },
   {
-    id: "explore-docktalk",
-    title: "Explore DockTalk Intelligence",
+    id: "explore-docket",
+    title: "Explore Docket Intelligence",
     description: "Stay current with marina M&A news, trends, and market alerts",
     icon: Radio,
-    href: "/analysis/docktalk",
-    tourId: "docktalk",
+    href: "/analysis/docket",
+    tourId: "docket",
     category: "explore",
   },
   {

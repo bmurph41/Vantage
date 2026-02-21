@@ -15,7 +15,7 @@ export type Permission =
   | 'view:fuel' | 'edit:fuel'
   | 'view:shipstore' | 'edit:shipstore'
   | 'view:vdr' | 'edit:vdr' | 'manage:vdr'
-  | 'view:docktalk' | 'manage:docktalk'
+  | 'view:docket' | 'manage:docket'
   | 'view:analytics' | 'view:reports' | 'create:reports'
   | 'manage:users' | 'manage:settings'
   | 'view:audit' | 'manage:integrations';
@@ -29,7 +29,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:rentroll', 'edit:rentroll', 'view:salescomps', 'edit:salescomps',
     'view:fuel', 'edit:fuel', 'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr', 'manage:vdr',
-    'view:docktalk', 'manage:docktalk',
+    'view:docket', 'manage:docket',
     'view:analytics', 'view:reports', 'create:reports',
     'manage:users', 'manage:settings', 'view:audit', 'manage:integrations',
   ],
@@ -41,7 +41,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:rentroll', 'edit:rentroll', 'view:salescomps', 'edit:salescomps',
     'view:fuel', 'edit:fuel', 'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr', 'manage:vdr',
-    'view:docktalk', 'manage:docktalk',
+    'view:docket', 'manage:docket',
     'view:analytics', 'view:reports', 'create:reports',
     'manage:users', 'manage:settings', 'view:audit',
   ],
@@ -56,7 +56,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:deals', 'edit:deals',
     'upload:files', 'view:files', 'download:files',
     'view:modeling', 'view:rentroll', 'view:salescomps', 'edit:salescomps',
-    'view:vdr', 'view:analytics', 'view:reports', 'create:reports', 'view:docktalk',
+    'view:vdr', 'view:analytics', 'view:reports', 'create:reports', 'view:docket',
   ],
   appraiser: [
     'view:financials', 'view:files', 'download:files',
@@ -71,13 +71,13 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:rentroll', 'edit:rentroll', 'view:salescomps', 'edit:salescomps',
     'view:fuel', 'edit:fuel', 'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr',
-    'view:analytics', 'view:reports', 'create:reports', 'view:docktalk',
+    'view:analytics', 'view:reports', 'create:reports', 'view:docket',
   ],
   viewer: [
     'view:financials', 'view:crm', 'view:deals', 'view:files',
     'view:modeling', 'view:rentroll', 'view:salescomps',
     'view:fuel', 'view:shipstore', 'view:vdr',
-    'view:analytics', 'view:reports', 'view:docktalk',
+    'view:analytics', 'view:reports', 'view:docket',
   ],
   auditor: [
     'view:financials', 'view:deals', 'view:files', 'download:files',

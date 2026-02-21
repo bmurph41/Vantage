@@ -44,7 +44,7 @@ This document lists all TODO and FIXME comments found in the codebase.
 |------|---------|
 | 96 | `TODO: Fetch CRM contacts and Rent Roll tenants` |
 
-### server/docktalk/storage.ts
+### server/docket/storage.ts
 | Line | Comment |
 |------|---------|
 | 20 | `TODO: When implementing user-scoped visibility:` |

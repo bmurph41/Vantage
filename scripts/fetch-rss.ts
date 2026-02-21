@@ -1,4 +1,4 @@
-import { fetchRssFeeds } from "../server/docktalk/services/rss-fetcher";
+import { fetchRssFeeds } from "../server/docket/services/rss-fetcher";
 
 async function main() {
   console.log("Fetching articles from all active RSS sources...");

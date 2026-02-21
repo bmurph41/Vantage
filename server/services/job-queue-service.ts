@@ -6,8 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type JobType = 
   | 'analytics_update'
-  | 'docktalk_refresh'
-  | 'docktalk_sentiment'
+  | 'docket_refresh'
+  | 'docket_sentiment'
   | 'document_parse'
   | 'portfolio_rollup'
   | 'benchmark_comparison'

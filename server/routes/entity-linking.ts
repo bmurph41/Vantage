@@ -5,7 +5,7 @@
  * - Link contacts/companies to deals
  * - Link deals to DD projects
  * - Link DD projects to modeling projects
- * - Link DockTalk articles to CRM entities
+ * - Link Docket articles to CRM entities
  * 
  * These endpoints provide a consistent interface for entity relationship
  * management across the entire platform.
@@ -25,10 +25,10 @@ import {
   modelingProjects,
 } from "@shared/schema";
 import {
-  articles as docktalkArticles,
+  articles as docketArticles,
   articleCrmLinks,
-  docktalkCrmEntityLinkTypeEnum,
-} from "@shared/docktalk-schema";
+  docketCrmEntityLinkTypeEnum,
+} from "@shared/docket-schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -287,13 +287,13 @@ export function registerEntityLinkingRoutes(app: Express) {
   });
 
   // -------------------------------------------------------------------------
-  // DockTalk Article → CRM Entity Linking
+  // Docket Article → CRM Entity Linking
   // -------------------------------------------------------------------------
 
   /**
-   * Link a DockTalk article to a CRM entity
+   * Link a Docket article to a CRM entity
    */
-  app.post("/api/entity-links/docktalk-articles", async (req: any, res: Response) => {
+  app.post("/api/entity-links/docket-articles", async (req: any, res: Response) => {
     try {
       const body = linkArticleToCrmSchema.parse(req.body);
       const orgId = req.user?.organizationId || 'org-1';
@@ -329,7 +329,7 @@ export function registerEntityLinkingRoutes(app: Express) {
   /**
    * Bulk link an article to multiple CRM entities
    */
-  app.post("/api/entity-links/docktalk-articles/bulk", async (req: any, res: Response) => {
+  app.post("/api/entity-links/docket-articles/bulk", async (req: any, res: Response) => {
     try {
       const body = bulkLinkArticlesSchema.parse(req.body);
       const orgId = req.user?.organizationId || 'org-1';
@@ -362,7 +362,7 @@ export function registerEntityLinkingRoutes(app: Express) {
   /**
    * Get all CRM links for an article
    */
-  app.get("/api/entity-links/docktalk-articles/:articleId", async (req: any, res: Response) => {
+  app.get("/api/entity-links/docket-articles/:articleId", async (req: any, res: Response) => {
     try {
       const articleId = parseInt(req.params.articleId);
       if (isNaN(articleId)) {
@@ -421,10 +421,10 @@ export function registerEntityLinkingRoutes(app: Express) {
       
       const links = await db.select({
         link: articleCrmLinks,
-        article: docktalkArticles,
+        article: docketArticles,
       })
       .from(articleCrmLinks)
-      .leftJoin(docktalkArticles, eq(articleCrmLinks.articleId, docktalkArticles.id))
+      .leftJoin(docketArticles, eq(articleCrmLinks.articleId, docketArticles.id))
       .where(and(
         eq(articleCrmLinks.entityType, entityType as any),
         eq(articleCrmLinks.entityId, entityId)
@@ -443,7 +443,7 @@ export function registerEntityLinkingRoutes(app: Express) {
   /**
    * Unlink an article from a CRM entity
    */
-  app.delete("/api/entity-links/docktalk-articles/:articleId/:entityType/:entityId", async (req: any, res: Response) => {
+  app.delete("/api/entity-links/docket-articles/:articleId/:entityType/:entityId", async (req: any, res: Response) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const { entityType, entityId } = req.params;
@@ -489,9 +489,9 @@ export function registerEntityLinkingRoutes(app: Express) {
           related.deals = dealLinks.map(d => d.deal).filter(Boolean);
           
           // Get articles linked to this contact
-          const articleLinks = await db.select({ article: docktalkArticles })
+          const articleLinks = await db.select({ article: docketArticles })
             .from(articleCrmLinks)
-            .leftJoin(docktalkArticles, eq(articleCrmLinks.articleId, docktalkArticles.id))
+            .leftJoin(docketArticles, eq(articleCrmLinks.articleId, docketArticles.id))
             .where(and(
               eq(articleCrmLinks.entityType, 'contact'),
               eq(articleCrmLinks.entityId, entityId)
@@ -514,9 +514,9 @@ export function registerEntityLinkingRoutes(app: Express) {
           related.contacts = contacts;
           
           // Get articles linked to this company
-          const articleLinks = await db.select({ article: docktalkArticles })
+          const articleLinks = await db.select({ article: docketArticles })
             .from(articleCrmLinks)
-            .leftJoin(docktalkArticles, eq(articleCrmLinks.articleId, docktalkArticles.id))
+            .leftJoin(docketArticles, eq(articleCrmLinks.articleId, docketArticles.id))
             .where(and(
               eq(articleCrmLinks.entityType, 'company'),
               eq(articleCrmLinks.entityId, entityId)
@@ -532,9 +532,9 @@ export function registerEntityLinkingRoutes(app: Express) {
           related.modelingProject = deal.modelingProject ? [deal.modelingProject] : [];
           
           // Get articles linked to this deal
-          const articleLinks = await db.select({ article: docktalkArticles })
+          const articleLinks = await db.select({ article: docketArticles })
             .from(articleCrmLinks)
-            .leftJoin(docktalkArticles, eq(articleCrmLinks.articleId, docktalkArticles.id))
+            .leftJoin(docketArticles, eq(articleCrmLinks.articleId, docketArticles.id))
             .where(and(
               eq(articleCrmLinks.entityType, 'deal'),
               eq(articleCrmLinks.entityId, entityId)
@@ -559,9 +559,9 @@ export function registerEntityLinkingRoutes(app: Express) {
           }
           
           // Get articles linked to this property
-          const articleLinks = await db.select({ article: docktalkArticles })
+          const articleLinks = await db.select({ article: docketArticles })
             .from(articleCrmLinks)
-            .leftJoin(docktalkArticles, eq(articleCrmLinks.articleId, docktalkArticles.id))
+            .leftJoin(docketArticles, eq(articleCrmLinks.articleId, docketArticles.id))
             .where(and(
               eq(articleCrmLinks.entityType, 'property'),
               eq(articleCrmLinks.entityId, entityId)

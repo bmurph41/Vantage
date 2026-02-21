@@ -102,7 +102,7 @@ const allModules: ModuleDefinition[] = [
   
   // Intelligence Modules
   {
-    id: 'docktalk-feed',
+    id: 'docket-feed',
     title: 'The Docket Intelligence',
     description: 'Monitor marina industry news and M&A activity',
     icon: Newspaper,

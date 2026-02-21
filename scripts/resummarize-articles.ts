@@ -1,4 +1,4 @@
-import { resummarizeExistingArticles } from "../server/docktalk/services/backfill";
+import { resummarizeExistingArticles } from "../server/docket/services/backfill";
 
 async function main() {
   console.log("Starting article re-summarization with new action-verb format...");

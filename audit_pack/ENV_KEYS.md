@@ -132,8 +132,8 @@ This document lists all environment variable keys referenced in the codebase.
 | `INTEGRATIONS_PLATFORM_ENABLED` | Integrations platform flag |
 | `LISTING_INGESTION_V` | Listing ingestion version |
 | `LISTING_V` | Listings version |
-| `DOCKTALK_V` | DockTalk version |
-| `DOCKTALK_SCRAPER_V` | DockTalk scraper version |
+| `DOCKET_V` | Docket version |
+| `DOCKET_SCRAPER_V` | Docket scraper version |
 
 ## Background Services Configuration
 

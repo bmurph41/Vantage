@@ -158,7 +158,7 @@ function getModuleLink(moduleType: string): string {
     fuel: '/fuel',
     shipStore: '/ship-store',
     modeling: '/modeling',
-    docktalk: '/docktalk',
+    docket: '/docket',
   };
   return linkMap[moduleType] || '/';
 }
@@ -454,7 +454,7 @@ export default function Dashboard() {
   const [isCRMDetailOpen, setIsCRMDetailOpen] = useState(false);
   const [isSalesCompsDetailOpen, setIsSalesCompsDetailOpen] = useState(false);
   const [isFuelDetailOpen, setIsFuelDetailOpen] = useState(false);
-  const [isDockTalkDetailOpen, setIsDockTalkDetailOpen] = useState(false);
+  const [isDocketDetailOpen, setIsDocketDetailOpen] = useState(false);
   const [isVDRDetailOpen, setIsVDRDetailOpen] = useState(false);
   const [isShipStoreDetailOpen, setIsShipStoreDetailOpen] = useState(false);
   const [isDDDetailOpen, setIsDDDetailOpen] = useState(false);
@@ -646,11 +646,11 @@ export default function Dashboard() {
     enabled: isFuelDetailOpen,
   });
 
-  // Fetch recent DockTalk articles for detail panel
+  // Fetch recent Docket articles for detail panel
   const { data: recentArticles, isLoading: articlesLoading } = useQuery({
-    queryKey: ['/api/docktalk/articles/recent', timeRange],
-    queryFn: () => fetch(`/api/docktalk/articles/recent?timeRange=${timeRange}`).then(res => res.json()),
-    enabled: isDockTalkDetailOpen,
+    queryKey: ['/api/docket/articles/recent', timeRange],
+    queryFn: () => fetch(`/api/docket/articles/recent?timeRange=${timeRange}`).then(res => res.json()),
+    enabled: isDocketDetailOpen,
   });
 
   // Fetch recent VDR documents for detail panel
@@ -814,7 +814,7 @@ export default function Dashboard() {
     'due-diligence',
     'sales-comps',
     'vdr-activity',
-    'docktalk-feed',
+    'docket-feed',
     'marina-analytics',
     'fuel-operations',
     'ship-store',
@@ -1221,11 +1221,11 @@ export default function Dashboard() {
       ),
     },
     {
-      id: 'docktalk-feed',
+      id: 'docket-feed',
       title: 'The Docket Intelligence',
       icon: Radio,
-      link: '/docktalk',
-      data: dashboardData?.docktalk,
+      link: '/docket',
+      data: dashboardData?.docket,
       renderContent: (data) => (
         <div className="space-y-4">
           <EnhancedMetricCard
@@ -1235,9 +1235,9 @@ export default function Dashboard() {
             size="md"
             variant="primary"
             icon={Radio}
-            testId="docktalk-deals-count"
+            testId="docket-deals-count"
             tooltip="Total marina M&A deals tracked in the system"
-            onClick={() => setIsDockTalkDetailOpen(true)}
+            onClick={() => setIsDocketDetailOpen(true)}
             clickable
             badge={data?.newDeals ? `+${data.newDeals} new` : undefined}
             subtitle="deals in database"
@@ -1998,12 +1998,12 @@ export default function Dashboard() {
       </DetailPanel>
 
       <DetailPanel
-        open={isDockTalkDetailOpen}
-        onOpenChange={setIsDockTalkDetailOpen}
+        open={isDocketDetailOpen}
+        onOpenChange={setIsDocketDetailOpen}
         title="Docket Articles"
         description="Recent marina industry news and insights"
         icon={Radio}
-        sourceLink="/docktalk"
+        sourceLink="/docket"
         sourceLinkText="Go to The Docket"
       >
         {articlesLoading ? (
@@ -2045,8 +2045,8 @@ export default function Dashboard() {
                 ),
               },
             ]}
-            onRowClick={(deal: any) => { setIsDockTalkDetailOpen(false); navigate(`/docktalk`); }}
-            getRowLink={() => `/docktalk`}
+            onRowClick={(deal: any) => { setIsDocketDetailOpen(false); navigate(`/docket`); }}
+            getRowLink={() => `/docket`}
             emptyMessage="No recent deals found"
           />
         )}

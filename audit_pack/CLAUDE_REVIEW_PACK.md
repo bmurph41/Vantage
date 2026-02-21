@@ -33,7 +33,7 @@ MarinaMatch is a comprehensive full-stack platform for marina acquisition manage
 - **Rent Roll Management** - Marina-specific lease tracking with V2 architecture
 - **Operations Modules** - Fuel Sales, Ship Store, Service Dept, Boat Rentals/Club/Sales
 - **Virtual Data Room (VDR)** - Secure document sharing with granular permissions
-- **DockTalk** - Industry intelligence via RSS aggregation and web scraping
+- **Docket** - Industry intelligence via RSS aggregation and web scraping
 - **MarinaMatch Intel** - Marina listing aggregation and market analysis
 
 ### Architecture Overview
@@ -213,7 +213,7 @@ MarinaMatch is a comprehensive full-stack platform for marina acquisition manage
 │   │   │   ├── vdr/                # VDR components
 │   │   │   └── widgets/            # Widget components
 │   │   ├── contexts/               # React contexts
-│   │   ├── docktalk/               # DockTalk frontend
+│   │   ├── docket/               # Docket frontend
 │   │   ├── hooks/                  # Custom hooks
 │   │   ├── lib/                    # Utilities
 │   │   ├── modules/                # Feature modules
@@ -241,8 +241,8 @@ MarinaMatch is a comprehensive full-stack platform for marina acquisition manage
 │
 ├── server/                         # Backend Express application
 │   ├── config/                     # Server config
-│   ├── docktalk/                   # DockTalk backend
-│   │   └── lib/                    # DockTalk utilities
+│   ├── docket/                   # Docket backend
+│   │   └── lib/                    # Docket utilities
 │   ├── lib/                        # Server utilities
 │   ├── listings/                   # Listing ingestion
 │   │   └── ingestion_v2/           # V2 ingestion pipeline
@@ -413,7 +413,7 @@ See **[DB_SCHEMA.md](./DB_SCHEMA.md)** for complete documentation.
 | Modeling | 20 | Scenarios, debt, capital stack, exits |
 | Operations | 30 | Fuel, ship store, service, rentals |
 | VDR | 8 | Folders, documents, permissions |
-| DockTalk | 10 | Articles, sources, keywords |
+| Docket | 10 | Articles, sources, keywords |
 | Analytics | 12 | Dashboards, widgets, layouts |
 
 ---
@@ -438,7 +438,7 @@ See **[ROUTES_MAP.md](./ROUTES_MAP.md)** for complete documentation.
 | `/api/fuel` | Fuel Sales | Required |
 | `/api/ship-store` | Ship Store | Required |
 | `/api/vdr` | Virtual Data Room | Required |
-| `/api/docktalk` | Industry Intel | Required |
+| `/api/docket` | Industry Intel | Required |
 | `/api/marinamatch` | MarinaMatch Intel | Required |
 | `/api/dashboards` | Analytics | Required |
 | `/api/admin` | Admin Functions | Owner/Admin |
@@ -546,7 +546,7 @@ See **[ROUTES_MAP.md](./ROUTES_MAP.md)** for complete documentation.
 | Deadline Monitor | On-demand | Check upcoming deadlines | `server/deadline-monitor.ts` |
 | Reconciliation Service | Configurable | Sync external integrations | `server/reconciliation-service.ts` |
 | VDR File Service | On-demand | File management | `server/vdr-file-service.ts` |
-| DockTalk Cron | `*/5 * * * *` | RSS feed scraping | `server/docktalk/cron-jobs.ts` |
+| Docket Cron | `*/5 * * * *` | RSS feed scraping | `server/docket/cron-jobs.ts` |
 | MarinaMatch Intel | `*/30 * * * *` | Listing scraping | `server/marinamatch/services/intel-cron.ts` |
 | Listing Scheduler | Every 6 hours | Scheduled scrapes | `server/marinamatch/services/listing-scheduler.ts` |
 | Global Broker Sources | On startup | Seed broker sources | `server/marinamatch/services/global-broker-sources.ts` |
@@ -557,13 +557,13 @@ See **[ROUTES_MAP.md](./ROUTES_MAP.md)** for complete documentation.
 1. Express app configuration
 2. Security middleware (helmet, rate limiting)
 3. Route registration
-4. DockTalk routes & storage
+4. Docket routes & storage
 5. Centralized error handler
 6. Vite (dev) or static serving (prod)
 7. HTTP server listen on PORT
 8. Start background services:
    - deadlineMonitor.start()
-   - startDockTalkCronJobs()
+   - startDocketCronJobs()
    - startMarinaMatchIntelCronJobs()
    - startListingScheduler()
    - autoSeedGlobalBrokerSources()

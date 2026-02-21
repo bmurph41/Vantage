@@ -257,7 +257,7 @@ propertyDataRouter.post("/api/admin/asset-classes/seed", async (req: any, res) =
         defaultDataSources: ["zillow_bridge", "mls_reso"] },
       { key: "marina", label: "Marina", shortLabel: "Marina", category: "specialty", icon: "Anchor", sortOrder: 7, enabled: true,
         config: { slipBased: true, fuelRevenue: true, typicalCapRate: 0.07 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "fuelSales", "shipStore", "vdr", "dueDiligence", "docktalk"],
+        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "fuelSales", "shipStore", "vdr", "dueDiligence", "docket"],
         defaultDataSources: [] },
     ];
 

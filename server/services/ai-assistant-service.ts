@@ -472,7 +472,7 @@ const PAGE_CONTEXT_PROMPTS: Record<string, string> = {
   '/modeling': 'User is in Modeling for financial analysis and valuation.',
   '/rent-roll': 'User is in Rent Roll managing tenants and leases.',
   '/sales-comps': 'User is in Sales Comps for transaction comparables.',
-  '/docktalk': 'User is in The Docket for industry news and intelligence.',
+  '/docket': 'User is in The Docket for industry news and intelligence.',
   '/vdr': 'User is in the Virtual Data Room for document management.',
   '/analytics': 'User is viewing Analytics for cross-module insights.',
 };

@@ -566,7 +566,7 @@ export class DashboardService {
         'due-diligence': () => this.getDDData(orgId, dateFilter),
         'vdr-activity': () => this.getVDRData(orgId, dateFilter),
         'sales-comps': () => this.getSalesCompsData(orgId, dateFilter),
-        'docktalk-feed': () => this.getDockTalkData(orgId, dateFilter),
+        'docket-feed': () => this.getDocketData(orgId, dateFilter),
         'fuel-operations': () => this.getFuelData(orgId, dateFilter),
         'ship-store': () => this.getShipStoreData(orgId, dateFilter),
         'rent-roll': () => this.getRentRollData(orgId, dateFilter),
@@ -594,7 +594,7 @@ export class DashboardService {
         'due-diligence': 'dueDiligence',
         'vdr-activity': 'vdr',
         'sales-comps': 'salesComps',
-        'docktalk-feed': 'docktalk',
+        'docket-feed': 'docket',
         'fuel-operations': 'fuel',
         'ship-store': 'shipStore',
         'rent-roll': 'rentRoll',
@@ -615,7 +615,7 @@ export class DashboardService {
         dueDiligence: { activeProjects: 0, completedProjects: 0, totalProjects: 0, completionRate: 0 },
         vdr: { activeDataRooms: 0, totalDocuments: 0, pendingRequests: 0 },
         salesComps: { totalComps: 0, avgPricePerSlip: 0, recentComps: [] },
-        docktalk: { recentDeals: [], totalDeals: 0 },
+        docket: { recentDeals: [], totalDeals: 0 },
         fuel: { monthlyRevenue: 0, monthlyGallons: 0 },
         shipStore: { monthlyRevenue: 0, monthlyTransactions: 0, avgTransaction: 0, inventoryValue: 0 },
         rentRoll: { totalUnits: 0, occupancyRate: 0, monthlyIncome: 0, vacantUnits: 0 },
@@ -835,19 +835,19 @@ export class DashboardService {
     };
   }
 
-  private async getDockTalkData(orgId: string, dateFilter: TimeRangeFilter | null) {
-    const { docktalkDeals } = await import('@shared/schema');
+  private async getDocketData(orgId: string, dateFilter: TimeRangeFilter | null) {
+    const { docketDeals } = await import('@shared/schema');
     const { desc, count } = await import('drizzle-orm');
     
     // Filter out soft-deleted deals
-    const conditions: any[] = [isNull(docktalkDeals.deletedAt)];
+    const conditions: any[] = [isNull(docketDeals.deletedAt)];
     if (dateFilter) {
-      conditions.push(gte(docktalkDeals.announcedDate, dateFilter.startDate));
+      conditions.push(gte(docketDeals.announcedDate, dateFilter.startDate));
     }
     
     const [deals, totalResult] = await Promise.all([
-      db.select().from(docktalkDeals).where(and(...conditions)).orderBy(desc(docktalkDeals.announcedDate)).limit(5),
-      db.select({ count: count() }).from(docktalkDeals).where(and(...conditions)),
+      db.select().from(docketDeals).where(and(...conditions)).orderBy(desc(docketDeals.announcedDate)).limit(5),
+      db.select({ count: count() }).from(docketDeals).where(and(...conditions)),
     ]);
 
     return {
@@ -1530,9 +1530,9 @@ export class DashboardService {
         metricGroup: 'market',
         displayOrder: 3,
       },
-      // DockTalk metrics
+      // Docket metrics
       {
-        moduleKey: 'docktalk',
+        moduleKey: 'docket',
         metricKey: 'total_deals',
         title: 'Tracked Deals',
         description: 'Number of M&A deals being tracked',
@@ -1546,7 +1546,7 @@ export class DashboardService {
         displayOrder: 1,
       },
       {
-        moduleKey: 'docktalk',
+        moduleKey: 'docket',
         metricKey: 'articles_today',
         title: 'Articles Today',
         description: 'Number of articles processed today',

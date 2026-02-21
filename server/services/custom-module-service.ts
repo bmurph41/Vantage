@@ -28,8 +28,8 @@ export async function getFilteredModuleData(request: FilteredDataRequest, orgId:
       return await getFilteredShipStoreData(filters, orgId, limit);
     case 'modeling':
       return await getFilteredModelingData(filters, orgId, limit);
-    case 'docktalk':
-      return await getFilteredDockTalkData(filters, limit);
+    case 'docket':
+      return await getFilteredDocketData(filters, limit);
     default:
       throw new Error(`Unknown module type: ${moduleType}`);
   }
@@ -311,29 +311,29 @@ async function getFilteredModelingData(filters: Record<string, any>, orgId: stri
   return results;
 }
 
-async function getFilteredDockTalkData(filters: Record<string, any>, limit: number) {
-  const { docktalkArticles } = await import('@shared/schema');
+async function getFilteredDocketData(filters: Record<string, any>, limit: number) {
+  const { docketArticles } = await import('@shared/schema');
   
   const conditions: any[] = [];
   
   if (filters.category) {
-    conditions.push(sql`${docktalkArticles.category} = ${filters.category}`);
+    conditions.push(sql`${docketArticles.category} = ${filters.category}`);
   }
 
   if (filters.dateRange?.from) {
-    conditions.push(gte(docktalkArticles.publishedAt, new Date(filters.dateRange.from)));
+    conditions.push(gte(docketArticles.publishedAt, new Date(filters.dateRange.from)));
   }
   
   if (filters.dateRange?.to) {
-    conditions.push(lte(docktalkArticles.publishedAt, new Date(filters.dateRange.to)));
+    conditions.push(lte(docketArticles.publishedAt, new Date(filters.dateRange.to)));
   }
 
   const query = conditions.length > 0
-    ? db.select().from(docktalkArticles).where(and(...conditions))
-    : db.select().from(docktalkArticles);
+    ? db.select().from(docketArticles).where(and(...conditions))
+    : db.select().from(docketArticles);
 
   const results = await query
-    .orderBy(desc(docktalkArticles.publishedAt))
+    .orderBy(desc(docketArticles.publishedAt))
     .limit(limit);
 
   return results;

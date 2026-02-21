@@ -4,10 +4,10 @@ import { setupVite, serveStatic, log } from "./vite";
 import { deadlineMonitor } from "./deadline-monitor";
 import { reconciliationService } from "./reconciliation-service";
 import { vdrFileService } from "./vdr-file-service";
-import { registerDockTalkRoutes } from "./docktalk/routes";
-import { startDockTalkCronJobs } from "./docktalk/cron-jobs";
-import { DatabaseStorage as DockTalkStorage } from "./docktalk/storage";
-import { initializeWebSocket } from "./docktalk/websocket";
+import { registerDocketRoutes } from "./docket/routes";
+import { startDocketCronJobs } from "./docket/cron-jobs";
+import { DatabaseStorage as DocketStorage } from "./docket/storage";
+import { initializeWebSocket } from "./docket/websocket";
 import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
 import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
 import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
@@ -78,9 +78,9 @@ app.use(ddChecklistRouter);
     app.use(workspaceRouter);
     app.use(exitStudioRouter);
 
-    // Initialize DockTalk storage and register routes
-    const dockTalkStorage = new DockTalkStorage();
-    registerDockTalkRoutes(app, dockTalkStorage);
+    // Initialize Docket storage and register routes
+    const docketStorage = new DocketStorage();
+    registerDocketRoutes(app, docketStorage);
 
     app.use(centralizedErrorHandler);
 
@@ -123,10 +123,10 @@ app.use(ddChecklistRouter);
       });
 
       try {
-        startDockTalkCronJobs(dockTalkStorage);
-        log('DockTalk background jobs started');
+        startDocketCronJobs(docketStorage);
+        log('Docket background jobs started');
       } catch (error) {
-        log(`Failed to start DockTalk background jobs: ${error}`);
+        log(`Failed to start Docket background jobs: ${error}`);
       }
 
       try {
@@ -152,16 +152,16 @@ app.use(ddChecklistRouter);
         log(`Failed to start MarinaMatch listing scheduler: ${error}`);
       }
 
-      // Skip DockTalk WebSocket in development to avoid conflict with Vite HMR WebSocket
+      // Skip Docket WebSocket in development to avoid conflict with Vite HMR WebSocket
       if (process.env.NODE_ENV !== 'development') {
         try {
           initializeWebSocket(server);
-          log('DockTalk WebSocket initialized');
+          log('Docket WebSocket initialized');
         } catch (error) {
-          log(`Failed to initialize DockTalk WebSocket: ${error}`);
+          log(`Failed to initialize Docket WebSocket: ${error}`);
         }
       } else {
-        log('DockTalk WebSocket disabled in development mode (use production for real-time updates)');
+        log('Docket WebSocket disabled in development mode (use production for real-time updates)');
       }
 
       // Async services - run in background without awaiting

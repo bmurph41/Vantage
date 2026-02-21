@@ -45,7 +45,7 @@ export const FEATURE_MODULES = {
   // ─────────────────────────────────────────────────────────────
   // ANALYTICS (MARINALYTICS) MODULES
   // ─────────────────────────────────────────────────────────────
-  ANALYTICS_NEWS: 'analytics.news',               // DockTalk
+  ANALYTICS_NEWS: 'analytics.news',               // Docket
   ANALYTICS_COMPS: 'analytics.comps',             // Sales Comps, Rate Comps
   ANALYTICS_DEMOGRAPHICS: 'analytics.demographics', // Demographics
   ANALYTICS_CAPITAL: 'analytics.capital',         // Capital Markets

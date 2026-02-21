@@ -250,10 +250,10 @@ const AVAILABLE_TOOLS: ToolItem[] = [
     color: '#6366f1',
   },
   {
-    id: 'docktalk',
+    id: 'docket',
     title: 'The Docket',
     description: 'Marina industry intelligence',
-    link: '/docktalk',
+    link: '/docket',
     icon: 'Radio',
     category: 'tools',
     color: '#0891b2',

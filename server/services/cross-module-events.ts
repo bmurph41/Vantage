@@ -5,7 +5,7 @@
  * entity changes across modules. This enables:
  * - Deal stage transitions triggering DD project creation
  * - Property updates refreshing related deal values
- * - DockTalk articles being linked when entities are mentioned
+ * - Docket articles being linked when entities are mentioned
  * - Activity logging across all entity changes
  * 
  * The event system uses an in-memory EventEmitter pattern that can
@@ -28,7 +28,7 @@ export type EntityType =
   | 'deal'
   | 'dd_project'
   | 'modeling_project'
-  | 'docktalk_article';
+  | 'docket_article';
 
 export type EventAction = 
   | 'created'

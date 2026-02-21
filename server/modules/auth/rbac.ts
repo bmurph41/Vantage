@@ -13,7 +13,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:fuel', 'edit:fuel',
     'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr', 'manage:vdr',
-    'view:docktalk', 'manage:docktalk',
+    'view:docket', 'manage:docket',
     'view:analytics', 'view:reports', 'create:reports',
     'manage:users', 'manage:settings',
     'view:audit', 'manage:integrations',
@@ -31,7 +31,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:fuel', 'edit:fuel',
     'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr', 'manage:vdr',
-    'view:docktalk', 'manage:docktalk',
+    'view:docket', 'manage:docket',
     'view:analytics', 'view:reports', 'create:reports',
     'manage:users', 'manage:settings',
     'view:audit',
@@ -60,7 +60,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:salescomps', 'edit:salescomps',
     'view:vdr',
     'view:analytics', 'view:reports', 'create:reports',
-    'view:docktalk',
+    'view:docket',
   ],
   
   [Role.APPRAISER]: [
@@ -86,7 +86,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:shipstore', 'edit:shipstore',
     'view:vdr', 'edit:vdr',
     'view:analytics', 'view:reports', 'create:reports',
-    'view:docktalk',
+    'view:docket',
   ],
   
   [Role.VIEWER]: [
@@ -101,7 +101,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'view:shipstore',
     'view:vdr',
     'view:analytics', 'view:reports',
-    'view:docktalk',
+    'view:docket',
   ],
   
   [Role.AUDITOR]: [

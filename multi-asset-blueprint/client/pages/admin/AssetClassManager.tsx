@@ -74,7 +74,7 @@ const MODULE_LABELS: Record<string, string> = {
   shipStore: "Ship Store",
   vdr: "Data Room",
   dueDiligence: "Due Diligence",
-  docktalk: "DockTalk",
+  docket: "Docket",
 };
 
 export default function AssetClassManager() {

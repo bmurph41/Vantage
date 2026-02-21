@@ -131,41 +131,41 @@ export const queryKeys = {
     },
   },
 
-  // DockTalk Module
-  docktalk: {
+  // Docket Module
+  docket: {
     articles: {
-      all: () => ['/api/docktalk/articles'] as const,
-      list: (filters?: Record<string, unknown>) => ['/api/docktalk/articles', { filters }] as const,
-      detail: (id: number) => ['/api/docktalk/articles', id] as const,
-      trending: () => ['/api/docktalk/articles/trending'] as const,
+      all: () => ['/api/docket/articles'] as const,
+      list: (filters?: Record<string, unknown>) => ['/api/docket/articles', { filters }] as const,
+      detail: (id: number) => ['/api/docket/articles', id] as const,
+      trending: () => ['/api/docket/articles/trending'] as const,
       byEntity: (entityType: string, entityId: string) => 
-        ['/api/docktalk/articles', 'by-entity', entityType, entityId] as const,
+        ['/api/docket/articles', 'by-entity', entityType, entityId] as const,
     },
     crmLinks: {
-      byArticle: (articleId: number) => ['/api/docktalk/articles', articleId, 'crm-links'] as const,
+      byArticle: (articleId: number) => ['/api/docket/articles', articleId, 'crm-links'] as const,
       byEntity: (entityType: string, entityId: string) => 
-        ['/api/docktalk/crm-links', entityType, entityId] as const,
+        ['/api/docket/crm-links', entityType, entityId] as const,
     },
     categories: {
-      all: () => ['/api/docktalk/categories/all'] as const,
+      all: () => ['/api/docket/categories/all'] as const,
     },
     sources: {
-      all: () => ['/api/docktalk/sources'] as const,
-      detail: (id: number) => ['/api/docktalk/sources', id] as const,
+      all: () => ['/api/docket/sources'] as const,
+      detail: (id: number) => ['/api/docket/sources', id] as const,
     },
     watchlists: {
-      all: () => ['/api/docktalk/watchlists'] as const,
-      detail: (id: string) => ['/api/docktalk/watchlists', id] as const,
+      all: () => ['/api/docket/watchlists'] as const,
+      detail: (id: string) => ['/api/docket/watchlists', id] as const,
     },
     savedSearches: {
-      all: () => ['/api/docktalk/saved-searches'] as const,
-      detail: (id: string) => ['/api/docktalk/saved-searches', id] as const,
+      all: () => ['/api/docket/saved-searches'] as const,
+      detail: (id: string) => ['/api/docket/saved-searches', id] as const,
     },
     analytics: {
-      stats: () => ['/api/docktalk/analytics/stats'] as const,
+      stats: () => ['/api/docket/analytics/stats'] as const,
     },
     notifications: {
-      preferences: () => ['/api/docktalk/notification-preferences'] as const,
+      preferences: () => ['/api/docket/notification-preferences'] as const,
     },
   },
 
@@ -262,7 +262,7 @@ export function getRelatedInvalidationKeys(entityType: 'contact' | 'company' | '
         queryKeys.crm.contacts.activities(entityId),
         queryKeys.crm.contacts.deals(entityId),
         queryKeys.crm.contacts.properties(entityId),
-        queryKeys.docktalk.crmLinks.byEntity('contact', entityId),
+        queryKeys.docket.crmLinks.byEntity('contact', entityId),
       );
       break;
     case 'company':
@@ -272,7 +272,7 @@ export function getRelatedInvalidationKeys(entityType: 'contact' | 'company' | '
         queryKeys.crm.companies.contacts(entityId),
         queryKeys.crm.companies.properties(entityId),
         queryKeys.crm.companies.deals(entityId),
-        queryKeys.docktalk.crmLinks.byEntity('company', entityId),
+        queryKeys.docket.crmLinks.byEntity('company', entityId),
       );
       break;
     case 'property':
@@ -281,7 +281,7 @@ export function getRelatedInvalidationKeys(entityType: 'contact' | 'company' | '
         queryKeys.crm.properties.detail(entityId),
         queryKeys.crm.properties.contacts(entityId),
         queryKeys.crm.properties.companies(entityId),
-        queryKeys.docktalk.crmLinks.byEntity('property', entityId),
+        queryKeys.docket.crmLinks.byEntity('property', entityId),
       );
       break;
     case 'deal':
@@ -293,7 +293,7 @@ export function getRelatedInvalidationKeys(entityType: 'contact' | 'company' | '
         queryKeys.crm.deals.activities(entityId),
         queryKeys.crm.deals.project(entityId),
         queryKeys.crm.deals.modeling(entityId),
-        queryKeys.docktalk.crmLinks.byEntity('deal', entityId),
+        queryKeys.docket.crmLinks.byEntity('deal', entityId),
       );
       break;
     case 'project':

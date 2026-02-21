@@ -70,7 +70,7 @@ const quickLinks: QuickLink[] = [
   {
     title: "M&A Spotlight",
     description: "Industry transaction intelligence and deal tracking",
-    href: "/docktalk",
+    href: "/docket",
     icon: Anchor,
     color: "text-sky-600",
   },

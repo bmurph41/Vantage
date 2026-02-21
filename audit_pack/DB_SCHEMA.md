@@ -158,7 +158,7 @@
 
 ---
 
-## DockTalk (Industry Intelligence)
+## Docket (Industry Intelligence)
 
 | Table | Key Columns | Purpose |
 |-------|-------------|---------|
@@ -166,8 +166,8 @@
 | `article_summaries` | id, articleId, summary, sentiment | AI summaries |
 | `rss_sources` | id, name, url, category, isActive | RSS feed sources |
 | `scrape_sources` | id, name, url, selector | Web scrape sources |
-| `docktalk_keyword_bank` | id, keyword, category, weight | Keyword scoring |
-| `docktalk_scoring_config` | id, orgId, weights | Custom scoring |
+| `docket_keyword_bank` | id, keyword, category, weight | Keyword scoring |
+| `docket_scoring_config` | id, orgId, weights | Custom scoring |
 
 ---
 

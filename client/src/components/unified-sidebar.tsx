@@ -805,7 +805,7 @@ export default function UnifiedSidebar() {
           )}
         </div>
         
-        {/* DockTalk - Section Title Style Link */}
+        {/* Docket - Section Title Style Link */}
         <div className="mb-2">
           {sidebarCollapsed ? (
             <Tooltip>
@@ -814,7 +814,7 @@ export default function UnifiedSidebar() {
                   className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
                   onClick={() => setSidebarCollapsed(false)}
                 >
-                  <MessageSquare className={cn("w-4 h-4", location.startsWith('/docktalk') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  <MessageSquare className={cn("w-4 h-4", location.startsWith('/docket') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
@@ -822,15 +822,15 @@ export default function UnifiedSidebar() {
               </TooltipContent>
             </Tooltip>
           ) : (
-            <Link href="/docktalk">
+            <Link href="/docket">
               <div
                 className={cn(
                   "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
-                  location.startsWith('/docktalk')
+                  location.startsWith('/docket')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
-                data-testid="nav-docktalk"
+                data-testid="nav-docket"
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-3.5 h-3.5" />

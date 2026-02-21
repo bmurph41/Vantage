@@ -4,11 +4,11 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Import DockTalk enums from docktalk-schema for reuse
+// Import Docket enums from docket-schema for reuse
 import { 
-  alertFrequencyEnum as docktalkAlertFrequencyEnum,
-  entityTypeEnum as docktalkEntityTypeEnum
-} from "./docktalk-schema";
+  alertFrequencyEnum as docketAlertFrequencyEnum,
+  entityTypeEnum as docketEntityTypeEnum
+} from "./docket-schema";
 
 // Custom vector type for pgvector
 const vector = customType<{ data: number[]; driverData: string }>({
@@ -445,7 +445,7 @@ export const dashboardCustomModules = pgTable("dashboard_custom_modules", {
   userId: varchar("user_id").notNull().references(() => users.id),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   title: text("title").notNull(), // User-defined module name (e.g., "Florida Sales Comps", "Q1 DD Tasks")
-  moduleType: text("module_type").notNull(), // Source: 'crm', 'sales-comps', 'fuel', 'vdr', 'docktalk', 'ship-store', 'dd', 'rent-roll', 'modeling'
+  moduleType: text("module_type").notNull(), // Source: 'crm', 'sales-comps', 'fuel', 'vdr', 'docket', 'ship-store', 'dd', 'rent-roll', 'modeling'
   filters: jsonb("filters").notNull().default(sql`'{}'`), // Filter configuration: { state: 'FL', dateRange: 'Q1', projectId: '123', etc. }
   visualizationType: text("visualization_type").notNull().default('table'), // 'kpi_card', 'line_chart', 'area_chart', 'bar_chart', 'pie_chart', 'combo_chart', 'stat_grid', 'table', 'goal_tracker', 'comparison_card'
   chartConfig: jsonb("chart_config").notNull().default(sql`'{}'`), // Visualization config: { xAxis, yAxis, metrics, colors, aggregations, timeframes, etc. }
@@ -584,7 +584,7 @@ export const userFavorites = pgTable("user_favorites", {
 // Dashboard Module Metrics - Registry of available metrics per module
 export const dashboardModuleMetrics = pgTable("dashboard_module_metrics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  moduleKey: text("module_key").notNull(), // 'sales_comps', 'rate_comps', 'demographics', 'capital_markets', 'docktalk', 'vdr', 'fuel', 'ship_store', 'rent_roll', 'modeling', 'due_diligence', 'crm'
+  moduleKey: text("module_key").notNull(), // 'sales_comps', 'rate_comps', 'demographics', 'capital_markets', 'docket', 'vdr', 'fuel', 'ship_store', 'rent_roll', 'modeling', 'due_diligence', 'crm'
   metricKey: text("metric_key").notNull(), // 'total_count', 'avg_price', 'median_price', 'total_volume', 'avg_cap_rate', etc.
   title: text("title").notNull(),
   description: text("description"),
@@ -3875,9 +3875,9 @@ export const crmMatchResults = pgTable("crm_match_results", {
   // Match explanation
   matchReason: text("match_reason"), // Human-readable explanation
 
-  // DockTalk flags
-  isInPortfolio: boolean("is_in_portfolio").default(false), // Company is in DockTalk Portfolio
-  isOnWatchlist: boolean("is_on_watchlist").default(false), // Company is on DockTalk Watchlist
+  // Docket flags
+  isInPortfolio: boolean("is_in_portfolio").default(false), // Company is in Docket Portfolio
+  isOnWatchlist: boolean("is_on_watchlist").default(false), // Company is on Docket Watchlist
 
   // Action taken
   resolution: text("resolution"), // 'accepted', 'rejected', 'merged', null if pending
@@ -7858,16 +7858,16 @@ export const scAnalyticsFilterPresets = pgTable('sc_analytics_filter_presets', {
 }));
 
 // ============================================================================
-// DOCKTALK M&A SPOTLIGHT
+// DOCKET M&A SPOTLIGHT
 // ============================================================================
 
-// Enums for DockTalk deals
+// Enums for Docket deals
 export const dealOriginEnum = pgEnum("deal_origin", ["marinaMatch", "aiExtraction"]);
-export const docktalkTransactionTypeEnum = pgEnum("docktalk_transaction_type", ["M&A", "Financing", "Partnership", "Asset Sale", "Lease", "Other"]);
-export const docktalkDealStatusEnum = pgEnum("docktalk_deal_status", ["Announced", "Pending", "Closed", "Terminated"]);
+export const docketTransactionTypeEnum = pgEnum("docket_transaction_type", ["M&A", "Financing", "Partnership", "Asset Sale", "Lease", "Other"]);
+export const docketDealStatusEnum = pgEnum("docket_deal_status", ["Announced", "Pending", "Closed", "Terminated"]);
 
-// DockTalk deals - M&A transaction tracking
-export const docktalkDeals = pgTable('docktalk_deals', {
+// Docket deals - M&A transaction tracking
+export const docketDeals = pgTable('docket_deals', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   createdBy: varchar('created_by').notNull().references(() => users.id),
@@ -7880,13 +7880,13 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   origin: dealOriginEnum('origin').notNull().default('aiExtraction'),
   externalId: varchar('external_id'), // MarinaMatch Sales Comp UUID for sync
   sourceReference: text('source_reference'), // Link back to MarinaMatch record or news article
-  articleId: integer('article_id'), // Optional link to docktalk_articles for AI-extracted deals
+  articleId: integer('article_id'), // Optional link to docket_articles for AI-extracted deals
 
-  // DockTalk-specific fields
-  transactionType: docktalkTransactionTypeEnum('transaction_type'), // Deal type
-  dealStatus: docktalkDealStatusEnum('deal_status'), // Deal status
-  buyerEntityId: integer('buyer_entity_id'), // DockTalk entity ID
-  sellerEntityId: integer('seller_entity_id'), // DockTalk entity ID
+  // Docket-specific fields
+  transactionType: docketTransactionTypeEnum('transaction_type'), // Deal type
+  dealStatus: docketDealStatusEnum('deal_status'), // Deal status
+  buyerEntityId: integer('buyer_entity_id'), // Docket entity ID
+  sellerEntityId: integer('seller_entity_id'), // Docket entity ID
   assetDescription: text('asset_description'), // Asset/property description
   dealSize: text('deal_size'), // Deal size as text (for AI extraction)
   valuation: text('valuation'), // Property valuation
@@ -7923,22 +7923,22 @@ export const docktalkDeals = pgTable('docktalk_deals', {
   // Flexible data storage
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 }, (table) => ({
-  orgIdx: index('docktalk_deals_org_idx').on(table.orgId),
-  orgOriginIdx: index('docktalk_deals_org_origin_idx').on(table.orgId, table.origin),
-  orgDateIdx: index('docktalk_deals_org_date_idx').on(table.orgId, table.dealDate),
-  externalIdIdx: index('docktalk_deals_external_id_idx').on(table.externalId),
-  articleIdIdx: index('docktalk_deals_article_id_idx').on(table.articleId),
-  transactionTypeIdx: index('docktalk_deals_transaction_type_idx').on(table.transactionType),
-  dealStatusIdx: index('docktalk_deals_deal_status_idx').on(table.dealStatus),
-  uniqueExternalId: unique('docktalk_deals_unique_external_idx').on(table.orgId, table.externalId),
+  orgIdx: index('docket_deals_org_idx').on(table.orgId),
+  orgOriginIdx: index('docket_deals_org_origin_idx').on(table.orgId, table.origin),
+  orgDateIdx: index('docket_deals_org_date_idx').on(table.orgId, table.dealDate),
+  externalIdIdx: index('docket_deals_external_id_idx').on(table.externalId),
+  articleIdIdx: index('docket_deals_article_id_idx').on(table.articleId),
+  transactionTypeIdx: index('docket_deals_transaction_type_idx').on(table.transactionType),
+  dealStatusIdx: index('docket_deals_deal_status_idx').on(table.dealStatus),
+  uniqueExternalId: unique('docket_deals_unique_external_idx').on(table.orgId, table.externalId),
 }));
 
-// DockTalk entities - Companies, people, locations, assets for tracking
-export const docktalkEntities = pgTable('docktalk_entities', {
+// Docket entities - Companies, people, locations, assets for tracking
+export const docketEntities = pgTable('docket_entities', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   name: text('name').notNull(),
-  type: docktalkEntityTypeEnum('type').notNull(),
+  type: docketEntityTypeEnum('type').notNull(),
   normalizedName: text('normalized_name').notNull(),
   aliases: text('aliases').array().default(sql`'{}'`),
   description: text('description'),
@@ -7948,14 +7948,14 @@ export const docktalkEntities = pgTable('docktalk_entities', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_entities_org_idx').on(table.orgId),
-  nameIdx: index('docktalk_entities_name_idx').on(table.name),
-  normalizedIdx: index('docktalk_entities_normalized_idx').on(table.normalizedName),
-  typeIdx: index('docktalk_entities_type_idx').on(table.type),
+  orgIdx: index('docket_entities_org_idx').on(table.orgId),
+  nameIdx: index('docket_entities_name_idx').on(table.name),
+  normalizedIdx: index('docket_entities_normalized_idx').on(table.normalizedName),
+  typeIdx: index('docket_entities_type_idx').on(table.type),
 }));
 
-// DockTalk portfolio companies - PE firms tracking their portfolio investments
-export const docktalkPortfolioCompanies = pgTable('docktalk_portfolio_companies', {
+// Docket portfolio companies - PE firms tracking their portfolio investments
+export const docketPortfolioCompanies = pgTable('docket_portfolio_companies', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
@@ -7963,69 +7963,69 @@ export const docktalkPortfolioCompanies = pgTable('docktalk_portfolio_companies'
   description: text('description'),
   industry: text('industry'),
   location: text('location'),
-  entityId: varchar('entity_id').references(() => docktalkEntities.id), // Optional link to entity
+  entityId: varchar('entity_id').references(() => docketEntities.id), // Optional link to entity
   alertEnabled: boolean('alert_enabled').default(true),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_portfolio_companies_org_idx').on(table.orgId),
-  userIdx: index('docktalk_portfolio_companies_user_idx').on(table.userId),
-  companyIdx: index('docktalk_portfolio_companies_company_idx').on(table.companyName),
+  orgIdx: index('docket_portfolio_companies_org_idx').on(table.orgId),
+  userIdx: index('docket_portfolio_companies_user_idx').on(table.userId),
+  companyIdx: index('docket_portfolio_companies_company_idx').on(table.companyName),
 }));
 
-// DockTalk saved searches - Save complex search queries with alerts
-export const docktalkSavedSearches = pgTable('docktalk_saved_searches', {
+// Docket saved searches - Save complex search queries with alerts
+export const docketSavedSearches = pgTable('docket_saved_searches', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
   name: text('name').notNull(),
   description: text('description'),
   filters: jsonb('filters').$type<Record<string, unknown>>().notNull(), // Search criteria as JSON
-  alertFrequency: docktalkAlertFrequencyEnum('alert_frequency').notNull().default('none'),
+  alertFrequency: docketAlertFrequencyEnum('alert_frequency').notNull().default('none'),
   lastAlertSent: timestamp('last_alert_sent'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_saved_searches_org_idx').on(table.orgId),
-  userIdx: index('docktalk_saved_searches_user_idx').on(table.userId),
-  activeIdx: index('docktalk_saved_searches_active_idx').on(table.isActive),
+  orgIdx: index('docket_saved_searches_org_idx').on(table.orgId),
+  userIdx: index('docket_saved_searches_user_idx').on(table.userId),
+  activeIdx: index('docket_saved_searches_active_idx').on(table.isActive),
 }));
 
-// DockTalk watchlists - Monitor specific entities (companies, people, etc.)
-export const docktalkWatchlists = pgTable('docktalk_watchlists', {
+// Docket watchlists - Monitor specific entities (companies, people, etc.)
+export const docketWatchlists = pgTable('docket_watchlists', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id),
   name: text('name').notNull(),
   description: text('description'),
-  alertFrequency: docktalkAlertFrequencyEnum('alert_frequency').notNull().default('none'),
+  alertFrequency: docketAlertFrequencyEnum('alert_frequency').notNull().default('none'),
   lastAlertSent: timestamp('last_alert_sent'),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_watchlists_org_idx').on(table.orgId),
-  userIdx: index('docktalk_watchlists_user_idx').on(table.userId),
+  orgIdx: index('docket_watchlists_org_idx').on(table.orgId),
+  userIdx: index('docket_watchlists_user_idx').on(table.userId),
 }));
 
-// DockTalk watchlist entities - Junction table for watchlist-to-entity relationships
-export const docktalkWatchlistEntities = pgTable('docktalk_watchlist_entities', {
+// Docket watchlist entities - Junction table for watchlist-to-entity relationships
+export const docketWatchlistEntities = pgTable('docket_watchlist_entities', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
-  watchlistId: varchar('watchlist_id').notNull().references(() => docktalkWatchlists.id, { onDelete: 'cascade' }),
-  entityId: varchar('entity_id').notNull().references(() => docktalkEntities.id, { onDelete: 'cascade' }),
+  watchlistId: varchar('watchlist_id').notNull().references(() => docketWatchlists.id, { onDelete: 'cascade' }),
+  entityId: varchar('entity_id').notNull().references(() => docketEntities.id, { onDelete: 'cascade' }),
   addedAt: timestamp('added_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_watchlist_entities_org_idx').on(table.orgId),
-  watchlistIdx: index('docktalk_watchlist_entities_watchlist_idx').on(table.watchlistId),
-  entityIdx: index('docktalk_watchlist_entities_entity_idx').on(table.entityId),
-  uniqueWatchlistEntity: unique('docktalk_watchlist_entities_unique_idx').on(table.watchlistId, table.entityId),
+  orgIdx: index('docket_watchlist_entities_org_idx').on(table.orgId),
+  watchlistIdx: index('docket_watchlist_entities_watchlist_idx').on(table.watchlistId),
+  entityIdx: index('docket_watchlist_entities_entity_idx').on(table.entityId),
+  uniqueWatchlistEntity: unique('docket_watchlist_entities_unique_idx').on(table.watchlistId, table.entityId),
 }));
 
-// DockTalk user preferences - Save user's default filter settings
-export const docktalkUserPreferences = pgTable('docktalk_user_preferences', {
+// Docket user preferences - Save user's default filter settings
+export const docketUserPreferences = pgTable('docket_user_preferences', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id).unique(),
@@ -8035,12 +8035,12 @@ export const docktalkUserPreferences = pgTable('docktalk_user_preferences', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_user_preferences_org_idx').on(table.orgId),
-  userIdx: index('docktalk_user_preferences_user_idx').on(table.userId),
+  orgIdx: index('docket_user_preferences_org_idx').on(table.orgId),
+  userIdx: index('docket_user_preferences_user_idx').on(table.userId),
 }));
 
-// DockTalk article removal patterns - Train AI to filter irrelevant articles
-export const docktalkArticleRemovalPatterns = pgTable('docktalk_article_removal_patterns', {
+// Docket article removal patterns - Train AI to filter irrelevant articles
+export const docketArticleRemovalPatterns = pgTable('docket_article_removal_patterns', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   articleId: integer('article_id'),
@@ -8054,20 +8054,20 @@ export const docktalkArticleRemovalPatterns = pgTable('docktalk_article_removal_
   articleContent: text('article_content'),
   removedAt: timestamp('removed_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_article_removal_patterns_org_idx').on(table.orgId),
-  articleIdx: index('docktalk_article_removal_patterns_article_idx').on(table.articleId),
-  removedByIdx: index('docktalk_article_removal_patterns_user_idx').on(table.removedBy),
-  dateIdx: index('docktalk_article_removal_patterns_date_idx').on(table.removedAt),
+  orgIdx: index('docket_article_removal_patterns_org_idx').on(table.orgId),
+  articleIdx: index('docket_article_removal_patterns_article_idx').on(table.articleId),
+  removedByIdx: index('docket_article_removal_patterns_user_idx').on(table.removedBy),
+  dateIdx: index('docket_article_removal_patterns_date_idx').on(table.removedAt),
 }));
 
-// DockTalk notification preferences - User email alert settings
-export const docktalkNotificationPreferences = pgTable('docktalk_notification_preferences', {
+// Docket notification preferences - User email alert settings
+export const docketNotificationPreferences = pgTable('docket_notification_preferences', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar('org_id').notNull().references(() => organizations.id),
   userId: varchar('user_id').notNull().references(() => users.id).unique(),
   emailAddress: text('email_address').notNull(),
   categories: text('categories').array().default(sql`'{}'`),
-  frequency: docktalkAlertFrequencyEnum('frequency').notNull().default('none'),
+  frequency: docketAlertFrequencyEnum('frequency').notNull().default('none'),
   deliveryTime: text('delivery_time').default('09:00'),
   timezone: text('timezone').default('America/New_York'),
   enabled: boolean('enabled').default(true),
@@ -8075,9 +8075,9 @@ export const docktalkNotificationPreferences = pgTable('docktalk_notification_pr
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
-  orgIdx: index('docktalk_notification_preferences_org_idx').on(table.orgId),
-  userIdx: index('docktalk_notification_preferences_user_idx').on(table.userId),
-  frequencyIdx: index('docktalk_notification_preferences_frequency_idx').on(table.frequency),
+  orgIdx: index('docket_notification_preferences_org_idx').on(table.orgId),
+  userIdx: index('docket_notification_preferences_user_idx').on(table.userId),
+  frequencyIdx: index('docket_notification_preferences_frequency_idx').on(table.frequency),
 }));
 
 // Relations
@@ -8477,23 +8477,23 @@ export const updateScAnalyticsFilterPresetSchema = insertScAnalyticsFilterPreset
 export type UpdateScAnalyticsFilterPreset = z.infer<typeof updateScAnalyticsFilterPresetSchema>;
 
 // ============================================================================
-// DOCKTALK M&A SPOTLIGHT - Types and Schemas
+// DOCKET M&A SPOTLIGHT - Types and Schemas
 // ============================================================================
 
-export const insertDocktalkDealSchema = createInsertSchema(docktalkDeals).omit({
+export const insertDocketDealSchema = createInsertSchema(docketDeals).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const updateDocktalkDealSchema = insertDocktalkDealSchema.partial().omit({
+export const updateDocketDealSchema = insertDocketDealSchema.partial().omit({
   orgId: true,
   createdBy: true,
 });
 
-export type DocktalkDeal = typeof docktalkDeals.$inferSelect;
-export type InsertDocktalkDeal = z.infer<typeof insertDocktalkDealSchema>;
-export type UpdateDocktalkDeal = z.infer<typeof updateDocktalkDealSchema>;
+export type DocketDeal = typeof docketDeals.$inferSelect;
+export type InsertDocketDeal = z.infer<typeof insertDocketDealSchema>;
+export type UpdateDocketDeal = z.infer<typeof updateDocketDealSchema>;
 
 // Analytics/Metrics Tables
 export const scMetricSeries = pgTable('sc_metric_series', {
@@ -13800,80 +13800,80 @@ export type Assumption = ShipStoreAssumption;
 export type Projection = ShipStoreProjection;
 export type HistoricalData = ShipStoreHistoricalData;
 
-// DockTalk Intelligence Features - Zod Schemas and Types
-export const insertDocktalkEntitySchema = createInsertSchema(docktalkEntities).omit({
+// Docket Intelligence Features - Zod Schemas and Types
+export const insertDocketEntitySchema = createInsertSchema(docketEntities).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const insertDocktalkPortfolioCompanySchema = createInsertSchema(docktalkPortfolioCompanies).omit({
+export const insertDocketPortfolioCompanySchema = createInsertSchema(docketPortfolioCompanies).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const insertDocktalkSavedSearchSchema = createInsertSchema(docktalkSavedSearches).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  lastAlertSent: true,
-});
-
-export const insertDocktalkWatchlistSchema = createInsertSchema(docktalkWatchlists).omit({
+export const insertDocketSavedSearchSchema = createInsertSchema(docketSavedSearches).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   lastAlertSent: true,
 });
 
-export const insertDocktalkWatchlistEntitySchema = createInsertSchema(docktalkWatchlistEntities).omit({
+export const insertDocketWatchlistSchema = createInsertSchema(docketWatchlists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastAlertSent: true,
+});
+
+export const insertDocketWatchlistEntitySchema = createInsertSchema(docketWatchlistEntities).omit({
   id: true,
   addedAt: true,
 });
 
-export const insertDocktalkUserPreferencesSchema = createInsertSchema(docktalkUserPreferences).omit({
+export const insertDocketUserPreferencesSchema = createInsertSchema(docketUserPreferences).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const insertDocktalkArticleRemovalPatternSchema = createInsertSchema(docktalkArticleRemovalPatterns).omit({
+export const insertDocketArticleRemovalPatternSchema = createInsertSchema(docketArticleRemovalPatterns).omit({
   id: true,
   removedAt: true,
 });
 
-export const insertDocktalkNotificationPreferencesSchema = createInsertSchema(docktalkNotificationPreferences).omit({
+export const insertDocketNotificationPreferencesSchema = createInsertSchema(docketNotificationPreferences).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   lastSentAt: true,
 });
 
-// DockTalk Intelligence Features - Type Exports
-export type DocktalkEntity = typeof docktalkEntities.$inferSelect;
-export type InsertDocktalkEntity = z.infer<typeof insertDocktalkEntitySchema>;
+// Docket Intelligence Features - Type Exports
+export type DocketEntity = typeof docketEntities.$inferSelect;
+export type InsertDocketEntity = z.infer<typeof insertDocketEntitySchema>;
 
-export type DocktalkPortfolioCompany = typeof docktalkPortfolioCompanies.$inferSelect;
-export type InsertDocktalkPortfolioCompany = z.infer<typeof insertDocktalkPortfolioCompanySchema>;
+export type DocketPortfolioCompany = typeof docketPortfolioCompanies.$inferSelect;
+export type InsertDocketPortfolioCompany = z.infer<typeof insertDocketPortfolioCompanySchema>;
 
-export type DocktalkSavedSearch = typeof docktalkSavedSearches.$inferSelect;
-export type InsertDocktalkSavedSearch = z.infer<typeof insertDocktalkSavedSearchSchema>;
+export type DocketSavedSearch = typeof docketSavedSearches.$inferSelect;
+export type InsertDocketSavedSearch = z.infer<typeof insertDocketSavedSearchSchema>;
 
-export type DocktalkWatchlist = typeof docktalkWatchlists.$inferSelect;
-export type InsertDocktalkWatchlist = z.infer<typeof insertDocktalkWatchlistSchema>;
+export type DocketWatchlist = typeof docketWatchlists.$inferSelect;
+export type InsertDocketWatchlist = z.infer<typeof insertDocketWatchlistSchema>;
 
-export type DocktalkWatchlistEntity = typeof docktalkWatchlistEntities.$inferSelect;
-export type InsertDocktalkWatchlistEntity = z.infer<typeof insertDocktalkWatchlistEntitySchema>;
+export type DocketWatchlistEntity = typeof docketWatchlistEntities.$inferSelect;
+export type InsertDocketWatchlistEntity = z.infer<typeof insertDocketWatchlistEntitySchema>;
 
-export type DocktalkUserPreferences = typeof docktalkUserPreferences.$inferSelect;
-export type InsertDocktalkUserPreferences = z.infer<typeof insertDocktalkUserPreferencesSchema>;
+export type DocketUserPreferences = typeof docketUserPreferences.$inferSelect;
+export type InsertDocketUserPreferences = z.infer<typeof insertDocketUserPreferencesSchema>;
 
-export type DocktalkArticleRemovalPattern = typeof docktalkArticleRemovalPatterns.$inferSelect;
-export type InsertDocktalkArticleRemovalPattern = z.infer<typeof insertDocktalkArticleRemovalPatternSchema>;
+export type DocketArticleRemovalPattern = typeof docketArticleRemovalPatterns.$inferSelect;
+export type InsertDocketArticleRemovalPattern = z.infer<typeof insertDocketArticleRemovalPatternSchema>;
 
-export type DocktalkNotificationPreferences = typeof docktalkNotificationPreferences.$inferSelect;
-export type InsertDocktalkNotificationPreferences = z.infer<typeof insertDocktalkNotificationPreferencesSchema>;
+export type DocketNotificationPreferences = typeof docketNotificationPreferences.$inferSelect;
+export type InsertDocketNotificationPreferences = z.infer<typeof insertDocketNotificationPreferencesSchema>;
 
 // ============================================================================
 // EXIT STRATEGY SUITE - Integrated with Modeling Projects
@@ -20667,11 +20667,11 @@ export type CrmListItem = typeof crmListItems.$inferSelect;
 export type InsertCrmListItem = z.infer<typeof insertCrmListItemSchema>;
 
 // ============================================================================
-// DockTalk 2.0 Schema Integration
-// Re-export all DockTalk tables, types, and schemas from docktalk-schema.ts
+// Docket 2.0 Schema Integration
+// Re-export all Docket tables, types, and schemas from docket-schema.ts
 // This makes them discoverable to Drizzle migrations while keeping schemas modular
 // ============================================================================
-export * from "./docktalk-schema";
+export * from "./docket-schema";
 
 // ============================================================================
 // Financial Kernel Schema Integration
@@ -23610,9 +23610,9 @@ export type InsertValuatorProjectContext = z.infer<typeof insertValuatorProjectC
 export * from "./models/auth";
 
 // ============================================================================
-// DOCKTALK_KEYWORD_BANK - Configurable keywords for article filtering
+// DOCKET_KEYWORD_BANK - Configurable keywords for article filtering
 // ============================================================================
-export const docktalkKeywordCategoryEnum = pgEnum('docktalk_keyword_category', [
+export const docketKeywordCategoryEnum = pgEnum('docket_keyword_category', [
   'marina',
   'investment', 
   'operations',
@@ -23621,11 +23621,11 @@ export const docktalkKeywordCategoryEnum = pgEnum('docktalk_keyword_category', [
   'required'  // Keywords that MUST appear for article to be included
 ]);
 
-export const docktalkKeywordBank = pgTable('docktalk_keyword_bank', {
+export const docketKeywordBank = pgTable('docket_keyword_bank', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   keyword: varchar("keyword", { length: 100 }).notNull(),
-  category: docktalkKeywordCategoryEnum("category").notNull().default('marina'),
+  category: docketKeywordCategoryEnum("category").notNull().default('marina'),
   weight: integer("weight").notNull().default(5), // Scoring weight (1-10)
   isActive: boolean("is_active").notNull().default(true),
   isRequired: boolean("is_required").notNull().default(false), // If true, article must match at least one required keyword
@@ -23633,15 +23633,15 @@ export const docktalkKeywordBank = pgTable('docktalk_keyword_bank', {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  orgIdx: index('docktalk_keyword_bank_org_idx').on(table.orgId),
-  categoryIdx: index('docktalk_keyword_bank_category_idx').on(table.category),
-  keywordIdx: index('docktalk_keyword_bank_keyword_idx').on(table.keyword),
+  orgIdx: index('docket_keyword_bank_org_idx').on(table.orgId),
+  categoryIdx: index('docket_keyword_bank_category_idx').on(table.category),
+  keywordIdx: index('docket_keyword_bank_keyword_idx').on(table.keyword),
 }));
 
 // ============================================================================
-// DOCKTALK_SCORING_CONFIG - Global scoring configuration per organization
+// DOCKET_SCORING_CONFIG - Global scoring configuration per organization
 // ============================================================================
-export const docktalkScoringConfig = pgTable('docktalk_scoring_config', {
+export const docketScoringConfig = pgTable('docket_scoring_config', {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   orgId: varchar("org_id").notNull().unique().references(() => organizations.id, { onDelete: "cascade" }),
   minimumScore: integer("minimum_score").notNull().default(40), // Minimum score to include article (0-100)
@@ -23655,26 +23655,26 @@ export const docktalkScoringConfig = pgTable('docktalk_scoring_config', {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  orgIdx: index('docktalk_scoring_config_org_idx').on(table.orgId),
+  orgIdx: index('docket_scoring_config_org_idx').on(table.orgId),
 }));
 
 // Insert/Select schemas for keyword bank
-export const insertDocktalkKeywordBankSchema = createInsertSchema(docktalkKeywordBank).omit({
+export const insertDocketKeywordBankSchema = createInsertSchema(docketKeywordBank).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
-export type InsertDocktalkKeywordBank = z.infer<typeof insertDocktalkKeywordBankSchema>;
-export type DocktalkKeywordBank = typeof docktalkKeywordBank.$inferSelect;
+export type InsertDocketKeywordBank = z.infer<typeof insertDocketKeywordBankSchema>;
+export type DocketKeywordBank = typeof docketKeywordBank.$inferSelect;
 
 // Insert/Select schemas for scoring config
-export const insertDocktalkScoringConfigSchema = createInsertSchema(docktalkScoringConfig).omit({
+export const insertDocketScoringConfigSchema = createInsertSchema(docketScoringConfig).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
-export type InsertDocktalkScoringConfig = z.infer<typeof insertDocktalkScoringConfigSchema>;
-export type DocktalkScoringConfig = typeof docktalkScoringConfig.$inferSelect;
+export type InsertDocketScoringConfig = z.infer<typeof insertDocketScoringConfigSchema>;
+export type DocketScoringConfig = typeof docketScoringConfig.$inferSelect;
 
 // ============================================================================
 // AI USAGE TRACKING - Track AI API calls and costs

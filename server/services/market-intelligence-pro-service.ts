@@ -2,7 +2,7 @@
  * Market Intelligence Pro Service
  * 
  * Provides AI-powered cross-module analysis and investor-grade insights
- * by aggregating data from CRM, Due Diligence, Modeling, and DockTalk.
+ * by aggregating data from CRM, Due Diligence, Modeling, and Docket.
  * 
  * Requires analytics_pro pack subscription.
  */
@@ -208,7 +208,7 @@ function formatDataForPrompt(data: ModuleData): string {
       }
     });
 
-    sections.push(`## MARKET NEWS & DOCKTALK
+    sections.push(`## MARKET NEWS & DOCKET
 - Recent Articles: ${data.newsArticles.length}
 - Categories: ${Object.entries(categoryDistribution).slice(0, 5).map(([c, n]) => `${c}(${n})`).join(', ')}
 - Sentiment: Positive(${sentimentCounts.positive}), Neutral(${sentimentCounts.neutral}), Negative(${sentimentCounts.negative})

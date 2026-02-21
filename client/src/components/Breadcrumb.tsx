@@ -22,7 +22,7 @@ const CATEGORIES = {
   DUE_DILIGENCE: { label: 'Due Diligence', href: '/dd/projects', icon: FolderKanban },
   VDR: { label: 'VDR', href: '/vdr', icon: FolderLock },
   MODELING: { label: 'Financial Model', href: '/modeling/projects', icon: TrendingUp },
-  DOCKTALK: { label: 'The Docket', href: '/docktalk', icon: MessageSquare },
+  DOCKET: { label: 'The Docket', href: '/docket', icon: MessageSquare },
   ANALYSIS: { label: 'Market Intelligence', href: '/analysis/sales-comps', icon: BarChart3 },
   MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },
 };
@@ -581,24 +581,24 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'Data Request' },
   ],
   
-  '/docktalk': [
-    CATEGORIES.DOCKTALK,
+  '/docket': [
+    CATEGORIES.DOCKET,
     { label: 'News Feed' },
   ],
-  '/docktalk/feed': [
-    CATEGORIES.DOCKTALK,
+  '/docket/feed': [
+    CATEGORIES.DOCKET,
     { label: 'News Feed' },
   ],
-  '/docktalk/deals': [
-    CATEGORIES.DOCKTALK,
+  '/docket/deals': [
+    CATEGORIES.DOCKET,
     { label: 'M&A Deals' },
   ],
-  '/docktalk/sources': [
-    CATEGORIES.DOCKTALK,
+  '/docket/sources': [
+    CATEGORIES.DOCKET,
     { label: 'Sources' },
   ],
-  '/docktalk/training': [
-    CATEGORIES.DOCKTALK,
+  '/docket/training': [
+    CATEGORIES.DOCKET,
     { label: 'AI Training' },
   ],
   

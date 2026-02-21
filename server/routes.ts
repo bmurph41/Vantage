@@ -39,7 +39,7 @@ import marinamatchRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
 import omBuilderRouter from "./routes/om-builder-routes";
 import documentBuilderRouter from "./routes/document-builder-routes";
-import scraperV2Routes from "./docktalk/scraper_v2/routes";
+import scraperV2Routes from "./docket/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
 import pnlRouter from "./services/pnl/routes";
@@ -491,8 +491,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/forms", authenticateUser, enforceTenant);
   app.use("/api/form-templates", authenticateUser, enforceTenant);
   app.use("/api/form-fields", authenticateUser, enforceTenant);
-  app.use("/api/docktalk", authenticateUser, enforceTenant);
-  app.use("/api/docktalk/v2", authenticateUser, enforceTenant, scraperV2Routes);
+  app.use("/api/docket", authenticateUser, enforceTenant);
+  app.use("/api/docket/v2", authenticateUser, enforceTenant, scraperV2Routes);
   app.use("/api/pnl", authenticateUser, enforceTenant, pnlRouter);
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
   app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
@@ -565,7 +565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [salesResult, rateResult, dealsResult] = await Promise.all([
         db.execute(sql`SELECT COUNT(*)::int as count FROM sales_comps WHERE org_id = ${orgId}`),
         db.execute(sql`SELECT COUNT(*)::int as count FROM rate_comps WHERE org_id = ${orgId}`),
-        db.execute(sql`SELECT COUNT(*)::int as count FROM docktalk_deals`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM docket_deals`),
       ]);
 
       let marketRatesCount = 0;
@@ -30371,7 +30371,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           ],
         },
         {
-          key: 'docktalk',
+          key: 'docket',
           name: 'The Docket Intelligence',
           icon: 'Radio',
           metrics: [
@@ -31418,27 +31418,27 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // Get recent DockTalk deals for detail panel
-  app.get('/api/docktalk/articles/recent', authenticateUser, async (req: any, res) => {
+  // Get recent Docket deals for detail panel
+  app.get('/api/docket/articles/recent', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { docktalkDeals } = await import('@shared/schema');
+      const { docketDeals } = await import('@shared/schema');
       const { desc, isNull, and } = await import('drizzle-orm');
       
       const deals = await db
         .select({
-          id: docktalkDeals.id,
-          buyer: docktalkDeals.buyer,
-          seller: docktalkDeals.seller,
-          transactionType: docktalkDeals.transactionType,
-          dealStatus: docktalkDeals.dealStatus,
-          assetDescription: docktalkDeals.assetDescription,
-          closingDate: docktalkDeals.closingDate,
-          createdAt: docktalkDeals.createdAt,
+          id: docketDeals.id,
+          buyer: docketDeals.buyer,
+          seller: docketDeals.seller,
+          transactionType: docketDeals.transactionType,
+          dealStatus: docketDeals.dealStatus,
+          assetDescription: docketDeals.assetDescription,
+          closingDate: docketDeals.closingDate,
+          createdAt: docketDeals.createdAt,
         })
-        .from(docktalkDeals)
-        .where(and(eq(docktalkDeals.orgId, orgId), isNull(docktalkDeals.deletedAt)))
-        .orderBy(desc(docktalkDeals.createdAt))
+        .from(docketDeals)
+        .where(and(eq(docketDeals.orgId, orgId), isNull(docketDeals.deletedAt)))
+        .orderBy(desc(docketDeals.createdAt))
         .limit(20);
 
       res.json(deals);
@@ -31795,7 +31795,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         'rent-roll',
         'due-diligence',
         'vdr-activity',
-        'docktalk-feed',
+        'docket-feed',
         'fuel-operations',
         'ship-store',
       ];

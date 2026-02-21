@@ -25,8 +25,8 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 - **COA-Based Financial Normalization Engine**: Full Chart of Accounts management with import/manual entry and mapping to 69 seeded `mm_standard_accounts`. Non-blocking post-parse normalization trigger.
 - **COA Taxonomy & Auto-Mapping System**: Multi-asset-class taxonomy engine (`server/services/coa-mapping-engine.ts`, `server/services/coa-taxonomy-seed.ts`, `server/routes/coa-taxonomy-routes.ts`). DB tables: `coa_taxonomy_packs`, `coa_profit_centers`, `coa_sub_centers`, `coa_canonical_accounts`, `coa_global_aliases`, `coa_user_aliases`, `coa_mapping_rules`, `coa_mapped_line_items`, `coa_mapping_audit_log` with 7 enums. Marina pack seeded with 16 profit centers, 18 sub-centers, 58 canonical accounts, 95 global aliases, 22 mapping rules. 3-layer mapping engine: exact alias → rules (keyword/regex/class-location) → keyword similarity, with confidence scoring and auto-approve threshold (≥0.90). Auto-maps after doc-intel parsing. Review UI: `CoaMappingReview.tsx` (stats, filter tabs, approve/override/bulk-approve, alias creation). Departmental P&L: `DepartmentalPL.tsx` (profit center waterfall, CSV export). Routes under `/api/coa-taxonomy/`. Tenant-scoped with upload ownership verification.
 - **Pro Forma Engine**: Institutional-grade P&L waterfall with year-specific granular growth rates and inline assumptions editor. Supports below-the-line cash flow calculations and exit year waterfall. IRR calculated on levered cash flows. Includes T12-Aware Year 1 Logic for calendar year-end or next 12 months projections.
-- **Content Aggregation**: DockTalk 2.0 for industry intelligence and Listing Ingestion V2 for robust listing aggregation.
-- **Cross-Module Architecture**: Connects CRM, Due Diligence, Modeling, and DockTalk via schema consolidation, a query key factory, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
+- **Content Aggregation**: Docket 2.0 for industry intelligence and Listing Ingestion V2 for robust listing aggregation.
+- **Cross-Module Architecture**: Connects CRM, Due Diligence, Modeling, and Docket via schema consolidation, a query key factory, a Deal Orchestrator Service, Entity Linking API, and a Cross-Module Event System.
 - **Marina Integration Adapters**: Abstract framework for connecting to various marina management systems (e.g., DockMaster, Dockwa).
 - **Operations Data Sync**: Connects Fuel Sales, Rent Roll V2, and Ship Store modules to marina integrations with real-time sync, enriching the Pro Forma Engine.
 - **Valuator Profit Centers**: Provides full CRUD for various marina profit centers.
@@ -42,7 +42,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 - **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence, Scenario Versioning, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
 - **Operations Modules**: Fuel Sales, Ship Store, Dockit (scheduling), and Marketing.
 - **Virtual Data Room (VDR)**: Secure document management with granular permissions and audit logging.
-- **DockTalk 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, and sentiment analysis.
+- **Docket 2.0**: Industry intelligence, AI-powered RSS aggregation, M&A tracking, and sentiment analysis.
 - **Listing Ingestion V2**: Institutional-grade listing aggregation pipeline with identity resolution and validation.
 - **Analytics**: Marina KPI Calculator, ancillary revenue tracking, benchmarking, and Unified Cross-Module Analytics Dashboard.
 - **AI Assistant**: Context-aware chatbot powered by GPT-5 with streaming responses.

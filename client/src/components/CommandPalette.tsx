@@ -94,7 +94,7 @@ const navigationItems = [
   { name: 'Fuel Sales', href: '/operations/fuel/dashboard', icon: Fuel, category: 'Operations' },
   { name: 'Ship Store', href: '/operations/ship-store/dashboard', icon: Package, category: 'Operations' },
   { name: 'VDR', href: '/vdr', icon: FolderLock, category: 'Documents' },
-  { name: 'The Docket', href: '/docktalk', icon: MessageSquare, category: 'Intelligence' },
+  { name: 'The Docket', href: '/docket', icon: MessageSquare, category: 'Intelligence' },
   { name: 'Settings', href: '/settings', icon: Settings, category: 'System' },
 ];
 

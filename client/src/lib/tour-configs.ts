@@ -7,7 +7,7 @@ export const TOUR_IDS = {
   CRM_COMPANIES: "crm-companies",
   CRM_PROPERTIES: "crm-properties",
   DUE_DILIGENCE: "due-diligence",
-  DOCKTALK: "docktalk",
+  DOCKET: "docket",
   RENT_ROLL: "rent-roll",
   VALUATOR: "valuator",
   FUEL_SALES: "fuel-sales",
@@ -106,9 +106,9 @@ export const dueDiligenceTourSteps: TourStep[] = [
   },
 ];
 
-export const docktalkTourSteps: TourStep[] = [
+export const docketTourSteps: TourStep[] = [
   {
-    target: '[data-tour="docktalk-feed"]',
+    target: '[data-tour="docket-feed"]',
     content: "Your curated feed of marina M&A activity and market trends. Track deal flow, recent transactions, and investment opportunities across the marina industry.",
     title: "M&A Spotlight",
     placement: "bottom",
@@ -346,8 +346,8 @@ export function getTourConfig(tourId: TourId): { steps: TourStep[]; videoUrl?: s
       return { steps: crmDealsTourSteps };
     case TOUR_IDS.DUE_DILIGENCE:
       return { steps: dueDiligenceTourSteps };
-    case TOUR_IDS.DOCKTALK:
-      return { steps: docktalkTourSteps };
+    case TOUR_IDS.DOCKET:
+      return { steps: docketTourSteps };
     case TOUR_IDS.FUEL_SALES:
       return { steps: fuelSalesTourSteps };
     case TOUR_IDS.SHIP_STORE:

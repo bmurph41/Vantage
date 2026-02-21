@@ -1,8 +1,8 @@
-import { V2_CONFIG } from '../../docktalk/scraper_v2/config';
-import { extractDomain } from '../../docktalk/scraper_v2/utils/url';
-import { contentHash } from '../../docktalk/scraper_v2/utils/hash';
-import { waitForToken, exponentialBackoff, sleep, acquireHostSlot, releaseHostSlot } from '../../docktalk/scraper_v2/utils/rateLimit';
-import { fetchRobotsRules, isUrlAllowed } from '../../docktalk/scraper_v2/utils/robots';
+import { V2_CONFIG } from '../../docket/scraper_v2/config';
+import { extractDomain } from '../../docket/scraper_v2/utils/url';
+import { contentHash } from '../../docket/scraper_v2/utils/hash';
+import { waitForToken, exponentialBackoff, sleep, acquireHostSlot, releaseHostSlot } from '../../docket/scraper_v2/utils/rateLimit';
+import { fetchRobotsRules, isUrlAllowed } from '../../docket/scraper_v2/utils/robots';
 import { smartFetch } from './headless-fetcher';
 
 export interface RobustFetchOptions {

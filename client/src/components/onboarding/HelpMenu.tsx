@@ -39,7 +39,7 @@ const routeToTourMap: Record<string, TourId> = {
   "/crm/companies": TOUR_IDS.CRM_COMPANIES,
   "/crm/properties": TOUR_IDS.CRM_PROPERTIES,
   "/projects": TOUR_IDS.DUE_DILIGENCE,
-  "/analysis/docktalk": TOUR_IDS.DOCKTALK,
+  "/analysis/docket": TOUR_IDS.DOCKET,
   "/rent-roll": TOUR_IDS.RENT_ROLL,
   "/modeling": TOUR_IDS.VALUATOR,
   "/operations/fuel": TOUR_IDS.FUEL_SALES,

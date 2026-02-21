@@ -24,12 +24,12 @@
 3. `express.json/urlencoded` - Body parsing
 4. `requestLoggingMiddleware` - Pino HTTP logging
 5. Route handlers registered via `registerRoutes()`
-6. DockTalk routes registered separately
+6. Docket routes registered separately
 7. `centralizedErrorHandler` - Error handling
 
 ### 1.3 Schema Location
 - **Primary**: `shared/schema.ts` (15,000+ lines)
-- **DockTalk**: `shared/docktalk-schema.ts`
+- **Docket**: `shared/docket-schema.ts`
 - **Pattern**: Drizzle ORM with `pgTable`, `pgEnum`, `createInsertSchema`
 - **Migrations**: Uses `npm run db:push` (schema-first approach)
 

@@ -323,15 +323,15 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'marinalytics',
     label: 'Market Intelligence',
     icon: BarChart3,
-    matchRoutes: ['/marinalytics', '/analytics', '/docktalk', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis'],
+    matchRoutes: ['/marinalytics', '/analytics', '/docket', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis'],
     requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
     children: [
       {
-        id: 'docktalk',
+        id: 'docket',
         label: 'The Docket',
-        href: '/marinalytics/docktalk',
+        href: '/marinalytics/docket',
         icon: Newspaper,
-        matchRoutes: ['/marinalytics/docktalk', '/docktalk'],
+        matchRoutes: ['/marinalytics/docket', '/docket'],
         requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
       },
       {

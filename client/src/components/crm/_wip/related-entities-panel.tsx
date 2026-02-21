@@ -9,7 +9,7 @@
  * - Related deals
  * - DD projects
  * - Modeling projects
- * - DockTalk articles (related news)
+ * - Docket articles (related news)
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -233,7 +233,7 @@ export function RelatedEntitiesPanel({
           />
         )}
 
-        {/* DockTalk Articles Section */}
+        {/* Docket Articles Section */}
         {related.articles && related.articles.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

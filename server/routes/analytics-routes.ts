@@ -30,7 +30,7 @@ import {
   analyticsReportSchedules,
   insertAnalyticsReportScheduleSchema,
 } from '@shared/schema';
-import { articles } from '@shared/docktalk-schema';
+import { articles } from '@shared/docket-schema';
 import { eq, sql, count, and, gte, lte, lt, desc, asc, inArray } from 'drizzle-orm';
 
 const router = Router();

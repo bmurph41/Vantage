@@ -36,7 +36,7 @@ const CALENDAR_PROVIDERS = [
 const TOUR_INFO = [
   { id: TOUR_IDS.DASHBOARD, name: "Dashboard", description: "Overview of your marina acquisitions", route: "/" },
   { id: TOUR_IDS.DEALS, name: "CRM Deals", description: "Manage your deal pipeline", route: "/deals" },
-  { id: TOUR_IDS.DOCKTALK, name: "The Docket", description: "M&A intelligence feed", route: "/docktalk" },
+  { id: TOUR_IDS.DOCKET, name: "The Docket", description: "M&A intelligence feed", route: "/docket" },
   { id: TOUR_IDS.FUEL_SALES, name: "Fuel Sales", description: "Track fuel operations", route: "/operations/fuel" },
   { id: TOUR_IDS.SHIP_STORE, name: "Ship Store", description: "Retail inventory tracking", route: "/operations/ship-store" },
   { id: TOUR_IDS.COMMERCIAL_TENANTS, name: "Commercial Tenants", description: "Lease management", route: "/operations/commercial-tenants" },

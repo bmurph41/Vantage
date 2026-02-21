@@ -359,18 +359,18 @@
 
 ---
 
-## DockTalk (`/api/docktalk/*`)
+## Docket (`/api/docket/*`)
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| GET | `/api/docktalk/articles` | List articles |
-| GET | `/api/docktalk/articles/:id` | Get article |
-| GET | `/api/docktalk/sources` | RSS sources |
-| POST | `/api/docktalk/sources` | Add source |
-| POST | `/api/docktalk/scrape` | Trigger scrape |
-| GET | `/api/docktalk/keywords` | Keywords |
-| POST | `/api/docktalk/keywords` | Add keyword |
-| GET | `/api/docktalk/analytics` | Analytics |
+| GET | `/api/docket/articles` | List articles |
+| GET | `/api/docket/articles/:id` | Get article |
+| GET | `/api/docket/sources` | RSS sources |
+| POST | `/api/docket/sources` | Add source |
+| POST | `/api/docket/scrape` | Trigger scrape |
+| GET | `/api/docket/keywords` | Keywords |
+| POST | `/api/docket/keywords` | Add keyword |
+| GET | `/api/docket/analytics` | Analytics |
 
 ---
 
