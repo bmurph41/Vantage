@@ -899,6 +899,8 @@ export default function UnifiedSidebar() {
                 <NavLink item={{ name: "Customers", href: "/admin/customers" }} />
                 <NavLink item={{ name: "Organizations", href: "/admin/organizations" }} />
                 <NavLink item={{ name: "Activity Log", href: "/admin/audit-trail" }} />
+                <NavLink item={{ name: "Data Sources", href: "/admin/data-sources" }} />
+                <NavLink item={{ name: "Asset Classes", href: "/admin/asset-classes" }} />
               </>
             )}
           </div>

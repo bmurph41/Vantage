@@ -25721,3 +25721,235 @@ export type InsertLoan = z.infer<typeof insertLoanSchema>;
 export type UpdateLoan = z.infer<typeof updateLoanSchema>;
 
 export type LoanSchedule = typeof loanSchedules.$inferSelect;
+
+// =============================================
+// MULTI-ASSET PROPERTY DATA FRAMEWORK
+// =============================================
+
+export const platformAssetClassEnum = pgEnum("platform_asset_class", [
+  "sfr",
+  "duplex",
+  "triplex",
+  "quadplex",
+  "multifamily",
+  "str_airbnb",
+  "marina",
+  "rv_park",
+  "self_storage",
+  "mobile_home",
+  "hotel",
+  "mixed_use",
+  "office",
+  "retail",
+  "industrial",
+  "land",
+]);
+
+export const assetClassCategoryEnum = pgEnum("asset_class_category", [
+  "residential",
+  "commercial",
+  "hospitality",
+  "specialty",
+  "land",
+]);
+
+export const dataSourceProviderTypeEnum = pgEnum("data_source_provider_type", [
+  "api",
+  "feed",
+  "aggregator",
+  "scraper",
+]);
+
+export const dataSourceStatusEnum = pgEnum("data_source_status", [
+  "disconnected",
+  "connected",
+  "syncing",
+  "error",
+  "rate_limited",
+  "suspended",
+]);
+
+export const dataSourceAuthTypeEnum = pgEnum("data_source_auth_type", [
+  "api_key",
+  "oauth2",
+  "basic",
+  "rets",
+  "none",
+]);
+
+export const syncFrequencyEnum = pgEnum("sync_frequency", [
+  "realtime",
+  "hourly",
+  "daily",
+  "weekly",
+  "monthly",
+  "manual",
+]);
+
+export const syncLogStatusEnum = pgEnum("sync_log_status", [
+  "started",
+  "completed",
+  "failed",
+  "partial",
+  "cancelled",
+]);
+
+export const platformAssetClasses = pgTable("platform_asset_classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: platformAssetClassEnum("key").notNull().unique(),
+  label: varchar("label", { length: 100 }).notNull(),
+  shortLabel: varchar("short_label", { length: 30 }),
+  category: assetClassCategoryEnum("category").notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }),
+  enabled: boolean("enabled").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  config: jsonb("config").default(sql`'{}'`),
+  enabledModules: jsonb("enabled_modules").default(sql`'[]'`),
+  defaultDataSources: jsonb("default_data_sources").default(sql`'[]'`),
+  coaTaxonomyPackKey: varchar("coa_taxonomy_pack_key", { length: 50 }),
+  ddTemplateKey: varchar("dd_template_key", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  categoryIdx: index("pac_category_idx").on(table.category),
+  enabledIdx: index("pac_enabled_idx").on(table.enabled),
+}));
+
+export const insertPlatformAssetClassSchema = createInsertSchema(platformAssetClasses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPlatformAssetClass = z.infer<typeof insertPlatformAssetClassSchema>;
+export type PlatformAssetClass = typeof platformAssetClasses.$inferSelect;
+
+export const platformDataSources = pgTable("platform_data_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  providerType: dataSourceProviderTypeEnum("provider_type").notNull(),
+  authType: dataSourceAuthTypeEnum("auth_type").notNull(),
+  baseUrl: varchar("base_url", { length: 500 }),
+  credentials: jsonb("credentials").default(sql`'{}'`),
+  rateLimits: jsonb("rate_limits").default(sql`'{}'`),
+  status: dataSourceStatusEnum("status").notNull().default("disconnected"),
+  statusMessage: text("status_message"),
+  lastTestedAt: timestamp("last_tested_at"),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncFrequency: syncFrequencyEnum("sync_frequency").notNull().default("daily"),
+  syncConfig: jsonb("sync_config").default(sql`'{}'`),
+  supportedAssetClasses: text("supported_asset_classes").array().default(sql`'{}'`),
+  capabilities: jsonb("capabilities").default(sql`'{}'`),
+  enabled: boolean("enabled").notNull().default(false),
+  totalRecordsSynced: integer("total_records_synced").default(0),
+  errorCount: integer("error_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("pds_status_idx").on(table.status),
+  enabledIdx: index("pds_enabled_idx").on(table.enabled),
+}));
+
+export const insertPlatformDataSourceSchema = createInsertSchema(platformDataSources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  totalRecordsSynced: true,
+  errorCount: true,
+});
+export type InsertPlatformDataSource = z.infer<typeof insertPlatformDataSourceSchema>;
+export type PlatformDataSource = typeof platformDataSources.$inferSelect;
+
+export const platformDataSourceMappings = pgTable("platform_data_source_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dataSourceId: varchar("data_source_id").notNull().references(() => platformDataSources.id, { onDelete: "cascade" }),
+  sourceEntity: varchar("source_entity", { length: 100 }).notNull(),
+  targetModule: varchar("target_module", { length: 50 }).notNull(),
+  targetEntity: varchar("target_entity", { length: 100 }).notNull(),
+  fieldMappings: jsonb("field_mappings").notNull(),
+  transformRules: jsonb("transform_rules").default(sql`'[]'`),
+  syncDirection: varchar("sync_direction", { length: 20 }).notNull().default("read"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dataSourceIdx: index("pdsm_source_idx").on(table.dataSourceId),
+}));
+
+export const insertPlatformDataSourceMappingSchema = createInsertSchema(platformDataSourceMappings).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPlatformDataSourceMapping = z.infer<typeof insertPlatformDataSourceMappingSchema>;
+export type PlatformDataSourceMapping = typeof platformDataSourceMappings.$inferSelect;
+
+export const propertyDataCache = pgTable("property_data_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceId: varchar("source_id").references(() => platformDataSources.id, { onDelete: "set null" }),
+  sourcePropertyId: varchar("source_property_id", { length: 200 }),
+  assetClass: platformAssetClassEnum("asset_class"),
+  addressStreet: varchar("address_street", { length: 300 }),
+  addressCity: varchar("address_city", { length: 100 }),
+  addressState: varchar("address_state", { length: 10 }),
+  addressZip: varchar("address_zip", { length: 20 }),
+  addressCounty: varchar("address_county", { length: 100 }),
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  propertyData: jsonb("property_data").default(sql`'{}'`),
+  valuationData: jsonb("valuation_data").default(sql`'{}'`),
+  listingData: jsonb("listing_data").default(sql`'{}'`),
+  marketData: jsonb("market_data").default(sql`'{}'`),
+  rawPayload: jsonb("raw_payload"),
+  orgId: varchar("org_id"),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  addressHash: varchar("address_hash", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  sourceIdx: index("pdc_source_idx").on(table.sourceId),
+  assetClassIdx: index("pdc_asset_class_idx").on(table.assetClass),
+  addressHashIdx: index("pdc_address_hash_idx").on(table.addressHash),
+  locationIdx: index("pdc_location_idx").on(table.addressState, table.addressCity, table.addressZip),
+  orgIdx: index("pdc_org_idx").on(table.orgId),
+  expiresIdx: index("pdc_expires_idx").on(table.expiresAt),
+}));
+
+export const insertPropertyDataCacheSchema = createInsertSchema(propertyDataCache).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPropertyDataCache = z.infer<typeof insertPropertyDataCacheSchema>;
+export type PropertyDataCache = typeof propertyDataCache.$inferSelect;
+
+export const dataSourceSyncLogs = pgTable("data_source_sync_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dataSourceId: varchar("data_source_id").notNull().references(() => platformDataSources.id, { onDelete: "cascade" }),
+  status: syncLogStatusEnum("status").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  recordsFetched: integer("records_fetched").default(0),
+  recordsCreated: integer("records_created").default(0),
+  recordsUpdated: integer("records_updated").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  errorMessage: text("error_message"),
+  errorDetails: jsonb("error_details"),
+  triggeredBy: varchar("triggered_by", { length: 50 }),
+  triggeredByUserId: varchar("triggered_by_user_id"),
+  syncParams: jsonb("sync_params").default(sql`'{}'`),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dataSourceIdx: index("dssl_source_idx").on(table.dataSourceId),
+  statusIdx: index("dssl_status_idx").on(table.status),
+  startedIdx: index("dssl_started_idx").on(table.startedAt),
+}));
+
+export const insertDataSourceSyncLogSchema = createInsertSchema(dataSourceSyncLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDataSourceSyncLog = z.infer<typeof insertDataSourceSyncLogSchema>;
+export type DataSourceSyncLog = typeof dataSourceSyncLogs.$inferSelect;

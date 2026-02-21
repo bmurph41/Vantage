@@ -139,6 +139,8 @@ const CuratedDataDashboard = lazy(() => import("@/pages/admin/CuratedDataDashboa
 const AdminCustomersPage = lazy(() => import("@/pages/admin/AdminCustomersPage"));
 const AdminOrganizationsPage = lazy(() => import("@/pages/admin/AdminOrganizationsPage"));
 const AdminAuditTrailPage = lazy(() => import("@/pages/admin/AdminAuditTrailPage"));
+const DataSourcesAdmin = lazy(() => import("@/pages/admin/DataSourcesAdmin"));
+const AssetClassManager = lazy(() => import("@/pages/admin/AssetClassManager"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -608,6 +610,16 @@ function Router() {
             </FeatureGate>
           </UnifiedLayout>
         )}
+      </Route>
+      <Route path="/admin/data-sources">
+        <Suspense fallback={<PageLoader />}>
+          <DataSourcesAdmin />
+        </Suspense>
+      </Route>
+      <Route path="/admin/asset-classes">
+        <Suspense fallback={<PageLoader />}>
+          <AssetClassManager />
+        </Suspense>
       </Route>
       <Route path="/projects/:id">
         {(params) => (
@@ -2014,11 +2026,9 @@ function Router() {
         )}
       </Route>
       <Route path="/modeling/investment-criteria">
-        {() => (
-          <UnifiedLayout>
-            <InvestmentCriteria />
-          </UnifiedLayout>
-        )}
+        <Suspense fallback={<PageLoader />}>
+          <InvestmentCriteria />
+        </Suspense>
       </Route>
       <Route path="/modeling/settings">
         {() => (

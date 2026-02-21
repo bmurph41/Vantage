@@ -265,6 +265,7 @@ import fs from "fs-extra";
 import { exitStudioRouter } from './routes/exit-studio-routes';
 import coaRoutes from './routes/coa-routes';
 import coaTaxonomyRoutes from './routes/coa-taxonomy-routes';
+import { propertyDataRouter } from "./routes/property-data-routes";
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -438,32 +439,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
   app.use(authenticateUser, tourProgressRoutes);
   app.use(authenticateUser, searchRoutes);
-
-  app.post("/api/feedback", authenticateUser, async (req: any, res) => {
-    try {
-      const userId = req.validatedUserId || req.user?.id;
-      const orgId = req.validatedOrgId || req.user?.orgId;
-      const { category, message, page } = req.body;
-      console.log(`[Feedback] user=${userId} org=${orgId} category=${category} page=${page}: ${message}`);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      res.status(500).json({ message: "Failed to submit feedback" });
-    }
-  });
-
-  app.post("/api/support/contact", authenticateUser, async (req: any, res) => {
-    try {
-      const userId = req.validatedUserId || req.user?.id;
-      const orgId = req.validatedOrgId || req.user?.orgId;
-      const { subject, message, page } = req.body;
-      console.log(`[Support Contact] user=${userId} org=${orgId} subject=${subject} page=${page}: ${message}`);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error submitting support request:", error);
-      res.status(500).json({ message: "Failed to submit support request" });
-    }
-  });
   app.use("/api/crm", authenticateUser, bulkEmailRoutes);
   // Utilization module routes
   const { createUtilizationRouter } = await import('./modules/utilization/utilization-routes');
@@ -641,6 +616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ai-assistant", authenticateUser, aiAssistantRoutes);
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
   app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);
+  app.use(authenticateUser, propertyDataRouter);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {
