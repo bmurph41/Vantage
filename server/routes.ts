@@ -9570,8 +9570,8 @@ Current context: Project ${req.params.projectId}`;
         // Aggregate deal stats in a single query
         const dealStats = await db.select({
           totalDeals: sql<number>`count(*)`,
-          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost'))`,
-          wonDeals: sql<number>`count(*) filter (where stage = 'closed_won')`,
+          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost', 'closed', 'dead_lost'))`,
+          wonDeals: sql<number>`count(*) filter (where stage in ('closed_won', 'closed'))`,
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.primaryContactId, entityId),
@@ -9594,7 +9594,7 @@ Current context: Project ${req.params.projectId}`;
         // Aggregate deal stats in a single query
         const dealStats = await db.select({
           totalDeals: sql<number>`count(*)`,
-          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost'))`,
+          openDeals: sql<number>`count(*) filter (where stage not in ('closed_won', 'closed_lost', 'closed', 'dead_lost'))`,
           totalDealValue: sql<number>`coalesce(sum(value::numeric), 0)`,
         }).from(crmDeals).where(and(
           eq(crmDeals.companyId, entityId),
@@ -10920,7 +10920,7 @@ Current context: Project ${req.params.projectId}`;
       const dealData = {
         ...req.body,
         title: req.body.title || req.body.name || '',
-        stage: req.body.stage || req.body.status || 'lead',
+        stage: req.body.stage || req.body.status || 'prospect',
         ownerId: req.user.id,
         orgId,
       };
@@ -11519,7 +11519,7 @@ Current context: Project ${req.params.projectId}`;
           JOIN crm_deals d ON (d.buyer_company_id = c.id OR d.seller_company_id = c.id)
           WHERE c.org_id = ${orgId}
             AND d.org_id = ${orgId}
-            AND d.status NOT IN ('closed_won', 'closed_lost', 'dead')
+            AND d.status NOT IN ('closed_won', 'closed_lost', 'closed', 'dead_lost', 'dead')
         `);
         companiesWithActiveDeals = parseInt(activeDealsResult.rows[0]?.count as string || '0');
       } catch (e) {
@@ -17254,7 +17254,7 @@ Current context: Project ${req.params.projectId}`;
 
       if (source === 'all' || source === 'pipeline') {
         const { dealWorkspaces } = await import('@shared/schema');
-        const pipelineStages = ['lead', 'qualified', 'proposal', 'negotiation'];
+        const pipelineStages = ['prospect', 'initial_outreach', 'qualified', 'loi_submitted', 'loi_negotiated', 'loi_executed', 'psa_drafting', 'psa_executed', 'due_diligence', 'dd_extension', 'deposits_hard', 'financing', 'clear_to_close', 'lead', 'proposal', 'negotiation'];
         const dealConditions: any[] = [
           eq(crmDeals.orgId, orgId),
           inArray(crmDeals.stage, pipelineStages),
@@ -29799,7 +29799,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         }).from(dealsTable)
           .where(andFn(
             inArrayFn(dealsTable.ownerId, orgUserIds),
-            orFn(eq(dealsTable.stage, 'lead'), eq(dealsTable.stage, 'qualified'), eq(dealsTable.stage, 'proposal'), eq(dealsTable.stage, 'negotiation'))
+            orFn(eq(dealsTable.stage, 'prospect'), eq(dealsTable.stage, 'initial_outreach'), eq(dealsTable.stage, 'qualified'), eq(dealsTable.stage, 'loi_submitted'), eq(dealsTable.stage, 'loi_negotiated'), eq(dealsTable.stage, 'loi_executed'), eq(dealsTable.stage, 'psa_drafting'), eq(dealsTable.stage, 'psa_executed'), eq(dealsTable.stage, 'due_diligence'), eq(dealsTable.stage, 'financing'), eq(dealsTable.stage, 'clear_to_close'), eq(dealsTable.stage, 'lead'), eq(dealsTable.stage, 'proposal'), eq(dealsTable.stage, 'negotiation'))
           ));
         
         const listingsResult = await db.select({

@@ -49,7 +49,9 @@ import {
   AlertTriangle,
   LandPlot,
   KeyRound,
-  ChevronDown
+  ChevronDown,
+  Box,
+  BarChart3
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
@@ -67,6 +69,7 @@ interface OnboardingWizardProps {
 
 type DealType = "acquisition" | "refinance" | "owned_marina" | null;
 type DealStructure = "single" | "portfolio" | null;
+type WizardAssetClass = "marina" | "multifamily" | "retail" | "office" | "industrial" | "self_storage" | "mixed_use" | "hotel" | "str" | "sfr" | "duplex" | "laundromat" | "medical_office" | "business" | null;
 
 interface MarinaAddress {
   line1: string;
@@ -252,6 +255,7 @@ interface WizardOwnership {
 interface WizardState {
   step: number;
   dealStructure: DealStructure;
+  assetClass: WizardAssetClass;
   marinaName: string;
   marinaAddress: MarinaAddress;
   dealType: DealType;
@@ -295,16 +299,32 @@ const newProjectSteps = [
 const dealStructures = [
   {
     id: "single",
-    name: "Single Marina",
-    description: "One marina being evaluated or managed",
-    icon: Anchor,
+    name: "Single Asset",
+    description: "One property being evaluated or managed",
+    icon: Building2,
   },
   {
     id: "portfolio",
     name: "Portfolio Deal",
-    description: "Multiple marinas being evaluated as one deal",
+    description: "Multiple properties being evaluated as one deal",
     icon: Layers,
   },
+];
+
+const wizardAssetClasses = [
+  { id: "marina", name: "Marina", description: "Wet slips, dry storage, fuel docks", icon: Anchor, metric: "cap_rate" },
+  { id: "multifamily", name: "Multifamily", description: "Apartments, condos, townhomes", icon: Home, metric: "cap_rate" },
+  { id: "retail", name: "Retail", description: "Strip centers, NNN, shopping centers", icon: Store, metric: "cap_rate" },
+  { id: "office", name: "Office", description: "Class A/B/C office buildings", icon: Building2, metric: "cap_rate" },
+  { id: "industrial", name: "Industrial", description: "Warehouse, flex, distribution", icon: Warehouse, metric: "cap_rate" },
+  { id: "self_storage", name: "Self-Storage", description: "Climate and non-climate units", icon: Box, metric: "cap_rate" },
+  { id: "hotel", name: "Hotel / Hospitality", description: "Full service, limited service, boutique", icon: Building2, metric: "ebitda_multiple" },
+  { id: "str", name: "Short-Term Rental", description: "Vacation rentals, Airbnb portfolios", icon: Home, metric: "grm" },
+  { id: "medical_office", name: "Medical Office", description: "MOB, surgical centers, clinics", icon: Building2, metric: "cap_rate" },
+  { id: "mixed_use", name: "Mixed-Use", description: "Retail + residential/office combo", icon: Layers, metric: "cap_rate" },
+  { id: "laundromat", name: "Laundromat", description: "Coin-op and card-op laundry facilities", icon: Store, metric: "ebitda_multiple" },
+  { id: "sfr", name: "Single-Family Rental", description: "SFR portfolios and build-to-rent", icon: Home, metric: "grm" },
+  { id: "business", name: "Business / Other", description: "Operating businesses, other asset types", icon: Briefcase, metric: "ebitda_multiple" },
 ];
 
 const dealTypes = [
@@ -347,6 +367,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const getInitialState = useCallback((): WizardState => ({
     step: 1,
     dealStructure: mode === "new_project" ? "single" : null,
+    assetClass: null,
     marinaName: "",
     marinaAddress: { ...emptyAddress },
     dealType: mode === "new_project" ? "acquisition" : null,
@@ -494,6 +515,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const createDealMutation = useMutation({
     mutationFn: async (data: {
       dealStructure: DealStructure;
+      assetClass: WizardAssetClass;
       marinaName: string;
       marinaAddress: MarinaAddress;
       dealType: DealType;
@@ -519,6 +541,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               region: data.region || undefined,
               dealOutcome: data.dealStatus || 'active',
               customMetrics: { dealType: data.dealType, portfolioName: data.portfolioName || 'Untitled Portfolio' },
+              assetClass: data.assetClass || "marina",
             });
             const modelingProject = await projectRes.json();
             
@@ -553,6 +576,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           zipCode: data.marinaAddress.zip || undefined,
           region: data.region || undefined,
           dealOutcome: data.dealStatus || 'active',
+          assetClass: data.assetClass || "marina",
           customMetrics: { dealType: data.dealType },
         });
         const modelingProject = await projectRes.json();
@@ -667,6 +691,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         dealStatus: state.dealStatus,
         portfolioName: state.portfolioName,
         portfolioMarinas: state.portfolioMarinas,
+        assetClass: state.assetClass,
       });
     } else {
       toast({
@@ -938,42 +963,83 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   );
 
   const renderDealStructureStep = () => (
-    <div className="space-y-4">
-      <div className="text-center mb-6">
+    <div className="space-y-6">
+      <div className="text-center mb-4">
         <h3 className="text-lg font-semibold">What type of deal are you working on?</h3>
         <p className="text-sm text-muted-foreground">
-          Choose between a single marina or a portfolio of assets
+          Choose a deal structure and asset class
         </p>
       </div>
-      <RadioGroup
-        value={state.dealStructure || ""}
-        onValueChange={(value) => setState(s => ({ ...s, dealStructure: value as DealStructure }))}
-        className="space-y-3"
-      >
-        {dealStructures.map((structure) => (
-          <div
-            key={structure.id}
-            className={cn(
-              "flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors",
-              state.dealStructure === structure.id 
-                ? "border-[#1E4FAB] bg-[#1E4FAB]/5" 
-                : "hover:bg-muted/50"
-            )}
-            onClick={() => setState(s => ({ ...s, dealStructure: structure.id as DealStructure }))}
-          >
-            <RadioGroupItem value={structure.id} id={`structure-${structure.id}`} />
-            <div className="p-2 rounded-lg bg-muted">
-              <structure.icon className="h-5 w-5 text-[#1E4FAB]" />
+
+      {/* Deal Structure */}
+      <div>
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Deal Structure</Label>
+        <RadioGroup
+          value={state.dealStructure || ""}
+          onValueChange={(value) => setState(s => ({ ...s, dealStructure: value as DealStructure }))}
+          className="grid grid-cols-2 gap-3"
+        >
+          {dealStructures.map((structure) => (
+            <div
+              key={structure.id}
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                state.dealStructure === structure.id
+                  ? "border-[#1E4FAB] bg-[#1E4FAB]/5"
+                  : "hover:bg-muted/50"
+              )}
+              onClick={() => setState(s => ({ ...s, dealStructure: structure.id as DealStructure }))}
+            >
+              <RadioGroupItem value={structure.id} id={`structure-${structure.id}`} />
+              <div className="p-1.5 rounded-md bg-muted">
+                <structure.icon className="h-4 w-4 text-[#1E4FAB]" />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor={`structure-${structure.id}`} className="font-medium cursor-pointer text-sm">
+                  {structure.name}
+                </Label>
+                <p className="text-xs text-muted-foreground">{structure.description}</p>
+              </div>
             </div>
-            <div className="flex-1">
-              <Label htmlFor={`structure-${structure.id}`} className="font-medium cursor-pointer">
-                {structure.name}
-              </Label>
-              <p className="text-sm text-muted-foreground">{structure.description}</p>
+          ))}
+        </RadioGroup>
+      </div>
+
+      {/* Asset Class */}
+      <div>
+        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Asset Class</Label>
+        <div className="grid grid-cols-3 gap-2 max-h-[320px] overflow-y-auto pr-1">
+          {wizardAssetClasses.map((ac) => (
+            <div
+              key={ac.id}
+              className={cn(
+                "flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all text-left",
+                state.assetClass === ac.id
+                  ? "border-[#1E4FAB] bg-[#1E4FAB]/5 ring-1 ring-[#1E4FAB]/20"
+                  : "hover:bg-muted/50 hover:border-gray-300"
+              )}
+              onClick={() => setState(s => ({ ...s, assetClass: ac.id as WizardAssetClass }))}
+            >
+              <div className={cn(
+                "p-1.5 rounded-md shrink-0",
+                state.assetClass === ac.id ? "bg-[#1E4FAB]/10" : "bg-muted"
+              )}>
+                <ac.icon className={cn("h-4 w-4", state.assetClass === ac.id ? "text-[#1E4FAB]" : "text-gray-500")} />
+              </div>
+              <div className="min-w-0">
+                <p className={cn("text-xs font-medium truncate", state.assetClass === ac.id && "text-[#1E4FAB]")}>{ac.name}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{ac.description}</p>
+              </div>
             </div>
+          ))}
+        </div>
+        {state.assetClass && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground bg-gray-50 rounded-md px-3 py-1.5">
+            <BarChart3 className="h-3 w-3" />
+            <span>Primary metric: <strong className="text-foreground">{wizardAssetClasses.find(a => a.id === state.assetClass)?.metric === "cap_rate" ? "Cap Rate" : wizardAssetClasses.find(a => a.id === state.assetClass)?.metric === "grm" ? "GRM" : "EBITDA Multiple"}</strong> (editable later)</span>
           </div>
-        ))}
-      </RadioGroup>
+        )}
+      </div>
     </div>
   );
 

@@ -4049,7 +4049,95 @@ export const crmAccounts = pgTable("crm_accounts", {
 });
 
 // Deal stages enum
-export const dealStageEnum = ['lead', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'] as const;
+export const dealStageEnum = ['prospect', 'initial_outreach', 'qualified', 'loi_submitted', 'loi_negotiated', 'loi_executed', 'psa_drafting', 'psa_executed', 'due_diligence', 'dd_extension', 'deposits_hard', 'financing', 'clear_to_close', 'closed', 'transition', 'lease_up', 'stabilized', 'disposition', 'dead_lost'] as const;
+
+// Underwriting stages for Financial Model
+export const uwStageEnum = [
+  "not_started", "initial_screening", "data_collection", "building_model",
+  "sensitivity_analysis", "ic_review", "approved", "passed", "on_hold"
+] as const;
+export type UWStage = (typeof uwStageEnum)[number];
+
+export const uwStageLabels: Record<string, string> = {
+  not_started: "Not Started",
+  initial_screening: "Initial Screening",
+  data_collection: "Data Collection",
+  building_model: "Building Model",
+  sensitivity_analysis: "Sensitivity Analysis",
+  ic_review: "IC Review",
+  approved: "Approved",
+  passed: "Passed",
+  on_hold: "On Hold",
+};
+
+// Sub-statuses per UW stage
+export const uwSubStatuses: Record<string, { value: string; label: string }[]> = {
+  not_started: [
+    { value: "queued", label: "Queued" },
+    { value: "awaiting_om", label: "Awaiting OM" },
+  ],
+  initial_screening: [
+    { value: "reviewing_om", label: "Reviewing OM" },
+    { value: "back_of_envelope", label: "Back-of-Envelope" },
+    { value: "go_no_go", label: "Go/No-Go Decision" },
+  ],
+  data_collection: [
+    { value: "waiting_on_financials", label: "Waiting on Financials" },
+    { value: "waiting_on_rent_roll", label: "Waiting on Rent Roll" },
+    { value: "waiting_on_pnl", label: "Waiting on P\u0026L" },
+    { value: "waiting_on_leases", label: "Waiting on Leases" },
+    { value: "documents_received", label: "Documents Received" },
+  ],
+  building_model: [
+    { value: "revenue_assumptions", label: "Revenue Assumptions" },
+    { value: "expense_assumptions", label: "Expense Assumptions" },
+    { value: "debt_structuring", label: "Debt Structuring" },
+    { value: "exit_modeling", label: "Exit Modeling" },
+    { value: "reviewing", label: "Reviewing" },
+  ],
+  sensitivity_analysis: [
+    { value: "running_scenarios", label: "Running Scenarios" },
+    { value: "stress_testing", label: "Stress Testing" },
+    { value: "finalizing", label: "Finalizing" },
+  ],
+  ic_review: [
+    { value: "submitted", label: "Submitted to IC" },
+    { value: "questions_pending", label: "Questions Pending" },
+    { value: "revisions_requested", label: "Revisions Requested" },
+    { value: "final_review", label: "Final Review" },
+  ],
+  approved: [],
+  passed: [
+    { value: "pricing", label: "Pricing Too High" },
+    { value: "returns", label: "Returns Below Threshold" },
+    { value: "risk", label: "Risk Factors" },
+    { value: "timing", label: "Timing/Capacity" },
+    { value: "other", label: "Other" },
+  ],
+  on_hold: [
+    { value: "seller_delay", label: "Seller Delay" },
+    { value: "financing_delay", label: "Financing Delay" },
+    { value: "internal", label: "Internal Hold" },
+  ],
+};
+
+// Default valuation metric per asset class
+export const assetClassValuationDefaults: Record<string, { metric: string; label: string }> = {
+  marina: { metric: "cap_rate", label: "Cap Rate" },
+  multifamily: { metric: "cap_rate", label: "Cap Rate" },
+  retail: { metric: "cap_rate", label: "Cap Rate" },
+  office: { metric: "cap_rate", label: "Cap Rate" },
+  industrial: { metric: "cap_rate", label: "Cap Rate" },
+  self_storage: { metric: "cap_rate", label: "Cap Rate" },
+  mixed_use: { metric: "cap_rate", label: "Cap Rate" },
+  hotel: { metric: "ebitda_multiple", label: "EBITDA Multiple" },
+  str: { metric: "grm", label: "GRM" },
+  sfr: { metric: "grm", label: "GRM" },
+  duplex: { metric: "grm", label: "GRM" },
+  laundromat: { metric: "ebitda_multiple", label: "EBITDA Multiple" },
+  medical_office: { metric: "cap_rate", label: "Cap Rate" },
+  business: { metric: "ebitda_multiple", label: "EBITDA Multiple" },
+};
 
 // Lease types for marina properties
 export const leaseTypeOptions = [
@@ -10922,6 +11010,10 @@ export const modelingProjects = pgTable('modeling_projects', {
   totalStorageUnits: integer('total_storage_units'), // Total number of storage options (wet slips + dry racks, etc.)
   ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
   dealOutcome: dealOutcomeEnum('deal_outcome').notNull().default('active'),
+  assetClass: varchar("asset_class", { length: 50 }).default("marina"),
+  uwStage: varchar("uw_stage", { length: 50 }).default("not_started"),
+  uwSubStatus: varchar("uw_sub_status", { length: 50 }),
+  primaryValuationMetric: varchar("primary_valuation_metric", { length: 50 }).default("cap_rate"),
 
   // Broker/deal source
   brokerId: varchar('broker_id').references(() => crmContacts.id), // Broker who introduced the deal

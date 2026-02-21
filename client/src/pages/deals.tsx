@@ -170,10 +170,11 @@ export default function Deals() {
 
     // Calculate win rate based on closed deals
     const closedWonStage = stages?.find(s => 
-      s.name.toLowerCase().includes('closed') && s.name.toLowerCase().includes('won')
+      s.stageType === "won" || s.name.toLowerCase() === "closed"
     );
     const closedLostStage = stages?.find(s => 
-      s.name.toLowerCase().includes('closed') && s.name.toLowerCase().includes('lost')
+      s.stageType === "lost" || s.name.toLowerCase().includes("dead") || s.name.toLowerCase().includes("lost")
+    );
     );
 
     const wonDeals = closedWonStage 

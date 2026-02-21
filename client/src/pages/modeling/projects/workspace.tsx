@@ -46,6 +46,8 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject, DocIntelUpload } from '@shared/schema';
+import { uwStageLabels, uwSubStatuses } from '@shared/schema';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
 import { formatCurrency } from '@/lib/formatUtils';
@@ -448,6 +450,15 @@ export default function ProjectWorkspace() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
+    },
+  });
+  const uwStageMutation = useMutation({
+    mutationFn: (data: { uwStage?: string; uwSubStatus?: string }) =>
+      apiRequest("PATCH", `/api/modeling/projects/${projectId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/modeling/projects"] });
+      toast({ title: "Updated", description: "Underwriting status updated." });
     },
   });
 
