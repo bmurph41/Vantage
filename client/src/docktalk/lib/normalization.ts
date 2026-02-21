@@ -34,6 +34,7 @@ export function normalizeSavedSearchData(data: {
   entities?: string[] | null;
   emailAlerts?: boolean;
   alertFrequency?: string | null;
+  deliveryTime?: string | null;
 }) {
   const result: any = {};
   
@@ -57,6 +58,10 @@ export function normalizeSavedSearchData(data: {
   
   if (data.alertFrequency !== undefined) {
     result.alertFrequency = normalizeString(data.alertFrequency) || "none";
+  }
+
+  if (data.deliveryTime !== undefined) {
+    result.deliveryTime = data.deliveryTime || "09:00";
   }
   
   return result;

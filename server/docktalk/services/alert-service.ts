@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import type { SavedSearch, Article } from "@shared/docktalk-schema";
 import { getUncachableResendClient } from "../lib/resend-client";
+import { toZonedTime } from "date-fns-tz";
 
 export interface AlertNotification {
   searchId: string;
@@ -12,7 +13,7 @@ export interface AlertNotification {
 
 export async function processNewArticlesForAlerts(): Promise<void> {
   try {
-    const searches = await storage.getAllActiveSearchesWithAlerts();
+    const searches = await storage.getActiveSearchesForAlerts("immediate");
 
     if (searches.length === 0) {
       return;
@@ -30,10 +31,93 @@ export async function processNewArticlesForAlerts(): Promise<void> {
     }
 
     if (processedCount > 0) {
-      console.log(`[Alerts] Processed ${processedCount} alert(s) after new articles`);
+      console.log(`[Alerts] Processed ${processedCount} instant alert(s)`);
     }
   } catch (error) {
-    console.error(`[Alerts] Error processing alerts:`, error);
+    console.error(`[Alerts] Error processing instant alerts:`, error);
+  }
+}
+
+export async function processDailyAlerts(): Promise<void> {
+  await processScheduledAlerts("daily");
+}
+
+export async function processWeeklyAlerts(): Promise<void> {
+  await processScheduledAlerts("weekly");
+}
+
+async function processScheduledAlerts(frequency: "daily" | "weekly"): Promise<void> {
+  try {
+    const searches = await storage.getActiveSearchesForAlerts(frequency);
+
+    if (searches.length === 0) {
+      return;
+    }
+
+    let processedCount = 0;
+
+    for (const search of searches) {
+      try {
+        const shouldSend = await shouldSendAlertNow(search, frequency);
+        if (!shouldSend) {
+          continue;
+        }
+        await processSearchAlert(search);
+        processedCount++;
+      } catch (error) {
+        console.error(`[Alerts] Error processing ${frequency} alert for search ${search.id}:`, error);
+      }
+    }
+
+    if (processedCount > 0) {
+      console.log(`[Alerts] Processed ${processedCount} ${frequency} alert(s)`);
+    }
+  } catch (error) {
+    console.error(`[Alerts] Error processing ${frequency} alerts:`, error);
+  }
+}
+
+async function shouldSendAlertNow(search: SavedSearch, frequency: "daily" | "weekly"): Promise<boolean> {
+  try {
+    let timezone = (search as any).timezone;
+    let deliveryTime = (search as any).deliveryTime;
+
+    if (!timezone || !deliveryTime) {
+      const preferences = await storage.getUserNotificationPreferences(search.userId);
+      if (!preferences) {
+        return false;
+      }
+      timezone = timezone || preferences.timezone || "America/New_York";
+      deliveryTime = deliveryTime || preferences.deliveryTime || "09:00";
+    }
+
+    const now = new Date();
+    const userLocalTime = toZonedTime(now, timezone);
+    const currentHour = userLocalTime.getHours();
+    const currentMinute = userLocalTime.getMinutes();
+
+    const [targetHour, targetMinute] = deliveryTime.split(':').map(Number);
+
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const targetMinutes = targetHour * 60 + targetMinute;
+    const diff = Math.abs(currentMinutes - targetMinutes);
+
+    const dayMinutes = 24 * 60;
+    const wrapDiff = Math.min(diff, dayMinutes - diff);
+
+    const isWithinWindow = wrapDiff <= 7;
+
+    if (frequency === "weekly") {
+      const dayOfWeek = userLocalTime.getDay();
+      if (dayOfWeek !== 1) {
+        return false;
+      }
+    }
+
+    return isWithinWindow;
+  } catch (error) {
+    console.error(`[Alerts] Error checking alert timing for search ${search.id}:`, error);
+    return false;
   }
 }
 
@@ -153,7 +237,7 @@ async function sendNotification(notification: AlertNotification, search: SavedSe
       })),
       articleIds: notification.articles.map(a => a.id.toString()),
       articleCount: notification.newCount,
-      frequency: "immediate",
+      frequency: search.alertFrequency || "immediate",
       message: `${notification.newCount} new article${notification.newCount > 1 ? 's' : ''} for "${notification.searchName}"`,
       deliveryMethod,
       deliveryStatus,
@@ -222,7 +306,6 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
               <h2 style="color: #003366; margin: 0 0 8px 0;">7-Day Recap</h2>
               <p style="margin: 0; color: #555;">
                 Welcome! Here are all articles from the past 7 days matching your new search "<strong>${search.name}</strong>".
-                Going forward, you'll be notified as soon as new articles are published.
               </p>
             </div>
             
@@ -241,7 +324,7 @@ export async function sendNewSearchRecap(searchId: string, userId: string, orgId
           
           <div style="background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666;">
             <p style="margin: 0;">This is a one-time recap for your new saved search "${search.name}"</p>
-            <p style="margin: 10px 0 0 0;">Future alerts will be sent instantly when new matching articles are found.</p>
+            <p style="margin: 10px 0 0 0;">Future alerts will be sent based on your chosen frequency.</p>
           </div>
         </div>
       `,

@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { fetchRssFeeds, initializeDefaultRssSources } from "./services/rss-fetcher";
 import { IStorage } from "./storage";
-import { processNewArticlesForAlerts } from "./services/alert-service";
+import { processNewArticlesForAlerts, processDailyAlerts, processWeeklyAlerts } from "./services/alert-service";
 import { generateAllCategorySummaries } from "./services/category-summary-service";
 import { broadcastFetchStatus } from "./websocket";
 import { runLearningCycle } from "./services/ai-learning";
@@ -92,6 +92,24 @@ export function startDockTalkCronJobs(storage: IStorage): void {
       await updateAnalytics();
     } catch (error) {
       console.error("Analytics update error:", error);
+    }
+  });
+
+  // Process daily alerts every 15 minutes (checks per-alert delivery time window)
+  cron.schedule("*/15 * * * *", async () => {
+    try {
+      await processDailyAlerts();
+    } catch (error) {
+      console.error("Daily alerts error:", error);
+    }
+  });
+
+  // Process weekly alerts every 15 minutes on Mondays (checks per-alert delivery time window)
+  cron.schedule("*/15 * * * 1", async () => {
+    try {
+      await processWeeklyAlerts();
+    } catch (error) {
+      console.error("Weekly alerts error:", error);
     }
   });
 

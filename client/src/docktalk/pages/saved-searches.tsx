@@ -118,6 +118,12 @@ const emailSettingsSchema = z.object({
 
 type EmailSettingsForm = z.infer<typeof emailSettingsSchema>;
 
+const FREQUENCY_OPTIONS = [
+  { value: "immediate", label: "Instant", description: "Notified right away", icon: Zap },
+  { value: "daily", label: "Daily Digest", description: "Once per day", icon: Clock },
+  { value: "weekly", label: "Weekly Summary", description: "Once per week", icon: CalendarIcon },
+] as const;
+
 interface SavedSearch {
   id: string;
   name: string;
@@ -129,6 +135,7 @@ interface SavedSearch {
     dealsOnly?: boolean;
   };
   alertFrequency: string | null;
+  deliveryTime?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -147,6 +154,10 @@ function getTimezoneLabel(value: string) {
   return TIMEZONES.find(tz => tz.value === value)?.label || value;
 }
 
+function getFrequencyLabel(value: string | null) {
+  if (!value) return "Off";
+  return FREQUENCY_OPTIONS.find(f => f.value === value)?.label || value;
+}
 
 
 export default function SavedSearchesPage() {
@@ -161,6 +172,8 @@ export default function SavedSearchesPage() {
   const [alertKeywords, setAlertKeywords] = useState("");
   const [alertCategories, setAlertCategories] = useState<string[]>([]);
   const [alertEntities, setAlertEntities] = useState("");
+  const [alertFrequency, setAlertFrequency] = useState("immediate");
+  const [alertDeliveryTime, setAlertDeliveryTime] = useState("09:00");
   const form = useForm<EmailSettingsForm>({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
@@ -325,6 +338,8 @@ export default function SavedSearchesPage() {
     setAlertKeywords("");
     setAlertCategories([]);
     setAlertEntities("");
+    setAlertFrequency("immediate");
+    setAlertDeliveryTime("09:00");
   };
 
   const openEditDialog = (search: SavedSearch) => {
@@ -333,6 +348,8 @@ export default function SavedSearchesPage() {
     setAlertKeywords(search.criteria?.search || "");
     setAlertCategories(search.criteria?.categories || []);
     setAlertEntities((search.criteria?.entities || []).join(", "));
+    setAlertFrequency(search.alertFrequency || "immediate");
+    setAlertDeliveryTime(search.deliveryTime || "09:00");
     setIsAddDialogOpen(true);
   };
 
@@ -354,7 +371,8 @@ export default function SavedSearchesPage() {
       categories: alertCategories,
       entities: entitiesArray,
       emailAlerts: true,
-      alertFrequency: "immediate",
+      alertFrequency: alertFrequency,
+      deliveryTime: alertDeliveryTime,
     });
 
     if (editingAlert) {
@@ -548,7 +566,7 @@ export default function SavedSearchesPage() {
                     onToggle={(id, enabled) => {
                       updateMutation.mutate({ id, data: {
                         isActive: enabled,
-                        alertFrequency: enabled ? 'immediate' : 'none',
+                        alertFrequency: enabled ? (search.alertFrequency || 'immediate') : 'none',
                       }});
                     }}
                     isUpdating={updateMutation.isPending}
@@ -576,7 +594,7 @@ export default function SavedSearchesPage() {
                     onToggle={(id, enabled) => {
                       updateMutation.mutate({ id, data: {
                         isActive: enabled,
-                        alertFrequency: enabled ? 'immediate' : 'none',
+                        alertFrequency: enabled ? (search.alertFrequency || 'immediate') : 'none',
                       }});
                     }}
                     isUpdating={updateMutation.isPending}
@@ -702,12 +720,54 @@ export default function SavedSearchesPage() {
 
               <Separator />
 
-              <div className="flex items-center gap-2 py-2 px-3 bg-primary/5 rounded-lg border border-primary/20">
-                <Zap className="h-4 w-4 text-primary flex-shrink-0" />
-                <p className="text-sm text-muted-foreground">
-                  You'll be notified <span className="font-medium text-foreground">instantly</span> when new articles match this alert.
-                </p>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">How Often</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FREQUENCY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = alertFrequency === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setAlertFrequency(option.value)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-center ${
+                          isSelected
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-muted hover:border-muted-foreground/30 text-muted-foreground"
+                        }`}
+                        data-testid={`freq-${option.value}`}
+                      >
+                        <Icon className={`h-5 w-5 ${isSelected ? 'text-primary' : ''}`} />
+                        <span className="text-sm font-medium">{option.label}</span>
+                        <span className="text-[11px] leading-tight">{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {(alertFrequency === "daily" || alertFrequency === "weekly") && (
+                <div className="space-y-2">
+                  <Label htmlFor="alertDeliveryTime" className="text-sm font-medium flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5" />
+                    Delivery Time
+                  </Label>
+                  <Input
+                    id="alertDeliveryTime"
+                    type="time"
+                    value={alertDeliveryTime}
+                    onChange={(e) => setAlertDeliveryTime(e.target.value)}
+                    className="w-40"
+                    data-testid="input-alert-delivery-time"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {alertFrequency === "daily"
+                      ? "Your daily digest will be sent at this time"
+                      : "Your weekly summary will be sent on Mondays at this time"}
+                  </p>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="flex-shrink-0 border-t pt-4">
@@ -798,10 +858,12 @@ function AlertCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-base truncate">{search.name}</h3>
-              {isActive && (
+              {isActive && search.alertFrequency && (
                 <Badge variant="outline" className="text-xs flex-shrink-0">
-                  <Zap className="h-3 w-3 mr-1" />
-                  Instant
+                  {getFrequencyLabel(search.alertFrequency)}
+                  {(search.alertFrequency === "daily" || search.alertFrequency === "weekly") && search.deliveryTime && (
+                    <span className="ml-1 opacity-70">@ {search.deliveryTime}</span>
+                  )}
                 </Badge>
               )}
             </div>

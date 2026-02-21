@@ -98,6 +98,7 @@ const savedSearchSchema = z.object({
     dealsOnly: z.boolean().optional(),
   }),
   alertFrequency: z.enum(["none", "immediate", "daily", "weekly"]),
+  deliveryTime: z.string().optional(),
 });
 
 type SavedSearchForm = z.infer<typeof savedSearchSchema>;
@@ -243,6 +244,7 @@ export default function NotificationPreferences({
         dealsOnly: false,
       },
       alertFrequency: "immediate",
+      deliveryTime: "09:00",
     },
   });
 
@@ -257,7 +259,8 @@ export default function NotificationPreferences({
             sentiment: "any",
             dealsOnly: false,
           },
-          alertFrequency: "immediate",
+          alertFrequency: editingSearch.alertFrequency || "immediate",
+          deliveryTime: (editingSearch as any).deliveryTime || "09:00",
         });
       } else {
         searchForm.reset({
@@ -269,6 +272,7 @@ export default function NotificationPreferences({
             dealsOnly: false,
           },
           alertFrequency: "immediate",
+          deliveryTime: "09:00",
         });
       }
     }
@@ -529,7 +533,7 @@ export default function NotificationPreferences({
                                 <CardTitle className="text-base flex items-center gap-2">
                                   {search.name}
                                   <Badge variant={search.alertFrequency === "none" ? "outline" : "default"} className="text-xs">
-                                    {search.alertFrequency === "none" ? "No Alerts" : "Instant"}
+                                    {search.alertFrequency === "none" ? "No Alerts" : search.alertFrequency === "daily" ? "Daily Digest" : search.alertFrequency === "weekly" ? "Weekly Summary" : "Instant"}
                                   </Badge>
                                 </CardTitle>
                                 <CardDescription className="mt-1">
@@ -838,12 +842,55 @@ export default function NotificationPreferences({
                 )}
               />
 
-              <div className="flex items-center gap-2 py-2 px-3 bg-primary/5 rounded-lg border border-primary/20">
-                <Zap className="h-4 w-4 text-primary flex-shrink-0" />
-                <p className="text-sm text-muted-foreground">
-                  Alerts are sent <span className="font-medium text-foreground">instantly</span> when new matching articles are found.
-                </p>
-              </div>
+              <FormField
+                control={searchForm.control}
+                name="alertFrequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alert Frequency</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-search-frequency">
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="immediate">Instant</SelectItem>
+                        <SelectItem value="daily">Daily Digest</SelectItem>
+                        <SelectItem value="weekly">Weekly Summary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>How often to send alerts for this search</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {(searchForm.watch("alertFrequency") === "daily" || searchForm.watch("alertFrequency") === "weekly") && (
+                <FormField
+                  control={searchForm.control}
+                  name="deliveryTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery Time</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          {...field}
+                          value={field.value || "09:00"}
+                          data-testid="input-delivery-time"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {searchForm.watch("alertFrequency") === "daily"
+                          ? "Time to receive your daily digest"
+                          : "Time to receive your weekly summary (sent on Mondays)"}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button
