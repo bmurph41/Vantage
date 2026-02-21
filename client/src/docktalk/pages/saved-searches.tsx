@@ -111,15 +111,8 @@ const TIMEZONES = [
   { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
 ] as const;
 
-const FREQUENCY_OPTIONS = [
-  { value: "immediate", label: "Immediate", description: "Get notified right away", icon: Zap },
-  { value: "daily", label: "Daily Digest", description: "Once per day at your chosen time", icon: Clock },
-  { value: "weekly", label: "Weekly Summary", description: "Once per week on Mondays", icon: CalendarIcon },
-] as const;
-
 const emailSettingsSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  deliveryTime: z.string().optional(),
   timezone: z.string().default("America/New_York"),
 });
 
@@ -154,10 +147,7 @@ function getTimezoneLabel(value: string) {
   return TIMEZONES.find(tz => tz.value === value)?.label || value;
 }
 
-function getFrequencyLabel(value: string | null) {
-  if (!value) return "Off";
-  return FREQUENCY_OPTIONS.find(f => f.value === value)?.label || value;
-}
+
 
 export default function SavedSearchesPage() {
   const { toast } = useToast();
@@ -171,13 +161,10 @@ export default function SavedSearchesPage() {
   const [alertKeywords, setAlertKeywords] = useState("");
   const [alertCategories, setAlertCategories] = useState<string[]>([]);
   const [alertEntities, setAlertEntities] = useState("");
-  const [alertFrequency, setAlertFrequency] = useState("daily");
-
   const form = useForm<EmailSettingsForm>({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
       email: "",
-      deliveryTime: "09:00",
       timezone: "America/New_York",
     },
   });
@@ -195,7 +182,6 @@ export default function SavedSearchesPage() {
       const prefs = currentUser.notificationPreferences;
       form.reset({
         email: prefs?.emailAddress || currentUser.email || "",
-        deliveryTime: prefs?.deliveryTime || "09:00",
         timezone: prefs?.timezone || "America/New_York",
       });
     }
@@ -209,10 +195,9 @@ export default function SavedSearchesPage() {
         credentials: "include",
         body: JSON.stringify({
           email: data.email,
-          deliveryTime: data.deliveryTime,
           timezone: data.timezone,
           categories: currentUser?.notificationPreferences?.categories || [],
-          frequency: currentUser?.notificationPreferences?.frequency || "none",
+          frequency: "immediate",
           enabled: true,
         }),
       });
@@ -340,7 +325,6 @@ export default function SavedSearchesPage() {
     setAlertKeywords("");
     setAlertCategories([]);
     setAlertEntities("");
-    setAlertFrequency("daily");
   };
 
   const openEditDialog = (search: SavedSearch) => {
@@ -349,7 +333,6 @@ export default function SavedSearchesPage() {
     setAlertKeywords(search.criteria?.search || "");
     setAlertCategories(search.criteria?.categories || []);
     setAlertEntities((search.criteria?.entities || []).join(", "));
-    setAlertFrequency(search.alertFrequency || "daily");
     setIsAddDialogOpen(true);
   };
 
@@ -371,7 +354,7 @@ export default function SavedSearchesPage() {
       categories: alertCategories,
       entities: entitiesArray,
       emailAlerts: true,
-      alertFrequency: alertFrequency,
+      alertFrequency: "immediate",
     });
 
     if (editingAlert) {
@@ -385,7 +368,6 @@ export default function SavedSearchesPage() {
   const pausedAlerts = searches.filter(s => !s.isActive);
   const userEmail = form.watch("email");
   const userTimezone = form.watch("timezone");
-  const userDeliveryTime = form.watch("deliveryTime");
 
   return (
     <div className="space-y-6">
@@ -420,8 +402,7 @@ export default function SavedSearchesPage() {
                     <span className="font-medium">{userEmail}</span>
                     {" "}&middot;{" "}
                     {getTimezoneLabel(userTimezone || "America/New_York")}
-                    {" "}&middot; Digest at{" "}
-                    {userDeliveryTime || "09:00"}
+                    {" "}&middot; Instant alerts
                   </>
                 ) : (
                   "Set your email address to receive alerts"
@@ -472,51 +453,34 @@ export default function SavedSearchesPage() {
                       </FormItem>
                     )}
                   />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="timezone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <Globe className="h-3.5 w-3.5" />
-                            Timezone
-                          </FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-timezone">
-                                <SelectValue placeholder="Select timezone" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {TIMEZONES.map((tz) => (
-                                <SelectItem key={tz.value} value={tz.value}>
-                                  {tz.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="deliveryTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <Clock className="h-3.5 w-3.5" />
-                            Digest Delivery Time
-                          </FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Globe className="h-3.5 w-3.5" />
+                          Timezone
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <Input type="time" {...field} data-testid="input-delivery-time" />
+                            <SelectTrigger data-testid="select-timezone">
+                              <SelectValue placeholder="Select timezone" />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>Alerts are sent instantly when new matching articles are found</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <div className="flex justify-between items-center pt-2">
                     <Button
                       type="button"
@@ -584,7 +548,7 @@ export default function SavedSearchesPage() {
                     onToggle={(id, enabled) => {
                       updateMutation.mutate({ id, data: {
                         isActive: enabled,
-                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : 'none',
+                        alertFrequency: enabled ? 'immediate' : 'none',
                       }});
                     }}
                     isUpdating={updateMutation.isPending}
@@ -612,7 +576,7 @@ export default function SavedSearchesPage() {
                     onToggle={(id, enabled) => {
                       updateMutation.mutate({ id, data: {
                         isActive: enabled,
-                        alertFrequency: enabled ? (search.alertFrequency || 'daily') : 'none',
+                        alertFrequency: enabled ? 'immediate' : 'none',
                       }});
                     }}
                     isUpdating={updateMutation.isPending}
@@ -738,31 +702,11 @@ export default function SavedSearchesPage() {
 
               <Separator />
 
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">How Often</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {FREQUENCY_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const isSelected = alertFrequency === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setAlertFrequency(option.value)}
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-center ${
-                          isSelected
-                            ? "border-primary bg-primary/5 text-primary"
-                            : "border-muted hover:border-muted-foreground/30 text-muted-foreground"
-                        }`}
-                        data-testid={`freq-${option.value}`}
-                      >
-                        <Icon className={`h-5 w-5 ${isSelected ? 'text-primary' : ''}`} />
-                        <span className="text-sm font-medium">{option.label}</span>
-                        <span className="text-[11px] leading-tight">{option.description}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center gap-2 py-2 px-3 bg-primary/5 rounded-lg border border-primary/20">
+                <Zap className="h-4 w-4 text-primary flex-shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  You'll be notified <span className="font-medium text-foreground">instantly</span> when new articles match this alert.
+                </p>
               </div>
             </div>
 
@@ -854,9 +798,10 @@ function AlertCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-base truncate">{search.name}</h3>
-              {search.alertFrequency && isActive && (
+              {isActive && (
                 <Badge variant="outline" className="text-xs flex-shrink-0">
-                  {getFrequencyLabel(search.alertFrequency)}
+                  <Zap className="h-3 w-3 mr-1" />
+                  Instant
                 </Badge>
               )}
             </div>

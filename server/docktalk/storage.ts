@@ -127,6 +127,7 @@ export interface IStorage {
   updateLastAlertSent(id: string): Promise<void>;
   markFirstAlertSent(id: string): Promise<void>;
   getActiveSearchesForAlerts(frequency: string): Promise<SavedSearch[]>;
+  getAllActiveSearchesWithAlerts(): Promise<SavedSearch[]>;
   
   // User methods
   updateUserLastLogin(id: string): Promise<void>;
@@ -935,6 +936,16 @@ export class DatabaseStorage implements IStorage {
         eq(savedSearches.isActive, true),
         eq(savedSearches.alertFrequency, frequency),
         sql`(${savedSearches.lastAlertSent} IS NULL OR ${savedSearches.lastAlertSent} < ${timeThreshold})`
+      ));
+  }
+
+  async getAllActiveSearchesWithAlerts(): Promise<SavedSearch[]> {
+    return await db
+      .select()
+      .from(savedSearches)
+      .where(and(
+        eq(savedSearches.isActive, true),
+        sql`${savedSearches.alertFrequency} != 'none'`
       ));
   }
 

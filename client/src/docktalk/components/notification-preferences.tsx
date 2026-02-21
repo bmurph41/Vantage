@@ -49,7 +49,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
-import { Mail, Bell, Clock, CheckCircle, Search, Plus, Pencil, Trash2, Calendar as CalendarIcon } from "lucide-react";
+import { Mail, Bell, Clock, CheckCircle, Search, Plus, Pencil, Trash2, Calendar as CalendarIcon, Zap } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,7 +84,6 @@ const TIMEZONES = [
 
 const emailSettingsSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  deliveryTime: z.string().optional(),
   timezone: z.string().default("America/New_York"),
 });
 
@@ -146,18 +145,15 @@ export default function NotificationPreferences({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
       email: "",
-      deliveryTime: "09:00",
       timezone: "America/New_York",
     },
   });
 
-  // Update form when user data loads
   useEffect(() => {
     if (currentUser) {
       const prefs = currentUser.notificationPreferences;
       form.reset({
         email: prefs?.emailAddress || currentUser.email || "",
-        deliveryTime: prefs?.deliveryTime || "09:00",
         timezone: prefs?.timezone || "America/New_York",
       });
     }
@@ -171,11 +167,9 @@ export default function NotificationPreferences({
         credentials: "include",
         body: JSON.stringify({
           email: data.email,
-          deliveryTime: data.deliveryTime,
           timezone: data.timezone,
-          // Keep existing categories and frequency for backwards compatibility
           categories: currentUser?.notificationPreferences?.categories || [],
-          frequency: currentUser?.notificationPreferences?.frequency || "none",
+          frequency: "immediate",
           enabled: true,
         }),
       });
@@ -248,7 +242,7 @@ export default function NotificationPreferences({
         sentiment: "any",
         dealsOnly: false,
       },
-      alertFrequency: "daily",
+      alertFrequency: "immediate",
     },
   });
 
@@ -263,7 +257,7 @@ export default function NotificationPreferences({
             sentiment: "any",
             dealsOnly: false,
           },
-          alertFrequency: editingSearch.alertFrequency || "daily",
+          alertFrequency: "immediate",
         });
       } else {
         searchForm.reset({
@@ -274,7 +268,7 @@ export default function NotificationPreferences({
             sentiment: "any",
             dealsOnly: false,
           },
-          alertFrequency: "daily",
+          alertFrequency: "immediate",
         });
       }
     }
@@ -473,29 +467,6 @@ export default function NotificationPreferences({
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="deliveryTime"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2">
-                                <Clock className="h-4 w-4" />
-                                Delivery Time
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="time"
-                                  {...field}
-                                  data-testid="input-delivery-time"
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Daily/weekly digest time
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
 
                       <div className="flex justify-between items-center pt-2">
@@ -558,7 +529,7 @@ export default function NotificationPreferences({
                                 <CardTitle className="text-base flex items-center gap-2">
                                   {search.name}
                                   <Badge variant={search.alertFrequency === "none" ? "outline" : "default"} className="text-xs">
-                                    {search.alertFrequency === "none" ? "No Alerts" : `${search.alertFrequency}`}
+                                    {search.alertFrequency === "none" ? "No Alerts" : "Instant"}
                                   </Badge>
                                 </CardTitle>
                                 <CardDescription className="mt-1">
@@ -732,7 +703,7 @@ export default function NotificationPreferences({
                     searchForm.setValue("criteria.categories", []);
                     searchForm.setValue("criteria.sentiment", "any");
                     searchForm.setValue("criteria.dealsOnly", false);
-                    searchForm.setValue("alertFrequency", "daily");
+                    searchForm.setValue("alertFrequency", "immediate");
                     searchForm.handleSubmit(onSearchSubmit)();
                   }}
                   disabled={createSearchMutation.isPending}
@@ -867,30 +838,12 @@ export default function NotificationPreferences({
                 )}
               />
 
-              <FormField
-                control={searchForm.control}
-                name="alertFrequency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Alert Frequency</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-search-frequency">
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No Alerts</SelectItem>
-                        <SelectItem value="immediate">Immediate</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>How often to send alerts for this search</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="flex items-center gap-2 py-2 px-3 bg-primary/5 rounded-lg border border-primary/20">
+                <Zap className="h-4 w-4 text-primary flex-shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  Alerts are sent <span className="font-medium text-foreground">instantly</span> when new matching articles are found.
+                </p>
+              </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <Button
