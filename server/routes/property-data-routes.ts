@@ -251,7 +251,7 @@ propertyDataRouter.post("/api/admin/asset-classes/seed", async (req: any, res) =
         config: { minUnits: 5, typicalCapRate: 0.055 },
         enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "vdr", "dueDiligence"],
         defaultDataSources: ["zillow_bridge", "mls_reso", "redfin"] },
-      { key: "str_airbnb", label: "Short-Term Rental (Airbnb/VRBO)", shortLabel: "STR", category: "hospitality", icon: "Palmtree", sortOrder: 6,
+      { key: "str", label: "Short-Term Rental (Airbnb/VRBO)", shortLabel: "STR", category: "hospitality", icon: "Palmtree", sortOrder: 6,
         config: { seasonalPricing: true, typicalOccupancy: 0.7 },
         enabledModules: ["crm", "salesComps", "modeling", "proForma", "vdr", "dueDiligence"],
         defaultDataSources: ["zillow_bridge", "mls_reso"] },

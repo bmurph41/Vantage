@@ -30,7 +30,7 @@ import {
   Factory,
   LandPlot,
   Loader2,
-  Seed,
+  Sprout,
   CheckCircle2,
   XCircle,
 } from "lucide-react";
@@ -122,7 +122,7 @@ export default function AssetClassManager() {
           {seedMutation.isPending ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
-            <Seed className="h-4 w-4 mr-2" />
+            <Sprout className="h-4 w-4 mr-2" />
           )}
           Seed Defaults
         </Button>
@@ -177,7 +177,7 @@ export default function AssetClassManager() {
               No asset classes configured. Click "Seed Defaults" to populate the standard set.
             </p>
             <Button onClick={() => seedMutation.mutate()}>
-              <Seed className="h-4 w-4 mr-2" />
+              <Sprout className="h-4 w-4 mr-2" />
               Seed Default Asset Classes
             </Button>
           </CardContent>
