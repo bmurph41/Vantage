@@ -390,7 +390,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       setQuickContactPhone("");
       toast({ title: "Contact created", description: `${quickContactFirst} added and linked to this deal` });
     } catch (error: any) {
-      const errData = error?.message ? JSON.parse(error.message).error || error.message : "Failed to create contact";
+      let errData = "Failed to create contact"; try { errData = error?.message ? JSON.parse(error.message).error || error.message : errData; } catch { errData = error?.message || errData; }
       toast({ title: "Failed to create contact", description: String(errData), variant: "destructive" });
     } finally {
       setIsCreatingContact(false);
