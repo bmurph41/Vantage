@@ -1,9 +1,9 @@
-import { DealAnalyticsDashboard } from "@/components/crm/DealAnalyticsDashboard";
+import { PipelineAnalyticsDashboard } from "@/components/crm/analytics/pipeline-analytics-dashboard";
 
 export default function DealAnalyticsPage() {
   return (
-    <div className="container mx-auto p-6">
-      <DealAnalyticsDashboard />
+    <div className="p-6">
+      <PipelineAnalyticsDashboard />
     </div>
   );
 }
