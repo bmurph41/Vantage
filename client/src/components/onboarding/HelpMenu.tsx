@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { HelpCircle, PlayCircle, RotateCcw, BookOpen, Video } from "lucide-react";
+import { HelpCircle, PlayCircle, RotateCcw, BookOpen, Video, Rocket } from "lucide-react";
 import { TOUR_IDS, type TourId } from "@/lib/tour-configs";
 
 const routeToTourMap: Record<string, TourId> = {
@@ -46,7 +46,7 @@ function getTourIdForRoute(path: string): TourId | null {
 }
 
 export function HelpMenu() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -74,6 +74,18 @@ export function HelpMenu() {
     },
   });
 
+  const showQuickStartMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/tour-progress/quick-start-guide");
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/tour-progress", "quick-start-guide"], { completed: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/tour-progress"] });
+      setIsOpen(false);
+      navigate("/dashboard");
+    },
+  });
+
   const handleRestartPageTour = () => {
     if (currentTourId) {
       resetCurrentTourMutation.mutate(currentTourId);
@@ -90,6 +102,14 @@ export function HelpMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Help & Guides</DropdownMenuLabel>
         <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onClick={() => showQuickStartMutation.mutate()}
+          disabled={showQuickStartMutation.isPending}
+        >
+          <Rocket className="h-4 w-4 mr-2 text-blue-600" />
+          Quick Start Guide
+        </DropdownMenuItem>
         
         {currentTourId && (
           <DropdownMenuItem 

@@ -56,6 +56,7 @@ import { FundSelector } from "@/components/dashboard/FundSelector";
 import { DashboardPersonaHeader } from "@/components/dashboard/DashboardPersonaHeader";
 import { PageTour } from "@/components/onboarding/PageTour";
 import { TOUR_IDS, dashboardTourSteps } from "@/lib/tour-configs";
+import { QuickStartGuide } from "@/components/onboarding/QuickStartGuide";
 
 type DashboardModule = {
   id: string;
@@ -1636,6 +1637,11 @@ export default function Dashboard() {
         {/* Fund Context Selector - Shows current fund and key metrics */}
         <div className="mb-6">
           <DashboardPersonaHeader />
+        </div>
+
+        {/* Quick Start Guide - For new users */}
+        <div className="mb-6">
+          <QuickStartGuide />
         </div>
 
         {/* Quick Access - Always at top */}
