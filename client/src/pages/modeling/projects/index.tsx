@@ -19,6 +19,9 @@ import {
 } from '@/components/ui/table';
 import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { uwStageLabels } from '@shared/schema';
+import { ASSET_CLASS_OPTIONS } from '@/components/crm/asset-class-fields';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'wouter';
 import { useLocation } from 'wouter';
@@ -48,6 +51,9 @@ type ModelingProject = {
   t12Label: string | null;
   year1Ebitda: number | null;
   dealOutcome: string;
+  assetClass: string | null;
+  uwStage: string | null;
+  uwSubStatus: string | null;
   ddProjectId: string | null;
   salesCompId: string | null;
   rateCompId: string | null;
@@ -349,6 +355,8 @@ export default function ModelingProjectsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="font-bold text-foreground min-w-[180px]">Marina Name</TableHead>
+                      <TableHead className="font-bold text-foreground text-center">Asset Class</TableHead>
+                      <TableHead className="font-bold text-foreground text-center">UW Stage</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Purchase Price</TableHead>
                       <TableHead className="font-bold text-foreground text-right">IRR</TableHead>
                       <TableHead className="font-bold text-foreground text-right whitespace-nowrap">Yr 1 Cap Rate</TableHead>
@@ -375,6 +383,16 @@ export default function ModelingProjectsPage() {
                         >
                           <TableCell className="pb-0" data-testid={`text-marina-name-${project.id}`}>
                             <div className="font-semibold">{project.marinaName}</div>
+                          </TableCell>
+                          <TableCell className="text-center pb-0">
+                            <Badge variant="outline" className="text-[10px] capitalize">
+                              {ASSET_CLASS_OPTIONS.find(a => a.value === project.assetClass)?.label || project.assetClass || "Marina"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center pb-0">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {uwStageLabels[(project.uwStage || "not_started") as keyof typeof uwStageLabels] || "Not Started"}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap font-semibold pb-0" data-testid={`text-price-${project.id}`}>
                             {formatCurrency(project.purchasePrice, { dash: true, context: 'price' })}

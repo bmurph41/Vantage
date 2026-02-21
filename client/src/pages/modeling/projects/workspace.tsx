@@ -559,6 +559,40 @@ export default function ProjectWorkspace() {
                   {project.dealOutcome.replace('_', ' ')}
                 </Badge>
               )}
+              {/* UW Stage */}
+              <div className="flex items-center gap-1.5 ml-2 pl-2 border-l">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">UW:</span>
+                <Select
+                  value={(project as any).uwStage || "not_started"}
+                  onValueChange={(val) => {
+                    uwStageMutation.mutate({ uwStage: val, uwSubStatus: undefined });
+                  }}
+                >
+                  <SelectTrigger className="h-6 w-[140px] text-xs border-dashed">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(uwStageLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {uwSubStatuses[(project as any).uwStage || "not_started"]?.length > 0 && (
+                  <Select
+                    value={(project as any).uwSubStatus || ""}
+                    onValueChange={(val) => uwStageMutation.mutate({ uwSubStatus: val })}
+                  >
+                    <SelectTrigger className="h-6 w-[150px] text-xs border-dashed">
+                      <SelectValue placeholder="Sub-status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uwSubStatuses[(project as any).uwStage || "not_started"]?.map((s: any) => (
+                        <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
           </div>
         </div>
