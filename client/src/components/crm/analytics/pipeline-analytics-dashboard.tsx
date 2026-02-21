@@ -39,7 +39,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ASSET_CLASS_OPTIONS } from "../crm/asset-class-fields";
+import { ASSET_CLASS_OPTIONS } from "../asset-class-fields";
 
 // ─── Types ────────────────────────────────────────────────────────
 

@@ -78,6 +78,7 @@ import executiveDashboardRoutes from "./routes/executive-dashboard-routes";
 import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
 import dealAnalyticsRoutes from "./routes/deal-analytics-routes";
+import dealDDRoutes from "./routes/deal-dd-routes";
 import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
 import commercialLeaseRoutes from "./routes/commercial-lease-routes";
 import unifiedLeaseRoutes from "./routes/unified-lease-routes";
@@ -425,6 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, pipelineAnalyticsRoutes);
   app.use("/api/crm/associations", crmAssociationsRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
+  app.use("/api", authenticateUser, dealDDRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/sla", getSlaRouter());
   registerCommentRoutes(app);

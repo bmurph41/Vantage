@@ -32,6 +32,9 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { insertDealSchema, type Deal, type Contact, type Company, type PipelineStage } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { DealContactsBlock, type DealContactEntry } from "@/components/deals/deal-contacts-block";
+import { DepositScheduleBlock, type DepositEntry } from "@/components/deals/deposit-schedule-block";
+import { DealTimelineVisualizer } from "@/components/deals/deal-timeline-visualizer";
 
 interface DealFormModalProps {
   isOpen: boolean;
@@ -251,7 +254,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
       }).optional(),
       ddCity: z.string().optional(),
       ddState: z.string().optional(),
-      anchorType: z.enum(["psa", "custom"]).optional(),
+      anchorType: z.enum(["psa", "loi", "effective_date", "custom"]).optional(),
       useBusinessDays: z.boolean().optional(),
       holidayCalendar: z.enum(["us_federal", "none"]).optional(),
       projectTimezone: z.string().optional(),
@@ -423,6 +426,10 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   const [sellersArray, setSellersArray] = useState<string[]>([]);
   const [attorneysArray, setAttorneysArray] = useState<string[]>([]);
   const [leases, setLeases] = useState<any[]>([]);
+  const [dealContactEntries, setDealContactEntries] = useState<DealContactEntry[]>([]);
+  const [depositEntries, setDepositEntries] = useState<DepositEntry[]>([]);
+  const [ddPeriodMode, setDdPeriodMode] = useState<"auto" | "custom">("auto");
+  const [linkedToModel, setLinkedToModel] = useState(false);
 
   const dealAmount = form.watch("amount");
   const dealSource = form.watch("dealSource");
@@ -1184,7 +1191,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Users className="w-5 h-5" />
-                      Relationships
+                      Deal Contacts
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1455,7 +1462,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                             name="anchorType"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Anchor Type</FormLabel>
+                                <div className="flex items-center gap-1.5"><FormLabel>Anchor Type</FormLabel><Tooltip><TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 cursor-help" /></TooltipTrigger><TooltipContent side="right" className="max-w-[280px] p-3"><div className="space-y-2 text-xs"><div><span className="font-semibold">PSA Signed</span><span className="text-muted-foreground"> — Official execution date of purchase agreement</span></div><div><span className="font-semibold">LOI Signed</span><span className="text-muted-foreground"> — Non-binding letter of intent execution</span></div><div><span className="font-semibold">Effective Date</span><span className="text-muted-foreground"> — Date agreement becomes enforceable</span></div><div><span className="font-semibold">Other (Custom)</span><span className="text-muted-foreground"> — User-defined timeline anchor</span></div></div></TooltipContent></Tooltip></div>
                                 <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger data-testid="select-anchor-type">
@@ -1464,7 +1471,9 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="psa">PSA Signed Date</SelectItem>
-                                    <SelectItem value="custom">Custom Date</SelectItem>
+                                    <SelectItem value="loi">LOI Signed Date</SelectItem>
+                                    <SelectItem value="effective_date">Effective Date</SelectItem>
+                                    <SelectItem value="custom">Other (Custom)</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -1601,6 +1610,20 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* DD Period Configuration */}
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">DD Period Configuration</h4>
+                      <div className="flex items-center gap-3 mb-4 p-2.5 rounded-lg bg-gray-50 border">
+                        <label className="text-xs font-medium text-muted-foreground">Mode:</label>
+                        <div className="flex gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="ddPeriodMode" value="auto" checked={ddPeriodMode === "auto"} onChange={() => setDdPeriodMode("auto")} className="h-3.5 w-3.5" />
+                            <span className="text-xs font-medium">Auto</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="ddPeriodMode" value="custom" checked={ddPeriodMode === "custom"} onChange={() => setDdPeriodMode("custom")} className="h-3.5 w-3.5" />
+                            <span className="text-xs font-medium">Custom</span>
+                          </label>
+                        </div>
+                        {ddPeriodMode === "auto" && <span className="text-[10px] text-muted-foreground ml-auto">Dates auto-calculate from PSA + DD period</span>}
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
@@ -1733,103 +1756,28 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         </div>
                       )}
                     </div>
-
-                    {/* Deal Team */}
+                    {/* Timeline Visualizer */}
                     <div className="pt-4 border-t">
-                      <h4 className="font-semibold text-sm mb-3">Deal Team</h4>
-                      <div className="space-y-4">
-                        <div>
-                          <Label className="text-sm mb-2 block">Seller(s)</Label>
-                          {sellersArray.map((seller, index) => (
-                            <div key={index} className="flex items-center gap-2 mb-2">
-                              <Input
-                                placeholder="Seller name"
-                                value={seller}
-                                onChange={(e) => {
-                                  const newArray = [...sellersArray];
-                                  newArray[index] = e.target.value;
-                                  setSellersArray(newArray);
-                                  form.setValue("sellers", newArray);
-                                }}
-                                data-testid={`input-seller-${index}`}
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => {
-                                  const newArray = sellersArray.filter((_, i) => i !== index);
-                                  setSellersArray(newArray);
-                                  form.setValue("sellers", newArray);
-                                }}
-                                data-testid={`button-remove-seller-${index}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newArray = [...sellersArray, ""];
-                              setSellersArray(newArray);
-                              form.setValue("sellers", newArray);
-                            }}
-                            data-testid="button-add-seller"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Seller
-                          </Button>
-                        </div>
+                      <DealTimelineVisualizer
+                        psaSignedDate={psaSignedDate}
+                        ddExpirationDate={form.watch("ddExpirationDate")}
+                        closingDate={form.watch("closingDate")}
+                        extensions={extensionDaysArray.filter(d => d !== "").map((days, i) => ({ id: `ext-${i}`, days: parseInt(days) || 0, executed: false, basedOnEvent: "dd_expiration" }))}
+                        ddPeriodDays={parseInt(ddPeriodDays || "0") || undefined}
+                        daysToClosing={parseInt(daysToClosing || "0") || undefined}
+                        ddPeriodMode={ddPeriodMode}
+                        useBusinessDays={useBusinessDays}
+                        variant="compact"
+                      />
+                    </div>
 
-                        <div>
-                          <Label className="text-sm mb-2 block">Our Attorney(s)</Label>
-                          {attorneysArray.map((attorney, index) => (
-                            <div key={index} className="flex items-center gap-2 mb-2">
-                              <Input
-                                placeholder="Attorney name"
-                                value={attorney}
-                                onChange={(e) => {
-                                  const newArray = [...attorneysArray];
-                                  newArray[index] = e.target.value;
-                                  setAttorneysArray(newArray);
-                                  form.setValue("ourAttorneys", newArray);
-                                }}
-                                data-testid={`input-attorney-${index}`}
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => {
-                                  const newArray = attorneysArray.filter((_, i) => i !== index);
-                                  setAttorneysArray(newArray);
-                                  form.setValue("ourAttorneys", newArray);
-                                }}
-                                data-testid={`button-remove-attorney-${index}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newArray = [...attorneysArray, ""];
-                              setAttorneysArray(newArray);
-                              form.setValue("ourAttorneys", newArray);
-                            }}
-                            data-testid="button-add-attorney"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Attorney
-                          </Button>
-                        </div>
-
+                    {/* Deal Contacts (structured) */}
+                    <div className="pt-4 border-t">
+                      <DealContactsBlock
+                        contacts={dealContactEntries}
+                        onChange={setDealContactEntries}
+                      />
+                      <div className="grid grid-cols-2 gap-4 mt-4">
                         <FormField
                           control={form.control}
                           name="titleInsuranceCompany"
@@ -1843,7 +1791,6 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                             </FormItem>
                           )}
                         />
-
                         <FormField
                           control={form.control}
                           name="lender"
@@ -1859,131 +1806,19 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         />
                       </div>
                     </div>
-
-                    {/* Deposit Information */}
+                    {/* Deposit Schedule (automated) */}
                     <div className="pt-4 border-t">
-                      <h4 className="font-semibold text-sm mb-3">Deposit Information</h4>
-                      <div className="space-y-4">
-                        {/* First Deposit */}
-                        <div>
-                          <Label className="text-sm font-semibold mb-2 block">First Deposit</Label>
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="firstDepositAmount"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Amount</FormLabel>
-                                  <FormControl>
-                                    <CurrencyInput
-                                      value={field.value ? parseFloat(field.value) : undefined}
-                                      onValueChange={(val) => field.onChange(val?.toString() || "")}
-                                      onBlur={field.onBlur}
-                                      data-testid="input-first-deposit-amount"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="firstDepositDays"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Days</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="number" 
-                                      placeholder="e.g., 3" 
-                                      {...field}
-                                      data-testid="input-first-deposit-days"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="firstDepositDueDate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Due Date</FormLabel>
-                                  <FormControl>
-                                    <DateInput
-                                      value={field.value}
-                                      onChange={field.onChange}
-                                      placeholder="MM/DD/YYYY"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Second Deposit */}
-                        <div>
-                          <Label className="text-sm font-semibold mb-2 block">Second Deposit</Label>
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="secondDepositAmount"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Amount</FormLabel>
-                                  <FormControl>
-                                    <CurrencyInput
-                                      value={field.value ? parseFloat(field.value) : undefined}
-                                      onValueChange={(val) => field.onChange(val?.toString() || "")}
-                                      onBlur={field.onBlur}
-                                      data-testid="input-second-deposit-amount"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="secondDepositDays"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Days</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="number" 
-                                      placeholder="e.g., 10" 
-                                      {...field}
-                                      data-testid="input-second-deposit-days"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="secondDepositDueDate"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs">Due Date</FormLabel>
-                                  <FormControl>
-                                    <DateInput
-                                      value={field.value}
-                                      onChange={field.onChange}
-                                      placeholder="MM/DD/YYYY"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      <DepositScheduleBlock
+                        deposits={depositEntries}
+                        onChange={setDepositEntries}
+                        dealDates={{
+                          psaSignedDate: psaSignedDate,
+                          ddExpirationDate: form.watch("ddExpirationDate"),
+                          closingDate: form.watch("closingDate"),
+                        }}
+                        useBusinessDays={useBusinessDays}
+                        holidayCalendar={holidayCalendar as "us_federal" | "none"}
+                      />
                     </div>
                   </CardContent>
                 </Card>

@@ -25953,3 +25953,96 @@ export const insertDataSourceSyncLogSchema = createInsertSchema(dataSourceSyncLo
 });
 export type InsertDataSourceSyncLog = z.infer<typeof insertDataSourceSyncLogSchema>;
 export type DataSourceSyncLog = typeof dataSourceSyncLogs.$inferSelect;
+// ============================================================================
+// Deal DD Enhancement Tables
+// ============================================================================
+
+// deal_contacts – Structured contact blocks with team classification
+export const dealContacts = pgTable("deal_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").references(() => crmContacts.id, { onDelete: "set null" }),
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
+  company: varchar("company", { length: 255 }),
+  titleRole: varchar("title_role", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  contactType: varchar("contact_type", { length: 50 }).notNull().default("other"),
+  teamType: varchar("team_type", { length: 20 }).notNull().default("mutual"),
+  isPrimary: boolean("is_primary").default(false),
+  notes: text("notes"),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  dealIdIdx: index("idx_dc_deal_id").on(table.dealId),
+  contactIdIdx: index("idx_dc_contact_id").on(table.contactId),
+  teamTypeIdx: index("idx_dc_team_type").on(table.teamType),
+}));
+export type DealContact = typeof dealContacts.$inferSelect;
+export type NewDealContact = typeof dealContacts.$inferInsert;
+
+// deal_extensions – DD extension periods with executed tracking
+export const dealExtensions = pgTable("deal_extensions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  extensionNumber: integer("extension_number").notNull().default(1),
+  days: integer("days").notNull().default(0),
+  executed: boolean("executed").notNull().default(false),
+  executedDate: timestamp("executed_date", { withTimezone: true }),
+  basedOnEvent: varchar("based_on_event", { length: 50 }).default("dd_expiration"),
+  notes: text("notes"),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  dealIdIdx: index("idx_de_deal_id").on(table.dealId),
+}));
+export type DealExtension = typeof dealExtensions.$inferSelect;
+export type NewDealExtension = typeof dealExtensions.$inferInsert;
+
+// deal_deposits – Automated deposit scheduling
+export const dealDeposits = pgTable("deal_deposits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  depositNumber: integer("deposit_number").notNull().default(1),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  anchorEvent: varchar("anchor_event", { length: 50 }).notNull().default("psa_signed"),
+  daysOffset: integer("days_offset").notNull().default(0),
+  dayType: varchar("day_type", { length: 20 }).notNull().default("calendar"),
+  calculatedDueDate: date("calculated_due_date"),
+  actualPaidDate: date("actual_paid_date"),
+  refundable: boolean("refundable").notNull().default(true),
+  appliedToPrice: boolean("applied_to_price").notNull().default(true),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  notes: text("notes"),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  dealIdIdx: index("idx_dd_deal_id").on(table.dealId),
+}));
+export type DealDeposit = typeof dealDeposits.$inferSelect;
+export type NewDealDeposit = typeof dealDeposits.$inferInsert;
+
+// deal_property_address – Full address for deals not linked to model
+export const dealPropertyAddress = pgTable("deal_property_address", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id, { onDelete: "cascade" }),
+  street: varchar("street", { length: 500 }),
+  city: varchar("city", { length: 255 }),
+  state: varchar("state", { length: 100 }),
+  zip: varchar("zip", { length: 20 }),
+  lat: numeric("lat", { precision: 10, scale: 7 }),
+  lng: numeric("lng", { precision: 10, scale: 7 }),
+  fullAddress: text("full_address"),
+  linkedToModel: boolean("linked_to_model").notNull().default(false),
+  modelId: varchar("model_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  dealIdIdx: uniqueIndex("idx_dpa_deal_id").on(table.dealId),
+}));
+export type DealPropertyAddress = typeof dealPropertyAddress.$inferSelect;
+export type NewDealPropertyAddress = typeof dealPropertyAddress.$inferInsert;
