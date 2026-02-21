@@ -4116,6 +4116,7 @@ export const crmDeals = pgTable("crm_deals", {
   boatLength: decimal("boat_length", { precision: 6, scale: 2 }), // in feet
   boatType: text("boat_type"), // sailboat, powerboat, yacht, etc.
   propertyType: text("property_type"), // slip, boat, mooring, dry_storage
+  assetClass: text("asset_class").default('marina'), // marina, multifamily, retail, office, industrial, hotel, mixed_use, land, self_storage, mobile_home_park, other
   leaseTermMonths: integer("lease_term_months"),
   leases: jsonb("leases").default([]), // Array of {type, lessor, startDate, endDate, extensionEnabled, extensionNotes}
   // Property Details - comprehensive marina property information from OMs

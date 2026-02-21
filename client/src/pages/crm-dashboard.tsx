@@ -1,34 +1,45 @@
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Users, Building, DollarSign, TrendingUp, Phone, Mail, Calendar, 
-  ArrowRight, Sparkles, Home, Clock, CheckCircle2, AlertCircle,
-  Layers, Activity, MapPin, MessageSquare, StickyNote, Info
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Users, Building, DollarSign, TrendingUp, Phone, Mail, Calendar,
+  ArrowRight, Sparkles, Home, Clock, CheckCircle2, AlertCircle, Layers,
+  Activity, MapPin, StickyNote, Info, Flame, Target, Award, Zap,
+  BarChart3, Timer, ArrowUpRight, ExternalLink, ChevronRight,
+  Anchor, Building2, Briefcase, Factory, Hotel, Mountain, Store,
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
 import { FeatureChecklist } from "@/components/ui/_primitives/feature-highlight";
 import { ExportPdfButton } from "@/components/ui/export-pdf-button";
-import { formatDistanceToNow, isToday, parseISO, isBefore, startOfDay } from "date-fns";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDistanceToNow, isToday, isBefore, startOfDay, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import {
+  ASSET_CLASSES, ACTIVITY_TYPES, DEAL_PRIORITIES,
+  calculateDaysInStage, formatCompactCurrency,
+  calculateDealScore, getDealScoreGrade,
+} from "@shared/crm-constants";
+
+// ─── Constants ───────────────────────────────────────────────────────
 
 const PIPELINE_STAGES = [
   { key: "initial_contact", label: "Initial Contact", color: "bg-slate-500" },
-  { key: "qualification", label: "Qualification", color: "bg-blue-500" },
-  { key: "proposal", label: "Proposal", color: "bg-purple-500" },
-  { key: "negotiation", label: "Negotiation", color: "bg-amber-500" },
-  { key: "due_diligence", label: "Due Diligence", color: "bg-cyan-500" },
-  { key: "closed_won", label: "Closed Won", color: "bg-green-500" },
-  { key: "closed_lost", label: "Closed Lost", color: "bg-red-500" },
+  { key: "qualification",   label: "Qualification",   color: "bg-blue-500" },
+  { key: "proposal",        label: "Proposal",        color: "bg-purple-500" },
+  { key: "negotiation",     label: "Negotiation",     color: "bg-amber-500" },
+  { key: "due_diligence",   label: "Due Diligence",   color: "bg-cyan-500" },
+  { key: "closed_won",      label: "Closed Won",      color: "bg-green-500" },
+  { key: "closed_lost",     label: "Closed Lost",     color: "bg-red-500" },
 ];
 
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", 
-  "bg-teal-500", "bg-pink-500", "bg-indigo-500", "bg-amber-500"
+  "bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500",
+  "bg-teal-500", "bg-pink-500", "bg-indigo-500", "bg-amber-500",
 ];
 
 const getInitials = (name: string): string => {
@@ -44,288 +55,263 @@ const getAvatarColor = (name: string): string => {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 };
 
+const getActivityIcon = (type: string) => {
+  switch (type) {
+    case 'call':    return <Phone className="w-4 h-4 text-blue-600" />;
+    case 'email':   return <Mail className="w-4 h-4 text-purple-600" />;
+    case 'meeting': return <Calendar className="w-4 h-4 text-green-600" />;
+    case 'task':    return <CheckCircle2 className="w-4 h-4 text-amber-600" />;
+    case 'note':    return <StickyNote className="w-4 h-4 text-gray-600" />;
+    default:        return <Activity className="w-4 h-4 text-gray-600" />;
+  }
+};
+
+// ─── KPI Stat Card ───────────────────────────────────────────────────
+
+function StatCard({
+  title, value, subtitle, icon: Icon, color, bgColor, link, isLoading, trend,
+}: {
+  title: string; value: string | number; subtitle: string;
+  icon: any; color: string; bgColor: string;
+  link: string; isLoading: boolean; trend?: { value: string; positive: boolean };
+}) {
+  return (
+    <Link href={link}>
+      <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group border hover:border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div className={`p-2 rounded-xl ${bgColor} group-hover:scale-110 transition-transform`}>
+              <Icon className={`w-4.5 h-4.5 ${color}`} />
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : (
+            <div className="text-2xl font-bold text-gray-900">{value}</div>
+          )}
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-gray-500">{subtitle}</p>
+            {trend && (
+              <Badge variant="outline" className={`text-[10px] ${trend.positive ? 'text-green-600 border-green-200 bg-green-50' : 'text-red-600 border-red-200 bg-red-50'}`}>
+                {trend.value}
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+// ─── Dashboard Component ─────────────────────────────────────────────
+
 export default function CRMDashboard() {
   const reportRef = useRef<HTMLDivElement>(null);
-  const { data: dealsData, isLoading: dealsLoading } = useQuery({
-    queryKey: ['/api/crm/deals'],
-  });
 
-  const { data: leadsData, isLoading: leadsLoading } = useQuery({
-    queryKey: ['/api/crm/leads'],
-  });
+  // ── Data Queries ──
+  const { data: dealsData, isLoading: dealsLoading } = useQuery({ queryKey: ['/api/crm/deals'] });
+  const { data: leadsData, isLoading: leadsLoading } = useQuery({ queryKey: ['/api/crm/leads'] });
+  const { data: contactsData, isLoading: contactsLoading } = useQuery({ queryKey: ['/api/crm/contacts'] });
+  const { data: companiesData, isLoading: companiesLoading } = useQuery({ queryKey: ['/api/crm/companies'] });
+  const { data: propertiesData, isLoading: propertiesLoading } = useQuery({ queryKey: ['/api/crm/properties'] });
+  const { data: activitiesData, isLoading: activitiesLoading } = useQuery({ queryKey: ['/api/crm/activities'] });
 
-  const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['/api/crm/contacts'],
-  });
-
-  const { data: companiesData, isLoading: companiesLoading } = useQuery({
-    queryKey: ['/api/crm/companies'],
-  });
-
-  const { data: propertiesData, isLoading: propertiesLoading } = useQuery({
-    queryKey: ['/api/crm/properties'],
-  });
-
-  const { data: activitiesData, isLoading: activitiesLoading } = useQuery({
-    queryKey: ['/api/crm/activities'],
-  });
-
-  const deals = Array.isArray(dealsData) ? dealsData : (dealsData?.deals || dealsData?.data || []);
-  const leads = Array.isArray(leadsData) ? leadsData : (leadsData?.leads || leadsData?.data || []);
-  const contacts = Array.isArray(contactsData) ? contactsData : (contactsData?.contacts || contactsData?.data || []);
-  const companies = Array.isArray(companiesData) ? companiesData : (companiesData?.companies || companiesData?.data || []);
-  const properties = Array.isArray(propertiesData) ? propertiesData : (propertiesData?.properties || propertiesData?.data || []);
-  const activities = Array.isArray(activitiesData) ? activitiesData : (activitiesData?.activities || activitiesData?.data || []);
-
-  const safeDeals = Array.isArray(deals) ? deals : [];
-  const safeLeads = Array.isArray(leads) ? leads : [];
-  const safeContacts = Array.isArray(contacts) ? contacts : [];
-  const safeCompanies = Array.isArray(companies) ? companies : [];
-  const safeProperties = Array.isArray(properties) ? properties : [];
-  const safeActivities = Array.isArray(activities) ? activities : [];
-
-  const totalDealValue = safeDeals.reduce((sum: number, deal: any) => {
-    const value = parseFloat(deal.value || deal.amount || '0');
-    return sum + (isNaN(value) ? 0 : value);
-  }, 0);
-
-  const pipelineByStage = PIPELINE_STAGES.map(stage => {
-    const stageDeals = safeDeals.filter((d: any) => d.stage === stage.key);
-    const stageValue = stageDeals.reduce((sum: number, d: any) => {
-      const value = parseFloat(d.value || d.amount || '0');
-      return sum + (isNaN(value) ? 0 : value);
-    }, 0);
-    return {
-      ...stage,
-      count: stageDeals.length,
-      value: stageValue,
-    };
-  }).filter(s => s.key !== 'closed_lost');
-
-  const activeDealsValue = safeDeals
-    .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-    .reduce((sum: number, deal: any) => {
-      const value = parseFloat(deal.value || deal.amount || '0');
-      return sum + (isNaN(value) ? 0 : value);
-    }, 0);
-
-  const stats = [
-    {
-      title: "Total Deals",
-      value: safeDeals.length,
-      icon: DollarSign,
-      description: `${formatCurrency(totalDealValue)} total value`,
-      link: "/crm/deals",
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-    },
-    {
-      title: "Active Leads",
-      value: safeLeads.filter((l: any) => l.leadStatus !== 'converted' && l.leadStatus !== 'unqualified').length,
-      icon: TrendingUp,
-      description: `${safeLeads.length} total leads`,
-      link: "/crm/leads",
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-    },
-    {
-      title: "Contacts",
-      value: safeContacts.length,
-      icon: Users,
-      description: "Active contacts",
-      link: "/crm/contacts",
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
-    },
-    {
-      title: "Companies",
-      value: safeCompanies.length,
-      icon: Building,
-      description: "Active companies",
-      link: "/crm/companies",
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
-    },
-    {
-      title: "Properties",
-      value: safeProperties.length,
-      icon: Home,
-      description: "Marina properties tracked",
-      link: "/crm/properties",
-      color: "text-teal-600",
-      bgColor: "bg-teal-100",
-    },
-  ];
-
-  const recentActivities = safeActivities
-    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-    .slice(0, 6);
-
-  // Today's follow-ups - activities due today or with type 'follow_up' scheduled for today
-  const todaysFollowUps = safeActivities.filter((a: any) => {
-    if (!a.dueDate) return false;
-    try {
-      const dueDate = new Date(a.dueDate);
-      return isToday(dueDate) && a.type !== 'meeting';
-    } catch { return false; }
-  });
-
-  // Today's meetings
-  const todaysMeetings = safeActivities.filter((a: any) => {
-    if (!a.dueDate && !a.scheduledAt) return false;
-    try {
-      const date = new Date(a.scheduledAt || a.dueDate);
-      return isToday(date) && a.type === 'meeting';
-    } catch { return false; }
-  });
-
-  // Overdue items - activities past due
-  const overdueItems = safeActivities.filter((a: any) => {
-    if (!a.dueDate || a.completed) return false;
-    try {
-      const dueDate = new Date(a.dueDate);
-      return isBefore(dueDate, startOfDay(new Date()));
-    } catch { return false; }
-  });
-
-  // Deals needing attention - stale deals (no activity in 7+ days) or deals in negotiation stage
-  const needsAttentionDeals = safeDeals.filter((d: any) => {
-    if (d.stage === 'closed_won' || d.stage === 'closed_lost') return false;
-    // Check for stale deals
-    if (d.updatedAt) {
-      const daysSinceUpdate = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
-      if (daysSinceUpdate >= 7) return true;
-    }
-    // Deals in negotiation or due_diligence stages
-    return d.stage === 'negotiation' || d.stage === 'due_diligence';
-  }).slice(0, 5);
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'call': return <Phone className="w-4 h-4 text-blue-600" />;
-      case 'email': return <Mail className="w-4 h-4 text-purple-600" />;
-      case 'meeting': return <Calendar className="w-4 h-4 text-green-600" />;
-      case 'task': return <CheckCircle2 className="w-4 h-4 text-amber-600" />;
-      default: return <Activity className="w-4 h-4 text-gray-600" />;
-    }
+  // Safe arrays
+  const safeArr = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (data?.deals) return data.deals;
+    if (data?.data) return data.data;
+    return [];
   };
+  const deals = safeArr(dealsData);
+  const leads = safeArr(leadsData);
+  const contacts = safeArr(contactsData);
+  const companies = safeArr(companiesData);
+  const properties = safeArr(propertiesData);
+  const activities = safeArr(activitiesData);
+
+  const isAnyLoading = dealsLoading || leadsLoading || contactsLoading || companiesLoading;
+
+  // ── Computed Metrics ──
+  const metrics = useMemo(() => {
+    const totalDealValue = deals.reduce((sum: number, d: any) => sum + (parseFloat(d.value || d.amount || '0') || 0), 0);
+
+    const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost');
+    const activePipelineValue = activeDeals.reduce((sum: number, d: any) => sum + (parseFloat(d.value || d.amount || '0') || 0), 0);
+
+    const wonDeals = deals.filter((d: any) => d.stage === 'closed_won' || d.status === 'won');
+    const lostDeals = deals.filter((d: any) => d.stage === 'closed_lost' || d.status === 'lost');
+    const totalClosed = wonDeals.length + lostDeals.length;
+    const winRate = totalClosed > 0 ? (wonDeals.length / totalClosed) * 100 : 0;
+    const wonValue = wonDeals.reduce((sum: number, d: any) => sum + (parseFloat(d.value || d.amount || '0') || 0), 0);
+
+    const weightedPipeline = activeDeals.reduce((sum: number, d: any) => {
+      const amt = parseFloat(d.value || d.amount || '0') || 0;
+      const prob = (d.probability ?? 50) / 100;
+      return sum + amt * prob;
+    }, 0);
+
+    const avgDealSize = activeDeals.length > 0 ? activePipelineValue / activeDeals.length : 0;
+    const avgDaysInStage = activeDeals.length > 0
+      ? Math.round(activeDeals.reduce((sum: number, d: any) => sum + calculateDaysInStage(d.currentStageEnteredAt || d.updatedAt), 0) / activeDeals.length)
+      : 0;
+
+    const rottingDeals = activeDeals.filter((d: any) => calculateDaysInStage(d.currentStageEnteredAt || d.updatedAt) > 30);
+    const hotLeads = leads.filter((l: any) => l.leadStatus === 'hot' || (Number(l.score) || 0) >= 70);
+    const activeLeads = leads.filter((l: any) => l.leadStatus !== 'converted' && l.leadStatus !== 'unqualified');
+
+    // This month closing
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const closingThisMonth = activeDeals.filter((d: any) => {
+      if (!d.expectedCloseDate) return false;
+      try {
+        return isWithinInterval(new Date(d.expectedCloseDate), { start: monthStart, end: monthEnd });
+      } catch { return false; }
+    });
+
+    const totalCommission = deals.reduce((sum: number, d: any) =>
+      sum + (parseFloat(d.commissionAmount || '0') || 0), 0);
+
+    return {
+      totalDealValue, activePipelineValue, weightedPipeline, avgDealSize, avgDaysInStage,
+      winRate, wonValue, wonCount: wonDeals.length, rottingCount: rottingDeals.length,
+      hotLeadsCount: hotLeads.length, activeLeadsCount: activeLeads.length,
+      closingThisMonthCount: closingThisMonth.length,
+      closingThisMonthValue: closingThisMonth.reduce((sum: number, d: any) => sum + (parseFloat(d.value || d.amount || '0') || 0), 0),
+      totalCommission,
+    };
+  }, [deals, leads]);
+
+  // ── Pipeline by Stage ──
+  const pipelineByStage = useMemo(() => {
+    return PIPELINE_STAGES.map(stage => {
+      const stageDeals = deals.filter((d: any) => d.stage === stage.key);
+      const stageValue = stageDeals.reduce((sum: number, d: any) =>
+        sum + (parseFloat(d.value || d.amount || '0') || 0), 0);
+      return { ...stage, count: stageDeals.length, value: stageValue };
+    }).filter(s => s.key !== 'closed_lost');
+  }, [deals]);
+
+  // ── Asset Class Breakdown ──
+  const assetClassBreakdown = useMemo(() => {
+    const buckets: Record<string, { count: number; value: number }> = {};
+    deals.forEach((d: any) => {
+      const ac = d.assetClass || 'other';
+      if (!buckets[ac]) buckets[ac] = { count: 0, value: 0 };
+      buckets[ac].count += 1;
+      buckets[ac].value += parseFloat(d.value || d.amount || '0') || 0;
+    });
+    return Object.entries(buckets)
+      .map(([key, data]) => ({
+        ...data,
+        assetClass: ASSET_CLASSES.find(a => a.value === key) || ASSET_CLASSES[ASSET_CLASSES.length - 1],
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [deals]);
+
+  // ── Activity Metrics ──
+  const activityMetrics = useMemo(() => {
+    const today = activities.filter((a: any) => {
+      try { return isToday(new Date(a.createdAt || a.dueDate)); } catch { return false; }
+    });
+    const followUps = activities.filter((a: any) => {
+      if (!a.dueDate) return false;
+      try { return isToday(new Date(a.dueDate)) && a.type !== 'meeting'; } catch { return false; }
+    });
+    const meetings = activities.filter((a: any) => {
+      try { return isToday(new Date(a.scheduledAt || a.dueDate)) && a.type === 'meeting'; } catch { return false; }
+    });
+    const overdue = activities.filter((a: any) => {
+      if (!a.dueDate || a.completed) return false;
+      try { return isBefore(new Date(a.dueDate), startOfDay(new Date())); } catch { return false; }
+    });
+    return { todayCount: today.length, followUps, meetings, overdue };
+  }, [activities]);
+
+  const recentActivities = activities
+    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 8);
+
+  // ── Deals needing attention ──
+  const needsAttention = useMemo(() => {
+    return deals.filter((d: any) => {
+      if (d.stage === 'closed_won' || d.stage === 'closed_lost') return false;
+      if (d.updatedAt) {
+        const daysSince = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSince >= 7) return true;
+      }
+      return d.stage === 'negotiation' || d.stage === 'due_diligence';
+    }).slice(0, 5);
+  }, [deals]);
 
   return (
-    <div ref={reportRef} className="p-6 space-y-6">
+    <div ref={reportRef} className="p-6 space-y-6 max-w-[1400px] mx-auto">
+      {/* ── Header ── */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">CRM Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your marina acquisition pipeline
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">CRM Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Investment pipeline command center</p>
         </div>
         <div className="flex gap-2">
           <ExportPdfButton contentRef={reportRef} filename="crm-dashboard" title="CRM Dashboard" />
           <Link href="/crm/deals">
-            <Button data-testid="button-new-deal">
-              <DollarSign className="w-4 h-4 mr-2" />
-              New Deal
-            </Button>
+            <Button size="sm"><DollarSign className="w-4 h-4 mr-1.5" />New Deal</Button>
           </Link>
           <Link href="/crm/leads">
-            <Button variant="outline" data-testid="button-new-lead">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              New Lead
-            </Button>
+            <Button variant="outline" size="sm"><TrendingUp className="w-4 h-4 mr-1.5" />New Lead</Button>
           </Link>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          const isLoading = dealsLoading || leadsLoading || contactsLoading || companiesLoading || propertiesLoading;
-          return (
-            <Link key={stat.title} href={stat.link}>
-              <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group border-2 hover:border-primary/20" data-testid={`card-stat-${stat.title.toLowerCase().replace(' ', '-')}`}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform`}>
-                    <Icon className={`w-5 h-5 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold" data-testid={`text-${stat.title.toLowerCase().replace(' ', '-')}-count`}>
-                    {isLoading ? "..." : stat.value}
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      {stat.description}
-                    </p>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+      {/* ── Top KPI Cards ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard title="Pipeline Value" value={formatCompactCurrency(metrics.activePipelineValue)}
+          subtitle={`${deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals`}
+          icon={DollarSign} color="text-green-600" bgColor="bg-green-100" link="/crm/pipeline" isLoading={isAnyLoading} />
+        <StatCard title="Weighted Pipeline" value={formatCompactCurrency(metrics.weightedPipeline)}
+          subtitle="Probability adjusted"
+          icon={Target} color="text-blue-600" bgColor="bg-blue-100" link="/crm/pipeline" isLoading={isAnyLoading} />
+        <StatCard title="Win Rate" value={`${metrics.winRate.toFixed(0)}%`}
+          subtitle={`${metrics.wonCount} won deals`}
+          icon={Award} color="text-emerald-600" bgColor="bg-emerald-100" link="/crm/deals" isLoading={isAnyLoading} />
+        <StatCard title="Active Leads" value={metrics.activeLeadsCount}
+          subtitle={`${metrics.hotLeadsCount} hot`}
+          icon={Flame} color="text-orange-600" bgColor="bg-orange-100" link="/crm/leads" isLoading={isAnyLoading} />
+        <StatCard title="Contacts" value={contacts.length}
+          subtitle={`${companies.length} companies`}
+          icon={Users} color="text-purple-600" bgColor="bg-purple-100" link="/crm/contacts" isLoading={isAnyLoading} />
+        <StatCard title="Properties" value={properties.length}
+          subtitle="Tracked assets"
+          icon={Home} color="text-teal-600" bgColor="bg-teal-100" link="/crm/properties" isLoading={isAnyLoading} />
       </div>
 
-      {/* Today's Activity Cards - Hostaway Style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Today's Follow-ups */}
+      {/* ── Today's Activity Panel (3 columns) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Follow-ups */}
         <Card className="border-l-4 border-l-orange-500">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  Today's Follow-ups
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="w-4 h-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Activities and tasks due today</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
+                <Phone className="w-4 h-4 text-orange-500" />
+                <span className="text-sm font-semibold">Today's Follow-ups</span>
               </div>
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                Current
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                {activityMetrics.followUps.length}
               </Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold mb-1">{todaysFollowUps.length}</div>
-            <p className="text-sm text-muted-foreground mb-4">Follow-ups due today</p>
-            
-            {activitiesLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
-            ) : todaysFollowUps.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No follow-ups scheduled for today</p>
+            {activityMetrics.followUps.length === 0 ? (
+              <p className="text-xs text-gray-500 text-center py-4">No follow-ups today</p>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {todaysFollowUps.slice(0, 5).map((activity: any) => (
-                  <div key={activity.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
-                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(activity.contactName || activity.subject || '')} flex items-center justify-center text-white text-xs font-medium`}>
-                      {getInitials(activity.contactName || activity.subject || 'Task')}
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {activityMetrics.followUps.slice(0, 4).map((a: any) => (
+                  <div key={a.id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50">
+                    <div className={`w-6 h-6 rounded-full ${getAvatarColor(a.contactName || '')} flex items-center justify-center text-white text-[10px] font-medium`}>
+                      {getInitials(a.contactName || 'T')}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{activity.subject || activity.type}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {activity.contactName || 'No contact assigned'}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Phone className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Mail className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    <span className="truncate flex-1 text-xs">{a.subject || a.type}</span>
                   </div>
                 ))}
               </div>
@@ -333,248 +319,213 @@ export default function CRMDashboard() {
           </CardContent>
         </Card>
 
-        {/* Today's Meetings */}
+        {/* Meetings */}
         <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  Today's Meetings
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="w-4 h-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Meetings scheduled for today</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
+                <Calendar className="w-4 h-4 text-green-500" />
+                <span className="text-sm font-semibold">Today's Meetings</span>
               </div>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                Current
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                {activityMetrics.meetings.length}
               </Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold mb-1">{todaysMeetings.length}</div>
-            <p className="text-sm text-muted-foreground mb-4">Meetings today</p>
-            
-            {activitiesLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
-            ) : todaysMeetings.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No meetings scheduled for today</p>
+            {activityMetrics.meetings.length === 0 ? (
+              <p className="text-xs text-gray-500 text-center py-4">No meetings today</p>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {todaysMeetings.slice(0, 5).map((meeting: any) => (
-                  <div key={meeting.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group">
-                    <div className={`w-8 h-8 rounded-full ${getAvatarColor(meeting.contactName || meeting.subject || '')} flex items-center justify-center text-white text-xs font-medium`}>
-                      {getInitials(meeting.contactName || meeting.subject || 'M')}
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {activityMetrics.meetings.slice(0, 4).map((a: any) => (
+                  <div key={a.id} className="flex items-center gap-2 text-sm p-1.5 rounded hover:bg-gray-50">
+                    <div className={`w-6 h-6 rounded-full ${getAvatarColor(a.contactName || '')} flex items-center justify-center text-white text-[10px] font-medium`}>
+                      {getInitials(a.contactName || 'M')}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{meeting.subject || 'Meeting'}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {meeting.dueDate ? new Date(meeting.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} 
-                        {meeting.contactName ? ` • ${meeting.contactName}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Calendar className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    <span className="truncate flex-1 text-xs">{a.subject || 'Meeting'}</span>
                   </div>
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Overdue / Alerts */}
+        <Card className={`border-l-4 ${activityMetrics.overdue.length > 0 ? 'border-l-red-500' : 'border-l-gray-300'}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className={`w-4 h-4 ${activityMetrics.overdue.length > 0 ? 'text-red-500' : 'text-gray-400'}`} />
+                <span className="text-sm font-semibold">Overdue Items</span>
+              </div>
+              <Badge variant={activityMetrics.overdue.length > 0 ? "destructive" : "outline"} className="text-xs">
+                {activityMetrics.overdue.length}
+              </Badge>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Overdue tasks</span>
+                <span className="font-semibold text-red-600">{activityMetrics.overdue.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Rotting deals</span>
+                <span className={`font-semibold ${metrics.rottingCount > 0 ? 'text-red-600' : 'text-gray-700'}`}>{metrics.rottingCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Closing this month</span>
+                <span className="font-semibold text-blue-600">{metrics.closingThisMonthCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Commission pending</span>
+                <span className="font-semibold text-purple-600">{formatCompactCurrency(metrics.totalCommission)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Needs Attention Section */}
-      {(needsAttentionDeals.length > 0 || overdueItems.length > 0) && (
-        <Card className="border-2 border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+      {/* ── Pipeline + Asset Class Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pipeline Summary (2/3) */}
+        <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-amber-600" />
-                <CardTitle className="text-base">Needs Attention</CardTitle>
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                  {needsAttentionDeals.length + overdueItems.length}
-                </Badge>
-              </div>
-              <Link href="/crm/deals">
-                <Button variant="ghost" size="sm">
-                  View All <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Overdue Activities */}
-              {overdueItems.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-amber-800 mb-2">Overdue Tasks ({overdueItems.length})</p>
-                  <div className="space-y-2">
-                    {overdueItems.slice(0, 3).map((item: any) => (
-                      <div key={item.id} className="flex items-center gap-2 text-sm p-2 bg-white dark:bg-gray-900 rounded border">
-                        <div className={`w-6 h-6 rounded-full ${getAvatarColor(item.contactName || '')} flex items-center justify-center text-white text-xs`}>
-                          {getInitials(item.contactName || 'T')}
-                        </div>
-                        <span className="truncate flex-1">{item.subject || item.type}</span>
-                        <Badge variant="destructive" className="text-xs">Overdue</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Stale Deals */}
-              {needsAttentionDeals.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-amber-800 mb-2">Deals Requiring Action ({needsAttentionDeals.length})</p>
-                  <div className="space-y-2">
-                    {needsAttentionDeals.slice(0, 3).map((deal: any) => {
-                      const stageInfo = PIPELINE_STAGES.find(s => s.key === deal.stage);
-                      return (
-                        <div key={deal.id} className="flex items-center gap-2 text-sm p-2 bg-white dark:bg-gray-900 rounded border">
-                          <div className={`w-6 h-6 rounded-full ${getAvatarColor(deal.title)} flex items-center justify-center text-white text-xs`}>
-                            {getInitials(deal.title)}
-                          </div>
-                          <span className="truncate flex-1">{deal.title}</span>
-                          <Badge variant="secondary" className={`text-xs text-white ${stageInfo?.color || 'bg-gray-500'}`}>
-                            {stageInfo?.label || deal.stage}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pipeline Summary */}
-      <Card data-testid="card-pipeline-summary">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-primary" />
-                Pipeline Summary
-              </CardTitle>
-              <CardDescription>
-                {formatCurrency(activeDealsValue)} in active pipeline
-              </CardDescription>
-            </div>
-            <Link href="/crm/pipeline">
-              <Button variant="ghost" size="sm" data-testid="button-view-pipeline">
-                View Pipeline
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {dealsLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pipelineByStage.map((stage) => {
-                const percentage = totalDealValue > 0 ? (stage.value / totalDealValue) * 100 : 0;
-                return (
-                  <div key={stage.key} className="flex items-center gap-4">
-                    <div className="w-28 flex-shrink-0">
-                      <span className="text-sm font-medium">{stage.label}</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${stage.color} transition-all duration-500`}
-                            style={{ width: `${Math.max(percentage, stage.count > 0 ? 3 : 0)}%` }}
-                          />
-                        </div>
-                        <Badge variant="secondary" className="min-w-[40px] justify-center">
-                          {stage.count}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="w-24 text-right text-sm text-muted-foreground">
-                      {formatCurrency(stage.value)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Deals */}
-        <Card data-testid="card-recent-deals">
-          <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Recent Deals</CardTitle>
-                <CardDescription>Latest opportunities in your pipeline</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Layers className="w-4.5 h-4.5 text-blue-600" />
+                  Pipeline Summary
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {formatCompactCurrency(metrics.activePipelineValue)} active pipeline
+                </CardDescription>
               </div>
-              <Link href="/crm/deals">
-                <Button variant="ghost" size="sm" data-testid="button-view-all-deals">
-                  View All
+              <Link href="/crm/pipeline">
+                <Button variant="ghost" size="sm" className="text-xs gap-1">
+                  View Pipeline <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {dealsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : safeDeals.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>No deals yet. Create your first deal to get started!</p>
-              </div>
+              <div className="space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
             ) : (
-              <div className="space-y-3">
-                {safeDeals.slice(0, 4).map((deal: any) => {
-                  const stageInfo = PIPELINE_STAGES.find(s => s.key === deal.stage);
+              <div className="space-y-2.5">
+                {pipelineByStage.map(stage => {
+                  const maxValue = Math.max(...pipelineByStage.map(s => s.value), 1);
+                  const barPct = Math.max((stage.value / maxValue) * 100, stage.count > 0 ? 3 : 0);
                   return (
-                    <div
-                      key={deal.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
-                      data-testid={`row-deal-${deal.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium truncate" data-testid={`text-deal-title-${deal.id}`}>
-                          {deal.title}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs text-white ${stageInfo?.color || 'bg-gray-500'}`}
+                    <div key={stage.key} className="flex items-center gap-3 group hover:bg-gray-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
+                      <div className="w-28 flex-shrink-0">
+                        <span className="text-sm font-medium text-gray-700">{stage.label}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-5 bg-gray-100 rounded-md overflow-hidden">
+                          <div
+                            className={`h-full ${stage.color} rounded-md transition-all duration-700 flex items-center justify-end pr-2`}
+                            style={{ width: `${barPct}%`, minWidth: stage.count > 0 ? '24px' : '0' }}
                           >
-                            {stageInfo?.label || deal.stage}
-                          </Badge>
+                            {stage.count > 0 && (
+                              <span className="text-[10px] text-white font-bold">{stage.count}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <div className="font-semibold" data-testid={`text-deal-value-${deal.id}`}>
-                          {formatCurrency(parseFloat(deal.value || deal.amount || 0))}
+                      <div className="w-24 text-right">
+                        <span className="text-sm font-semibold text-gray-700">
+                          {formatCompactCurrency(stage.value)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Asset Class Breakdown (1/3) */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BarChart3 className="w-4.5 h-4.5 text-purple-600" />
+              By Asset Class
+            </CardTitle>
+            <CardDescription className="text-xs">{assetClassBreakdown.length} asset types in pipeline</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {assetClassBreakdown.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8">No asset class data yet</p>
+            ) : (
+              <div className="space-y-3">
+                {assetClassBreakdown.slice(0, 6).map(item => (
+                  <div key={item.assetClass.value} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${item.assetClass.color}15` }}>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.assetClass.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700 truncate">{item.assetClass.label}</span>
+                        <span className="text-xs text-gray-500 ml-2">{item.count}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">{formatCompactCurrency(item.value)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Deals + Activity Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Deals */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-base">Recent Deals</CardTitle>
+              <Link href="/crm/deals">
+                <Button variant="ghost" size="sm" className="text-xs gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dealsLoading ? (
+              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
+            ) : deals.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No deals yet</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {deals.slice(0, 5).map((deal: any) => {
+                  const stageInfo = PIPELINE_STAGES.find(s => s.key === deal.stage);
+                  const assetClass = ASSET_CLASSES.find(a => a.value === deal.assetClass);
+                  return (
+                    <div key={deal.id} className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-gray-50 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-medium truncate">{deal.title}</h4>
+                          {assetClass && (
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: assetClass.color }}
+                              title={assetClass.label} />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="secondary" className={`text-[10px] text-white ${stageInfo?.color || 'bg-gray-500'}`}>
+                            {stageInfo?.label || deal.stage}
+                          </Badge>
+                          {deal.expectedCloseDate && (
+                            <span className="text-[10px] text-gray-500">
+                              Close: {formatDistanceToNow(new Date(deal.expectedCloseDate), { addSuffix: true })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right ml-3 flex-shrink-0">
+                        <div className="text-sm font-bold text-gray-900">
+                          {formatCompactCurrency(parseFloat(deal.value || deal.amount || '0'))}
                         </div>
                       </div>
                     </div>
@@ -586,66 +537,40 @@ export default function CRMDashboard() {
         </Card>
 
         {/* Recent Activity */}
-        <Card data-testid="card-recent-activity">
-          <CardHeader>
+        <Card>
+          <CardHeader className="pb-3">
             <div className="flex justify-between items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Recent Activity
-                </CardTitle>
-                <CardDescription>Latest CRM interactions</CardDescription>
-              </div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="w-4 h-4" /> Recent Activity
+              </CardTitle>
               <Link href="/crm/activities">
-                <Button variant="ghost" size="sm" data-testid="button-view-all-activities">
-                  View All
-                </Button>
+                <Button variant="ghost" size="sm" className="text-xs gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Button>
               </Link>
             </div>
           </CardHeader>
           <CardContent>
             {activitiesLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
+              <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
             ) : recentActivities.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Activity className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>No activities recorded yet</p>
+              <div className="text-center py-8 text-gray-400 text-sm">
+                <Activity className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No activities yet</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {recentActivities.map((activity: any) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors group"
-                  >
-                    <div className={`w-9 h-9 rounded-full ${getAvatarColor(activity.contactName || activity.subject || '')} flex items-center justify-center text-white text-xs font-medium flex-shrink-0`}>
-                      {getInitials(activity.contactName || activity.subject || 'A')}
-                    </div>
+                  <div key={activity.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors group">
+                    <div className="flex-shrink-0">{getActivityIcon(activity.type)}</div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {activity.subject || activity.type}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.createdAt 
-                          ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })
-                          : 'Recently'}
-                        {activity.contactName ? ` • ${activity.contactName}` : ''}
+                      <p className="text-sm font-medium truncate">{activity.subject || activity.type}</p>
+                      <p className="text-[11px] text-gray-500">
+                        {activity.createdAt ? formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true }) : 'Recently'}
+                        {activity.contactName ? ` · ${activity.contactName}` : ''}
                       </p>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Call">
-                        <Phone className="w-3.5 h-3.5 text-blue-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Email">
-                        <Mail className="w-3.5 h-3.5 text-purple-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Add Note">
-                        <StickyNote className="w-3.5 h-3.5 text-amber-600" />
-                      </Button>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-6 w-6"><Phone className="w-3 h-3 text-blue-600" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6"><Mail className="w-3 h-3 text-purple-600" /></Button>
                     </div>
                   </div>
                 ))}
@@ -655,64 +580,41 @@ export default function CRMDashboard() {
         </Card>
       </div>
 
-      {/* Properties Overview */}
-      <Card data-testid="card-properties-overview">
-        <CardHeader>
+      {/* ── Properties Overview ── */}
+      <Card>
+        <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Home className="w-5 h-5 text-teal-600" />
-                Properties Overview
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Home className="w-4.5 h-4.5 text-teal-600" /> Properties Overview
               </CardTitle>
-              <CardDescription>Marina properties in your portfolio</CardDescription>
+              <CardDescription className="text-xs">Tracked assets in your portfolio</CardDescription>
             </div>
             <Link href="/crm/properties">
-              <Button variant="ghost" size="sm" data-testid="button-view-all-properties">
-                View All
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <Button variant="ghost" size="sm" className="text-xs gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Button>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
           {propertiesLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </div>
-          ) : safeProperties.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Home className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p>No properties tracked yet</p>
-              <Link href="/crm/properties">
-                <Button variant="link" size="sm" className="mt-2">
-                  Add your first property
-                </Button>
-              </Link>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
+          ) : properties.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">
+              <Home className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>No properties tracked yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {safeProperties.slice(0, 6).map((property: any) => (
-                <div
-                  key={property.id}
-                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                >
-                  <h4 className="font-medium truncate">{property.title}</h4>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {properties.slice(0, 6).map((p: any) => (
+                <div key={p.id} className="p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <h4 className="text-sm font-medium truncate">{p.title || p.name}</h4>
+                  <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-1">
                     <MapPin className="w-3 h-3" />
-                    <span className="truncate">
-                      {property.address || property.city || 'No address'}
-                    </span>
+                    <span className="truncate">{p.address || p.city || 'No address'}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {property.status?.replace('_', ' ') || 'Available'}
-                    </Badge>
-                    {property.listingPrice && (
-                      <span className="text-sm font-medium text-green-600">
-                        {formatCurrency(parseFloat(property.listingPrice))}
-                      </span>
+                    <Badge variant="outline" className="text-[10px] capitalize">{(p.status || 'available').replace('_', ' ')}</Badge>
+                    {p.listingPrice && (
+                      <span className="text-xs font-semibold text-green-600">{formatCompactCurrency(parseFloat(p.listingPrice))}</span>
                     )}
                   </div>
                 </div>
@@ -722,78 +624,61 @@ export default function CRMDashboard() {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <Card data-testid="card-quick-actions" className="border-2">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="w-5 h-5 text-primary" />
+      {/* ── Quick Actions + Platform Features ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-2">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-100"><Zap className="w-4 h-4 text-blue-600" /></div>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
             </div>
-            <div>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common CRM tasks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Log a Call", icon: Phone, color: "bg-blue-100", textColor: "text-blue-600", href: "/crm/activities" },
+                { label: "Send Email", icon: Mail, color: "bg-purple-100", textColor: "text-purple-600", href: "/crm/activities" },
+                { label: "Schedule Meeting", icon: Calendar, color: "bg-green-100", textColor: "text-green-600", href: "/crm/activities" },
+                { label: "Add Contact", icon: Users, color: "bg-orange-100", textColor: "text-orange-600", href: "/crm/contacts" },
+                { label: "New Property", icon: Home, color: "bg-teal-100", textColor: "text-teal-600", href: "/crm/properties" },
+                { label: "Pipeline View", icon: Layers, color: "bg-indigo-100", textColor: "text-indigo-600", href: "/crm/pipeline" },
+              ].map(action => (
+                <Link key={action.label} href={action.href}>
+                  <Button variant="outline" className="w-full h-auto py-3 flex-col gap-1.5 hover:bg-gray-50 group" size="sm">
+                    <div className={`p-2 rounded-lg ${action.color} group-hover:scale-110 transition-transform`}>
+                      <action.icon className={`w-4 h-4 ${action.textColor}`} />
+                    </div>
+                    <span className="text-[11px] font-medium">{action.label}</span>
+                  </Button>
+                </Link>
+              ))}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/crm/activities">
-              <Button variant="outline" className="w-full justify-start h-auto py-4 hover:bg-primary/5 hover:border-primary/30 transition-all group" data-testid="button-log-call">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 mr-3 group-hover:scale-110 transition-transform">
-                  <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Log a Call</div>
-                  <div className="text-xs text-muted-foreground">Track conversations</div>
-                </div>
-              </Button>
-            </Link>
-            <Link href="/crm/activities">
-              <Button variant="outline" className="w-full justify-start h-auto py-4 hover:bg-primary/5 hover:border-primary/30 transition-all group" data-testid="button-send-email">
-                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 mr-3 group-hover:scale-110 transition-transform">
-                  <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Send Email</div>
-                  <div className="text-xs text-muted-foreground">Compose message</div>
-                </div>
-              </Button>
-            </Link>
-            <Link href="/crm/activities">
-              <Button variant="outline" className="w-full justify-start h-auto py-4 hover:bg-primary/5 hover:border-primary/30 transition-all group" data-testid="button-schedule-meeting">
-                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 mr-3 group-hover:scale-110 transition-transform">
-                  <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="text-left">
-                  <div className="font-medium">Schedule Meeting</div>
-                  <div className="text-xs text-muted-foreground">Set up a call</div>
-                </div>
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Platform Capabilities */}
-      <Card className="bg-gradient-to-br from-primary/5 via-white to-teal-50/30 dark:from-primary/10 dark:via-gray-900 dark:to-teal-950/20 border-2 border-primary/10">
-        <CardHeader>
-          <CardTitle className="text-lg">MarinaMatch CRM Includes:</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FeatureChecklist
-            items={[
-              { text: "Deal Pipeline Management" },
-              { text: "Lead Tracking & Qualification" },
-              { text: "Contact & Company Database" },
-              { text: "Activity Logging & History" },
-              { text: "Email Sequence Automation" },
-              { text: "Due Diligence Integration" },
-            ]}
-            columns={3}
-            variant="accent"
-          />
-        </CardContent>
-      </Card>
+        <Card className="bg-gradient-to-br from-blue-50/50 via-white to-teal-50/30 border-2 border-blue-100">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">MarinaMatch CRM Includes:</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FeatureChecklist
+              items={[
+                { text: "Multi-Asset-Class Pipeline Management" },
+                { text: "Deal Scoring & Rot Detection" },
+                { text: "Lead Tracking & Qualification" },
+                { text: "Contact & Company Database" },
+                { text: "Activity Logging & Timeline" },
+                { text: "Due Diligence Integration" },
+                { text: "Commission Tracking" },
+                { text: "Property Portfolio Management" },
+                { text: "Email & Call Automation" },
+              ]}
+              columns={3}
+              variant="accent"
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
