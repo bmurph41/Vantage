@@ -46,7 +46,8 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject, DocIntelUpload } from '@shared/schema';
-import { uwStageLabels, uwSubStatuses } from '@shared/schema';
+import { uwStageLabels, uwSubStatuses, assetClassValuationDefaults } from '@shared/schema';
+import { getAssetClassConfig } from '@/components/crm/asset-class-fields';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FavoriteButton, PinButton } from '@/components/quick-access';
 import { useTrackRecent } from '@/hooks/use-track-recent';
@@ -540,6 +541,11 @@ export default function ProjectWorkspace() {
               <Building2 className="h-6 w-6 text-muted-foreground" />
               {project.marinaName}
               <ProjectTypeBadge project={project} />
+              {(project as any).assetClass && (project as any).assetClass !== "marina" && (
+                <Badge variant="outline" className="text-[10px] capitalize h-5">
+                  {(project as any).assetClass.replace("_", " ")}
+                </Badge>
+              )}
             </h1>
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               {(project.city || project.state) && (

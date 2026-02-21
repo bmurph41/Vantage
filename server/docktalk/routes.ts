@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { IStorage } from "./storage";
 import { z } from "zod";
 import { startCronJobs, triggerManualFetch, getAutoFetchStatus, setAutoFetchEnabled } from "./cron-jobs";
+import { fetchAllSourcesWithReport } from "./services/rss-fetcher";
 import bcrypt from "bcrypt";
 import { initializeWebSocket } from "./websocket";
 import type { User } from "@shared/docktalk-schema";
@@ -707,6 +708,22 @@ export async function registerDockTalkRoutes(app: Express, dockTalkStorage: ISto
     } catch (error) {
       console.error("Error during manual fetch:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/docktalk/fetch-all", requireMarinaMatchAuth, async (req: DockTalkRequest, res) => {
+    try {
+      const report = await fetchAllSourcesWithReport();
+      res.json({
+        success: true,
+        totalNewArticles: report.totalNew,
+        sourcesProcessed: report.sourceResults.length,
+        sourceResults: report.sourceResults,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      console.error("Error during full fetch:", error);
+      res.status(500).json({ error: "Failed to fetch all sources" });
     }
   });
 

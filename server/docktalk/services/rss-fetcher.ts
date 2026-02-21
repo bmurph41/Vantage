@@ -39,6 +39,12 @@ function matchesCustomKeywords(title: string, content: string, keywords: string[
   return keywords.some(keyword => text.includes(keyword.toLowerCase()));
 }
 
+function isOlderThan30Days(date: Date): boolean {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  return date < thirtyDaysAgo;
+}
+
 interface FeedItem {
   title?: string;
   link?: string;
@@ -68,6 +74,12 @@ export async function fetchRssFeeds(): Promise<number> {
           
           for (const article of articles) {
             if (validateScrapedArticle(article)) {
+              if (article.publishedAt && isOlderThan30Days(article.publishedAt)) {
+                continue;
+              }
+              if (!matchesCustomKeywords(article.title || '', article.content || '', source.customKeywords || null)) {
+                continue;
+              }
               const newArticles = await processScrapedArticle(article, source.name, !!source.isTrustedSource);
               totalNewArticles += newArticles;
             }
@@ -79,6 +91,10 @@ export async function fetchRssFeeds(): Promise<number> {
           const feed = await parser.parseURL(source.url);
           
           for (const item of feed.items || []) {
+            const itemDate = item.isoDate ? new Date(item.isoDate) : item.pubDate ? new Date(item.pubDate) : null;
+            if (itemDate && isOlderThan30Days(itemDate)) {
+              continue;
+            }
             const newArticles = await processRssItem(item, source.name, source.customKeywords, !!source.isTrustedSource);
             totalNewArticles += newArticles;
           }
@@ -528,6 +544,74 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     console.error("Error processing RSS item:", error);
     return 0;
   }
+}
+
+export async function fetchAllSourcesWithReport(): Promise<{
+  totalNew: number;
+  sourceResults: Array<{ name: string; type: string; articlesFound: number; articlesNew: number; error?: string }>;
+}> {
+  const sourceResults: Array<{ name: string; type: string; articlesFound: number; articlesNew: number; error?: string }> = [];
+  let totalNew = 0;
+
+  try {
+    const sources = await storage.getRssSources();
+    console.log(`[DockTalk Backfill] Starting fetch across ${sources.length} active sources (30-day window, keyword-filtered)`);
+
+    for (const source of sources) {
+      if (!source.isActive) continue;
+
+      const result = { name: source.name, type: source.sourceType || 'rss', articlesFound: 0, articlesNew: 0, error: undefined as string | undefined };
+
+      try {
+        if (source.sourceType === 'web_scrape') {
+          const articles = await scrapeWebPage(source.url);
+          result.articlesFound = articles.length;
+
+          for (const article of articles) {
+            if (!validateScrapedArticle(article)) continue;
+            if (article.publishedAt && isOlderThan30Days(article.publishedAt)) continue;
+            if (!matchesCustomKeywords(article.title || '', article.content || '', source.customKeywords || null)) continue;
+
+            const added = await processScrapedArticle(article, source.name, !!source.isTrustedSource);
+            result.articlesNew += added;
+            totalNew += added;
+          }
+
+          await storage.updateRssSourceLastScrapedAt(source.id);
+          await storage.recordRssSourceSuccess(source.id);
+        } else {
+          const feed = await parser.parseURL(source.url);
+          const items = feed.items || [];
+          result.articlesFound = items.length;
+
+          for (const item of items) {
+            const itemDate = item.isoDate ? new Date(item.isoDate) : item.pubDate ? new Date(item.pubDate) : null;
+            if (itemDate && isOlderThan30Days(itemDate)) continue;
+
+            const added = await processRssItem(item, source.name, source.customKeywords, !!source.isTrustedSource);
+            result.articlesNew += added;
+            totalNew += added;
+          }
+
+          await storage.updateRssSourceLastFetched(source.id);
+          await storage.recordRssSourceSuccess(source.id);
+        }
+
+        console.log(`[DockTalk Backfill] ${source.name}: ${result.articlesNew}/${result.articlesFound} new articles`);
+      } catch (error: any) {
+        result.error = error.message || String(error);
+        console.error(`[DockTalk Backfill] Error: ${source.name}: ${result.error}`);
+        await storage.recordRssSourceFailure(source.id);
+      }
+
+      sourceResults.push(result);
+    }
+  } catch (error) {
+    console.error("[DockTalk Backfill] Fatal error:", error);
+  }
+
+  console.log(`[DockTalk Backfill] Complete: ${totalNew} new articles from ${sourceResults.length} sources`);
+  return { totalNew, sourceResults };
 }
 
 export async function initializeDefaultRssSources(): Promise<void> {
