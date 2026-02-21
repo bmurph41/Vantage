@@ -4,6 +4,7 @@
  * Activity feed for deals with:
  * - Chronological event timeline (stage changes, notes, calls, emails, meetings)
  * - Inline activity composer (quick-log without modal)
+ * - Full activity composer modal (detailed logging)
  * - Activity type filtering
  * - Relative timestamps with full date tooltips
  * 
@@ -33,6 +34,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow, format } from "date-fns";
+import { ActivityComposerModal } from "./activity-composer-modal";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -90,6 +92,7 @@ export function DealActivityTimeline({
   const [composerContent, setComposerContent] = useState("");
   const [composerSubject, setComposerSubject] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [fullComposerOpen, setFullComposerOpen] = useState(false);
 
   // Fetch timeline
   const { data: timelineData, isLoading } = useQuery<TimelineEvent[]>({
@@ -247,18 +250,28 @@ export function DealActivityTimeline({
           </DropdownMenu>
 
           {showComposer && !composerOpen && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="h-7 text-xs gap-1"
-              onClick={() => {
-                setComposerOpen(true);
-                setTimeout(() => textareaRef.current?.focus(), 100);
-              }}
-            >
-              <Plus className="h-3 w-3" />
-              Log Activity
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={() => {
+                  setComposerOpen(true);
+                  setTimeout(() => textareaRef.current?.focus(), 100);
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                Quick Log
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={() => setFullComposerOpen(true)}
+              >
+                Detailed
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -365,6 +378,15 @@ export function DealActivityTimeline({
           </div>
         )}
       </ScrollArea>
+
+      {/* Full Activity Composer Modal */}
+      <ActivityComposerModal
+        open={fullComposerOpen}
+        onOpenChange={setFullComposerOpen}
+        entityType={entityType}
+        entityId={String(dealId)}
+        defaultType={composerType}
+      />
     </div>
   );
 }
