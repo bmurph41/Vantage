@@ -28,17 +28,11 @@ export const PROFIT_CENTER_CATALOG: CatalogProfitCenter[] = [
   { id: 'boat_club', name: 'Boat Club', description: 'Membership-based boat club with recurring fees', icon: 'users', category: 'specialty', scLegacyField: 'profitCenterBoatClub', scLegacyTypeField: 'profitCenterBoatClubType' },
   { id: 'commercial_tenants', name: 'Third-Party Leases', description: 'Leased spaces to restaurants, shops, or other businesses', icon: 'building', category: 'ancillary', scLegacyField: 'profitCenterThirdPartyLeases' },
   { id: 'restaurant', name: 'F&B / Restaurant', description: 'On-site food & beverage operations or concessions', icon: 'utensils', category: 'ancillary', scLegacyField: 'profitCenterFnb', scLegacyTypeField: 'profitCenterFnbType' },
-  { id: 'transient', name: 'Transient Dockage', description: 'Short-term or overnight slip rentals for visiting boaters', icon: 'anchor', category: 'core' },
   { id: 'events', name: 'Events', description: 'Event venue rental for weddings, corporate events, and gatherings', icon: 'building', category: 'ancillary', scLegacyField: 'profitCenterEvents' },
   { id: 'rv_park', name: 'RV Park', description: 'RV parking and camping site rentals', icon: 'car', category: 'specialty', scLegacyField: 'profitCenterRvPark' },
   { id: 'hospitality', name: 'Hospitality / Accommodations', description: 'Lodging, hotel rooms, cabins, or vacation rental units', icon: 'home', category: 'specialty', scLegacyField: 'profitCenterHospitality', scLegacyTypeField: 'profitCenterHospitalityType' },
-  { id: 'haul_out', name: 'Haul-Out / Travel Lift', description: 'Boat haul-out, launch, and travel lift services', icon: 'container', category: 'core' },
-  { id: 'winter_storage', name: 'Winterization / Shrink Wrap', description: 'Seasonal winterization, shrink wrapping, and decommissioning', icon: 'warehouse', category: 'ancillary' },
   { id: 'charter_tours', name: 'Charters / Tours', description: 'Fishing charters, sunset cruises, and sightseeing tours', icon: 'sailboat', category: 'specialty' },
   { id: 'sailing_school', name: 'Sailing / Boating School', description: 'Boating education, sailing lessons, and certification courses', icon: 'sailboat', category: 'specialty' },
-  { id: 'bait_tackle', name: 'Bait & Tackle', description: 'Live bait, tackle, and fishing supply sales', icon: 'anchor', category: 'ancillary' },
-  { id: 'towing_salvage', name: 'Towing / Salvage', description: 'On-water towing assistance and salvage operations', icon: 'ship', category: 'specialty' },
-  { id: 'insurance_commissions', name: 'Insurance Commissions', description: 'Commissions from marine insurance referrals or in-house policies', icon: 'store', category: 'specialty' },
   { id: 'membership_fees', name: 'Membership / Association Fees', description: 'Annual or monthly membership dues, yacht club fees', icon: 'users', category: 'ancillary' },
 ];
 
