@@ -2014,9 +2014,11 @@ function Router() {
         )}
       </Route>
       <Route path="/modeling/investment-criteria">
-        <Suspense fallback={<LoadingFallback />}>
-          <InvestmentCriteria />
-        </Suspense>
+        {() => (
+          <UnifiedLayout>
+            <InvestmentCriteria />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/modeling/settings">
         {() => (
