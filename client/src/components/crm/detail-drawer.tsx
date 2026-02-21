@@ -71,6 +71,7 @@ import { RelationshipStats } from "./relationship-stats";
 import { CustomFieldsEditor } from "./custom-fields-editor";
 import { NoteModal, TaskModal, CallModal, EmailRedirectModal } from "./action-modals";
 import { CollapsibleSection, EditableFieldRow, FieldRow } from "./collapsible-section";
+import { DealDetailPanel } from "./deal-detail-panel";
 
 interface DetailDrawerProps {
   open: boolean;
@@ -167,7 +168,7 @@ export function DetailDrawer({
   // Fetch related company for contacts
   const { data: relatedCompany } = useQuery({
     queryKey: ['/api/companies', entity?.companyId],
-    enabled: entityType === 'contact' && !!entity?.companyId,
+    enabled: (entityType === 'contact' || entityType === 'deal') && !!entity?.companyId,
   });
 
   // Fetch related contact for deals
@@ -858,39 +859,20 @@ export function DetailDrawer({
                       </div>
                     )}
 
-                    {/* Deal Overview - Collapsible Sections */}
+                    {/* Deal Overview - Institutional Grade Panel */}
                     {entityType === "deal" && (
-                      <div className="space-y-3">
-                        <CollapsibleSection title="Deal Details" icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} defaultOpen={true}>
-                          <div className="space-y-0.5">
-                            <EditableFieldRow label="Deal Name" isEditing={isEditing}
-                              value={<span data-testid="text-name">{entity?.name || "-"}</span>}
-                              editComponent={<Input value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} data-testid="input-name" />}
-                            />
-                            <EditableFieldRow label="Amount" isEditing={isEditing}
-                              value={<span data-testid="text-amount" className="font-medium text-green-600">${entity?.amount?.toLocaleString() || "0"}</span>}
-                              editComponent={<Input type="number" value={editData.amount || ""} onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) })} data-testid="input-amount" />}
-                            />
-                            <EditableFieldRow label="Close Date" isEditing={isEditing}
-                              value={<span data-testid="text-closeDate">{entity?.closeDate ? new Date(entity.closeDate).toLocaleDateString() : "-"}</span>}
-                              editComponent={<Input type="date" value={editData.closeDate ? new Date(editData.closeDate).toISOString().split('T')[0] : ""} onChange={(e) => setEditData({ ...editData, closeDate: new Date(e.target.value) })} data-testid="input-closeDate" />}
-                            />
-                            <FieldRow label="Status" value={
-                              <Badge variant={entity?.status === 'won' ? 'default' : entity?.status === 'lost' ? 'destructive' : 'secondary'} data-testid="badge-status" className="capitalize">
-                                {entity?.status || "open"}
-                              </Badge>
-                            } />
-                            {relatedContact && (
-                              <FieldRow label="Primary Contact" value={
-                                <span className="flex items-center gap-1" data-testid="text-contact">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  {relatedContact.firstName} {relatedContact.lastName}
-                                </span>
-                              } />
-                            )}
-                          </div>
-                        </CollapsibleSection>
-                      </div>
+                      <DealDetailPanel
+                        deal={entity as Deal}
+                        isEditing={isEditing}
+                        onEditToggle={setIsEditing}
+                        editData={editData}
+                        setEditData={setEditData}
+                        onSave={handleSave}
+                        isSaving={updateMutation.isPending}
+                        relatedContact={relatedContact}
+                        relatedCompany={relatedCompany}
+                        layoutMode="narrow"
+                      />
                     )}
 
                     {/* Property Overview - Collapsible Sections */}

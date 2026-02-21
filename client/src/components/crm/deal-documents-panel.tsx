@@ -11,7 +11,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
   FileText, Upload, FolderOpen, ExternalLink, Download, Eye,
-  File, FileSpreadsheet, FileImage, FilePdf,
+  File, FileSpreadsheet, FileImage, FileType,
   Clock, Plus, MoreHorizontal, CheckCircle2, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -311,7 +311,7 @@ function categorizeFile(nameOrType: string): string {
 function getFileIcon(filename: string) {
   const ext = filename.split(".").pop()?.toLowerCase();
   switch (ext) {
-    case "pdf": return <FilePdf className="h-3.5 w-3.5 text-red-500" />;
+    case "pdf": return <FileType className="h-3.5 w-3.5 text-red-500" />;
     case "xlsx": case "xls": case "csv": return <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />;
     case "jpg": case "jpeg": case "png": case "gif": return <FileImage className="h-3.5 w-3.5 text-purple-500" />;
     case "doc": case "docx": return <FileText className="h-3.5 w-3.5 text-blue-500" />;
