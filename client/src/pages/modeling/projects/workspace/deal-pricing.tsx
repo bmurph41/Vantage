@@ -50,7 +50,7 @@ import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import type { ProjectConfig } from '@/types/modeling';
 import debounce from 'lodash.debounce';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
-import { computeDealSignal, getSignalBadgeProps, type DealSignalResult } from '@/lib/dealSignal';
+import { computeDealSignal, getSignalBadgeProps, computeCriteriaSignal, type DealSignalResult, type CriteriaMatchResult, type InvestmentCriteria } from '@/lib/dealSignal';
 import YearSelector from '@/components/modeling/YearSelector';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 
@@ -555,6 +555,27 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
     },
   });
 
+  // Pro Forma-based pricing: uses actual projected cash flows instead of simple NOI growth
+  const proFormaSolveMutation = useMutation({
+    mutationFn: async (params: { targetIrr: number; scenario?: string }) => {
+      const res = await apiRequest('POST', `/api/deal-pricing/solve-from-pro-forma`, {
+        method: 'POST',
+        body: JSON.stringify({ projectId, targetIrr: params.targetIrr, scenario: params.scenario || 'base' }),
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+      if (data.solvedPrice) {
+        toast({ title: 'Pro Forma Price Solved', description: `Solved price: $${Math.round(data.solvedPrice).toLocaleString()} at ${(data.targetIrr * 100).toFixed(1)}% IRR` });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: 'Pro Forma solve failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: (data: { purchasePrice?: number; year1CapRate?: number }) =>
       apiRequest('POST', `/api/modeling/projects/${projectId}/deal-pricing/save`, data),
@@ -566,6 +587,51 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
       toast({ title: 'Error', description: 'Failed to save deal pricing.', variant: 'destructive' });
     },
   });
+
+  // Fetch user's investment criteria for deal recommendation
+  const { data: criteriaData } = useQuery<{ profile: any; financial: any; capital: any; location: any; operational: any; size: any; involvement: any } | null>({
+    queryKey: ['/api/investment-criteria/default'],
+  });
+
+  const userCriteria: InvestmentCriteria | null = criteriaData ? {
+    financial: criteriaData.financial ? {
+      minCapRate: criteriaData.financial.minCapRate ? parseFloat(criteriaData.financial.minCapRate) : null,
+      maxCapRate: criteriaData.financial.maxCapRate ? parseFloat(criteriaData.financial.maxCapRate) : null,
+      minNoi: criteriaData.financial.minNoi ? parseFloat(criteriaData.financial.minNoi) : null,
+      minEbitda: criteriaData.financial.minEbitda ? parseFloat(criteriaData.financial.minEbitda) : null,
+      minOperatingMargin: criteriaData.financial.minOperatingMargin ? parseFloat(criteriaData.financial.minOperatingMargin) : null,
+    } : null,
+    capital: criteriaData.capital ? {
+      minIrrTarget: criteriaData.capital.minIrrTarget ? parseFloat(criteriaData.capital.minIrrTarget) : null,
+      minCashOnCashReturn: criteriaData.capital.minCashOnCashReturn ? parseFloat(criteriaData.capital.minCashOnCashReturn) : null,
+      targetLtvRatio: criteriaData.capital.targetLtvRatio ? parseFloat(criteriaData.capital.targetLtvRatio) : null,
+      targetHoldPeriod: criteriaData.capital.targetHoldPeriod,
+      maxEquityPerDeal: criteriaData.capital.maxEquityPerDeal ? parseFloat(criteriaData.capital.maxEquityPerDeal) : null,
+    } : null,
+    location: criteriaData.location ? {
+      targetStates: criteriaData.location.targetStates,
+      targetRegions: criteriaData.location.targetRegions,
+    } : null,
+    operational: criteriaData.operational ? {
+      minOccupancyRate: criteriaData.operational.minOccupancyRate ? parseFloat(criteriaData.operational.minOccupancyRate) : null,
+    } : null,
+    size: criteriaData.size ? {
+      minTotalSlips: criteriaData.size.minTotalSlips,
+      maxTotalSlips: criteriaData.size.maxTotalSlips,
+    } : null,
+    involvement: criteriaData.involvement ? {
+      involvementLevel: criteriaData.involvement.involvementLevel,
+      requireManagementInPlace: criteriaData.involvement.requireManagementInPlace,
+    } : null,
+    weights: criteriaData.profile ? {
+      financialWeight: criteriaData.profile.financialWeight,
+      capitalWeight: criteriaData.profile.capitalWeight,
+      locationWeight: criteriaData.profile.locationWeight,
+      operationalWeight: criteriaData.profile.operationalWeight,
+      sizeWeight: criteriaData.profile.sizeWeight,
+      involvementWeight: criteriaData.profile.involvementWeight,
+    } : undefined,
+  } : null;
 
   const priceDriverKeys = ['targetIRR', 'goingInCap', 'price'];
 
@@ -1149,9 +1215,64 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     Pro Forma Engine
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    const targetIrr = parseFloat(pricingData.targetIRR?.toString() || '15') / 100;
+                    proFormaSolveMutation.mutate({ targetIrr });
+                  }}
+                  disabled={proFormaSolveMutation.isPending}
+                >
+                  {proFormaSolveMutation.isPending ? (
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Calculator className="h-3 w-3 mr-1" />
+                  )}
+                  Solve from Pro Forma
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {/* Pro Forma solve result */}
+              {proFormaSolveMutation.data && (
+                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+                    <span className="font-medium text-sm text-indigo-800">Pro Forma-Based Price</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <span className="text-xs text-muted-foreground">Solved Price</span>
+                      <p className="font-bold text-indigo-700">{formatCurrency(proFormaSolveMutation.data.solvedPrice)}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Target IRR</span>
+                      <p className="font-medium">{((proFormaSolveMutation.data.targetIrr || 0) * 100).toFixed(1)}%</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Equity Multiple</span>
+                      <p className="font-medium">{(proFormaSolveMutation.data.equityMultiple || 0).toFixed(2)}x</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Going-In Cap</span>
+                      <p className="font-medium">{((proFormaSolveMutation.data.goingInCapRate || 0) * 100).toFixed(2)}%</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="mt-2 text-xs"
+                    onClick={() => {
+                      const price = proFormaSolveMutation.data.solvedPrice;
+                      if (price) saveMutation.mutate({ purchasePrice: Math.round(price) });
+                    }}
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    Save as Purchase Price
+                  </Button>
+                </div>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <p className="text-xs text-muted-foreground">Purchase Price</p>
@@ -1356,7 +1477,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         const exitNp = bestExitScenario?.netProceeds ? parseFloat(bestExitScenario.netProceeds) : null;
         const exitMoicVal = bestExitScenario?.moic ? parseFloat(bestExitScenario.moic) : null;
         const exitIrrVal = bestExitScenario?.irr ? parseFloat(bestExitScenario.irr) : null;
-        const dealSignal = computeDealSignal({
+        const dealSignal = computeCriteriaSignal({
           irr: pricingData.irr ?? null,
           capRate: pricingData.goingInCapRate ?? null,
           equityMultiple: pricingData.equityMultiple ?? null,
@@ -1370,7 +1491,8 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           exitNetProceeds: exitNp,
           exitMoic: exitMoicVal,
           exitIrr: exitIrrVal,
-        });
+          noi: pricingData.projectFinancials?.year1NOI ?? null,
+        }, userCriteria);
         const signalBadge = getSignalBadgeProps(dealSignal.signal);
         const SignalIcon = dealSignal.signal === 'Buy' ? ThumbsUp : dealSignal.signal === 'Pass' ? ThumbsDown : AlertCircleIcon;
 
@@ -1387,7 +1509,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <span className="text-sm font-semibold text-foreground">Deal Recommendation</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Institutional-grade Buy/Pass signal based on pricing + exit strategy analysis
+                    {userCriteria ? 'Scored against your investment criteria' : 'Institutional-grade Buy/Pass signal — set up Investment Criteria for personalized scoring'}
                   </p>
                 </div>
               </div>
@@ -1423,6 +1545,39 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+              {/* Criteria Match Breakdown */}
+              {'criteriaMatches' in dealSignal && (dealSignal as any).criteriaMatches && (dealSignal as any).criteriaMatches.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Investment Criteria Match</p>
+                    <span className="text-xs text-muted-foreground">
+                      {(dealSignal as any).criteriaMatches.filter((m: any) => m.met).length}/{(dealSignal as any).criteriaMatches.length} criteria met
+                    </span>
+                  </div>
+                  <div className="grid gap-1.5">
+                    {(dealSignal as any).criteriaMatches.map((match: any, i: number) => (
+                      <div key={i} className={cn("flex items-center justify-between px-3 py-2 rounded-lg text-xs border", match.met ? "bg-green-50/50 border-green-200 dark:bg-green-950/20" : "bg-red-50/50 border-red-200 dark:bg-red-950/20")}>
+                        <div className="flex items-center gap-2">
+                          {match.met ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <AlertCircleIcon className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                          )}
+                          <span className="text-muted-foreground">{match.category}</span>
+                          <span className="font-medium">{match.criterion}</span>
+                          {match.mustHave && <span className="px-1 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold">MUST</span>}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground">Target: {match.target}</span>
+                          <span className={cn("font-medium", match.met ? "text-green-700" : "text-red-700")}>{match.actual}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
                 {dealSignal.reasons.length > 0 && (
                   <div className={cn("rounded-lg p-3 space-y-1.5", dealSignal.bgColor)}>
                     <p className={cn("text-xs font-semibold uppercase tracking-wider", dealSignal.color)}>Key Factors</p>

@@ -251,6 +251,7 @@ const ModelingSettings = lazy(() => import("@/pages/modeling/settings"));
 const ChartOfAccounts = lazy(() => import("@/pages/modeling/settings/chart-of-accounts"));
 const CategoryMapping = lazy(() => import("@/pages/modeling/settings/category-mapping"));
 const NormalizationStatus = lazy(() => import("@/pages/modeling/settings/normalization-status"));
+const InvestmentCriteria = lazy(() => import("@/pages/modeling/investment-criteria"));
 const TransactionClosingPage = lazy(() => import("@/pages/modeling/projects/transaction-closing"));
 const VDRDashboard = lazy(() => import("@/pages/vdr/Dashboard"));
 const ProjectVDR = lazy(() => import("@/pages/vdr/ProjectVDR"));

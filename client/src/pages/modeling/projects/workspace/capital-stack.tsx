@@ -1017,6 +1017,14 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const computedEquity = Math.max(0, purchasePrice - totalDebt);
   const hasComputedEquity = purchasePrice > 0;
 
+  // ── Refi Scenario State ──
+  const [refiYear, setRefiYear] = useState<number>(3);
+  const [refiRate, setRefiRate] = useState<string>('5.5');
+  const [refiTermYears, setRefiTermYears] = useState<string>('10');
+  const [refiAmortYears, setRefiAmortYears] = useState<string>('30');
+  const [refiLtv, setRefiLtv] = useState<string>('65');
+  const [refiIoMonths, setRefiIoMonths] = useState<string>('0');
+
   // Dynamic partner rows for Partnership/JV structures
   const [equityPartners, setEquityPartners] = useState<{
     id: string;
@@ -2049,6 +2057,38 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           </AlertDescription>
                         </Alert>
                       )}
+
+                      {/* Template Preview */}
+                      {selectedTemplateId && fundTemplates && (() => {
+                        const tmpl = fundTemplates.find(t => t.id === selectedTemplateId);
+                        if (!tmpl) return null;
+                        const config = (tmpl as any).config || {};
+                        return (
+                          <Card className="bg-slate-50 border-dashed">
+                            <CardContent className="pt-4">
+                              <h5 className="text-sm font-medium mb-2 flex items-center gap-2">
+                                <Layers className="h-4 w-4" />
+                                Template Preview: {tmpl.name}
+                              </h5>
+                              <div className="grid grid-cols-2 gap-3 text-xs">
+                                {config.targetLtv && (
+                                  <div><span className="text-muted-foreground">Target LTV:</span> <span className="font-medium">{config.targetLtv}%</span></div>
+                                )}
+                                {config.preferredReturn && (
+                                  <div><span className="text-muted-foreground">Pref Return:</span> <span className="font-medium">{config.preferredReturn}%</span></div>
+                                )}
+                                {config.gpSplit && (
+                                  <div><span className="text-muted-foreground">GP/LP Split:</span> <span className="font-medium">{config.gpSplit}/{100 - config.gpSplit}</span></div>
+                                )}
+                                {config.catchUp && (
+                                  <div><span className="text-muted-foreground">GP Catch-Up:</span> <span className="font-medium">{config.catchUp}%</span></div>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-2">This structure will be applied to the new capital stack</p>
+                            </CardContent>
+                          </Card>
+                        );
+                      })()}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowFundInheritance(false)}>
@@ -2133,6 +2173,14 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                 onClick={() => {
                   const defaultTemplate = fundTemplates.find(t => t.isDefault) || fundTemplates[0];
                   if (defaultTemplate) applyTemplateMutation.mutate(defaultTemplate.id);
+                  // Also pre-fill equity form from template if it has equity config
+                  if (defaultTemplate && (defaultTemplate as any).equityConfig) {
+                    const ec = (defaultTemplate as any).equityConfig;
+                    if (ec.preferredReturn) equityForm.setValue('preferredReturn', String(ec.preferredReturn));
+                    if (ec.gpSplit) {
+                      setPromoteTiers([{ irrHurdle: (ec.preferredReturn || 8) / 100, gpSplit: ec.gpSplit / 100, lpSplit: (100 - ec.gpSplit) / 100 }]);
+                    }
+                  }
                 }}
                 disabled={applyTemplateMutation.isPending}
               >
@@ -2296,6 +2344,18 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     <TabsTrigger value="projections" className="gap-1.5 text-xs">
                       <Calculator className="h-3.5 w-3.5" />
                       Projections
+                    </TabsTrigger>
+                    <TabsTrigger value="sources-uses" className="gap-1.5 text-xs">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Sources & Uses
+                    </TabsTrigger>
+                    <TabsTrigger value="sensitivity" className="gap-1.5 text-xs">
+                      <Calculator className="h-3.5 w-3.5" />
+                      Sensitivity
+                    </TabsTrigger>
+                    <TabsTrigger value="refi" className="gap-1.5 text-xs">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Refi Scenario
                     </TabsTrigger>
                   </TabsList>
 
@@ -3187,23 +3247,59 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                   <TabsContent value="projections" className="space-y-4">
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Generate Projections</CardTitle>
-                        <CardDescription>Calculate cash flows and returns based on NOI assumptions</CardDescription>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">Cash Flow Projections</CardTitle>
+                            <CardDescription>Auto-generated from Pro Forma engine or manual NOI input</CardDescription>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const res = await apiRequest(`/api/capital-stack/${selectedStackId}/projections/from-pro-forma`, {
+                                    method: 'POST',
+                                    body: JSON.stringify({ projectId, scenario: 'base' }),
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
+                                  toast({ title: 'Projections synced from Pro Forma' });
+                                } catch (e: any) {
+                                  toast({ title: 'Pro Forma sync failed', description: e.message, variant: 'destructive' });
+                                }
+                              }}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Sync from Pro Forma
+                            </Button>
+                            <Button
+                              onClick={() => generateProjectionsMutation.mutate()}
+                              disabled={generateProjectionsMutation.isPending}
+                              size="sm"
+                              variant="secondary"
+                              data-testid="button-generate-projections"
+                            >
+                              <Calculator className="h-4 w-4 mr-2" />
+                              Manual Generate
+                            </Button>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="flex gap-4 items-end">
+                        <div className="flex gap-4 items-end mb-4 p-3 bg-muted/30 rounded-lg">
                           <div>
-                            <Label htmlFor="noi">Starting NOI ($)</Label>
+                            <Label htmlFor="noi" className="text-xs">Starting NOI ($)</Label>
                             <Input
                               id="noi"
                               type="number"
                               value={noi}
                               onChange={(e) => setNoi(e.target.value)}
                               placeholder="1000000"
+                              className="h-8"
                             />
                           </div>
                           <div>
-                            <Label htmlFor="noiGrowth">Annual Growth Rate</Label>
+                            <Label htmlFor="noiGrowth" className="text-xs">Annual Growth</Label>
                             <Input
                               id="noiGrowth"
                               type="number"
@@ -3211,16 +3307,10 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               value={noiGrowthRate}
                               onChange={(e) => setNoiGrowthRate(e.target.value)}
                               placeholder="0.02"
+                              className="h-8"
                             />
                           </div>
-                          <Button
-                            onClick={() => generateProjectionsMutation.mutate()}
-                            disabled={generateProjectionsMutation.isPending}
-                            data-testid="button-generate-projections"
-                          >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${generateProjectionsMutation.isPending ? 'animate-spin' : ''}`} />
-                            Generate
-                          </Button>
+                          <p className="text-xs text-muted-foreground pb-2">Used for manual generation only. "Sync from Pro Forma" uses actual projected values.</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -3352,8 +3442,13 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <div className="text-sm text-muted-foreground">100% to LPs until target IRR achieved</div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Input className="w-16 h-8 text-sm" defaultValue="8.0%" />
-                              <span className="text-xs text-muted-foreground">IRR</span>
+                              <span className="text-sm font-medium">
+                                {(() => {
+                                  const prefLayer = equityLayers.find(l => l.preferredReturn);
+                                  return prefLayer ? `${parseNumber(prefLayer.preferredReturn).toFixed(1)}%` : '8.0%';
+                                })()}
+                              </span>
+                              <span className="text-xs text-muted-foreground">Pref Return</span>
                             </div>
                           </div>
 
@@ -3380,9 +3475,27 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                               <span className="text-muted-foreground">LP</span>
-                              <Input className="w-14 h-8 text-sm" defaultValue="80%" />
+                              <span className="font-medium">
+                                {(() => {
+                                  const promoLayer = equityLayers.find(l => l.promoteTiers && (l.promoteTiers as any[]).length > 0);
+                                  if (promoLayer) {
+                                    const tiers = promoLayer.promoteTiers as { lpSplit: number }[];
+                                    return `${(tiers[tiers.length - 1]?.lpSplit * 100 || 80).toFixed(0)}%`;
+                                  }
+                                  return '80%';
+                                })()}
+                              </span>
                               <span className="text-muted-foreground">/</span>
-                              <Input className="w-14 h-8 text-sm" defaultValue="20%" />
+                              <span className="font-medium">
+                                {(() => {
+                                  const promoLayer = equityLayers.find(l => l.promoteTiers && (l.promoteTiers as any[]).length > 0);
+                                  if (promoLayer) {
+                                    const tiers = promoLayer.promoteTiers as { gpSplit: number }[];
+                                    return `${(tiers[tiers.length - 1]?.gpSplit * 100 || 20).toFixed(0)}%`;
+                                  }
+                                  return '20%';
+                                })()}
+                              </span>
                               <span className="text-muted-foreground">GP</span>
                             </div>
                           </div>
@@ -3405,34 +3518,45 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 <TableHead>IRR Hurdle</TableHead>
                                 <TableHead>LP Split</TableHead>
                                 <TableHead>GP Split (Promote)</TableHead>
-                                <TableHead className="w-16"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              <TableRow>
-                                <TableCell>0% - 8%</TableCell>
-                                <TableCell>100%</TableCell>
-                                <TableCell>0%</TableCell>
-                                <TableCell></TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell>8% - 12%</TableCell>
-                                <TableCell>80%</TableCell>
-                                <TableCell>20%</TableCell>
-                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell>12% - 18%</TableCell>
-                                <TableCell>70%</TableCell>
-                                <TableCell>30%</TableCell>
-                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell>18%+</TableCell>
-                                <TableCell>60%</TableCell>
-                                <TableCell>40%</TableCell>
-                                <TableCell><Button variant="ghost" size="sm"><Trash2 className="h-3 w-3" /></Button></TableCell>
-                              </TableRow>
+                              {(() => {
+                                const promoLayer = equityLayers.find(l => l.promoteTiers && (l.promoteTiers as any[]).length > 0);
+                                const tiers = promoLayer?.promoteTiers as { irrHurdle: number; lpSplit: number; gpSplit: number }[] || [];
+                                
+                                if (tiers.length === 0) {
+                                  return (
+                                    <>
+                                      <TableRow><TableCell>0% - 8%</TableCell><TableCell>100%</TableCell><TableCell>0%</TableCell></TableRow>
+                                      <TableRow><TableCell>8% - 12%</TableCell><TableCell>80%</TableCell><TableCell>20%</TableCell></TableRow>
+                                      <TableRow><TableCell>12%+</TableCell><TableCell>70%</TableCell><TableCell>30%</TableCell></TableRow>
+                                    </>
+                                  );
+                                }
+                                
+                                // Tier 0: below first hurdle = 100% LP
+                                const rows = [
+                                  <TableRow key="base" className="bg-blue-50/30">
+                                    <TableCell>0% - {(tiers[0].irrHurdle * 100).toFixed(0)}%</TableCell>
+                                    <TableCell>100%</TableCell>
+                                    <TableCell>0%</TableCell>
+                                  </TableRow>
+                                ];
+                                
+                                tiers.forEach((tier, i) => {
+                                  const nextHurdle = tiers[i + 1]?.irrHurdle;
+                                  rows.push(
+                                    <TableRow key={i}>
+                                      <TableCell>{(tier.irrHurdle * 100).toFixed(0)}%{nextHurdle ? ` - ${(nextHurdle * 100).toFixed(0)}%` : '+'}</TableCell>
+                                      <TableCell>{(tier.lpSplit * 100).toFixed(0)}%</TableCell>
+                                      <TableCell className="font-medium text-purple-600">{(tier.gpSplit * 100).toFixed(0)}%</TableCell>
+                                    </TableRow>
+                                  );
+                                });
+                                
+                                return rows;
+                              })()}
                             </TableBody>
                           </Table>
                         </div>
@@ -3739,157 +3863,677 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <TrendingUp className="h-5 w-5" />
                               Investor Returns Analysis
                             </CardTitle>
-                            <CardDescription>Waterfall distribution based on exit scenario</CardDescription>
+                            <CardDescription>Computed from actual projections and capital structure</CardDescription>
                           </div>
-                          <Button variant="outline" size="sm">
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Calculate Returns
+                          <Button variant="outline" size="sm" onClick={() => generateProjectionsMutation.mutate()} disabled={generateProjectionsMutation.isPending}>
+                            <RefreshCw className={`h-4 w-4 mr-2 ${generateProjectionsMutation.isPending ? 'animate-spin' : ''}`} />
+                            Recalculate
                           </Button>
                         </div>
                       </CardHeader>
                       <CardContent>
-                        {/* Summary Cards */}
-                        <div className="grid gap-4 md:grid-cols-4 mb-6">
-                          <Card className="bg-blue-500/10 border-blue-500/20">
-                            <CardContent className="pt-4 text-center">
-                              <div className="text-2xl font-bold text-blue-600">$15,500,000</div>
-                              <div className="text-xs text-muted-foreground">Total Proceeds</div>
-                            </CardContent>
-                          </Card>
-                          <Card className="bg-green-500/10 border-green-500/20">
-                            <CardContent className="pt-4 text-center">
-                              <div className="text-2xl font-bold text-green-600">$5,500,000</div>
-                              <div className="text-xs text-muted-foreground">Total Profit</div>
-                            </CardContent>
-                          </Card>
-                          <Card className="bg-purple-500/10 border-purple-500/20">
-                            <CardContent className="pt-4 text-center">
-                              <div className="text-2xl font-bold text-purple-600">18.5%</div>
-                              <div className="text-xs text-muted-foreground">Fund IRR</div>
-                            </CardContent>
-                          </Card>
-                          <Card className="bg-orange-500/10 border-orange-500/20">
-                            <CardContent className="pt-4 text-center">
-                              <div className="text-2xl font-bold text-orange-600">1.55x</div>
-                              <div className="text-xs text-muted-foreground">Equity Multiple</div>
-                            </CardContent>
-                          </Card>
+                        {(() => {
+                          const lastProj = projections[projections.length - 1];
+                          const exitVal = lastProj ? parseNumber(lastProj.exitValue) : 0;
+                          const loanPayoff = lastProj ? parseNumber(lastProj.loanPayoff) : 0;
+                          const netSaleProceeds = lastProj ? parseNumber(lastProj.netSaleProceeds) : 0;
+                          const totalCashFlows = projections.reduce((s, p) => s + parseNumber(p.cashFlowAfterDebt), 0);
+                          const totalProceeds = totalCashFlows + netSaleProceeds;
+                          const totalProfit = totalProceeds - totalEquity;
+                          const projIrr = lastProj ? parseNumber(lastProj.irr) : 0;
+                          const projEqMult = lastProj ? parseNumber(lastProj.equityMultiple) : 0;
+                          const avgCoC = projections.length > 0
+                            ? projections.reduce((s, p) => s + parseNumber(p.cashOnCash), 0) / projections.length : 0;
+                          
+                          const gpLayers = equityLayers.filter(l => l.investorType === 'gp' || l.layerType === 'promote');
+                          const lpLayers = equityLayers.filter(l => l.investorType !== 'gp' && l.layerType !== 'promote');
+                          const gpEquity = gpLayers.reduce((s, l) => s + parseNumber(l.commitmentAmount), 0);
+                          const lpEquity = lpLayers.reduce((s, l) => s + parseNumber(l.commitmentAmount), 0);
+                          const gpPct = totalEquity > 0 ? gpEquity / totalEquity : 0;
+                          const lpPct = totalEquity > 0 ? lpEquity / totalEquity : 1;
+
+                          // Simple waterfall calc
+                          let remaining = totalProceeds;
+                          const t1_roc = Math.min(remaining, totalEquity);
+                          remaining -= t1_roc;
+                          const prefRate = gpLayers[0]?.preferredReturn ? parseNumber(gpLayers[0].preferredReturn) / 100 : 0.08;
+                          const holdYrs = projections.length || 5;
+                          const prefAmount = totalEquity * prefRate * holdYrs;
+                          const t2_pref = Math.min(remaining, prefAmount);
+                          remaining -= t2_pref;
+                          const catchUpPct = gpLayers[0]?.catchUpPct ? parseNumber(gpLayers[0].catchUpPct) / 100 : 1;
+                          const gpCatchUp = Math.min(remaining, t2_pref * gpPct / (1 - gpPct)) * catchUpPct;
+                          const t3_catchup = Math.min(remaining, gpCatchUp);
+                          remaining -= t3_catchup;
+                          const promoteSplit = 0.2;
+                          const t4_gp = remaining * promoteSplit;
+                          const t4_lp = remaining * (1 - promoteSplit);
+
+                          if (projections.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Generate projections to see returns analysis</p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <>
+                              <div className="grid gap-4 md:grid-cols-4 mb-6">
+                                <Card className="bg-blue-500/10 border-blue-500/20">
+                                  <CardContent className="pt-4 text-center">
+                                    <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalProceeds)}</div>
+                                    <div className="text-xs text-muted-foreground">Total Proceeds</div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="bg-green-500/10 border-green-500/20">
+                                  <CardContent className="pt-4 text-center">
+                                    <div className="text-2xl font-bold text-green-600">{formatCurrency(totalProfit)}</div>
+                                    <div className="text-xs text-muted-foreground">Total Profit</div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="bg-purple-500/10 border-purple-500/20">
+                                  <CardContent className="pt-4 text-center">
+                                    <div className="text-2xl font-bold text-purple-600">{projIrr.toFixed(1)}%</div>
+                                    <div className="text-xs text-muted-foreground">Levered IRR</div>
+                                  </CardContent>
+                                </Card>
+                                <Card className="bg-orange-500/10 border-orange-500/20">
+                                  <CardContent className="pt-4 text-center">
+                                    <div className="text-2xl font-bold text-orange-600">{projEqMult.toFixed(2)}x</div>
+                                    <div className="text-xs text-muted-foreground">Equity Multiple</div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+
+                              {/* Waterfall Distribution */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Waterfall Distribution</h4>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Tier</TableHead>
+                                      <TableHead>Description</TableHead>
+                                      <TableHead>Amount</TableHead>
+                                      <TableHead>LP Share</TableHead>
+                                      <TableHead>GP Share</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    <TableRow className="bg-blue-500/5">
+                                      <TableCell><Badge variant="outline">Tier 1</Badge></TableCell>
+                                      <TableCell>Return of Capital</TableCell>
+                                      <TableCell className="font-medium">{formatCurrency(t1_roc)}</TableCell>
+                                      <TableCell>{formatCurrency(t1_roc * lpPct)}</TableCell>
+                                      <TableCell>{formatCurrency(t1_roc * gpPct)}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="bg-green-500/5">
+                                      <TableCell><Badge variant="outline">Tier 2</Badge></TableCell>
+                                      <TableCell>Preferred Return ({(prefRate * 100).toFixed(0)}%)</TableCell>
+                                      <TableCell className="font-medium">{formatCurrency(t2_pref)}</TableCell>
+                                      <TableCell>{formatCurrency(t2_pref)}</TableCell>
+                                      <TableCell>$0</TableCell>
+                                    </TableRow>
+                                    <TableRow className="bg-orange-500/5">
+                                      <TableCell><Badge variant="outline">Tier 3</Badge></TableCell>
+                                      <TableCell>GP Catch-Up</TableCell>
+                                      <TableCell className="font-medium">{formatCurrency(t3_catchup)}</TableCell>
+                                      <TableCell>$0</TableCell>
+                                      <TableCell>{formatCurrency(t3_catchup)}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="bg-purple-500/5">
+                                      <TableCell><Badge variant="outline">Tier 4</Badge></TableCell>
+                                      <TableCell>Carried Interest / Promote</TableCell>
+                                      <TableCell className="font-medium">{formatCurrency(t4_gp + t4_lp)}</TableCell>
+                                      <TableCell>{formatCurrency(t4_lp)}</TableCell>
+                                      <TableCell>{formatCurrency(t4_gp)}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="border-t-2 font-bold">
+                                      <TableCell></TableCell>
+                                      <TableCell>Total</TableCell>
+                                      <TableCell>{formatCurrency(totalProceeds)}</TableCell>
+                                      <TableCell className="text-green-600">{formatCurrency(t1_roc * lpPct + t2_pref + t4_lp)}</TableCell>
+                                      <TableCell className="text-blue-600">{formatCurrency(t1_roc * gpPct + t3_catchup + t4_gp)}</TableCell>
+                                    </TableRow>
+                                  </TableBody>
+                                </Table>
+                              </div>
+
+                              {/* Per-Investor LP Report */}
+                              {equityLayers.length > 0 && (
+                                <div className="mt-6 space-y-3">
+                                  <h4 className="font-medium flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Per-Investor Returns
+                                  </h4>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Investor</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Contributed</TableHead>
+                                        <TableHead>Ownership</TableHead>
+                                        <TableHead>Distributions</TableHead>
+                                        <TableHead>Profit</TableHead>
+                                        <TableHead>Multiple</TableHead>
+                                        <TableHead>IRR</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {equityLayers.map(layer => {
+                                        const pct = parseNumber(layer.ownershipPct) / 100;
+                                        const contributed = parseNumber(layer.commitmentAmount);
+                                        const isGp = layer.investorType === 'gp' || layer.layerType === 'promote';
+                                        const distributions = isGp
+                                          ? (t1_roc * gpPct + t3_catchup + t4_gp) * (contributed / Math.max(gpEquity, 1))
+                                          : (t1_roc * lpPct + t2_pref + t4_lp) * (contributed / Math.max(lpEquity, 1));
+                                        const profit = distributions - contributed;
+                                        const multiple = contributed > 0 ? distributions / contributed : 0;
+                                        const investorIrr = contributed > 0 ? ((Math.pow(multiple, 1 / holdYrs) - 1) * 100) : 0;
+                                        
+                                        return (
+                                          <TableRow key={layer.id}>
+                                            <TableCell className="font-medium">{layer.name}</TableCell>
+                                            <TableCell>
+                                              <Badge variant={isGp ? 'default' : 'secondary'} className="text-xs">
+                                                {isGp ? 'GP' : 'LP'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell>{formatCurrency(contributed)}</TableCell>
+                                            <TableCell>{parseNumber(layer.ownershipPct).toFixed(1)}%</TableCell>
+                                            <TableCell className="font-medium text-green-600">{formatCurrency(distributions)}</TableCell>
+                                            <TableCell className={profit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(profit)}</TableCell>
+                                            <TableCell className="font-medium">{multiple.toFixed(2)}x</TableCell>
+                                            <TableCell className={investorIrr >= 15 ? 'text-green-600 font-medium' : ''}>{investorIrr.toFixed(1)}%</TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* REFI SCENARIO TAB */}
+                  <TabsContent value="refi" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <RefreshCw className="h-5 w-5" />
+                          Refinance Scenario
+                        </CardTitle>
+                        <CardDescription>Model mid-hold refinancing. Bridge/mezz debt is called first, then senior debt is replaced.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Current Debt Stack */}
+                        <div>
+                          <h4 className="font-medium text-sm mb-3">Current Debt Stack</h4>
+                          <div className="space-y-2">
+                            {debtTranches.map(t => {
+                              const isBridgeMezz = t.trancheType === 'bridge' || t.trancheType === 'mezzanine';
+                              return (
+                                <div key={t.id} className={`p-3 rounded-lg border flex items-center justify-between ${isBridgeMezz ? 'bg-amber-50 border-amber-200' : 'bg-slate-50'}`}>
+                                  <div className="flex items-center gap-3">
+                                    <Badge variant={isBridgeMezz ? 'destructive' : 'secondary'} className="text-xs">
+                                      {t.trancheType}
+                                    </Badge>
+                                    <span className="font-medium text-sm">{t.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-sm">
+                                    <span>{formatCurrency(parseNumber(t.principal))}</span>
+                                    <span className="text-muted-foreground">{parseNumber(t.interestRate).toFixed(2)}%</span>
+                                    <span className="text-muted-foreground">{t.termYears}yr</span>
+                                    {isBridgeMezz && (
+                                      <Badge className="bg-amber-600 text-xs">Called at refi</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {debtTranches.length === 0 && (
+                              <p className="text-sm text-muted-foreground text-center py-4">No debt tranches configured</p>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Waterfall Distribution Table */}
-                        <div className="space-y-3">
-                          <h4 className="font-medium">Waterfall Distribution</h4>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Tier</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>LP Share</TableHead>
-                                <TableHead>GP Share</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              <TableRow className="bg-blue-500/5">
-                                <TableCell><Badge variant="outline">Tier 1</Badge></TableCell>
-                                <TableCell>Return of Capital</TableCell>
-                                <TableCell className="font-medium">$10,000,000</TableCell>
-                                <TableCell>$9,500,000</TableCell>
-                                <TableCell>$500,000</TableCell>
-                              </TableRow>
-                              <TableRow className="bg-green-500/5">
-                                <TableCell><Badge variant="outline">Tier 2</Badge></TableCell>
-                                <TableCell>Preferred Return (8% IRR)</TableCell>
-                                <TableCell className="font-medium">$3,200,000</TableCell>
-                                <TableCell>$3,200,000</TableCell>
-                                <TableCell>$0</TableCell>
-                              </TableRow>
-                              <TableRow className="bg-orange-500/5">
-                                <TableCell><Badge variant="outline">Tier 3</Badge></TableCell>
-                                <TableCell>GP Catch-Up (100%)</TableCell>
-                                <TableCell className="font-medium">$800,000</TableCell>
-                                <TableCell>$0</TableCell>
-                                <TableCell>$800,000</TableCell>
-                              </TableRow>
-                              <TableRow className="bg-purple-500/5">
-                                <TableCell><Badge variant="outline">Tier 4</Badge></TableCell>
-                                <TableCell>Promote Split (80/20)</TableCell>
-                                <TableCell className="font-medium">$1,500,000</TableCell>
-                                <TableCell>$1,200,000</TableCell>
-                                <TableCell>$300,000</TableCell>
-                              </TableRow>
-                              <TableRow className="font-bold border-t-2">
-                                <TableCell></TableCell>
-                                <TableCell>Total Distributions</TableCell>
-                                <TableCell>$15,500,000</TableCell>
-                                <TableCell className="text-blue-600">$13,900,000</TableCell>
-                                <TableCell className="text-green-600">$1,600,000</TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
+                        <Separator />
+
+                        {/* Refi Parameters */}
+                        <div>
+                          <h4 className="font-medium text-sm mb-3">Refinance Parameters</h4>
+                          <div className="grid grid-cols-6 gap-4">
+                            <div>
+                              <Label className="text-xs">Refi Year</Label>
+                              <Select value={String(refiYear)} onValueChange={(v) => setRefiYear(parseInt(v))}>
+                                <SelectTrigger className="h-8 mt-1"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: parseInt(stack?.holdPeriodYears?.toString() || '5') - 1 }, (_, i) => i + 1).map(yr => (
+                                    <SelectItem key={yr} value={String(yr)}>Year {yr}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">New Rate (%)</Label>
+                              <Input type="number" step="0.1" value={refiRate} onChange={e => setRefiRate(e.target.value)} className="h-8 mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Term (yrs)</Label>
+                              <Input type="number" value={refiTermYears} onChange={e => setRefiTermYears(e.target.value)} className="h-8 mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Amort (yrs)</Label>
+                              <Input type="number" value={refiAmortYears} onChange={e => setRefiAmortYears(e.target.value)} className="h-8 mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">New LTV (%)</Label>
+                              <Input type="number" step="1" value={refiLtv} onChange={e => setRefiLtv(e.target.value)} className="h-8 mt-1" />
+                            </div>
+                            <div>
+                              <Label className="text-xs">I/O Months</Label>
+                              <Input type="number" value={refiIoMonths} onChange={e => setRefiIoMonths(e.target.value)} className="h-8 mt-1" />
+                            </div>
+                          </div>
                         </div>
 
-                        <Separator className="my-6" />
+                        <Separator />
 
-                        {/* LP vs GP Returns Comparison */}
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">LP Returns Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Capital Invested</span>
-                                <span>$9,500,000</span>
+                        {/* Before vs After Comparison */}
+                        <div>
+                          <h4 className="font-medium text-sm mb-3">Before vs After Refinance</h4>
+                          {(() => {
+                            const holdYears = parseInt(stack?.holdPeriodYears?.toString() || '5');
+                            const baseNoi = projections[0]?.noi ? parseNumber(projections[0].noi) : 0;
+                            
+                            if (baseNoi === 0 || debtTranches.length === 0) {
+                              return (
+                                <div className="text-center py-6 text-muted-foreground">
+                                  <RefreshCw className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p>Generate projections and add debt tranches to model refinancing</p>
+                                </div>
+                              );
+                            }
+
+                            // Current debt metrics
+                            const currentDS = annualDebtService;
+                            const currentDscr = baseNoi > 0 && currentDS > 0 ? baseNoi / currentDS : 0;
+                            const currentWeightedRate = debtTranches.reduce((s, t) => s + parseNumber(t.principal) * parseNumber(t.interestRate), 0) / totalDebt;
+
+                            // Bridge/mezz debt to be called
+                            const calledTranches = debtTranches.filter(t => t.trancheType === 'bridge' || t.trancheType === 'mezzanine');
+                            const calledAmount = calledTranches.reduce((s, t) => s + parseNumber(t.principal), 0);
+                            const remainingSenior = debtTranches.filter(t => t.trancheType !== 'bridge' && t.trancheType !== 'mezzanine');
+                            const remainingSeniorPrincipal = remainingSenior.reduce((s, t) => s + parseNumber(t.principal), 0);
+
+                            // Refi: new permanent loan replaces everything
+                            const refiNoi = baseNoi * Math.pow(1.02, refiYear);
+                            const refiPropertyValue = refiNoi / (parseFloat(stack?.exitCapRate?.toString() || '7') / 100);
+                            const newLoanAmount = refiPropertyValue * (parseFloat(refiLtv) / 100);
+                            const newRate = parseFloat(refiRate) / 100;
+                            const newAmort = parseInt(refiAmortYears);
+                            const monthlyRate = newRate / 12;
+                            const numPayments = newAmort * 12;
+                            const monthlyPayment = newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+                            const ioMonths = parseInt(refiIoMonths);
+                            const annualDSNew = ioMonths >= 12 ? newLoanAmount * newRate : monthlyPayment * 12;
+                            const newDscr = refiNoi / annualDSNew;
+                            const cashOutProceeds = newLoanAmount - totalDebt;
+
+                            // IRR impact: simple before/after comparison
+                            const calcIrr = (cfs: number[]) => {
+                              let lo = -0.99, hi = 5, irr = 0;
+                              for (let i = 0; i < 100; i++) {
+                                irr = (lo + hi) / 2;
+                                let npv = 0;
+                                for (let j = 0; j < cfs.length; j++) npv += cfs[j] / Math.pow(1 + irr, j);
+                                if (Math.abs(npv) < 1) break;
+                                if (npv > 0) lo = irr; else hi = irr;
+                              }
+                              return irr;
+                            };
+
+                            const exitNoi = baseNoi * Math.pow(1.02, holdYears);
+                            const exitVal = exitNoi / (parseFloat(stack?.exitCapRate?.toString() || '7') / 100);
+
+                            // Before refi cash flows
+                            const cfsBefore = [-totalEquity];
+                            for (let yr = 1; yr <= holdYears; yr++) {
+                              const yrNoi = baseNoi * Math.pow(1.02, yr);
+                              const cf = yrNoi - currentDS;
+                              cfsBefore.push(yr === holdYears ? cf + exitVal - totalDebt * 0.92 : cf);
+                            }
+                            const irrBefore = calcIrr(cfsBefore) * 100;
+
+                            // After refi cash flows
+                            const cfsAfter = [-totalEquity];
+                            for (let yr = 1; yr <= holdYears; yr++) {
+                              const yrNoi = baseNoi * Math.pow(1.02, yr);
+                              if (yr < refiYear) {
+                                cfsAfter.push(yrNoi - currentDS);
+                              } else if (yr === refiYear) {
+                                // Refi year: old DS for part, new DS for part, plus cash-out
+                                cfsAfter.push(yrNoi - annualDSNew + (cashOutProceeds > 0 ? cashOutProceeds : 0));
+                              } else {
+                                const cf = yrNoi - annualDSNew;
+                                const loanBal = newLoanAmount * 0.95;
+                                cfsAfter.push(yr === holdYears ? cf + exitVal - loanBal : cf);
+                              }
+                            }
+                            const irrAfter = calcIrr(cfsAfter) * 100;
+
+                            return (
+                              <div className="space-y-4">
+                                {/* Called Debt Alert */}
+                                {calledTranches.length > 0 && (
+                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                                      <span className="font-medium text-sm text-amber-800">Debt Called at Year {refiYear}</span>
+                                    </div>
+                                    <div className="text-xs text-amber-700 space-y-1">
+                                      {calledTranches.map(t => (
+                                        <div key={t.id} className="flex justify-between">
+                                          <span>{t.name} ({t.trancheType})</span>
+                                          <span className="font-medium">{formatCurrency(parseNumber(t.principal))}</span>
+                                        </div>
+                                      ))}
+                                      <div className="flex justify-between pt-1 border-t border-amber-300 font-medium">
+                                        <span>Total Called</span>
+                                        <span>{formatCurrency(calledAmount)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Cash-Out Proceeds */}
+                                {cashOutProceeds > 0 && (
+                                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <DollarSign className="h-4 w-4 text-green-600" />
+                                      <span className="font-medium text-sm text-green-800">Cash-Out Refi Proceeds</span>
+                                    </div>
+                                    <span className="font-bold text-green-700">{formatCurrency(cashOutProceeds)}</span>
+                                  </div>
+                                )}
+
+                                {/* Comparison Grid */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <Card className="bg-slate-50">
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-sm">Before Refi (Acquisition)</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Total Debt</span><span className="font-medium">{formatCurrency(totalDebt)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Weighted Rate</span><span className="font-medium">{currentWeightedRate.toFixed(2)}%</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Annual D/S</span><span className="font-medium">{formatCurrency(currentDS)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">DSCR</span><span className={`font-medium ${currentDscr >= 1.25 ? 'text-green-600' : 'text-red-600'}`}>{currentDscr.toFixed(2)}x</span></div>
+                                      <Separator />
+                                      <div className="flex justify-between font-medium"><span>Levered IRR</span><span className={irrBefore >= 15 ? 'text-green-600' : ''}>{irrBefore.toFixed(1)}%</span></div>
+                                    </CardContent>
+                                  </Card>
+                                  <Card className="bg-blue-50/50 border-blue-200">
+                                    <CardHeader className="pb-2">
+                                      <CardTitle className="text-sm text-blue-700">After Refi (Year {refiYear})</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">New Loan</span><span className="font-medium">{formatCurrency(newLoanAmount)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">{refiRate}%</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Annual D/S</span><span className="font-medium">{formatCurrency(annualDSNew)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">DSCR</span><span className={`font-medium ${newDscr >= 1.25 ? 'text-green-600' : 'text-red-600'}`}>{newDscr.toFixed(2)}x</span></div>
+                                      <Separator />
+                                      <div className="flex justify-between font-medium"><span>Levered IRR</span><span className={irrAfter >= 15 ? 'text-green-600' : ''}>{irrAfter.toFixed(1)}%</span></div>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+
+                                {/* IRR Impact Summary */}
+                                <div className={`p-3 rounded-lg border text-sm flex justify-between items-center ${irrAfter > irrBefore ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                  <span className="font-medium">IRR Impact</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">{irrBefore.toFixed(1)}%</span>
+                                    <span>&#8594;</span>
+                                    <span className={`font-bold ${irrAfter > irrBefore ? 'text-green-700' : 'text-red-700'}`}>{irrAfter.toFixed(1)}%</span>
+                                    <Badge className={irrAfter > irrBefore ? 'bg-green-600' : 'bg-red-600'}>
+                                      {irrAfter > irrBefore ? '+' : ''}{(irrAfter - irrBefore).toFixed(1)}%
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                {/* Year-by-Year Cash Flow */}
+                                <div>
+                                  <h5 className="text-sm font-medium mb-2">Year-by-Year Cash Flow Comparison</h5>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs">Year</TableHead>
+                                        <TableHead className="text-xs">NOI</TableHead>
+                                        <TableHead className="text-xs">Before Refi CF</TableHead>
+                                        <TableHead className="text-xs">After Refi CF</TableHead>
+                                        <TableHead className="text-xs">Delta</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {Array.from({ length: holdYears }, (_, i) => i + 1).map(yr => {
+                                        const yrNoi = baseNoi * Math.pow(1.02, yr);
+                                        const before = cfsBefore[yr];
+                                        const after = cfsAfter[yr];
+                                        const delta = after - before;
+                                        return (
+                                          <TableRow key={yr} className={yr === refiYear ? 'bg-blue-50' : ''}>
+                                            <TableCell className="text-xs font-medium">
+                                              {yr}{yr === refiYear && <Badge className="ml-1 text-[9px] bg-blue-600">REFI</Badge>}
+                                            </TableCell>
+                                            <TableCell className="text-xs">{formatCurrency(yrNoi)}</TableCell>
+                                            <TableCell className="text-xs">{formatCurrency(before)}</TableCell>
+                                            <TableCell className="text-xs font-medium">{formatCurrency(after)}</TableCell>
+                                            <TableCell className={`text-xs font-medium ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-600' : ''}`}>
+                                              {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Total Distributions</span>
-                                <span>$13,900,000</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Net Profit</span>
-                                <span className="text-green-600">$4,400,000</span>
-                              </div>
-                              <Separator />
-                              <div className="flex justify-between font-medium">
-                                <span>LP IRR</span>
-                                <span className="text-green-600">16.8%</span>
-                              </div>
-                              <div className="flex justify-between font-medium">
-                                <span>LP Multiple</span>
-                                <span className="text-green-600">1.46x</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">GP Returns Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Capital Invested</span>
-                                <span>$500,000</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Co-Invest Return</span>
-                                <span>$500,000</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Promote (Carry)</span>
-                                <span className="text-green-600">$1,100,000</span>
-                              </div>
-                              <Separator />
-                              <div className="flex justify-between font-medium">
-                                <span>GP IRR</span>
-                                <span className="text-green-600">42.5%</span>
-                              </div>
-                              <div className="flex justify-between font-medium">
-                                <span>GP Multiple</span>
-                                <span className="text-green-600">3.20x</span>
-                              </div>
-                            </CardContent>
-                          </Card>
+                            );
+                          })()}
                         </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* SOURCES & USES TAB */}
+                  <TabsContent value="sources-uses" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5" />
+                          Sources &amp; Uses of Funds
+                        </CardTitle>
+                        <CardDescription>Closing statement auto-balanced from capital stack</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <h4 className="font-semibold text-sm mb-3 text-green-700 flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" /> Sources
+                            </h4>
+                            <Table>
+                              <TableBody>
+                                {debtTranches.map((t) => (
+                                  <TableRow key={t.id}>
+                                    <TableCell className="text-sm">{t.name}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatCurrency(parseNumber(t.principal))}</TableCell>
+                                  </TableRow>
+                                ))}
+                                {equityLayers.map((l) => (
+                                  <TableRow key={l.id}>
+                                    <TableCell className="text-sm">{l.name} (Equity)</TableCell>
+                                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(parseNumber(l.commitmentAmount))}</TableCell>
+                                  </TableRow>
+                                ))}
+                                <TableRow className="border-t-2 font-bold">
+                                  <TableCell>Total Sources</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(totalDebt + totalEquity)}</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm mb-3 text-blue-700 flex items-center gap-2">
+                              <Building2 className="h-4 w-4" /> Uses
+                            </h4>
+                            <Table>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell className="text-sm">Purchase Price</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(purchasePrice)}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="text-sm">Closing Costs</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(parseNumber(stack?.closingCosts))}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="text-sm">CapEx Reserves</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(parseNumber(stack?.capexReserves))}</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="text-sm">Working Capital</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(parseNumber(stack?.workingCapital))}</TableCell>
+                                </TableRow>
+                                {(() => {
+                                  const totalUses = purchasePrice + parseNumber(stack?.closingCosts) + parseNumber(stack?.capexReserves) + parseNumber(stack?.workingCapital);
+                                  const origFees = debtTranches.reduce((sum, t) => sum + parseNumber(t.principal) * parseNumber(t.originationFeePct), 0);
+                                  return (
+                                    <>
+                                      {origFees > 0 && (
+                                        <TableRow>
+                                          <TableCell className="text-sm">Loan Origination Fees</TableCell>
+                                          <TableCell className="text-right font-medium">{formatCurrency(origFees)}</TableCell>
+                                        </TableRow>
+                                      )}
+                                      <TableRow className="border-t-2 font-bold">
+                                        <TableCell>Total Uses</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(totalUses + origFees)}</TableCell>
+                                      </TableRow>
+                                    </>
+                                  );
+                                })()}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                        {(() => {
+                          const totalSources = totalDebt + totalEquity;
+                          const origFees = debtTranches.reduce((sum, t) => sum + parseNumber(t.principal) * parseNumber(t.originationFeePct), 0);
+                          const totalUses = purchasePrice + parseNumber(stack?.closingCosts) + parseNumber(stack?.capexReserves) + parseNumber(stack?.workingCapital) + origFees;
+                          const gap = totalSources - totalUses;
+                          return (
+                            <div className={`mt-4 p-3 rounded-lg border text-sm flex justify-between items-center ${Math.abs(gap) < 100 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                              <span>Sources - Uses = {formatCurrency(gap)}</span>
+                              {Math.abs(gap) < 100 ? (
+                                <Badge className="bg-green-600">Balanced</Badge>
+                              ) : gap > 0 ? (
+                                <Badge variant="outline" className="border-amber-500 text-amber-700">Excess: {formatCurrency(gap)}</Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-red-500 text-red-700">Gap: {formatCurrency(Math.abs(gap))}</Badge>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* SENSITIVITY MATRIX TAB */}
+                  <TabsContent value="sensitivity" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Calculator className="h-5 w-5" />
+                          Sensitivity Matrix
+                        </CardTitle>
+                        <CardDescription>How returns change with different cap rates and LTV</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {(() => {
+                          const baseCapRate = parseFloat(stack?.exitCapRate?.toString() || '7') / 100;
+                          const capRates = [-1.5, -1, -0.5, 0, 0.5, 1, 1.5].map(d => baseCapRate + d / 100);
+                          const ltvLevels = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80];
+                          const baseNoi = projections[0]?.noi ? parseNumber(projections[0].noi) : 0;
+                          if (baseNoi === 0) {
+                            return (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <Calculator className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Generate projections first to see the sensitivity matrix</p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="overflow-x-auto">
+                              <p className="text-xs text-muted-foreground mb-3">Estimated Levered IRR. Green 15%+, yellow 10%+, red below.</p>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-xs font-bold">Exit Cap / LTV</TableHead>
+                                    {ltvLevels.map(l => (
+                                      <TableHead key={l} className="text-xs text-center">{(l * 100).toFixed(0)}%</TableHead>
+                                    ))}
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {capRates.map(cr => {
+                                    const exitNoi = baseNoi * Math.pow(1 + parseFloat(stack?.noiGrowthRate?.toString() || '0.02'), parseInt(stack?.holdPeriodYears?.toString() || '5'));
+                                    const exitVal = exitNoi / cr;
+                                    return (
+                                      <TableRow key={cr}>
+                                        <TableCell className="text-xs font-semibold">{(cr * 100).toFixed(1)}%</TableCell>
+                                        {ltvLevels.map(ltvPct => {
+                                          const debtAmt = purchasePrice * ltvPct;
+                                          const eqAmt = purchasePrice - debtAmt;
+                                          if (eqAmt <= 0) return <TableCell key={ltvPct} className="text-center text-xs">-</TableCell>;
+                                          const avgRate = debtTranches.length > 0
+                                            ? debtTranches.reduce((s, t) => s + parseNumber(t.interestRate), 0) / debtTranches.length / 100 : 0.06;
+                                          const annualDS = debtAmt * (avgRate + 0.02);
+                                          const holdYears = parseInt(stack?.holdPeriodYears?.toString() || '5');
+                                          const cfs = [-eqAmt];
+                                          for (let yr = 1; yr <= holdYears; yr++) {
+                                            const yrNoi = baseNoi * Math.pow(1.02, yr);
+                                            const cf = yrNoi - annualDS;
+                                            cfs.push(yr === holdYears ? cf + exitVal - debtAmt * 0.92 : cf);
+                                          }
+                                          let lo = -0.99, hi = 5, irr = 0;
+                                          for (let i = 0; i < 100; i++) {
+                                            irr = (lo + hi) / 2;
+                                            let npv = 0;
+                                            for (let j = 0; j < cfs.length; j++) npv += cfs[j] / Math.pow(1 + irr, j);
+                                            if (Math.abs(npv) < 1) break;
+                                            if (npv > 0) lo = irr; else hi = irr;
+                                          }
+                                          const irrPct = irr * 100;
+                                          const isBase = Math.abs(cr - baseCapRate) < 0.001 && Math.abs(ltvPct - ltv / 100) < 0.03;
+                                          return (
+                                            <TableCell key={ltvPct} className={`text-center text-xs font-medium ${isBase ? 'ring-2 ring-blue-500 bg-blue-50' : ''} ${irrPct >= 15 ? 'text-green-700 bg-green-50/50' : irrPct >= 10 ? 'text-yellow-700 bg-yellow-50/50' : 'text-red-700 bg-red-50/50'}`}>
+                                              {irrPct.toFixed(1)}%
+                                            </TableCell>
+                                          );
+                                        })}
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                              <p className="text-xs text-muted-foreground mt-2">Blue ring = current position.</p>
+                            </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
                   </TabsContent>

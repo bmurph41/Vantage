@@ -38407,6 +38407,160 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     res.json({ publishableKey: null, configured: false });
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // INVESTMENT CRITERIA — Account-level buy-box configuration
+  // ═══════════════════════════════════════════════════════════════
+
+  // List all criteria profiles for org
+  app.get("/api/investment-criteria", async (req, res) => {
+    try {
+      const orgId = req.headers["x-org-id"] as string || "default";
+      const profiles = await db.select()
+        .from(investmentCriteriaProfiles)
+        .where(eq(investmentCriteriaProfiles.orgId, orgId))
+        .orderBy(investmentCriteriaProfiles.createdAt);
+      res.json(profiles);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get default active profile with all sub-tables
+  app.get("/api/investment-criteria/default", async (req, res) => {
+    try {
+      const orgId = req.headers["x-org-id"] as string || "default";
+      const [profile] = await db.select()
+        .from(investmentCriteriaProfiles)
+        .where(and(
+          eq(investmentCriteriaProfiles.orgId, orgId),
+          eq(investmentCriteriaProfiles.isDefault, true),
+          eq(investmentCriteriaProfiles.isActive, true),
+        ))
+        .limit(1);
+      
+      if (!profile) {
+        return res.json(null);
+      }
+      
+      const [location] = await db.select().from(investmentCriteriaLocation).where(eq(investmentCriteriaLocation.profileId, profile.id));
+      const [financial] = await db.select().from(investmentCriteriaFinancial).where(eq(investmentCriteriaFinancial.profileId, profile.id));
+      const [operational] = await db.select().from(investmentCriteriaOperational).where(eq(investmentCriteriaOperational.profileId, profile.id));
+      const [size] = await db.select().from(investmentCriteriaSize).where(eq(investmentCriteriaSize.profileId, profile.id));
+      const [capital] = await db.select().from(investmentCriteriaCapital).where(eq(investmentCriteriaCapital.profileId, profile.id));
+      const [involvement] = await db.select().from(investmentCriteriaInvolvement).where(eq(investmentCriteriaInvolvement.profileId, profile.id));
+      
+      res.json({ profile, location, financial, operational, size, capital, involvement });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single profile with all sub-tables
+  app.get("/api/investment-criteria/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [profile] = await db.select().from(investmentCriteriaProfiles).where(eq(investmentCriteriaProfiles.id, id));
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      
+      const [location] = await db.select().from(investmentCriteriaLocation).where(eq(investmentCriteriaLocation.profileId, id));
+      const [financial] = await db.select().from(investmentCriteriaFinancial).where(eq(investmentCriteriaFinancial.profileId, id));
+      const [operational] = await db.select().from(investmentCriteriaOperational).where(eq(investmentCriteriaOperational.profileId, id));
+      const [size] = await db.select().from(investmentCriteriaSize).where(eq(investmentCriteriaSize.profileId, id));
+      const [capital] = await db.select().from(investmentCriteriaCapital).where(eq(investmentCriteriaCapital.profileId, id));
+      const [involvement] = await db.select().from(investmentCriteriaInvolvement).where(eq(investmentCriteriaInvolvement.profileId, id));
+      
+      res.json({ profile, location, financial, operational, size, capital, involvement });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create new criteria profile with sub-tables
+  app.post("/api/investment-criteria", async (req, res) => {
+    try {
+      const orgId = req.headers["x-org-id"] as string || "default";
+      const { name, description, isDefault, location, financial, operational, size, capital, involvement, ...weights } = req.body;
+      
+      // If setting as default, unset existing defaults
+      if (isDefault) {
+        await db.update(investmentCriteriaProfiles)
+          .set({ isDefault: false })
+          .where(eq(investmentCriteriaProfiles.orgId, orgId));
+      }
+      
+      const [profile] = await db.insert(investmentCriteriaProfiles).values({
+        orgId,
+        name: name || "Investment Criteria",
+        description,
+        isDefault: isDefault ?? true,
+        isActive: true,
+        ...weights,
+      }).returning();
+      
+      // Insert sub-tables if provided
+      if (location) await db.insert(investmentCriteriaLocation).values({ ...location, profileId: profile.id, orgId });
+      if (financial) await db.insert(investmentCriteriaFinancial).values({ ...financial, profileId: profile.id, orgId });
+      if (operational) await db.insert(investmentCriteriaOperational).values({ ...operational, profileId: profile.id, orgId });
+      if (size) await db.insert(investmentCriteriaSize).values({ ...size, profileId: profile.id, orgId });
+      if (capital) await db.insert(investmentCriteriaCapital).values({ ...capital, profileId: profile.id, orgId });
+      if (involvement) await db.insert(investmentCriteriaInvolvement).values({ ...involvement, profileId: profile.id, orgId });
+      
+      res.json(profile);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update profile + upsert sub-tables
+  app.put("/api/investment-criteria/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const orgId = req.headers["x-org-id"] as string || "default";
+      const { location, financial, operational, size, capital, involvement, ...profileData } = req.body;
+      
+      // If setting as default, unset existing
+      if (profileData.isDefault) {
+        await db.update(investmentCriteriaProfiles)
+          .set({ isDefault: false })
+          .where(and(eq(investmentCriteriaProfiles.orgId, orgId), sql`id != ${id}`));
+      }
+      
+      const [profile] = await db.update(investmentCriteriaProfiles)
+        .set({ ...profileData, updatedAt: new Date() })
+        .where(eq(investmentCriteriaProfiles.id, id))
+        .returning();
+      
+      // Upsert sub-tables: delete + re-insert
+      const upsert = async (table: any, data: any) => {
+        if (!data) return;
+        await db.delete(table).where(eq(table.profileId, id));
+        await db.insert(table).values({ ...data, profileId: id, orgId });
+      };
+      
+      await upsert(investmentCriteriaLocation, location);
+      await upsert(investmentCriteriaFinancial, financial);
+      await upsert(investmentCriteriaOperational, operational);
+      await upsert(investmentCriteriaSize, size);
+      await upsert(investmentCriteriaCapital, capital);
+      await upsert(investmentCriteriaInvolvement, involvement);
+      
+      res.json(profile);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete profile (cascade deletes sub-tables via FK)
+  app.delete("/api/investment-criteria/:id", async (req, res) => {
+    try {
+      await db.delete(investmentCriteriaProfiles).where(eq(investmentCriteriaProfiles.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+
   app.post("/api/stripe/checkout", authenticateUser, async (req: any, res) => {
     res.status(503).json({ error: "Payment processing coming soon. Free trials are available during beta - activate packs from the settings page." });
   });
