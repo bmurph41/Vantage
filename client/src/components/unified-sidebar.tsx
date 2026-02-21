@@ -600,7 +600,7 @@ export default function UnifiedSidebar() {
                 ))}
                 {/* Pending Section - Only visible when there are pending items */}
                 {hasPendingItems && (
-                  <div className="ml-4 mt-1 mb-2">
+                  <div className="mt-1 mb-2">
                     <button
                       onClick={() => setPendingExpanded(!pendingExpanded)}
                       className={cn(
@@ -666,7 +666,7 @@ export default function UnifiedSidebar() {
                   <NavLink key={item.name} item={item} />
                 ))}
                 {activeWorkspaceId && (
-                  <div className="ml-4 mt-2 border-l-2 border-blue-200 pl-2">
+                  <div className="mt-2 border-l-2 border-blue-200 ml-4 pl-0">
                     <div className="text-xs font-medium text-blue-600 mb-1 px-2">Active Workspace</div>
                     {getWorkspaceSubNav(activeWorkspaceId).map((item) => (
                       <NavLink key={item.name} item={item} />
@@ -732,7 +732,7 @@ export default function UnifiedSidebar() {
             <Link href="/document-builder">
               <div
                 className={cn(
-                  "flex items-center gap-2 w-full pl-8 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
+                  "flex items-center gap-2 w-full pl-4 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
                   location.startsWith('/document-builder')
                     ? "text-blue-600 font-medium" 
                     : "text-gray-500 hover:text-gray-700"

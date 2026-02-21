@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { SavedViewsManager } from "@/components/crm/saved-views-manager";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, Plus, LayoutGrid, List, Users, DollarSign, TrendingUp,
@@ -208,30 +209,27 @@ export default function DealWorkspace() {
                 />
               </div>
 
-              {/* Saved Views Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 gap-1.5 text-sm">
-                    <Bookmark className="w-4 h-4" />
-                    Views
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="text-xs">Saved Views</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {SAVED_VIEW_PRESETS.map(view => (
-                    <DropdownMenuItem
-                      key={view.id}
-                      onClick={() => setActiveSavedView(view.id)}
-                      className={activeSavedView === view.id ? "bg-blue-50" : ""}
-                    >
-                      <Eye className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                      <span className="text-sm">{view.label}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+             {/* Saved Views */}
+              <SavedViewsManager
+                entityType="deal"
+                currentConfig={{
+                  filters: activeAssetClass !== "all"
+                    ? [{ field: "assetClass", operator: "eq", value: activeAssetClass }]
+                    : [],
+                  sort: [],
+                  columns: [],
+                  assetClassFilter: activeAssetClass !== "all" ? [activeAssetClass] : undefined,
+                }}
+                onApplyView={(config) => {
+                  if (config.assetClassFilter?.[0]) {
+                    setActiveAssetClass(config.assetClassFilter[0]);
+                  } else {
+                    setActiveAssetClass("all");
+                  }
+                }}
+                activeViewId={activeSavedView}
+                onActiveViewChange={(id) => setActiveSavedView(id || "all_deals")}
+              />
 
               <Button variant="outline" size="sm" className="h-9"
                 onClick={() => setLocation('/crm/deals/compare')}>
