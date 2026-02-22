@@ -498,10 +498,8 @@ class DealPricingService {
       }
     }
 
-    if (totalRevenue === 0) {
-      totalRevenue = 1909000;
-      totalExpenses = 1109000;
-    }
+    // No hardcoded fallback — if no actuals exist, financials stay at $0
+    // Direct Input P&L computation will be added in Phase 2
 
     const year1NOI = totalRevenue - totalExpenses;
     const purchasePrice = project.purchasePrice ? Number(project.purchasePrice) : null;

@@ -64,9 +64,13 @@ export interface AssetClassModelConfig {
       { id: '1br_1ba', name: '1 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 650, count: 0 } },
       { id: '2br_1ba', name: '2 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 900, count: 0 } },
       { id: '2br_2ba', name: '2 Bed / 2 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 1000, count: 0 } },
+      { id: '2br_1half', name: '2 Bed / 1.5 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 950, count: 0 } },
       { id: '3br_2ba', name: '3 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1200, count: 0 } },
+      { id: '3br_2half', name: '3 Bed / 2.5 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1300, count: 0 } },
       { id: '3br_3ba', name: '3 Bed / 3 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1400, count: 0 } },
       { id: '4br_2ba', name: '4 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1600, count: 0 } },
+      { id: '4br_2half', name: '4 Bed / 2.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1700, count: 0 } },
+      { id: '4br_3half', name: '4 Bed / 3.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1900, count: 0 } },
       { id: '4br_3ba', name: '4 Bed / 3 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1800, count: 0 } },
       { id: '5br_plus', name: '5+ Bed', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 2200, count: 0 } },
       { id: 'custom', name: 'Custom Layout', icon: 'edit', section: 'Custom', hasSeasons: true, defaultFields: { avgSF: 0, count: 0 } },
@@ -91,11 +95,7 @@ export interface AssetClassModelConfig {
   kpis: KPIConfig[];
 
   // ─── Tab Visibility ─────────────────────────────────────
-  tabs: {
-    storageLeases: boolean;
-    commercialLeases: boolean;
-    profitCenters: boolean;
-  };
+  tabs: { storageLeases: true, commercialLeases: false, profitCenters: false },
 }
 
 export interface UnitMixTypeConfig {
@@ -298,7 +298,9 @@ const MULTIFAMILY_CONFIG: AssetClassModelConfig = {
       { id: '1br_1ba', name: '1 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: false, defaultFields: { avgSF: 700 } },
       { id: '2br_1ba', name: '2 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: false, defaultFields: { avgSF: 900 } },
       { id: '2br_2ba', name: '2 Bed / 2 Bath', icon: 'home', section: 'Standard', hasSeasons: false, defaultFields: { avgSF: 1000 } },
+      { id: '2br_1half', name: '2 Bed / 1.5 Bath', icon: 'home', section: 'Standard', hasSeasons: false, defaultFields: { avgSF: 950 } },
       { id: '3br_2ba', name: '3 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: false, defaultFields: { avgSF: 1200 } },
+      { id: '3br_2half', name: '3 Bed / 2.5 Bath', icon: 'home', section: 'Larger', hasSeasons: false, defaultFields: { avgSF: 1300 } },
       { id: '4br_plus', name: '4 Bed+', icon: 'home', section: 'Larger', hasSeasons: false, defaultFields: { avgSF: 1500 } },
       { id: 'townhome', name: 'Townhome', icon: 'building-2', section: 'Specialty', hasSeasons: false, defaultFields: { avgSF: 1400 } },
     ],
@@ -489,13 +491,29 @@ const STR_CONFIG: AssetClassModelConfig = {
     offSeasonLabel: 'Low Season',
   },
   unitMix: {
-    tabLabel: 'Listing Setup',
+    tabLabel: 'Listings & Units',
     tabIcon: 'home',
-    showTab: false,   // STR is typically a single property
+    showTab: true,
     countColumnLabel: 'Listings',
     rateColumnLabel: 'Avg Nightly Rate',
-    showSF: false,
-    types: [],
+    sfColumnLabel: 'Avg SF',
+    showSF: true,
+    types: [
+      { id: 'studio', name: 'Studio', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 450, count: 0 } },
+      { id: '1br_1ba', name: '1 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 650, count: 0 } },
+      { id: '2br_1ba', name: '2 Bed / 1 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 900, count: 0 } },
+      { id: '2br_2ba', name: '2 Bed / 2 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 1000, count: 0 } },
+      { id: '2br_1half', name: '2 Bed / 1.5 Bath', icon: 'home', section: 'Standard', hasSeasons: true, defaultFields: { avgSF: 950, count: 0 } },
+      { id: '3br_2ba', name: '3 Bed / 2 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1200, count: 0 } },
+      { id: '3br_2half', name: '3 Bed / 2.5 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1300, count: 0 } },
+      { id: '3br_3ba', name: '3 Bed / 3 Bath', icon: 'home', section: 'Larger', hasSeasons: true, defaultFields: { avgSF: 1400, count: 0 } },
+      { id: '4br_2ba', name: '4 Bed / 2 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1600, count: 0 } },
+      { id: '4br_2half', name: '4 Bed / 2.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1700, count: 0 } },
+      { id: '4br_3half', name: '4 Bed / 3.5 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1900, count: 0 } },
+      { id: '4br_3ba', name: '4 Bed / 3 Bath', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 1800, count: 0 } },
+      { id: '5br_plus', name: '5+ Bed', icon: 'home', section: 'Large', hasSeasons: true, defaultFields: { avgSF: 2200, count: 0 } },
+      { id: 'custom', name: 'Custom Layout', icon: 'edit', section: 'Custom', hasSeasons: true, defaultFields: { avgSF: 0, count: 0 } },
+    ],
   },
   profitCenters: {
     tabLabel: 'Revenue Streams',
@@ -549,7 +567,7 @@ const STR_CONFIG: AssetClassModelConfig = {
     { id: 'occupancy', label: 'Occupancy', field: 'occupancyPercent', format: 'percent', icon: 'bar-chart' },
     { id: 'noi', label: 'NOI', field: 'ebitda', format: 'currency', icon: 'trending-up' },
   ],
-  tabs: { storageLeases: false, commercialLeases: false, profitCenters: false },
+  tabs: { storageLeases: true, commercialLeases: false, profitCenters: false },
 };
 
 
