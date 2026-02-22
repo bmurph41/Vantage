@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation, useSearch } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,7 +58,7 @@ import { toast } from '@/hooks/use-toast';
 import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
 
 import WorkspaceOverview from './workspace/overview';
-import InputsAssumptions from './workspace/inputs';
+import WorkspaceInputs from './workspace/inputs';
 import WorkspaceUploads from './workspace/uploads';
 import WorkspaceAssumptions from './workspace/assumptions';
 import WorkspaceHistoricalPL from './workspace/historical-pl';
@@ -90,9 +90,6 @@ import PropertyTaxTab from './workspace/property-tax';
 import TaxAndDistributionsPage from './workspace/tax-distributions';
 import DebtInputs from './workspace/debt-inputs';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
-import { getModelConfig, getTabOverrides } from "@shared/asset-class-model-config";
-import UnitMixLeases from "./workspace/unit-mix-leases";
-import ProfitCentersDynamic from "./workspace/profit-centers-dynamic";
 
 interface TabItem {
   value: string;
@@ -428,9 +425,6 @@ export default function ProjectWorkspace() {
     enabled: !!projectId,
   });
 
-  // === Asset-class-aware tab config ===
-  const tabOverrides = useMemo(() => getTabOverrides(project?.assetClass), [project?.assetClass]);
-
   const createOmMutation = useMutation({
     mutationFn: (data: { projectId: string; name: string; status: string; modelingProjectId: string }) =>
       apiRequest('POST', '/api/om/oms', data),
@@ -694,22 +688,12 @@ export default function ProjectWorkspace() {
           <div className="overflow-x-auto">
             <TabsList className="inline-flex" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
-                if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
-                if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
-                if (tab.value === "commercial-leases") {
-                  if (!tabOverrides.showCommercialLeases) return false;
+                if (tab.value === 'commercial-leases') {
                   const cm = project?.customMetrics as any;
                   return cm?.profitCenters?.commercialTenants?.enabled === true;
                 }
                 return true;
               }).map((tab) => {
-
-
-
-
-
-
-
                 const TabIcon = tab.icon;
                 return (
                   <TabsTrigger
@@ -719,7 +703,7 @@ export default function ProjectWorkspace() {
                     data-testid={`tab-${tab.value}`}
                   >
                     <TabIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{tab.value === "storage-leases" ? (tabOverrides.storageLabel || tab.label) : tab.value === "profit" ? (tabOverrides.profitCentersLabel || tab.label) : tab.label}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
                   </TabsTrigger>
                 );
               })}
@@ -732,7 +716,8 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
-          <InputsAssumptions project={project!} />
+          <WorkspaceInputs projectId={projectId!} onTabChange={handleTabChange} />
+          <WorkspaceAssumptions projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="cases" className="space-y-6" data-tour="valuator-scenarios">
@@ -793,7 +778,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="storage-leases" className="space-y-6">
-          <UnitMixLeases project={project!} />
+          <StorageLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="commercial-leases" className="space-y-6">
@@ -809,7 +794,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="profit" className="space-y-6">
-          <ProfitCentersDynamic project={project!} />
+          <ValuatorProfitCenters projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
         <TabsContent value="dcf" className="space-y-6">

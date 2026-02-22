@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/ui/address-autocomplete-input";
 import { US_REGIONS } from "@shared/salescomps-constants";
 import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
+import { getAssetClassCatalog } from '@shared/asset-class-catalog';
 import { 
   Building2, 
   Anchor, 
@@ -363,6 +364,25 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   
   const steps = mode === "new_project" ? newProjectSteps : onboardingSteps;
   const totalSteps = steps.length;
+  // Asset-class-aware terminology
+  const getAssetTerms = (ac: string | null) => {
+    const terms: Record<string, { property: string; placeholder: string; heading: string }> = {
+      marina: { property: "Marina Name", placeholder: "e.g., Sunset Bay Marina", heading: "Tell us about your marina" },
+      multifamily: { property: "Property Name", placeholder: "e.g., Sunset Ridge Apartments", heading: "Tell us about your property" },
+      retail: { property: "Property Name", placeholder: "e.g., Shoppes at Sunset", heading: "Tell us about your property" },
+      office: { property: "Property Name", placeholder: "e.g., Sunset Tower Office", heading: "Tell us about your property" },
+      industrial: { property: "Property Name", placeholder: "e.g., Sunset Distribution Center", heading: "Tell us about your property" },
+      self_storage: { property: "Facility Name", placeholder: "e.g., Sunset Self Storage", heading: "Tell us about your facility" },
+      hotel: { property: "Hotel Name", placeholder: "e.g., The Sunset Hotel", heading: "Tell us about your hotel" },
+      str: { property: "Property Name", placeholder: "e.g., Sunset Beach House", heading: "Tell us about your property" },
+      medical_office: { property: "Property Name", placeholder: "e.g., Sunset Medical Plaza", heading: "Tell us about your property" },
+      mixed_use: { property: "Property Name", placeholder: "e.g., Sunset Mixed-Use Center", heading: "Tell us about your property" },
+      laundromat: { property: "Business Name", placeholder: "e.g., Sunset Wash & Fold", heading: "Tell us about your laundromat" },
+      sfr: { property: "Property Name", placeholder: "e.g., 123 Sunset Lane", heading: "Tell us about your rental" },
+      business: { property: "Business Name", placeholder: "e.g., Sunset Enterprises", heading: "Tell us about your business" },
+    };
+    return terms[ac || "marina"] || terms.marina;
+  };
 
   const getInitialState = useCallback((): WizardState => ({
     step: 1,
@@ -386,6 +406,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   }), [mode]);
   
   const [state, setState] = useState<WizardState>(getInitialState);
+  const assetTerms = getAssetTerms(state.assetClass);
   const [expandedLeases, setExpandedLeases] = useState<Set<string>>(new Set());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const prevOpenRef = useRef(open);
@@ -402,10 +423,22 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [state.step]);
+  // Update profit centers and amenities when asset class changes
+  useEffect(() => {
+    if (!state.assetClass) return;
+    const catalog = getAssetClassCatalog(state.assetClass);
+    const newProfitCenters = catalog.profitCenters.map(pc => ({
+      id: pc.id, name: pc.name, description: pc.description, isEnabled: false, iconName: pc.icon,
+    }));
+    const newAmenities = catalog.amenities.map(a => ({
+      id: a.id, name: a.name, description: a.description, isEnabled: false, iconName: a.icon,
+    }));
+    setState(s => ({ ...s, profitCenters: newProfitCenters, amenities: newAmenities }));
+  }, [state.assetClass]);
 
   const hasProgress = state.step > 1 || 
     state.marinaName.trim() !== '' || 
-    (state.marinaAddress?.street || '').trim() !== '' ||
+    (state.marinaAddress?.line1 || '').trim() !== '' ||
     state.portfolioName.trim() !== '' ||
     state.portfolioMarinas.some(m => m.name.trim() !== '') ||
     state.region !== '' ||
@@ -649,27 +682,65 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       }
     },
     onError: (error: any) => {
-      console.error('Project creation error:', error);
-      const msg = error?.message || 'Unknown error';
-      toast({ 
-        title: "Error", 
-        description: msg.includes('403') || msg.includes('CSRF')
-          ? "Session expired. Please refresh the page and try again."
-          : `Failed to create project: ${msg.substring(0, 100)}`, 
-        variant: "destructive" 
+      const msg = error?.message || "Unknown error";
+      toast({
+        title: "Error",
+        description: msg.substring(0, 100),
+        variant: "destructive",
       });
-    }
+    },
   });
+  function handleNext() {
+    if (state.step < steps.length) {
+      // Validate current step before advancing
+      const currentStepId = mode === "new_project" ? state.step : state.step;
+      const newProjectStep = mode === "new_project" ? state.step : null;
+      
+      // Step 1 (new_project): must select deal structure + asset class
+      if (newProjectStep === 1) {
+        if (!state.dealStructure) {
+          toast({ title: "Required", description: "Please select a deal structure.", variant: "destructive" });
+          return;
+        }
+        if (!state.assetClass) {
+          toast({ title: "Required", description: "Please select an asset class.", variant: "destructive" });
+          return;
+        }
+      }
+      
+      // Step 2 (new_project): must have name + city + state
+      if (newProjectStep === 2) {
+        if (state.dealStructure === "single") {
+          if (!state.marinaName.trim()) {
+            toast({ title: "Required", description: `Please enter a ${getAssetTerms(state.assetClass).property.toLowerCase()}.`, variant: "destructive" });
+            return;
+          }
+          if (!state.marinaAddress.city.trim() || !state.marinaAddress.state.trim()) {
+            toast({ title: "Required", description: "Please enter at least a city and state.", variant: "destructive" });
+            return;
+          }
+        } else if (state.dealStructure === "portfolio") {
+          if (!state.portfolioMarinas.some(m => m.name.trim())) {
+            toast({ title: "Required", description: "Please add at least one property with a name.", variant: "destructive" });
+            return;
+          }
+        }
+      }
+      
+      // Step 3 (new_project): must select deal type
+      if (newProjectStep === 3 && !state.dealType) {
+        toast({ title: "Required", description: "Please select a deal type.", variant: "destructive" });
+        return;
+      }
+      
+      setState(s => ({ ...s, step: s.step + 1 }));
+    }
+  }
 
   const progress = (state.step / steps.length) * 100;
 
   const currentStepTitle = steps.find(s => s.id === state.step)?.title || '';
 
-  function handleNext() {
-    if (state.step < steps.length) {
-      setState(s => ({ ...s, step: s.step + 1 }));
-    }
-  }
 
   function handleBack() {
     if (state.step > 1) {
@@ -1049,7 +1120,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         <div className="space-y-4">
           <div className="text-center mb-4">
             <h3 className="text-lg font-semibold">Build your portfolio</h3>
-            <p className="text-sm text-muted-foreground">Add the marinas in this deal</p>
+            <p className="text-sm text-muted-foreground">Add the properties in this deal</p>
           </div>
           <div className="space-y-2 mb-4">
             <Label htmlFor="portfolioName">Portfolio Name</Label>
@@ -1064,14 +1135,14 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             {state.portfolioMarinas.map((marina, index) => (
               <div key={index} className="p-3 rounded-lg border bg-muted/30 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Marina {index + 1}</span>
+                  <span className="text-sm font-medium text-muted-foreground">Property {index + 1}</span>
                   {state.portfolioMarinas.length > 1 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removePortfolioMarina(index)} className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
-                <Input placeholder="Marina name" value={marina.name} onChange={(e) => updatePortfolioMarinaName(index, e.target.value)} />
+                <Input placeholder="Property name" value={marina.name} onChange={(e) => updatePortfolioMarinaName(index, e.target.value)} />
                 <AddressAutocompleteInput value={marina.address.line1} placeholder="Address" onChangeText={(text) => updatePortfolioMarinaAddress(index, 'line1', text)} onSelectAddress={(addr) => handleAddressAutocomplete(addr, index)} searchType="address" />
                 <Input placeholder="Address Line 2 (optional)" value={marina.address.line2} onChange={(e) => updatePortfolioMarinaAddress(index, 'line2', e.target.value)} />
                 <div className="grid grid-cols-3 gap-2">
@@ -1084,7 +1155,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           </div>
           <Button type="button" variant="outline" onClick={addPortfolioMarina} className="w-full">
             <Plus className="h-4 w-4 mr-2" />
-            Add Another Marina
+            Add Another Property
           </Button>
         </div>
       );
@@ -1093,13 +1164,13 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     return (
       <div className="space-y-4">
         <div className="text-center mb-6">
-          <h3 className="text-lg font-semibold">Tell us about your marina</h3>
+          <h3 className="text-lg font-semibold">{assetTerms.heading}</h3>
           <p className="text-sm text-muted-foreground">We'll create a CRM property and modeling project</p>
         </div>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="marinaName">Marina Name <span className="text-destructive">*</span></Label>
-            <Input id="marinaName" placeholder="e.g., Sunset Bay Marina" value={state.marinaName} onChange={(e) => setState(s => ({ ...s, marinaName: e.target.value }))} />
+            <Label htmlFor="marinaName">{assetTerms.property} <span className="text-destructive">*</span></Label>
+            <Input id="marinaName" placeholder={assetTerms.placeholder} value={state.marinaName} onChange={(e) => setState(s => ({ ...s, marinaName: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Address <span className="text-destructive">*</span></Label>
@@ -1207,14 +1278,28 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   );
 
   const renderProfitCentersStep = () => {
+    const catalog = getAssetClassCatalog(state.assetClass);
+    if (!catalog.hasProfitCenters) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center py-8">
+            <Store className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <h3 className="text-lg font-semibold">No Profit Centers</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-1">
+              {assetTerms.heading.replace("Tell us about your ", "").replace("Tell us about your", "This")} asset class uses a single revenue stream. You can configure revenue details in the financial model.
+            </p>
+            <p className="text-xs text-muted-foreground mt-3">Click Continue to proceed.</p>
+          </div>
+        </div>
+      );
+    }
     const enabledCount = state.profitCenters.filter(pc => pc.isEnabled).length;
-
     return (
       <div className="space-y-4">
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold">Profit Centers</h3>
           <p className="text-sm text-muted-foreground">
-            Which revenue sources does this marina have? Check all that apply.
+            Which revenue sources does this property have? Check all that apply.
           </p>
           {enabledCount > 0 && (
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
@@ -1278,15 +1363,29 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       </div>
     );
   };
-
   const renderAmenitiesStep = () => {
+    const catalog = getAssetClassCatalog(state.assetClass);
+    if (!catalog.hasAmenities) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center py-8">
+            <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <h3 className="text-lg font-semibold">No Amenities to Configure</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-1">
+              This asset class doesn't have standard amenities to track. You can add custom features later.
+            </p>
+            <p className="text-xs text-muted-foreground mt-3">Click Continue to proceed.</p>
+          </div>
+        </div>
+      );
+    }
     const enabledCount = state.amenities.filter(a => a.isEnabled).length;
     return (
       <div className="space-y-4">
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold">Amenities & Services</h3>
           <p className="text-sm text-muted-foreground">
-            What amenities and supporting services does this marina offer? These are features that add value but aren't individually modeled as revenue departments.
+            What amenities and supporting services does this property offer?
           </p>
           {enabledCount > 0 && (
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
@@ -1776,6 +1875,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                   onChange={(e) => setState(s => ({ ...s, acreage: { ...s.acreage, uplandAcres: e.target.value } }))}
                 />
               </div>
+              {state.assetClass === "marina" && (
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Submerged Acres</Label>
                 <Input
@@ -1787,8 +1887,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                   onChange={(e) => setState(s => ({ ...s, acreage: { ...s.acreage, submergedAcres: e.target.value } }))}
                 />
               </div>
+              )}
             </div>
-            {state.acreage.uplandAcres && state.acreage.submergedAcres && (
+            {state.assetClass === "marina" && state.acreage.uplandAcres && state.acreage.submergedAcres && (
               <div className="flex items-center justify-between p-2 rounded bg-muted/30 border text-xs">
                 <span className="text-muted-foreground">Calculated Total</span>
                 <span className="font-medium">
@@ -1814,7 +1915,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fee_simple">Fee Simple</SelectItem>
-                  <SelectItem value="submerged_land_lease">Submerged Land Lease</SelectItem>
+                  {state.assetClass === "marina" && <SelectItem value="submerged_land_lease">Submerged Land Lease</SelectItem>}
                   <SelectItem value="ground_lease">Ground Lease</SelectItem>
                   <SelectItem value="combined">Combined (Multiple)</SelectItem>
                 </SelectContent>
@@ -2015,7 +2116,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           <DialogHeader className="shrink-0">
             <div className="flex items-center justify-between mb-2">
               <DialogTitle className="flex items-center gap-2">
-                <Anchor className="h-5 w-5 text-[#1E4FAB]" />
+                {state.assetClass === "marina" ? <Anchor className="h-5 w-5 text-[#1E4FAB]" /> : <Building2 className="h-5 w-5 text-[#1E4FAB]" />}
                 {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
               </DialogTitle>
               <div className="flex items-center gap-1.5 mr-6 -mt-1">

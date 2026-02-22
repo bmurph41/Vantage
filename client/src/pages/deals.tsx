@@ -175,7 +175,6 @@ export default function Deals() {
     const closedLostStage = stages?.find(s => 
       s.stageType === "lost" || s.name.toLowerCase().includes("dead") || s.name.toLowerCase().includes("lost")
     );
-    );
 
     const wonDeals = closedWonStage 
       ? filteredDeals.filter(d => d.stageId === closedWonStage.id).length 
