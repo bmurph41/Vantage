@@ -990,14 +990,22 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
     setPromoteTiers(updated);
   };
 
-  if (stacksLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
+  // ── Refi Scenario State ──
+  const [refiYear, setRefiYear] = useState<number>(3);
+  const [refiRate, setRefiRate] = useState<string>('5.5');
+  const [refiTermYears, setRefiTermYears] = useState<string>('10');
+  const [refiAmortYears, setRefiAmortYears] = useState<string>('30');
+  const [refiLtv, setRefiLtv] = useState<string>('65');
+  const [refiIoMonths, setRefiIoMonths] = useState<string>('0');
+
+  // Dynamic partner rows for Partnership/JV structures
+  const [equityPartners, setEquityPartners] = useState<{
+    id: string;
+    name: string;
+    role: 'gp' | 'lp' | 'partner';
+    amount: string;
+    ownershipPct: string;
+  }[]>([]);
 
   const stack = stackDetails?.stack;
   const debtTranches = stackDetails?.debtTranches || [];
@@ -1016,23 +1024,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const purchasePrice = parseNumber(stackDetails?.stack?.purchasePrice) || 0;
   const computedEquity = Math.max(0, purchasePrice - totalDebt);
   const hasComputedEquity = purchasePrice > 0;
-
-  // ── Refi Scenario State ──
-  const [refiYear, setRefiYear] = useState<number>(3);
-  const [refiRate, setRefiRate] = useState<string>('5.5');
-  const [refiTermYears, setRefiTermYears] = useState<string>('10');
-  const [refiAmortYears, setRefiAmortYears] = useState<string>('30');
-  const [refiLtv, setRefiLtv] = useState<string>('65');
-  const [refiIoMonths, setRefiIoMonths] = useState<string>('0');
-
-  // Dynamic partner rows for Partnership/JV structures
-  const [equityPartners, setEquityPartners] = useState<{
-    id: string;
-    name: string;
-    role: 'gp' | 'lp' | 'partner';
-    amount: string;
-    ownershipPct: string;
-  }[]>([]);
 
   // Initialize partner rows when equity type changes
   useEffect(() => {
@@ -1125,6 +1116,15 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
   const totalPartnerOwnership = equityPartners.reduce((s, p) => s + (parseFloat(p.ownershipPct) || 0), 0);
   const totalPartnerAmount = equityPartners.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+
+  if (stacksLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" ref={pdfRef}>

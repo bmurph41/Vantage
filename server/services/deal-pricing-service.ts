@@ -2,6 +2,7 @@ import { db } from '../db';
 import { eq, and } from 'drizzle-orm';
 import { modelingProjects, modelingActuals } from '@shared/schema';
 import { proFormaEngineService } from './pro-forma-engine-service';
+import { computeDirectInputFinancials } from './direct-input-engine';
 
 function roundDownToThousand(value: number): number {
   return Math.floor(value / 1000) * 1000;
@@ -464,6 +465,10 @@ class DealPricingService {
     baseRevenue: number;
     baseExpenses: number;
     purchasePrice: number | null;
+    source?: string;
+    revenueLines?: any[];
+    expenseLines?: any[];
+    formulaBreakdowns?: Record<string, string>;
   }> {
     const [project] = await db
       .select()
@@ -472,45 +477,98 @@ class DealPricingService {
         eq(modelingProjects.id, projectId),
         eq(modelingProjects.orgId, orgId)
       ));
-
     if (!project) {
       throw new Error('Project not found');
     }
 
-    const actuals = await db
-      .select()
-      .from(modelingActuals)
-      .where(eq(modelingActuals.modelingProjectId, projectId));
-
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-
-    const actualsYears = Array.from(new Set(actuals.map(a => a.year))).sort((a, b) => b - a);
-    const latestYear = actualsYears[0];
-
-    for (const actual of actuals) {
-      if (latestYear && actual.year !== latestYear) continue;
-      const amount = Number(actual.amount) || 0;
-      if (actual.category === 'Revenue' || actual.category === 'revenue') {
-        totalRevenue += amount;
-      } else if (actual.category === 'Expenses' || actual.category === 'expense' || actual.category === 'Operating Expenses' || actual.category === 'OpEx' || actual.category === 'Payroll' || actual.category === 'COGS' || actual.category === 'cogs') {
-        totalExpenses += amount;
-      }
-    }
-
-    // No hardcoded fallback — if no actuals exist, financials stay at $0
-    // Direct Input P&L computation will be added in Phase 2
-
-    const year1NOI = totalRevenue - totalExpenses;
+    const modelInputMode = (project as any).modelInputMode ?? 'auto';
+    const assetClass = (project as any).assetClass ?? 'marina';
+    const customMetrics = (project.customMetrics as any) ?? {};
+    const inputAssumptions = customMetrics?.inputAssumptions ?? {};
+    const unitMix = customMetrics?.unitMix ?? customMetrics?.enabledStorageTypes ?? [];
     const purchasePrice = project.purchasePrice ? Number(project.purchasePrice) : null;
 
+    // --- Fetch actuals (uploaded P&L) ---
+    let actualsRevenue = 0;
+    let actualsExpenses = 0;
+    let hasActuals = false;
+
+    if (modelInputMode !== 'direct_input') {
+      const actuals = await db
+        .select()
+        .from(modelingActuals)
+        .where(eq(modelingActuals.modelingProjectId, projectId));
+
+      const actualsYears = Array.from(new Set(actuals.map(a => a.year))).sort((a, b) => b - a);
+      const latestYear = actualsYears[0];
+
+      for (const actual of actuals) {
+        if (latestYear && actual.year !== latestYear) continue;
+        const amount = Number(actual.amount) || 0;
+        if (actual.category === 'Revenue' || actual.category === 'revenue') {
+          actualsRevenue += amount;
+        } else if (actual.category === 'Expenses' || actual.category === 'expense' || actual.category === 'Operating Expenses' || actual.category === 'OpEx' || actual.category === 'Payroll' || actual.category === 'COGS' || actual.category === 'cogs') {
+          actualsExpenses += amount;
+        }
+      }
+      hasActuals = actualsRevenue > 0 || actualsExpenses > 0;
+    }
+
+    // --- Compute from direct inputs ---
+    let computed = null;
+    if (modelInputMode !== 'upload') {
+      computed = computeDirectInputFinancials(assetClass, inputAssumptions, unitMix);
+    }
+
+    // --- Resolve based on mode ---
+    if (modelInputMode === 'upload' || (modelInputMode === 'auto' && hasActuals)) {
+      return {
+        year1NOI: actualsRevenue - actualsExpenses,
+        baseRevenue: actualsRevenue,
+        baseExpenses: actualsExpenses,
+        purchasePrice,
+        source: hasActuals ? 'upload' : 'none',
+      };
+    }
+
+    if (modelInputMode === 'direct_input' || (modelInputMode === 'auto' && !hasActuals && computed)) {
+      return {
+        year1NOI: computed!.noi,
+        baseRevenue: computed!.totalRevenue,
+        baseExpenses: computed!.totalExpenses,
+        purchasePrice,
+        source: 'direct_input',
+        revenueLines: computed!.revenueLines,
+        expenseLines: computed!.expenseLines,
+        formulaBreakdowns: computed!.formulaBreakdowns,
+      };
+    }
+
+    if (modelInputMode === 'hybrid') {
+      const rev = hasActuals && !computed ? actualsRevenue : computed ? (hasActuals ? actualsRevenue : computed.totalRevenue) : 0;
+      const exp = hasActuals && !computed ? actualsExpenses : computed ? (hasActuals ? actualsExpenses : computed.totalExpenses) : 0;
+      return {
+        year1NOI: rev - exp,
+        baseRevenue: rev,
+        baseExpenses: exp,
+        purchasePrice,
+        source: 'hybrid',
+        revenueLines: computed?.revenueLines,
+        expenseLines: computed?.expenseLines,
+        formulaBreakdowns: computed?.formulaBreakdowns,
+      };
+    }
+
+    // Fallback
     return {
-      year1NOI,
-      baseRevenue: totalRevenue,
-      baseExpenses: totalExpenses,
+      year1NOI: 0,
+      baseRevenue: 0,
+      baseExpenses: 0,
       purchasePrice,
+      source: 'none',
     };
   }
+
 
   async getProFormaData(projectId: string, orgId: string): Promise<ProFormaCashFlowData | null> {
     try {

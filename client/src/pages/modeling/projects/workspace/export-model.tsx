@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getExportConfig, serializeProjectForExport } from '@shared/export-model-config';
 import { useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

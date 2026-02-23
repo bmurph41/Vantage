@@ -11011,6 +11011,7 @@ export const modelingProjects = pgTable('modeling_projects', {
   ebitda: decimal('ebitda', { precision: 15, scale: 2 }),
   dealOutcome: dealOutcomeEnum('deal_outcome').notNull().default('active'),
   assetClass: varchar("asset_class", { length: 50 }).default("marina"),
+  modelInputMode: text('model_input_mode').default('auto'),
   uwStage: varchar("uw_stage", { length: 50 }).default("not_started"),
   uwSubStatus: varchar("uw_sub_status", { length: 50 }),
   primaryValuationMetric: varchar("primary_valuation_metric", { length: 50 }).default("cap_rate"),

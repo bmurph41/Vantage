@@ -58,12 +58,14 @@ import { toast } from '@/hooks/use-toast';
 import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
 
 import WorkspaceOverview from './workspace/overview';
+import { OverviewDynamic } from './workspace/overview-dynamic';
 import InputsAssumptions from './workspace/inputs';
 import WorkspaceUploads from './workspace/uploads';
 import WorkspaceAssumptions from './workspace/assumptions';
 import WorkspaceHistoricalPL from './workspace/historical-pl';
 import WorkspaceProForma from './workspace/pro-forma';
 import WorkspaceExecutiveSummary from './workspace/executive-summary';
+import { ExecutiveSummaryDynamic } from './workspace/executive-summary-dynamic';
 import WorkspaceDebtScenarios from './workspace/debt-scenarios';
 import WorkspaceExitStrategy from './workspace/exit-strategy';
 import AuditTrailViewer from './workspace/audit-trail';
@@ -728,7 +730,7 @@ export default function ProjectWorkspace() {
         </div>
 
         <TabsContent value="overview" className="space-y-6">
-          <WorkspaceOverview project={project} onTabChange={handleTabChange} />
+          <OverviewDynamic project={project} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
@@ -765,7 +767,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
-          <WorkspaceExecutiveSummary projectId={projectId!} onTabChange={handleTabChange} />
+          <ExecutiveSummaryDynamic projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="debt" className="space-y-6">

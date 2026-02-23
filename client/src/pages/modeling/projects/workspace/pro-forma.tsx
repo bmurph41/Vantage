@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from '@/lib/queryClient';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { useHoldPeriod } from '@/hooks/use-hold-period';
+import { getProFormaConfig } from '@shared/pro-forma-config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RevenueSourceToggle } from '@/components/modeling/RevenueSourceToggle';
 import { Button } from '@/components/ui/button';

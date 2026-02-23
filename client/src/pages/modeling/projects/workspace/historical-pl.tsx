@@ -1,6 +1,7 @@
-import { useState, Fragment, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, Fragment, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { PLModeToggle, PLBuilder } from '@/components/modeling/pl-mode-toggle';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -205,6 +206,11 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     deleteOverride,
     isPending: overridePending,
   } = useDisplayOverrides(projectId);
+
+  // Fetch project for PLModeToggle
+  const { data: project } = useQuery<any>({
+    queryKey: [`/api/modeling/projects/${projectId}`],
+  });
 
   const { data: availableYearsData } = useQuery<{ years: number[] }>({
     queryKey: [`/api/modeling/projects/${projectId}/actuals/years`],
@@ -606,6 +612,15 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
       )}
       
+
+      {project && (
+        <PLModeToggle
+          project={project}
+          onModeChange={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}`] });
+          }}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-xl font-semibold">Historical P&L</h2>

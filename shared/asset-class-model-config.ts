@@ -871,6 +871,28 @@ const BUSINESS_CONFIG = makeConfig({
 // Registry + Lookup
 // ═══════════════════════════════════════════════════════════════
 
+
+// Duplex / Triplex / Quad — share SFR config with unit count overrides
+const DUPLEX_CONFIG: AssetClassModelConfig = {
+  ...SFR_CONFIG,
+  id: 'duplex',
+  label: 'Duplex',
+  defaults: { ...SFR_CONFIG.defaults, numberOfUnits: 2 },
+  tabs: { ...SFR_CONFIG.tabs, storageLeases: true },
+  unitMix: { ...SFR_CONFIG.unitMix, tabLabel: 'Unit Mix' },
+};
+const TRIPLEX_CONFIG: AssetClassModelConfig = {
+  ...DUPLEX_CONFIG,
+  id: 'triplex',
+  label: 'Triplex',
+  defaults: { ...DUPLEX_CONFIG.defaults, numberOfUnits: 3 },
+};
+const QUAD_CONFIG: AssetClassModelConfig = {
+  ...DUPLEX_CONFIG,
+  id: 'quad',
+  label: 'Quadplex',
+  defaults: { ...DUPLEX_CONFIG.defaults, numberOfUnits: 4 },
+};
 const MODEL_CONFIG_REGISTRY: Record<string, AssetClassModelConfig> = {
   marina: MARINA_CONFIG,
   multifamily: MULTIFAMILY_CONFIG,
@@ -885,6 +907,9 @@ const MODEL_CONFIG_REGISTRY: Record<string, AssetClassModelConfig> = {
   laundromat: LAUNDROMAT_CONFIG,
   sfr: SFR_CONFIG,
   business: BUSINESS_CONFIG,
+  duplex: DUPLEX_CONFIG,
+  triplex: TRIPLEX_CONFIG,
+  quad: QUAD_CONFIG,
 };
 
 /**

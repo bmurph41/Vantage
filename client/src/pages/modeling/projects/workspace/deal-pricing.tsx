@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { FinancialSourceBadge } from '@/components/modeling/pl-mode-toggle';
+import { getValuationMethods, getPrimaryValuationMethod } from '@shared/valuation-config';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
@@ -840,6 +842,9 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                 <Badge variant="secondary" className="ml-2 text-[10px] bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 border-indigo-200">
                   Pro Forma Engine
                 </Badge>
+              )}
+              {pricingData.projectFinancials?.source && (
+                <FinancialSourceBadge source={pricingData.projectFinancials.source} />
               )}
             </CardTitle>
           </CardHeader>
