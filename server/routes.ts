@@ -29913,10 +29913,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         
         headerData = {
           personaType: personaType,
-          title: 'Marina Portfolio',
-          subtitle: totalOwnedCount > 0 ? `${totalOwnedCount} owned ${totalOwnedCount === 1 ? 'marina' : 'marinas'}` : 'Track your marina investments',
+          title: 'Investment Portfolio',
+          subtitle: totalOwnedCount > 0 ? `${totalOwnedCount} owned ${totalOwnedCount === 1 ? 'asset' : 'assets'}` : 'Track your real estate investments',
           metrics: [
-            { label: 'Owned Marinas', value: String(totalOwnedCount), icon: 'Building2', color: 'blue' },
+            { label: 'Owned Assets', value: String(totalOwnedCount), icon: 'Building2', color: 'blue' },
             { label: 'Portfolio Value', value: formatCurrency(ownedProjectsResult[0]?.totalValue || 0), icon: 'DollarSign', color: 'green' },
             { label: 'Annual EBITDA', value: formatCurrency(ownedProjectsResult[0]?.totalEbitda || 0), icon: 'TrendingUp', color: 'purple' },
             { label: 'Active Deals', value: String(pipelineResult[0]?.count || 0), icon: 'Target', color: 'amber' },
