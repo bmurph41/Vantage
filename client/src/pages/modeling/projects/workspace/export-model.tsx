@@ -113,7 +113,7 @@ export default function ExportModel({ projectId, projectName, onTabChange }: Exp
       setExportProgress(90);
       
       const filename = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') 
-        || `${projectName || 'Marina'}_Model_${new Date().toISOString().split('T')[0]}.xlsx`;
+        || `${projectName || 'Investment'}_Model_${new Date().toISOString().split('T')[0]}.xlsx`;
       
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

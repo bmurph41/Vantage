@@ -160,7 +160,7 @@ export default function OwnedMarinas() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="page-title">Owned Marinas</h1>
+          <h1 className="text-2xl font-bold" data-testid="page-title">Owned Assets</h1>
           <p className="text-muted-foreground">
             Manage your marina portfolio and track performance
           </p>
@@ -183,7 +183,7 @@ export default function OwnedMarinas() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard
-          label="Owned Marinas"
+          label="Owned Assets"
           value={String(summary.totalMarinas)}
           icon={Building2}
           color="blue"
@@ -237,14 +237,14 @@ export default function OwnedMarinas() {
         <TabsContent value="overview" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Marina Portfolio</CardTitle>
-              <CardDescription>All owned marinas and their key metrics</CardDescription>
+              <CardTitle>Asset Portfolio</CardTitle>
+              <CardDescription>All owned assets and their key metrics</CardDescription>
             </CardHeader>
             <CardContent>
               {(!marinas || marinas.length === 0) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">No owned marinas yet</p>
+                  <p className="text-lg font-medium mb-2">No owned assets yet</p>
                   <p className="mb-4">Add properties to your portfolio to see them here</p>
                   <Button onClick={() => navigate("/crm/properties")}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -468,7 +468,7 @@ export default function OwnedMarinas() {
           <MarinaMapEmbed
             source="properties"
             markerColor="#4285F4"
-            sourceLabel="Owned Marinas"
+            sourceLabel="Owned Assets"
             height="calc(100vh - 380px)"
             showSearch={true}
             showStateFilter={true}

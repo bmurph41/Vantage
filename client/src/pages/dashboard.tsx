@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar, Activity, X } from "lucide-react";
+import { Settings, GripVertical, ExternalLink, TrendingUp, Users, FileText, Database, Radio, Fuel, DollarSign, ShoppingCart, Home, BarChart3, ChevronDown, ChevronUp, Plus, Calendar, Activity, X, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -693,6 +693,11 @@ export default function Dashboard() {
     queryKey: ['/api/analytics/marina/summary'],
     queryFn: () => fetch('/api/analytics/marina/summary').then(res => res.json()),
   });
+  // Fetch portfolio asset class breakdown
+  const { data: portfolioBreakdown } = useQuery({
+    queryKey: ['/api/portfolio/asset-class-breakdown'],
+    queryFn: () => fetch('/api/portfolio/asset-class-breakdown').then(res => res.json()),
+  });
 
   // Fetch custom modules
   const { data: customModulesData } = useQuery({
@@ -816,6 +821,7 @@ export default function Dashboard() {
     'vdr-activity',
     'docket-feed',
     'marina-analytics',
+    'portfolio-breakdown',
     'fuel-operations',
     'ship-store',
     'rent-roll',
@@ -1363,6 +1369,49 @@ export default function Dashboard() {
       ),
     },
     {
+      id: 'portfolio-breakdown',
+      title: 'Portfolio Overview',
+      icon: Building2,
+      link: '/portfolio',
+      data: portfolioBreakdown,
+      renderContent: (data) => {
+        const ASSET_LABELS: Record<string, string> = {
+          marina: 'Marina', sfr: 'SFR', str: 'STR', duplex: 'Duplex', triplex: 'Triplex',
+          quad: 'Quad', multifamily: 'Multifamily', hotel: 'Hotel', self_storage: 'Self Storage',
+          laundromat: 'Laundromat', retail: 'Retail', office: 'Office', industrial: 'Industrial',
+          medical_office: 'Medical Office', mixed_use: 'Mixed Use', business: 'Business', other: 'Other',
+        };
+        const breakdown = data?.byAssetClass || {};
+        const classes = Object.entries(breakdown).sort((a: any, b: any) => b[1].totalValue - a[1].totalValue);
+        if (classes.length === 0) {
+          return (
+            <div className="text-center py-8 text-muted-foreground">
+              <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No projects yet</p>
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground border-b pb-2">
+              <span>{data?.totalProjects ?? 0} projects</span>
+              <span className="font-medium">{formatCurrency(data?.totalValue ?? 0)}</span>
+            </div>
+            {classes.map(([ac, info]: [string, any]) => (
+              <div key={ac} className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-sm font-medium">{ASSET_LABELS[ac] || ac}</span>
+                  <span className="text-xs text-muted-foreground">{info.count}</span>
+                </div>
+                <span className="text-sm tabular-nums">{formatCurrency(info.totalValue)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      },
+    },
+    {
       id: 'fuel-operations',
       title: 'Fuel Operations',
       icon: Fuel,
@@ -1594,7 +1643,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-1">
-              Your comprehensive marina acquisition intelligence platform
+              Your comprehensive real estate investment intelligence platform
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">

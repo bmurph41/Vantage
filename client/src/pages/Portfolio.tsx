@@ -76,9 +76,11 @@ interface OwnedMarina {
 
 interface PortfolioSummary {
   totalMarinas: number;
+  totalAssets: number;
   totalValue: number;
   totalEbitda: number;
   totalSlips: number;
+  totalUnits: number;
   avgOccupancy: number;
   totalRevenue: number;
 }
@@ -216,7 +218,7 @@ export default function Portfolio() {
     },
   });
 
-  const handleAddMarina = () => {
+  const handleAddAsset = () => {
     setSelectedMarina(null);
     setModalMode("create");
     setModalOpen(true);
@@ -241,9 +243,11 @@ export default function Portfolio() {
 
   const summary: PortfolioSummary = {
     totalMarinas: marinas?.length || 0,
+    totalAssets: marinas?.length || 0,
     totalValue: marinas?.reduce((sum, m) => sum + (m.currentValue || m.acquisitionPrice || 0), 0) || 0,
     totalEbitda: marinas?.reduce((sum, m) => sum + (m.annualEbitda || 0), 0) || 0,
     totalSlips: marinas?.reduce((sum, m) => sum + (m.slips || 0), 0) || 0,
+    totalUnits: marinas?.reduce((sum, m) => sum + (m.slips || m.units || 0), 0) || 0,
     avgOccupancy:
       marinas && marinas.length > 0
         ? marinas.reduce((sum, m) => sum + (m.occupancy || 0), 0) / marinas.length
@@ -255,7 +259,7 @@ export default function Portfolio() {
   const unrealizedGain = summary.totalValue - totalCost;
   const gainPercent = totalCost > 0 ? ((unrealizedGain / totalCost) * 100).toFixed(1) : "0";
   const avgCapRate = summary.totalValue > 0 ? ((summary.totalEbitda / summary.totalValue) * 100).toFixed(1) : "0";
-  const revenuePerSlip = summary.totalSlips > 0 ? Math.round(summary.totalRevenue / summary.totalSlips) : 0;
+  const revenuePerUnit = (summary.totalUnits || summary.totalSlips) > 0 ? Math.round(summary.totalRevenue / (summary.totalUnits || summary.totalSlips)) : 0;
 
   if (isLoading) {
     return (
@@ -282,7 +286,7 @@ export default function Portfolio() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="page-title">Portfolio</h1>
           <p className="text-muted-foreground">
-            Manage your marina portfolio and track performance
+            Manage your investment portfolio and track performance
           </p>
         </div>
         <div className="flex gap-2">
@@ -294,17 +298,17 @@ export default function Portfolio() {
             <Briefcase className="h-4 w-4 mr-2" />
             Active Deals
           </Button>
-          <Button onClick={handleAddMarina} data-testid="button-add-marina">
+          <Button onClick={handleAddAsset} data-testid="button-add-marina">
             <Plus className="h-4 w-4 mr-2" />
-            Add Marina
+            Add Asset
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard
-          label="Owned Marinas"
-          value={String(summary.totalMarinas)}
+          label="Owned Assets"
+          value={String(summary.totalAssets ?? summary.totalMarinas)}
           icon={Building2}
           color="blue"
           onClick={() => handleTabChange("overview")}
@@ -324,8 +328,8 @@ export default function Portfolio() {
           onClick={() => handleTabChange("financials")}
         />
         <KPICard
-          label="Total Slips"
-          value={String(summary.totalSlips)}
+          label="Total Units"
+          value={String(summary.totalUnits ?? summary.totalSlips)}
           icon={Anchor}
           color="blue"
           onClick={() => handleTabChange("overview")}
@@ -360,18 +364,18 @@ export default function Portfolio() {
         <TabsContent value="overview" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Marina Portfolio</CardTitle>
-              <CardDescription>All owned marinas and their key metrics</CardDescription>
+              <CardTitle>Asset Portfolio</CardTitle>
+              <CardDescription>All owned assets and their key metrics</CardDescription>
             </CardHeader>
             <CardContent>
               {(!marinas || marinas.length === 0) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-2">No owned marinas yet</p>
+                  <p className="text-lg font-medium mb-2">No owned assets yet</p>
                   <p className="mb-4">Add properties to your portfolio to see them here</p>
-                  <Button onClick={handleAddMarina}>
+                  <Button onClick={handleAddAsset}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Marina
+                    Add Asset
                   </Button>
                 </div>
               ) : (
@@ -593,7 +597,7 @@ export default function Portfolio() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Financial Summary by Marina</CardTitle>
+              <CardTitle>Financial Summary by Asset</CardTitle>
               <CardDescription>Detailed financial breakdown for each property</CardDescription>
             </CardHeader>
             <CardContent>
@@ -651,16 +655,16 @@ export default function Portfolio() {
               value={formatPercent(summary.avgOccupancy)}
             />
             <FinancialMetricCard
-              label="Total Slips"
-              value={String(summary.totalSlips)}
+              label="Total Units"
+              value={String(summary.totalUnits ?? summary.totalSlips)}
             />
             <FinancialMetricCard
               label="Occupied Slips"
-              value={String(Math.round(summary.totalSlips * (summary.avgOccupancy / 100)))}
+              value={String(Math.round(summary.totalUnits ?? summary.totalSlips * (summary.avgOccupancy / 100)))}
             />
             <FinancialMetricCard
               label="Vacant Slips"
-              value={String(Math.round(summary.totalSlips * (1 - summary.avgOccupancy / 100)))}
+              value={String(Math.round(summary.totalUnits ?? summary.totalSlips * (1 - summary.avgOccupancy / 100)))}
             />
           </div>
 

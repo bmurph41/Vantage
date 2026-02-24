@@ -2,6 +2,7 @@ import { useState, useCallback, Fragment, useMemo, useEffect, useRef } from 'rea
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { PLModeToggle, PLBuilder } from '@/components/modeling/pl-mode-toggle';
+import { DirectInputForm } from '@/components/modeling/direct-input-form';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -620,6 +621,10 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
             queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}`] });
           }}
         />
+      )}
+
+      {project && ((project as any).modelInputMode === 'direct_input' || (project as any).modelInputMode === 'hybrid') && (
+        <DirectInputForm project={project} />
       )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>

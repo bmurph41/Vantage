@@ -6,6 +6,12 @@ MarinaMatch is a comprehensive full-stack platform designed to manage the entire
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+**Future: Pricing Strategy (not yet implemented)**
+- 3 tiers + Enterprise: Starter ($249/mo, 1 seat), Professional ($749/mo, 5 seats), Institutional ($1,499/mo, 15 seats), Enterprise (custom $2,500+/mo, unlimited seats)
+- Per-seat add-ons ($50-75/mo), per-asset-class add-on ($99/mo), AI doc processing overages, annual billing discount (15-20%)
+- Competitive positioning: below combined cost of ARGUS + Dealpath + CoStar + PMS ($5K-8K+/mo fragmented)
+- Stripe billing integration when ready
+
 **Code Editing Guidelines:**
 - Always preserve existing formatting - do not edit formatting unless specifically requested
 - Build incrementally on the existing app - never replace what is not suggested to change

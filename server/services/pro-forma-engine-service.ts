@@ -53,6 +53,7 @@ import {
   type T12Context
 } from '../utils/modeling-periods';
 import { loadCanonicalActuals } from './canonical-actuals-loader';
+import { computeDirectInputFinancials } from './direct-input-engine';
 
 // ============================================
 // TYPES
@@ -469,6 +470,59 @@ export class ProFormaEngineService {
     // ========================================
     
     await this.enrichFromProfitCenters(projectId, revenueBySubcat, cogsBySubcat, expensesBySubcat);
+
+    // ========================================
+    // 4c. DIRECT INPUT FALLBACK
+    // If no uploaded actuals, check for direct-input assumptions
+    // ========================================
+    const inputMode = (project as any).modelInputMode || 'auto';
+    const inputAssumptions = (project.customMetrics as any)?.inputAssumptions;
+    const hasUploadedActuals = Object.keys(revenueBySubcat).length > 0 || Object.keys(expensesBySubcat).length > 0;
+
+    if (inputMode === 'direct' && !hasUploadedActuals && inputAssumptions && Object.keys(inputAssumptions).length > 0) {
+      const assetClass = (project as any).assetClass || 'marina';
+      const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
+      if (directResult) {
+        for (const line of directResult.revenueLines) {
+          revenueBySubcat[line.label] = {
+            amount: line.amount,
+            category: 'Revenue',
+            subcategory: line.label,
+            department: 'Revenue',
+            year: latestHistoricalYear,
+          };
+        }
+        for (const line of directResult.expenseLines) {
+          expensesBySubcat[line.label] = {
+            amount: line.amount,
+            category: 'Expense',
+            subcategory: line.label,
+            department: 'Operating Expenses',
+            year: latestHistoricalYear,
+          };
+        }
+      }
+    } else if (inputMode === 'hybrid' && inputAssumptions && Object.keys(inputAssumptions).length > 0) {
+      const assetClass = (project as any).assetClass || 'marina';
+      const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
+      if (directResult) {
+        for (const line of directResult.revenueLines) {
+          revenueBySubcat[line.label] = {
+            amount: line.amount, category: 'Revenue',
+            subcategory: line.label, department: 'Revenue',
+            year: latestHistoricalYear,
+          };
+        }
+        for (const line of directResult.expenseLines) {
+          expensesBySubcat[line.label] = {
+            amount: line.amount, category: 'Expense',
+            subcategory: line.label, department: 'Operating Expenses',
+            year: latestHistoricalYear,
+          };
+        }
+      }
+    }
+
 
     // ========================================
     // 5. VALIDATION: Require actuals or base amounts

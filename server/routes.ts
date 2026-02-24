@@ -17676,6 +17676,36 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Portfolio breakdown by asset class
+  app.get('/api/portfolio/asset-class-breakdown', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const projects = await db.select({
+        id: modelingProjects.id,
+        name: modelingProjects.name,
+        assetClass: modelingProjects.assetClass,
+        purchasePrice: modelingProjects.purchasePrice,
+        askingPrice: modelingProjects.askingPrice,
+        year1CapRate: modelingProjects.year1CapRate,
+        status: modelingProjects.status,
+        customMetrics: modelingProjects.customMetrics,
+      }).from(modelingProjects).where(eq(modelingProjects.orgId, orgId));
+      const byClass: Record<string, { count: number; totalValue: number; assets: any[] }> = {};
+      for (const p of projects) {
+        const ac = (p as any).assetClass || 'other';
+        if (!byClass[ac]) byClass[ac] = { count: 0, totalValue: 0, assets: [] };
+        byClass[ac].count++;
+        byClass[ac].totalValue += Number(p.purchasePrice || p.askingPrice || 0);
+        byClass[ac].assets.push({ id: p.id, name: p.name, value: Number(p.purchasePrice || p.askingPrice || 0), capRate: p.year1CapRate, status: p.status });
+      }
+      res.json({ totalProjects: projects.length, totalValue: projects.reduce((s, p) => s + Number(p.purchasePrice || p.askingPrice || 0), 0), byAssetClass: byClass });
+    } catch (error: any) {
+      console.error('Failed to fetch portfolio breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio breakdown' });
+    }
+  });
+
+
   // Legacy endpoint - redirect to new one
   app.get('/api/operations/owned-marinas', authenticateUser, async (req: any, res) => {
     res.redirect(301, '/api/portfolio/marinas');
@@ -19691,6 +19721,26 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete modeling project
+
+  // Compute direct input financials (live preview — no DB write)
+  app.post('/api/modeling/projects/:projectId/compute-direct-input', authenticateUser, async (req: any, res) => {
+    try {
+      const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
+      const { assetClass, inputAssumptions, unitMix } = req.body;
+      if (!assetClass || !inputAssumptions) {
+        return res.status(400).json({ error: 'assetClass and inputAssumptions are required' });
+      }
+      const result = computeDirectInputFinancials(assetClass, inputAssumptions, unitMix);
+      if (!result) {
+        return res.json({ totalRevenue: 0, totalExpenses: 0, noi: 0, revenueLines: [], expenseLines: [], formulaBreakdowns: {} });
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to compute direct input financials:', error);
+      res.status(500).json({ error: 'Failed to compute financials' });
+    }
+  });
+
   app.delete('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
