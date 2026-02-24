@@ -274,6 +274,8 @@ interface WizardState {
   ownership: WizardOwnership;
 }
 
+const MARINA_ONLY_STEPS = new Set(["Profit Centers", "Amenities", "Storage"]);
+
 function getOnboardingSteps(assetClass: string | null) {
   const allSteps = [
     { title: "Welcome", icon: Sparkles },
@@ -293,11 +295,6 @@ function getOnboardingSteps(assetClass: string | null) {
   return filtered.map((s, i) => ({ ...s, id: i + 1 }));
 }
 
-const onboardingSteps = getOnboardingSteps(null);
-
-// Marina-only steps that get filtered out for other asset classes
-const MARINA_ONLY_STEPS = new Set(["Profit Centers", "Amenities", "Storage"]);
-
 function getNewProjectSteps(assetClass: string | null) {
   const allSteps = [
     { title: "Deal Structure", icon: Layers },
@@ -313,9 +310,6 @@ function getNewProjectSteps(assetClass: string | null) {
     : allSteps;
   return filtered.map((s, i) => ({ ...s, id: i + 1 }));
 }
-
-// Keep a static reference for the default (used before asset class is selected)
-const newProjectSteps = getNewProjectSteps(null);
 
 const dealStructures = [
   {
@@ -387,14 +381,7 @@ const features = [
 export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboarding", onProjectCreated }: OnboardingWizardProps) {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
-  
-  const steps = useMemo(() => 
-    mode === "new_project" 
-      ? getNewProjectSteps(state.assetClass) 
-      : getOnboardingSteps(state.assetClass),
-    [mode, state.assetClass]
-  );
-  const totalSteps = steps.length;
+
   // Asset-class-aware terminology
   const getAssetTerms = (ac: string | null) => {
     const terms: Record<string, { property: string; placeholder: string; heading: string }> = {
@@ -410,9 +397,6 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       mixed_use: { property: "Property Name", placeholder: "e.g., Sunset Mixed-Use Center", heading: "Tell us about your property" },
       laundromat: { property: "Business Name", placeholder: "e.g., Sunset Wash & Fold", heading: "Tell us about your laundromat" },
       sfr: { property: "Property Name", placeholder: "e.g., 123 Sunset Lane", heading: "Tell us about your rental" },
-      duplex: { property: "Property Name", placeholder: "e.g., 456 Oak Street", heading: "Tell us about your duplex" },
-      triplex: { property: "Property Name", placeholder: "e.g., 789 Elm Avenue", heading: "Tell us about your triplex" },
-      quad: { property: "Property Name", placeholder: "e.g., 321 Pine Drive", heading: "Tell us about your fourplex" },
       duplex: { property: "Property Name", placeholder: "e.g., 456 Oak Street", heading: "Tell us about your duplex" },
       triplex: { property: "Property Name", placeholder: "e.g., 789 Elm Avenue", heading: "Tell us about your triplex" },
       quad: { property: "Property Name", placeholder: "e.g., 321 Pine Drive", heading: "Tell us about your fourplex" },
@@ -443,6 +427,13 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   }), [mode]);
   
   const [state, setState] = useState<WizardState>(getInitialState);
+  const steps = useMemo(() => 
+    mode === "new_project" 
+      ? getNewProjectSteps(state.assetClass) 
+      : getOnboardingSteps(state.assetClass),
+    [mode, state.assetClass]
+  );
+  const totalSteps = steps.length;
   const assetTerms = getAssetTerms(state.assetClass);
   const [expandedLeases, setExpandedLeases] = useState<Set<string>>(new Set());
   const [showExitConfirm, setShowExitConfirm] = useState(false);
