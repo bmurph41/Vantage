@@ -35,6 +35,31 @@ import type { UnitMixTypeConfig } from '@shared/asset-class-model-config';
 import { apiRequest } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 
+// ─── Revenue calculation helpers ─────────────────────────────────
+const AVG_DAYS_PER_MONTH = 365.25 / 12; // 30.4375
+
+/** Calculate monthly revenue for a unit row based on rate type */
+function calcMonthlyRevenue(
+  count: number,
+  rate: number,
+  occupancy: number,
+  rateType: string,
+): number {
+  const occPct = occupancy / 100;
+  switch (rateType) {
+    case 'nightly':
+      // Nightly rate × occupancy × avg days per month × count
+      return count * rate * occPct * AVG_DAYS_PER_MONTH;
+    case 'per_sf_annual':
+      // Annual $/SF rate → monthly
+      return count * rate / 12 * occPct;
+    case 'monthly':
+    default:
+      // Monthly rate × occupancy × count
+      return count * rate * occPct;
+  }
+}
+
 // ─── Unit row state ──────────────────────────────────────────────
 interface UnitRow {
   typeId: string;
@@ -58,6 +83,7 @@ interface UnitMixLeasesProps {
 export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
   const config = useMemo(() => getModelConfig(project.assetClass), [project.assetClass]);
   const unitMixConfig = config.unitMix;
+  const rateType: string = (unitMixConfig as any).rateType || 'monthly';
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -95,7 +121,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
   const weightedAvgRate = totalUnits > 0
     ? enabledRows.reduce((sum, r) => sum + (r.count * r.monthlyRate), 0) / totalUnits
     : 0;
-  const totalMonthlyRevenue = enabledRows.reduce((sum, r) => sum + (r.count * r.monthlyRate * (r.occupancy / 100)), 0);
+  const totalMonthlyRevenue = enabledRows.reduce((sum, r) => sum + calcMonthlyRevenue(r.count, r.monthlyRate, r.occupancy, rateType), 0);
   const totalAnnualRevenue = totalMonthlyRevenue * 12;
 
   // ─── Save ──────────────────────────────────────────────────
@@ -215,7 +241,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
               {/* Rows */}
               <div className="space-y-1.5">
                 {sectionRows.map(row => {
-                  const monthlyRev = row.enabled ? row.count * row.monthlyRate * (row.occupancy / 100) : 0;
+                  const monthlyRev = row.enabled ? calcMonthlyRevenue(row.count, row.monthlyRate, row.occupancy, rateType) : 0;
                   return (
                     <div
                       key={row.typeId}
@@ -283,7 +309,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
                   {sectionEnabled.reduce((s, r) => s + r.count, 0).toLocaleString()} {config.terms.unitPlural}
                 </span>
                 <span className="font-semibold">
-                  ${sectionEnabled.reduce((s, r) => s + (r.count * r.monthlyRate * (r.occupancy / 100)), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} / mo
+                  ${sectionEnabled.reduce((s, r) => s + calcMonthlyRevenue(r.count, r.monthlyRate, r.occupancy, rateType), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} / mo
                 </span>
               </div>
             </CardContent>

@@ -57,6 +57,7 @@ export interface AssetClassModelConfig {
     showTab: true,
     countColumnLabel: 'Listings',
     rateColumnLabel: 'Avg Nightly Rate',
+    rateType: 'nightly',
     sfColumnLabel: 'Avg SF',
     showSF: true,
     types: [
@@ -191,6 +192,7 @@ const MARINA_CONFIG: AssetClassModelConfig = {
     showTab: true,
     countColumnLabel: 'Slips / Spaces',
     rateColumnLabel: 'Monthly Rate',
+    rateType: 'monthly',
     showSF: false,
     types: [
       { id: 'wet_slips', name: 'Wet Slips', icon: 'anchor', section: 'In-Water', hasSeasons: true, defaultFields: {} },
@@ -291,6 +293,7 @@ const MULTIFAMILY_CONFIG: AssetClassModelConfig = {
     showTab: true,
     countColumnLabel: 'Units',
     rateColumnLabel: 'Avg Rent/Mo',
+    rateType: 'monthly',
     sfColumnLabel: 'Avg SF',
     showSF: true,
     types: [
@@ -394,6 +397,7 @@ const HOTEL_CONFIG: AssetClassModelConfig = {
     showTab: true,
     countColumnLabel: 'Keys',
     rateColumnLabel: 'Avg ADR',
+    rateType: 'nightly',
     showSF: true,
     sfColumnLabel: 'Avg SF',
     types: [
@@ -496,6 +500,7 @@ const STR_CONFIG: AssetClassModelConfig = {
     showTab: true,
     countColumnLabel: 'Listings',
     rateColumnLabel: 'Avg Nightly Rate',
+    rateType: 'nightly',
     sfColumnLabel: 'Avg SF',
     showSF: true,
     types: [
@@ -659,6 +664,7 @@ const SELF_STORAGE_CONFIG: AssetClassModelConfig = {
     showTab: true,
     countColumnLabel: 'Units',
     rateColumnLabel: 'Rent / Mo',
+    rateType: 'monthly',
     sfColumnLabel: 'Unit SF',
     showSF: true,
     types: [
