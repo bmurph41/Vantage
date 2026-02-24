@@ -96,7 +96,7 @@ export default function BookkeepingDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Data Flow to Financial Model</CardTitle>
-              <CardDescription>Live data sync status for owned marinas</CardDescription>
+              <CardDescription>Live data sync status for owned assets</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -116,7 +116,7 @@ export default function BookkeepingDashboard() {
                 <Badge variant="outline" className="text-muted-foreground">Not Connected</Badge>
               </div>
               <p className="text-xs text-muted-foreground pt-2 border-t">
-                Connected data automatically syncs to the Financial Model for owned marina valuation models.
+                Connected data automatically syncs to the Financial Model for owned asset valuation models.
               </p>
             </CardContent>
           </Card>

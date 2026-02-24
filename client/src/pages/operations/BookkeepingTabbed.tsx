@@ -72,7 +72,7 @@ export default function BookkeepingTabbed() {
   return (
     <TabbedModuleLayout
       moduleName="Bookkeeping"
-      moduleDescription="Accounting integrations and financial data sync for owned marinas"
+      moduleDescription="Accounting integrations and financial data sync for owned assets"
       moduleIcon={BookOpen}
       tabs={tabs}
       defaultTab="dashboard"

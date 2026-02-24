@@ -162,7 +162,7 @@ export default function OwnedMarinas() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="page-title">Owned Assets</h1>
           <p className="text-muted-foreground">
-            Manage your marina portfolio and track performance
+            Manage your asset portfolio and track performance
           </p>
         </div>
         <div className="flex gap-2">
@@ -176,7 +176,7 @@ export default function OwnedMarinas() {
           </Button>
           <Button onClick={() => navigate("/crm/properties/new")} data-testid="button-add-marina">
             <Plus className="h-4 w-4 mr-2" />
-            Add Marina
+            Add Asset
           </Button>
         </div>
       </div>
@@ -475,7 +475,7 @@ export default function OwnedMarinas() {
             showSourceFilter={false}
             showLayerToggles={false}
             showListPanel={true}
-            emptyMessage="No owned marinas with location data found"
+            emptyMessage="No owned assets with location data found"
             onLocationClick={(loc) => {
               if (loc.id) navigate(`/crm/properties/${loc.id}`);
             }}

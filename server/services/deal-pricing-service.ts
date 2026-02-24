@@ -794,6 +794,7 @@ class DealPricingService {
         baseRevenue: financials.baseRevenue,
         baseExpenses: financials.baseExpenses,
         storedPurchasePrice: baseFinancials.purchasePrice,
+        source: baseFinancials.source,
       },
       noiProjections,
       proFormaIntegrated: useProForma,
@@ -919,6 +920,7 @@ class DealPricingService {
         year1NOI: financials.year1NOI, baseRevenue: financials.baseRevenue,
         baseExpenses: financials.baseExpenses, storedPurchasePrice: baseFinancials.purchasePrice,
         selectedPeriod: inputs.periodLabel,
+        source: baseFinancials.source,
       },
       noiProjections, proFormaIntegrated: useProForma, exitValue, netExitProceeds,
     };

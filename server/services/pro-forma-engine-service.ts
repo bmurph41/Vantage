@@ -474,12 +474,19 @@ export class ProFormaEngineService {
     // ========================================
     // 4c. DIRECT INPUT FALLBACK
     // If no uploaded actuals, check for direct-input assumptions
+    // Modes: direct_input = use only computed, auto = fallback if no actuals,
+    //        hybrid = merge computed lines that don't exist from actuals
     // ========================================
     const inputMode = (project as any).modelInputMode || 'auto';
     const inputAssumptions = (project.customMetrics as any)?.inputAssumptions;
     const hasUploadedActuals = Object.keys(revenueBySubcat).length > 0 || Object.keys(expensesBySubcat).length > 0;
+    const hasInputAssumptions = inputAssumptions && Object.keys(inputAssumptions).length > 0;
 
-    if (inputMode === 'direct' && !hasUploadedActuals && inputAssumptions && Object.keys(inputAssumptions).length > 0) {
+    const shouldUseDirectInput =
+      (inputMode === 'direct_input' && hasInputAssumptions) ||
+      (inputMode === 'auto' && !hasUploadedActuals && hasInputAssumptions);
+
+    if (shouldUseDirectInput) {
       const assetClass = (project as any).assetClass || 'marina';
       const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
       if (directResult) {
@@ -502,23 +509,32 @@ export class ProFormaEngineService {
           };
         }
       }
-    } else if (inputMode === 'hybrid' && inputAssumptions && Object.keys(inputAssumptions).length > 0) {
+    } else if (inputMode === 'hybrid' && hasInputAssumptions) {
+      // Hybrid: only add direct-input lines that DON'T already exist from actuals
       const assetClass = (project as any).assetClass || 'marina';
       const directResult = computeDirectInputFinancials(assetClass, inputAssumptions);
       if (directResult) {
         for (const line of directResult.revenueLines) {
-          revenueBySubcat[line.label] = {
-            amount: line.amount, category: 'Revenue',
-            subcategory: line.label, department: 'Revenue',
-            year: latestHistoricalYear,
-          };
+          if (!revenueBySubcat[line.label]) {
+            revenueBySubcat[line.label] = {
+              amount: line.amount,
+              category: 'Revenue',
+              subcategory: line.label,
+              department: 'Revenue',
+              year: latestHistoricalYear,
+            };
+          }
         }
         for (const line of directResult.expenseLines) {
-          expensesBySubcat[line.label] = {
-            amount: line.amount, category: 'Expense',
-            subcategory: line.label, department: 'Operating Expenses',
-            year: latestHistoricalYear,
-          };
+          if (!expensesBySubcat[line.label]) {
+            expensesBySubcat[line.label] = {
+              amount: line.amount,
+              category: 'Expense',
+              subcategory: line.label,
+              department: 'Operating Expenses',
+              year: latestHistoricalYear,
+            };
+          }
         }
       }
     }
