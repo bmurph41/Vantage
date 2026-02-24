@@ -274,28 +274,48 @@ interface WizardState {
   ownership: WizardOwnership;
 }
 
-const onboardingSteps = [
-  { id: 1, title: "Welcome", icon: Sparkles },
-  { id: 2, title: "Deal Structure", icon: Layers },
-  { id: 3, title: "Marina Details", icon: Anchor },
-  { id: 4, title: "Deal Type", icon: Target },
-  { id: 5, title: "Profit Centers", icon: Store },
-  { id: 6, title: "Amenities", icon: ClipboardList },
-  { id: 7, title: "Storage", icon: Warehouse },
-  { id: 8, title: "Documents", icon: Upload },
-  { id: 9, title: "Features", icon: Sparkles },
-  { id: 10, title: "Get Started", icon: Check },
-];
+function getOnboardingSteps(assetClass: string | null) {
+  const allSteps = [
+    { title: "Welcome", icon: Sparkles },
+    { title: "Deal Structure", icon: Layers },
+    { title: "Property Details", icon: Anchor },
+    { title: "Deal Type", icon: Target },
+    { title: "Profit Centers", icon: Store },
+    { title: "Amenities", icon: ClipboardList },
+    { title: "Storage", icon: Warehouse },
+    { title: "Documents", icon: Upload },
+    { title: "Features", icon: Sparkles },
+    { title: "Get Started", icon: Check },
+  ];
+  const filtered = assetClass && assetClass !== 'marina'
+    ? allSteps.filter(s => !MARINA_ONLY_STEPS.has(s.title))
+    : allSteps;
+  return filtered.map((s, i) => ({ ...s, id: i + 1 }));
+}
 
-const newProjectSteps = [
-  { id: 1, title: "Deal Structure", icon: Layers },
-  { id: 2, title: "Marina Details", icon: Anchor },
-  { id: 3, title: "Deal Info", icon: Target },
-  { id: 4, title: "Profit Centers", icon: Store },
-  { id: 5, title: "Amenities", icon: ClipboardList },
-  { id: 6, title: "Storage", icon: Warehouse },
-  { id: 7, title: "Documents", icon: Upload },
-];
+const onboardingSteps = getOnboardingSteps(null);
+
+// Marina-only steps that get filtered out for other asset classes
+const MARINA_ONLY_STEPS = new Set(["Profit Centers", "Amenities", "Storage"]);
+
+function getNewProjectSteps(assetClass: string | null) {
+  const allSteps = [
+    { title: "Deal Structure", icon: Layers },
+    { title: "Property Details", icon: Anchor },
+    { title: "Deal Info", icon: Target },
+    { title: "Profit Centers", icon: Store },
+    { title: "Amenities", icon: ClipboardList },
+    { title: "Storage", icon: Warehouse },
+    { title: "Documents", icon: Upload },
+  ];
+  const filtered = assetClass && assetClass !== 'marina'
+    ? allSteps.filter(s => !MARINA_ONLY_STEPS.has(s.title))
+    : allSteps;
+  return filtered.map((s, i) => ({ ...s, id: i + 1 }));
+}
+
+// Keep a static reference for the default (used before asset class is selected)
+const newProjectSteps = getNewProjectSteps(null);
 
 const dealStructures = [
   {
@@ -368,7 +388,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   
-  const steps = mode === "new_project" ? newProjectSteps : onboardingSteps;
+  const steps = useMemo(() => 
+    mode === "new_project" 
+      ? getNewProjectSteps(state.assetClass) 
+      : getOnboardingSteps(state.assetClass),
+    [mode, state.assetClass]
+  );
   const totalSteps = steps.length;
   // Asset-class-aware terminology
   const getAssetTerms = (ac: string | null) => {
@@ -654,7 +679,9 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         : result?.modelingProject?.id;
       
       if (projectId) {
-        await saveStorageConfig(projectId);
+        if (state.assetClass === 'marina') {
+          await saveStorageConfig(projectId);
+        }
         await uploadStagedFiles(projectId);
         queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'config'] });
         queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'documents'] });
@@ -666,7 +693,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       toast({ 
         title: isPortfolio ? "Portfolio Created!" : "Project Created!", 
         description: isPortfolio 
-          ? `${projectCount} marina${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
+          ? `${projectCount} asset${projectCount > 1 ? 's' : ''} added to CRM and Financial Model.`
           : `${state.marinaName} has been added.${uploadCount > 0 ? ` ${uploadCount} document${uploadCount > 1 ? 's' : ''} queued for AI processing.` : ''}` 
       });
       
@@ -704,24 +731,21 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   });
   function handleNext() {
     if (state.step < steps.length) {
-      // Validate current step before advancing
-      const currentStepId = mode === "new_project" ? state.step : state.step;
-      const newProjectStep = mode === "new_project" ? state.step : null;
+      // Validate current step before advancing (by title, not ordinal)
+      const currentTitle = steps.find(s => s.id === state.step)?.title;
       
-      // Step 1 (new_project): must select deal structure + asset class
-      if (newProjectStep === 1) {
+      if (currentTitle === "Deal Structure") {
         if (!state.dealStructure) {
           toast({ title: "Required", description: "Please select a deal structure.", variant: "destructive" });
           return;
         }
-        if (!state.assetClass) {
+        if (mode === "new_project" && !state.assetClass) {
           toast({ title: "Required", description: "Please select an asset class.", variant: "destructive" });
           return;
         }
       }
       
-      // Step 2 (new_project): must have name + city + state
-      if (newProjectStep === 2) {
+      if (currentTitle === "Property Details") {
         if (state.dealStructure === "single") {
           if (!state.marinaName.trim()) {
             toast({ title: "Required", description: `Please enter a ${getAssetTerms(state.assetClass).property.toLowerCase()}.`, variant: "destructive" });
@@ -739,8 +763,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         }
       }
       
-      // Step 3 (new_project): must select deal type
-      if (newProjectStep === 3 && !state.dealType) {
+      if ((currentTitle === "Deal Info" || currentTitle === "Deal Type") && !state.dealType) {
         toast({ title: "Required", description: "Please select a deal type.", variant: "destructive" });
         return;
       }
@@ -1548,7 +1571,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold">Storage & Spaces</h3>
           <p className="text-sm text-muted-foreground">
-            What types of boat storage does this marina offer? Add counts and occupancy if known.
+            What types of storage or spaces does this property offer? Add counts and occupancy if known.
           </p>
           {enabledCount > 0 && (
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
@@ -1829,7 +1852,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             <SelectContent>
               <SelectItem value="acquisition">New Acquisition</SelectItem>
               <SelectItem value="refinance">Refinance/Revaluation</SelectItem>
-              <SelectItem value="owned_marina">Owned Marina</SelectItem>
+              <SelectItem value="owned_marina">Owned Asset</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2096,29 +2119,30 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
   );
 
   const getStepContent = () => {
-    if (mode === "new_project") {
-      return {
-        1: renderDealStructureStep(),
-        2: renderMarinaDetailsStep(),
-        3: renderDealInfoStep(),
-        4: renderProfitCentersStep(),
-        5: renderAmenitiesStep(),
-        6: renderStorageTypesStep(),
-        7: renderDocumentUploadStep(),
-      }[state.step];
-    }
-    return {
-      1: renderWelcomeStep(),
-      2: renderDealStructureStep(),
-      3: renderMarinaDetailsStep(),
-      4: renderDealTypeStep(),
-      5: renderProfitCentersStep(),
-      6: renderAmenitiesStep(),
-      7: renderStorageTypesStep(),
-      8: renderDocumentUploadStep(),
-      9: renderFeaturesStep(),
-      10: renderGetStartedStep(),
-    }[state.step];
+    const stepTitle = steps.find(s => s.id === state.step)?.title;
+    const contentMap: Record<string, React.ReactNode> = mode === "new_project"
+      ? {
+          "Deal Structure": renderDealStructureStep(),
+          "Property Details": renderMarinaDetailsStep(),
+          "Deal Info": renderDealInfoStep(),
+          "Profit Centers": renderProfitCentersStep(),
+          "Amenities": renderAmenitiesStep(),
+          "Storage": renderStorageTypesStep(),
+          "Documents": renderDocumentUploadStep(),
+        }
+      : {
+          "Welcome": renderWelcomeStep(),
+          "Deal Structure": renderDealStructureStep(),
+          "Property Details": renderMarinaDetailsStep(),
+          "Deal Type": renderDealTypeStep(),
+          "Profit Centers": renderProfitCentersStep(),
+          "Amenities": renderAmenitiesStep(),
+          "Storage": renderStorageTypesStep(),
+          "Documents": renderDocumentUploadStep(),
+          "Features": renderFeaturesStep(),
+          "Get Started": renderGetStartedStep(),
+        };
+    return stepTitle ? contentMap[stepTitle] : null;
   };
 
   return (
@@ -2129,7 +2153,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             <div className="flex items-center justify-between mb-2">
               <DialogTitle className="flex items-center gap-2">
                 {state.assetClass === "marina" ? <Anchor className="h-5 w-5 text-[#1E4FAB]" /> : <Building2 className="h-5 w-5 text-[#1E4FAB]" />}
-                {mode === "new_project" ? "New Project" : "MarinaMatch Setup"}
+                {mode === "new_project" ? "New Project" : "Setup Wizard"}
               </DialogTitle>
               <div className="flex items-center gap-1.5 mr-6 -mt-1">
                 {steps.map((s) => (
