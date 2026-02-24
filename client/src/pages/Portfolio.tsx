@@ -209,12 +209,12 @@ export default function Portfolio() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/marinas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-properties"] });
-      toast({ title: "Marina removed from portfolio" });
+      toast({ title: "Asset removed from portfolio" });
       setDeleteDialogOpen(false);
       setMarinaToDelete(null);
     },
     onError: (error: any) => {
-      toast({ title: "Failed to remove marina", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to remove asset", description: error.message, variant: "destructive" });
     },
   });
 
@@ -529,14 +529,14 @@ export default function Portfolio() {
                 key={mapSource}
                 source={mapSource === 'owned' ? 'owned' : mapSource === 'pipeline' ? 'pipeline' : 'all'}
                 baseUrl={mapSource === 'owned' || mapSource === 'pipeline' ? '/api/portfolio/map-locations' : '/api/marina-map/locations'}
-                sourceLabel={mapSource === 'all' ? 'All Marina Assets' : mapSource === 'owned' ? 'Owned Marinas' : 'Pipeline Deals'}
+                sourceLabel={mapSource === 'all' ? 'All Assets' : mapSource === 'owned' ? 'Owned Assets' : 'Pipeline Deals'}
                 height="calc(100vh - 420px)"
                 showSearch={true}
                 showStateFilter={true}
                 showSourceFilter={false}
                 showLayerToggles={mapSource === 'all'}
                 showListPanel={true}
-                emptyMessage={mapSource === 'owned' ? 'No owned marinas with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No marina assets with location data found'}
+                emptyMessage={mapSource === 'owned' ? 'No owned assets with location data found' : mapSource === 'pipeline' ? 'No pipeline deals with location data found' : 'No assets with location data found'}
                 onLocationClick={(loc) => {
                   if (loc.source === 'owned' && loc.id) {
                     navigate(`/portfolio/${loc.id}`);
@@ -590,8 +590,8 @@ export default function Portfolio() {
               value={formatCurrency(summary.totalEbitda)}
             />
             <FinancialMetricCard
-              label="Revenue per Slip"
-              value={formatCurrency(revenuePerSlip)}
+              label="Revenue per Unit"
+              value={formatCurrency(revenuePerUnit)}
             />
           </div>
 
@@ -670,7 +670,7 @@ export default function Portfolio() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Performance by Marina</CardTitle>
+              <CardTitle>Performance by Asset</CardTitle>
               <CardDescription>Occupancy and operational metrics by property</CardDescription>
             </CardHeader>
             <CardContent>

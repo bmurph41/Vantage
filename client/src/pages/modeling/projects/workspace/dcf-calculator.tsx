@@ -111,37 +111,97 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     enabled: !!projectId,
   });
 
-  // Real-time input state
+  const { data: proFormaData } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
+    enabled: !!projectId,
+  });
+
+  const { data: capitalStackData } = useQuery<any>({
+    queryKey: ['/api/capital-stacks', projectId],
+    enabled: !!projectId,
+  });
+
   const [liveInputs, setLiveInputs] = useState({
-    purchasePrice: 5000000,
-    year1NOI: 500000,
+    purchasePrice: 0,
+    year1NOI: 0,
     noiGrowthRate: 3,
     discountRate: 10,
     exitCapRate: 7.5,
     holdPeriod: 10,
-    loanAmount: 3250000,
+    loanAmount: 0,
     loanRate: 5.5,
   });
 
-  useEffect(() => {
-    if (activeScenario?.exitCapRate) {
-      const capRatePercent = parseFloat(activeScenario.exitCapRate) * 100;
-      if (capRatePercent > 0 && Math.abs(capRatePercent - liveInputs.exitCapRate) > 0.01) {
-        setLiveInputs(prev => ({ ...prev, exitCapRate: capRatePercent }));
-      }
-    } else {
-      const dealPricingCap = dcfProject?.customMetrics?.dealPricing?.exitCapRate;
-      if (dealPricingCap && !isNaN(Number(dealPricingCap)) && Number(dealPricingCap) > 0) {
-        const dpCapRate = Number(dealPricingCap);
-        if (Math.abs(dpCapRate - liveInputs.exitCapRate) > 0.01) {
-          setLiveInputs(prev => ({ ...prev, exitCapRate: dpCapRate }));
-        }
-      }
-    }
-  }, [activeScenario?.exitCapRate, dcfProject?.customMetrics?.dealPricing?.exitCapRate]);
+  const [inputSources, setInputSources] = useState<Record<string, string>>({});
+  const [userOverrides, setUserOverrides] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (sharedHoldPeriod && sharedHoldPeriod !== liveInputs.holdPeriod) {
+    const updates: Partial<typeof liveInputs> = {};
+    const sources: Record<string, string> = {};
+
+    const trySet = (field: keyof typeof liveInputs, value: number, source: string) => {
+      if (userOverrides[field]) return;
+      if (value > 0) {
+        updates[field] = value;
+        sources[field] = source;
+      }
+    };
+
+    const pp = dcfProject?.purchasePrice ? parseFloat(dcfProject.purchasePrice) : 0;
+    trySet('purchasePrice', pp, 'Project');
+
+    const pfY1 = proFormaData?.metrics?.year1Noi || proFormaData?.noi?.[0];
+    if (pfY1 && pfY1 > 0) {
+      trySet('year1NOI', pfY1, 'Pro Forma');
+    } else if (pp > 0 && !pfY1 && !userOverrides.year1NOI) {
+      updates.year1NOI = pp * 0.10;
+      sources.year1NOI = 'Estimated (10% cap)';
+    }
+
+    const pfExitCap = proFormaData?.metrics?.exitCapRate;
+    if (pfExitCap && pfExitCap > 0) {
+      trySet('exitCapRate', pfExitCap, 'Pro Forma');
+    } else if (activeScenario?.exitCapRate) {
+      const ecr = parseFloat(activeScenario.exitCapRate);
+      trySet('exitCapRate', ecr > 1 ? ecr : ecr * 100, 'Scenario');
+    }
+
+    const pfGrowth = proFormaData?.metrics?.revenueGrowthRate;
+    if (pfGrowth && pfGrowth > 0) {
+      trySet('noiGrowthRate', pfGrowth, 'Pro Forma');
+    } else if (activeScenario?.revenueGrowthRate) {
+      trySet('noiGrowthRate', parseFloat(activeScenario.revenueGrowthRate), 'Scenario');
+    }
+
+    const pfHp = proFormaData?.holdPeriod;
+    if (pfHp && pfHp > 0) {
+      trySet('holdPeriod', pfHp, 'Pro Forma');
+    } else if (sharedHoldPeriod && sharedHoldPeriod > 0) {
+      trySet('holdPeriod', sharedHoldPeriod, 'Shared');
+    }
+
+    const stack = capitalStackData?.capitalStack || capitalStackData;
+    if (stack?.totalDebt) {
+      trySet('loanAmount', parseFloat(stack.totalDebt), 'Capital Stack');
+    }
+    if (stack?.blendedDebtRate) {
+      const bdr = parseFloat(stack.blendedDebtRate);
+      trySet('loanRate', bdr > 1 ? bdr : bdr * 100, 'Capital Stack');
+    }
+
+    if (updates.loanAmount === undefined && updates.purchasePrice && updates.purchasePrice > 0 && !userOverrides.loanAmount) {
+      updates.loanAmount = updates.purchasePrice * 0.65;
+      sources.loanAmount = 'Default (65% LTV)';
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setLiveInputs(prev => ({ ...prev, ...updates }));
+      setInputSources(prev => ({ ...prev, ...sources }));
+    }
+  }, [dcfProject, proFormaData, capitalStackData, activeScenario, sharedHoldPeriod, userOverrides]);
+
+  useEffect(() => {
+    if (sharedHoldPeriod && sharedHoldPeriod !== liveInputs.holdPeriod && !userOverrides.holdPeriod) {
       setLiveInputs(prev => ({ ...prev, holdPeriod: sharedHoldPeriod }));
     }
   }, [sharedHoldPeriod]);
@@ -199,6 +259,8 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const handleInputChange = (key: keyof typeof liveInputs, value: number) => {
     const newInputs = { ...liveInputs, [key]: value };
     setLiveInputs(newInputs);
+    setUserOverrides(prev => ({ ...prev, [key]: true }));
+    setInputSources(prev => ({ ...prev, [key]: 'Manual' }));
     debouncedCalculate(newInputs);
     if (key === 'holdPeriod') {
       setSharedHoldPeriod(value);
@@ -238,8 +300,26 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   const probabilityResult = dcfAnalysis?.probabilityWeightedResult;
   const comparison = dcfAnalysis?.scenarioComparison;
 
-  // Determine real-time IRR display
-  const displayIRR = calculateQuickIRR.data?.irr ?? baseScenario?.irr ?? 0;
+  const quickResult = calculateQuickIRR.data as any;
+  const displayIRR = quickResult?.irr ?? baseScenario?.irr ?? 0;
+  const displayLeveredIRR = quickResult?.leveredIrr ?? baseScenario?.leveredIRR ?? 0;
+  const displayNPV = quickResult?.npv ?? baseScenario?.npv ?? 0;
+  const displayEquityMultiple = quickResult?.equityMultiple ?? baseScenario?.equityMultiple ?? 0;
+
+  const SourceBadge = ({ field }: { field: string }) => {
+    const src = inputSources[field];
+    if (!src) return null;
+    const isManual = src === 'Manual';
+    return (
+      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+        isManual 
+          ? 'bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-400'
+          : 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
+      }`}>
+        {src}
+      </span>
+    );
+  };
 
   return (
     <div ref={pdfRef} className="space-y-6 p-6" data-testid="dcf-calculator-page">
@@ -285,7 +365,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="space-y-2">
-              <Label>Purchase Price</Label>
+              <div className="flex items-center justify-between">
+                <Label>Purchase Price</Label>
+                <SourceBadge field="purchasePrice" />
+              </div>
               <Input
                 value={liveInputs.purchasePrice ? `$${liveInputs.purchasePrice.toLocaleString()}` : ''}
                 onChange={(e) => handleInputChange('purchasePrice', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
@@ -295,7 +378,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Year 1 NOI</Label>
+              <div className="flex items-center justify-between">
+                <Label>Year 1 NOI</Label>
+                <SourceBadge field="year1NOI" />
+              </div>
               <Input
                 value={liveInputs.year1NOI ? `$${liveInputs.year1NOI.toLocaleString()}` : ''}
                 onChange={(e) => handleInputChange('year1NOI', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
@@ -305,7 +391,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>NOI Growth Rate</Label>
+              <div className="flex items-center justify-between">
+                <Label>NOI Growth Rate</Label>
+                <SourceBadge field="noiGrowthRate" />
+              </div>
               <div className="flex items-center gap-2">
                 <Slider
                   value={[liveInputs.noiGrowthRate]}
@@ -352,7 +441,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Exit Cap Rate</Label>
+              <div className="flex items-center justify-between">
+                <Label>Exit Cap Rate</Label>
+                <SourceBadge field="exitCapRate" />
+              </div>
               <div className="flex items-center gap-2">
                 <Slider
                   value={[liveInputs.exitCapRate]}
@@ -367,7 +459,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Hold Period (Years)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Hold Period (Years)</Label>
+                <SourceBadge field="holdPeriod" />
+              </div>
               <div className="flex items-center gap-2">
                 <Slider
                   value={[liveInputs.holdPeriod]}
@@ -382,7 +477,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Loan Amount</Label>
+              <div className="flex items-center justify-between">
+                <Label>Loan Amount</Label>
+                <SourceBadge field="loanAmount" />
+              </div>
               <Input
                 value={liveInputs.loanAmount ? `$${liveInputs.loanAmount.toLocaleString()}` : ''}
                 onChange={(e) => handleInputChange('loanAmount', parseFloat(e.target.value.replace(/[$,]/g, '')) || 0)}
@@ -392,7 +490,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
             </div>
 
             <div className="space-y-2">
-              <Label>Loan Rate</Label>
+              <div className="flex items-center justify-between">
+                <Label>Loan Rate</Label>
+                <SourceBadge field="loanRate" />
+              </div>
               <div className="flex items-center gap-2">
                 <Slider
                   value={[liveInputs.loanRate]}
@@ -774,8 +875,11 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       <td colSpan={2}></td>
                       <td>{formatCurrency(baseScenario?.terminalValueAmount || 0)}</td>
                       <td>
-                        {formatCurrency((baseScenario?.terminalValueAmount || 0) / 
-                          Math.pow(1.1, baseScenario?.cashFlows.length || 10))}
+                        {formatCurrency(
+                          (baseScenario as any)?.presentValueOfTerminal ||
+                          ((baseScenario?.terminalValueAmount || 0) / 
+                            Math.pow(1 + (liveInputs.discountRate / 100), baseScenario?.cashFlows.length || 10))
+                        )}
                       </td>
                     </tr>
                   </tbody>

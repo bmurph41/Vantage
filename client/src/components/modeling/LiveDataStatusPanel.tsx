@@ -166,7 +166,7 @@ export function LiveDataStatusPanel({ projectId, dealSource, className }: LiveDa
             <CardTitle className="text-base">Live Operations Data</CardTitle>
           </div>
           <CardDescription>
-            Live data sync is available only for owned marinas
+            Live data sync is available only for owned assets
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -11,14 +11,15 @@
  */
 
 import { db } from '../db';
-import { modelingProjects, modelingCases } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { modelingProjects, modelingScenarioVersions, capitalStacks, debtTranches } from '@shared/schema';
+import { eq, and, desc } from 'drizzle-orm';
 import { 
   calculateXIRR, 
   calculateXNPV, 
   periodsToDatedCashFlows,
   type DatedCashFlow 
 } from '../utils/financial-calculations';
+import { proFormaEngineService } from './pro-forma-engine-service';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -610,45 +611,202 @@ class DCFCalculatorService {
   }
 
   /**
-   * Full DCF analysis with multiple scenarios
+   * Load real data from Pro Forma engine, Capital Stack, and Scenario Versions
+   * to build a DCFInput grounded in the actual model instead of hardcoded defaults
+   */
+  private async loadProjectInputs(
+    projectId: string,
+    orgId: string
+  ): Promise<{ baseInput: DCFInput; dataSources: Record<string, string> }> {
+    const dataSources: Record<string, string> = {};
+
+    const [project] = await db
+      .select()
+      .from(modelingProjects)
+      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
+      .limit(1);
+
+    let purchasePrice = project?.purchasePrice ? parseFloat(project.purchasePrice) : 0;
+    if (purchasePrice > 0) dataSources.purchasePrice = 'project';
+
+    let year1NOI = 0;
+    let noiGrowthRate = 0.03;
+    let exitCapRate = 0.075;
+    let holdPeriod = 10;
+    let loanAmount = 0;
+    let loanRate = 0.055;
+    let loanTerm = 10;
+    let amortization = 25;
+
+    try {
+      const proForma = await proFormaEngineService.generateProForma(projectId, orgId, 'base');
+
+      if (proForma.noi && proForma.noi[0] > 0) {
+        year1NOI = proForma.noi[0];
+        dataSources.year1NOI = 'pro_forma';
+      }
+
+      if (proForma.holdPeriod > 0) {
+        holdPeriod = proForma.holdPeriod;
+        dataSources.holdPeriod = 'pro_forma';
+      }
+
+      if (proForma.metrics) {
+        if (proForma.metrics.purchasePrice > 0 && purchasePrice === 0) {
+          purchasePrice = proForma.metrics.purchasePrice;
+          dataSources.purchasePrice = 'pro_forma';
+        }
+
+        if (proForma.metrics.exitCapRate > 0) {
+          exitCapRate = proForma.metrics.exitCapRate / 100;
+          dataSources.exitCapRate = 'pro_forma';
+        }
+
+        if (proForma.metrics.revenueGrowthRate > 0) {
+          noiGrowthRate = proForma.metrics.revenueGrowthRate / 100;
+          dataSources.noiGrowthRate = 'pro_forma';
+        }
+
+        if (proForma.metrics.debtSchedule?.totalDebtAtClose > 0) {
+          loanAmount = proForma.metrics.debtSchedule.totalDebtAtClose;
+          dataSources.loanAmount = 'capital_stack';
+
+          if (proForma.metrics.debtSchedule.blendedRate > 0) {
+            loanRate = proForma.metrics.debtSchedule.blendedRate;
+            dataSources.loanRate = 'capital_stack';
+          }
+        }
+      }
+    } catch (proFormaError) {
+      console.warn('[DCF] Pro Forma data unavailable, loading from scenario/capital stack directly:', proFormaError);
+    }
+
+    try {
+      const [scenario] = await db
+        .select()
+        .from(modelingScenarioVersions)
+        .where(
+          and(
+            eq(modelingScenarioVersions.modelingProjectId, projectId),
+            eq(modelingScenarioVersions.orgId, orgId),
+            eq(modelingScenarioVersions.scenarioType, 'base'),
+            eq(modelingScenarioVersions.isCurrentVersion, true)
+          )
+        )
+        .limit(1);
+
+      if (scenario) {
+        if (!dataSources.exitCapRate && scenario.exitCapRate) {
+          const ecr = parseFloat(scenario.exitCapRate);
+          exitCapRate = ecr > 1 ? ecr / 100 : ecr;
+          dataSources.exitCapRate = 'scenario';
+        }
+        if (!dataSources.noiGrowthRate && scenario.revenueGrowthRate) {
+          const rgr = parseFloat(scenario.revenueGrowthRate);
+          noiGrowthRate = rgr > 1 ? rgr / 100 : rgr;
+          dataSources.noiGrowthRate = 'scenario';
+        }
+      }
+    } catch (e) {
+      console.warn('[DCF] Scenario version load failed:', e);
+    }
+
+    if (!dataSources.loanAmount) {
+      try {
+        const [stack] = await db
+          .select()
+          .from(capitalStacks)
+          .where(
+            and(
+              eq(capitalStacks.modelingProjectId, projectId),
+              eq(capitalStacks.orgId, orgId),
+              eq(capitalStacks.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (stack) {
+          if (stack.totalDebt) {
+            loanAmount = parseFloat(stack.totalDebt);
+            dataSources.loanAmount = 'capital_stack';
+          }
+          if (stack.blendedDebtRate) {
+            loanRate = parseFloat(stack.blendedDebtRate);
+            dataSources.loanRate = 'capital_stack';
+          }
+          if (stack.holdPeriodYears && !dataSources.holdPeriod) {
+            holdPeriod = stack.holdPeriodYears;
+            dataSources.holdPeriod = 'capital_stack';
+          }
+
+          const tranches = await db
+            .select()
+            .from(debtTranches)
+            .where(eq(debtTranches.capitalStackId, stack.id));
+
+          if (tranches.length > 0) {
+            const seniorTranche = tranches.sort((a, b) => a.priority - b.priority)[0];
+            if (seniorTranche.termYears) {
+              loanTerm = seniorTranche.termYears;
+              dataSources.loanTerm = 'capital_stack';
+            }
+            if (seniorTranche.amortizationYears) {
+              amortization = seniorTranche.amortizationYears;
+              dataSources.amortization = 'capital_stack';
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[DCF] Capital stack load failed:', e);
+      }
+    }
+
+    if (loanAmount === 0 && purchasePrice > 0) {
+      loanAmount = purchasePrice * 0.65;
+      dataSources.loanAmount = 'default_65pct_ltv';
+    }
+
+    if (purchasePrice === 0) {
+      purchasePrice = 5000000;
+      dataSources.purchasePrice = 'default';
+    }
+    if (year1NOI === 0) {
+      year1NOI = purchasePrice * 0.10;
+      dataSources.year1NOI = 'default_10pct_cap';
+    }
+
+    return {
+      baseInput: {
+        purchasePrice,
+        year1NOI,
+        noiGrowthRate,
+        holdPeriod,
+        discountRate: 0.10,
+        exitCapRate,
+        loanAmount,
+        loanRate,
+        loanTerm,
+        amortization,
+      },
+      dataSources,
+    };
+  }
+
+  /**
+   * Full DCF analysis with multiple scenarios.
+   * Sources base inputs from Pro Forma engine, Capital Stack, and scenario versions.
    */
   async performDCFAnalysis(
     projectId: string,
     orgId: string,
     scenarioInputs?: { name: string; input: DCFInput; probability?: number }[]
-  ): Promise<DCFAnalysis> {
-    // Get project data
-    const project = await db
-      .select()
-      .from(modelingProjects)
-      .where(
-        and(
-          eq(modelingProjects.id, projectId),
-          eq(modelingProjects.orgId, orgId)
-        )
-      )
-      .limit(1);
+  ): Promise<DCFAnalysis & { dataSources?: Record<string, string> }> {
+    const { baseInput, dataSources } = await this.loadProjectInputs(projectId, orgId);
 
-    // Build base scenario from project data
-    const baseInput: DCFInput = {
-      purchasePrice: project[0]?.purchasePrice ? parseFloat(project[0].purchasePrice) : 5000000,
-      year1NOI: project[0]?.yearOneNoi ? parseFloat(project[0].yearOneNoi) : 500000,
-      noiGrowthRate: 0.03,
-      holdPeriod: 10,
-      discountRate: 0.10,
-      exitCapRate: 0.075,
-      loanAmount: project[0]?.purchasePrice ? parseFloat(project[0].purchasePrice) * 0.65 : 3250000,
-      loanRate: 0.055,
-      loanTerm: 10,
-      amortization: 25,
-    };
-
-    // Create base scenario
     const baseScenario = this.calculateScenario('base', 'Base Case', baseInput, true, 0.5);
-    
-    // Create additional scenarios
+
     const scenarios: DCFScenario[] = [baseScenario];
-    
+
     if (scenarioInputs && scenarioInputs.length > 0) {
       for (const si of scenarioInputs) {
         const scenario = this.calculateScenario(
@@ -661,42 +819,47 @@ class DCFCalculatorService {
         scenarios.push(scenario);
       }
     } else {
-      // Create default upside and downside scenarios
       const upsideInput = {
         ...baseInput,
-        noiGrowthRate: 0.045,
-        exitCapRate: 0.065,
+        noiGrowthRate: baseInput.noiGrowthRate * 1.5,
+        exitCapRate: baseInput.exitCapRate * 0.87,
       };
       const downsideInput = {
         ...baseInput,
-        noiGrowthRate: 0.015,
-        exitCapRate: 0.085,
+        noiGrowthRate: baseInput.noiGrowthRate * 0.5,
+        exitCapRate: baseInput.exitCapRate * 1.13,
       };
-      
+
       scenarios.push(this.calculateScenario('upside', 'Upside Case', upsideInput, false, 0.25));
       scenarios.push(this.calculateScenario('downside', 'Downside Case', downsideInput, false, 0.25));
     }
 
-    // Generate sensitivity matrix
+    const baseExitCap = baseInput.exitCapRate;
+    const baseGrowth = baseInput.noiGrowthRate;
     const sensitivityMatrix = this.generateSensitivityMatrix(
       baseInput,
-      { 
-        name: 'Exit Cap Rate', 
-        key: 'exitCapRate', 
-        values: [0.06, 0.065, 0.07, 0.075, 0.08, 0.085, 0.09] 
+      {
+        name: 'Exit Cap Rate',
+        key: 'exitCapRate',
+        values: [
+          baseExitCap - 0.015, baseExitCap - 0.01, baseExitCap - 0.005,
+          baseExitCap,
+          baseExitCap + 0.005, baseExitCap + 0.01, baseExitCap + 0.015,
+        ].map(v => Math.max(0.03, Math.round(v * 1000) / 1000)),
       },
-      { 
-        name: 'NOI Growth Rate', 
-        key: 'noiGrowthRate', 
-        values: [0.01, 0.02, 0.03, 0.04, 0.05] 
+      {
+        name: 'NOI Growth Rate',
+        key: 'noiGrowthRate',
+        values: [
+          baseGrowth - 0.02, baseGrowth - 0.01,
+          baseGrowth,
+          baseGrowth + 0.01, baseGrowth + 0.02,
+        ].map(v => Math.max(0, Math.round(v * 1000) / 1000)),
       },
       'irr'
     );
 
-    // Compare scenarios
     const scenarioComparison = this.compareScenarios(scenarios);
-
-    // Calculate probability-weighted result
     const probabilityWeightedResult = this.calculateProbabilityWeightedResult(scenarios);
 
     return {
@@ -707,7 +870,34 @@ class DCFCalculatorService {
       sensitivityMatrix,
       scenarioComparison,
       probabilityWeightedResult,
+      dataSources,
       lastCalculated: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Quick calculation for real-time updates — returns full metrics, not just IRR
+   */
+  quickCalculate(input: DCFInput): {
+    irr: number;
+    leveredIrr: number;
+    npv: number;
+    equityMultiple: number;
+    goingInCapRate: number;
+    avgCashOnCash: number;
+    paybackPeriod: number;
+    terminalValue: number;
+  } {
+    const scenario = this.calculateScenario('quick', 'Quick', input);
+    return {
+      irr: scenario.irr,
+      leveredIrr: scenario.leveredIRR,
+      npv: scenario.npv,
+      equityMultiple: scenario.equityMultiple,
+      goingInCapRate: scenario.goingInCapRate,
+      avgCashOnCash: scenario.avgCashOnCash,
+      paybackPeriod: scenario.paybackPeriod,
+      terminalValue: scenario.terminalValueAmount,
     };
   }
 

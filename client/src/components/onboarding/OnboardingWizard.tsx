@@ -70,7 +70,7 @@ interface OnboardingWizardProps {
 
 type DealType = "acquisition" | "refinance" | "owned_marina" | null;
 type DealStructure = "single" | "portfolio" | null;
-type WizardAssetClass = "marina" | "multifamily" | "retail" | "office" | "industrial" | "self_storage" | "mixed_use" | "hotel" | "str" | "sfr" | "duplex" | "laundromat" | "medical_office" | "business" | null;
+type WizardAssetClass = "marina" | "multifamily" | "retail" | "office" | "industrial" | "self_storage" | "mixed_use" | "hotel" | "str" | "sfr" | "duplex" | "triplex" | "quad" | "laundromat" | "medical_office" | "business" | null;
 
 interface MarinaAddress {
   line1: string;
@@ -325,6 +325,12 @@ const wizardAssetClasses = [
   { id: "mixed_use", name: "Mixed-Use", description: "Retail + residential/office combo", icon: Layers, metric: "cap_rate" },
   { id: "laundromat", name: "Laundromat", description: "Coin-op and card-op laundry facilities", icon: Store, metric: "ebitda_multiple" },
   { id: "sfr", name: "Single-Family Rental", description: "SFR portfolios and build-to-rent", icon: Home, metric: "grm" },
+  { id: "duplex", name: "Duplex", description: "Two-unit residential properties", icon: Home, metric: "grm" },
+  { id: "triplex", name: "Triplex", description: "Three-unit residential properties", icon: Home, metric: "grm" },
+  { id: "quad", name: "Quad / Fourplex", description: "Four-unit residential properties", icon: Home, metric: "grm" },
+  { id: "duplex", name: "Duplex", description: "Two-unit residential properties", icon: Home, metric: "grm" },
+  { id: "triplex", name: "Triplex", description: "Three-unit residential properties", icon: Home, metric: "grm" },
+  { id: "quad", name: "Quad / Fourplex", description: "Four-unit residential properties", icon: Home, metric: "grm" },
   { id: "business", name: "Business / Other", description: "Operating businesses, other asset types", icon: Briefcase, metric: "ebitda_multiple" },
 ];
 
@@ -332,19 +338,19 @@ const dealTypes = [
   {
     id: "acquisition",
     name: "New Acquisition",
-    description: "Evaluating a marina to potentially purchase",
+    description: "Evaluating a property to potentially purchase",
     icon: Briefcase,
   },
   {
     id: "refinance",
     name: "Refinance/Revaluation",
-    description: "Refinancing or updating valuation of owned asset",
+    description: "Refinancing or updating valuation of an owned asset",
     icon: TrendingUp,
   },
   {
     id: "owned_marina",
-    name: "Owned Marina",
-    description: "Managing an existing marina in your portfolio",
+    name: "Owned Asset",
+    description: "Managing an existing asset in your portfolio",
     icon: Anchor,
   },
 ];
@@ -353,7 +359,7 @@ const features = [
   { id: "crm", name: "CRM & Leads", description: "Track deals and contacts", icon: Users },
   { id: "dd", name: "Due Diligence", description: "Manage DD checklists", icon: ClipboardList },
   { id: "modeling", name: "Financial Model", description: "Financial modeling", icon: TrendingUp },
-  { id: "operations", name: "Operations", description: "Manage marina ops", icon: Store },
+  { id: "operations", name: "Operations", description: "Manage property ops", icon: Store },
   { id: "fuel", name: "Fuel Sales", description: "Track fuel revenue", icon: Fuel },
   { id: "documents", name: "Documents", description: "Virtual data room", icon: FileText },
 ];
@@ -379,6 +385,12 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       mixed_use: { property: "Property Name", placeholder: "e.g., Sunset Mixed-Use Center", heading: "Tell us about your property" },
       laundromat: { property: "Business Name", placeholder: "e.g., Sunset Wash & Fold", heading: "Tell us about your laundromat" },
       sfr: { property: "Property Name", placeholder: "e.g., 123 Sunset Lane", heading: "Tell us about your rental" },
+      duplex: { property: "Property Name", placeholder: "e.g., 456 Oak Street", heading: "Tell us about your duplex" },
+      triplex: { property: "Property Name", placeholder: "e.g., 789 Elm Avenue", heading: "Tell us about your triplex" },
+      quad: { property: "Property Name", placeholder: "e.g., 321 Pine Drive", heading: "Tell us about your fourplex" },
+      duplex: { property: "Property Name", placeholder: "e.g., 456 Oak Street", heading: "Tell us about your duplex" },
+      triplex: { property: "Property Name", placeholder: "e.g., 789 Elm Avenue", heading: "Tell us about your triplex" },
+      quad: { property: "Property Name", placeholder: "e.g., 321 Pine Drive", heading: "Tell us about your fourplex" },
       business: { property: "Business Name", placeholder: "e.g., Sunset Enterprises", heading: "Tell us about your business" },
     };
     return terms[ac || "marina"] || terms.marina;

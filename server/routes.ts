@@ -22783,14 +22783,14 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // Quick IRR calculation for real-time updates
+  // Quick IRR calculation for real-time updates (returns full metrics)
   app.post('/api/dcf/quick-irr', authenticateUser, async (req: any, res) => {
     try {
       const { input } = req.body;
       
       const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
-      const irr = dcfCalculatorService.quickIRR(input);
-      res.json({ irr });
+      const result = dcfCalculatorService.quickCalculate(input);
+      res.json(result);
     } catch (error: any) {
       console.error('Failed to calculate quick IRR:', error);
       res.status(500).json({ error: 'Failed to calculate quick IRR' });

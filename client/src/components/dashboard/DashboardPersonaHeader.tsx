@@ -63,7 +63,7 @@ export function DashboardPersonaHeader() {
   
   const getMetricHref = (label: string, personaType?: string): string | null => {
     const lowerLabel = label.toLowerCase();
-    if (lowerLabel.includes('owned') || lowerLabel.includes('marinas')) {
+    if (lowerLabel.includes('owned') || lowerLabel.includes('assets')) {
       return '/portfolio';
     }
     if (lowerLabel.includes('portfolio value')) {

@@ -325,6 +325,30 @@ const ASSET_CLASS_CATALOGS: Record<string, AssetClassCatalogEntry> = {
     storageLabel: 'Revenue Streams',
     showStorageStep: false,
   },
+  duplex: {
+    profitCenters: MULTIFAMILY_PROFIT_CENTERS,
+    amenities: SFR_AMENITIES,
+    hasProfitCenters: false,
+    hasAmenities: true,
+    storageLabel: 'Unit Details',
+    showStorageStep: true,
+  },
+  triplex: {
+    profitCenters: MULTIFAMILY_PROFIT_CENTERS,
+    amenities: SFR_AMENITIES,
+    hasProfitCenters: false,
+    hasAmenities: true,
+    storageLabel: 'Unit Details',
+    showStorageStep: true,
+  },
+  quad: {
+    profitCenters: MULTIFAMILY_PROFIT_CENTERS,
+    amenities: SFR_AMENITIES,
+    hasProfitCenters: false,
+    hasAmenities: true,
+    storageLabel: 'Unit Details',
+    showStorageStep: true,
+  },
 };
 
 export function getAssetClassCatalog(assetClass: string | null): AssetClassCatalogEntry {

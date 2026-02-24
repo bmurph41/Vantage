@@ -79,8 +79,8 @@ const templates: DealTemplate[] = [
   },
   {
     id: "owned_marina",
-    name: "Portfolio Marina",
-    description: "Ongoing tracking and management of an owned marina",
+    name: "Portfolio Asset",
+    description: "Ongoing tracking and management of an owned asset",
     icon: Anchor,
     color: "text-purple-600",
     bgColor: "bg-purple-50",

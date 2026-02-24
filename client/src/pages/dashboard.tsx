@@ -1160,7 +1160,7 @@ export default function Dashboard() {
                     const price = comp.salePrice || comp.estimatedPurchasePrice;
                     const isEstimated = !comp.salePrice && comp.estimatedPurchasePrice;
                     return {
-                      label: comp.marina || 'Unnamed Marina',
+                      label: comp.marina || comp.propertyName || 'Unnamed Property',
                       value: price ? `${formatCurrency(price)}${isEstimated ? ' (Est.)' : ''}` : 'N/A',
                       badge: comp.saleMonth && comp.saleYear ? `${comp.saleMonth}/${comp.saleYear}` : comp.state?.substring(0, 2).toUpperCase(),
                     };
@@ -1252,7 +1252,7 @@ export default function Dashboard() {
             <ModuleSection title="Latest Transactions" description="Most recent M&A activity">
               <DataList
                 items={data.recentDeals.slice(0, 3).map((deal: any) => ({
-                  label: deal.marinaName || deal.dealDescription || 'Unnamed Deal',
+                  label: deal.marinaName || deal.propertyName || deal.dealDescription || 'Unnamed Deal',
                   value: deal.dealDate ? new Date(deal.dealDate).toLocaleDateString() : 'Recent',
                   badge: deal.dealType || 'M&A',
                 }))}
@@ -1890,7 +1890,7 @@ export default function Dashboard() {
         open={isSalesCompsDetailOpen}
         onOpenChange={setIsSalesCompsDetailOpen}
         title={salesCompsYear === 'all' ? 'Sales Comps Details' : `${salesCompsYear} Sales Comps`}
-        description={salesCompsYear === 'all' ? 'All marina sales comparables' : `Marina sales comparables from ${salesCompsYear}`}
+        description={salesCompsYear === 'all' ? 'All sales comparables' : `Marina sales comparables from ${salesCompsYear}`}
         icon={TrendingUp}
         sourceLink={`/analysis/sales-comps/analytics?timeRange=${timeRange}`}
         sourceLinkText="Go to Sales Comps"
@@ -1912,10 +1912,10 @@ export default function Dashboard() {
             data={recentComps || []}
             columns={[
               {
-                key: 'marina',
-                header: 'Marina',
+                key: 'property',
+                header: 'Property',
                 render: (comp: any) => (
-                  <div className="font-medium">{comp.marina || 'Unnamed'}</div>
+                  <div className="font-medium">{comp.marina || comp.propertyName || 'Unnamed'}</div>
                 ),
               },
               {
@@ -2396,7 +2396,7 @@ export default function Dashboard() {
             columns={[
               {
                 key: 'marinaName',
-                header: 'Marina',
+                header: 'Property',
                 render: (project: any) => (
                   <div className="text-gray-900 font-medium">{project.marinaName}</div>
                 ),

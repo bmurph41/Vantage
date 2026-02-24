@@ -65,14 +65,14 @@ const allModules: ModuleDefinition[] = [
   {
     id: 'modeling-projects',
     title: 'Modeling Projects',
-    description: 'Monitor marina valuation and investment modeling projects',
+    description: 'Monitor valuation and investment modeling projects',
     icon: TrendingUp,
     category: 'financial',
   },
   {
     id: 'sales-comps',
     title: 'Sales Comparables',
-    description: 'Track marina sales data and market benchmarks',
+    description: 'Track sales data and market benchmarks',
     icon: Building2,
     category: 'financial',
   },
@@ -104,7 +104,7 @@ const allModules: ModuleDefinition[] = [
   {
     id: 'docket-feed',
     title: 'The Docket Intelligence',
-    description: 'Monitor marina industry news and M&A activity',
+    description: 'Monitor industry news and M&A activity',
     icon: Newspaper,
     category: 'intel',
   },
@@ -113,7 +113,7 @@ const allModules: ModuleDefinition[] = [
   {
     id: 'marina-analytics',
     title: 'Rent Roll',
-    description: 'Track marina KPIs: occupancy, ADR, RevPALF, NOI margin, and DSCR',
+    description: 'Track property KPIs: occupancy, ADR, NOI margin, and DSCR',
     icon: Activity,
     category: 'analytics',
   },
