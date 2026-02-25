@@ -52,7 +52,7 @@ function levenshteinDistance(a: string, b: string): number {
 }
 
 const MARINA_COMMON_WORDS = [
-  'marina', 'marinas', 'yacht', 'yachts', 'club', 'harbor', 'harbour',
+  'marina', 'properties', 'yacht', 'yachts', 'club', 'harbor', 'harbour',
   'dock', 'docks', 'docking', 'boat', 'boats', 'boatyard', 'boathouse',
   'pier', 'piers', 'wharf', 'landing', 'cove', 'bay', 'basin',
   'waterfront', 'waterway', 'coastal', 'shore', 'shoreline',

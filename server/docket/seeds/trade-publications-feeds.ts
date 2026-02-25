@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 const MARINA_KEYWORDS = [
   "marina",
-  "marinas",
+  "properties",
   "harbor",
   "harbour",
   "dock",
@@ -37,7 +37,7 @@ const MARINA_KEYWORDS = [
   "slips",
   "mooring",
   "moorage",
-  "boat storage",
+  "storage",
   "dry storage",
   "dry stack",
   "wet slip",

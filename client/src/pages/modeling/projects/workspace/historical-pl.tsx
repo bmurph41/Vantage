@@ -1,8 +1,8 @@
 import { useState, useCallback, Fragment, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-import { PLModeToggle, PLBuilder } from '@/components/modeling/pl-mode-toggle';
-import { DirectInputForm } from '@/components/modeling/direct-input-form';
+// PLModeToggle moved to Inputs tab (Session 4)
+// DirectInputForm moved to Inputs tab (Session 4)
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { inferDepartmentClient } from '@/lib/department-inference';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -208,7 +208,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     isPending: overridePending,
   } = useDisplayOverrides(projectId);
 
-  // Fetch project for PLModeToggle
+  // Fetch project data
   const { data: project } = useQuery<any>({
     queryKey: [`/api/modeling/projects/${projectId}`],
   });
@@ -611,20 +611,6 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
     <div className="space-y-6" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
-      )}
-      
-
-      {project && (
-        <PLModeToggle
-          project={project}
-          onModeChange={() => {
-            queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}`] });
-          }}
-        />
-      )}
-
-      {project && ((project as any).modelInputMode === 'direct_input' || (project as any).modelInputMode === 'hybrid') && (
-        <DirectInputForm project={project} />
       )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>

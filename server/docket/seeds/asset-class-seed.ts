@@ -22,10 +22,10 @@ export async function seedMarinaAssetClass() {
       color: "#1B3A5C",
       isActive: true,
       requiredKeywords: [
-        "marina", "marina for sale", "marina broker", "marina investment", "marina operations",
-        "marinas for sale", "marinas", "boat sales", "private equity in marinas", "boat slip",
+        "marina", "marina for sale", "marina broker", "property investment", "marina operations",
+        "marinas for sale", "properties", "boat sales", "private equity in marinas", "boat slip",
         "dry stack", "yacht club", "boatyard", "superyacht marina", "megayacht", "dockage",
-        "boat storage", "marine industry", "marina operator", "marina owner", "marina management"
+        "storage", "marine industry", "marina operator", "marina owner", "marina management"
       ],
       scoringTerms: {
         vertical: {

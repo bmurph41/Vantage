@@ -41,7 +41,7 @@ const ADDRESS_ABBREVIATIONS: Record<string, string[]> = {
 
 const COMPANY_ABBREVIATIONS: Record<string, string[]> = {
   'marina': ['mar', 'mna'],
-  'marinas': ['mar', 'mna'],
+  'properties': ['mar', 'mna'],
   'yacht': ['yc', 'yt'],
   'club': ['clb', 'c'],
   'harbor': ['hbr', 'harb', 'hrbr'],

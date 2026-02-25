@@ -454,7 +454,7 @@ export default function Companies() {
       ) : <span className="text-gray-400">—</span>
     },
     {
-      key: 'marinas',
+      key: 'properties',
       header: '# Marinas',
       sortable: true,
       sortValue: (company) => company.portfolioCount || 0,

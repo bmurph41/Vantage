@@ -305,7 +305,7 @@ export const portfolioTourSteps: TourStep[] = [
   {
     target: '[data-tour="portfolio-add"]',
     content: "Add a new marina to your portfolio to start tracking operations.",
-    title: "Add Marina",
+    title: "Add Property",
     placement: "left",
   },
 ];

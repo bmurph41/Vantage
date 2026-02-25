@@ -539,7 +539,7 @@ export default function AddEditMarinaDialog({ open, onOpenChange, marina, onSucc
               </Button>
               <Button type="submit" disabled={isPending} data-testid="button-save-marina">
                 {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {isEditing ? "Save Changes" : "Add Marina"}
+                {isEditing ? "Save Changes" : "Add Property"}
               </Button>
             </DialogFooter>
           </form>

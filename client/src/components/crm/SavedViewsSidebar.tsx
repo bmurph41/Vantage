@@ -57,7 +57,7 @@ const defaultViews: Record<string, Array<{ name: string; filters: Record<string,
     { name: 'All Properties', filters: {} },
     { name: 'Available', filters: { status: 'available' } },
     { name: 'Under Contract', filters: { status: 'under_contract' } },
-    { name: 'Marinas', filters: { propertyType: 'marina' } },
+    { name: 'Properties', filters: { propertyType: 'marina' } },
   ],
 };
 

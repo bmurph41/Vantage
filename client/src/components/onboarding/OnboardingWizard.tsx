@@ -14,6 +14,7 @@ import { AddressAutocompleteInput, type NormalizedAddress } from "@/components/u
 import { US_REGIONS } from "@shared/salescomps-constants";
 import { PROFIT_CENTER_CATALOG, AMENITY_CATALOG } from '@shared/marina-catalog';
 import { getAssetClassCatalog } from '@shared/asset-class-catalog';
+import { getWizardConfig, getDocumentTypesForAsset } from '@shared/wizard-enhancement-config';
 import { 
   Building2, 
   Anchor, 
@@ -124,7 +125,8 @@ interface WizardAmenity {
   iconName: string;
 }
 
-type DocTypeEnum = "pnl" | "t12" | "rent_roll" | "balance_sheet" | "rate_sheet" | "invoice" | "other";
+// Widened to string to support asset-class-specific doc types from wizard config
+type DocTypeEnum = string;
 
 interface WizardStagedFile {
   id: string;
@@ -167,6 +169,24 @@ function guessDocType(filename: string): DocTypeEnum {
   if (lower.includes("balance")) return "balance_sheet";
   if (lower.includes("rate")) return "rate_sheet";
   if (lower.includes("invoice")) return "invoice";
+  if (lower.includes("payout") || lower.includes("airbnb") || lower.includes("vrbo")) return "payout";
+  if (lower.includes("occupancy") || lower.includes("occ")) return "occupancy";
+  if (lower.includes("operating") || lower.includes("ops")) return "operating_statement";
+  if (lower.includes("lease") || lower.includes("abstract")) return "lease_abstract";
+  if (lower.includes("cam") || lower.includes("reconcil")) return "cam_reconciliation";
+  if (lower.includes("tax return") || lower.includes("schedule e") || lower.includes("k-1") || lower.includes("k1")) return "tax_return";
+  if (lower.includes("insurance") || lower.includes("declaration")) return "insurance";
+  if (lower.includes("property tax") || lower.includes("tax bill")) return "property_tax";
+  if (lower.includes("appraisal")) return "appraisal";
+  if (lower.includes("environment") || lower.includes("phase i") || lower.includes("phase ii")) return "environmental";
+  if (lower.includes("fuel")) return "fuel_sales";
+  if (lower.includes("wash") || lower.includes("machine")) return "wash_count";
+  if (lower.includes("smith travel") || lower.includes("str report")) return "smith_travel";
+  if (lower.includes("franchise")) return "franchise";
+  if (lower.includes("debt") || lower.includes("loan") || lower.includes("mortgage")) return "debt_schedule";
+  if (lower.includes("capex") || lower.includes("capital")) return "capex_log";
+  if (lower.includes("unit mix")) return "unit_mix";
+  if (lower.includes("bank statement")) return "bank_statement";
   return "other";
 }
 
@@ -271,6 +291,7 @@ interface WizardState {
   designatedSpaces: WizardStorageType[];
   stagedFiles: WizardStagedFile[];
   acreage: WizardAcreage;
+  propertySizeValues: Record<string, string>;
   ownership: WizardOwnership;
 }
 
@@ -423,6 +444,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     designatedSpaces: defaultWizardDesignatedSpaces.map(s => ({ ...s })),
     stagedFiles: [],
     acreage: { totalAcres: '', uplandAcres: '', submergedAcres: '' },
+    propertySizeValues: {},
     ownership: { type: 'fee_simple', leases: [] },
   }), [mode]);
   
@@ -523,11 +545,14 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         ? state.acreage : undefined;
       const ownershipData = state.ownership.type !== 'fee_simple' || state.ownership.leases.length > 0
         ? state.ownership : undefined;
-      const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0 || amenities.length > 0 || acreageData || ownershipData;
+      const propertySizeData = Object.keys(state.propertySizeValues).some(k => state.propertySizeValues[k] !== '')
+          ? state.propertySizeValues : undefined;
+        const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0 || amenities.length > 0 || acreageData || ownershipData || propertySizeData;
       if (hasData) {
         await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, {
           departments, profitCenters, amenities,
           ...(acreageData ? { acreage: acreageData } : {}),
+            ...(propertySizeData ? { propertySize: propertySizeData } : {}),
           ...(ownershipData ? { ownership: ownershipData } : {}),
         });
       }
@@ -1220,6 +1245,46 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               <Input id="zip" placeholder="33139" maxLength={10} value={state.marinaAddress.zip} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, zip: e.target.value } }))} />
             </div>
           </div>
+
+          {/* Property Size — driven by asset class config */}
+          {state.assetClass && (() => {
+            const wizCfg = getWizardConfig(state.assetClass);
+            if (!wizCfg.propertySizeFields.length) return null;
+            return (
+              <div className="border-t pt-4 mt-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-semibold">Property Size</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {wizCfg.propertySizeFields.map((field) => (
+                    <div key={field.id} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step={field.suffix === 'acres' ? '0.01' : '1'}
+                          placeholder="0"
+                          value={state.propertySizeValues[field.id] || ''}
+                          onChange={(e) => setState(s => ({
+                            ...s,
+                            propertySizeValues: { ...s.propertySizeValues, [field.id]: e.target.value }
+                          }))}
+                          className={field.suffix ? 'pr-12' : ''}
+                        />
+                        {field.suffix && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            {field.suffix}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -1593,12 +1658,20 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     );
   };
 
-  const renderDocumentUploadStep = () => (
+  const renderDocumentUploadStep = () => {
+    const assetDocTypes = state.assetClass
+      ? getDocumentTypesForAsset(state.assetClass)
+      : getDocumentTypesForAsset('business');
+    return (
     <div className="space-y-4">
       <div className="text-center mb-4">
-        <h3 className="text-lg font-semibold">Upload Documents</h3>
+        <h3 className="text-lg font-semibold">
+          {state.assetClass ? getWizardConfig(state.assetClass).uploadLabel : 'Upload Documents'}
+        </h3>
         <p className="text-sm text-muted-foreground">
-          Upload P&L statements, rent rolls, or other financials. They'll be auto-processed by AI when your project is created.
+          {state.assetClass
+            ? `${getWizardConfig(state.assetClass).uploadDescription} They'll be auto-processed by AI when your project is created.`
+            : "Upload P&L statements, rent rolls, or other financials. They'll be auto-processed by AI when your project is created."}
         </p>
       </div>
 
@@ -1647,12 +1720,14 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
               </div>
               <div className="flex items-center gap-2 pl-6">
                 <Select value={staged.docType === 't12' ? 'pnl' : staged.docType} onValueChange={(v) => updateStagedFileField(staged.id, 'docType', v as DocTypeEnum)}>
-                  <SelectTrigger className="h-7 w-[140px] text-xs">
+                  <SelectTrigger className="h-7 w-[180px] text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(WIZARD_DOC_TYPES_NO_T12).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    {assetDocTypes
+                      .filter(dt => dt.id !== 't12')
+                      .map((dt) => (
+                      <SelectItem key={dt.id} value={dt.id}>{dt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

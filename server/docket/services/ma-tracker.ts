@@ -62,11 +62,11 @@ const MA_KEYWORDS = {
 
 // Marina industry context keywords
 const MARINA_CONTEXT_KEYWORDS = [
-  'marina', 'marinas', 'harbor', 'harbour', 'port',
+  'marina', 'properties', 'harbor', 'harbour', 'port',
   'dock', 'docks', 'dockage', 'slip', 'slips',
   'boat', 'boats', 'boating', 'yacht', 'yachts',
   'waterfront', 'moorage', 'mooring', 'berth', 'berths',
-  'dry stack', 'dry storage', 'boat storage',
+  'dry stack', 'dry storage', 'storage',
   'marine', 'maritime', 'nautical',
   'boatyard', 'shipyard', 'boat sales',
 ];

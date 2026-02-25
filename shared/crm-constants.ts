@@ -94,17 +94,17 @@ export interface DynamicFieldDef {
 }
 
 const MARINA_FIELDS: DynamicFieldDef[] = [
-  { key: 'totalSlips',        label: 'Total Slips',        type: 'number',   group: 'Marina Details', tooltip: 'Total wet slips' },
-  { key: 'occupancyRate',     label: 'Occupancy Rate',     type: 'percent',  group: 'Marina Details' },
+  { key: 'totalSlips',        label: 'Total Slips',        type: 'number',   group: 'Property Details', tooltip: 'Total wet slips' },
+  { key: 'occupancyRate',     label: 'Occupancy Rate',     type: 'percent',  group: 'Property Details' },
   { key: 'avgSlipRate',       label: 'Avg Slip Rate',      type: 'currency', group: 'Revenue', tooltip: 'Monthly per-slip average' },
   { key: 'fuelRevenue',       label: 'Fuel Revenue',       type: 'currency', group: 'Revenue' },
-  { key: 'dryStorage',        label: 'Dry Storage Spaces',  type: 'number',   group: 'Marina Details' },
+  { key: 'dryStorage',        label: 'Dry Storage Spaces',  type: 'number',   group: 'Property Details' },
   { key: 'boatRamp',          label: 'Boat Ramp',          type: 'boolean',  group: 'Amenities' },
   { key: 'shipStore',         label: 'Ship Store',         type: 'boolean',  group: 'Amenities' },
   { key: 'restaurant',        label: 'Restaurant / Bar',   type: 'boolean',  group: 'Amenities' },
   { key: 'travelLift',        label: 'Travel Lift',        type: 'boolean',  group: 'Amenities' },
-  { key: 'maxLOA',            label: 'Max LOA (ft)',       type: 'number',   group: 'Marina Details', tooltip: 'Largest vessel accommodated' },
-  { key: 'waterDepth',        label: 'Water Depth (ft)',   type: 'number',   group: 'Marina Details' },
+  { key: 'maxLOA',            label: 'Max LOA (ft)',       type: 'number',   group: 'Property Details', tooltip: 'Largest vessel accommodated' },
+  { key: 'waterDepth',        label: 'Water Depth (ft)',   type: 'number',   group: 'Property Details' },
   { key: 'seawallCondition',  label: 'Seawall Condition',  type: 'select',   group: 'Physical', options: [
     { value: 'excellent', label: 'Excellent' }, { value: 'good', label: 'Good' },
     { value: 'fair', label: 'Fair' }, { value: 'poor', label: 'Poor' },
