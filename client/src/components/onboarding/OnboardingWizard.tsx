@@ -1906,6 +1906,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       )}
     </div>
   );
+  };
 
   const createWizardLease = (type: 'submerged_land_lease' | 'ground_lease'): WizardLeaseDetail => ({
     id: `lease_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
