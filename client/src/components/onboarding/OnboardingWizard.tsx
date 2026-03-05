@@ -292,6 +292,8 @@ interface WizardState {
   stagedFiles: WizardStagedFile[];
   acreage: WizardAcreage;
   propertySizeValues: Record<string, string>;
+  buildings: Array<{ name: string; sizeValues: Record<string, string> }>;
+  isMultiBuilding: boolean;
   ownership: WizardOwnership;
 }
 
@@ -445,6 +447,8 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
     stagedFiles: [],
     acreage: { totalAcres: '', uplandAcres: '', submergedAcres: '' },
     propertySizeValues: {},
+    buildings: [{ name: 'Building A', sizeValues: {} }],
+    isMultiBuilding: false,
     ownership: { type: 'fee_simple', leases: [] },
   }), [mode]);
   
@@ -545,8 +549,11 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         ? state.acreage : undefined;
       const ownershipData = state.ownership.type !== 'fee_simple' || state.ownership.leases.length > 0
         ? state.ownership : undefined;
-      const propertySizeData = Object.keys(state.propertySizeValues).some(k => state.propertySizeValues[k] !== '')
+      const propertySizeData = Object.keys(state.propertySizeValues).some(k => state.propertySizeValues[k] !== '') ||
+    state.buildings.length > 1
           ? state.propertySizeValues : undefined;
+      const buildingsData = state.isMultiBuilding && state.buildings.length > 0
+          ? state.buildings.filter(b => b.name.trim() !== '') : undefined;
         const hasData = Object.keys(departments).length > 0 || profitCenters.length > 0 || amenities.length > 0 || acreageData || ownershipData || propertySizeData;
       if (hasData) {
         await apiRequest('POST', `/api/modeling/projects/${projectId}/config`, {
@@ -1282,6 +1289,95 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                     </div>
                   ))}
                 </div>
+                {/* Multi-building toggle */}
+                {wizCfg.supportsMultiBuilding && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="multiBuilding"
+                        checked={state.isMultiBuilding}
+                        onChange={(e) => setState(s => ({ ...s, isMultiBuilding: e.target.checked }))}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor="multiBuilding" className="text-xs text-muted-foreground cursor-pointer">
+                        This property has multiple buildings
+                      </Label>
+                    </div>
+                    {state.isMultiBuilding && (
+                      <div className="space-y-3 pl-2 border-l-2 border-primary/20">
+                        {state.buildings.map((building, idx) => (
+                          <div key={idx} className="space-y-2 p-3 bg-muted/30 rounded-md">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                placeholder={`Building ${String.fromCharCode(65 + idx)}`}
+                                value={building.name}
+                                onChange={(e) => setState(s => {
+                                  const buildings = [...s.buildings];
+                                  buildings[idx] = { ...buildings[idx], name: e.target.value };
+                                  return { ...s, buildings };
+                                })}
+                                className="h-8 text-sm font-medium"
+                              />
+                              {state.buildings.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setState(s => ({
+                                    ...s,
+                                    buildings: s.buildings.filter((_, i) => i !== idx)
+                                  }))}
+                                  className="text-xs text-destructive hover:text-destructive/80 shrink-0"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {wizCfg.propertySizeFields.map((field) => (
+                                <div key={field.id} className="space-y-1">
+                                  <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step={field.suffix === 'acres' ? '0.01' : '1'}
+                                      placeholder="0"
+                                      value={building.sizeValues[field.id] || ''}
+                                      onChange={(e) => setState(s => {
+                                        const buildings = [...s.buildings];
+                                        buildings[idx] = {
+                                          ...buildings[idx],
+                                          sizeValues: { ...buildings[idx].sizeValues, [field.id]: e.target.value }
+                                        };
+                                        return { ...s, buildings };
+                                      })}
+                                      className={`h-7 text-xs ${field.suffix ? 'pr-10' : ''}`}
+                                    />
+                                    {field.suffix && (
+                                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                                        {field.suffix}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setState(s => ({
+                            ...s,
+                            buildings: [...s.buildings, { name: `Building ${String.fromCharCode(65 + s.buildings.length)}`, sizeValues: {} }]
+                          }))}
+                          className="text-xs text-primary hover:text-primary/80 font-medium"
+                        >
+                          + Add Building
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -16,6 +16,7 @@ export interface WizardAssetConfig {
   uploadDescription: string;
   propertySizeFields: PropertySizeField[];
   documentTypes: string[];
+  supportsMultiBuilding?: boolean;
 }
 
 export const DOCUMENT_TYPES: DocumentTypeOption[] = [
@@ -74,24 +75,29 @@ export const WIZARD_ASSET_CONFIGS: Record<string, WizardAssetConfig> = {
     documentTypes: ['pnl','rent_roll','tax_return','insurance','property_tax'] },
   multifamily: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, rent rolls, or T12 financials.',
     propertySizeFields: [...SF, {id:'totalUnits',label:'Total Units',type:'number'}, {id:'yearBuilt',label:'Year Built',type:'number'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','rent_roll','occupancy','unit_mix','debt_schedule','tax_return'] },
   retail: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, lease abstracts, or CAM reconciliations.',
     propertySizeFields: [...SF, {id:'gla',label:'Gross Leasable Area (GLA)',type:'number',suffix:'SF'}],
     documentTypes: ['pnl','operating_statement','rent_roll','lease_abstract','cam_reconciliation','debt_schedule'] },
   office: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, lease abstracts, or rent rolls.',
     propertySizeFields: [...SF, {id:'gla',label:'GLA',type:'number',suffix:'SF'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','rent_roll','lease_abstract','cam_reconciliation','debt_schedule'] },
   industrial: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, lease abstracts, or rent rolls.',
     propertySizeFields: [...SF, {id:'gla',label:'GLA',type:'number',suffix:'SF'}, {id:'clearHeight',label:'Clear Height',type:'number',suffix:'ft'}, {id:'dockDoors',label:'Dock Doors',type:'number'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','rent_roll','lease_abstract','cam_reconciliation','debt_schedule'] },
   hotel: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, STR reports, or P&L statements.',
     propertySizeFields: [...SF, {id:'totalRooms',label:'Total Rooms',type:'number'}, {id:'yearBuilt',label:'Year Built',type:'number'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','smith_travel','occupancy','franchise','debt_schedule'] },
   marina: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload P&L statements, fuel sales reports, or operating statements.',
     propertySizeFields: [{id:'uplandAcreage',label:'Upland Acreage',type:'number',suffix:'acres'}, {id:'submergedAcreage',label:'Submerged Acreage',type:'number',suffix:'acres'}, {id:'totalSlips',label:'Total Slips',type:'number'}],
     documentTypes: ['pnl','operating_statement','fuel_sales','occupancy','environmental','debt_schedule'] },
   self_storage: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, unit mix schedules, or P&L statements.',
     propertySizeFields: [...SF, {id:'totalUnits',label:'Total Units',type:'number'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','occupancy','unit_mix','debt_schedule'] },
   laundromat: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload P&L statements, wash count reports, or bank statements.',
     propertySizeFields: [{id:'buildingSF',label:'Building SF',type:'number',suffix:'SF'}],
@@ -101,6 +107,7 @@ export const WIZARD_ASSET_CONFIGS: Record<string, WizardAssetConfig> = {
     documentTypes: ['pnl','business_tax','revenue_summary','franchise','bank_statement'] },
   mixed_use: { uploadLabel: 'Upload Financials', uploadDescription: 'Upload operating statements, rent rolls, or lease abstracts.',
     propertySizeFields: [...SF, {id:'totalUnits',label:'Total Residential Units',type:'number'}, {id:'gla',label:'Commercial GLA',type:'number',suffix:'SF'}],
+    supportsMultiBuilding: true,
     documentTypes: ['pnl','operating_statement','rent_roll','lease_abstract','cam_reconciliation'] },
 };
 

@@ -443,3 +443,75 @@ describe('Seasonal Occupancy', () => {
     expect(monthlySum).toBeCloseTo(result!.totalRevenue, -1);
   });
 });
+
+// ─── 9. Debt Interest Compounding Tests ────────────────────────
+
+import { computeLoanSchedule, computeAnnualDebtService } from '@shared/debt/debt-engine';
+
+describe('Debt Interest Compounding', () => {
+  const baseLoan = {
+    loanAmount: 1_000_000,
+    termMonths: 60,
+    amortMonths: 360,
+    interestOnlyMonths: 0,
+    rateType: 'fixed' as const,
+    fixedRate: 0.065,
+    capitalizeOriginationFees: false,
+    prepayType: 'none' as const,
+  };
+
+  it('monthly compounding matches legacy behavior', () => {
+    const schedule = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'monthly' });
+    const scheduleDefault = computeLoanSchedule(baseLoan);
+    expect(schedule.length).toBe(60);
+    expect(schedule[0].interest).toBe(scheduleDefault[0].interest);
+    expect(schedule[0].debtService).toBe(scheduleDefault[0].debtService);
+  });
+
+  it('daily compounding produces slightly higher interest', () => {
+    const monthly = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'monthly' });
+    const daily = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'daily' });
+    expect(daily[0].interest).toBeGreaterThan(monthly[0].interest);
+    const diff = (daily[0].interest - monthly[0].interest) / monthly[0].interest;
+    expect(diff).toBeLessThan(0.01);
+  });
+
+  it('annual compounding produces slightly lower interest', () => {
+    const monthly = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'monthly' });
+    const annual = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'annual' });
+    expect(annual[0].interest).toBeLessThan(monthly[0].interest);
+  });
+
+  it('continuous compounding produces highest interest', () => {
+    const monthly = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'monthly' });
+    const continuous = computeLoanSchedule({ ...baseLoan, compoundingFrequency: 'continuous' });
+    expect(continuous[0].interest).toBeGreaterThan(monthly[0].interest);
+  });
+
+  it('all compounding types produce valid schedules', () => {
+    const types = ['monthly', 'daily', 'annual', 'continuous'] as const;
+    for (const freq of types) {
+      const schedule = computeLoanSchedule({ ...baseLoan, compoundingFrequency: freq });
+      expect(schedule.length).toBe(60);
+      for (const row of schedule) {
+        expect(row.debtService).toBeGreaterThan(0);
+        expect(row.interest).toBeGreaterThanOrEqual(0);
+        expect(row.principal).toBeGreaterThanOrEqual(0);
+      }
+      expect(schedule[59].endBal).toBeLessThan(schedule[0].beginBal);
+    }
+  });
+
+  it('annual debt service sums correctly for all types', () => {
+    const types = ['monthly', 'daily', 'annual', 'continuous'] as const;
+    for (const freq of types) {
+      const schedule = computeLoanSchedule({ ...baseLoan, compoundingFrequency: freq });
+      const annual = computeAnnualDebtService(schedule, 5);
+      expect(annual.length).toBe(5);
+      for (const yr of annual) {
+        expect(yr.totalDebtService).toBeGreaterThan(0);
+        expect(yr.totalDebtService).toBeCloseTo(yr.interest + yr.principal, 0);
+      }
+    }
+  });
+});
