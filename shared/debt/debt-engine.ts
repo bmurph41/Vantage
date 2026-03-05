@@ -21,6 +21,7 @@ export interface DebtEngineInput {
   annualServicingFee?: number;
   exitFeePct?: number;
   prepayType: 'none' | 'stepdown' | 'yield_maint' | 'defeasance';
+  compoundingFrequency?: 'monthly' | 'daily' | 'annual' | 'continuous';
   stepdownSchedule?: number[];
 }
 
@@ -90,6 +91,25 @@ function r2(val: number): number {
   return Math.round(val * 100) / 100;
 }
 
+function toEffectiveMonthlyRate(annualRate: number, compounding: 'monthly' | 'daily' | 'annual' | 'continuous' = 'monthly'): number {
+  if (annualRate <= 0) return 0;
+  switch (compounding) {
+    case 'monthly':
+      return annualRate / 12;
+    case 'daily':
+      // Convert nominal daily-compounded rate to effective monthly
+      return Math.pow(1 + annualRate / 365, 365 / 12) - 1;
+    case 'annual':
+      // Convert nominal annual rate to effective monthly
+      return Math.pow(1 + annualRate, 1 / 12) - 1;
+    case 'continuous':
+      // Convert continuously compounded rate to effective monthly
+      return Math.exp(annualRate / 12) - 1;
+    default:
+      return annualRate / 12;
+  }
+}
+
 function getEffectiveAnnualRate(input: DebtEngineInput): number {
   if (input.rateType === 'fixed') {
     return input.fixedRate ?? 0;
@@ -110,7 +130,7 @@ export function computeLoanSchedule(input: DebtEngineInput): MonthlyScheduleRow[
   if (startingBalance <= 0 || input.termMonths <= 0) return [];
 
   const annualRate = getEffectiveAnnualRate(input);
-  const monthlyRate = annualRate / 12;
+  const monthlyRate = toEffectiveMonthlyRate(annualRate, input.compoundingFrequency ?? 'monthly');
   const rateBps = Math.round(annualRate * 10000);
   const ioMonths = Math.min(input.interestOnlyMonths, input.termMonths);
   const amortPayments = Math.max(input.amortMonths - ioMonths, 1);
@@ -216,7 +236,7 @@ function computePrepayPenalty(
     if (rateDiff <= 0) return 0;
     const remainingMonths = input.termMonths - (exitYear * 12);
     if (remainingMonths <= 0) return 0;
-    const monthlyRate = rate / 12;
+    const monthlyRate = toEffectiveMonthlyRate(rate, input.compoundingFrequency ?? 'monthly');
     const amortRemaining = Math.max(input.amortMonths - (exitYear * 12), remainingMonths);
     const monthlyPmt = pmt(payoffBalance, monthlyRate, amortRemaining);
     let pvLostInterest = 0;

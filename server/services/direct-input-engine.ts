@@ -20,6 +20,7 @@ export interface DirectInputFinancials {
   expenseLines: FinancialLine[];
   computedFrom: 'direct_input';
   formulaBreakdowns: Record<string, string>;
+  monthlyBreakdown?: MonthlyBreakdown[];
 }
 
 export interface FinancialLine {
@@ -30,6 +31,24 @@ export interface FinancialLine {
   key?: string;         // stable key for persistence (e.g. 'annualPropertyTax')
   isCustom?: boolean;   // user-added line
   isSubtraction?: boolean; // renders as negative (vacancy, concessions)
+}
+
+
+// ---------------------------------------------------------------------------
+// Monthly calendar constants
+// ---------------------------------------------------------------------------
+const DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_IN_YEAR = 365;
+
+export interface MonthlyBreakdown {
+  month: string;           // 'Jan', 'Feb', ...
+  days: number;            // 31, 28, ...
+  revenue: number;
+  expenses: number;
+  noi: number;
+  occupancy?: number;      // effective occupancy for this month
+  isSeason?: 'in' | 'off'; // seasonal tag
 }
 
 // ---------------------------------------------------------------------------
@@ -390,8 +409,27 @@ function computeFromCOA(
 
       if (isNightly) {
         const occ = pct(unit.occupancy ?? unit.occupancyRate ?? inputs.occupancy ?? 0.65);
-        unitAmt = rent * occ * 365 * count;
-        formula = `$${fmtC(rent)}/night × ${fmtP(occ)} × 365 × ${count} = $${fmtC(unitAmt)}`;
+        const inSeasonOcc = pct(unit.inSeasonOccupancy ?? inputs.inSeasonOccupancy ?? occ);
+        const offSeasonOcc = pct(unit.offSeasonOccupancy ?? inputs.offSeasonOccupancy ?? occ);
+        const inSeasonMonths: number[] = inputs.inSeasonMonths ?? [];
+        const hasSeasonal = inSeasonMonths.length > 0 && inSeasonMonths.length < 12;
+        if (hasSeasonal) {
+          // Exact days-per-month with seasonal occupancy
+          unitAmt = 0;
+          const monthDetails: string[] = [];
+          for (let m = 0; m < 12; m++) {
+            const isSeason = inSeasonMonths.includes(m + 1);
+            const mOcc = isSeason ? inSeasonOcc : offSeasonOcc;
+            const mRev = rent * mOcc * DAYS_PER_MONTH[m] * count;
+            unitAmt += mRev;
+          }
+          const inDays = inSeasonMonths.reduce((s, m) => s + DAYS_PER_MONTH[m - 1], 0);
+          const offDays = DAYS_IN_YEAR - inDays;
+          formula = `$${fmtC(rent)}/night × (${inDays}d@${fmtP(inSeasonOcc)} + ${offDays}d@${fmtP(offSeasonOcc)}) × ${count} = $${fmtC(unitAmt)}`;
+        } else {
+          unitAmt = rent * occ * DAYS_IN_YEAR * count;
+          formula = `$${fmtC(rent)}/night × ${fmtP(occ)} × ${DAYS_IN_YEAR} × ${count} = $${fmtC(unitAmt)}`;
+        }
       } else {
         unitAmt = rent * 12 * count;
         formula = `$${fmtC(rent)}/mo × 12 × ${count} = $${fmtC(unitAmt)}`;
@@ -487,6 +525,45 @@ function computeFromCOA(
   const totalRevenue = revenueLines.reduce((s, l) => s + l.amount, 0);
   const totalExpenses = expenseLines.reduce((s, l) => s + l.amount, 0);
 
+  // --- Monthly breakdown ---
+  const _inSeasonMonths: number[] = inputs.inSeasonMonths ?? [];
+  const _hasSeasonal = _inSeasonMonths.length > 0 && _inSeasonMonths.length < 12;
+  const monthlyBreakdown: MonthlyBreakdown[] = DAYS_PER_MONTH.map((days, m) => {
+    const seasonTag = _hasSeasonal ? (_inSeasonMonths.includes(m + 1) ? 'in' as const : 'off' as const) : undefined;
+    const dayFraction = days / DAYS_IN_YEAR;
+    let monthRevenue = 0;
+    for (const line of revenueLines) {
+      if (line.key?.startsWith('unitMix_') && unitMix) {
+        const unitLabel = line.key.replace('unitMix_', '');
+        const unit = unitMix.find((u: any) => (u.label ?? u.type ?? u.name ?? u.size ?? 'Unit') === unitLabel);
+        if (unit && (unit.nightlyRate || unit.averageDailyRate) && _hasSeasonal) {
+          const rate = num(unit.nightlyRate ?? unit.averageDailyRate ?? 0);
+          const cnt = num(unit.count ?? unit.quantity ?? unit.units ?? 1);
+          const baseOcc = pct(unit.occupancy ?? unit.occupancyRate ?? inputs.occupancy ?? 0.65);
+          const mOcc = seasonTag === 'in'
+            ? pct(unit.inSeasonOccupancy ?? inputs.inSeasonOccupancy ?? baseOcc)
+            : seasonTag === 'off'
+            ? pct(unit.offSeasonOccupancy ?? inputs.offSeasonOccupancy ?? baseOcc)
+            : baseOcc;
+          monthRevenue += rate * mOcc * days * cnt;
+        } else {
+          monthRevenue += (line.isSubtraction ? -line.amount : line.amount) * dayFraction;
+        }
+      } else {
+        monthRevenue += (line.isSubtraction ? -line.amount : line.amount) * dayFraction;
+      }
+    }
+    const monthExpenses = totalExpenses * dayFraction;
+    return {
+      month: MONTH_NAMES[m],
+      days,
+      revenue: Math.round(monthRevenue * 100) / 100,
+      expenses: Math.round(monthExpenses * 100) / 100,
+      noi: Math.round((monthRevenue - monthExpenses) * 100) / 100,
+      ...(seasonTag ? { isSeason: seasonTag, occupancy: seasonTag === 'in' ? pct(inputs.inSeasonOccupancy ?? 0.85) : pct(inputs.offSeasonOccupancy ?? 0.50) } : {}),
+    } as MonthlyBreakdown;
+  });
+
   return {
     totalRevenue,
     totalExpenses,
@@ -495,6 +572,7 @@ function computeFromCOA(
     expenseLines,
     computedFrom: 'direct_input',
     formulaBreakdowns,
+    monthlyBreakdown,
   };
 }
 

@@ -848,12 +848,20 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
 
   const { data: computedFinancials } = useQuery({
     queryKey: ['/api/modeling/projects', projectId, 'direct-input-preview',
-      JSON.stringify(coaValues), JSON.stringify(customRevenue), JSON.stringify(customExpenses)],
+      JSON.stringify(coaValues), JSON.stringify(customRevenue), JSON.stringify(customExpenses), JSON.stringify(unitRows), rateType],
     queryFn: async () => {
       const assumptions = buildAssumptionsPayload();
       const res = await apiRequest('POST', `/api/modeling/projects/${projectId}/compute-direct-input`, {
         assetClass,
         inputAssumptions: assumptions,
+        unitMix: unitRows.filter(r => r.enabled).map(r => ({
+          label: r.name,
+          count: r.count,
+          monthlyRent: r.monthlyRate,
+          nightlyRate: rateType === 'nightly' ? r.monthlyRate : undefined,
+          occupancy: r.occupancy / 100,
+          avgSF: r.avgSF,
+        })),
       });
       return res.json();
     },
@@ -869,8 +877,8 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
   }, [unitRows, rateType]);
 
   // Combined financials (no double-count: rental keys excluded from compute when unit mix active)
-  const unitMixAnnualRevenue = unitMixMonthlyRevenue * 12;
-  const totalRevenue = (computedFinancials?.totalRevenue ?? 0) + unitMixAnnualRevenue;
+  // unitMixAnnualRevenue kept for display subtotal only
+  const totalRevenue = computedFinancials?.totalRevenue ?? 0;
   const totalExpenses = computedFinancials?.totalExpenses ?? 0;
   const noi = totalRevenue - totalExpenses;
 
@@ -910,6 +918,22 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
         customMetrics: {
           ...existingMetrics,
           inputAssumptions: assumptions,
+        unitMix: unitRows.filter(r => r.enabled).map(r => ({
+          label: r.name,
+          count: r.count,
+          monthlyRent: r.monthlyRate,
+          nightlyRate: rateType === 'nightly' ? r.monthlyRate : undefined,
+          occupancy: r.occupancy / 100,
+          avgSF: r.avgSF,
+        })),
+          unitMix: unitRows.filter(r => r.enabled).map(r => ({
+            label: r.name,
+            count: r.count,
+            monthlyRent: r.monthlyRate,
+            nightlyRate: rateType === 'nightly' ? r.monthlyRate : undefined,
+            occupancy: r.occupancy / 100,
+            avgSF: r.avgSF,
+          })),
         },
       };
 

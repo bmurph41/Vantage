@@ -211,6 +211,84 @@ export async function exportModelingProjectToExcel(
     }
   }
 
+
+  // Sheet: Pro Forma / Direct Input Financials
+  const modelInputMode = (project as any).modelInputMode ?? 'auto';
+  const customMetrics = (project.customMetrics as any) ?? {};
+  const assetClass = (project as any).assetClass ?? 'marina';
+  
+  if (modelInputMode === 'direct_input' || customMetrics?.inputAssumptions) {
+    try {
+      const { computeDirectInputFinancials } = await import('./direct-input-engine');
+      const inputAssumptions = customMetrics.inputAssumptions ?? {};
+      const unitMix = customMetrics.unitMix ?? [];
+      const computed = computeDirectInputFinancials(assetClass, inputAssumptions, unitMix);
+      
+      if (computed && (computed.revenueLines.length > 0 || computed.expenseLines.length > 0)) {
+        const proFormaData: any[][] = [
+          ['PRO FORMA - DIRECT INPUT FINANCIALS'],
+          [''],
+          ['Asset Class', assetClass],
+          ['Input Mode', modelInputMode],
+          [''],
+          ['REVENUE', '', 'Annual Amount', 'Formula'],
+        ];
+        
+        for (const line of computed.revenueLines) {
+          proFormaData.push([
+            '',
+            line.label,
+            formatCurrency(line.amount),
+            line.formula || '',
+          ]);
+        }
+        
+        proFormaData.push(['', '', '', '']);
+        proFormaData.push(['', 'Total Revenue', formatCurrency(computed.totalRevenue), '']);
+        proFormaData.push(['']);
+        proFormaData.push(['OPERATING EXPENSES', '', 'Annual Amount', 'Formula']);
+        
+        for (const line of computed.expenseLines) {
+          proFormaData.push([
+            '',
+            line.label,
+            formatCurrency(line.amount),
+            line.formula || '',
+          ]);
+        }
+        
+        proFormaData.push(['', '', '', '']);
+        proFormaData.push(['', 'Total Expenses', formatCurrency(computed.totalExpenses), '']);
+        proFormaData.push(['']);
+        proFormaData.push(['NET OPERATING INCOME (NOI)', '', formatCurrency(computed.noi), '']);
+        
+        // Unit Mix detail (if present)
+        if (unitMix.length > 0) {
+          proFormaData.push(['']);
+          proFormaData.push(['UNIT MIX DETAIL']);
+          proFormaData.push(['', 'Unit Type', 'Count', 'Rate', 'Occupancy']);
+          for (const unit of unitMix) {
+            const rate = unit.monthlyRent ?? unit.nightlyRate ?? 0;
+            const rateLabel = unit.nightlyRate ? `$${rate}/night` : `$${rate}/mo`;
+            proFormaData.push([
+              '',
+              unit.label || unit.name || 'Unit',
+              unit.count ?? 1,
+              rateLabel,
+              unit.occupancy ? `${(unit.occupancy * 100).toFixed(1)}%` : 'N/A',
+            ]);
+          }
+        }
+        
+        const proFormaSheet = XLSX.utils.aoa_to_sheet(proFormaData);
+        proFormaSheet['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 18 }, { wch: 45 }];
+        XLSX.utils.book_append_sheet(workbook, proFormaSheet, 'Pro Forma');
+      }
+    } catch (proFormaError) {
+      console.error('[Export] Failed to compute pro forma sheet:', proFormaError);
+    }
+  }
+
   return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 }
 
@@ -296,6 +374,7 @@ export async function exportCaseComparisonToExcel(
     ...validCases.map(() => ({ wch: 18 }))
   ];
   XLSX.utils.book_append_sheet(workbook, comparisonSheet, 'Case Comparison');
+
 
   return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 }
