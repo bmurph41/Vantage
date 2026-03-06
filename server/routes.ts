@@ -19754,7 +19754,7 @@ Current context: Project ${req.params.projectId}`;
       if (!project) return res.status(404).json({ error: 'Project not found' });
       const r2 = await pool.query('SELECT hold_period FROM modeling_project_config WHERE modeling_project_id = $1 LIMIT 1', [projectId]);
       const projConfig = r2.rows[0] ? { holdPeriod: r2.rows[0].hold_period } : { holdPeriod: 5 };
-      const r3 = await pool.query('SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate, hold_period_years FROM modeling_scenario_versions WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1', [projectId]);
+      const r3 = await pool.query('SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate FROM modeling_scenario_versions WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1', [projectId]);
       const latestScenario = r3.rows[0] ?? null;
       const bodyOverrides = Object.fromEntries(
         Object.entries({
@@ -19774,7 +19774,6 @@ Current context: Project ${req.params.projectId}`;
         latestScenario ? {
           revenueGrowthRate: latestScenario.revenue_growth_rate,
           expenseGrowthRate: latestScenario.expense_growth_rate,
-          holdPeriodYears: latestScenario.hold_period_years,
         } : null,
         bodyOverrides
       );
