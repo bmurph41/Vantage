@@ -19741,6 +19741,66 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Multi-year pro forma projection
+  app.post('/api/modeling/projects/:projectId/multi-year-projection', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { modelingProjects, modelingProjectConfig, modelingScenarioVersions } = await import('@shared/schema');
+      const { eq, and, desc } = await import('drizzle-orm');
+      const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
+      const { computeMultiYearProjection, buildProjectionConfig } = await import('./services/multi-year-projection-engine');
+      const [project] = await db.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+      const [projConfig] = await db.select().from(modelingProjectConfig)
+        .where(eq(modelingProjectConfig.projectId, projectId));
+      const [latestScenario] = await db.select().from(modelingScenarioVersions)
+        .where(eq(modelingScenarioVersions.projectId, projectId))
+        .orderBy(desc(modelingScenarioVersions.createdAt))
+        .limit(1);
+      const bodyOverrides = Object.fromEntries(
+        Object.entries({
+          holdPeriod: req.body.holdPeriod,
+          revenueGrowthRate: req.body.revenueGrowthRate,
+          expenseGrowthRate: req.body.expenseGrowthRate,
+          categoryGrowthRates: req.body.categoryGrowthRates,
+          vacancyCurve: req.body.vacancyCurve,
+          capexSchedule: req.body.capexSchedule,
+          defaultCapExPct: req.body.defaultCapExPct,
+          exitCapRate: req.body.exitCapRate,
+          sellingCostPct: req.body.sellingCostPct,
+        }).filter(([, v]) => v !== undefined)
+      );
+      const projectionConfig = buildProjectionConfig(
+        projConfig ?? { holdPeriod: 5 },
+        latestScenario ?? null,
+        bodyOverrides
+      );
+      const COMMERCIAL = new Set(['retail', 'office', 'industrial', 'mixed_use', 'medical_office', 'flex']);
+      const assetClass = project.assetClass ?? 'multifamily';
+      if (COMMERCIAL.has(assetClass)) {
+        try {
+          const { syncLeaseRollupToAssumptions } = await import('./services/commercial-lease-bridge');
+          await syncLeaseRollupToAssumptions(projectId, orgId);
+        } catch (leaseErr) {
+          console.warn('[multiYearProjection] lease sync failed:', leaseErr);
+        }
+      }
+      const customMetrics = (project.customMetrics ?? {});
+      const year1Financials = computeDirectInputFinancials(
+        assetClass,
+        customMetrics.inputAssumptions ?? {},
+        customMetrics.unitMix ?? []
+      );
+      const result = computeMultiYearProjection(year1Financials, projectionConfig);
+      res.json({ projectId, assetClass, projection: result, meta: { holdPeriod: projectionConfig.holdPeriod, revenueGrowthRate: projectionConfig.revenueGrowthRate, expenseGrowthRate: projectionConfig.expenseGrowthRate, exitCapRate: projectionConfig.exitCapRate, leaseSynced: COMMERCIAL.has(assetClass) } });
+    } catch (error) {
+      console.error('[multi-year-projection]', error);
+      res.status(500).json({ error: error.message ?? 'Failed to compute projection' });
+    }
+  });
+
   app.delete('/api/modeling/projects/:id', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
