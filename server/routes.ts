@@ -19746,19 +19746,16 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { modelingProjects, modelingProjectConfig, modelingScenarioVersions } = await import('@shared/schema');
-      const { eq, and, desc } = await import('drizzle-orm');
       const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
       const { computeMultiYearProjection, buildProjectionConfig } = await import('./services/multi-year-projection-engine');
-      const [project] = await db.select().from(modelingProjects)
-        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      const { pool } = await import('./db');
+      const r1 = await pool.query('SELECT id, asset_class, custom_metrics FROM modeling_projects WHERE id = $1 AND org_id = $2', [projectId, orgId]);
+      const project = r1.rows[0];
       if (!project) return res.status(404).json({ error: 'Project not found' });
-      const [projConfig] = await db.select().from(modelingProjectConfig)
-        .where(eq(modelingProjectConfig.projectId, projectId));
-      const [latestScenario] = await db.select().from(modelingScenarioVersions)
-        .where(eq(modelingScenarioVersions.projectId, projectId))
-        .orderBy(desc(modelingScenarioVersions.createdAt))
-        .limit(1);
+      const r2 = await pool.query('SELECT hold_period FROM modeling_project_config WHERE modeling_project_id = $1 LIMIT 1', [projectId]);
+      const projConfig = r2.rows[0] ? { holdPeriod: r2.rows[0].hold_period } : { holdPeriod: 5 };
+      const r3 = await pool.query('SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate, hold_period_years FROM modeling_scenario_versions WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1', [projectId]);
+      const latestScenario = r3.rows[0] ?? null;
       const bodyOverrides = Object.fromEntries(
         Object.entries({
           holdPeriod: req.body.holdPeriod,
@@ -19773,8 +19770,12 @@ Current context: Project ${req.params.projectId}`;
         }).filter(([, v]) => v !== undefined)
       );
       const projectionConfig = buildProjectionConfig(
-        projConfig ?? { holdPeriod: 5 },
-        latestScenario ?? null,
+        projConfig,
+        latestScenario ? {
+          revenueGrowthRate: latestScenario.revenue_growth_rate,
+          expenseGrowthRate: latestScenario.expense_growth_rate,
+          holdPeriodYears: latestScenario.hold_period_years,
+        } : null,
         bodyOverrides
       );
       const COMMERCIAL = new Set(['retail', 'office', 'industrial', 'mixed_use', 'medical_office', 'flex']);
