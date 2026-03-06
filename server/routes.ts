@@ -19778,7 +19778,7 @@ Current context: Project ${req.params.projectId}`;
         bodyOverrides
       );
       const COMMERCIAL = new Set(['retail', 'office', 'industrial', 'mixed_use', 'medical_office', 'flex']);
-      const assetClass = project.assetClass ?? 'multifamily';
+      const assetClass = project.asset_class ?? 'multifamily';
       if (COMMERCIAL.has(assetClass)) {
         try {
           const { syncLeaseRollupToAssumptions } = await import('./services/commercial-lease-bridge');
@@ -19787,7 +19787,7 @@ Current context: Project ${req.params.projectId}`;
           console.warn('[multiYearProjection] lease sync failed:', leaseErr);
         }
       }
-      const customMetrics = (project.customMetrics ?? {});
+      const customMetrics = (project.custom_metrics ?? {});
       const year1Financials = computeDirectInputFinancials(
         assetClass,
         customMetrics.inputAssumptions ?? {},
