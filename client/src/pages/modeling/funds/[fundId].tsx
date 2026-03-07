@@ -151,6 +151,8 @@ interface Fund {
   investmentPeriodYears: number;
   fundLifeYears: number;
   managementFeePct: string;
+  assetManagementFeePct: string | null;
+  propertyManagementFeePct: string | null;
   carriedInterestPct: string;
   preferredReturn: string;
   waterfallStyle: string;
@@ -244,6 +246,8 @@ const updateFundSchema = z.object({
   status: z.enum(['raising', 'investing', 'harvesting', 'closed', 'liquidated']),
   targetSize: z.string().optional(),
   managementFeePct: z.string().optional(),
+  assetManagementFeePct: z.string().optional(),
+  propertyManagementFeePct: z.string().optional(),
   carriedInterestPct: z.string().optional(),
   preferredReturn: z.string().optional(),
 });
@@ -269,6 +273,8 @@ function EditFundDialog({
       status: fund.status,
       targetSize: fund.targetSize || '',
       managementFeePct: fund.managementFeePct || '0.02',
+      assetManagementFeePct: fund.assetManagementFeePct || '0.0150',
+      propertyManagementFeePct: fund.propertyManagementFeePct || '0.0050',
       carriedInterestPct: fund.carriedInterestPct || '0.20',
       preferredReturn: fund.preferredReturn || '0.08',
     },
@@ -360,6 +366,45 @@ function EditFundDialog({
                 )}
               />
             </div>
+            <div>
+              <p className="text-sm font-medium mb-3">Fee Structure</p>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="assetManagementFeePct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Asset Mgmt Fee (AM)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input {...field} type="number" step="0.001" min="0" max="1" placeholder="0.0150" />
+                          <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">dec</span>
+                        </div>
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">% of invested equity (e.g. 0.015 = 1.5%)</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="propertyManagementFeePct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Property Mgmt Fee (PM)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input {...field} type="number" step="0.001" min="0" max="1" placeholder="0.0050" />
+                          <span className="absolute right-3 top-2.5 text-sm text-muted-foreground">dec</span>
+                        </div>
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">% of EGI / called capital (e.g. 0.005 = 0.5%)</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
@@ -442,7 +487,8 @@ function OverviewTab({ fund, numPartners }: { fund: Fund; numPartners: number })
   const distributed = parseFloat(fund.distributedCapital || '0');
   const carryPct = parseFloat(fund.carriedInterestPct || '0.20');
   const prefPct = parseFloat(fund.preferredReturn || '0.08');
-  const mgmtFeePct = parseFloat(fund.managementFeePct || '0.02');
+  const amFeePct = parseFloat(fund.assetManagementFeePct || '0.0150');
+  const pmFeePct = parseFloat(fund.propertyManagementFeePct || '0.0050');
   const fundLife = fund.fundLifeYears || 10;
 
   const commitmentProgress = target > 0 ? (committed / target) * 100 : 0;
@@ -463,7 +509,9 @@ function OverviewTab({ fund, numPartners }: { fund: Fund; numPartners: number })
   const totalPrefAccrued = lpEquityIn * prefPct * holdYrs;
   const upside = Math.max(0, lpProceeds - lpEquityIn - totalPrefAccrued);
   const gpPromote = upside * carryPct;
-  const amPmFees = mgmtFeePct * called * fundLife;
+  const amFees = amFeePct * called * fundLife;
+  const pmFees = pmFeePct * called * fundLife;
+  const amPmFees = amFees + pmFees;
   const gpNet = gpPromote + amPmFees;
   const perPartner = numPartners > 0 ? gpNet / numPartners : 0;
 
@@ -569,7 +617,9 @@ function OverviewTab({ fund, numPartners }: { fund: Fund; numPartners: number })
             <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">AM + PM Fees</CardTitle></CardHeader>
             <CardContent className="px-4 pb-3">
               <div className="text-xl font-bold">{formatCurrency(amPmFees)}</div>
-              <p className="text-xs text-muted-foreground mt-0.5">{fundLife}-yr fee income (est.)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                AM {formatCurrency(amFees)} · PM {formatCurrency(pmFees)} ({fundLife}-yr est.)
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -994,18 +1044,26 @@ function WaterfallTab({ fund, prefType, setPrefType, gpCatchUp, setGpCatchUp, nu
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
             <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Management Fee</p>
-              <p className="text-2xl font-bold">{formatPercent(fund.managementFeePct)}</p>
+              <p className="text-sm text-muted-foreground">Asset Mgmt Fee (AM)</p>
+              <p className="text-2xl font-bold">{formatPercent(fund.assetManagementFeePct ?? fund.managementFeePct)}</p>
+              <p className="text-xs text-muted-foreground mt-1">% of invested equity / yr</p>
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Property Mgmt Fee (PM)</p>
+              <p className="text-2xl font-bold">{formatPercent(fund.propertyManagementFeePct ?? '0.005')}</p>
+              <p className="text-xs text-muted-foreground mt-1">% of EGI / yr</p>
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Carried Interest</p>
               <p className="text-2xl font-bold">{formatPercent(fund.carriedInterestPct)}</p>
+              <p className="text-xs text-muted-foreground mt-1">above pref hurdle</p>
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Preferred Return</p>
               <p className="text-2xl font-bold">{formatPercent(fund.preferredReturn)}</p>
+              <p className="text-xs text-muted-foreground mt-1">annual LP hurdle</p>
             </div>
           </div>
 
@@ -1140,21 +1198,29 @@ function SettingsTab({ fund }: { fund: Fund }) {
       <Card>
         <CardHeader>
           <CardTitle>Fee Structure</CardTitle>
-          <CardDescription>Management fees and carried interest terms</CardDescription>
+          <CardDescription>Asset management, property management, carry and preferred return</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
             <div className="p-4 border rounded-lg">
-              <Label className="text-muted-foreground">Management Fee</Label>
-              <p className="text-2xl font-bold">{formatPercent(fund.managementFeePct)}</p>
+              <Label className="text-muted-foreground">Asset Mgmt Fee (AM)</Label>
+              <p className="text-2xl font-bold">{formatPercent(fund.assetManagementFeePct ?? fund.managementFeePct)}</p>
+              <p className="text-xs text-muted-foreground mt-1">% of invested equity / yr</p>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <Label className="text-muted-foreground">Property Mgmt Fee (PM)</Label>
+              <p className="text-2xl font-bold">{formatPercent(fund.propertyManagementFeePct ?? '0.005')}</p>
+              <p className="text-xs text-muted-foreground mt-1">% of EGI / yr</p>
             </div>
             <div className="p-4 border rounded-lg">
               <Label className="text-muted-foreground">Carried Interest</Label>
               <p className="text-2xl font-bold">{formatPercent(fund.carriedInterestPct)}</p>
+              <p className="text-xs text-muted-foreground mt-1">above pref hurdle</p>
             </div>
             <div className="p-4 border rounded-lg">
               <Label className="text-muted-foreground">Preferred Return</Label>
               <p className="text-2xl font-bold">{formatPercent(fund.preferredReturn)}</p>
+              <p className="text-xs text-muted-foreground mt-1">annual LP hurdle</p>
             </div>
           </div>
         </CardContent>

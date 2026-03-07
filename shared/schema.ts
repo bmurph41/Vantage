@@ -18202,6 +18202,8 @@ export const funds = pgTable('funds', {
   // Fees
   managementFeePct: decimal('management_fee_pct', { precision: 6, scale: 4 }).default('0.02'),
   managementFeeBase: text('management_fee_base').default('committed'), // 'committed', 'called', 'invested', 'nav'
+  assetManagementFeePct: decimal('asset_management_fee_pct', { precision: 6, scale: 4 }).default('0.0150'), // % of invested equity
+  propertyManagementFeePct: decimal('property_management_fee_pct', { precision: 6, scale: 4 }).default('0.0050'), // % of EGI / called capital
   carriedInterestPct: decimal('carried_interest_pct', { precision: 6, scale: 4 }).default('0.20'),
 
   // Waterfall configuration (fund-level defaults)
