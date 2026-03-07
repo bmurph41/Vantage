@@ -22662,11 +22662,10 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // ============================================================================
-  // [REPLACED] // MONTE CARLO SIMULATION - Stochastic Analysis Engine
+  // MONTE CARLO SIMULATION - Stochastic Analysis Engine
   // ============================================================================
 
   // Get persisted Monte Carlo results and config (does NOT auto-run)
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === GET /monte-carlo
   app.get('/api/modeling/projects/:projectId/monte-carlo', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22697,10 +22696,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to get Monte Carlo data' });
     }
   });
-  === END OLD ROUTE === */
 
   // Run Monte Carlo simulation and persist results
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /monte-carlo/run
   app.post('/api/modeling/projects/:projectId/monte-carlo/run', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22751,10 +22748,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to run Monte Carlo simulation' });
     }
   });
-  === END OLD ROUTE === */
 
   // Save Monte Carlo configuration (variable distributions)
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /monte-carlo/config
   app.post('/api/modeling/projects/:projectId/monte-carlo/config', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22782,10 +22777,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to save Monte Carlo config' });
     }
   });
-  === END OLD ROUTE === */
 
   // Quick simulation for real-time feedback
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === GET /monte-carlo/quick
   app.get('/api/modeling/projects/:projectId/monte-carlo/quick', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22804,14 +22797,12 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to run quick Monte Carlo' });
     }
   });
-  === END OLD ROUTE === */
 
   // ============================================================================
-  // [REPLACED] // DCF CALCULATOR - Real-Time Discounted Cash Flow Analysis
+  // DCF CALCULATOR - Real-Time Discounted Cash Flow Analysis
   // ============================================================================
 
   // Perform full DCF analysis with multiple scenarios
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === GET /dcf
   app.get('/api/modeling/projects/:projectId/dcf', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22830,10 +22821,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to perform DCF analysis' });
     }
   });
-  === END OLD ROUTE === */
 
   // Calculate DCF with custom scenarios
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /dcf/calculate
   app.post('/api/modeling/projects/:projectId/dcf/calculate', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -22853,10 +22842,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to calculate custom DCF' });
     }
   });
-  === END OLD ROUTE === */
 
   // Quick IRR calculation for real-time updates (returns full metrics)
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /dcf/quick-irr
   app.post('/api/dcf/quick-irr', authenticateUser, async (req: any, res) => {
     try {
       const { input } = req.body;
@@ -22869,10 +22856,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to calculate quick IRR' });
     }
   });
-  === END OLD ROUTE === */
 
   // Quick NPV calculation for real-time updates
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /dcf/quick-npv
   app.post('/api/dcf/quick-npv', authenticateUser, async (req: any, res) => {
     try {
       const { input } = req.body;
@@ -22885,10 +22870,8 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to calculate quick NPV' });
     }
   });
-  === END OLD ROUTE === */
 
   // Generate sensitivity matrix
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /dcf/sensitivity
   app.post('/api/dcf/sensitivity', authenticateUser, async (req: any, res) => {
     try {
       const { baseInput, var1Config, var2Config, metric } = req.body;
@@ -22906,7 +22889,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
     }
   });
-  === END OLD ROUTE === */
 
   // ============================================================================
   // MARINA PROFIT CENTER MODULE - Multi-Revenue Stream Financial Modeling
@@ -23659,7 +23641,6 @@ Current context: Project ${req.params.projectId}`;
   // ==================== SENSITIVITY MATRIX ROUTES ====================
   
   // Generate sensitivity matrix for a project
-  /* === OLD ROUTE (replaced by dcf-routes.ts) === POST /sensitivity-matrix
   app.post('/api/modeling/projects/:projectId/sensitivity-matrix', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
@@ -23686,7 +23667,6 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: 'Failed to generate sensitivity matrix' });
     }
   });
-  === END OLD ROUTE === */
 
   // Get saved sensitivity matrices for a project
   app.get('/api/modeling/projects/:projectId/sensitivity-matrices', authenticateUser, async (req: any, res) => {
@@ -38706,27 +38686,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   const httpServer = createServer(app);
-
-  // ============================================================================
-  // DCF REFACTOR — Layers 1-4 (canonical Pro Forma consumption)
-  // ============================================================================
-  {
-    const { registerDCFRoutes } = await import('./routes/dcf-routes');
-    const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
-    const { computeMultiYearProjection } = await import('./services/multi-year-projection-engine');
-    const { pool } = await import('./db');
-    // const { generateDebtSchedule } = await import('../shared/debt/debt-engine'); // wire when ready
-
-    registerDCFRoutes(app, {
-      pool,
-      authenticateUser,
-      computeDirectInputFinancials,
-      computeMultiYearProjection,
-      generateDebtSchedule: undefined,  // TODO: wire debt engine
-    });
-    console.log('[DCF] Refactored routes registered (Layers 1-4)');
-  }
-
   return httpServer;
 }
 

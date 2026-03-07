@@ -1,3 +1,7 @@
+
+// ─── Canonical XIRR also available from shared/finance/xirr.ts ───
+// New code should import from '../../shared/finance/xirr' directly.
+// This file's calculateXIRR is kept for backward compatibility.
 /**
  * PE-Grade Financial Calculation Utilities
  * 

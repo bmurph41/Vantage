@@ -77,6 +77,7 @@ import LeaseCashFlowPage from './workspace/lease-cashflow';
 import ProfitCentersPage from './workspace/profit-centers';
 import DCFCalculatorPage from './workspace/dcf-calculator';
 import MonteCarloPage from './workspace/monte-carlo';
+import MultiYearProjectionTab from '@/components/workspace/MultiYearProjectionTab';
 import RentRollDataTab from './workspace/rent-roll-data';
 import RentRollAnalysis from './workspace/rent-roll-analysis';
 import ModelReturns from './workspace/model-returns';
@@ -153,6 +154,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'exit', label: 'Exit Strategy', icon: Target },
       { value: 'dcf', label: 'DCF', icon: Calculator },
       { value: 'returns', label: 'Returns', icon: TrendingUp },
+      { value: 'multi-year', label: 'Multi-Year', icon: TrendingUp },
       { value: 'tax-dist', label: 'Tax & Distributions', icon: Receipt },
     ],
   },
@@ -822,6 +824,17 @@ export default function ProjectWorkspace() {
           <ModelReturns projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
+        <TabsContent value="multi-year" className="space-y-6">
+          <MultiYearProjectionTab
+            projectId={project.id}
+            initialConfig={{
+              holdPeriod: 5,
+              revenueGrowthRate: 0.03,
+              expenseGrowthRate: 0.025,
+              exitCapRate: 0.065,
+            }}
+          />
+        </TabsContent>
         <TabsContent value="monte-carlo" className="space-y-6">
           <MonteCarloPage />
         </TabsContent>

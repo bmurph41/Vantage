@@ -1,921 +1,547 @@
 /**
- * Real-Time DCF (Discounted Cash Flow) Calculator Service
+ * server/services/dcf-calculator-service.ts
  * 
- * Provides institutional-grade DCF valuation with:
- * - Unlimited scenario support with real-time recalculation
- * - Multiple discount rate methodologies (WACC, risk-adjusted, comparative)
- * - Terminal value calculations (Gordon Growth, Exit Multiple)
- * - Sensitivity analysis with 2D matrices
- * - IRR, NPV, Equity Multiple, Cash-on-Cash returns
- * - Scenario comparison and blending
+ * REFACTORED — Layer 1 Foundation
+ * 
+ * This service is now a CONSUMER of the Multi-Year Projection Engine.
+ * It does NOT independently model NOI, growth, or exit.
+ * 
+ * DCF = Pro Forma (canonical projections)
+ *      + Sensitivity Layer
+ *      + Discount Rate Analysis
+ *      + Scenario Overrides (via Layer 3)
+ * 
+ * KEY CHANGES:
+ * - Removed hardcoded 3% growth, 65% LTV, $5M purchase price, 10% discount
+ * - NOI comes from computeMultiYearProjection().years[].ncf
+ * - Exit comes from projection.exit.netSaleProceeds
+ * - Debt comes from debtEngine or capital stack, not assumed
+ * - IRR uses shared calculateXIRR with actual dates
+ * - All percentages returned as PERCENT (e.g. 14.25, not 0.1425)
  */
 
-import { db } from '../db';
-import { modelingProjects, modelingScenarioVersions, capitalStacks, debtTranches } from '@shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
-import { 
-  calculateXIRR, 
-  calculateXNPV, 
-  periodsToDatedCashFlows,
-  type DatedCashFlow 
-} from '../utils/financial-calculations';
-import { proFormaEngineService } from './pro-forma-engine-service';
+import {
+  calculateXIRR,
+  calculateNPV,
+  calculateEquityMultiple,
+  DatedCashFlow,
+} from '../../shared/finance/xirr';
 
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+import {
+  fromProjection,
+  ProjectionInput,
+  CanonicalCashFlowSet,
+} from './finance/cashflow-parity';
 
-interface CashFlowPeriod {
-  period: number;
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface DCFAnalysisInput {
+  projectId: string;
+  orgId: string;
+  /** Override discount rate (percent). User-defined — not from Pro Forma. */
+  discountRate?: number;
+  /** Optional scenario overrides. If omitted, uses canonical Pro Forma values. */
+  overrides?: DCFOverrides;
+}
+
+export interface DCFOverrides {
+  purchasePrice?: number;
+  revenueGrowthRateDelta?: number;   // pct points (e.g. +1.0)
+  exitCapRateDelta?: number;         // pct points (e.g. -0.25)
+  saleCostRateDelta?: number;        // pct points
+  discountRate?: number;             // percent
+  holdPeriodYears?: number;
+  noiMarginDelta?: number;           // pct points (optional)
+  occupancyDelta?: number;           // pct points (optional)
+}
+
+export interface DCFAnalysisResult {
+  projectId: string;
+  irr: number;                       // percent (e.g. 14.25)
+  leveredIrr: number;                // percent
+  unleveredIrr: number;              // percent
+  npv: number;                       // currency
+  equityMultiple: number;            // multiple (e.g. 2.1x)
+  goingInCapRate: number;            // percent
+  exitCapRate: number;               // percent
+  cashOnCashReturn: number;          // percent (year 1)
+  purchasePrice: number;
+  equityInvested: number;
+  holdPeriodYears: number;
+  totalDebt: number;
+  blendedDebtRate: number;           // percent
+  years: DCFYearDetail[];
+  exit: DCFExitDetail;
+  cashFlows: DatedCashFlow[];        // full dated flows for parity testing
+  sensitivity: SensitivityMatrix;
+  meta: {
+    source: 'proForma';
+    generatedAt: string;
+    discountRate: number;
+    hasDebt: boolean;
+    overridesApplied: boolean;
+  };
+}
+
+export interface DCFYearDetail {
   year: number;
-  month?: number;
-  grossRevenue: number;
-  effectiveRevenue: number;
-  operatingExpenses: number;
+  label: string;
   noi: number;
   capex: number;
+  ncf: number;
   debtService: number;
-  cashFlowBeforeDebt: number;
-  cashFlowAfterDebt: number;
-  discountFactor: number;
-  presentValue: number;
-  cumulativePV: number;
+  leveredCF: number;
+  cashOnCash: number;                // percent
 }
 
-interface TerminalValueInput {
-  method: 'gordon_growth' | 'exit_multiple';
-  exitCapRate?: number;
-  terminalGrowthRate?: number;
-  exitMultiple?: number;
-  saleCosts?: number;
+export interface DCFExitDetail {
+  exitNOI: number;
+  exitCapRate: number;               // percent
+  exitValue: number;
+  sellingCosts: number;
+  netSaleProceeds: number;
+  debtPayoff: number;
+  netToEquity: number;
 }
 
-interface DCFScenario {
-  id: string;
-  name: string;
-  description?: string;
-  isBase: boolean;
-  probability?: number; // For probability-weighted scenarios
-  
-  // Investment Parameters
-  purchasePrice: number;
-  closingCosts: number;
-  initialCapex: number;
-  totalInvestment: number;
-  
-  // Financing
-  loanAmount: number;
-  loanRate: number;
-  loanTerm: number;
-  amortization: number;
-  
-  // Operating Assumptions
-  revenueGrowthRate: number;
-  expenseGrowthRate: number;
-  vacancyRate: number;
-  managementFee: number;
-  reserveRate: number;
-  
-  // Cash Flows
-  holdPeriod: number;
-  cashFlows: CashFlowPeriod[];
-  
-  // Terminal Value
-  terminalValue: TerminalValueInput;
-  
-  // Discount Rate
-  discountRate: number;
-  discountRateMethod: 'wacc' | 'risk_adjusted' | 'comparative' | 'custom';
-  
-  // Results
-  npv: number;
-  irr: number;
-  leveredIRR: number;
-  equityMultiple: number;
-  cashOnCash: number[];
-  avgCashOnCash: number;
-  paybackPeriod: number;
-  profitabilityIndex: number;
-  modifiedIRR: number;
-  terminalValueAmount: number;
-  presentValueOfTerminal: number;
-  goingInCapRate: number;
-  exitCapRate: number;
+export interface SensitivityMatrix {
+  target: 'irr';
+  rows: Array<{ exitCapRate: number; values: number[] }>;
+  columns: number[];                 // growth rate values
 }
 
-interface DCFAnalysis {
-  projectId: string;
-  analysisDate: string;
-  scenarios: DCFScenario[];
-  baseScenario: DCFScenario;
-  sensitivityMatrix?: SensitivityMatrix;
-  scenarioComparison: ScenarioComparison;
-  probabilityWeightedResult?: ProbabilityWeightedResult;
-  lastCalculated: string;
-}
-
-interface SensitivityMatrix {
-  variable1: { name: string; values: number[] };
-  variable2: { name: string; values: number[] };
-  metric: 'irr' | 'npv' | 'equity_multiple' | 'cash_on_cash';
-  results: number[][];
-}
-
-interface ScenarioComparison {
-  scenarios: string[];
-  metrics: {
-    name: string;
-    values: Record<string, number>;
-    unit: string;
-  }[];
-}
-
-interface ProbabilityWeightedResult {
-  expectedNPV: number;
-  expectedIRR: number;
-  expectedEquityMultiple: number;
-  variance: number;
-  standardDeviation: number;
-  confidenceInterval: { low: number; high: number };
-}
-
-interface DCFInput {
-  purchasePrice: number;
-  closingCostsPct?: number;
-  initialCapex?: number;
-  year1NOI: number;
-  noiGrowthRate?: number;
-  holdPeriod?: number;
-  discountRate?: number;
-  exitCapRate?: number;
-  loanAmount?: number;
-  loanRate?: number;
-  loanTerm?: number;
-  amortization?: number;
-  startDate?: string;
-  cashFlowGranularity?: 'annual' | 'monthly';
-}
-
-// ============================================================================
-// DCF CALCULATION FUNCTIONS
-// ============================================================================
+// ─── Main Analysis Function ──────────────────────────────────────────────────
 
 /**
- * Calculate IRR using Newton-Raphson method
+ * Perform DCF analysis by consuming canonical Multi-Year Projection output.
+ * 
+ * This function does NOT model NOI, growth, or exit independently.
+ * It reads projections from the engine and layers on discount rate analysis.
+ * 
+ * @param pool - Database pool for raw SQL queries
+ * @param computeDirectInputFinancials - Year 1 computation function
+ * @param computeMultiYearProjection - Multi-year engine function
  */
-function calculateIRR(cashFlows: number[], guess: number = 0.1, maxIterations: number = 100, tolerance: number = 0.00001): number {
-  let rate = guess;
-  
-  for (let i = 0; i < maxIterations; i++) {
-    let npv = 0;
-    let derivative = 0;
-    
-    for (let j = 0; j < cashFlows.length; j++) {
-      const discountFactor = Math.pow(1 + rate, j);
-      npv += cashFlows[j] / discountFactor;
-      if (j > 0) {
-        derivative -= (j * cashFlows[j]) / Math.pow(1 + rate, j + 1);
-      }
-    }
-    
-    if (Math.abs(derivative) < 1e-10) break;
-    
-    const newRate = rate - npv / derivative;
-    
-    if (Math.abs(newRate - rate) < tolerance) {
-      return newRate;
-    }
-    
-    rate = newRate;
+export async function performDCFAnalysis(
+  input: DCFAnalysisInput,
+  deps: {
+    pool: any;
+    computeDirectInputFinancials: (assetClass: string, assumptions: any, unitMix: any) => any;
+    computeMultiYearProjection: (year1: any, config: any) => any;
+    generateDebtSchedule?: (tranches: any[], holdPeriod: number) => any;
   }
-  
-  return rate;
-}
+): Promise<DCFAnalysisResult> {
+  const { projectId, orgId, discountRate: userDiscountRate } = input;
+  const { pool, computeDirectInputFinancials, computeMultiYearProjection } = deps;
 
-/**
- * Calculate NPV
- */
-function calculateNPV(cashFlows: number[], discountRate: number): number {
-  return cashFlows.reduce((npv, cf, i) => {
-    return npv + cf / Math.pow(1 + discountRate, i);
-  }, 0);
-}
+  // ── Step 1: Load project data from DB (raw SQL) ─────────────────────────
+  const projectData = await loadProjectData(pool, projectId);
+  const scenarioData = await loadScenarioData(pool, projectData.modelingProjectId);
+  const capitalStackData = await loadCapitalStackData(pool, projectData.modelingProjectId);
 
-/**
- * Calculate Modified IRR (MIRR)
- */
-function calculateMIRR(
-  cashFlows: number[],
-  financeRate: number,
-  reinvestRate: number
-): number {
-  const n = cashFlows.length - 1;
-  
-  // Calculate present value of negative cash flows
-  let pvNegative = 0;
-  for (let i = 0; i < cashFlows.length; i++) {
-    if (cashFlows[i] < 0) {
-      pvNegative += cashFlows[i] / Math.pow(1 + financeRate, i);
+  // ── Step 2: Compute Year 1 from Direct Input Engine ─────────────────────
+  const year1 = computeDirectInputFinancials(
+    projectData.assetClass,
+    projectData.inputAssumptions,
+    projectData.unitMix
+  );
+
+  // ── Step 3: Build projection config from scenario/capital stack ─────────
+  const holdPeriod = input.overrides?.holdPeriodYears
+    ?? scenarioData.holdPeriod
+    ?? capitalStackData?.holdPeriodYears
+    ?? 5;
+
+  const revenueGrowthRate = (scenarioData.revenueGrowthRate ?? 3) / 100
+    + (input.overrides?.revenueGrowthRateDelta ?? 0) / 100;
+
+  const expenseGrowthRate = (scenarioData.expenseGrowthRate ?? 2.5) / 100;
+
+  const exitCapRate = (scenarioData.exitCapRate ?? 7.0) / 100
+    + (input.overrides?.exitCapRateDelta ?? 0) / 100;
+
+  const sellingCostPct = 0.03
+    + (input.overrides?.saleCostRateDelta ?? 0) / 100;
+
+  const purchasePrice = input.overrides?.purchasePrice
+    ?? capitalStackData?.purchasePrice
+    ?? projectData.purchasePrice
+    ?? 0;
+
+  // ── Step 4: Generate Multi-Year Projection (CANONICAL SOURCE) ───────────
+  const projection = computeMultiYearProjection(year1, {
+    holdPeriod,
+    revenueGrowthRate,
+    expenseGrowthRate,
+    exitCapRate,
+    sellingCostPct,
+  });
+
+  // ── Step 5: Compute debt schedule ───────────────────────────────────────
+  const debtTranches = capitalStackData?.debtTranches ?? [];
+  let annualDebtService: number[] = new Array(holdPeriod).fill(0);
+  let debtBalanceAtExit = 0;
+  let totalDebtAtClose = 0;
+  let blendedRate = 0;
+
+  if (deps.generateDebtSchedule && debtTranches.length > 0) {
+    try {
+      const schedule = deps.generateDebtSchedule(debtTranches, holdPeriod);
+      annualDebtService = schedule.annualDebtService ?? annualDebtService;
+      debtBalanceAtExit = schedule.remainingBalanceAtExit ?? 0;
+      totalDebtAtClose = schedule.totalDebtAtClose ?? 0;
+      blendedRate = schedule.blendedRate ?? 0;
+    } catch {
+      // No debt — unlevered analysis
     }
   }
-  
-  // Calculate future value of positive cash flows
-  let fvPositive = 0;
-  for (let i = 0; i < cashFlows.length; i++) {
-    if (cashFlows[i] > 0) {
-      fvPositive += cashFlows[i] * Math.pow(1 + reinvestRate, n - i);
-    }
-  }
-  
-  if (pvNegative === 0 || fvPositive <= 0) return 0;
-  
-  return Math.pow(fvPositive / Math.abs(pvNegative), 1 / n) - 1;
-}
 
-/**
- * Calculate debt service (annual payment)
- */
-function calculateDebtService(
-  principal: number,
-  annualRate: number,
-  amortizationYears: number
-): number {
-  if (annualRate === 0 || amortizationYears === 0) return 0;
-  
-  const monthlyRate = annualRate / 12;
-  const numPayments = amortizationYears * 12;
-  const monthlyPayment =
-    principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
-    (Math.pow(1 + monthlyRate, numPayments) - 1);
-  
-  return monthlyPayment * 12;
-}
+  const equityInvested = purchasePrice - totalDebtAtClose;
+  const discountRate = userDiscountRate ?? 10; // percent
 
-/**
- * Calculate remaining loan balance
- */
-function calculateRemainingBalance(
-  principal: number,
-  annualRate: number,
-  amortizationYears: number,
-  yearsElapsed: number
-): number {
-  if (annualRate === 0) return principal - (principal / amortizationYears) * yearsElapsed;
-  
-  const monthlyRate = annualRate / 12;
-  const numPayments = amortizationYears * 12;
-  const paymentsElapsed = yearsElapsed * 12;
-  
-  const factor = Math.pow(1 + monthlyRate, numPayments);
-  const elapsedFactor = Math.pow(1 + monthlyRate, paymentsElapsed);
-  
-  return principal * (factor - elapsedFactor) / (factor - 1);
-}
+  // ── Step 6: Build levered cash flows (dated) ────────────────────────────
+  const acquisitionDate = scenarioData.acquisitionCloseDate
+    ?? new Date().toISOString().split('T')[0];
 
-/**
- * Calculate terminal value using specified method
- */
-function calculateTerminalValue(
-  finalYearNOI: number,
-  terminalInput: TerminalValueInput,
-  nextYearNOI?: number
-): number {
-  switch (terminalInput.method) {
-    case 'gordon_growth':
-      // Gordon Growth Model: TV = NOI * (1 + g) / (r - g)
-      const g = terminalInput.terminalGrowthRate || 0.02;
-      const r = terminalInput.exitCapRate || 0.075;
-      return (nextYearNOI || finalYearNOI * (1 + g)) / r;
-      
-    case 'exit_multiple':
-      // Exit Cap Rate approach
-      const capRate = terminalInput.exitCapRate || 0.075;
-      const grossValue = finalYearNOI / capRate;
-      const saleCosts = terminalInput.saleCosts || 0.02;
-      return grossValue * (1 - saleCosts);
-      
-    default:
-      return finalYearNOI / (terminalInput.exitCapRate || 0.075);
-  }
-}
+  const projectionInput: ProjectionInput = {
+    acquisitionDate,
+    equityInvested,
+    years: projection.years.map((y: any) => ({ year: y.year, ncf: y.ncf })),
+    annualDebtService,
+    exit: projection.exit,
+    debtBalanceAtExit,
+  };
 
-// ============================================================================
-// MAIN SERVICE CLASS
-// ============================================================================
+  const canonical = fromProjection(projectionInput);
 
-class DCFCalculatorService {
-  /**
-   * Calculate a single DCF scenario
-   */
-  calculateScenario(
-    id: string,
-    name: string,
-    input: DCFInput,
-    isBase: boolean = false,
-    probability?: number
-  ): DCFScenario {
-    const {
+  // ── Step 7: Compute IRR, NPV, Equity Multiple ──────────────────────────
+  const xirrResult = calculateXIRR(canonical.flows);
+  const leveredIrr = xirrResult.irr;
+
+  // Unlevered: same flows but without debt service or debt payoff
+  const unleveredFlows: DatedCashFlow[] = [
+    { date: acquisitionDate, amount: -purchasePrice },
+    ...projection.years.map((y: any, i: number) => ({
+      date: addYearsISO(acquisitionDate, y.year),
+      amount: y.ncf + (i === projection.years.length - 1
+        ? projection.exit.netSaleProceeds
+        : 0),
+    })),
+  ];
+  const unleveredIrr = calculateXIRR(unleveredFlows).irr;
+
+  const npv = calculateNPV(canonical.flows, discountRate);
+  const equityMultiple = calculateEquityMultiple(canonical.flows);
+
+  // Going-in cap rate
+  const year1NOI = projection.years[0]?.noi ?? 0;
+  const goingInCapRate = purchasePrice > 0
+    ? (year1NOI / purchasePrice) * 100
+    : 0;
+
+  // Cash-on-cash (year 1)
+  const year1LeveredCF = (projection.years[0]?.ncf ?? 0) - (annualDebtService[0] ?? 0);
+  const cashOnCashReturn = equityInvested > 0
+    ? (year1LeveredCF / equityInvested) * 100
+    : 0;
+
+  // ── Step 8: Build year detail array ─────────────────────────────────────
+  const years: DCFYearDetail[] = projection.years.map((y: any, i: number) => ({
+    year: y.year,
+    label: y.label,
+    noi: y.noi,
+    capex: y.capex,
+    ncf: y.ncf,
+    debtService: annualDebtService[i] ?? 0,
+    leveredCF: y.ncf - (annualDebtService[i] ?? 0),
+    cashOnCash: equityInvested > 0
+      ? ((y.ncf - (annualDebtService[i] ?? 0)) / equityInvested) * 100
+      : 0,
+  }));
+
+  // ── Step 9: Exit detail ─────────────────────────────────────────────────
+  const exit: DCFExitDetail = {
+    exitNOI: projection.exit.exitNOI,
+    exitCapRate: exitCapRate * 100,     // back to percent for response
+    exitValue: projection.exit.exitValue,
+    sellingCosts: projection.exit.sellingCosts,
+    netSaleProceeds: projection.exit.netSaleProceeds,
+    debtPayoff: debtBalanceAtExit,
+    netToEquity: projection.exit.netSaleProceeds - debtBalanceAtExit,
+  };
+
+  // ── Step 10: Sensitivity matrix ─────────────────────────────────────────
+  const sensitivity = buildSensitivityMatrix(
+    year1,
+    computeMultiYearProjection,
+    deps,
+    {
+      baseGrowth: revenueGrowthRate,
+      baseExitCap: exitCapRate,
+      holdPeriod,
+      expenseGrowthRate,
+      sellingCostPct,
+      equityInvested,
+      annualDebtService,
+      debtBalanceAtExit,
+      acquisitionDate,
       purchasePrice,
-      closingCostsPct = 0.02,
-      initialCapex = 0,
-      year1NOI,
-      noiGrowthRate = 0.03,
-      holdPeriod = 10,
-      discountRate = 0.10,
-      exitCapRate = 0.075,
-      loanAmount = 0,
-      loanRate = 0.055,
-      loanTerm = 10,
-      amortization = 25,
-    } = input;
+    }
+  );
 
-    const closingCosts = purchasePrice * closingCostsPct;
-    const totalInvestment = purchasePrice + closingCosts + initialCapex;
-    const equity = totalInvestment - loanAmount;
-    const annualDebtService = calculateDebtService(loanAmount, loanRate, amortization);
-    const goingInCapRate = year1NOI / purchasePrice;
+  return {
+    projectId,
+    irr: leveredIrr,
+    leveredIrr,
+    unleveredIrr,
+    npv,
+    equityMultiple,
+    goingInCapRate,
+    exitCapRate: exitCapRate * 100,
+    cashOnCashReturn,
+    purchasePrice,
+    equityInvested,
+    holdPeriodYears: holdPeriod,
+    totalDebt: totalDebtAtClose,
+    blendedDebtRate: blendedRate * 100,
+    years,
+    exit,
+    cashFlows: canonical.flows,
+    sensitivity,
+    meta: {
+      source: 'proForma',
+      generatedAt: new Date().toISOString(),
+      discountRate,
+      hasDebt: totalDebtAtClose > 0,
+      overridesApplied: !!input.overrides,
+    },
+  };
+}
 
-    // Generate cash flows
-    const cashFlows: CashFlowPeriod[] = [];
-    const unleveredCashFlows: number[] = [-totalInvestment];
-    const leveredCashFlows: number[] = [-equity];
-    const cashOnCashReturns: number[] = [];
+// ─── Quick IRR Endpoint Logic ────────────────────────────────────────────────
 
-    for (let year = 1; year <= holdPeriod; year++) {
-      const growthFactor = Math.pow(1 + noiGrowthRate, year - 1);
-      const noi = year1NOI * growthFactor;
-      
-      // Calculate cash flow before and after debt
-      const cfBeforeDebt = noi;
-      const cfAfterDebt = noi - annualDebtService;
-      
-      // Discount factor
-      const discountFactor = 1 / Math.pow(1 + discountRate, year);
-      const pv = cfBeforeDebt * discountFactor;
-      
-      cashFlows.push({
-        period: year,
-        year: new Date().getFullYear() + year - 1,
-        grossRevenue: noi / 0.65, // Estimate gross from NOI
-        effectiveRevenue: noi / 0.65 * 0.95,
-        operatingExpenses: (noi / 0.65) * 0.35,
-        noi,
-        capex: 0,
-        debtService: annualDebtService,
-        cashFlowBeforeDebt: cfBeforeDebt,
-        cashFlowAfterDebt: cfAfterDebt,
-        discountFactor,
-        presentValue: pv,
-        cumulativePV: cashFlows.reduce((sum, cf) => sum + cf.presentValue, 0) + pv,
+export interface QuickIRRRequest {
+  projectId: string;
+  orgId: string;
+  discountRate?: number;
+}
+
+export interface QuickIRRResponse {
+  irr: number;           // percent
+  leveredIrr: number;    // percent
+  npv: number;           // currency
+  equityMultiple: number;
+  goingInCapRate: number; // percent
+  exitCapRate: number;    // percent
+}
+
+/**
+ * Quick IRR — lightweight version that still consumes canonical projection.
+ * Returns all KPIs as percentages.
+ */
+export async function computeQuickIRR(
+  request: QuickIRRRequest,
+  deps: {
+    pool: any;
+    computeDirectInputFinancials: (assetClass: string, assumptions: any, unitMix: any) => any;
+    computeMultiYearProjection: (year1: any, config: any) => any;
+    generateDebtSchedule?: (tranches: any[], holdPeriod: number) => any;
+  }
+): Promise<QuickIRRResponse> {
+  // Reuse full analysis — same engine, just return subset
+  const result = await performDCFAnalysis(
+    { projectId: request.projectId, orgId: request.orgId, discountRate: request.discountRate },
+    deps
+  );
+
+  return {
+    irr: result.leveredIrr,
+    leveredIrr: result.leveredIrr,
+    npv: result.npv,
+    equityMultiple: result.equityMultiple,
+    goingInCapRate: result.goingInCapRate,
+    exitCapRate: result.exitCapRate,
+  };
+}
+
+// ─── Sensitivity Matrix Builder ──────────────────────────────────────────────
+
+function buildSensitivityMatrix(
+  year1: any,
+  computeMultiYearProjection: (y1: any, config: any) => any,
+  deps: any,
+  params: {
+    baseGrowth: number;
+    baseExitCap: number;
+    holdPeriod: number;
+    expenseGrowthRate: number;
+    sellingCostPct: number;
+    equityInvested: number;
+    annualDebtService: number[];
+    debtBalanceAtExit: number;
+    acquisitionDate: string;
+    purchasePrice: number;
+  }
+): SensitivityMatrix {
+  // Growth rate columns: base ± 1%, ± 2% (5 columns)
+  const growthDeltas = [-0.02, -0.01, 0, 0.01, 0.02];
+  const columns = growthDeltas.map(d =>
+    Math.round((params.baseGrowth + d) * 10000) / 100 // as percent
+  );
+
+  // Exit cap rows: base ± 50bps, ± 100bps (5 rows)
+  const exitCapDeltas = [-0.01, -0.005, 0, 0.005, 0.01];
+
+  const rows = exitCapDeltas.map(exitDelta => {
+    const exitCap = params.baseExitCap + exitDelta;
+    const values = growthDeltas.map(growthDelta => {
+      const growth = params.baseGrowth + growthDelta;
+      const proj = computeMultiYearProjection(year1, {
+        holdPeriod: params.holdPeriod,
+        revenueGrowthRate: growth,
+        expenseGrowthRate: params.expenseGrowthRate,
+        exitCapRate: exitCap,
+        sellingCostPct: params.sellingCostPct,
       });
 
-      unleveredCashFlows.push(cfBeforeDebt);
-      leveredCashFlows.push(cfAfterDebt);
-      
-      // Cash-on-cash return
-      const coc = equity > 0 ? cfAfterDebt / equity : 0;
-      cashOnCashReturns.push(coc);
-    }
+      const flows = buildQuickFlows(
+        params.acquisitionDate,
+        params.equityInvested,
+        proj.years,
+        params.annualDebtService,
+        proj.exit,
+        params.debtBalanceAtExit
+      );
 
-    // Calculate terminal value
-    const finalNOI = cashFlows[cashFlows.length - 1].noi;
-    const nextYearNOI = finalNOI * (1 + noiGrowthRate);
-    const terminalValueInput: TerminalValueInput = {
-      method: 'exit_multiple',
-      exitCapRate,
-      saleCosts: 0.02,
-    };
-    const terminalValue = calculateTerminalValue(finalNOI, terminalValueInput, nextYearNOI);
-    
-    // Remaining loan balance at exit
-    const remainingBalance = calculateRemainingBalance(loanAmount, loanRate, amortization, holdPeriod);
-    
-    // Add terminal value to final year cash flows
-    unleveredCashFlows[unleveredCashFlows.length - 1] += terminalValue;
-    leveredCashFlows[leveredCashFlows.length - 1] += (terminalValue - remainingBalance);
-
-    // Calculate returns - use XIRR for PE-grade precision when monthly granularity is selected
-    const { startDate, cashFlowGranularity = 'annual' } = input;
-    
-    let irr: number;
-    let leveredIRR: number;
-    let npv: number;
-    
-    if (cashFlowGranularity === 'monthly' && startDate) {
-      // PE-Grade: Use XIRR with actual dates for precise timing
-      // This uses the actual start date for accurate time-value calculations
-      // Annual cash flows are mapped to their true calendar dates from the investment start
-      const investmentDate = new Date(startDate);
-      const unleveredDated = periodsToDatedCashFlows(unleveredCashFlows, investmentDate, 'annual');
-      const leveredDated = periodsToDatedCashFlows(leveredCashFlows, investmentDate, 'annual');
-      // Note: Cash flows remain annual but XIRR uses actual investment dates
-      // This enables accurate IRR calculation for mid-month investment starts like 2/15/26
-      
-      irr = calculateXIRR(unleveredDated);
-      leveredIRR = calculateXIRR(leveredDated);
-      npv = calculateXNPV(discountRate, unleveredDated);
-    } else {
-      // Standard annual period-based calculations
-      irr = calculateIRR(unleveredCashFlows);
-      leveredIRR = calculateIRR(leveredCashFlows);
-      npv = calculateNPV(unleveredCashFlows, discountRate);
-    }
-    
-    const modifiedIRR = calculateMIRR(unleveredCashFlows, discountRate, discountRate);
-    
-    // Terminal value PV
-    const terminalPV = terminalValue / Math.pow(1 + discountRate, holdPeriod);
-    
-    // Total cash received
-    const totalCashReceived = 
-      cashFlows.reduce((sum, cf) => sum + cf.cashFlowAfterDebt, 0) +
-      (terminalValue - remainingBalance);
-    const equityMultiple = equity > 0 ? totalCashReceived / equity : 0;
-    
-    // Payback period
-    let cumulativeCash = 0;
-    let paybackPeriod = holdPeriod;
-    for (let i = 0; i < cashFlows.length; i++) {
-      cumulativeCash += cashFlows[i].cashFlowAfterDebt;
-      if (cumulativeCash >= equity) {
-        paybackPeriod = i + 1 - (cumulativeCash - equity) / cashFlows[i].cashFlowAfterDebt;
-        break;
-      }
-    }
-    
-    // Profitability index
-    const profitabilityIndex = totalInvestment > 0 ? (npv + totalInvestment) / totalInvestment : 0;
-
-    const avgCashOnCash = cashOnCashReturns.reduce((a, b) => a + b, 0) / cashOnCashReturns.length;
+      return calculateXIRR(flows).irr;
+    });
 
     return {
-      id,
-      name,
-      isBase,
-      probability,
-      purchasePrice,
-      closingCosts,
-      initialCapex,
-      totalInvestment,
-      loanAmount,
-      loanRate,
-      loanTerm,
-      amortization,
-      revenueGrowthRate: noiGrowthRate,
-      expenseGrowthRate: noiGrowthRate * 0.8,
-      vacancyRate: 0.05,
-      managementFee: 0.05,
-      reserveRate: 0.02,
-      holdPeriod,
-      cashFlows,
-      terminalValue: terminalValueInput,
-      discountRate,
-      discountRateMethod: 'custom',
-      npv,
-      irr: irr * 100,
-      leveredIRR: leveredIRR * 100,
-      equityMultiple,
-      cashOnCash: cashOnCashReturns.map(c => c * 100),
-      avgCashOnCash: avgCashOnCash * 100,
-      paybackPeriod,
-      profitabilityIndex,
-      modifiedIRR: modifiedIRR * 100,
-      terminalValueAmount: terminalValue,
-      presentValueOfTerminal: terminalPV,
-      goingInCapRate: goingInCapRate * 100,
-      exitCapRate: exitCapRate * 100,
+      exitCapRate: Math.round(exitCap * 10000) / 100, // as percent
+      values,
     };
-  }
+  });
 
-  /**
-   * Generate sensitivity matrix for two variables
-   */
-  generateSensitivityMatrix(
-    baseInput: DCFInput,
-    var1Config: { name: string; key: keyof DCFInput; values: number[] },
-    var2Config: { name: string; key: keyof DCFInput; values: number[] },
-    metric: 'irr' | 'npv' | 'equity_multiple' | 'cash_on_cash'
-  ): SensitivityMatrix {
-    const results: number[][] = [];
-    
-    for (const v1 of var1Config.values) {
-      const row: number[] = [];
-      for (const v2 of var2Config.values) {
-        const modifiedInput = {
-          ...baseInput,
-          [var1Config.key]: v1,
-          [var2Config.key]: v2,
-        };
-        
-        const scenario = this.calculateScenario('temp', 'temp', modifiedInput);
-        
-        switch (metric) {
-          case 'irr':
-            row.push(scenario.irr);
-            break;
-          case 'npv':
-            row.push(scenario.npv);
-            break;
-          case 'equity_multiple':
-            row.push(scenario.equityMultiple);
-            break;
-          case 'cash_on_cash':
-            row.push(scenario.avgCashOnCash);
-            break;
-        }
-      }
-      results.push(row);
-    }
-    
-    return {
-      variable1: { name: var1Config.name, values: var1Config.values },
-      variable2: { name: var2Config.name, values: var2Config.values },
-      metric,
-      results,
-    };
-  }
-
-  /**
-   * Compare multiple scenarios
-   */
-  compareScenarios(scenarios: DCFScenario[]): ScenarioComparison {
-    const scenarioNames = scenarios.map(s => s.name);
-    
-    const metrics = [
-      { name: 'NPV', key: 'npv', unit: '$' },
-      { name: 'IRR', key: 'irr', unit: '%' },
-      { name: 'Levered IRR', key: 'leveredIRR', unit: '%' },
-      { name: 'Equity Multiple', key: 'equityMultiple', unit: 'x' },
-      { name: 'Avg Cash-on-Cash', key: 'avgCashOnCash', unit: '%' },
-      { name: 'Payback Period', key: 'paybackPeriod', unit: 'years' },
-      { name: 'Going-In Cap', key: 'goingInCapRate', unit: '%' },
-      { name: 'Exit Cap', key: 'exitCapRate', unit: '%' },
-      { name: 'Terminal Value', key: 'terminalValueAmount', unit: '$' },
-    ];
-    
-    return {
-      scenarios: scenarioNames,
-      metrics: metrics.map(m => ({
-        name: m.name,
-        values: scenarios.reduce((acc, s) => {
-          acc[s.name] = (s as any)[m.key];
-          return acc;
-        }, {} as Record<string, number>),
-        unit: m.unit,
-      })),
-    };
-  }
-
-  /**
-   * Calculate probability-weighted result from multiple scenarios
-   */
-  calculateProbabilityWeightedResult(scenarios: DCFScenario[]): ProbabilityWeightedResult {
-    // Normalize probabilities
-    const totalProb = scenarios.reduce((sum, s) => sum + (s.probability || 0), 0);
-    const normalizedScenarios = scenarios.map(s => ({
-      ...s,
-      probability: totalProb > 0 ? (s.probability || 0) / totalProb : 1 / scenarios.length,
-    }));
-    
-    // Calculate expected values
-    const expectedNPV = normalizedScenarios.reduce(
-      (sum, s) => sum + s.npv * (s.probability || 0), 0
-    );
-    const expectedIRR = normalizedScenarios.reduce(
-      (sum, s) => sum + s.irr * (s.probability || 0), 0
-    );
-    const expectedEquityMultiple = normalizedScenarios.reduce(
-      (sum, s) => sum + s.equityMultiple * (s.probability || 0), 0
-    );
-    
-    // Calculate variance
-    const varianceNPV = normalizedScenarios.reduce(
-      (sum, s) => sum + Math.pow(s.npv - expectedNPV, 2) * (s.probability || 0), 0
-    );
-    const stdDev = Math.sqrt(varianceNPV);
-    
-    // 90% confidence interval (1.645 standard deviations)
-    const confidenceInterval = {
-      low: expectedNPV - 1.645 * stdDev,
-      high: expectedNPV + 1.645 * stdDev,
-    };
-    
-    return {
-      expectedNPV,
-      expectedIRR,
-      expectedEquityMultiple,
-      variance: varianceNPV,
-      standardDeviation: stdDev,
-      confidenceInterval,
-    };
-  }
-
-  /**
-   * Load real data from Pro Forma engine, Capital Stack, and Scenario Versions
-   * to build a DCFInput grounded in the actual model instead of hardcoded defaults
-   */
-  private async loadProjectInputs(
-    projectId: string,
-    orgId: string
-  ): Promise<{ baseInput: DCFInput; dataSources: Record<string, string> }> {
-    const dataSources: Record<string, string> = {};
-
-    const [project] = await db
-      .select()
-      .from(modelingProjects)
-      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
-      .limit(1);
-
-    let purchasePrice = project?.purchasePrice ? parseFloat(project.purchasePrice) : 0;
-    if (purchasePrice > 0) dataSources.purchasePrice = 'project';
-
-    let year1NOI = 0;
-    let noiGrowthRate = 0.03;
-    let exitCapRate = 0.075;
-    let holdPeriod = 10;
-    let loanAmount = 0;
-    let loanRate = 0.055;
-    let loanTerm = 10;
-    let amortization = 25;
-
-    try {
-      const proForma = await proFormaEngineService.generateProForma(projectId, orgId, 'base');
-
-      if (proForma.noi && proForma.noi[0] > 0) {
-        year1NOI = proForma.noi[0];
-        dataSources.year1NOI = 'pro_forma';
-      }
-
-      if (proForma.holdPeriod > 0) {
-        holdPeriod = proForma.holdPeriod;
-        dataSources.holdPeriod = 'pro_forma';
-      }
-
-      if (proForma.metrics) {
-        if (proForma.metrics.purchasePrice > 0 && purchasePrice === 0) {
-          purchasePrice = proForma.metrics.purchasePrice;
-          dataSources.purchasePrice = 'pro_forma';
-        }
-
-        if (proForma.metrics.exitCapRate > 0) {
-          exitCapRate = proForma.metrics.exitCapRate / 100;
-          dataSources.exitCapRate = 'pro_forma';
-        }
-
-        if (proForma.metrics.revenueGrowthRate > 0) {
-          noiGrowthRate = proForma.metrics.revenueGrowthRate / 100;
-          dataSources.noiGrowthRate = 'pro_forma';
-        }
-
-        if (proForma.metrics.debtSchedule?.totalDebtAtClose > 0) {
-          loanAmount = proForma.metrics.debtSchedule.totalDebtAtClose;
-          dataSources.loanAmount = 'capital_stack';
-
-          if (proForma.metrics.debtSchedule.blendedRate > 0) {
-            loanRate = proForma.metrics.debtSchedule.blendedRate;
-            dataSources.loanRate = 'capital_stack';
-          }
-        }
-      }
-    } catch (proFormaError) {
-      console.warn('[DCF] Pro Forma data unavailable, loading from scenario/capital stack directly:', proFormaError);
-    }
-
-    try {
-      const [scenario] = await db
-        .select()
-        .from(modelingScenarioVersions)
-        .where(
-          and(
-            eq(modelingScenarioVersions.modelingProjectId, projectId),
-            eq(modelingScenarioVersions.orgId, orgId),
-            eq(modelingScenarioVersions.scenarioType, 'base'),
-            eq(modelingScenarioVersions.isCurrentVersion, true)
-          )
-        )
-        .limit(1);
-
-      if (scenario) {
-        if (!dataSources.exitCapRate && scenario.exitCapRate) {
-          const ecr = parseFloat(scenario.exitCapRate);
-          exitCapRate = ecr > 1 ? ecr / 100 : ecr;
-          dataSources.exitCapRate = 'scenario';
-        }
-        if (!dataSources.noiGrowthRate && scenario.revenueGrowthRate) {
-          const rgr = parseFloat(scenario.revenueGrowthRate);
-          noiGrowthRate = rgr > 1 ? rgr / 100 : rgr;
-          dataSources.noiGrowthRate = 'scenario';
-        }
-      }
-    } catch (e) {
-      console.warn('[DCF] Scenario version load failed:', e);
-    }
-
-    if (!dataSources.loanAmount) {
-      try {
-        const [stack] = await db
-          .select()
-          .from(capitalStacks)
-          .where(
-            and(
-              eq(capitalStacks.modelingProjectId, projectId),
-              eq(capitalStacks.orgId, orgId),
-              eq(capitalStacks.isActive, true)
-            )
-          )
-          .limit(1);
-
-        if (stack) {
-          if (stack.totalDebt) {
-            loanAmount = parseFloat(stack.totalDebt);
-            dataSources.loanAmount = 'capital_stack';
-          }
-          if (stack.blendedDebtRate) {
-            loanRate = parseFloat(stack.blendedDebtRate);
-            dataSources.loanRate = 'capital_stack';
-          }
-          if (stack.holdPeriodYears && !dataSources.holdPeriod) {
-            holdPeriod = stack.holdPeriodYears;
-            dataSources.holdPeriod = 'capital_stack';
-          }
-
-          const tranches = await db
-            .select()
-            .from(debtTranches)
-            .where(eq(debtTranches.capitalStackId, stack.id));
-
-          if (tranches.length > 0) {
-            const seniorTranche = tranches.sort((a, b) => a.priority - b.priority)[0];
-            if (seniorTranche.termYears) {
-              loanTerm = seniorTranche.termYears;
-              dataSources.loanTerm = 'capital_stack';
-            }
-            if (seniorTranche.amortizationYears) {
-              amortization = seniorTranche.amortizationYears;
-              dataSources.amortization = 'capital_stack';
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[DCF] Capital stack load failed:', e);
-      }
-    }
-
-    if (loanAmount === 0 && purchasePrice > 0) {
-      loanAmount = purchasePrice * 0.65;
-      dataSources.loanAmount = 'default_65pct_ltv';
-    }
-
-    if (purchasePrice === 0) {
-      purchasePrice = 5000000;
-      dataSources.purchasePrice = 'default';
-    }
-    if (year1NOI === 0) {
-      year1NOI = purchasePrice * 0.10;
-      dataSources.year1NOI = 'default_10pct_cap';
-    }
-
-    return {
-      baseInput: {
-        purchasePrice,
-        year1NOI,
-        noiGrowthRate,
-        holdPeriod,
-        discountRate: 0.10,
-        exitCapRate,
-        loanAmount,
-        loanRate,
-        loanTerm,
-        amortization,
-      },
-      dataSources,
-    };
-  }
-
-  /**
-   * Full DCF analysis with multiple scenarios.
-   * Sources base inputs from Pro Forma engine, Capital Stack, and scenario versions.
-   */
-  async performDCFAnalysis(
-    projectId: string,
-    orgId: string,
-    scenarioInputs?: { name: string; input: DCFInput; probability?: number }[]
-  ): Promise<DCFAnalysis & { dataSources?: Record<string, string> }> {
-    const { baseInput, dataSources } = await this.loadProjectInputs(projectId, orgId);
-
-    const baseScenario = this.calculateScenario('base', 'Base Case', baseInput, true, 0.5);
-
-    const scenarios: DCFScenario[] = [baseScenario];
-
-    if (scenarioInputs && scenarioInputs.length > 0) {
-      for (const si of scenarioInputs) {
-        const scenario = this.calculateScenario(
-          si.name.toLowerCase().replace(/\s+/g, '_'),
-          si.name,
-          si.input,
-          false,
-          si.probability
-        );
-        scenarios.push(scenario);
-      }
-    } else {
-      const upsideInput = {
-        ...baseInput,
-        noiGrowthRate: baseInput.noiGrowthRate * 1.5,
-        exitCapRate: baseInput.exitCapRate * 0.87,
-      };
-      const downsideInput = {
-        ...baseInput,
-        noiGrowthRate: baseInput.noiGrowthRate * 0.5,
-        exitCapRate: baseInput.exitCapRate * 1.13,
-      };
-
-      scenarios.push(this.calculateScenario('upside', 'Upside Case', upsideInput, false, 0.25));
-      scenarios.push(this.calculateScenario('downside', 'Downside Case', downsideInput, false, 0.25));
-    }
-
-    const baseExitCap = baseInput.exitCapRate;
-    const baseGrowth = baseInput.noiGrowthRate;
-    const sensitivityMatrix = this.generateSensitivityMatrix(
-      baseInput,
-      {
-        name: 'Exit Cap Rate',
-        key: 'exitCapRate',
-        values: [
-          baseExitCap - 0.015, baseExitCap - 0.01, baseExitCap - 0.005,
-          baseExitCap,
-          baseExitCap + 0.005, baseExitCap + 0.01, baseExitCap + 0.015,
-        ].map(v => Math.max(0.03, Math.round(v * 1000) / 1000)),
-      },
-      {
-        name: 'NOI Growth Rate',
-        key: 'noiGrowthRate',
-        values: [
-          baseGrowth - 0.02, baseGrowth - 0.01,
-          baseGrowth,
-          baseGrowth + 0.01, baseGrowth + 0.02,
-        ].map(v => Math.max(0, Math.round(v * 1000) / 1000)),
-      },
-      'irr'
-    );
-
-    const scenarioComparison = this.compareScenarios(scenarios);
-    const probabilityWeightedResult = this.calculateProbabilityWeightedResult(scenarios);
-
-    return {
-      projectId,
-      analysisDate: new Date().toISOString(),
-      scenarios,
-      baseScenario,
-      sensitivityMatrix,
-      scenarioComparison,
-      probabilityWeightedResult,
-      dataSources,
-      lastCalculated: new Date().toISOString(),
-    };
-  }
-
-  /**
-   * Quick calculation for real-time updates — returns full metrics, not just IRR
-   */
-  quickCalculate(input: DCFInput): {
-    irr: number;
-    leveredIrr: number;
-    npv: number;
-    equityMultiple: number;
-    goingInCapRate: number;
-    avgCashOnCash: number;
-    paybackPeriod: number;
-    terminalValue: number;
-  } {
-    const scenario = this.calculateScenario('quick', 'Quick', input);
-    return {
-      irr: scenario.irr,
-      leveredIrr: scenario.leveredIRR,
-      npv: scenario.npv,
-      equityMultiple: scenario.equityMultiple,
-      goingInCapRate: scenario.goingInCapRate,
-      avgCashOnCash: scenario.avgCashOnCash,
-      paybackPeriod: scenario.paybackPeriod,
-      terminalValue: scenario.terminalValueAmount,
-    };
-  }
-
-  /**
-   * Quick IRR calculation for real-time updates
-   */
-  quickIRR(input: DCFInput): number {
-    const scenario = this.calculateScenario('quick', 'Quick', input);
-    return scenario.irr;
-  }
-
-  /**
-   * Quick NPV calculation for real-time updates
-   */
-  quickNPV(input: DCFInput): number {
-    const scenario = this.calculateScenario('quick', 'Quick', input);
-    return scenario.npv;
-  }
+  return { target: 'irr', rows, columns };
 }
 
-export const dcfCalculatorService = new DCFCalculatorService();
+function buildQuickFlows(
+  acquisitionDate: string,
+  equityInvested: number,
+  years: Array<{ year: number; ncf: number }>,
+  annualDS: number[],
+  exit: { netSaleProceeds: number },
+  debtPayoff: number
+): DatedCashFlow[] {
+  const flows: DatedCashFlow[] = [
+    { date: acquisitionDate, amount: -Math.abs(equityInvested) },
+  ];
+
+  for (let i = 0; i < years.length; i++) {
+    const ds = annualDS[i] ?? 0;
+    const levered = years[i].ncf - ds;
+    const isLast = i === years.length - 1;
+    const exitAmt = isLast ? (exit.netSaleProceeds - debtPayoff) : 0;
+
+    flows.push({
+      date: addYearsISO(acquisitionDate, years[i].year),
+      amount: levered + exitAmt,
+    });
+  }
+
+  return flows;
+}
+
+// ─── DB Loaders (Raw SQL — Drizzle breaks on enable_rls tables) ─────────────
+
+async function loadProjectData(pool: any, projectId: string) {
+  const r = await pool.query(
+    `SELECT mp.id as modeling_project_id, mp.asset_class,
+            p.custom_metrics, p.purchase_price
+     FROM modeling_projects mp
+     JOIN projects p ON p.id = mp.project_id
+     WHERE mp.project_id = $1 OR mp.id = $1
+     LIMIT 1`,
+    [projectId]
+  );
+
+  const row = r.rows[0];
+  if (!row) throw new Error(`Project not found: ${projectId}`);
+
+  const customMetrics = typeof row.custom_metrics === 'string'
+    ? JSON.parse(row.custom_metrics)
+    : row.custom_metrics ?? {};
+
+  return {
+    modelingProjectId: row.modeling_project_id,
+    assetClass: row.asset_class ?? 'str',
+    inputAssumptions: customMetrics.inputAssumptions ?? {},
+    unitMix: customMetrics.unitMix ?? [],
+    purchasePrice: Number(row.purchase_price) || 0,
+  };
+}
+
+async function loadScenarioData(pool: any, modelingProjectId: string) {
+  // Scenario version
+  const sv = await pool.query(
+    `SELECT revenue_growth_rate, expense_growth_rate, exit_cap_rate, assumptions
+     FROM modeling_scenario_versions
+     WHERE modeling_project_id = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [modelingProjectId]
+  );
+  const scenario = sv.rows[0] ?? {};
+
+  // Project config for hold period + acquisition date
+  const pc = await pool.query(
+    `SELECT hold_period, acquisition_close_date, cash_flow_granularity
+     FROM modeling_project_config
+     WHERE modeling_project_id = $1 LIMIT 1`,
+    [modelingProjectId]
+  );
+  const config = pc.rows[0] ?? {};
+
+  return {
+    revenueGrowthRate: Number(scenario.revenue_growth_rate) || 3,
+    expenseGrowthRate: Number(scenario.expense_growth_rate) || 2.5,
+    exitCapRate: Number(scenario.exit_cap_rate) || 7.0,
+    holdPeriod: Number(config.hold_period) || 5,
+    acquisitionCloseDate: config.acquisition_close_date ?? null,
+    assumptions: typeof scenario.assumptions === 'string'
+      ? JSON.parse(scenario.assumptions)
+      : scenario.assumptions ?? {},
+  };
+}
+
+async function loadCapitalStackData(pool: any, modelingProjectId: string) {
+  const cs = await pool.query(
+    `SELECT hold_period_years, noi_growth_rate, exit_cap_rate,
+            total_equity, purchase_price, debt_tranches
+     FROM capital_stacks
+     WHERE modeling_project_id = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [modelingProjectId]
+  );
+
+  if (!cs.rows[0]) return null;
+  const row = cs.rows[0];
+
+  return {
+    holdPeriodYears: Number(row.hold_period_years) || 5,
+    noiGrowthRate: Number(row.noi_growth_rate) || 0,
+    exitCapRate: Number(row.exit_cap_rate) || 0,
+    totalEquity: Number(row.total_equity) || 0,
+    purchasePrice: Number(row.purchase_price) || 0,
+    debtTranches: typeof row.debt_tranches === 'string'
+      ? JSON.parse(row.debt_tranches)
+      : row.debt_tranches ?? [],
+  };
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function addYearsISO(dateStr: string, years: number): string {
+  const d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().split('T')[0];
+}
