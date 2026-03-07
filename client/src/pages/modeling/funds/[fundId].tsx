@@ -46,7 +46,9 @@ import {
   Cell,
   LineChart,
   Line,
-  Legend
+  Legend,
+  AreaChart,
+  Area
 } from 'recharts';
 import { 
   Building2, 
@@ -432,13 +434,17 @@ function StatusTransitionDialog({
   );
 }
 
-function OverviewTab({ fund }: { fund: Fund }) {
+function OverviewTab({ fund, numPartners }: { fund: Fund; numPartners: number }) {
   const metrics = fund.metrics;
   const committed = parseFloat(fund.committedCapital || '0');
   const target = parseFloat(fund.targetSize || '0');
   const called = parseFloat(fund.calledCapital || '0');
   const distributed = parseFloat(fund.distributedCapital || '0');
-  
+  const carryPct = parseFloat(fund.carriedInterestPct || '0.20');
+  const prefPct = parseFloat(fund.preferredReturn || '0.08');
+  const mgmtFeePct = parseFloat(fund.managementFeePct || '0.02');
+  const fundLife = fund.fundLifeYears || 10;
+
   const commitmentProgress = target > 0 ? (committed / target) * 100 : 0;
   const deploymentProgress = committed > 0 ? (called / committed) * 100 : 0;
 
@@ -448,6 +454,38 @@ function OverviewTab({ fund }: { fund: Fund }) {
     { name: 'Distributed', value: distributed },
     { name: 'Dry Powder', value: metrics?.dryPowder || 0 },
   ];
+
+  const lpPct = 0.98;
+  const lpEquityIn = called * lpPct;
+  const nav = metrics?.nav || 0;
+  const lpProceeds = distributed * lpPct + nav * lpPct;
+  const holdYrs = Math.min(fundLife, 7);
+  const totalPrefAccrued = lpEquityIn * prefPct * holdYrs;
+  const upside = Math.max(0, lpProceeds - lpEquityIn - totalPrefAccrued);
+  const gpPromote = upside * carryPct;
+  const amPmFees = mgmtFeePct * called * fundLife;
+  const gpNet = gpPromote + amPmFees;
+  const perPartner = numPartners > 0 ? gpNet / numPartners : 0;
+
+  const baseNoi = (nav > 0 ? nav : called) * 0.065;
+  const noiGrowthData = Array.from({ length: Math.max(fundLife, 1) }, (_, i) => ({
+    year: `Yr ${i + 1}`,
+    noi: baseNoi * Math.pow(1.03, i),
+  }));
+
+  const assetIrrData = (fund.allocations || [])
+    .filter(a => a.dealIrr !== null && a.dealIrr !== undefined && parseFloat(a.dealIrr) !== 0)
+    .map(a => ({
+      name: a.projectName ? a.projectName.substring(0, 12) : 'Asset',
+      irr: parseFloat(a.dealIrr || '0') * 100,
+    }));
+
+  const investMonths = Math.max((fund.investmentPeriodYears || 3) * 12, 6);
+  const deploymentData = Array.from({ length: investMonths }, (_, i) => {
+    const m = i + 1;
+    const progress = 1 / (1 + Math.exp(-0.25 * (m - investMonths / 2)));
+    return { month: `M${m}`, deployed: called * progress };
+  });
 
   return (
     <div className="space-y-6">
@@ -459,51 +497,164 @@ function OverviewTab({ fund }: { fund: Fund }) {
           icon={TrendingUp}
           variant={metrics?.netIrr && parseFloat(String(metrics.netIrr)) > 0.15 ? 'success' : 'default'}
         />
-        <MetricCard
-          title="TVPI"
-          value={formatMultiple(metrics?.tvpi)}
-          subtitle="Total value / paid-in"
-          icon={Activity}
-        />
-        <MetricCard
-          title="DPI"
-          value={formatMultiple(metrics?.dpi)}
-          subtitle="Distributions / paid-in"
-          icon={DollarSign}
-        />
-        <MetricCard
-          title="Dry Powder"
-          value={formatCurrency(metrics?.dryPowder || 0)}
-          subtitle="Available to deploy"
-          icon={Target}
-        />
+        <MetricCard title="TVPI" value={formatMultiple(metrics?.tvpi)} subtitle="Total value / paid-in" icon={Activity} />
+        <MetricCard title="DPI" value={formatMultiple(metrics?.dpi)} subtitle="Distributions / paid-in" icon={DollarSign} />
+        <MetricCard title="Dry Powder" value={formatCurrency(metrics?.dryPowder || 0)} subtitle="Available to deploy" icon={Target} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Committed Capital"
-          value={formatCurrency(metrics?.committedCapital || 0)}
-          subtitle={`${fund.investors?.length || 0} investors`}
-          icon={Users}
-        />
+        <MetricCard title="Committed Capital" value={formatCurrency(metrics?.committedCapital || 0)} subtitle={`${fund.investors?.length || 0} investors`} icon={Users} />
         <MetricCard
           title="Called Capital"
           value={formatCurrency(metrics?.calledCapital || 0)}
           subtitle={`${metrics?.calledCapital && metrics?.committedCapital ? ((metrics.calledCapital / metrics.committedCapital) * 100).toFixed(0) : 0}% of committed`}
           icon={Percent}
         />
-        <MetricCard
-          title="Deployed"
-          value={formatCurrency(metrics?.deployedCapital || 0)}
-          subtitle={`${metrics?.activeDeals || 0} active deals`}
-          icon={Briefcase}
-        />
-        <MetricCard
-          title="NAV"
-          value={formatCurrency(metrics?.nav || 0)}
-          subtitle="Current portfolio value"
-          icon={Building2}
-        />
+        <MetricCard title="Deployed" value={formatCurrency(metrics?.deployedCapital || 0)} subtitle={`${metrics?.activeDeals || 0} active deals`} icon={Briefcase} />
+        <MetricCard title="NAV" value={formatCurrency(metrics?.nav || 0)} subtitle="Current portfolio value" icon={Building2} />
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">LP Returns</p>
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20">
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">LP Net IRR</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold text-blue-700 dark:text-blue-400">{formatPercent(metrics?.netIrr)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Net of fees + promote</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">LP MOIC</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatMultiple(metrics?.netMoic)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Multiple on invested capital</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">LP Equity In</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(lpEquityIn)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">{(lpPct * 100).toFixed(0)}% of total equity</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">Pref Hurdle</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatPercent(fund.preferredReturn)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Annual preferred return</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">LP Proceeds</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(lpProceeds)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Total at exit (est.)</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">GP Economics</p>
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-950/20">
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">GP Promote</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{formatCurrency(gpPromote)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">{(carryPct * 100).toFixed(0)}% carry above pref (est.)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">AM + PM Fees</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(amPmFees)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">{fundLife}-yr fee income (est.)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">Per Partner</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(perPartner)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">1 of {numPartners} partners</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4"><CardTitle className="text-xs font-medium text-muted-foreground">GP Net</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(gpNet)}</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Promote + fees (est.)</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Portfolio NOI Growth</CardTitle>
+            <CardDescription className="text-xs">Estimated year-by-year across all deals</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={noiGrowthData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={(v) => `$${(v / 1e6).toFixed(1)}M`} tick={{ fontSize: 10 }} width={48} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                  <Line type="monotone" dataKey="noi" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Asset-Level IRRs</CardTitle>
+            <CardDescription className="text-xs">By deal allocation</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[160px]">
+              {assetIrrData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={assetIrrData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis tickFormatter={(v) => `${v.toFixed(0)}%`} tick={{ fontSize: 10 }} width={36} />
+                    <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} />
+                    <Bar dataKey="irr" fill="#10b981" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-center text-xs text-muted-foreground px-4">
+                  Add deal allocations with IRRs to see asset-level comparison
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">LP Capital Deployment</CardTitle>
+            <CardDescription className="text-xs">Cumulative over investment period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[160px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={deploymentData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={Math.floor(deploymentData.length / 5)} />
+                  <YAxis tickFormatter={(v) => `$${(v / 1e6).toFixed(0)}M`} tick={{ fontSize: 10 }} width={40} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                  <Area type="monotone" dataKey="deployed" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.12} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -563,22 +714,15 @@ function OverviewTab({ fund }: { fund: Fund }) {
             {STATUS_ORDER.map((status, index) => {
               const isActive = fund.status === status;
               const isPast = STATUS_ORDER.indexOf(fund.status) > index;
-              
               return (
                 <div key={status} className="flex items-center">
                   <div className="flex flex-col items-center">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      isActive ? 'bg-blue-600 text-white' : 
-                      isPast ? 'bg-green-600 text-white' : 
-                      'bg-gray-200 text-gray-500'
+                      isActive ? 'bg-blue-600 text-white' : isPast ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'
                     }`}>
-                      {isPast ? <CheckCircle className="h-5 w-5" /> : 
-                       isActive ? <Clock className="h-5 w-5" /> : 
-                       <div className="w-3 h-3 rounded-full bg-gray-400" />}
+                      {isPast ? <CheckCircle className="h-5 w-5" /> : isActive ? <Clock className="h-5 w-5" /> : <div className="w-3 h-3 rounded-full bg-gray-400" />}
                     </div>
-                    <span className={`mt-2 text-xs font-medium capitalize ${isActive ? 'text-blue-600' : 'text-muted-foreground'}`}>
-                      {status}
-                    </span>
+                    <span className={`mt-2 text-xs font-medium capitalize ${isActive ? 'text-blue-600' : 'text-muted-foreground'}`}>{status}</span>
                   </div>
                   {index < STATUS_ORDER.length - 1 && (
                     <div className={`w-16 h-0.5 mx-2 ${isPast ? 'bg-green-600' : 'bg-gray-200'}`} />
@@ -777,7 +921,16 @@ function AllocationsTab({ fund }: { fund: Fund }) {
   );
 }
 
-function WaterfallTab({ fund }: { fund: Fund }) {
+function WaterfallTab({ fund, prefType, setPrefType, gpCatchUp, setGpCatchUp, numPartners, setNumPartners }: {
+  fund: Fund;
+  prefType: 'simple' | 'compound';
+  setPrefType: (v: 'simple' | 'compound') => void;
+  gpCatchUp: 'none' | 'full';
+  setGpCatchUp: (v: 'none' | 'full') => void;
+  numPartners: number;
+  setNumPartners: (v: number) => void;
+}) {
+  const splitStep = gpCatchUp === 'full' ? 4 : 3;
   return (
     <Card>
       <CardHeader>
@@ -789,6 +942,58 @@ function WaterfallTab({ fund }: { fund: Fund }) {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          <div className="p-4 border rounded-lg bg-muted/20">
+            <h4 className="font-medium mb-4">Waterfall Terms</h4>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Preferred Return Type</Label>
+                <div className="flex rounded-md overflow-hidden border h-9">
+                  <button
+                    className={`flex-1 px-3 text-sm font-medium transition-colors ${prefType === 'simple' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+                    onClick={() => setPrefType('simple')}
+                  >Simple</button>
+                  <button
+                    className={`flex-1 px-3 text-sm font-medium transition-colors ${prefType === 'compound' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+                    onClick={() => setPrefType('compound')}
+                  >Compound</button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {prefType === 'simple' ? 'Capital × rate × years' : 'Accrues on unpaid balance'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">GP Catch-Up</Label>
+                <div className="flex rounded-md overflow-hidden border h-9">
+                  <button
+                    className={`flex-1 px-3 text-sm font-medium transition-colors ${gpCatchUp === 'none' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+                    onClick={() => setGpCatchUp('none')}
+                  >None</button>
+                  <button
+                    className={`flex-1 px-3 text-sm font-medium transition-colors ${gpCatchUp === 'full' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
+                    onClick={() => setGpCatchUp('full')}
+                  >Full</button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {gpCatchUp === 'none' ? 'No GP catch-up provision' : 'GP takes 100% above pref until at carry %'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground"># of GP Partners</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={numPartners}
+                  onChange={(e) => setNumPartners(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">Drives per-partner view on Overview</p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Management Fee</p>
@@ -818,18 +1023,22 @@ function WaterfallTab({ fund }: { fund: Fund }) {
                 <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm">2</div>
                 <div>
                   <p className="font-medium">Preferred Return</p>
-                  <p className="text-sm text-muted-foreground">{formatPercent(fund.preferredReturn)} annual preferred to LPs</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatPercent(fund.preferredReturn)} annual to LPs — <span className="font-medium">{prefType === 'simple' ? 'simple' : 'compounded'}</span>
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">3</div>
-                <div>
-                  <p className="font-medium">GP Catch-Up</p>
-                  <p className="text-sm text-muted-foreground">100% to GP until at carry percentage</p>
+              {gpCatchUp === 'full' && (
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">3</div>
+                  <div>
+                    <p className="font-medium">GP Catch-Up</p>
+                    <p className="text-sm text-muted-foreground">100% to GP until at carry percentage</p>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm">4</div>
+                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm">{splitStep}</div>
                 <div>
                   <p className="font-medium">Profit Split</p>
                   <p className="text-sm text-muted-foreground">
@@ -968,6 +1177,9 @@ export default function FundDetailPage() {
   const [, params] = useRoute('/modeling/funds/:fundId');
   const fundId = params?.fundId;
   const { toast } = useToast();
+  const [numPartners, setNumPartners] = useState(3);
+  const [prefType, setPrefType] = useState<'simple' | 'compound'>('simple');
+  const [gpCatchUp, setGpCatchUp] = useState<'none' | 'full'>('none');
 
   const { data: fund, isLoading, error } = useQuery<Fund>({
     queryKey: ['/api/funds', fundId],
@@ -1087,7 +1299,7 @@ export default function FundDetailPage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <OverviewTab fund={fund} />
+          <OverviewTab fund={fund} numPartners={numPartners} />
         </TabsContent>
 
         <TabsContent value="investors">
@@ -1099,7 +1311,15 @@ export default function FundDetailPage() {
         </TabsContent>
 
         <TabsContent value="waterfall">
-          <WaterfallTab fund={fund} />
+          <WaterfallTab
+            fund={fund}
+            prefType={prefType}
+            setPrefType={setPrefType}
+            gpCatchUp={gpCatchUp}
+            setGpCatchUp={setGpCatchUp}
+            numPartners={numPartners}
+            setNumPartners={setNumPartners}
+          />
         </TabsContent>
 
         <TabsContent value="settings">
