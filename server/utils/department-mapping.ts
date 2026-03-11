@@ -74,6 +74,18 @@ export function inferDepartment(subcategory: string, category?: string): string 
   if (lower.includes('commercial lease') || lower.includes('commercial tenant') || lower.includes('commercial rent') || lower.includes('tenant lease') || lower.includes('tenant rent'))
     return 'Commercial Leases';
 
+  // ─── Extended expense department inference ────────────────────────────────
+  if (lower.includes('insur')) return 'Insurance';
+  if (lower.includes('tax') && !lower.includes('payroll tax')) return 'Taxes';
+  if (lower.includes('utilit') || lower.includes('telephone') || lower.includes('propane') || lower.includes('heating') || lower.includes('sewer') || lower.includes('trash') || lower.includes('garbage removal')) return 'Utilities';
+  if (lower.includes('professional fee') || lower.includes('legal') || lower.includes('accounting') || lower.includes('audit') || lower.includes(' cpa')) return 'Professional Services';
+  if (lower.includes('bank') || lower.includes('merchant fee') || lower.includes('credit card') || lower.includes('dockwa') || lower.includes('processing fee')) return 'Bank & Credit Card Fees';
+  if (lower.includes('license') || lower.includes('permit') || lower.includes('registration')) return 'Licenses & Permits';
+  if (lower.includes('security') || lower.includes('guard') || lower.includes('surveillance') || lower.includes('alarm') || lower.includes('janitorial') || lower.includes('cleaning service') || lower.includes('outside service') || lower.includes('contract service')) return 'Security & Contract Services';
+  if (lower.includes('repair') || lower.includes('maintenance') || lower.includes('r&m')) return 'Repairs & Maintenance';
+  if (lower.includes('advertis') || lower.includes('marketing') || lower.includes('promotion') || lower.includes('boat show')) return 'Advertising';
+  if (lower.includes('lease') || lower.includes('ground lease') || lower.includes('land lease') || lower.includes('rent expense')) return 'Leases';
+
   return 'General';
 }
 
