@@ -300,3 +300,47 @@ export function majorGroupToCategory(majorGroup: string): string {
     default: return 'Expenses';
   }
 }
+
+// ─── Category/tier correction based on department ────────────────────────────
+// When the AI mis-tiers a line item, this overrides to the correct category.
+// e.g. "Repairs & Service" department=Service but tier=expense → should be Revenue
+const DEPT_FORCES_CATEGORY: Record<string, string> = {
+  // Revenue departments — these should NEVER be Expenses
+  'Service':           'Revenue',
+  "Ship's Store":      'Revenue',
+  'Storage':           'Revenue',
+  'Fuel':              'Revenue',
+  'Boat Sales':        'Revenue',
+  'Boat Brokerage':    'Revenue',
+  'Boat Rentals':      'Revenue',
+  'Boat Club':         'Revenue',
+  'Marina & Amenities':'Revenue',
+  'Commercial Leases': 'Revenue',
+};
+
+// COGS line items that are commonly mis-tiered as Expenses
+const LINE_ITEM_FORCES_COGS = [
+  'gas purchase', 'fuel purchase', 'diesel purchase', 'fuel cost',
+  'sub-contract', 'subcontract', 'sub contract',
+  'shop supplies', 'parts & supplies', 'parts and supplies', 'parts & materials',
+  'cost of goods', 'cogs',
+];
+
+export function correctCategoryForDepartment(
+  category: string,
+  department: string,
+  lineItemDescription: string
+): string {
+  // Check if this line item is clearly COGS
+  const lower = (lineItemDescription || '').toLowerCase();
+  for (const kw of LINE_ITEM_FORCES_COGS) {
+    if (lower.includes(kw)) return 'COGS';
+  }
+  // Check if department forces a specific category
+  if (DEPT_FORCES_CATEGORY[department]) {
+    // Only override if currently wrong (don't flip Revenue→Revenue)
+    const forced = DEPT_FORCES_CATEGORY[department];
+    if (category === 'Expenses' && forced === 'Revenue') return forced;
+  }
+  return category;
+}

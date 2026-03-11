@@ -2211,7 +2211,7 @@ Respond with JSON only:
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');
 
       // Resolve department: prioritize user-confirmed fields, then fall back to inference
-      const { inferDepartment: inferDeptForActual, deptKeyToLabel } = await import('../utils/department-mapping');
+      const { inferDepartment: inferDeptForActual, deptKeyToLabel, correctCategoryForDepartment } = await import('../utils/department-mapping');
       let inferredDept: string;
       let deptSource = 'inferred';
 
@@ -2238,6 +2238,16 @@ Respond with JSON only:
       }
 
       console.log(`[DocIntel Import] Item "${item.rawText?.substring(0, 40)}" → dept: ${inferredDept} (source: ${deptSource})`);
+
+      // Correct category if department implies a different tier
+      // e.g. dept=Service + category=Expenses → should be Revenue
+      if (plCategory) {
+        const corrected = correctCategoryForDepartment(plCategory, inferredDept, item.rawText || '');
+        if (corrected !== plCategory) {
+          console.log(`[DocIntel Import] Correcting category "${plCategory}" → "${corrected}" based on dept "${inferredDept}" for "${item.rawText?.substring(0,40)}"`);
+          plCategory = corrected;
+        }
+      }
 
       if (isAnnualPeriod) {
         const monthlyAmount = amount / 12;
