@@ -57,13 +57,8 @@ async function getDocIntelUploadDetails(orgId: string, uploadId: string): Promis
   fileSize: number;
 } | null> {
   try {
-    // Try common column name patterns for DocIntel uploads table
     const result = await (pool as any).query(
-      `SELECT 
-        COALESCE(storage_path, file_path, filepath) AS storage_path,
-        COALESCE(original_name, original_filename, filename, display_name) AS original_filename,
-        COALESCE(mime_type, mimetype, content_type) AS mime_type,
-        COALESCE(file_size, size, byte_size, 0) AS file_size
+      `SELECT storage_path, original_name, mime_type, file_size
        FROM doc_intel_uploads
        WHERE id = $1 AND org_id = $2
        LIMIT 1`,
@@ -73,7 +68,7 @@ async function getDocIntelUploadDetails(orgId: string, uploadId: string): Promis
     const row = result.rows[0];
     return {
       storagePath: row.storage_path,
-      originalFilename: row.original_filename ?? 'document',
+      originalFilename: row.original_name ?? 'document',
       mimeType: row.mime_type ?? 'application/octet-stream',
       fileSize: Number(row.file_size ?? 0),
     };
