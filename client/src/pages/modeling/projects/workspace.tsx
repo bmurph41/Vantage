@@ -432,6 +432,24 @@ export default function ProjectWorkspace() {
     enabled: !!projectId,
   });
 
+  // Pricing + financials for Overview/Summary KPI cards
+  const { data: _pricingRaw } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'deal-pricing', 'inputs'],
+    enabled: !!projectId,
+  });
+  const pricingData = _pricingRaw?.dealPricingResults ?? _pricingRaw?.dealPricing ?? _pricingRaw;
+
+  const { data: _proFormaRaw } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
+    enabled: !!projectId,
+  });
+  const financials = _proFormaRaw ? {
+    totalRevenue: _proFormaRaw.totalRevenue ?? _proFormaRaw.revenue?.total ?? 0,
+    totalExpenses: _proFormaRaw.totalExpenses ?? _proFormaRaw.expenses?.total ?? 0,
+    noi: _proFormaRaw.noi ?? _proFormaRaw.netOperatingIncome ?? 0,
+    revenueLines: _proFormaRaw.revenueLines ?? _proFormaRaw.revenue?.lines ?? [],
+  } : undefined;
+
   // === Asset-class-aware tab config ===
   const tabOverrides = useMemo(() => getTabOverrides(project?.assetClass), [project?.assetClass]);
 
@@ -732,7 +750,7 @@ export default function ProjectWorkspace() {
         </div>
 
         <TabsContent value="overview" className="space-y-6">
-          <OverviewDynamic project={project} onTabChange={handleTabChange} />
+          <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">
@@ -769,7 +787,7 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-6" data-tour="valuator-export">
-          <ExecutiveSummaryDynamic projectId={projectId!} onTabChange={handleTabChange} />
+          <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="debt" className="space-y-6">

@@ -525,7 +525,9 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
               {pendingUploads.map((upload) => {
                 const isPnlType = PNL_DOC_TYPES.has(upload.docType ?? '');
                 const isSyncing = syncingUploadId === upload.id;
-                const canSync = isPnlType && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
+                const confirmedCount = upload.stats?.confirmed ?? 0;
+                const alreadySynced = (upload.stats?.imported ?? 0) >= confirmedCount && confirmedCount > 0;
+                const canSync = isPnlType && confirmedCount > 0 && (upload.status === 'parsed' || upload.status === 'reviewing' || upload.status === 'completed');
 
                 return (
                   <div
@@ -594,13 +596,15 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5 border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400"
+                          className={`gap-1.5 ${alreadySynced
+                            ? 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                            : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400'}`}
                           onClick={() => handleSyncToModel(upload.id)}
                           disabled={pnlImportMutation.isPending}
                           data-testid={`button-sync-model-${upload.id}`}
                         >
                           <Zap className="h-3.5 w-3.5" />
-                          Sync to Model
+                          {alreadySynced ? 'Re-sync to Model' : 'Sync to Model'}
                         </Button>
                       )}
                       <Button
