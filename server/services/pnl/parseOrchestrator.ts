@@ -17,6 +17,7 @@ import { extractPdfTables, type PdfRow as ExtractedPdfRow, type PdfCell } from '
 import { detectHeaderAndPeriods, type PeriodCell } from './periodDetect';
 import { validateParsedStatement, type ValidationResult, type ValidationStatus } from './validate';
 import * as XLSX from 'xlsx';
+import { extractExcelPnl } from './excel-extractor';
 import fs from 'fs/promises';
 import { pnlFileStorage } from './pnl-file-storage';
 
@@ -394,123 +395,17 @@ async function parseDocumentToStatement(
         });
       }
     } else if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType === 'text/csv') {
-      // ─── XLSX / CSV parsing (unchanged from v1) ─────────────────────
+      // ─── XLSX / CSV parsing — Phase 2 smart extractor ───────────────
       const fileBuffer = await fs.readFile(storagePath);
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const filename = storagePath ? storagePath.split('/').pop() : undefined;
+      const result = extractExcelPnl(fileBuffer, yearHint ?? null, filename);
 
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+      periods.push(...result.periods);
+      rows.push(...result.rows);
+      if (result.vendorHint) vendorHint = result.vendorHint;
+      confidence = result.confidence;
 
-        if (jsonData.length < 2) continue;
-
-        const headerRow = jsonData[0];
-
-        for (let c = 1; c < headerRow.length; c++) {
-          const header = String(headerRow[c] ?? '').trim();
-          if (!header) continue;
-          const period = parseColumnHeaderToPeriod(header, yearHint ?? undefined);
-          if (period) {
-            periods.push(period);
-          }
-        }
-
-        if (periods.length === 0 && yearHint) {
-          const { start, end } = getYearPeriod(yearHint);
-          periods.push({
-            label: `FY ${yearHint}`,
-            start: start.toISOString(),
-            end: end.toISOString(),
-            type: 'year',
-            year: yearHint,
-            periodNo: 1,
-          });
-        }
-
-        const sectionKeywords: Record<string, ParsedRow['sectionHint']> = {
-          'revenue': 'revenue', 'income': 'revenue', 'sales': 'revenue',
-          'cost of goods sold': 'cogs', 'cost of goods': 'cogs', 'cogs': 'cogs', 'cost of sales': 'cogs',
-          'operating expense': 'expense', 'operating expenses': 'expense', 'expenses': 'expense', 'overhead': 'expense',
-          'payroll': 'payroll', 'wages': 'payroll', 'salaries': 'payroll', 'payroll expense': 'payroll', 'payroll expenses': 'payroll',
-        };
-        let currentSection: ParsedRow['sectionHint'] = null;
-
-        for (let r = 1; r < jsonData.length; r++) {
-          const rowData = jsonData[r];
-          const label = String(rowData[0] ?? '').trim();
-
-          if (!label) continue;
-
-          const lowerLabel = label.toLowerCase();
-
-          const hasNumericValues = rowData.slice(1).some((v: any) => parseMoney(v) !== null);
-          if (!hasNumericValues) {
-            for (const [keyword, section] of Object.entries(sectionKeywords)) {
-              if (lowerLabel === keyword || lowerLabel.startsWith(keyword + ' ') || lowerLabel.endsWith(' ' + keyword)) {
-                currentSection = section as ParsedRow['sectionHint'];
-                break;
-              }
-            }
-          }
-
-          if (lowerLabel.startsWith('total ') || lowerLabel === 'total') {
-            for (const [keyword] of Object.entries(sectionKeywords)) {
-              if (lowerLabel.includes(keyword)) {
-                currentSection = null;
-                break;
-              }
-            }
-            continue;
-          }
-
-          if (lowerLabel.includes('total') && !lowerLabel.includes('subtotal')) continue;
-          if (/^={2,}$/.test(label) || /^-{2,}$/.test(label)) continue;
-
-          if (lowerLabel === 'gross profit' || lowerLabel === 'gross margin') {
-            currentSection = null;
-            continue;
-          }
-
-          const values: ParsedRow['values'] = [];
-
-          for (let c = 1; c < rowData.length && c - 1 < periods.length; c++) {
-            const rawValue = rowData[c];
-            const parsedValue = parseMoney(rawValue);
-
-            values.push({
-              periodIndex: c - 1,
-              value: parsedValue,
-              trace: {
-                page: workbook.SheetNames.indexOf(sheetName) + 1,
-                row: r + 1,
-                col: c + 1,
-                raw: String(rawValue ?? ''),
-              },
-            });
-          }
-
-          if (values.some(v => v.value !== null)) {
-            rows.push({
-              label,
-              normalizedLabel: normalizeLabel(label),
-              values,
-              sectionHint: currentSection,
-              trace: {
-                page: workbook.SheetNames.indexOf(sheetName) + 1,
-                row: r + 1,
-              },
-            });
-          }
-        }
-
-        if (sheetName.toLowerCase().includes('quickbook')) {
-          vendorHint = 'quickbooks';
-        }
-
-        break;
-      }
-
-      confidence = rows.length > 0 ? 0.75 : 0.3;
+      console.log(`[P&L Parser][Excel] sheet="${result.sheetUsed}" headerRow=${result.headerRowIndex} labelCol=${result.labelColIndex} periods=${result.periods.length} rows=${result.rows.length} year=${result.yearInferred}`);
     }
   } catch (error) {
     console.error(`[P&L Parser][${jobId}] Error parsing document:`, error);

@@ -209,9 +209,53 @@ function BulkDepartmentSelect({
   );
 }
 
+
+// ─── Sortable column header helper ───────────────────────────────────────────
+function SortableHead({
+  label,
+  field,
+  activeField,
+  dir,
+  onToggle,
+  className = '',
+}: {
+  label: string;
+  field: string;
+  activeField: string | null;
+  dir: 'asc' | 'desc';
+  onToggle: (f: any) => void;
+  className?: string;
+}) {
+  const isActive = activeField === field;
+  return (
+    <button
+      type="button"
+      className={`flex items-center gap-1 text-xs font-medium text-left w-full hover:text-foreground transition-colors ${isActive ? 'text-foreground' : 'text-muted-foreground'} ${className}`}
+      onClick={() => onToggle(field)}
+    >
+      {label}
+      <span className="flex flex-col leading-none ml-0.5">
+        <span className={`text-[8px] leading-none ${isActive && dir === 'asc' ? 'text-primary' : 'text-muted-foreground/40'}`}>▲</span>
+        <span className={`text-[8px] leading-none ${isActive && dir === 'desc' ? 'text-primary' : 'text-muted-foreground/40'}`}>▼</span>
+      </span>
+    </button>
+  );
+}
+
 export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFilter = 'all' }: PLReviewGridProps) {
   const { toast } = useToast();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [groupedSortField, setGroupedSortField] = useState<'lineItemName' | 'totalAmount' | 'status' | null>(null);
+  const [groupedSortDir, setGroupedSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleGroupedSort = (field: 'lineItemName' | 'totalAmount' | 'status') => {
+    if (groupedSortField === field) {
+      setGroupedSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setGroupedSortField(field);
+      setGroupedSortDir('asc');
+    }
+  };
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [localEdits, setLocalEdits] = useState<Record<string, Partial<ExtractedItem>>>({});
@@ -905,19 +949,33 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     state: { sorting },
   });
 
-  // Filter lineItems based on statusFilter prop - must be before any early returns
+  // Filter + sort lineItems — must be before any early returns
   const filteredLineItems = useMemo(() => {
     if (!groupedData?.lineItems) return [];
-    if (statusFilter === 'all') return groupedData.lineItems;
-    
-    return groupedData.lineItems.filter((lineItem) => {
-      // For pending filter, also include needs_review
-      if (statusFilter === 'pending') {
-        return lineItem.status === 'pending' || lineItem.status === 'needs_review';
-      }
-      return lineItem.status === statusFilter;
-    });
-  }, [groupedData?.lineItems, statusFilter]);
+    let list = statusFilter === 'all'
+      ? groupedData.lineItems
+      : groupedData.lineItems.filter((lineItem) => {
+          if (statusFilter === 'pending') return lineItem.status === 'pending' || lineItem.status === 'needs_review';
+          return lineItem.status === statusFilter;
+        });
+
+    if (groupedSortField) {
+      const dir = groupedSortDir === 'asc' ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        if (groupedSortField === 'lineItemName') {
+          return dir * a.lineItemName.localeCompare(b.lineItemName);
+        }
+        if (groupedSortField === 'totalAmount') {
+          return dir * ((a.totalAmount ?? 0) - (b.totalAmount ?? 0));
+        }
+        if (groupedSortField === 'status') {
+          return dir * a.status.localeCompare(b.status);
+        }
+        return 0;
+      });
+    }
+    return list;
+  }, [groupedData?.lineItems, statusFilter, groupedSortField, groupedSortDir]);
 
   if (isLoading) {
     return (
@@ -1107,9 +1165,9 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
           </div>
         ) : (
           <>
-            {/* Bulk Action Bar - fixed at top of viewport when rows are selected */}
+            {/* Bulk Action Bar - sticky inline below toolbar */}
             {selectedRowKeys.size > 0 && (
-              <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground p-3 flex items-center justify-between gap-4 shadow-lg">
+              <div className="sticky top-0 z-30 bg-primary text-primary-foreground px-3 py-2 flex items-center justify-between gap-4 shadow-md rounded-t-lg">
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{selectedRowKeys.size} row{selectedRowKeys.size !== 1 ? 's' : ''} selected</span>
                   <Button
@@ -1300,7 +1358,9 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                         aria-label="Select all rows"
                       />
                     </TableHead>
-                    <TableHead className="bg-muted/50 sticky left-8 z-20 w-[160px]">Line Item</TableHead>
+                    <TableHead className="bg-muted/50 sticky left-8 z-20 w-[160px]">
+                      <SortableHead label="Line Item" field="lineItemName" activeField={groupedSortField} dir={groupedSortDir} onToggle={toggleGroupedSort} />
+                    </TableHead>
                     <TableHead className="bg-muted/50 w-[130px] px-1">Category</TableHead>
                     <TableHead className="bg-muted/50 w-[140px] px-1">Department</TableHead>
                     {groupedData.isMultiColumn ? (
@@ -1310,12 +1370,18 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                         </TableHead>
                       ))
                     ) : (
-                      <TableHead className="bg-muted/50 text-right w-[80px]">Amount</TableHead>
+                      <TableHead className="bg-muted/50 text-right w-[80px]">
+                        <SortableHead label="Amount" field="totalAmount" activeField={groupedSortField} dir={groupedSortDir} onToggle={toggleGroupedSort} className="justify-end" />
+                      </TableHead>
                     )}
                     {groupedData.isMultiColumn && (
-                      <TableHead className="bg-muted/50 text-right w-[75px] sticky right-[140px] z-20 px-1">Total</TableHead>
+                      <TableHead className="bg-muted/50 text-right w-[75px] sticky right-[140px] z-20 px-1">
+                        <SortableHead label="Total" field="totalAmount" activeField={groupedSortField} dir={groupedSortDir} onToggle={toggleGroupedSort} className="justify-end" />
+                      </TableHead>
                     )}
-                    <TableHead className="bg-muted/50 text-center w-[70px] sticky right-[70px] z-20 px-1">Status</TableHead>
+                    <TableHead className="bg-muted/50 text-center w-[70px] sticky right-[70px] z-20 px-1">
+                      <SortableHead label="Status" field="status" activeField={groupedSortField} dir={groupedSortDir} onToggle={toggleGroupedSort} className="justify-center" />
+                    </TableHead>
                     <TableHead className="bg-muted/50 text-center w-[70px] sticky right-0 z-20 px-1">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
