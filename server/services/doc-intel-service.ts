@@ -625,50 +625,113 @@ class DocIntelService {
             }
           }
         } else {
-          const textColumns: string[] = [];
-          let amount: number | null = null;
-          let dateValue: string | undefined;
+          // ── Multi-entity detection (e.g. Oakdale: CROWLEY | OAKDALE | JMTM | TOTALS) ──
+          const entityCols = this.detectEntityColumns(jsonData);
+          if (entityCols && (rowIndex === 0 || rowIndex === 1)) continue;
 
-          for (const cell of row) {
-            if (cell === null || cell === undefined || cell === '') continue;
+          if (entityCols) {
+            const labelCell = row[0];
+            const rawText = sanitizeText(typeof labelCell === 'string' ? labelCell : String(labelCell || ''));
+            if (!rawText || this.isHeaderOrSubtotalRow(rawText)) continue;
 
-            if (typeof cell === 'number') {
-              if (amount === null) {
-                amount = cell;
-              }
-            } else if (typeof cell === 'string') {
-              const trimmed = sanitizeText(cell);
-              
-              const numericValue = this.parseNumericString(trimmed);
-              if (numericValue !== null && amount === null) {
-                amount = numericValue;
-              } else if (this.isDateString(trimmed)) {
-                dateValue = trimmed;
-              } else if (trimmed.length > 0 && !this.isNumericOnly(trimmed)) {
-                textColumns.push(trimmed);
-              }
-            }
-          }
+            const totalsEnt = entityCols.find(e => e.name.toUpperCase().includes('TOTAL')) ?? entityCols[entityCols.length - 1];
+            const totalsAmount = typeof row[totalsEnt.colIndex] === 'number' ? (row[totalsEnt.colIndex] as number) : null;
 
-          const rawText = sanitizeText(textColumns.join(' '));
-          
-          if (rawText.length > 2 || amount !== null) {
-            const isZeroValueSubtotal = amount === null || amount === 0;
-            items.push({
+            const totalsItem: any = {
               rawText: rawText || '(no description)',
-              amount,
-              extractedDate: dateValue,
+              amount: totalsAmount,
               sourcePage: sheetIndex + 1,
               sourceRow: globalRow,
-              isZeroValueSubtotal,
+              isZeroValueSubtotal: totalsAmount === null || totalsAmount === 0,
               periodKey: isAnnual ? `${yearForPeriod}-ANNUAL` : undefined,
-            });
+              entityName: totalsEnt.name,
+              _entityChildren: [] as any[],
+            };
+
+            for (const ent of entityCols) {
+              if (ent.name.toUpperCase().includes('TOTAL')) continue;
+              const val = typeof row[ent.colIndex] === 'number' ? (row[ent.colIndex] as number) : null;
+              totalsItem._entityChildren.push({
+                rawText: rawText || '(no description)',
+                amount: val,
+                sourcePage: sheetIndex + 1,
+                sourceRow: globalRow,
+                entityName: ent.name,
+                periodKey: isAnnual ? `${yearForPeriod}-ANNUAL` : undefined,
+              });
+            }
+            items.push(totalsItem);
+
+          } else {
+            // Standard single-column mode
+            const textColumns: string[] = [];
+            let amount: number | null = null;
+            let dateValue: string | undefined;
+            for (const cell of row) {
+              if (cell === null || cell === undefined || cell === '') continue;
+              if (typeof cell === 'number') {
+                if (amount === null) amount = cell;
+              } else if (typeof cell === 'string') {
+                const trimmed = sanitizeText(cell);
+                const numericValue = this.parseNumericString(trimmed);
+                if (numericValue !== null && amount === null) {
+                  amount = numericValue;
+                } else if (this.isDateString(trimmed)) {
+                  dateValue = trimmed;
+                } else if (trimmed.length > 0 && !this.isNumericOnly(trimmed)) {
+                  textColumns.push(trimmed);
+                }
+              }
+            }
+            const rawText = sanitizeText(textColumns.join(' '));
+            if (rawText.length > 2 || amount !== null) {
+              const isZeroValueSubtotal = amount === null || amount === 0;
+              items.push({
+                rawText: rawText || '(no description)',
+                amount,
+                extractedDate: dateValue,
+                sourcePage: sheetIndex + 1,
+                sourceRow: globalRow,
+                isZeroValueSubtotal,
+                periodKey: isAnnual ? `${yearForPeriod}-ANNUAL` : undefined,
+              });
+            }
           }
         }
       }
     }
 
     return items;
+  }
+
+
+  /**
+   * Detect multi-entity column layout (e.g. Oakdale: col0=label, col1=CROWLEY, col2=OAKDALE, col3=JMTM, col4=TOTALS)
+   * Returns array of {colIndex, name} for each entity column, or null if not multi-entity.
+   */
+  private detectEntityColumns(jsonData: any[][]): Array<{colIndex: number; name: string}> | null {
+    if (!jsonData || jsonData.length < 2) return null;
+    const row0 = jsonData[0] || [];
+    const row1 = jsonData[1] || [];
+
+    const PERIOD_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|q[1-4]|20\d{2}|ytd|t12|ttm)\b/i;
+    const candidates: Array<{colIndex: number; name: string}> = [];
+
+    for (let c = 1; c < row0.length; c++) {
+      const cell0 = String(row0[c] || '').trim();
+      const cell1 = String(row1[c] || '').trim();
+      const cell = cell0 || cell1;
+      if (!cell) continue;
+      if (typeof row0[c] === 'number') continue;
+      if (PERIOD_RE.test(cell)) continue;
+      // Must look like a business name or TOTALS
+      if (cell.length > 2) {
+        candidates.push({ colIndex: c, name: cell });
+      }
+    }
+
+    // Need at least 2 entity columns (otherwise it's just a label column)
+    return candidates.length >= 2 ? candidates : null;
   }
 
   private detectMonthHeaders(jsonData: any[][], multiYears?: number[]): MonthHeader[] {
@@ -1080,6 +1143,29 @@ class DocIntelService {
           .returning();
 
         extractedItems.push(extracted);
+
+        // ── Multi-entity children ──────────────────────────────────────────
+        if ((cleanedItem as any)._entityChildren?.length) {
+          for (const child of (cleanedItem as any)._entityChildren) {
+            const childText = sanitizeText(child.rawText);
+            const [childRecord] = await db
+              .insert(docIntelExtractedItems)
+              .values({
+                orgId,
+                uploadId,
+                rawText: childText || '(no description)',
+                amount: child.amount !== null ? String(child.amount) : null,
+                sourcePage: child.sourcePage,
+                sourceRow: child.sourceRow,
+                periodKey: child.periodKey,
+                status: 'pending',
+                entityName: child.entityName,
+                parentItemId: extracted.id,
+              })
+              .returning();
+            extractedItems.push(childRecord);
+          }
+        }
       }
 
       // Auto-categorize items using alias bank

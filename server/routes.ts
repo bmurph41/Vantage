@@ -25431,7 +25431,7 @@ Current context: Project ${req.params.projectId}`;
         'text/csv',
         'application/pdf'
       ];
-      if (allowedTypes.includes(file.mimetype)) {
+      if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(csv|xls|xlsx)$/i)) {
         cb(null, true);
       } else {
         cb(new Error('Invalid file type. Only Excel, CSV, and PDF files are allowed.'));

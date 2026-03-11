@@ -16549,6 +16549,9 @@ export const docIntelExtractedItems = pgTable('doc_intel_extracted_items', {
   // Review notes
   reviewNotes: text('review_notes'),
 
+  // Multi-entity support (e.g. Oakdale combined P&L with 3 entities + TOTALS)
+  entityName: text('entity_name'),       // e.g. 'CROWLEY MARINE', 'TOTALS'
+  parentItemId: varchar('parent_item_id'), // ID of the TOTALS row this entity row belongs to
   // Destination mapping
   targetTable: text('target_table'), // e.g., 'pnl_lines', 'rent_roll_entries'
   targetRecordId: varchar('target_record_id'), // ID of created record after import
