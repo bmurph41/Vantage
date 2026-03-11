@@ -175,7 +175,7 @@ export async function applyLearningRules(
     item.autoConfirmed = true;
     item.learningRuleApplied = true;
 
-    toUpdate.push({ id: item.id, category: rule.category, dept: rule.department ?? '', ruleId: rule.id });
+    toUpdate.push({ id: item.id, category: rule.category, dept: rule.department ?? '', matchedRuleId: rule.id });
   }
 
   if (toUpdate.length === 0) return { items, appliedCount: 0 };
@@ -188,9 +188,7 @@ export async function applyLearningRules(
       try {
         const updatePayload: any = {
           categoryTierConfirmed: category,
-          autoConfirmed: true,
-          learningRuleApplied: true,
-          ruleId,
+                              matchedRuleId: ruleId,
         };
         if (category === 'expense') {
           updatePayload.expenseDeptConfirmed = dept;
