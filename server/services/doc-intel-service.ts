@@ -2211,22 +2211,25 @@ Respond with JSON only:
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');
 
       // Resolve department: prioritize user-confirmed fields, then fall back to inference
-      const { inferDepartment: inferDeptForActual } = await import('../utils/department-mapping');
+      const { inferDepartment: inferDeptForActual, deptKeyToLabel } = await import('../utils/department-mapping');
       let inferredDept: string;
       let deptSource = 'inferred';
 
       // Check tier-specific confirmed departments first (from PLReviewGrid)
       // Note: plCategory is "Revenue"/"COGS"/"Expenses" but tier fields use lowercase
+      // IMPORTANT: dept values are stored as keys (e.g. 'taxes', 'bank_cc_fees') —
+      // translate to display labels (e.g. 'Taxes', 'Bank & Credit Card Fees') for
+      // modelingActuals so Historical P&L and Pro Forma group correctly.
       const tierLower = plCategory?.toLowerCase() || '';
       if ((tierLower === 'revenue' || tierLower === 'cogs') && item.revenueCogsDeptConfirmed) {
-        inferredDept = item.revenueCogsDeptConfirmed;
+        inferredDept = deptKeyToLabel(item.revenueCogsDeptConfirmed, 'revenue');
         deptSource = 'revenueCogsDeptConfirmed';
       } else if ((tierLower === 'expenses' || tierLower === 'expense') && item.expenseDeptConfirmed) {
-        inferredDept = item.expenseDeptConfirmed;
+        inferredDept = deptKeyToLabel(item.expenseDeptConfirmed, 'expense');
         deptSource = 'expenseDeptConfirmed';
       } else if (item.departmentConfirmed) {
-        // Legacy confirm path
-        inferredDept = item.departmentConfirmed;
+        // Legacy confirm path — also translate in case it's a key
+        inferredDept = deptKeyToLabel(item.departmentConfirmed);
         deptSource = 'departmentConfirmed';
       } else {
         // No user confirmation — fall back to heuristic inference

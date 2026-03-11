@@ -111,11 +111,80 @@ const VALID_DEPARTMENTS = new Set([
   'Commercial Leases',
 ]);
 
+// ─── Expense department key → display label (from EXPENSE_DEPT_LABELS) ─────────
+// These are the keys used in the PLReviewGrid (expenseDeptConfirmed field)
+export const EXPENSE_DEPT_KEY_TO_LABEL: Record<string, string> = {
+  payroll: 'Payroll',
+  general_admin: 'General & Administrative',
+  advertising: 'Advertising',
+  repairs_maintenance: 'Repairs & Maintenance',
+  utilities: 'Utilities',
+  licenses_permits: 'Licenses & Permits',
+  security_contract_services: 'Security & Contract Services',
+  bank_cc_fees: 'Bank & Credit Card Fees',
+  professional_services: 'Professional Services',
+  insurance: 'Insurance',
+  taxes: 'Taxes',
+  leases: 'Leases',
+  fb: 'F&B',
+  service: 'Service',
+  parts: 'Parts',
+  rv_park: 'RV Park',
+  hospitality_lodging: 'Hospitality/Lodging',
+  miscellaneous: 'Miscellaneous',
+};
+
+// Revenue/COGS department key → display label (from REVENUE_COGS_DEPT_LABELS)
+export const REVENUE_COGS_DEPT_KEY_TO_LABEL: Record<string, string> = {
+  storage: 'Storage',
+  fuel: 'Fuel',
+  marina_amenities: 'Marina & Amenities',
+  ship_store_retail: "Ship's Store",
+  service: 'Service',
+  parts: 'Parts',
+  third_party_leases: 'Third Party Leases',
+  commercial_leases: 'Commercial Leases',
+  boat_club: 'Boat Club',
+  boat_rentals: 'Boat Rentals',
+  boat_sales: 'Boat Sales',
+  boat_brokerage: 'Boat Brokerage',
+  boat_finance: 'Boat Finance',
+  fb: 'F&B',
+  rv_park: 'RV Park',
+  hospitality_lodging: 'Hospitality/Lodging',
+  miscellaneous: 'Miscellaneous',
+};
+
+/**
+ * Translate a dept key (from expenseDeptConfirmed / revenueCogsDeptConfirmed)
+ * to its display label for storage in modelingActuals.department.
+ *
+ * e.g. 'taxes' → 'Taxes', 'repairs_maintenance' → 'Repairs & Maintenance'
+ *      'storage' → 'Storage', 'bank_cc_fees' → 'Bank & Credit Card Fees'
+ */
+export function deptKeyToLabel(key: string, tier?: string): string {
+  if (!key) return 'General';
+  // Try expense map first (most common for expense items)
+  if (EXPENSE_DEPT_KEY_TO_LABEL[key]) return EXPENSE_DEPT_KEY_TO_LABEL[key];
+  // Try revenue/cogs map
+  if (REVENUE_COGS_DEPT_KEY_TO_LABEL[key]) return REVENUE_COGS_DEPT_KEY_TO_LABEL[key];
+  // Already a display label? Pass through
+  if (VALID_DEPARTMENTS.has(key)) return key;
+  // Titlecase fallback for unknown keys
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export function normalizeDepartment(dept: string): string {
   if (!dept) return 'General';
   const trimmed = dept.trim();
+  // Already a valid display-label department
   if (VALID_DEPARTMENTS.has(trimmed)) return trimmed;
   const lower = trimmed.toLowerCase();
+  // Expense dept key (e.g. 'taxes', 'bank_cc_fees')
+  if (EXPENSE_DEPT_KEY_TO_LABEL[lower]) return EXPENSE_DEPT_KEY_TO_LABEL[lower];
+  // Revenue/cogs dept key (e.g. 'storage', 'fuel')
+  if (REVENUE_COGS_DEPT_KEY_TO_LABEL[lower]) return REVENUE_COGS_DEPT_KEY_TO_LABEL[lower];
+  // Legacy map
   if (LEGACY_DEPARTMENT_MAP[lower]) return LEGACY_DEPARTMENT_MAP[lower];
   return 'General';
 }
