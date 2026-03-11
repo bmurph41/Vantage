@@ -26332,7 +26332,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       // ── Learning: record confirmed classification ──────────────────────
       if (updates.status === 'confirmed' || updates.categoryTierConfirmed) {
-        recordConfirm(orgId, [{ rawText: item.rawText, ...updates }]).catch(() => {});
+        recordConfirm(orgId, [{ rawText: item.rawText, ...updates }]).catch(e => console.error('[Learning single]', e.message, e.stack?.split('\n')[1]));
       }
 
       let propagation = { propagatedCount: 0, affectedUploadIds: [] as string[] };
@@ -26405,7 +26405,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       // ── Learning: record confirmed classifications ───────────────────────
       if (updates.status === 'confirmed' || updates.categoryTierConfirmed) {
         const learningItems = results.map((r: any) => ({ rawText: r.rawText, ...updates }));
-        recordConfirm(orgId, learningItems).catch(() => {});
+        recordConfirm(orgId, learningItems).catch(e => console.error('[Learning bulk]', e.message, e.stack?.split('\n')[1]));
       }
 
       const allAffectedUploadIds = new Set<string>();
