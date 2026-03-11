@@ -1139,14 +1139,15 @@ class DocIntelService {
             columnIndex: item.columnIndex ?? undefined,
             status: isAutoExcluded ? 'excluded' : 'pending',
             reviewNotes: isAutoExcluded ? 'Auto-excluded: subtotal row with no value' : undefined,
+            entityName: (item as any).entityName || undefined,
           })
           .returning();
 
         extractedItems.push(extracted);
 
         // ── Multi-entity children ──────────────────────────────────────────
-        if ((cleanedItem as any)._entityChildren?.length) {
-          for (const child of (cleanedItem as any)._entityChildren) {
+        if ((item as any)._entityChildren?.length) {
+          for (const child of (item as any)._entityChildren) {
             const childText = sanitizeText(child.rawText);
             const [childRecord] = await db
               .insert(docIntelExtractedItems)
