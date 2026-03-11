@@ -26461,8 +26461,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         } 
       });
     } catch (error: any) {
-      console.error('Failed to bulk update items:', error);
-      res.status(500).json({ error: 'Failed to bulk update items' });
+      console.error('Failed to bulk update items:', error?.message, error?.stack?.split('\n').slice(0,3).join(' | '));
+      res.status(500).json({ error: 'Failed to bulk update items', detail: error?.message });
     }
   });
 
