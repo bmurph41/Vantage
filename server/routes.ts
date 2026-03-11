@@ -21269,6 +21269,13 @@ Current context: Project ${req.params.projectId}`;
       }
       
       const items = await query;
+      // ── Learning: auto-classify pending items on load ─────────────────
+      try {
+        const { appliedCount } = await applyLearningRules(orgId, items as any);
+        if (appliedCount > 0) console.log(`[Learning] Applied ${appliedCount} rule(s) on items fetch`);
+      } catch (e) {
+        console.warn('[Learning] applyLearningRules failed silently:', e);
+      }
       res.json(items);
     } catch (error: any) {
       console.error('Failed to fetch catalog items:', error);
@@ -26323,6 +26330,11 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(404).json({ error: 'Item not found' });
       }
 
+      // ── Learning: record confirmed classification ──────────────────────
+      if (updates.status === 'confirmed' || updates.categoryTierConfirmed) {
+        recordConfirm(orgId, [{ rawText: item.rawText, ...updates }]).catch(() => {});
+      }
+
       let propagation = { propagatedCount: 0, affectedUploadIds: [] as string[] };
       const hasStatusChange = updates.status !== undefined;
       const hasClassificationChange = updates.categoryTierConfirmed !== undefined || 
@@ -26388,6 +26400,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           return res.status(400).json({ error: bulkError.message });
         }
         throw bulkError;
+      }
+
+      // ── Learning: record confirmed classifications ───────────────────────
+      if (updates.status === 'confirmed' || updates.categoryTierConfirmed) {
+        const learningItems = results.map((r: any) => ({ rawText: r.rawText, ...updates }));
+        recordConfirm(orgId, learningItems).catch(() => {});
       }
 
       const allAffectedUploadIds = new Set<string>();

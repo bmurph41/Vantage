@@ -191,6 +191,74 @@ function detectLabelColumn(jsonData: any[][], headerRowIndex: number): number {
 
 // ─── Main extraction ──────────────────────────────────────────────────────────
 
+
+// ─── Multi-entity detection ───────────────────────────────────────────────────
+// Detects files where row 0 has entity/business names as column headers
+// rather than time-period labels (e.g. combined P&Ls with 3 entities + totals).
+
+interface EntityHeader {
+  colIndex: number;
+  entityName: string;
+}
+
+function detectEntityHeaders(row0: any[], row1: any[]): EntityHeader[] | null {
+  // A row is "entity-style" if it has 2+ non-empty text cells that are NOT period patterns
+  // and are NOT purely numeric
+  const candidates: EntityHeader[] = [];
+  const allCells = [...(row0 ?? []), ...(row1 ?? [])];
+
+  for (let c = 1; c < (row0 ?? []).length; c++) {
+    const cell0 = String(row0[c] ?? '').trim();
+    const cell1 = String((row1 ?? [])[c] ?? '').trim();
+    const cell = cell0 || cell1;
+    if (!cell) continue;
+    if (parseMoney(cell) !== null) continue; // skip numeric
+    // Skip if it looks like a period (month/quarter/year)
+    if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(cell)) continue;
+    if (/\bq[1-4]\b/i.test(cell)) continue;
+    if (/\b20\d{2}\b/.test(cell)) continue;
+    if (/\bytd\b|\bt12\b|\bttm\b/i.test(cell)) continue;
+    candidates.push({ colIndex: c, entityName: cell });
+  }
+
+  // Need at least 2 entity columns to qualify as multi-entity
+  return candidates.length >= 2 ? candidates : null;
+}
+
+function buildEntityPeriods(
+  entities: EntityHeader[],
+  yearHint: number | null,
+  filename?: string,
+): { periods: ParsedPeriod[]; periodColIndices: number[] } {
+  // Derive fiscal year from filename (e.g. "10-1-24_-_9-30-25" → FY2025)
+  let year = yearHint;
+  if (!year && filename) {
+    const m = filename.match(/[_-](20\d{2})[_-]/);
+    if (m) year = parseInt(m[1], 10);
+    if (!year) {
+      const m2 = filename.match(/[_-](\d{2})[_.-]/g);
+      if (m2 && m2.length >= 2) {
+        const lastYear = m2[m2.length - 1].replace(/[^\d]/g, '');
+        if (lastYear) year = parseInt(lastYear, 10) > 50 ? 1900 + parseInt(lastYear, 10) : 2000 + parseInt(lastYear, 10);
+      }
+    }
+  }
+  if (!year) year = new Date().getFullYear();
+
+  const { start, end } = getYearPeriod(year);
+
+  const periods: ParsedPeriod[] = entities.map(e => ({
+    label: e.entityName,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    type: 'year' as const,
+    year,
+    periodNo: 1,
+  }));
+
+  return { periods, periodColIndices: entities.map(e => e.colIndex) };
+}
+
 const VENDOR_PATTERNS: { pattern: RegExp; hint: string }[] = [
   { pattern: /quickbook/i, hint: 'quickbooks' },
   { pattern: /sage/i, hint: 'sage' },
@@ -232,9 +300,23 @@ export function extractExcelPnl(
   if (!yearFromMeta) yearFromMeta = inferYearFromText(sheetName);
   if (!yearFromMeta && filename) yearFromMeta = inferYearFromText(filename);
 
+  // ── Multi-entity detection: check row 0 for entity names ──────────────
+  const entityHeaders = detectEntityHeaders(jsonData[0] ?? [], jsonData[1] ?? []);
+  let isMultiEntity = false;
+
   // Header row scan
   const header = scanForHeaderRow(jsonData, yearFromMeta);
   let { periods, periodColIndices, rowIndex: headerRowIndex, yearHint } = header;
+
+  // If no periods found and row 0 looks like entity names → multi-entity mode
+  if (periods.length === 0 && entityHeaders && entityHeaders.length >= 2) {
+    const built = buildEntityPeriods(entityHeaders, yearFromMeta, filename);
+    periods = built.periods;
+    periodColIndices = built.periodColIndices;
+    headerRowIndex = entityHeaders[0] ? 1 : 0; // skip the entity header rows
+    isMultiEntity = true;
+    console.log(`[Excel] Multi-entity mode: ${entityHeaders.map(e => e.entityName).join(', ')}`);
+  }
 
   // Fallback to annual period
   if (periods.length === 0 && yearHint) {
@@ -244,7 +326,8 @@ export function extractExcelPnl(
     periodColIndices = [lc + 1];
   }
 
-  const labelColIndex = detectLabelColumn(jsonData, headerRowIndex);
+  // In multi-entity mode: label col is always 0 (entity headers are in cols 1+)
+  const labelColIndex = isMultiEntity ? 0 : detectLabelColumn(jsonData, headerRowIndex);
 
   // Extend periodColIndices if needed
   while (periodColIndices.length < periods.length) {
