@@ -925,7 +925,6 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
               : `${holdPeriod}-year projections - upload documents to populate baseline actuals`
             }</div>
         </div>
-        </div>
         <div className="flex items-center gap-2">
           {/* Hold Period Selector - Requirement J */}
           <Select 

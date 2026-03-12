@@ -229,7 +229,6 @@ function SofrForwardRatePreview({ holdYears, spreadBps, floorRate }: SofrForward
           </span>
         </div>
       </div>
-      <div className="fm-body">
     );
   }
 
@@ -1128,7 +1127,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   }
 
   return (
-    <div className="fm-page" ref={pdfRef}>
+    <div className="space-y-4" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
       )}
@@ -1196,7 +1195,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         <div>
           <div className="fm-header-title">Capital Stack Builder</div>
           <div className="fm-header-sub">Configure multi-tranche debt, equity layers, and waterfall distributions</div>
-        </div>
         </div>
         <Dialog open={showCreateStack} onOpenChange={(open) => { setShowCreateStack(open); if (!open) resetWizard(); }}>
           <DialogTrigger asChild>
@@ -4277,7 +4275,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                             const irrAfter = calcIrr(cfsAfter) * 100;
 
                             return (
-                              <div className="fm-page">
+                              <div className="space-y-4">
                                 {/* Called Debt Alert */}
                                 {calledTranches.length > 0 && (
                                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">

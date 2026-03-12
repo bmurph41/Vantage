@@ -165,7 +165,6 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           <div className="fm-header-title">Exit Strategy Suite</div>
           <div className="fm-header-sub">Institutional-grade exit analysis for {project?.marinaName}</div>
         </div>
-        </div>
         <div className="flex items-center gap-3">
           <ExportPdfButton contentRef={pdfRef} filename="exit-strategy" title="Exit Strategy" />
           <div className="flex items-center gap-2">
