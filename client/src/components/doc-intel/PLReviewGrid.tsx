@@ -117,6 +117,9 @@ interface MonthlyDataItem {
 interface GroupedLineItem {
   lineItemName: string;
   sourceRow: number;
+  entityName: string | null;
+  parentItemId: string | null;
+  isTotal: boolean;
   monthlyData: MonthlyDataItem[];
   totalAmount: number;
   status: "pending" | "confirmed" | "excluded" | "mixed";
@@ -128,6 +131,13 @@ interface GroupedItemsResponse {
   lineItems: GroupedLineItem[];
   periods: string[];
   isMultiColumn: boolean;
+}
+
+// Derived structure for entity grouping UI
+interface EntityGroup {
+  entityName: string;
+  isTotal: boolean;
+  rows: GroupedLineItem[];
 }
 
 
@@ -262,6 +272,14 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
   const [pendingMonthlyEdits, setPendingMonthlyEdits] = useState<Record<string, number>>({});
   const [showExcluded, setShowExcluded] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set(['__TOTALS__']));
+  const toggleEntityExpanded = (entityName: string) => {
+    setExpandedEntities(prev => {
+      const next = new Set(prev);
+      if (next.has(entityName)) next.delete(entityName); else next.add(entityName);
+      return next;
+    });
+  };
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [excludeDialog, setExcludeDialog] = useState<{ open: boolean; item: ExtractedItem | null; reason: string }>({
     open: false,
@@ -977,6 +995,33 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
     return list;
   }, [groupedData?.lineItems, statusFilter, groupedSortField, groupedSortDir]);
 
+  // Derived: group filteredLineItems into entity sections (TOTALS as parent, entities as children)
+  const hasEntityGrouping = (filteredLineItems.length > 0 && filteredLineItems.some(li => li.entityName && li.entityName !== 'TOTALS'));
+  const entityGroups = useMemo<EntityGroup[]>(() => {
+    // Always return groups — single passthrough group when no entity data
+    if (!hasEntityGrouping) {
+      return [{ entityName: '', isTotal: false, rows: filteredLineItems }];
+    }
+    const groupMap = new Map<string, GroupedLineItem[]>();
+    // TOTALS rows first
+    for (const li of filteredLineItems) {
+      if (li.isTotal || !li.entityName) {
+        if (!groupMap.has('__TOTALS__')) groupMap.set('__TOTALS__', []);
+        groupMap.get('__TOTALS__')!.push(li);
+      } else {
+        if (!groupMap.has(li.entityName)) groupMap.set(li.entityName, []);
+        groupMap.get(li.entityName)!.push(li);
+      }
+    }
+    const result: EntityGroup[] = [];
+    const totals = groupMap.get('__TOTALS__');
+    if (totals) result.push({ entityName: 'TOTALS', isTotal: true, rows: totals });
+    for (const [name, rows] of groupMap.entries()) {
+      if (name !== '__TOTALS__') result.push({ entityName: name, isTotal: false, rows });
+    }
+    return result;
+  }, [filteredLineItems, hasEntityGrouping]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -1393,9 +1438,51 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLineItems.map((lineItem) => {
-                    const rowKey = `${lineItem.lineItemName}__${lineItem.sourceRow}`;
-                    const isExpanded = expandedRows.has(rowKey);
+                  // ── Entity-grouped view (always) — header shown only when multiple groups ──
+                  entityGroups.map((group) => {
+                    const entityKey = group.entityName;
+                    const isEntityExpanded = expandedEntities.has(entityKey);
+                    const colSpan = groupedData.isMultiColumn ? groupedData.periods.length + 7 : 7;
+                    const confirmedInGroup = group.rows.filter(r => r.status === 'confirmed').length;
+                    const pendingInGroup = group.rows.filter(r => r.status === 'pending' || r.status === 'needs_review').length;
+                    return (
+                      <Fragment key={entityKey}>
+                        {/* Entity section header row — only when multiple groups exist */}
+                        {entityGroups.length > 1 && <TableRow
+                          className="bg-muted/60 hover:bg-muted/80 cursor-pointer select-none border-t-2 border-border"
+                          onClick={() => toggleEntityExpanded(entityKey)}
+                        >
+                          <TableCell colSpan={colSpan} className="py-2 px-4">
+                            <div className="flex items-center gap-3">
+                              {isEntityExpanded
+                                ? <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                : <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
+                              <span className="font-semibold text-sm">
+                                {group.isTotal ? '∑ TOTALS' : group.entityName}
+                              </span>
+                              {group.isTotal && (
+                                <span className="text-xs text-muted-foreground font-normal">combined across all entities</span>
+                              )}
+                              <div className="flex items-center gap-1.5 ml-auto">
+                                <span className="text-xs text-muted-foreground">{group.rows.length} line items</span>
+                                {pendingInGroup > 0 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                                    {pendingInGroup} pending
+                                  </span>
+                                )}
+                                {confirmedInGroup > 0 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400">
+                                    {confirmedInGroup} confirmed
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>}
+                        {/* Line item rows — always shown when single group, collapsible otherwise */}
+                        {(entityGroups.length === 1 || isEntityExpanded) && group.rows.map((lineItem) => {
+                          const rowKey = `${lineItem.lineItemName}__${lineItem.sourceRow}`;
+                          const isExpanded = expandedRows.has(rowKey);
                     
                     return (
                       <Fragment key={rowKey}>
@@ -1891,8 +1978,10 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                         )}
                       </Fragment>
                     );
-                  })
-                )}
+                  })}
+                      </Fragment>
+                    );
+                  })}
               </TableBody>
               </Table>
             </div>

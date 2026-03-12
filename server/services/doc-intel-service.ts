@@ -1831,6 +1831,9 @@ Respond with JSON only:
     lineItems: Array<{
       lineItemName: string;
       sourceRow: number;
+      entityName: string | null;
+      parentItemId: string | null;
+      isTotal: boolean;
       monthlyData: Array<{
         id: string;
         periodKey: string;
@@ -1857,6 +1860,9 @@ Respond with JSON only:
         lineItems: items.map(item => ({
           lineItemName: item.rawText,
           sourceRow: item.sourceRow,
+          entityName: (item as any).entityName ?? null,
+          parentItemId: (item as any).parentItemId ?? null,
+          isTotal: !(item as any).entityName || (item as any).entityName === 'TOTALS',
           monthlyData: [{
             id: item.id,
             periodKey: item.periodKey || 'single',
@@ -1895,7 +1901,7 @@ Respond with JSON only:
       
       const key = `${item.rawText}__${item.sourceRow}`;
       if (!lineItemMap.has(key)) {
-        lineItemMap.set(key, { sourceRow: item.sourceRow, items: [] });
+        lineItemMap.set(key, { sourceRow: item.sourceRow, entityName: (item as any).entityName ?? null, parentItemId: (item as any).parentItemId ?? null, items: [] });
       }
       lineItemMap.get(key)!.items.push(item);
     }
@@ -1935,6 +1941,9 @@ Respond with JSON only:
       return {
         lineItemName,
         sourceRow: data.sourceRow,
+        entityName: data.entityName ?? null,
+        parentItemId: data.parentItemId ?? null,
+        isTotal: !data.entityName || data.entityName === 'TOTALS',
         monthlyData,
         totalAmount,
         status,
