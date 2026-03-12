@@ -926,14 +926,6 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
           occupancy: r.occupancy / 100,
           avgSF: r.avgSF,
         })),
-          unitMix: unitRows.filter(r => r.enabled).map(r => ({
-            label: r.name,
-            count: r.count,
-            monthlyRent: r.monthlyRate,
-            nightlyRate: rateType === 'nightly' ? r.monthlyRate : undefined,
-            occupancy: r.occupancy / 100,
-            avgSF: r.avgSF,
-          })),
         },
       };
 

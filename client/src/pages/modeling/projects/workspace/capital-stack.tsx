@@ -4609,7 +4609,6 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
         </TabsContent>
       </Tabs>
-      </div>
     </div>
   );
 }

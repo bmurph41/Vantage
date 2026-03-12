@@ -176,3 +176,27 @@ Then click Sync to Model in Uploads tab.
 1. **Single-item confirm 500** — undiagnosed, needs [Learning single] server log
 2. **DCF service audit** — verify performDCFAnalysis handles empty inputAssumptions gracefully (doesn't throw)
 3. **Seasonalize → Re-sync test** — verify Historical P&L shows even monthly split after re-sync
+
+---
+
+## Session 4b — FM Design System + Build Fix Marathon
+
+### FM Design System v2 (index.css)
+Added full institutional CSS layer: `fm-page`, `fm-header`, `fm-header-title`, `fm-header-sub`, `fm-header-actions`, `fm-kpi-strip` (cols-4/5/6/8), `fm-kpi` with accent bars, `fm-kpi-label`/`fm-kpi-value`/`fm-kpi-sub`, `fm-body`, `fm-panel`, `fm-panel-header`, `fm-panel-title`, `fm-panel-body`, `fm-section-label`, `fm-table` with row-total/row-subtotal/row-group-header, `fm-scenario-pill` (bear/base/bull), `fm-delta` (up/down), `fm-source-badge` (manual/synced). Monospace font stack via `--fm-mono`.
+
+### Tabs upgraded to fm-page wrapper
+historical-pl, dcf-calculator, deal-pricing, pro-forma, exit-strategy, model-returns, debt-scenarios, monte-carlo, scenario-comparison
+
+### Tabs reverted (complex nested returns — apply manually)
+capital-stack — reverted to space-y-4, needs careful manual wrap of top-level return only
+
+### Build errors fixed
+1. inputs.tsx — duplicate `unitMix` key from fm-wrap-bodies script
+2. capital-stack.tsx — extra `</div>` injected before `</Tabs>` at line 4613
+3. PLReviewGrid.tsx — outer entityGroups Fragment never closed; inner map closed with `})}` but outer needed `})` + `)}` to close ternary
+
+### Remaining visual upgrade work
+- Apply `fm-kpi` classes to individual KPI cells inside fm-kpi-strip (they still use old p-4 flex-col pattern)  
+- capital-stack needs manual fm-page wrapper at component root (line ~1130)
+- debt-inputs.tsx header patch may need re-check
+- Add `fm-body` content wrap inside each tab after fm-header

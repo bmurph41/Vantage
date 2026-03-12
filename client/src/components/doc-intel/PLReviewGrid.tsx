@@ -1981,7 +1981,8 @@ export function PLReviewGrid({ projectId, uploadId, onApplyToModeling, statusFil
                   })}
                       </Fragment>
                     );
-                  })}
+                  })
+                )}
               </TableBody>
               </Table>
             </div>
