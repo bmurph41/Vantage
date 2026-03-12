@@ -253,9 +253,9 @@ export function registerDCFRoutes(
 
 async function loadProjectQuick(pool: any, projectId: string) {
   const r = await pool.query(
-    `SELECT mp.id as modeling_project_id, mp.asset_class, p.custom_metrics, p.purchase_price
-     FROM modeling_projects mp JOIN projects p ON p.id = mp.project_id
-     WHERE mp.project_id = $1 OR mp.id = $1 LIMIT 1`,
+    `SELECT mp.id as modeling_project_id, mp.asset_class, mp.custom_metrics, mp.purchase_price
+     FROM modeling_projects mp
+     WHERE mp.id = $1 LIMIT 1`,
     [projectId]
   );
   const row = r.rows[0] ?? {};
@@ -293,7 +293,7 @@ async function loadScenarioQuick(pool: any, mpId: string) {
 
 async function loadCapitalStackQuick(pool: any, mpId: string) {
   const r = await pool.query(
-    `SELECT purchase_price, debt_tranches, hold_period_years
+    `SELECT purchase_price, total_debt, blended_debt_rate, hold_period_years
      FROM capital_stacks WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [mpId]
   );
@@ -301,7 +301,7 @@ async function loadCapitalStackQuick(pool: any, mpId: string) {
   const row = r.rows[0];
   return {
     purchasePrice: Number(row.purchase_price) || 0,
-    debtTranches: typeof row.debt_tranches === 'string' ? JSON.parse(row.debt_tranches) : row.debt_tranches ?? [],
+    debtTranches: [],
     holdPeriodYears: Number(row.hold_period_years) || 5,
   };
 }

@@ -63,7 +63,7 @@ async function checkRedis(): Promise<HealthCheck> {
     }
 
     const Redis = (await import('ioredis')).default;
-    const client = new Redis(redisUrl, { connectTimeout: 2000, lazyConnect: true });
+    const client = new Redis(redisUrl, { connectTimeout: 2000, lazyConnect: true, maxRetriesPerRequest: 0, retryStrategy: () => null });
     await client.ping();
     await client.quit();
 

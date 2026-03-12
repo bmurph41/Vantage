@@ -457,10 +457,9 @@ function buildQuickFlows(
 async function loadProjectData(pool: any, projectId: string) {
   const r = await pool.query(
     `SELECT mp.id as modeling_project_id, mp.asset_class,
-            p.custom_metrics, p.purchase_price
+            mp.custom_metrics, mp.purchase_price
      FROM modeling_projects mp
-     JOIN projects p ON p.id = mp.project_id
-     WHERE mp.project_id = $1 OR mp.id = $1
+     WHERE mp.id = $1
      LIMIT 1`,
     [projectId]
   );
@@ -519,7 +518,7 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
 async function loadCapitalStackData(pool: any, modelingProjectId: string) {
   const cs = await pool.query(
     `SELECT hold_period_years, noi_growth_rate, exit_cap_rate,
-            total_equity, purchase_price, debt_tranches
+            total_equity, purchase_price, total_debt, blended_debt_rate
      FROM capital_stacks
      WHERE modeling_project_id = $1
      ORDER BY created_at DESC LIMIT 1`,
@@ -535,9 +534,7 @@ async function loadCapitalStackData(pool: any, modelingProjectId: string) {
     exitCapRate: Number(row.exit_cap_rate) || 0,
     totalEquity: Number(row.total_equity) || 0,
     purchasePrice: Number(row.purchase_price) || 0,
-    debtTranches: typeof row.debt_tranches === 'string'
-      ? JSON.parse(row.debt_tranches)
-      : row.debt_tranches ?? [],
+    debtTranches: [],
   };
 }
 

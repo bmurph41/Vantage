@@ -720,7 +720,7 @@ export default function ProjectWorkspace() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0">
         <div className="sticky top-0 z-20 bg-background/98 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-6 px-6 border-b border-border/60">
           {/* ── Group Rail ── */}
-          <div className="flex items-center gap-0 overflow-x-auto border-b border-border/30" data-testid="tab-groups">
+          <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {
               const GroupIcon = group.icon;
               const isActive = activeGroup === group.id;
@@ -728,15 +728,12 @@ export default function ProjectWorkspace() {
                 <button
                   key={group.id}
                   onClick={() => handleGroupChange(group.id)}
-                  className={`relative inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 ${
-                    isActive
-                      ? 'border-primary text-primary bg-primary/5'
-                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
-                  }`}
+                  title={group.label}
+                  className={`ws-nav-group ${isActive ? 'ws-nav-group-active' : ''}`}
                   data-testid={`tab-group-${group.id}`}
                 >
-                  <GroupIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:inline tracking-wide uppercase" style={{fontSize:'10px',letterSpacing:'0.06em'}}>{group.label}</span>
+                  <GroupIcon className="h-3 w-3 shrink-0" />
+                  <span className="hidden sm:inline">{group.label}</span>
                 </button>
               );
             })}
@@ -744,7 +741,7 @@ export default function ProjectWorkspace() {
           </div>
           {/* ── Sub-tab Rail ── */}
           <div className="overflow-x-auto">
-            <TabsList className="inline-flex h-9 bg-transparent gap-0 rounded-none p-0" data-testid="tabs-workspace">
+            <TabsList className="inline-flex h-8 bg-transparent gap-0.5 rounded-none p-0 py-0.5" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
@@ -767,7 +764,7 @@ export default function ProjectWorkspace() {
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="h-9 gap-1.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs font-medium text-muted-foreground data-[state=active]:text-primary"
+                    className="ws-nav-tab data-[state=active]:ws-nav-tab-active"
                     data-testid={`tab-${tab.value}`}
                   >
                     <TabIcon className="h-3.5 w-3.5 shrink-0" />
