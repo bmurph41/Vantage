@@ -43,7 +43,7 @@ export function registerDCFRoutes(
     async (req: Request, res: Response) => {
       try {
         const { projectId } = req.params;
-        const orgId = (req as any).user?.organizationId ?? '';
+        const orgId = (req as any).user?.orgId ?? '';
         const { discountRate, overrides } = req.body ?? {};
 
         const result = await performDCFAnalysis(
@@ -51,6 +51,9 @@ export function registerDCFRoutes(
           { pool, computeDirectInputFinancials, computeMultiYearProjection, generateDebtSchedule }
         );
 
+        if (!result) {
+          return res.status(422).json({ error: 'No inputs — complete property assumptions on the Inputs tab first.' });
+        }
         res.json(result);
       } catch (err: any) {
         console.error('DCF analysis error:', err);
@@ -70,7 +73,7 @@ export function registerDCFRoutes(
           return res.status(400).json({ error: 'projectId is required' });
         }
 
-        const orgId = (req as any).user?.organizationId ?? '';
+        const orgId = (req as any).user?.orgId ?? '';
         const result = await computeQuickIRR(
           { projectId, orgId, discountRate },
           { pool, computeDirectInputFinancials, computeMultiYearProjection, generateDebtSchedule }
@@ -91,7 +94,7 @@ export function registerDCFRoutes(
     async (req: Request, res: Response) => {
       try {
         const { projectId } = req.params;
-        const orgId = (req as any).user?.organizationId ?? '';
+        const orgId = (req as any).user?.orgId ?? '';
         const body = req.body ?? {};
 
         // Load project and compute base inputs (same pattern as DCF)
@@ -158,6 +161,29 @@ export function registerDCFRoutes(
     }
   );
 
+  // ── GET /dcf — TanStack Query default (mirrors POST but no body) ──────────
+  app.get(
+    '/api/modeling/projects/:projectId/dcf',
+    authenticateUser,
+    async (req: Request, res: Response) => {
+      try {
+        const { projectId } = req.params;
+        const orgId = (req as any).user?.orgId ?? '';
+        const result = await performDCFAnalysis(
+          { projectId, orgId, discountRate: undefined, overrides: undefined },
+          { pool, computeDirectInputFinancials, computeMultiYearProjection, generateDebtSchedule }
+        );
+        if (!result) {
+          return res.status(422).json({ error: 'No inputs — complete property assumptions on the Inputs tab first.' });
+        }
+        res.json(result);
+      } catch (err: any) {
+        console.error('DCF GET error:', err);
+        res.status(500).json({ error: err.message ?? 'DCF analysis failed' });
+      }
+    }
+  );
+
   // ── Decision Support (Fast — GET) ──────────────────────────────────────
   app.get(
     '/api/modeling/projects/:projectId/dcf/decision-support',
@@ -165,7 +191,7 @@ export function registerDCFRoutes(
     async (req: Request, res: Response) => {
       try {
         const { projectId } = req.params;
-        const orgId = (req as any).user?.organizationId ?? '';
+        const orgId = (req as any).user?.orgId ?? '';
         const userId = (req as any).user?.id;
 
         const result = await runDecisionSupport(
@@ -195,7 +221,7 @@ export function registerDCFRoutes(
     async (req: Request, res: Response) => {
       try {
         const { projectId } = req.params;
-        const orgId = (req as any).user?.organizationId ?? '';
+        const orgId = (req as any).user?.orgId ?? '';
         const userId = (req as any).user?.id;
         const body = req.body ?? {};
 

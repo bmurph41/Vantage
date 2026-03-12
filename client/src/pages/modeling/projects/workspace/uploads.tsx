@@ -59,6 +59,7 @@ import {
   Database,
   Zap,
   TrendingUp,
+  Calendar,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';

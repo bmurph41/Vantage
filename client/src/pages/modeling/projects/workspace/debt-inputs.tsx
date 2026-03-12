@@ -323,11 +323,11 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
   const ltvValue = purchasePrice && purchasePrice > 0 ? (loanAmount / purchasePrice) * 100 : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="fm-page">
+      <div className="fm-header">
         <div className="flex items-center gap-2">
-          <Landmark className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">Debt Structure</h3>
+          <Landmark className="h-4 w-4 text-muted-foreground" />
+          <div className="fm-header-title">Debt Structure</div>
           <Badge variant="outline" className="text-xs">{loan.loanType}</Badge>
         </div>
         <Button

@@ -229,6 +229,7 @@ function SofrForwardRatePreview({ holdYears, spreadBps, floorRate }: SofrForward
           </span>
         </div>
       </div>
+      <div className="fm-body">
     );
   }
 
@@ -1127,7 +1128,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   }
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="capital" onNavigate={onTabChange} />
       )}
@@ -1191,10 +1192,11 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
         </Alert>
       )}
       
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h2 className="text-2xl font-bold">Capital Stack Builder</h2>
-          <p className="text-muted-foreground">Configure multi-tranche debt, equity layers, and waterfall distributions</p>
+          <div className="fm-header-title">Capital Stack Builder</div>
+          <div className="fm-header-sub">Configure multi-tranche debt, equity layers, and waterfall distributions</div>
+        </div>
         </div>
         <Dialog open={showCreateStack} onOpenChange={(open) => { setShowCreateStack(open); if (!open) resetWizard(); }}>
           <DialogTrigger asChild>
@@ -4275,7 +4277,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                             const irrAfter = calcIrr(cfsAfter) * 100;
 
                             return (
-                              <div className="space-y-4">
+                              <div className="fm-page">
                                 {/* Called Debt Alert */}
                                 {calledTranches.length > 0 && (
                                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -4609,6 +4611,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

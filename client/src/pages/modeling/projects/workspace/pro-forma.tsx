@@ -363,6 +363,28 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     return scenarios.find((s: any) => s.scenarioType === 'base' && s.isCurrentVersion);
   }, [scenarios]);
 
+  // Guard: no projection data yet — show CTA instead of broken/empty tab
+  const hasNoData = !proFormaData && !isLoadingProForma;
+  if (hasNoData && !activeScenario) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-8 text-center space-y-4">
+        <div className="rounded-full bg-blue-100 dark:bg-blue-950 p-4">
+          <BarChart3 className="h-8 w-8 text-blue-500" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-1">Pro Forma Not Yet Generated</h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Complete your property assumptions on the Inputs tab — occupancy, revenue lines,
+            and unit mix — to generate a pro forma projection automatically.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'inputs' }))}>
+          Go to Inputs
+        </Button>
+      </div>
+    );
+  }
+
   const getGrowthRatesForDepartment = (department: string, category: 'Revenue' | 'COGS' | 'Expenses'): number[] => {
     if (!activeScenario?.assumptions) return Array(holdPeriod).fill(3.0);
     const mapping = departmentNameToCategoryKey(department, category);
@@ -889,21 +911,20 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const finalYearSummary = calculateYearSummary(holdPeriod - 1);
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="proforma" onNavigate={onTabChange} />
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-bold">Pro Forma Projections</h2>
-          <p className="text-sm text-muted-foreground">
-            {hasHistoricalData 
+          <div className="fm-header-title">Pro Forma Projections</div>
+          <div className="fm-header-sub">{hasHistoricalData 
               ? `${holdPeriod}-year projections based on ${baselinePeriod?.label || 'historical'} data with growth assumptions`
               : `${holdPeriod}-year projections - upload documents to populate baseline actuals`
-            }
-          </p>
+            }</div>
+        </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Hold Period Selector - Requirement J */}
@@ -977,6 +998,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           <ExportPdfButton contentRef={pdfRef} filename="pro-forma-projections" title="Pro Forma Projections" />
         </div>
       </div>
+      <div className="fm-body">
 
       {/* Revenue Source Toggle */}
       <RevenueSourceToggle projectId={projectId} />
@@ -2307,6 +2329,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

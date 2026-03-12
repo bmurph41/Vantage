@@ -201,7 +201,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
   }
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">

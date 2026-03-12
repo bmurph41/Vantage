@@ -609,18 +609,16 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
   }
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="historical" onNavigate={onTabChange} />
       )}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-semibold">Historical P&L</h2>
-          <p className="text-sm text-muted-foreground">
-            Actual financial performance by month and category
-          </p>
+          <div className="fm-header-title">Historical P&L</div>
+          <div className="fm-header-sub">Actual financial performance by period and category</div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="fm-header-actions">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="h-9">
             <TabsList className="h-9">
               <TabsTrigger value="single" className="text-xs px-3">
@@ -888,7 +886,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
       {/* ── Financial summary strip ── */}
       {(totalRevenue > 0 || totalExpenses > 0) && (
-        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-border border rounded-lg overflow-hidden">
+        <div className="fm-kpi-strip cols-5">
           {[
             { label: 'Total Revenue', value: totalRevenue, color: 'text-foreground', bg: 'bg-primary/5' },
             { label: 'COGS', value: totalCOGS, color: 'text-foreground', bg: '' },

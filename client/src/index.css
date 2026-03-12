@@ -308,75 +308,367 @@
   transform: translateY(-1px);
 }
 
-/* Zilculator-Inspired Financial Styling */
-.finance-kpi-card {
-  background: linear-gradient(135deg, hsl(177 75% 28%) 0%, hsl(177 75% 22%) 100%);
-  color: white;
-  border-radius: 0.5rem;
-  padding: 1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* ============================================================
+   MARINAMATCH — INSTITUTIONAL FM DESIGN SYSTEM v2
+   Refined, information-dense, professional-grade
+   ============================================================ */
+
+/* ── Shared tokens ── */
+:root {
+  --fm-accent:        210 100% 52%;
+  --fm-accent-green:  158 64% 42%;
+  --fm-accent-red:    0 72% 51%;
+  --fm-accent-amber:  38 92% 50%;
+  --fm-accent-purple: 262 83% 58%;
+  --fm-surface:       hsl(220 14% 96%);
+  --fm-surface-dark:  hsl(222 20% 12%);
+  --fm-border:        hsl(220 13% 91%);
+  --fm-border-dark:   hsl(222 15% 22%);
+  --fm-mono:          'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  --fm-header-h:      3rem;
+  --fm-kpi-h:         5rem;
 }
 
-.finance-kpi-card .kpi-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  background: rgba(255,255,255,0.15);
-  border-radius: 0.375rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.dark {
+  --fm-surface:     hsl(222 20% 14%);
+  --fm-border:      hsl(222 15% 22%);
 }
 
-.finance-kpi-card .kpi-label {
+/* ── Page wrapper ── */
+.fm-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  background: var(--fm-surface);
+}
+
+/* ── Section header bar ── */
+.fm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  background: hsl(var(--background));
+  border-bottom: 1px solid var(--fm-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+  min-height: var(--fm-header-h);
+}
+
+.fm-header-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.fm-header-sub {
   font-size: 0.75rem;
-  opacity: 0.9;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.125rem;
+}
+
+.fm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── KPI strip ── */
+.fm-kpi-strip {
+  display: grid;
+  border-bottom: 1px solid var(--fm-border);
+  background: hsl(var(--background));
+}
+
+.fm-kpi-strip.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.fm-kpi-strip.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.fm-kpi-strip.cols-6 { grid-template-columns: repeat(6, 1fr); }
+.fm-kpi-strip.cols-8 { grid-template-columns: repeat(8, 1fr); }
+
+.fm-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.75rem 1.125rem;
+  border-right: 1px solid var(--fm-border);
+  min-height: var(--fm-kpi-h);
+  position: relative;
+  transition: background 0.12s;
+}
+
+.fm-kpi:last-child { border-right: none; }
+
+.fm-kpi::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.fm-kpi.accent-blue::before   { background: hsl(var(--fm-accent)); }
+.fm-kpi.accent-green::before  { background: hsl(var(--fm-accent-green)); }
+.fm-kpi.accent-red::before    { background: hsl(var(--fm-accent-red)); }
+.fm-kpi.accent-amber::before  { background: hsl(var(--fm-accent-amber)); }
+.fm-kpi.accent-purple::before { background: hsl(var(--fm-accent-purple)); }
+
+.fm-kpi-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.055em;
+  color: hsl(var(--muted-foreground));
+  line-height: 1;
+  margin-bottom: 0.3rem;
+  white-space: nowrap;
 }
 
-.finance-kpi-card .kpi-value {
-  font-size: 1.25rem;
-  font-weight: 700;
+.fm-kpi-value {
+  font-family: var(--fm-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
 }
 
-.finance-kpi-card.variant-blue {
-  background: linear-gradient(135deg, hsl(210 70% 40%) 0%, hsl(210 70% 32%) 100%);
+.fm-kpi-value.positive { color: hsl(var(--fm-accent-green)); }
+.fm-kpi-value.negative { color: hsl(var(--fm-accent-red)); }
+
+.fm-kpi-sub {
+  font-size: 0.6875rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.2rem;
+  font-family: var(--fm-mono);
+  letter-spacing: -0.01em;
 }
 
-.finance-kpi-card.variant-green {
-  background: linear-gradient(135deg, hsl(142 70% 35%) 0%, hsl(142 70% 28%) 100%);
+/* ── Content area ── */
+.fm-body {
+  flex: 1;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--fm-surface);
+  min-height: 0;
 }
 
-.finance-kpi-card.variant-orange {
-  background: linear-gradient(135deg, hsl(30 80% 50%) 0%, hsl(30 80% 42%) 100%);
+/* ── Two-column layout ── */
+.fm-cols {
+  display: grid;
+  gap: 1.25rem;
+}
+.fm-cols.split-60-40 { grid-template-columns: 3fr 2fr; }
+.fm-cols.split-70-30 { grid-template-columns: 7fr 3fr; }
+.fm-cols.split-50-50 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 1024px) {
+  .fm-cols { grid-template-columns: 1fr !important; }
 }
 
-.finance-table {
+/* ── Panel (replaces Card) ── */
+.fm-panel {
+  background: hsl(var(--background));
+  border: 1px solid var(--fm-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.fm-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--fm-border);
+  background: hsl(var(--background));
+}
+
+.fm-panel-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.fm-panel-body {
+  padding: 1rem;
+}
+
+.fm-panel-body.no-pad { padding: 0; }
+
+/* ── Section label inside panel ── */
+.fm-section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: hsl(var(--muted-foreground));
+  padding: 0.5rem 1rem;
+  background: hsl(var(--muted) / 0.4);
+  border-bottom: 1px solid var(--fm-border);
+}
+
+/* ── Finance table ── */
+.fm-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.8125rem;
 }
 
-.finance-table th {
-  text-align: left;
-  padding: 0.75rem 1rem;
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: hsl(215 16% 46%);
-  border-bottom: 1px solid hsl(214 32% 91%);
-}
-
-.finance-table th:not(:first-child) {
+.fm-table th {
+  padding: 0.5rem 0.875rem;
   text-align: right;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid var(--fm-border);
+  white-space: nowrap;
 }
 
-.finance-table td {
-  padding: 0.625rem 1rem;
-  font-size: 0.875rem;
-  border-bottom: 1px solid hsl(214 32% 91%);
+.fm-table th:first-child { text-align: left; }
+
+.fm-table td {
+  padding: 0.4375rem 0.875rem;
+  text-align: right;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  font-family: var(--fm-mono);
+  font-size: 0.8125rem;
 }
+
+.fm-table td:first-child {
+  text-align: left;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.fm-table tr:hover td { background: hsl(var(--muted) / 0.3); }
+
+.fm-table tr.row-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--fm-border);
+  border-bottom: none;
+  background: hsl(var(--muted) / 0.2);
+}
+
+.fm-table tr.row-subtotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--fm-border);
+  font-style: italic;
+}
+
+.fm-table tr.row-group-header td {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.3);
+  padding-top: 0.625rem;
+  padding-bottom: 0.3125rem;
+}
+
+/* ── Chart container ── */
+.fm-chart {
+  width: 100%;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+/* ── Scenario pill badges ── */
+.fm-scenario-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fm-scenario-pill.bear  { background: hsl(0 72% 96%);   color: hsl(0 72% 42%); }
+.fm-scenario-pill.base  { background: hsl(210 100% 96%); color: hsl(210 100% 40%); }
+.fm-scenario-pill.bull  { background: hsl(158 64% 94%);  color: hsl(158 64% 30%); }
+
+.dark .fm-scenario-pill.bear  { background: hsl(0 72% 16%);   color: hsl(0 72% 72%); }
+.dark .fm-scenario-pill.base  { background: hsl(210 100% 16%); color: hsl(210 100% 72%); }
+.dark .fm-scenario-pill.bull  { background: hsl(158 64% 14%);  color: hsl(158 64% 62%); }
+
+/* ── Waterfall bar ── */
+.fm-waterfall-bar {
+  display: flex;
+  align-items: stretch;
+  height: 0.5rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  gap: 1px;
+}
+
+/* ── Delta badge ── */
+.fm-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  font-family: var(--fm-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.fm-delta.up   { color: hsl(var(--fm-accent-green)); background: hsl(var(--fm-accent-green) / 0.1); }
+.fm-delta.down { color: hsl(var(--fm-accent-red));   background: hsl(var(--fm-accent-red) / 0.1); }
+
+/* ── Input row inside calculator ── */
+.fm-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fm-input-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Source badge ── */
+.fm-source-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fm-source-badge.manual  { background: hsl(38 92% 94%); color: hsl(38 92% 38%); }
+.fm-source-badge.synced  { background: hsl(210 100% 94%); color: hsl(210 100% 38%); }
+
+/* ── Dividers ── */
+.fm-divider {
+  height: 1px;
+  background: var(--fm-border);
+  margin: 0 -1rem;
+}
+
 
 .finance-table td:not(:first-child) {
   text-align: right;

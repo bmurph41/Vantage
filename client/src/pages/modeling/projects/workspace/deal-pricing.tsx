@@ -765,19 +765,17 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
   };
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       {onTabChange && (
         <WorkflowNavigation currentTab="pricing" onNavigate={onTabChange} />
       )}
       
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-semibold">Deal Pricing</h2>
-          <p className="text-sm text-muted-foreground">
-            Interconnected pricing — change any input and all metrics update dynamically
-          </p>
+          <div className="fm-header-title">Deal Pricing &amp; Valuation</div>
+          <div className="fm-header-sub">Interconnected — change any input and all metrics update dynamically</div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="fm-header-actions">
           <YearSelector
             projectId={projectId}
             selectedPeriod={selectedPeriod}
@@ -798,6 +796,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
           <ExportPdfButton contentRef={pdfRef} filename="deal-pricing" title="Deal Pricing Analysis" />
         </div>
       </div>
+      <div className="fm-body">
 
       {activeAdjustmentsCount > 0 && (
         <Card className="bg-amber-500/10 border-amber-500/30">
@@ -1663,6 +1662,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
         );
       })()}
 
+      </div>
     </div>
   );
 }

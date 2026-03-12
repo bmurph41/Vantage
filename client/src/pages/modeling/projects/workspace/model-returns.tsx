@@ -883,15 +883,13 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
   }
 
   return (
-    <div className="space-y-6" ref={pdfRef}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="fm-page" ref={pdfRef}>
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" /> Returns Analysis
-          </h2>
-          <p className="text-sm text-muted-foreground">{projectName}</p>
+          <div className="fm-header-title">Investment Returns</div>
+          <div className="fm-header-sub">{projectName} · IRR · Equity Multiple · Cash-on-Cash</div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="fm-header-actions">
           <ExportPdfButton contentRef={pdfRef} filename="model-returns" title="Model Returns" />
           <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
             <Button
@@ -940,6 +938,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
           </Button>
         </div>
       </div>
+      <div className="fm-body">
 
       {!hasData && !pf && !seedMutation.isPending && activeTab === 'dashboard' && (
         <Card className="border-dashed">
@@ -1343,6 +1342,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

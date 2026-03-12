@@ -466,7 +466,10 @@ async function loadProjectData(pool: any, projectId: string) {
   );
 
   const row = r.rows[0];
-  if (!row) throw new Error(`Project not found: ${projectId}`);
+  if (!row) {
+    // Return a structured "no data" result rather than throwing — client shows CTA
+    return null;
+  }
 
   const customMetrics = typeof row.custom_metrics === 'string'
     ? JSON.parse(row.custom_metrics)

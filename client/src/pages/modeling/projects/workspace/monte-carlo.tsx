@@ -280,7 +280,7 @@ export default function MonteCarloPage() {
   const enabledCount = variables.filter(v => v.enabled).length;
 
   return (
-    <div className="space-y-6 p-6" ref={pdfRef}>
+    <div className="fm-page" ref={pdfRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Monte Carlo Simulation</h1>

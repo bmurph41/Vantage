@@ -393,6 +393,16 @@ export default function ProjectWorkspace() {
     const tab = params.get('tab') || 'overview';
     return TAB_TO_GROUP[tab] ? tab : 'overview';
   });
+
+  // Allow child tabs to navigate via custom event (e.g. "Go to Inputs" CTA)
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      setActiveTab(e.detail);
+      setActiveGroup(getGroupForTab(e.detail));
+    };
+    window.addEventListener('navigate-tab', handler as EventListener);
+    return () => window.removeEventListener('navigate-tab', handler as EventListener);
+  }, []);
   const [activeGroup, setActiveGroup] = useState(() => getGroupForTab(activeTab));
   const queryClient = useQueryClient();
   useDisplayPreferences();

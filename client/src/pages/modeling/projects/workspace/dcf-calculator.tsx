@@ -207,9 +207,10 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     }
   }, [sharedHoldPeriod]);
 
-  const { data: dcfAnalysis, isLoading, refetch } = useQuery<DCFAnalysis>({
+  const { data: dcfAnalysis, isLoading, isError, error: dcfError, refetch } = useQuery<DCFAnalysis>({
     queryKey: ['/api/modeling/projects', projectId, 'dcf'],
     enabled: !!projectId,
+    retry: false,
   });
 
   const saveExitCapRateToScenario = useMutation({
@@ -295,6 +296,36 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     );
   }
 
+  if (isError) {
+    const errMsg = (dcfError as any)?.message ?? '';
+    const needsInputs = errMsg.includes('Project not found') || errMsg.includes('No inputs') || !dcfAnalysis;
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-8 text-center space-y-4">
+        <div className="rounded-full bg-amber-100 dark:bg-amber-950 p-4">
+          <AlertCircle className="h-8 w-8 text-amber-500" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold mb-1">
+            {needsInputs ? 'Input Assumptions Required' : 'DCF Analysis Unavailable'}
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            {needsInputs
+              ? 'Complete the property inputs on the Inputs & Data tab — occupancy, revenue assumptions, and unit mix — to generate a DCF analysis.'
+              : errMsg || 'Unable to compute DCF. Check that project assumptions are configured.'}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
+          </Button>
+          <Button size="sm" onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'inputs' }))}>
+            Go to Inputs
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const baseScenario = dcfAnalysis?.baseScenario;
   const dcfScenarios = dcfAnalysis?.scenarios || [];
   const sensitivityMatrix = dcfAnalysis?.sensitivityMatrix;
@@ -323,19 +354,16 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
   };
 
   return (
-    <div ref={pdfRef} className="space-y-6 p-6" data-testid="dcf-calculator-page">
+    <div ref={pdfRef} className="fm-page" data-testid="dcf-calculator-page">
       {onTabChange && (
         <WorkflowNavigation currentTab="dcf" onNavigate={onTabChange} />
       )}
-      
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h1 className="text-2xl font-bold">DCF Calculator</h1>
-          <p className="text-muted-foreground">
-            Real-time discounted cash flow analysis with unlimited scenarios
-          </p>
+          <div className="fm-header-title">DCF Analysis</div>
+          <div className="fm-header-sub">Discounted cash flow · IRR · NPV · Sensitivity</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="fm-header-actions">
           <Button 
             variant="outline" 
             size="icon"
@@ -353,18 +381,17 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
       </div>
 
       {/* Real-Time Calculator */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
+      <div className="fm-body">
+      <div className="fm-panel">
+        <div className="fm-panel-header">
+          <div className="fm-panel-title">
+            <Calculator className="h-4 w-4 text-muted-foreground" />
             Real-Time DCF Calculator
-          </CardTitle>
-          <CardDescription>
-            Adjust inputs to see instant IRR and NPV calculations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          </div>
+          <span className="text-xs text-muted-foreground">Adjust inputs for instant IRR · NPV · Equity Multiple</span>
+        </div>
+        <div className="fm-panel-body">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Purchase Price</Label>
@@ -545,8 +572,9 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+      </div>
 
       {/* ── Institutional KPI strip ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 divide-x divide-border border rounded-lg overflow-hidden">

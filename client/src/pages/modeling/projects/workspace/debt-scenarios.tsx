@@ -481,7 +481,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
   }
 
   return (
-    <div className="space-y-6">
+    <div className="fm-page">
       {onTabChange && (
         <WorkflowNavigation currentTab="debt" onNavigate={onTabChange} />
       )}

@@ -142,7 +142,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
 
   if (projectLoading) {
     return (
-      <div className="space-y-6">
+      <div className="fm-page">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -160,12 +160,11 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
         <WorkflowNavigation currentTab="exit" onNavigate={onTabChange} />
       )}
       
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-semibold" data-testid="exit-strategy-title">Exit Strategy Suite</h2>
-          <p className="text-sm text-muted-foreground">
-            Institutional-grade exit analysis for {project?.marinaName}
-          </p>
+          <div className="fm-header-title">Exit Strategy Suite</div>
+          <div className="fm-header-sub">Institutional-grade exit analysis for {project?.marinaName}</div>
+        </div>
         </div>
         <div className="flex items-center gap-3">
           <ExportPdfButton contentRef={pdfRef} filename="exit-strategy" title="Exit Strategy" />
@@ -208,6 +207,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           </div>
         </div>
       </div>
+      <div className="fm-body">
 
       <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-300">
         <Link2 className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
@@ -378,6 +378,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           <AdvisorInsightsPanel />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
