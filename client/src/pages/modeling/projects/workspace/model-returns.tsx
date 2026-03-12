@@ -97,7 +97,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, trend, className }: {
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-none">{title}</p>
             <p className="text-xl font-bold">{value}</p>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>

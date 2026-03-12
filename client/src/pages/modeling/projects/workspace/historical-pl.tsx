@@ -67,6 +67,7 @@ import {
   ArrowRightLeft
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   DropdownMenu,
@@ -885,6 +886,36 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
         </div>
       </div>
 
+      {/* ── Financial summary strip ── */}
+      {(totalRevenue > 0 || totalExpenses > 0) && (
+        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-border border rounded-lg overflow-hidden">
+          {[
+            { label: 'Total Revenue', value: totalRevenue, color: 'text-foreground', bg: 'bg-primary/5' },
+            { label: 'COGS', value: totalCOGS, color: 'text-foreground', bg: '' },
+            { label: 'Gross Profit', value: grossProfit, color: grossProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500', bg: '' },
+            { label: 'Operating Expenses', value: totalExpenses, color: 'text-foreground', bg: '' },
+            { label: 'NOI', value: netIncome, color: netIncome >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500', bg: netIncome >= 0 ? 'bg-emerald-500/5' : 'bg-red-500/5' },
+          ].map(m => (
+            <div key={m.label} className={`px-4 py-3 ${m.bg}`}>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">{m.label}</p>
+              <p className={`text-base font-bold tabular-nums ${m.color}`}>
+                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(m.value)}
+              </p>
+              {m.label === 'NOI' && totalRevenue > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {(netIncome / totalRevenue * 100).toFixed(1)}% margin
+                </p>
+              )}
+              {m.label === 'Gross Profit' && totalRevenue > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {(grossProfit / totalRevenue * 100).toFixed(1)}% margin
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {dataSources && dataSources.length > 0 && (
         <details className="group">
           <summary className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none list-none [&::-webkit-details-marker]:hidden">
@@ -910,15 +941,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
       )}
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-3">
+        <CardHeader className="py-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle>
-                {displayMode === 'monthly' ? `Monthly Detail - ${selectedYear || ''}` : 'Annual Comparison'}
+              <CardTitle className="text-sm font-semibold">
+                {displayMode === 'monthly' ? `Monthly Detail — ${selectedYear || ''}` : 'Annual Comparison'}
               </CardTitle>
-              <CardDescription>
-                Click category rows to expand/collapse line items
-              </CardDescription>
+              <CardDescription className="text-xs">Click category rows to expand/collapse line items</CardDescription>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               {viewMode === 'single' && displayMode === 'annual' && (

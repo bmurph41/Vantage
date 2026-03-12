@@ -34,6 +34,7 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';
 import debounce from 'lodash.debounce';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
@@ -547,7 +548,25 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
         </CardContent>
       </Card>
 
-      {/* Key Metrics - Zilculator Style KPI Cards */}
+      {/* ── Institutional KPI strip ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 divide-x divide-border border rounded-lg overflow-hidden">
+        {[
+          { label: 'Levered IRR', value: formatPercent(baseScenario?.leveredIRR || 0), accent: 'text-emerald-600 dark:text-emerald-400', testId: 'card-irr' },
+          { label: 'Unlevered IRR', value: formatPercent(baseScenario?.irr || 0), accent: 'text-emerald-600/80' },
+          { label: 'Equity Multiple', value: `${(baseScenario?.equityMultiple || 0).toFixed(2)}x`, accent: 'text-blue-600 dark:text-blue-400', testId: 'card-equity-multiple' },
+          { label: 'NPV', value: formatCompactCurrency(baseScenario?.npv || 0), accent: (baseScenario?.npv||0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500', testId: 'card-npv' },
+          { label: 'Cash-on-Cash', value: formatPercent(baseScenario?.avgCashOnCash || 0), accent: 'text-amber-600 dark:text-amber-400', testId: 'card-coc' },
+          { label: 'Going-In Cap', value: formatPercent(baseScenario?.goingInCapRate || 0), accent: 'text-indigo-600 dark:text-indigo-400' },
+          { label: 'Exit Cap', value: formatPercent(baseScenario?.exitCapRate || 0), accent: 'text-violet-600 dark:text-violet-400' },
+          { label: 'Payback', value: baseScenario?.paybackPeriod ? `${baseScenario.paybackPeriod.toFixed(1)} yrs` : '—', accent: 'text-foreground' },
+        ].map(m => (
+          <div key={m.label} className="px-3 py-3" data-testid={(m as any).testId}>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none mb-1.5">{m.label}</p>
+            <p className={`text-base font-bold tabular-nums leading-none ${m.accent}`}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="hidden">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="finance-kpi-card variant-green" data-testid="card-irr">
           <div className="kpi-icon">
@@ -589,6 +608,28 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           </div>
         </div>
       </div>
+      </div>
+
+      {baseScenario?.cashFlows && baseScenario.cashFlows.length > 0 && (
+        <div className="p-4 border rounded-lg bg-card">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Levered Cash Flow Waterfall</p>
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart data={baseScenario.cashFlows.map((cf: any) => ({
+              yr: cf.year ? `Y${cf.year}` : `P${cf.period}`,
+              noi: Math.round(cf.noi || cf.cashFlowBeforeDebt || 0),
+              cf: Math.round(cf.cashFlowAfterDebt ?? cf.leveredCashFlow ?? cf.cashFlow ?? cf.noi ?? 0),
+            }))} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+              <XAxis dataKey="yr" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : `${(v/1e3).toFixed(0)}K`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
+              <RechartTooltip formatter={(v, n) => [`${Number(v).toLocaleString()}`, n === 'noi' ? 'NOI' : 'Levered CF']} contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid hsl(var(--border))' }} />
+              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+              <Bar dataKey="noi" fill="#3b82f6" opacity={0.25} radius={[3,3,0,0]} name="NOI" />
+              <Line type="monotone" dataKey="cf" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} name="Levered CF" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

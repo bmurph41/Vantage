@@ -267,7 +267,7 @@ function StorageLeaseUploads({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mt-4 space-y-4">
       <div>
         <h3 className="text-lg font-semibold">Storage Rent Roll Uploads</h3>
         <p className="text-sm text-muted-foreground">
@@ -437,18 +437,35 @@ export default function ProjectWorkspace() {
     queryKey: ['/api/modeling/projects', projectId, 'deal-pricing', 'inputs'],
     enabled: !!projectId,
   });
-  const pricingData = _pricingRaw?.dealPricingResults ?? _pricingRaw?.dealPricing ?? _pricingRaw;
+  const pricingData = _pricingRaw?.dealPricingResults ?? _pricingRaw?.dealPricing ?? (_pricingRaw?.irr !== undefined ? _pricingRaw : _pricingRaw);
 
   const { data: _proFormaRaw } = useQuery<any>({
     queryKey: ['/api/modeling/projects', projectId, 'pro-forma'],
     enabled: !!projectId,
   });
-  const financials = _proFormaRaw ? {
-    totalRevenue: _proFormaRaw.totalRevenue ?? _proFormaRaw.revenue?.total ?? 0,
-    totalExpenses: _proFormaRaw.totalExpenses ?? _proFormaRaw.expenses?.total ?? 0,
-    noi: _proFormaRaw.noi ?? _proFormaRaw.netOperatingIncome ?? 0,
-    revenueLines: _proFormaRaw.revenueLines ?? _proFormaRaw.revenue?.lines ?? [],
-  } : undefined;
+  const financials = (() => {
+    if (!_proFormaRaw) return undefined;
+    // Shape 1: { scenarios: [{ metrics: { totalRevenue, noi, ... } }] }
+    const s0 = _proFormaRaw.scenarios?.[0];
+    if (s0?.metrics) {
+      return {
+        totalRevenue: s0.metrics.totalRevenue ?? 0,
+        totalExpenses: s0.metrics.totalExpenses ?? 0,
+        noi: s0.metrics.noi ?? s0.metrics.stabilizedNoi ?? 0,
+        capRate: s0.metrics.capRate ?? 0,
+        irr: s0.metrics.irr ?? 0,
+        equityMultiple: s0.metrics.equityMultiple ?? 0,
+        cashOnCash: s0.metrics.cashOnCash ?? 0,
+        noiMargin: s0.metrics.noiMargin ?? 0,
+        revenueLines: s0.revenueBreakdown ?? [],
+      };
+    }
+    // Shape 2: flat with revenue.totals[]
+    const rev = _proFormaRaw.revenue?.totals?.[0] ?? _proFormaRaw.revenue?.total ?? _proFormaRaw.totalRevenue ?? 0;
+    const exp = _proFormaRaw.expenses?.totals?.[0] ?? _proFormaRaw.expenses?.total ?? _proFormaRaw.totalExpenses ?? 0;
+    const noi = Array.isArray(_proFormaRaw.noi) ? _proFormaRaw.noi[0] : (_proFormaRaw.noi ?? (rev - exp));
+    return { totalRevenue: rev, totalExpenses: exp, noi, revenueLines: [] };
+  })();
 
   // === Asset-class-aware tab config ===
   const tabOverrides = useMemo(() => getTabOverrides(project?.assetClass), [project?.assetClass]);
@@ -512,7 +529,7 @@ export default function ProjectWorkspace() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 pt-4 space-y-0">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <div className="space-y-2">
@@ -552,30 +569,30 @@ export default function ProjectWorkspace() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between pb-3 border-b border-border/40 mb-0">
+        <div className="flex items-center gap-3 min-w-0">
           <Button 
             variant="ghost" 
-            size="sm" 
+            size="icon"
+            className="h-7 w-7 shrink-0"
             onClick={() => navigate('/modeling/projects')}
             data-testid="button-back-to-projects"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="h-6 w-px bg-border" />
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3" data-testid="text-project-name">
-              <Building2 className="h-6 w-6 text-muted-foreground" />
-              {project.marinaName}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold tracking-tight leading-none flex items-center gap-2 truncate" data-testid="text-project-name">
+                {project.marinaName}
+              </h1>
               <ProjectTypeBadge project={project} />
               {(project as any).assetClass && (project as any).assetClass !== "marina" && (
-                <Badge variant="outline" className="text-[10px] capitalize h-5">
+                <Badge variant="outline" className="text-[10px] capitalize h-4.5 px-1.5">
                   {(project as any).assetClass.replace("_", " ")}
                 </Badge>
               )}
-            </h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+            </div>
+            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
               {(project.city || project.state) && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5" />
@@ -690,9 +707,10 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 -mx-6 px-6 pt-2 pb-3 border-b border-border/40 space-y-2">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1" data-testid="tab-groups">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0">
+        <div className="sticky top-0 z-20 bg-background/98 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-6 px-6 border-b border-border/60">
+          {/* ── Group Rail ── */}
+          <div className="flex items-center gap-0 overflow-x-auto border-b border-border/30" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {
               const GroupIcon = group.icon;
               const isActive = activeGroup === group.id;
@@ -700,21 +718,23 @@ export default function ProjectWorkspace() {
                 <button
                   key={group.id}
                   onClick={() => handleGroupChange(group.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`relative inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-all border-b-2 ${
                     isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'border-primary text-primary bg-primary/5'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
                   }`}
                   data-testid={`tab-group-${group.id}`}
                 >
-                  <GroupIcon className="h-3.5 w-3.5" />
-                  <span>{group.label}</span>
+                  <GroupIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline tracking-wide uppercase" style={{fontSize:'10px',letterSpacing:'0.06em'}}>{group.label}</span>
                 </button>
               );
             })}
+            <div className="flex-1" />
           </div>
+          {/* ── Sub-tab Rail ── */}
           <div className="overflow-x-auto">
-            <TabsList className="inline-flex" data-testid="tabs-workspace">
+            <TabsList className="inline-flex h-9 bg-transparent gap-0 rounded-none p-0" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
@@ -737,10 +757,10 @@ export default function ProjectWorkspace() {
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="gap-2"
+                    className="h-9 gap-1.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-xs font-medium text-muted-foreground data-[state=active]:text-primary"
                     data-testid={`tab-${tab.value}`}
                   >
-                    <TabIcon className="h-4 w-4" />
+                    <TabIcon className="h-3.5 w-3.5 shrink-0" />
                     <span className="hidden sm:inline">{tab.value === "storage-leases" ? (tabOverrides.storageLabel || tab.label) : tab.value === "profit" ? (tabOverrides.profitCentersLabel || tab.label) : tab.label}</span>
                   </TabsTrigger>
                 );
@@ -749,7 +769,7 @@ export default function ProjectWorkspace() {
           </div>
         </div>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="mt-4 space-y-4">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -761,16 +781,16 @@ export default function ProjectWorkspace() {
           <CaseConfiguration projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="uploads" className="space-y-6">
+        <TabsContent value="uploads" className="mt-4 space-y-4">
           <WorkspaceUploads projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
 
-        <TabsContent value="historical" className="space-y-6">
+        <TabsContent value="historical" className="mt-4 space-y-4">
           <WorkspaceHistoricalPL projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="property-tax" className="space-y-6">
+        <TabsContent value="property-tax" className="mt-4 space-y-4">
           <PropertyTaxTab projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -778,11 +798,11 @@ export default function ProjectWorkspace() {
           <AnalyticsNormalization projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="proforma" className="space-y-6">
+        <TabsContent value="proforma" className="mt-4 space-y-4">
           <WorkspaceProForma projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="pricing" className="space-y-6">
+        <TabsContent value="pricing" className="mt-4 space-y-4">
           <DealPricing projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -790,11 +810,11 @@ export default function ProjectWorkspace() {
           <ExecutiveSummaryDynamic projectId={projectId!} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="debt" className="space-y-6">
+        <TabsContent value="debt" className="mt-4 space-y-4">
           <DebtInputs projectId={projectId!} purchasePrice={project?.purchasePrice ? parseFloat(project.purchasePrice) : undefined} />
         </TabsContent>
 
-        <TabsContent value="capital" className="space-y-6">
+        <TabsContent value="capital" className="mt-4 space-y-4">
           <CapitalStackWorkspace projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
@@ -803,22 +823,22 @@ export default function ProjectWorkspace() {
         </TabsContent>
 
 
-        <TabsContent value="audit" className="space-y-6">
+        <TabsContent value="audit" className="mt-4 space-y-4">
           <AuditTrailViewer projectId={projectId!} />
         </TabsContent>
 
-        <TabsContent value="comps" className="space-y-6">
+        <TabsContent value="comps" className="mt-4 space-y-4">
           <ModelingProjectIntegrationPanel 
             projectId={projectId!} 
             projectName={project.marinaName} 
           />
         </TabsContent>
 
-        <TabsContent value="storage-leases" className="space-y-6">
+        <TabsContent value="storage-leases" className="mt-4 space-y-4">
           <UnitMixLeases project={project!} />
         </TabsContent>
 
-        <TabsContent value="commercial-leases" className="space-y-6">
+        <TabsContent value="commercial-leases" className="mt-4 space-y-4">
           {(project?.customMetrics as any)?.profitCenters?.commercialTenants?.enabled ? (
             <CommercialLeasesWorkspace projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
           ) : (
@@ -830,19 +850,19 @@ export default function ProjectWorkspace() {
           )}
         </TabsContent>
 
-        <TabsContent value="profit" className="space-y-6">
+        <TabsContent value="profit" className="mt-4 space-y-4">
           <ProfitCentersDynamic project={project!} />
         </TabsContent>
 
-        <TabsContent value="dcf" className="space-y-6">
+        <TabsContent value="dcf" className="mt-4 space-y-4">
           <DCFCalculatorPage onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="returns" className="space-y-6">
+        <TabsContent value="returns" className="mt-4 space-y-4">
           <ModelReturns projectId={projectId!} projectName={project.marinaName} />
         </TabsContent>
 
-        <TabsContent value="multi-year" className="space-y-6">
+        <TabsContent value="multi-year" className="mt-4 space-y-4">
           <MultiYearProjectionTab
             projectId={project.id}
             initialConfig={{
@@ -853,31 +873,31 @@ export default function ProjectWorkspace() {
             }}
           />
         </TabsContent>
-        <TabsContent value="monte-carlo" className="space-y-6">
+        <TabsContent value="monte-carlo" className="mt-4 space-y-4">
           <MonteCarloPage />
         </TabsContent>
 
-        <TabsContent value="proforma-charts" className="space-y-6">
+        <TabsContent value="proforma-charts" className="mt-4 space-y-4">
           <WorkspaceProFormaCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="scenario-compare" className="space-y-6">
+        <TabsContent value="scenario-compare" className="mt-4 space-y-4">
           <ScenarioComparisonCharts projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="sensitivity" className="space-y-6">
+        <TabsContent value="sensitivity" className="mt-4 space-y-4">
           <SensitivityTornado projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="validation" className="space-y-6">
+        <TabsContent value="validation" className="mt-4 space-y-4">
           <ValidationWarnings projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="export" className="space-y-6">
+        <TabsContent value="export" className="mt-4 space-y-4">
           <ExportModel projectId={projectId!} projectName={project.marinaName} onTabChange={handleTabChange} />
         </TabsContent>
 
-        <TabsContent value="tax-dist" className="space-y-6">
+        <TabsContent value="tax-dist" className="mt-4 space-y-4">
           <TaxAndDistributionsPage projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>

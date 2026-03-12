@@ -2281,41 +2281,88 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                       Capital Structure
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex h-8 rounded-lg overflow-hidden">
-                      {debtTranches.map((t, i) => {
-                        const pct = totalCap > 0 ? (parseNumber(t.principal) / totalCap) * 100 : 0;
-                        const colors = ['bg-blue-500', 'bg-blue-400', 'bg-blue-300', 'bg-sky-400', 'bg-cyan-400'];
-                        return (
-                          <div
-                            key={t.id}
-                            className={`${colors[i % colors.length]} flex items-center justify-center text-xs text-white font-medium`}
-                            style={{ width: `${pct}%` }}
-                            title={`${t.name}: ${formatCurrency(parseNumber(t.principal))} (${pct.toFixed(1)}%)`}
-                          >
-                            {pct > 10 && t.name.slice(0, 8)}
-                          </div>
-                        );
-                      })}
-                      {equityLayers.map((l, i) => {
-                        const pct = totalCap > 0 ? (parseNumber(l.commitmentAmount) / totalCap) * 100 : 0;
-                        const colors = ['bg-green-500', 'bg-green-400', 'bg-emerald-400', 'bg-teal-400'];
-                        return (
-                          <div
-                            key={l.id}
-                            className={`${colors[i % colors.length]} flex items-center justify-center text-xs text-white font-medium`}
-                            style={{ width: `${pct}%` }}
-                            title={`${l.name}: ${formatCurrency(parseNumber(l.commitmentAmount))} (${pct.toFixed(1)}%)`}
-                          >
-                            {pct > 10 && l.name.slice(0, 8)}
-                          </div>
-                        );
-                      })}
+                  <CardContent className="space-y-4">
+                    {/* ── KPI strip ── */}
+                    <div className="grid grid-cols-4 divide-x divide-border border rounded-lg overflow-hidden">
+                      {[
+                        { label: 'Total Capitalization', value: formatCurrency(totalCap), accent: 'text-foreground' },
+                        { label: 'Total Debt', value: formatCurrency(totalDebt), accent: 'text-blue-600 dark:text-blue-400' },
+                        { label: 'Total Equity', value: formatCurrency(totalEquity || Math.max(0, purchasePrice - totalDebt)), accent: 'text-emerald-600 dark:text-emerald-400' },
+                        { label: 'LTV', value: `${ltv.toFixed(1)}%`, accent: ltv > 75 ? 'text-amber-600' : 'text-foreground' },
+                      ].map(m => (
+                        <div key={m.label} className="px-3 py-2.5">
+                          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none mb-1">{m.label}</p>
+                          <p className={`text-sm font-bold tabular-nums ${m.accent}`}>{m.value}</p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                      <span>Debt: {ltv.toFixed(1)}%</span>
-                      <span>Equity: {(100 - ltv).toFixed(1)}%</span>
-                    </div>
+                    {/* ── Visual stack bar ── */}
+                    {totalCap > 0 && (
+                      <div>
+                        <div className="flex h-8 rounded-md overflow-hidden gap-px">
+                          {debtTranches.map((t, i) => {
+                            const pct = totalCap > 0 ? (parseNumber(t.principal) / totalCap) * 100 : 0;
+                            const hexColors = ['#3b82f6','#6366f1','#8b5cf6','#0ea5e9','#06b6d4'];
+                            return pct > 0 ? (
+                              <div
+                                key={t.id}
+                                style={{ width: `${pct}%`, backgroundColor: hexColors[i % hexColors.length] }}
+                                className="flex items-center justify-center overflow-hidden transition-all"
+                                title={`${t.name}: ${formatCurrency(parseNumber(t.principal))} (${pct.toFixed(1)}%)`}
+                              >
+                                {pct > 8 && <span className="text-[9px] text-white font-semibold truncate px-1">{t.name.slice(0,10)}</span>}
+                              </div>
+                            ) : null;
+                          })}
+                          {equityLayers.map((l, i) => {
+                            const pct = totalCap > 0 ? (parseNumber(l.commitmentAmount) / totalCap) * 100 : 0;
+                            const hexColors = ['#10b981','#34d399','#f59e0b','#84cc16'];
+                            return pct > 0 ? (
+                              <div
+                                key={l.id}
+                                style={{ width: `${pct}%`, backgroundColor: hexColors[i % hexColors.length] }}
+                                className="flex items-center justify-center overflow-hidden transition-all"
+                                title={`${l.name}: ${formatCurrency(parseNumber(l.commitmentAmount))} (${pct.toFixed(1)}%)`}
+                              >
+                                {pct > 8 && <span className="text-[9px] text-white font-semibold truncate px-1">{l.name.slice(0,10)}</span>}
+                              </div>
+                            ) : null;
+                          })}
+                          {equityLayers.length === 0 && purchasePrice > totalDebt && (
+                            <div style={{ width: `${Math.round(((purchasePrice-totalDebt)/totalCap)*100)}%`, backgroundColor: '#10b981' }} className="flex items-center justify-center overflow-hidden">
+                              {(purchasePrice-totalDebt)/totalCap > 0.08 && <span className="text-[9px] text-white font-semibold px-1">Equity</span>}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 flex-wrap">
+                          {debtTranches.map((t, i) => {
+                            const hexColors = ['#3b82f6','#6366f1','#8b5cf6','#0ea5e9','#06b6d4'];
+                            const pct = totalCap > 0 ? (parseNumber(t.principal) / totalCap) * 100 : 0;
+                            return (
+                              <span key={t.id} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: hexColors[i % hexColors.length] }} />
+                                {t.name} {pct.toFixed(0)}%
+                              </span>
+                            );
+                          })}
+                          {equityLayers.map((l, i) => {
+                            const hexColors = ['#10b981','#34d399','#f59e0b','#84cc16'];
+                            const pct = totalCap > 0 ? (parseNumber(l.commitmentAmount) / totalCap) * 100 : 0;
+                            return (
+                              <span key={l.id} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: hexColors[i % hexColors.length] }} />
+                                {l.name} {pct.toFixed(0)}%
+                              </span>
+                            );
+                          })}
+                          {annualDebtService > 0 && (
+                            <span className="text-[10px] text-muted-foreground ml-auto">
+                              Ann. Debt Svc: <span className="font-semibold text-foreground">{formatCurrency(annualDebtService)}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

@@ -22091,6 +22091,24 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get persisted deal pricing inputs
+    // ── Seasonal config for annual uploads ──────────────────────────────────
+  app.patch('/api/modeling/projects/:projectId/documents/:uploadId/seasonal-config', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId, uploadId } = req.params;
+      const orgId = req.user?.orgId;
+      const { seasonalConfig } = req.body;
+      if (!seasonalConfig) return res.status(400).json({ error: 'seasonalConfig required' });
+      await pool.query(
+        `UPDATE doc_intel_uploads SET seasonal_config = $1, seasonal_profile = $2 WHERE id = $3 AND org_id = $4 AND modeling_project_id = $5`,
+        [JSON.stringify(seasonalConfig), seasonalConfig.defaultProfile ?? 'custom', uploadId, orgId, projectId]
+      );
+      return res.json({ success: true });
+    } catch (e: any) {
+      console.error('[seasonal-config PATCH]', e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get('/api/modeling/projects/:projectId/deal-pricing/inputs', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;

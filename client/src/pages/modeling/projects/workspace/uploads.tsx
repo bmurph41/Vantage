@@ -154,6 +154,7 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
   const [vdrSectionOpen, setVdrSectionOpen] = useState(true);
   const [importingDocId, setImportingDocId] = useState<string | null>(null);
   const [syncingUploadId, setSyncingUploadId] = useState<string | null>(null);
+  const [seasonalModalUpload, setSeasonalModalUpload] = useState<{id:string;name:string;depts:string[]} | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [processingMessageIndex, setProcessingMessageIndex] = useState(0);
 
@@ -589,6 +590,21 @@ export default function WorkspaceUploads({ projectId, onTabChange }: WorkspaceUp
                         <Button size="sm" onClick={() => handleReview(upload.id)} data-testid={`button-review-${upload.id}`}>
                           <Eye className="h-4 w-4 mr-2" />
                           Review
+                        </Button>
+                      )}
+                      {isPnlType && (upload as any).dataGranularity === 'annual' && (
+                        <Button size="sm" variant="outline" className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400"
+                          onClick={async () => {
+                            try {
+                              const items = await fetch(`/api/modeling/projects/${projectId}/documents/${upload.id}/items?limit=500`).then(r=>r.json());
+                              const depts = [...new Set((items?.items ?? items ?? []).map((i: any) => i.departmentConfirmed || i.department).filter(Boolean))] as string[];
+                              setSeasonalModalUpload({ id:upload.id, name:upload.originalName, depts: depts.length > 0 ? depts : [] });
+                            } catch {
+                              setSeasonalModalUpload({ id:upload.id, name:upload.originalName, depts:[] });
+                            }
+                          }}>
+                          <Calendar className="h-3.5 w-3.5" />
+                          Seasonalize
                         </Button>
                       )}
                       {/* ── NEW: Sync to Financial Model button ── */}

@@ -19,6 +19,7 @@ import {
   RefreshCcw
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartTooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import type { ModelingProject, ModelingCase } from "@shared/schema";
 import type { ProjectConfig, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
@@ -278,38 +279,45 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-green-50 rounded-lg">
-                <DollarSign className="h-4 w-4 text-green-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Sale Price ({currentScenario.name})</p>
-                <p className="text-lg font-bold text-green-600" data-testid="text-exit-sale-price">
-                  {formatCurrency(calculatedSalePrice)}
-                </p>
-              </div>
+        <div className="col-span-full grid grid-cols-2 md:grid-cols-5 divide-x divide-border border rounded-lg overflow-hidden">
+          {[
+            { label: 'Purchase Price', value: purchasePrice > 0 ? formatCurrency(purchasePrice) : '—', accent: 'text-foreground', bg: '' },
+            { label: `Exit NOI (Yr ${holdPeriod})`, value: formatCurrency(exitNOI), accent: 'text-foreground', bg: '' },
+            { label: `Sale Price`, value: formatCurrency(calculatedSalePrice), accent: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/5', testId: 'text-exit-sale-price' },
+            { label: 'Appreciation', value: purchasePrice > 0 ? `${(((calculatedSalePrice - purchasePrice) / purchasePrice) * 100).toFixed(1)}%` : '—', accent: calculatedSalePrice > purchasePrice ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500', bg: '' },
+            { label: 'Hold Period', value: `${holdPeriod} yrs`, accent: 'text-foreground', bg: '', testId: 'text-exit-hold-period' },
+          ].map(m => (
+            <div key={m.label} className={`px-4 py-3 ${m.bg}`} data-testid={(m as any).testId}>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">{m.label}</p>
+              <p className={`text-base font-bold tabular-nums ${m.accent}`}>{m.value}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-cyan-50 rounded-lg">
-                <FileSpreadsheet className="h-4 w-4 text-cyan-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Hold Period</p>
-                <p className="text-lg font-bold" data-testid="text-exit-hold-period">
-                  {holdPeriod} years
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       </div>
+
+      {cases.length > 0 && (
+        <div className="p-4 border rounded-lg bg-card">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Scenario Comparison — Estimated Sale Price</p>
+          <ResponsiveContainer width="100%" height={Math.max(100, cases.length * 36)}>
+            <BarChart data={cases.map((c, i) => {
+              const scenario = defaultScenarios.find(s => s.id === c.scenarioType) || defaultScenarios[0];
+              const growth = ((scenario?.revenueGrowth || 3) - (scenario?.expenseGrowth || 2)) / 100;
+              const caseExitNOI = (year1NOI || 0) * Math.pow(1 + growth, holdPeriod);
+              const capR = scenario?.exitCapRate || 7.5;
+              const saleP = caseExitNOI / (capR / 100);
+              return { name: c.name || scenario?.name || `Case ${i+1}`, price: Math.round(saleP > 0 ? saleP : purchasePrice * 1.2) };
+            })} layout="vertical" margin={{ top: 2, right: 70, left: 90, bottom: 2 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} horizontal={false} />
+              <XAxis type="number" tickFormatter={(v) => `${(v/1e6).toFixed(1)}M`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={86} />
+              <RechartTooltip formatter={(v) => [`${Number(v).toLocaleString()}`, 'Est. Sale Price']} contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid hsl(var(--border))' }} />
+              <Bar dataKey="price" radius={[0,4,4,0]} maxBarSize={22}>
+                {cases.map((_, i) => <Cell key={i} fill={['#3b82f6','#10b981','#f59e0b','#8b5cf6'][i % 4]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 overflow-x-auto">

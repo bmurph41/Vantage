@@ -31,6 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer } from 'recharts';
 import {
   Plus,
   Trash2,
@@ -625,7 +626,45 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
           {loan.loanAmount > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Loan Schedule Preview</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Calculator className="h-3.5 w-3.5 text-primary" />
+                  Amortization Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {schedule && schedule.length > 0 && (
+                  <div className="mb-5">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart data={schedule.map((row) => ({
+                        yr: `Yr ${row.year + 1}`,
+                        interest: Math.round(row.interest || 0),
+                        principal: Math.round(row.principal || 0),
+                      }))} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                        <XAxis dataKey="yr" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                        <YAxis tickFormatter={(v) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : `${(v/1e3).toFixed(0)}K`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={60} />
+                        <RechartTooltip formatter={(v, n) => [`${Number(v).toLocaleString()}`, n === 'interest' ? 'Interest' : 'Principal']} contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid hsl(var(--border))' }} />
+                        <Bar dataKey="interest" stackId="a" fill="#ef4444" opacity={0.7} name="Interest" />
+                        <Bar dataKey="principal" stackId="a" fill="#3b82f6" opacity={0.85} radius={[3,3,0,0]} name="Principal" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-3 gap-3 mt-2 text-xs">
+                      {[
+                        { label: 'Total Interest', val: schedule.reduce((s,r)=>s+(r.interest||0),0), color: 'text-red-600' },
+                        { label: 'Total Principal', val: schedule.reduce((s,r)=>s+(r.principal||0),0), color: 'text-blue-600' },
+                        { label: 'Total Debt Service', val: schedule.reduce((s,r)=>s+(r.totalDebtService||0),0), color: 'text-foreground' },
+                      ].map(m => (
+                        <div key={m.label} className="p-2 rounded border bg-muted/30">
+                          <p className="text-muted-foreground">{m.label}</p>
+                          <p className={`font-semibold tabular-nums ${m.color}`}>{new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(m.val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+              <CardHeader className="pb-1 pt-2 px-6">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Year-by-Year Detail</CardTitle>
               </CardHeader>
               <CardContent>
                 {scheduleLoading ? (

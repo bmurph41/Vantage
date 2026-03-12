@@ -2337,7 +2337,26 @@ Respond with JSON only:
       }
 
       if (isAnnualPeriod) {
-        const monthlyAmount = amount / 12;
+        // Load seasonal config from upload (set via Configure Distribution modal)
+        const uploadRecord = await pool.query(
+          `SELECT seasonal_config FROM doc_intel_uploads WHERE id = $1`,
+          [uploadId]
+        );
+        const seasonalConfig = uploadRecord.rows[0]?.seasonal_config as any;
+        
+        // Resolve department weights: per-dept config > even split
+        const getMonthWeights = (dept: string): Record<number,number> => {
+          if (!seasonalConfig?.departments) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
+          const deptCfg = seasonalConfig.departments[dept];
+          if (!deptCfg?.enabled || !deptCfg?.weights) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
+          // Normalize weights to sum to 1
+          const w = deptCfg.weights as Record<string,number>;
+          const total = Object.values(w).reduce((a,b)=>a+b,0);
+          if (total === 0) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
+          return Object.fromEntries(Object.entries(w).map(([k,v])=>[Number(k),v/total]));
+        };
+        
+        const monthWeights = getMonthWeights(inferredDept);
         for (let m = 1; m <= 12; m++) {
           const [actualRecord] = await db
             .insert(modelingActuals)
@@ -2350,7 +2369,7 @@ Respond with JSON only:
               subcategory: subcategory,
               department: inferredDept,
               lineItemDescription: item.rawText,
-              amount: String(Math.round(monthlyAmount * 100) / 100),
+              amount: String(Math.round((amount * (monthWeights[m] ?? 1/12)) * 100) / 100),
               dataSource: 'doc_intel',
               sourceRecordId: item.id,
               sourceRecordType: 'doc_intel_extracted_item',
@@ -2366,7 +2385,7 @@ Respond with JSON only:
                 modelingActuals.lineItemDescription
               ],
               set: {
-                amount: String(Math.round(monthlyAmount * 100) / 100),
+                amount: String(Math.round((amount * (monthWeights[m] ?? 1/12)) * 100) / 100),
                 department: inferredDept,
                 updatedAt: new Date(),
               }

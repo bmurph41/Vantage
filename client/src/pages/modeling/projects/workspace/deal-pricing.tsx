@@ -51,6 +51,7 @@ import {
 import type { ModelingProject, ModelingFinancialPeriod } from '@shared/schema';
 import type { ProjectConfig } from '@/types/modeling';
 import debounce from 'lodash.debounce';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
 import { computeDealSignal, getSignalBadgeProps, computeCriteriaSignal, type DealSignalResult, type CriteriaMatchResult, type InvestmentCriteria } from '@/lib/dealSignal';
 import YearSelector from '@/components/modeling/YearSelector';
@@ -1278,34 +1279,44 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                   </Button>
                 </div>
               )}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <p className="text-xs text-muted-foreground">Purchase Price</p>
-                  <p className="num text-2xl font-bold" data-testid="text-result-price">
-                    {formatCurrency(pricingData.purchasePrice)}
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <p className="text-xs text-muted-foreground">IRR</p>
-                  <p className="num text-2xl font-bold text-green-600" data-testid="text-result-irr">
-                    {formatPercent(pricingData.irr)}
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <p className="text-xs text-muted-foreground">Year 1 Cap Rate</p>
-                  <p className="num text-2xl font-bold text-blue-600" data-testid="text-result-cap-rate">
-                    {formatPercent(pricingData.year1CapRate)}
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                  <p className="text-xs text-muted-foreground">MOIC</p>
-                  <p className="num text-2xl font-bold text-purple-600" data-testid="text-result-moic">
-                    {formatMultiple(pricingData.moic)}
-                  </p>
-                </div>
+              {/* ── Institutional metrics strip ── */}
+              <div className="grid grid-cols-4 lg:grid-cols-8 divide-x divide-border border rounded-lg overflow-hidden mb-5">
+                {[
+                  { label: 'Purchase Price', value: formatCurrency(pricingData.purchasePrice), testId: 'text-result-price', accent: 'text-foreground', highlight: true },
+                  { label: 'IRR', value: formatPercent(pricingData.irr), testId: 'text-result-irr', accent: 'text-emerald-600 dark:text-emerald-400' },
+                  { label: 'Going-In Cap', value: formatPercent(pricingData.year1CapRate), testId: 'text-result-cap-rate', accent: 'text-blue-600 dark:text-blue-400' },
+                  { label: 'Exit Cap', value: formatPercent(pricingData.exitCapRate ?? pricingData.stabilizedCapRate), testId: 'text-result-exit-cap', accent: 'text-indigo-600 dark:text-indigo-400' },
+                  { label: 'MOIC', value: formatMultiple(pricingData.moic), testId: 'text-result-moic', accent: 'text-violet-600 dark:text-violet-400' },
+                  { label: 'Equity Multiple', value: formatMultiple(pricingData.equityMultiple), testId: '', accent: 'text-foreground' },
+                  { label: 'Avg CoC Return', value: formatPercent(pricingData.averageCashOnCash), testId: '', accent: 'text-amber-600 dark:text-amber-400' },
+                  { label: 'DSCR', value: pricingData.dscr ? `${Number(pricingData.dscr).toFixed(2)}x` : '—', testId: '', accent: (pricingData.dscr ?? 0) >= 1.25 ? 'text-emerald-600' : 'text-red-500' },
+                ].map((m) => (
+                  <div key={m.label} className={`px-3 py-3 ${m.highlight ? 'bg-primary/5' : ''}`}>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider leading-none mb-1.5">{m.label}</p>
+                    <p className={`num font-bold tabular-nums leading-none ${m.highlight ? 'text-lg' : 'text-base'} ${m.accent}`} data-testid={m.testId}>{m.value}</p>
+                  </div>
+                ))}
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              {/* ── Cash flow progression chart ── */}
+              {pricingData.annualCashFlows && pricingData.annualCashFlows.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Annual Cash Flow Progression</p>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <BarChart data={pricingData.annualCashFlows.map((cf: any, i: number) => ({ year: `Yr ${i+1}`, cf: Math.round(typeof cf === 'object' ? cf.cashFlow ?? cf.value ?? cf : cf) }))} margin={{ top: 2, right: 8, left: 8, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
+                      <XAxis dataKey="year" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v: number) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : `${(v/1e3).toFixed(0)}K`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={56} />
+                      <RechartTooltip formatter={(v: number) => [`${v.toLocaleString()}`, 'Cash Flow']} contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid hsl(var(--border))' }} />
+                      <Bar dataKey="cf" radius={[3,3,0,0]}>
+                        {(pricingData.annualCashFlows || []).map((_: any, i: number) => <Cell key={i} fill={i === (pricingData.annualCashFlows.length - 1) ? '#8b5cf6' : '#3b82f6'} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4" style={{display:'none'}}>
                 <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
                   <p className="text-xs text-muted-foreground">Avg Cash-on-Cash</p>
                   <p className="num text-lg font-bold text-orange-600">

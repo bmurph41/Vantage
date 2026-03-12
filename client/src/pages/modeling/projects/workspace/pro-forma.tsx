@@ -66,6 +66,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend, ReferenceLine, Area, AreaChart, ComposedChart } from 'recharts';
 import type { ProjectAssumptions, ProFormaData } from '@/types/modeling';
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { useDepartmentOrder } from '@/hooks/useDepartmentOrder';
@@ -1000,7 +1001,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
       )}
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card 
           className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${selectedKPI === 'baseline-revenue' ? 'ring-2 ring-primary border-primary' : ''}`}
           onClick={() => setSelectedKPI(selectedKPI === 'baseline-revenue' ? null : 'baseline-revenue')}
@@ -1011,7 +1012,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.revenue, { dash: true })}</div>
+            <div className="text-xl font-bold tabular-nums">{formatCurrency(baselineSummary?.revenue, { dash: true })}</div>
             {priorPeriods.length > 0 && (
               <div className="flex items-center gap-1 mt-1">
                 {(() => {
@@ -1047,7 +1048,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(baselineSummary?.noi, { dash: true })}</div>
+            <div className="text-xl font-bold tabular-nums">{formatCurrency(baselineSummary?.noi, { dash: true })}</div>
             <div className="text-xs text-muted-foreground mt-1">
               {formatPercent(baselineSummary?.noiMargin, { dash: true })} margin
             </div>
@@ -1062,7 +1063,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             <CardTitle className="text-sm font-medium text-muted-foreground">Year 1 NOI</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(year1Summary.noi, { dash: true })}</div>
+            <div className="text-xl font-bold tabular-nums">{formatCurrency(year1Summary.noi, { dash: true })}</div>
             {baselineSummary && (
               <div className="flex items-center gap-1 mt-1">
                 {(() => {
@@ -1095,7 +1096,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
             <CardTitle className="text-sm font-medium text-muted-foreground">Year {holdPeriod} NOI</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(finalYearSummary.noi, { dash: true })}</div>
+            <div className="text-xl font-bold tabular-nums">{formatCurrency(finalYearSummary.noi, { dash: true })}</div>
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3 text-green-500" />
               <span className="text-xs text-green-600">
@@ -1106,6 +1107,62 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           </CardContent>
         </Card>
       </div>
+
+      {/* ── NOI Projection Chart ── */}
+      {years.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-semibold">NOI Projection — {holdPeriod}-Year Hold</CardTitle>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-500 inline-block rounded" /> Revenue</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-400 inline-block rounded" /> OpEx</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-2 bg-emerald-500/80 inline-block rounded-sm" /> NOI</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 pb-4 px-5">
+            <ResponsiveContainer width="100%" height={220}>
+              <ComposedChart data={years.map(year => {
+                const rev = (() => {
+                  if (!proFormaData?.revenue?.lineItems) return 0;
+                  return proFormaData.revenue.lineItems.reduce((s: number, item: any) => {
+                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
+                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
+                  }, 0);
+                })();
+                const cogs = (() => {
+                  if (!proFormaData?.cogs?.lineItems) return 0;
+                  return proFormaData.cogs.lineItems.reduce((s: number, item: any) => {
+                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
+                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
+                  }, 0);
+                })();
+                const exp = (() => {
+                  if (!proFormaData?.expenses?.lineItems) return 0;
+                  return proFormaData.expenses.lineItems.reduce((s: number, item: any) => {
+                    const v = item.yearlyValues?.[year] ?? item.projectedValues?.[String(year)] ?? 0;
+                    return s + (typeof v === 'number' ? v : parseFloat(v) || 0);
+                  }, 0);
+                })();
+                const noi = rev - cogs - exp;
+                return { year: String(year), revenue: Math.round(rev), opex: Math.round(cogs + exp), noi: Math.round(noi) };
+              })} margin={{ top: 4, right: 16, left: 16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v: number) => v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : `${v}`} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={64} />
+                <RechartTooltip formatter={(v: number, name: string) => [`${v.toLocaleString()}`, name === 'revenue' ? 'Revenue' : name === 'opex' ? 'OpEx' : 'NOI']} contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid hsl(var(--border))' }} />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" opacity={0.15} radius={[2,2,0,0]} />
+                <Bar dataKey="opex" fill="hsl(var(--destructive))" opacity={0.15} radius={[2,2,0,0]} />
+                <Line type="monotone" dataKey="noi" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Drilldown Panel */}
       {selectedKPI && (
