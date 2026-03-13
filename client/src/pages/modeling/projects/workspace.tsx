@@ -539,7 +539,7 @@ export default function ProjectWorkspace() {
 
   if (isLoading) {
     return (
-      <div className="p-6 pt-4 space-y-0">
+      <div className="px-6 pt-4 pb-8 space-y-0">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10" />
           <div className="space-y-2">
@@ -578,8 +578,8 @@ export default function ProjectWorkspace() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between pb-3 border-b border-border/40 mb-0">
+    <div className="flex flex-col min-h-screen bg-background">
+      <div className="sticky top-0 z-30 bg-white border-b border-border/50 shadow-sm px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <Button 
             variant="ghost" 
@@ -727,8 +727,8 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 -mt-3">
-        <div className="ws-nav-strip sticky top-0 z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1">
+        <div className="ws-nav-strip sticky top-[56px] z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
           {/* ── Group Rail ── */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {

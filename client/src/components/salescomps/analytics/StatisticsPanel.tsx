@@ -1,5 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus, DollarSign, Home, Percent, Database } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, DollarSign, Home, Percent, Database, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface OverallStats {
@@ -19,180 +18,165 @@ interface StatisticsPanelProps {
   isLoading?: boolean;
 }
 
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+
+function StatSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 animate-pulse">
+      <div className="h-3 w-20 bg-slate-100 rounded mb-3" />
+      <div className="h-7 w-28 bg-slate-100 rounded mb-2" />
+      <div className="h-2.5 w-16 bg-slate-100 rounded" />
+    </div>
+  );
+}
+
+// ─── Individual stat card ─────────────────────────────────────────────────────
+
+interface StatCardProps {
+  label: string;
+  primary: string;
+  secondary?: string;
+  secondaryLabel?: string;
+  delta?: number; // positive = up, negative = down
+  deltaLabel?: string;
+  icon: React.ElementType;
+  accent: string;
+  accentText: string;
+  testId?: string;
+}
+
+function StatCard({
+  label, primary, secondary, secondaryLabel,
+  delta, deltaLabel, icon: Icon, accent, accentText, testId,
+}: StatCardProps) {
+  const hasDelta = delta !== undefined;
+  const isUp = hasDelta && delta > 0.05;
+  const isDown = hasDelta && delta < -0.05;
+
+  return (
+    <div
+      className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+      data-testid={testId}
+    >
+      <div className="flex items-start justify-between mb-2.5">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 leading-none">{label}</p>
+        <div className={`w-7 h-7 rounded-lg ${accent} ${accentText} flex items-center justify-center flex-shrink-0`}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+      </div>
+
+      <p className="text-[22px] font-bold text-slate-900 leading-none tabular-nums">{primary}</p>
+
+      <div className="flex items-center justify-between mt-2">
+        {secondary && (
+          <span className="text-[11px] text-slate-400">
+            {secondaryLabel && <span className="text-slate-300 mr-1">{secondaryLabel}</span>}
+            {secondary}
+          </span>
+        )}
+        {hasDelta && (
+          <span className={`flex items-center gap-0.5 text-[11px] font-semibold ${
+            isUp ? 'text-emerald-600' : isDown ? 'text-red-500' : 'text-slate-400'
+          }`}>
+            {isUp && <ArrowUpRight className="w-3 h-3" />}
+            {isDown && <ArrowDownRight className="w-3 h-3" />}
+            {!isUp && !isDown && <Minus className="w-3 h-3" />}
+            {deltaLabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main panel ───────────────────────────────────────────────────────────────
+
 export default function StatisticsPanel({ stats, isLoading }: StatisticsPanelProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="pb-2">
-              <div className="h-4 bg-muted rounded w-24" />
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-muted rounded w-32 mb-2" />
-              <div className="h-3 bg-muted rounded w-20" />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {Array.from({ length: 8 }).map((_, i) => <StatSkeleton key={i} />)}
       </div>
     );
   }
 
-  const priceChange = stats.medianPrice > 0 
-    ? ((stats.avgPrice - stats.medianPrice) / stats.medianPrice)
+  const priceVsMedian = stats.medianPrice > 0
+    ? (stats.avgPrice - stats.medianPrice) / stats.medianPrice
+    : 0;
+  const capRatePremium = stats.medianCapRate > 0
+    ? (stats.avgCapRate - stats.medianCapRate) / stats.medianCapRate
     : 0;
 
+  const cards: StatCardProps[] = [
+    {
+      label: "Sample Size",
+      primary: stats.count.toLocaleString(),
+      secondary: "comparables analyzed",
+      icon: Database,
+      accent: "bg-slate-100",
+      accentText: "text-slate-500",
+      testId: "card-stat-count",
+    },
+    {
+      label: "Average Price",
+      primary: formatCurrency(stats.avgPrice),
+      secondary: formatCurrency(stats.medianPrice),
+      secondaryLabel: "Median:",
+      delta: priceVsMedian,
+      deltaLabel: priceVsMedian >= 0 ? `+${(priceVsMedian * 100).toFixed(1)}% vs median` : `${(priceVsMedian * 100).toFixed(1)}% vs median`,
+      icon: DollarSign,
+      accent: "bg-emerald-50",
+      accentText: "text-emerald-600",
+      testId: "card-stat-avg-price",
+    },
+    {
+      label: "Price / Slip",
+      primary: formatCurrency(stats.avgPricePerSlip),
+      secondary: formatCurrency(stats.medianPricePerSlip),
+      secondaryLabel: "Median:",
+      icon: Home,
+      accent: "bg-blue-50",
+      accentText: "text-blue-600",
+      testId: "card-stat-price-per-slip",
+    },
+    {
+      label: "Avg Capacity",
+      primary: stats.avgCapacity.toFixed(0),
+      secondary: "slips / marina",
+      icon: Home,
+      accent: "bg-cyan-50",
+      accentText: "text-cyan-600",
+      testId: "card-stat-avg-capacity",
+    },
+    {
+      label: "Avg Cap Rate",
+      primary: `${(stats.avgCapRate * 100).toFixed(2)}%`,
+      secondary: `${(stats.medianCapRate * 100).toFixed(2)}%`,
+      secondaryLabel: "Median:",
+      delta: capRatePremium,
+      deltaLabel: capRatePremium >= 0 ? `+${(capRatePremium * 100).toFixed(1)}% vs median` : `${(capRatePremium * 100).toFixed(1)}% vs median`,
+      icon: Percent,
+      accent: "bg-orange-50",
+      accentText: "text-orange-600",
+      testId: "card-stat-cap-rate",
+    },
+    {
+      label: "Total Portfolio Value",
+      primary: formatCurrency(stats.totalValue),
+      secondary: `${stats.count} transactions`,
+      icon: TrendingUp,
+      accent: "bg-purple-50",
+      accentText: "text-purple-600",
+      testId: "card-stat-total-value",
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Count */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-count">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Sample Size
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {stats.count.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Comparables analyzed
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Average Price */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-avg-price">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Average Price
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {formatCurrency(stats.avgPrice)}
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-              {priceChange > 0.05 && <TrendingUp className="h-3 w-3 text-green-500" />}
-              {priceChange < -0.05 && <TrendingDown className="h-3 w-3 text-red-500" />}
-              {Math.abs(priceChange) <= 0.05 && <Minus className="h-3 w-3 text-muted-foreground" />}
-              <p className={`text-xs truncate ${priceChange > 0 ? 'text-green-600' : priceChange < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                {Math.abs(priceChange * 100).toFixed(1)}% vs median
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Median Price */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-median-price">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Median Price
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {formatCurrency(stats.medianPrice)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              50th percentile
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Total Value */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-total-value">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Total Value
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {formatCurrency(stats.totalValue)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              Aggregate volume
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Average Price Per Slip */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-avg-pps">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Home className="h-4 w-4" />
-              Avg Price/Slip
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {formatCurrency(stats.avgPricePerSlip, true)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per wet slip
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Median Price Per Slip */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-median-pps">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Home className="h-4 w-4" />
-              Median Price/Slip
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {formatCurrency(stats.medianPricePerSlip, true)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              50th percentile
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Average Cap Rate */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-avg-cap-rate">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Percent className="h-4 w-4" />
-              Avg Cap Rate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {stats.avgCapRate > 0 ? formatPercent(stats.avgCapRate) : 'N/A'}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Mean yield
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Average Capacity */}
-        <Card className="border-border/40 hover:border-primary/50 transition-colors" data-testid="card-stat-avg-capacity">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Avg Capacity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground truncate">
-              {Math.round(stats.avgCapacity).toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Slips per marina
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {cards.map((card) => (
+          <StatCard key={card.label} {...card} />
+        ))}
       </div>
     </div>
   );

@@ -1963,7 +1963,7 @@ export default function SetupWizard() {
       });
 
       if (result.id) {
-        const redirectTab = wizardStagedFiles.length > 0 ? '?tab=storage-leases' : '';
+        const redirectTab = '?tab=inputs'; // Always land on Inputs & Assumptions after project creation
         setLocation(`/modeling/projects/${result.id}${redirectTab}`);
       } else {
         setLocation("/modeling/projects");
