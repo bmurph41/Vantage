@@ -748,16 +748,29 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
     }
     setGrowthRates(rates);
 
-    // Enabled unit types
+    // Enabled unit types — prefer saved array, fall back to wizard storageMix
     const projectUnitTypes = (project as any)?.enabledStorageTypes;
     if (projectUnitTypes && Array.isArray(projectUnitTypes)) {
       setEnabledUnitTypes(new Set(projectUnitTypes));
+    } else {
+      const wizardMixItems: any[] = (project as any)?.customMetrics?.storageMix?.items || [];
+      if (wizardMixItems.length > 0) {
+        setEnabledUnitTypes(new Set(wizardMixItems.map((w: any) => w.storageType)));
+      }
     }
 
-    // Enabled profit centers
+    // Enabled profit centers — prefer saved array, fall back to wizard customMetrics
     const projectPCs = (project as any)?.enabledProfitCenters;
     if (projectPCs && Array.isArray(projectPCs)) {
       setEnabledProfitCenters(new Set(projectPCs));
+    } else {
+      const wizardPCs = (project as any)?.customMetrics?.profitCenters ?? {};
+      const enabledFromWizard = Object.entries(wizardPCs)
+        .filter(([, v]: any) => v?.enabled === true)
+        .map(([k]) => k);
+      if (enabledFromWizard.length > 0) {
+        setEnabledProfitCenters(new Set(enabledFromWizard));
+      }
     }
 
     // COA values from inputAssumptions
@@ -777,20 +790,34 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
     setCustomRevenue(savedAssumptions.customRevenueLines ?? []);
     setCustomExpenses(savedAssumptions.customExpenseLines ?? []);
 
-    // Unit mix rows
+    // Unit mix rows — prefer storageTypes rows, fall back to wizard customMetrics.storageMix
     const projectUnits = (project as any)?.storageTypes || [];
+    const wizardMix: any[] = (project as any)?.customMetrics?.storageMix?.items || [];
     const initialRows: UnitRow[] = config.unitMix.types.map(t => {
       const existing = projectUnits.find((u: any) => u.id === t.id || u.typeId === t.id);
+      const wizardItem = !existing ? wizardMix.find((w: any) =>
+        w.storageType === t.id ||
+        w.storageType?.toLowerCase() === t.id?.toLowerCase() ||
+        w.storageType?.toLowerCase().replace(/[^a-z0-9]/g,'') === t.id?.toLowerCase().replace(/[^a-z0-9]/g,'')
+      ) : null;
       return {
         typeId: t.id,
         name: t.name,
         section: t.section,
-        enabled: existing ? (existing.isEnabled ?? existing.enabled ?? false) : false,
-        count: existing?.count ?? existing?.totalSlips ?? 0,
+        enabled: existing
+          ? (existing.isEnabled ?? existing.enabled ?? false)
+          : (wizardItem != null),
+        count: existing?.count ?? existing?.totalSlips ?? wizardItem?.count ?? 0,
         avgSF: existing?.avgSF ?? t.defaultFields?.avgSF ?? 0,
-        monthlyRate: existing?.monthlyRate ? parseFloat(existing.monthlyRate) : 0,
-        annualRate: existing?.annualRate ? parseFloat(existing.annualRate) : 0,
-        occupancy: existing?.occupancy ?? (existing?.occupancyPercent ? parseFloat(existing.occupancyPercent) : 95),
+        monthlyRate: existing?.monthlyRate
+          ? parseFloat(existing.monthlyRate)
+          : (wizardItem?.avgRate ?? 0),
+        annualRate: existing?.annualRate
+          ? parseFloat(existing.annualRate)
+          : (wizardItem?.avgRate ? wizardItem.avgRate * 12 : 0),
+        occupancy: existing?.occupancy
+          ?? (existing?.occupancyPercent ? parseFloat(existing.occupancyPercent) : null)
+          ?? (wizardItem?.currentOccupancy ?? 95),
         inSeasonRate: existing?.inSeasonRate ? parseFloat(existing.inSeasonRate) : 0,
         offSeasonRate: existing?.offSeasonRate ? parseFloat(existing.offSeasonRate) : 0,
       };

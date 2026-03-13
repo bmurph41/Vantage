@@ -579,151 +579,156 @@ export default function ProjectWorkspace() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <div className="sticky top-0 z-30 bg-white border-b border-border/50 shadow-sm px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className="h-7 w-7 shrink-0"
+      {/* ── Persistent Project Header ─────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-white border-b border-border/40 shadow-sm">
+        {/* Breadcrumb row */}
+        <div className="flex items-center gap-1.5 px-6 pt-2.5 pb-0 text-[11px] text-muted-foreground">
+          <button
             onClick={() => navigate('/modeling/projects')}
-            data-testid="button-back-to-projects"
+            className="hover:text-foreground transition-colors font-medium"
           >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold tracking-tight leading-none flex items-center gap-2 truncate" data-testid="text-project-name">
-                {project.marinaName}
-              </h1>
-              <ProjectTypeBadge project={project} />
-              {(project as any).assetClass && (project as any).assetClass !== "marina" && (
-                <Badge variant="outline" className="text-[10px] capitalize h-4.5 px-1.5">
-                  {(project as any).assetClass.replace("_", " ")}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
-              {(project.city || project.state) && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {[project.city, project.state].filter(Boolean).join(', ')}
-                </span>
-              )}
-              {project.purchasePrice && (
-                <span className="flex items-center gap-1">
-                  <DollarSign className="h-3.5 w-3.5" />
-                  {formatCurrencyValue(project.purchasePrice)}
-                </span>
-              )}
-              {project.dealOutcome && (
-                <Badge variant="outline" className="capitalize">
-                  {project.dealOutcome.replace('_', ' ')}
-                </Badge>
-              )}
-              {/* UW Stage */}
-              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-border/60">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/60 border border-border/40">
-                  <div className={[
-                    'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                    ((project as any).uwStage === 'active_uw' || (project as any).uwStage === 'building_model') ? 'bg-blue-500 animate-pulse' :
-                    (project as any).uwStage === 'loi_submitted' || (project as any).uwStage === 'under_contract' ? 'bg-amber-500' :
-                    (project as any).uwStage === 'closed' ? 'bg-emerald-500' :
-                    (project as any).uwStage === 'dead' ? 'bg-red-400' :
-                    'bg-slate-400'
-                  ].join(' ')} />
-                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Stage</span>
-                </div>
-                <Select
-                  value={(project as any).uwStage || "not_started"}
-                  onValueChange={(val) => {
-                    uwStageMutation.mutate({ uwStage: val, uwSubStatus: undefined });
-                  }}
-                >
-                  <SelectTrigger className="h-7 w-[145px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(uwStageLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {uwSubStatuses[(project as any).uwStage || "not_started"]?.length > 0 && (
-                  <Select
-                    value={(project as any).uwSubStatus || ""}
-                    onValueChange={(val) => uwStageMutation.mutate({ uwSubStatus: val })}
-                  >
-                    <SelectTrigger className="h-7 w-[150px] text-xs border border-border/60 bg-background shadow-sm hover:border-primary/40 transition-colors">
-                      <SelectValue placeholder="Sub-status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uwSubStatuses[(project as any).uwStage || "not_started"]?.map((s: any) => (
-                        <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            Financial Model
+          </button>
+          <ChevronRight className="h-3 w-3 opacity-50 flex-shrink-0" />
+          <span className="text-foreground font-semibold truncate max-w-[260px]">{project.marinaName}</span>
+        </div>
+
+        {/* Main header row */}
+        <div className="flex items-center justify-between gap-4 px-6 py-2.5">
+          {/* Left: back + project identity */}
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 -ml-1"
+              onClick={() => navigate('/modeling/projects')}
+              data-testid="button-back-to-projects"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-[15px] font-bold tracking-tight leading-none truncate" data-testid="text-project-name">
+                  {project.marinaName}
+                </h1>
+                <ProjectTypeBadge project={project} />
+                {(project as any).assetClass && (project as any).assetClass !== "marina" && (
+                  <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
+                    {(project as any).assetClass.replace(/_/g, " ")}
+                  </Badge>
+                )}
+                {(project.city || project.state) && (
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    {[project.city, project.state].filter(Boolean).join(', ')}
+                  </span>
+                )}
+                {project.purchasePrice && (
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <DollarSign className="h-3 w-3" />
+                    {formatCurrencyValue(project.purchasePrice)}
+                  </span>
                 )}
               </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={saveSuccess ? "default" : "outline"}
-            size="sm"
-            onClick={() => saveProjectMutation.mutate()}
-            disabled={saveProjectMutation.isPending}
-            className={saveSuccess ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-            data-testid="button-save-project"
-          >
-            {saveSuccess ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Saved
-              </>
-            ) : saveProjectMutation.isPending ? (
-              <>
-                <Save className="h-4 w-4 mr-2 animate-pulse" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save
-              </>
+
+          {/* Right: stage + actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Stage dot + label */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/60 border border-border/40">
+              <div className={[
+                'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                ((project as any).uwStage === 'active_uw' || (project as any).uwStage === 'building_model') ? 'bg-blue-500 animate-pulse' :
+                (project as any).uwStage === 'loi_submitted' || (project as any).uwStage === 'under_contract' ? 'bg-amber-500' :
+                (project as any).uwStage === 'closed' ? 'bg-emerald-500' :
+                (project as any).uwStage === 'dead' ? 'bg-red-400' : 'bg-slate-400'
+              ].join(' ')} />
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Stage</span>
+            </div>
+            <Select
+              value={(project as any).uwStage || "not_started"}
+              onValueChange={(val) => uwStageMutation.mutate({ uwStage: val, uwSubStatus: undefined })}
+            >
+              <SelectTrigger className="h-7 w-[140px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(uwStageLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value} className="text-xs">{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {uwSubStatuses[(project as any).uwStage || "not_started"]?.length > 0 && (
+              <Select
+                value={(project as any).uwSubStatus || ""}
+                onValueChange={(val) => uwStageMutation.mutate({ uwSubStatus: val })}
+              >
+                <SelectTrigger className="h-7 w-[145px] text-xs border border-border/60 bg-background shadow-sm hover:border-primary/40 transition-colors">
+                  <SelectValue placeholder="Sub-status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {uwSubStatuses[(project as any).uwStage || "not_started"]?.map((s: any) => (
+                    <SelectItem key={s.value} value={s.value} className="text-xs">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCreateOm}
-            disabled={createOmMutation.isPending}
-            data-testid="button-create-om"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            {createOmMutation.isPending ? 'Creating...' : 'Create OM'}
-          </Button>
-          <PinButton
-            itemType="modeling_project"
-            itemId={projectId}
-            title={project.marinaName}
-            description={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
-            link={`/modeling/projects/${projectId}`}
-            icon="TrendingUp"
-            color="#3B82F6"
-            variant="outline"
-            showLabel
-          />
-          <FavoriteButton
-            itemType="modeling_project"
-            itemId={projectId!}
-            title={project.marinaName}
-            subtitle={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
-            link={`/modeling/projects/${projectId}`}
-            icon="TrendingUp"
-            variant="outline"
-            showLabel
-          />
+
+            <div className="w-px h-5 bg-border/60 mx-1" />
+
+            {/* Save */}
+            <Button
+              variant={saveSuccess ? "default" : "outline"}
+              size="sm"
+              onClick={() => saveProjectMutation.mutate()}
+              disabled={saveProjectMutation.isPending}
+              className={saveSuccess ? "bg-green-600 hover:bg-green-700 text-white h-8 text-xs" : "h-8 text-xs"}
+              data-testid="button-save-project"
+            >
+              {saveSuccess ? <><Check className="h-3.5 w-3.5 mr-1.5" />Saved</> :
+               saveProjectMutation.isPending ? <><Save className="h-3.5 w-3.5 mr-1.5 animate-pulse" />Saving...</> :
+               <><Save className="h-3.5 w-3.5 mr-1.5" />Save</>}
+            </Button>
+
+            {/* Create OM */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCreateOm}
+              disabled={createOmMutation.isPending}
+              className="h-8 text-xs"
+              data-testid="button-create-om"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
+              {createOmMutation.isPending ? 'Creating...' : 'Create OM'}
+            </Button>
+
+            {/* Pin */}
+            <PinButton
+              itemType="modeling_project"
+              itemId={projectId}
+              title={project.marinaName}
+              description={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
+              link={`/modeling/projects/${projectId}`}
+              icon="TrendingUp"
+              color="#3B82F6"
+              variant="outline"
+              showLabel
+            />
+
+            {/* Star */}
+            <FavoriteButton
+              itemType="modeling_project"
+              itemId={projectId!}
+              title={project.marinaName}
+              subtitle={`${project.city || ''} ${project.state || ''}`.trim() || undefined}
+              link={`/modeling/projects/${projectId}`}
+              icon="TrendingUp"
+              variant="outline"
+              showLabel
+            />
+          </div>
         </div>
       </div>
 
