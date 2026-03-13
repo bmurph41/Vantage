@@ -514,13 +514,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           './services/pnl/project-bridge'
         );
 
-        const result = await importDocIntelToPnlPipeline({
+        const importResult = await importDocIntelToPnlPipeline({
           orgId,
           modelingProjectId: projectId,
           docIntelUploadId: uploadId,
         });
 
-        res.json(result);
+        // Auto-promote pnlFacts → modeling_actuals immediately after import
+        let promoteResult = { promoted: 0, skipped: 0, errors: [] as string[] };
+        try {
+          const { manuallyPromotePnlFacts } = await import('./services/pnl/project-bridge');
+          promoteResult = await manuallyPromotePnlFacts({ orgId, modelingProjectId: projectId });
+          console.log(`[PNL Pipeline Import] Auto-promoted ${promoteResult.promoted} actuals for project ${projectId}`);
+        } catch (promoteErr: any) {
+          console.warn('[PNL Pipeline Import] Auto-promote failed (non-fatal):', promoteErr.message);
+          promoteResult.errors.push(promoteErr.message);
+        }
+
+        res.json({ ...importResult, promote: promoteResult });
       } catch (error: any) {
         console.error('[PNL Pipeline Import] Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -26899,7 +26910,31 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
                 else if (cat === 'cogs') cogs += amt;
                 else if (cat === 'expenses' || cat === 'expense') expenses += amt;
               }
-              t12Ebitda = revenue - cogs - expenses;
+              const rawNoi = revenue - cogs - expenses;
+
+              // Apply active addbacks to get normalized NOI
+              let addbackTotal = 0;
+              try {
+                const { modelingAddbacks, modelingAddbackValues } = await import('@shared/schema');
+                const activeAddbackRows = await db.select()
+                  .from(modelingAddbacks)
+                  .where(and(
+                    eq(modelingAddbacks.projectId, projectId),
+                    eq(modelingAddbacks.orgId, orgId),
+                    eq(modelingAddbacks.isActive, true)
+                  ));
+                for (const ab of activeAddbackRows) {
+                  const vals = await db.select()
+                    .from(modelingAddbackValues)
+                    .where(eq(modelingAddbackValues.addbackId, ab.id));
+                  for (const v of vals) {
+                    addbackTotal += parseFloat(v.amount?.toString() || '0');
+                  }
+                }
+              } catch (abErr) {
+                console.warn('[Exit Metrics] Addback fetch failed (non-fatal):', abErr);
+              }
+              t12Ebitda = rawNoi + addbackTotal;
 
               const firstPeriod = sortedPeriods[0].split('-');
               const lastPeriod = sortedPeriods[sortedPeriods.length - 1].split('-');

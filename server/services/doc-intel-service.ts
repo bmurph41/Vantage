@@ -2353,19 +2353,59 @@ Respond with JSON only:
         );
         const seasonalConfig = uploadRecord.rows[0]?.seasonal_config as any;
         
-        // Resolve department weights: per-dept config > even split
-        const getMonthWeights = (dept: string): Record<number,number> => {
-          if (!seasonalConfig?.departments) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
-          const deptCfg = seasonalConfig.departments[dept];
-          if (!deptCfg?.enabled || !deptCfg?.weights) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
-          // Normalize weights to sum to 1
-          const w = deptCfg.weights as Record<string,number>;
-          const total = Object.values(w).reduce((a,b)=>a+b,0);
-          if (total === 0) return Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
-          return Object.fromEntries(Object.entries(w).map(([k,v])=>[Number(k),v/total]));
+        // Resolve department weights: per-dept config > wizard seasonality > even split
+        const getMonthWeights = async (dept: string): Promise<Record<number,number>> => {
+          const even = Object.fromEntries(Array.from({length:12},(_,i)=>[i+1,1/12]));
+
+          // Priority 1: explicit per-dept seasonal config from upload
+          if (seasonalConfig?.departments) {
+            const deptCfg = seasonalConfig.departments[dept];
+            if (deptCfg?.enabled && deptCfg?.weights) {
+              const w = deptCfg.weights as Record<string,number>;
+              const total = Object.values(w).reduce((a,b)=>a+b,0);
+              if (total > 0) return Object.fromEntries(Object.entries(w).map(([k,v])=>[Number(k),v/total]));
+            }
+          }
+
+          // Priority 2: derive from wizard customMetrics.seasonality
+          try {
+            const projRecord = uploadRecord.rows[0];
+            if (projRecord) {
+              // Fetch the project to get customMetrics
+              const projResult = await pool.query(
+                `SELECT custom_metrics FROM modeling_projects WHERE id = (
+                  SELECT modeling_project_id FROM doc_intel_uploads WHERE id = $1
+                ) LIMIT 1`,
+                [uploadId]
+              );
+              const cm = projResult.rows[0]?.custom_metrics as any;
+              const seasonality = cm?.seasonality;
+              if (seasonality && seasonality.profile && seasonality.profile !== 'YEAR_ROUND') {
+                const startMonth = seasonality.seasonStartMonth || 4;
+                const endMonth = seasonality.seasonEndMonth || 10;
+                const inSeasonMonths = endMonth >= startMonth
+                  ? endMonth - startMonth + 1
+                  : (12 - startMonth + 1) + endMonth;
+                const offSeasonMonths = 12 - inSeasonMonths;
+                // Revenue-heavy in-season: 70% weight in-season, 30% off-season
+                const inSeasonWeight = 0.70 / Math.max(inSeasonMonths, 1);
+                const offSeasonWeight = offSeasonMonths > 0 ? 0.30 / offSeasonMonths : 1/12;
+                const weights: Record<number,number> = {};
+                for (let m = 1; m <= 12; m++) {
+                  const inSeason = endMonth >= startMonth
+                    ? (m >= startMonth && m <= endMonth)
+                    : (m >= startMonth || m <= endMonth);
+                  weights[m] = inSeason ? inSeasonWeight : offSeasonWeight;
+                }
+                return weights;
+              }
+            }
+          } catch (_e) { /* fallthrough to even split */ }
+
+          return even;
         };
         
-        const monthWeights = getMonthWeights(inferredDept);
+        const monthWeights = await getMonthWeights(inferredDept);
         for (let m = 1; m <= 12; m++) {
           const [actualRecord] = await db
             .insert(modelingActuals)
