@@ -261,7 +261,7 @@ async function loadProjectQuick(pool: any, projectId: string) {
   const row = r.rows[0] ?? {};
   const cm = typeof row.custom_metrics === 'string' ? JSON.parse(row.custom_metrics) : row.custom_metrics ?? {};
   return {
-    modelingProjectId: row.modeling_project_id,
+    modelingProjectId: row.id,
     assetClass: row.asset_class ?? 'str',
     inputAssumptions: cm.inputAssumptions ?? {},
     unitMix: cm.unitMix ?? [],

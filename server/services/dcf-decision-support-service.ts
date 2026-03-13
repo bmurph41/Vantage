@@ -71,21 +71,13 @@ export async function checkEntitlement(
   let entitled = false;
   try {
     const orgResult = await pool.query(
-      `SELECT subscription_tier, plan_type, features
-       FROM organizations
-       WHERE id = $1 LIMIT 1`,
+      'SELECT id FROM organizations WHERE id = $1 LIMIT 1',
       [orgId]
     );
     const org = orgResult.rows[0];
     if (org) {
-      // Entitled if institutional tier or if features JSON includes decision_support
-      const tier = (org.subscription_tier ?? org.plan_type ?? '').toLowerCase();
-      const features = typeof org.features === 'string'
-        ? JSON.parse(org.features)
-        : org.features ?? {};
-
-      entitled = ['institutional', 'enterprise', 'pro'].includes(tier)
-        || features.decision_support === true;
+      // MVP: no subscription tier system yet — allow all
+      entitled = true;
     }
   } catch {
     // Table/columns may not exist — fall back to enabled
@@ -96,13 +88,8 @@ export async function checkEntitlement(
   let enabled = false;
   if (entitled && userId) {
     try {
-      const prefResult = await pool.query(
-        `SELECT preferences FROM users WHERE id = $1 LIMIT 1`,
-        [userId]
-      );
-      const prefs = prefResult.rows[0]?.preferences;
-      const parsed = typeof prefs === 'string' ? JSON.parse(prefs) : prefs ?? {};
-      enabled = parsed.dcfDecisionSupportEnabled === true;
+      // MVP: no user preferences column yet — default to entitled state
+      enabled = entitled;
     } catch {
       enabled = entitled; // If no prefs table, default to entitled state
     }
@@ -365,19 +352,15 @@ function buildFlowsForAttribution(
 
 async function loadProjectForDS(pool: any, projectId: string) {
   const r = await pool.query(
-    `SELECT mp.id as modeling_project_id, mp.asset_class, p.name as project_name,
-            p.custom_metrics, p.purchase_price
-     FROM modeling_projects mp
-     JOIN projects p ON p.id = mp.project_id
-     WHERE mp.project_id = $1 OR mp.id = $1 LIMIT 1`,
+    'SELECT id, org_id, asset_class, custom_metrics, purchase_price, marina_name FROM modeling_projects WHERE id = $1 LIMIT 1',
     [projectId]
   );
   const row = r.rows[0] ?? {};
   const cm = typeof row.custom_metrics === 'string' ? JSON.parse(row.custom_metrics) : row.custom_metrics ?? {};
   return {
-    modelingProjectId: row.modeling_project_id,
+    modelingProjectId: row.id,
     assetClass: row.asset_class ?? 'str',
-    projectName: row.project_name ?? 'Unknown Project',
+    projectName: row.marina_name ?? 'Unknown Project',
     inputAssumptions: cm.inputAssumptions ?? {},
     unitMix: cm.unitMix ?? [],
     purchasePrice: Number(row.purchase_price) || 0,
