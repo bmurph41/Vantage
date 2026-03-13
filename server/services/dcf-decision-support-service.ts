@@ -391,7 +391,7 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
 
 async function loadCapitalStackForDS(pool: any, modelingProjectId: string) {
   const r = await pool.query(
-    `SELECT purchase_price, total_equity, debt_tranches, hold_period_years
+    `SELECT purchase_price, total_equity, total_debt, blended_debt_rate, hold_period_years, exit_cap_rate
      FROM capital_stacks WHERE modeling_project_id = $1 ORDER BY created_at DESC LIMIT 1`,
     [modelingProjectId]
   );
