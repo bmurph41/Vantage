@@ -65,7 +65,7 @@ export function RateInput({
   
   return (
     <div className={cn(
-      "flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border",
+      "flex items-center justify-between py-2 px-3 rounded-lg transition-all duration-150 border max-w-sm",
       isModified 
         ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60" 
         : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600"

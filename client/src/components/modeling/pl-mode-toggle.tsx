@@ -59,28 +59,36 @@ const MODE_OPTIONS: {
   label: string;
   description: string;
   icon: React.ElementType;
-  color: string;
+  activeClass: string;
+  iconActiveClass: string;
+  dotClass: string;
 }[] = [
   {
     value: 'upload',
     label: 'Upload a P&L',
     description: 'Use an uploaded P&L statement as the source of historical financials',
     icon: Upload,
-    color: 'border-blue-500 bg-blue-50 dark:bg-blue-950',
+    activeClass: 'border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-md shadow-blue-100',
+    iconActiveClass: 'text-blue-600 dark:text-blue-400',
+    dotClass: 'bg-blue-500',
   },
   {
     value: 'direct_input',
     label: 'Direct Input',
     description: 'Build Year 1 financials from your input assumptions (nightly rate, occupancy, etc.)',
     icon: Calculator,
-    color: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950',
+    activeClass: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950 shadow-md shadow-emerald-100',
+    iconActiveClass: 'text-emerald-600 dark:text-emerald-400',
+    dotClass: 'bg-emerald-500',
   },
   {
     value: 'hybrid',
     label: 'Both (Hybrid)',
     description: 'Use uploaded actuals as the base, supplemented by computed values from assumptions',
     icon: Layers,
-    color: 'border-purple-500 bg-purple-50 dark:bg-purple-950',
+    activeClass: 'border-purple-500 bg-purple-50 dark:bg-purple-950 shadow-md shadow-purple-100',
+    iconActiveClass: 'text-purple-600 dark:text-purple-400',
+    dotClass: 'bg-purple-500',
   },
 ];
 
@@ -105,6 +113,9 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
   const currentMode: ModelInputMode =
     (project?.modelInputMode as ModelInputMode) ?? getDefaultMode(assetClass);
 
+  const [optimisticMode, setOptimisticMode] = useState<ModelInputMode | null>(null);
+  const displayMode: ModelInputMode = optimisticMode ?? currentMode;
+
   const updateModeMutation = useMutation({
     mutationFn: async (mode: ModelInputMode) => {
       return apiRequest('PATCH', `/api/modeling/projects/${project.id}`, {
@@ -112,13 +123,18 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${project.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${project.id}/pricing`] });
+      setOptimisticMode(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', project.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+    },
+    onError: () => {
+      setOptimisticMode(null); // revert on error
     },
   });
 
   const handleSelectMode = useCallback(
     (mode: ModelInputMode) => {
+      setOptimisticMode(mode);
       updateModeMutation.mutate(mode);
       onModeChange?.(mode);
     },
@@ -138,7 +154,7 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {MODE_OPTIONS.map((opt) => {
-          const isActive = currentMode === opt.value;
+          const isActive = displayMode === opt.value;
           const Icon = opt.icon;
 
           return (
@@ -146,26 +162,24 @@ export function PLModeToggle({ project, onModeChange }: PLModeToggleProps) {
               key={opt.value}
               onClick={() => handleSelectMode(opt.value)}
               disabled={updateModeMutation.isPending}
-              className={`
-                relative p-4 rounded-lg border-2 text-left transition-all duration-150
-                ${isActive
-                  ? `${opt.color} border-opacity-100 ring-2 ring-offset-2 ring-opacity-50`
-                  : 'border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30'
-                }
-                ${updateModeMutation.isPending ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
-              `}
+              className={[
+                'relative p-4 rounded-xl border-2 text-left transition-all duration-200 w-full',
+                isActive ? opt.activeClass + ' scale-[1.01]' : 'border-border bg-card hover:border-muted-foreground/40 hover:bg-muted/20',
+                updateModeMutation.isPending ? 'opacity-50 cursor-wait' : 'cursor-pointer',
+              ].join(' ')}
             >
-              {isActive && (
-                <div className="absolute top-2 right-2">
-                  <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                </div>
-              )}
+              <div className={[
+                'absolute top-2.5 right-2.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
+                isActive ? opt.dotClass + ' border-transparent text-white shadow-sm' : 'border-muted-foreground/20 text-transparent',
+              ].join(' ')}>
+                <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-current stroke-[2.5]"><polyline points="1,4 3.5,6.5 9,1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
               <div className="flex items-start gap-3">
-                <div className={`mt-0.5 ${isActive ? 'text-current' : 'text-muted-foreground'}`}>
+                <div className={[' mt-0.5 p-1.5 rounded-lg flex-shrink-0 transition-colors', isActive ? opt.iconActiveClass + ' bg-white/70' : 'text-muted-foreground bg-muted/40'].join(' ')}>
                   <Icon className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className={`font-medium text-sm ${isActive ? '' : 'text-foreground'}`}>
+                  <div className={['font-semibold text-sm', isActive ? opt.iconActiveClass : 'text-foreground'].join(' ')}>
                     {opt.label}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1 leading-relaxed">

@@ -1168,13 +1168,13 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
 
       {viewMode === 'compare' ? (
               <div className="overflow-x-auto">
-              <Table style={{ minWidth: '700px' }}>
+              <Table style={{ width: 'auto', minWidth: 'unset', tableLayout: 'auto' }} className="mx-auto">
                 <colgroup>
-                  <col style={{ width: '240px', minWidth: '180px' }} />
-                  <col style={{ width: '140px', minWidth: '110px' }} />
-                  <col style={{ width: '140px', minWidth: '110px' }} />
-                  <col style={{ width: '130px', minWidth: '100px' }} />
-                  <col style={{ width: '100px', minWidth: '80px' }} />
+                  <col style={{ width: '220px', minWidth: '160px' }} />
+                  <col style={{ width: '120px', minWidth: '100px' }} />
+                  <col style={{ width: '120px', minWidth: '100px' }} />
+                  <col style={{ width: '110px', minWidth: '90px' }} />
+                  <col style={{ width: '90px', minWidth: '70px' }} />
                 </colgroup>
                 <TableHeader>
                   <TableRow className="border-b-2">

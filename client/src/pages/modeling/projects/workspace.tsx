@@ -621,15 +621,25 @@ export default function ProjectWorkspace() {
                 </Badge>
               )}
               {/* UW Stage */}
-              <div className="flex items-center gap-1.5 ml-2 pl-2 border-l">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">UW:</span>
+              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-border/60">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/60 border border-border/40">
+                  <div className={[
+                    'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                    ((project as any).uwStage === 'active_uw' || (project as any).uwStage === 'building_model') ? 'bg-blue-500 animate-pulse' :
+                    (project as any).uwStage === 'loi_submitted' || (project as any).uwStage === 'under_contract' ? 'bg-amber-500' :
+                    (project as any).uwStage === 'closed' ? 'bg-emerald-500' :
+                    (project as any).uwStage === 'dead' ? 'bg-red-400' :
+                    'bg-slate-400'
+                  ].join(' ')} />
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Stage</span>
+                </div>
                 <Select
                   value={(project as any).uwStage || "not_started"}
                   onValueChange={(val) => {
                     uwStageMutation.mutate({ uwStage: val, uwSubStatus: undefined });
                   }}
                 >
-                  <SelectTrigger className="h-6 w-[140px] text-xs border-dashed">
+                  <SelectTrigger className="h-7 w-[145px] text-xs border border-border/60 bg-background font-medium shadow-sm hover:border-primary/40 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -643,7 +653,7 @@ export default function ProjectWorkspace() {
                     value={(project as any).uwSubStatus || ""}
                     onValueChange={(val) => uwStageMutation.mutate({ uwSubStatus: val })}
                   >
-                    <SelectTrigger className="h-6 w-[150px] text-xs border-dashed">
+                    <SelectTrigger className="h-7 w-[150px] text-xs border border-border/60 bg-background shadow-sm hover:border-primary/40 transition-colors">
                       <SelectValue placeholder="Sub-status..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -717,8 +727,8 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0">
-        <div className="sticky top-0 z-20 bg-background/98 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-6 px-6 border-b border-border/60">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 -mt-3">
+        <div className="ws-nav-strip sticky top-0 z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
           {/* ── Group Rail ── */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
             {TAB_GROUPS.map((group) => {
@@ -741,7 +751,7 @@ export default function ProjectWorkspace() {
           </div>
           {/* ── Sub-tab Rail ── */}
           <div className="overflow-x-auto">
-            <TabsList className="inline-flex h-8 bg-transparent gap-0.5 rounded-none p-0 py-0.5" data-testid="tabs-workspace">
+            <TabsList key={activeGroup} className="inline-flex h-8 bg-transparent gap-0.5 rounded-none p-0 py-0.5" data-testid="tabs-workspace">
               {currentGroup.tabs.filter((tab) => {
                 if (tab.value === "storage-leases" && !tabOverrides.showStorageLeases) return false;
                 if (tab.value === "profit" && !tabOverrides.showProfitCenters) return false;
