@@ -178,22 +178,18 @@ export async function performDCFAnalysis(
   });
 
   // ── Step 5: Compute debt schedule ───────────────────────────────────────
-  const debtTranches = capitalStackData?.debtTranches ?? [];
+  // Debt from capital stack (already aggregated — no tranches to schedule)
+  const totalDebtAtClose = capitalStackData?.totalDebt ?? 0;
+  const blendedRate = capitalStackData?.blendedDebtRate ?? 0;
   let annualDebtService: number[] = new Array(holdPeriod).fill(0);
   let debtBalanceAtExit = 0;
-  let totalDebtAtClose = 0;
-  let blendedRate = 0;
 
-  if (deps.generateDebtSchedule && debtTranches.length > 0) {
-    try {
-      const schedule = deps.generateDebtSchedule(debtTranches, holdPeriod);
-      annualDebtService = schedule.annualDebtService ?? annualDebtService;
-      debtBalanceAtExit = schedule.remainingBalanceAtExit ?? 0;
-      totalDebtAtClose = schedule.totalDebtAtClose ?? 0;
-      blendedRate = schedule.blendedRate ?? 0;
-    } catch {
-      // No debt — unlevered analysis
-    }
+  if (totalDebtAtClose > 0 && blendedRate > 0) {
+    // Simple annual interest-only debt service approximation
+    // Full amortization schedule would come from debt engine when wired
+    const annualDS = totalDebtAtClose * blendedRate;
+    annualDebtService = new Array(holdPeriod).fill(annualDS);
+    debtBalanceAtExit = totalDebtAtClose; // IO assumption — full balance at exit
   }
 
   const equityInvested = purchasePrice - totalDebtAtClose;

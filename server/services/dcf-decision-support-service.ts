@@ -154,18 +154,16 @@ export async function runDecisionSupport(
   };
 
   // Debt
-  const debtTranches = capitalStack?.debtTranches ?? [];
+  // Debt from capital stack (already aggregated)
+  const totalDebt = capitalStack?.totalDebt ?? 0;
+  const blendedDebtRate = capitalStack?.blendedDebtRate ?? 0;
   let annualDebtService: number[] = new Array(holdPeriod).fill(0);
   let debtBalanceAtExit = 0;
-  let totalDebt = 0;
 
-  if (deps.generateDebtSchedule && debtTranches.length > 0) {
-    try {
-      const schedule = deps.generateDebtSchedule(debtTranches, holdPeriod);
-      annualDebtService = schedule.annualDebtService ?? annualDebtService;
-      debtBalanceAtExit = schedule.remainingBalanceAtExit ?? 0;
-      totalDebt = schedule.totalDebtAtClose ?? 0;
-    } catch { /* no debt */ }
+  if (totalDebt > 0 && blendedDebtRate > 0) {
+    const annualDS = totalDebt * blendedDebtRate;
+    annualDebtService = new Array(holdPeriod).fill(annualDS);
+    debtBalanceAtExit = totalDebt;
   }
 
   const purchasePrice = capitalStack?.purchasePrice ?? projectData.purchasePrice ?? 0;
@@ -402,7 +400,8 @@ async function loadCapitalStackForDS(pool: any, modelingProjectId: string) {
   return {
     purchasePrice: Number(row.purchase_price) || 0,
     totalEquity: Number(row.total_equity) || 0,
-    debtTranches: typeof row.debt_tranches === 'string' ? JSON.parse(row.debt_tranches) : row.debt_tranches ?? [],
+    totalDebt: Number(row.total_debt) || 0,
+    blendedDebtRate: Number(row.blended_debt_rate) || 0,
     holdPeriodYears: Number(row.hold_period_years) || 5,
   };
 }

@@ -122,13 +122,13 @@ export function registerDCFRoutes(
         let debtPayoff = 0;
         let totalDebt = 0;
 
-        if (generateDebtSchedule && capitalStack?.debtTranches?.length > 0) {
-          try {
-            const schedule = generateDebtSchedule(capitalStack.debtTranches, holdPeriod);
-            annualDS = schedule.annualDebtService ?? annualDS;
-            debtPayoff = schedule.remainingBalanceAtExit ?? 0;
-            totalDebt = schedule.totalDebtAtClose ?? 0;
-          } catch { /* no debt */ }
+        // Debt from capital stack (already aggregated)
+        const csDebt = capitalStack?.totalDebt ?? 0;
+        const csRate = capitalStack?.blendedDebtRate ?? 0;
+        if (csDebt > 0 && csRate > 0) {
+          annualDS = new Array(holdPeriod).fill(csDebt * csRate);
+          debtPayoff = csDebt;
+          totalDebt = csDebt;
         }
 
         const equity = {
