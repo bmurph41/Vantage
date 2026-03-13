@@ -231,6 +231,37 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
     },
   });
 
+  const bulkConfirmMutation = useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      return apiRequest("PATCH", `/api/doc-intel/uploads/${upload.id}/items/bulk`, {
+        itemIds,
+        updates: { status: "confirmed", categoryTierConfirmed: true },
+      });
+    },
+    onSuccess: (_, variables) => {
+      refetchItems();
+      setSelectedItems(new Set());
+      toast({ title: "Confirmed", description: `${variables.length} items confirmed for import.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to confirm items.", variant: "destructive" });
+    },
+  });
+
+  const handleBulkConfirmSelected = () => {
+    const ids = Array.from(selectedItems);
+    if (ids.length === 0) return;
+    bulkConfirmMutation.mutate(ids);
+  };
+
+  const handleConfirmAllPending = () => {
+    const ids = filteredItems
+      .filter(i => i.status === "pending" || i.status === "needs_review")
+      .map(i => i.id);
+    if (ids.length === 0) return;
+    bulkConfirmMutation.mutate(ids);
+  };
+
   const handleBulkExcludeSelected = () => {
     const ids = Array.from(selectedItems);
     if (ids.length === 0) return;
@@ -743,6 +774,16 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
                 <Button
                   size="sm"
                   variant="outline"
+                  className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
+                  onClick={handleBulkConfirmSelected}
+                  disabled={bulkConfirmMutation.isPending}
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  Confirm Selected ({selectedItems.size})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50"
                   onClick={handleBulkExcludeSelected}
                   disabled={bulkExcludeMutation.isPending}
@@ -762,6 +803,16 @@ export function ReviewWizard({ projectId, upload, categories, onClose, onComplet
 
             {viewMode !== 'spreadsheet' && selectedItems.size === 0 && (
               <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
+                  onClick={handleConfirmAllPending}
+                  disabled={bulkConfirmMutation.isPending || filteredItems.filter(i => i.status === "pending" || i.status === "needs_review").length === 0}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Confirm All Pending ({filteredItems.filter(i => i.status === "pending" || i.status === "needs_review").length})
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"

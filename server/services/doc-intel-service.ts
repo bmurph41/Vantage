@@ -2302,6 +2302,10 @@ Respond with JSON only:
           year = parseInt(dateMatch[1]);
           month = parseInt(dateMatch[2]);
         }
+      } else {
+        // No period info at all — treat as annual and distribute across months
+        // This handles P&Ls uploaded without column headers (e.g. single-year summary sheets)
+        isAnnualPeriod = true;
       }
 
       const amount = parseFloat(item.amountConfirmed || item.amount || '0');

@@ -520,18 +520,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           docIntelUploadId: uploadId,
         });
 
-        // Auto-promote pnlFacts → modeling_actuals immediately after import
-        let promoteResult = { promoted: 0, skipped: 0, errors: [] as string[] };
-        try {
-          const { manuallyPromotePnlFacts } = await import('./services/pnl/project-bridge');
-          promoteResult = await manuallyPromotePnlFacts({ orgId, modelingProjectId: projectId });
-          console.log(`[PNL Pipeline Import] Auto-promoted ${promoteResult.promoted} actuals for project ${projectId}`);
-        } catch (promoteErr: any) {
-          console.warn('[PNL Pipeline Import] Auto-promote failed (non-fatal):', promoteErr.message);
-          promoteResult.errors.push(promoteErr.message);
-        }
-
-        res.json({ ...importResult, promote: promoteResult });
+        // Note: promote happens automatically inside setImmediate in project-bridge.ts
+        // after runPnlPipeline completes. Poll /pnl-facts-summary for status.
+        res.json(importResult);
       } catch (error: any) {
         console.error('[PNL Pipeline Import] Error:', error.message);
         res.status(500).json({ error: error.message });
@@ -26409,6 +26400,66 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
   
+  // Bulk confirm ALL pending items for an upload (one-click confirm all)
+  app.post('/api/doc-intel/uploads/:uploadId/confirm-all', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { uploadId } = req.params;
+      const { categoryTierConfirmed, revenueCogsDeptConfirmed } = req.body;
+
+      // Get all pending items
+      const { docIntelExtractedItems } = await import('@shared/schema');
+      const { eq, and, inArray } = await import('drizzle-orm');
+      const pendingItems = await db.select({ id: docIntelExtractedItems.id })
+        .from(docIntelExtractedItems)
+        .where(and(
+          eq(docIntelExtractedItems.uploadId, uploadId),
+          eq(docIntelExtractedItems.status, 'pending')
+        ));
+
+      if (pendingItems.length === 0) {
+        return res.json({ confirmed: 0, message: 'No pending items to confirm' });
+      }
+
+      const ids = pendingItems.map(i => i.id);
+      const updates: any = { status: 'confirmed', updatedAt: new Date() };
+      if (categoryTierConfirmed !== undefined) updates.categoryTierConfirmed = categoryTierConfirmed;
+      if (revenueCogsDeptConfirmed !== undefined) updates.revenueCogsDeptConfirmed = revenueCogsDeptConfirmed;
+
+      await db.update(docIntelExtractedItems)
+        .set(updates)
+        .where(inArray(docIntelExtractedItems.id, ids));
+
+      // Auto-import to modeling_actuals
+      const upload = await db.select({ modelingProjectId: docIntelExtractedItems.uploadId })
+        .from(docIntelExtractedItems)
+        .limit(1);
+
+      const uploadRecord = await db.query.docIntelUploads?.findFirst?.({
+        where: (t: any, { eq }: any) => eq(t.id, uploadId)
+      }).catch(() => null);
+
+      let imported = 0;
+      if (uploadRecord?.modelingProjectId) {
+        try {
+          const lines = await docIntelService.importConfirmedItems(
+            orgId, uploadId, uploadRecord.modelingProjectId, userId,
+            uploadRecord.year || undefined
+          );
+          imported = lines.length;
+        } catch (importErr: any) {
+          console.warn('[ConfirmAll] Auto-import failed:', importErr.message);
+        }
+      }
+
+      res.json({ confirmed: ids.length, imported, message: `Confirmed ${ids.length} items${imported ? `, imported ${imported} actuals` : ''}` });
+    } catch (error: any) {
+      console.error('Failed to confirm all items:', error);
+      res.status(500).json({ error: 'Failed to confirm all items' });
+    }
+  });
+
   // Bulk update extracted items
   app.patch('/api/doc-intel/uploads/:uploadId/items/bulk', authenticateUser, async (req: any, res) => {
     try {
@@ -38871,7 +38922,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // ============================================================================
   // DCF REFACTOR — Layers 1-4 (canonical Pro Forma consumption)
   // ============================================================================
-  {
+  try {
     const { registerDCFRoutes } = await import('./routes/dcf-routes');
     const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
     const { computeMultiYearProjection } = await import('./services/multi-year-projection-engine');
@@ -38886,6 +38937,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       generateDebtSchedule: undefined,  // TODO: wire debt engine
     });
     console.log('[DCF] Refactored routes registered (Layers 1-4)');
+  } catch (dcfErr: any) {
+    console.error('[DCF] ROUTE REGISTRATION FAILED:', dcfErr.message);
+    console.error(dcfErr.stack);
   }
 
   return httpServer;
