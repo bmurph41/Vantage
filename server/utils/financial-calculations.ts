@@ -1,7 +1,22 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// CANONICAL XIRR CONSOLIDATION NOTE
+// ═══════════════════════════════════════════════════════════════════════════════
+// The canonical XIRR implementation now lives in shared/finance/xirr.ts.
+// New code should import from there:
+//   import { calculateXIRR, calculateNPV, calculateEquityMultiple } from '../../shared/finance/xirr';
+//
+// This file's calculateXIRR is KEPT for backward compatibility because:
+//   - It returns DECIMAL (0.15 for 15%), while shared/finance/xirr.ts returns PERCENT (15.0)
+//   - It accepts Date objects, while shared/finance/xirr.ts accepts ISO date strings
+//   - pro-forma-engine-service.ts imports from here and expects the decimal convention
+//
+// Both implementations produce identical results (proven by 47 golden vector parity tests).
+// To fully consolidate later:
+//   1. Update pro-forma-engine-service.ts to import from shared/finance/xirr.ts
+//   2. Adjust all consumers to handle percent convention (value / 100)
+//   3. Then this file can re-export instead of maintaining its own implementation
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Canonical XIRR also available from shared/finance/xirr.ts ───
-// New code should import from '../../shared/finance/xirr' directly.
-// This file's calculateXIRR is kept for backward compatibility.
 /**
  * PE-Grade Financial Calculation Utilities
  * 

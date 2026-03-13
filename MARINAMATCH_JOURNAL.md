@@ -200,3 +200,29 @@ capital-stack — reverted to space-y-4, needs careful manual wrap of top-level 
 - capital-stack needs manual fm-page wrapper at component root (line ~1130)
 - debt-inputs.tsx header patch may need re-check
 - Add `fm-body` content wrap inside each tab after fm-header
+
+## DCF Refactor Complete — March 2026
+
+### What Changed
+- **Layer 1 (Foundation):** DCF now consumes `computeMultiYearProjection()` as canonical source. No independent NOI modeling.
+- **Layer 2 (Validation):** Shared XIRR in `shared/finance/xirr.ts`, cash flow canonicalizer, 47 golden vector parity tests.
+- **Layer 3 (Simulation):** Monte Carlo (fast/exact modes, seeded PRNG), deterministic base/upside/downside scenarios with probability-weighted expected case.
+- **Layer 4 (Decision Support):** Tornado chart, OLS attribution, IC memo generator (3 tones: concise/ic/lender). Gated behind entitlement check (MVP: allow all).
+
+### New Files (16)
+- `shared/finance/`: xirr.ts, distributions.ts, tornado.ts, attribution.ts, memo-generator.ts
+- `server/services/`: dcf-calculator-service.ts (replaced), dcf-scenario-layer.ts, dcf-simulation-service.ts, dcf-decision-support-service.ts, finance/cashflow-parity.ts
+- `server/routes/dcf-routes.ts`
+- `server/__tests__/`: irr-parity.test.ts (47), monte-carlo.test.ts (20), decision-support.test.ts (26)
+- `client/src/components/workspace/DCFMonteCarloPanel.tsx`
+
+### Endpoints
+- `POST /api/modeling/projects/:id/dcf` — Full DCF analysis
+- `POST /api/dcf/quick-irr` — Quick IRR (identical results)
+- `POST /api/modeling/projects/:id/dcf/monte-carlo` — Monte Carlo simulation
+- `GET /api/modeling/projects/:id/dcf/decision-support` — Fast decision support
+- `POST /api/modeling/projects/:id/dcf/decision-support` — Full with MC
+
+### Test Results: 93/93 new + 51/51 existing = 144 passing
+### Old DCF/MC routes commented out in routes.ts (backup: routes.ts.pre-dcf-refactor)
+### Old dcf-calculator-service.ts backed up to .OLD

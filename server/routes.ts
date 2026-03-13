@@ -38926,6 +38926,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     const { registerDCFRoutes } = await import('./routes/dcf-routes');
     const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
     const { computeMultiYearProjection } = await import('./services/multi-year-projection-engine');
+    const debtEngine = await import('../shared/debt/debt-engine');
     const { pool } = await import('./db');
     // const { generateDebtSchedule } = await import('../shared/debt/debt-engine'); // wire when ready
 
@@ -38934,7 +38935,45 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       authenticateUser,
       computeDirectInputFinancials,
       computeMultiYearProjection,
-      generateDebtSchedule: undefined,  // TODO: wire debt engine
+      generateDebtSchedule: (tranches: any[], holdPeriod: number) => {
+        // Wrapper that adapts debt engine to the expected interface
+        // Each "tranche" from capital_stacks is already aggregated,
+        // so we compute schedule from the tranche inputs if available
+        if (!tranches || tranches.length === 0) return null;
+        
+        const results = tranches.map((t: any) => {
+          const schedule = debtEngine.computeLoanSchedule({
+            loanAmount: Number(t.loanAmount || t.amount || 0),
+            termMonths: Number(t.termMonths || t.term || 60) * (t.termMonths ? 1 : 12),
+            amortMonths: Number(t.amortMonths || t.amortization || 360) * (t.amortMonths ? 1 : 12),
+            interestOnlyMonths: Number(t.ioMonths || t.interestOnlyMonths || 0),
+            rateType: t.rateType || 'fixed',
+            fixedRate: Number(t.rate || t.fixedRate || 0.05),
+            capitalizeOriginationFees: false,
+            prepayType: 'none',
+          });
+          const annual = debtEngine.computeAnnualDebtService(schedule);
+          const payoff = debtEngine.computeLoanPayoffAtExit(schedule, holdPeriod * 12, {
+            exitFeePct: 0, prepayType: 'none'
+          });
+          return { schedule, annual, payoff, amount: Number(t.loanAmount || t.amount || 0) };
+        });
+
+        const totalDebtAtClose = results.reduce((s: number, r: any) => s + r.amount, 0);
+        const annualDebtService = Array.from({ length: holdPeriod }, (_, yr) =>
+          results.reduce((s: number, r: any) => s + (r.annual[yr]?.totalDebtService ?? 0), 0)
+        );
+        const remainingBalanceAtExit = results.reduce((s: number, r: any) =>
+          s + (r.payoff?.payoffBalance ?? 0), 0
+        );
+        const blendedRate = totalDebtAtClose > 0
+          ? results.reduce((s: number, r: any) =>
+              s + (Number(r.schedule[0]?.rateBps ?? 0) / 10000) * r.amount, 0
+            ) / totalDebtAtClose
+          : 0;
+
+        return { totalDebtAtClose, annualDebtService, remainingBalanceAtExit, blendedRate };
+      },  // TODO: wire debt engine
     });
     console.log('[DCF] Refactored routes registered (Layers 1-4)');
   } catch (dcfErr: any) {

@@ -38,6 +38,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as Recha
 import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { MarketRatePicker, MarketRateContext } from '@/components/modeling/MarketRatePicker';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { DCFMonteCarloPanel, DecisionSupportAccordion } from '@/components/workspace/DCFMonteCarloPanel';
 
 interface DCFScenario {
   id: string;
@@ -959,6 +960,12 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Monte Carlo Simulation */}
+      {projectId && <DCFMonteCarloPanel projectId={projectId} />}
+
+      {/* Decision Support (Tornado, Attribution, IC Memo) */}
+      {projectId && <DecisionSupportAccordion projectId={projectId} />}
 
     </div>
   );
