@@ -322,7 +322,7 @@ export default function LeaseCashFlowPage() {
                 <Label>Market Rent Growth</Label>
                 <div className="flex items-center gap-2">
                   <Slider
-                    value={[(customAssumptions.marketRentGrowth || cashFlowData?.assumptions.marketRentGrowth || 0.03) * 100]}
+                    value={[(customAssumptions.marketRentGrowth || cashFlowData?.assumptions.marketRentGrowth || 0) * 100]}
                     onValueChange={([v]) => setCustomAssumptions(prev => ({ ...prev, marketRentGrowth: v / 100 }))}
                     min={0}
                     max={10}
@@ -330,7 +330,7 @@ export default function LeaseCashFlowPage() {
                     className="flex-1"
                   />
                   <span className="text-sm w-12 text-right">
-                    {formatPercent((customAssumptions.marketRentGrowth || cashFlowData?.assumptions.marketRentGrowth || 0.03) * 100)}
+                    {formatPercent((customAssumptions.marketRentGrowth || cashFlowData?.assumptions.marketRentGrowth || 0) * 100)}
                   </span>
                 </div>
               </div>

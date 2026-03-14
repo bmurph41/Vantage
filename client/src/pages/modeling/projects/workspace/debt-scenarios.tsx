@@ -102,8 +102,8 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
 
   useEffect(() => {
     if (project) {
-      const pp = Number(project.purchasePrice) || 10000000;
-      const noi = Number(project.ebitda) || 800000;
+      const pp = Number(project.purchasePrice) || 0;
+      const noi = Number(project.ebitda) || 0;
       const capRate = pp > 0 ? (noi / pp) * 100 : 8;
       const ltvPercent = 70;
       const loanAmount = pp * (ltvPercent / 100);
@@ -318,8 +318,8 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
   };
 
   const newScenario = () => {
-    const pp = Number(project?.purchasePrice) || 10000000;
-    const noi = Number(project?.ebitda) || 800000;
+    const pp = Number(project?.purchasePrice) || 0;
+    const noi = Number(project?.ebitda) || 0;
     const capRate = pp > 0 ? (noi / pp) * 100 : 8;
     const ltvPercent = 70;
     const loanAmount = pp * (ltvPercent / 100);

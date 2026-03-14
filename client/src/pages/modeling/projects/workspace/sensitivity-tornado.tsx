@@ -89,83 +89,38 @@ export default function SensitivityTornado({ projectId, onTabChange }: Sensitivi
   const { data: tornadoData, isLoading, refetch } = useQuery<TornadoDataPoint[]>({
     queryKey: ['/api/modeling/projects', projectId, 'sensitivity-tornado', selectedMetric, varianceRange],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        metric: selectedMetric,
-        varianceRange: varianceRange.toString(),
-      });
-      const response = await fetch(`/api/modeling/projects/${projectId}/sensitivity-tornado?${params}`);
-      if (!response.ok) {
-        const simulated = generateSimulatedData(selectedMetric, varianceRange);
-        return simulated;
+      // Try new DCF decision support tornado endpoint first
+      try {
+        const dsResponse = await fetch(`/api/modeling/projects/${projectId}/dcf/decision-support`);
+        if (dsResponse.ok) {
+          const ds = await dsResponse.json();
+          if (ds.tornado?.drivers?.length > 0) {
+            return ds.tornado.drivers.map((d: any) => ({
+              variable: d.driver,
+              lowLabel: d.delta,
+              highLabel: d.delta,
+              lowValue: d.low - d.base,
+              highValue: d.high - d.base,
+              baseValue: d.base,
+              lowScenarioValue: d.low,
+              highScenarioValue: d.high,
+              totalRange: Math.abs(d.high - d.low),
+              unit: selectedMetric === 'irr' ? '%' : selectedMetric === 'equity_multiple' ? 'x' : '$',
+            }));
+          }
+        }
+      } catch {
+        // DCF endpoint not available
       }
+
+      // Fallback to legacy endpoint
+      const params = new URLSearchParams({ metric: selectedMetric, variance: String(varianceRange) });
+      const response = await fetch(`/api/modeling/projects/${projectId}/sensitivity-tornado?${params}`);
+      if (!response.ok) return [];
       return response.json();
     },
   });
 
-  const generateSimulatedData = (metric: string, variance: number): TornadoDataPoint[] => {
-    const baseValuation = 15000000;
-    const baseNOI = 975000;
-    const baseIRR = 18.5;
-    const baseEquityMultiple = 2.1;
-    
-    let baseMetricValue: number;
-    let formatFn: (val: number) => string;
-    
-    switch (metric) {
-      case 'irr':
-        baseMetricValue = baseIRR;
-        formatFn = (v) => `${v.toFixed(1)}%`;
-        break;
-      case 'equity_multiple':
-        baseMetricValue = baseEquityMultiple;
-        formatFn = (v) => `${v.toFixed(2)}x`;
-        break;
-      case 'noi':
-        baseMetricValue = baseNOI;
-        formatFn = (v) => formatCurrency(v);
-        break;
-      case 'valuation':
-      case 'npv':
-      default:
-        baseMetricValue = baseValuation;
-        formatFn = (v) => formatCurrency(v);
-        break;
-    }
-
-    const sensitivityFactors: Record<string, { lowImpact: number; highImpact: number }> = {
-      cap_rate: { lowImpact: variance * 0.8, highImpact: -variance * 0.75 },
-      rent_growth: { lowImpact: -variance * 0.5, highImpact: variance * 0.55 },
-      expense_ratio: { lowImpact: variance * 0.35, highImpact: -variance * 0.4 },
-      vacancy_rate: { lowImpact: variance * 0.3, highImpact: -variance * 0.25 },
-      exit_cap: { lowImpact: variance * 0.65, highImpact: -variance * 0.6 },
-    };
-
-    return DEFAULT_VARIABLES.map(variable => {
-      const factors = sensitivityFactors[variable.id] || { lowImpact: -variance * 0.2, highImpact: variance * 0.2 };
-      
-      const lowValue = variable.baseValue + variable.minDelta;
-      const highValue = variable.baseValue + variable.maxDelta;
-      
-      const lowImpact = baseMetricValue * (1 + factors.lowImpact / 100);
-      const highImpact = baseMetricValue * (1 + factors.highImpact / 100);
-
-      const unit = variable.unit === 'percent' ? '%' : variable.unit === 'currency' ? '$' : '';
-      
-      return {
-        variable: variable.name,
-        variableId: variable.id,
-        baseValue: variable.baseValue,
-        lowValue,
-        highValue,
-        lowImpact: lowImpact - baseMetricValue,
-        highImpact: highImpact - baseMetricValue,
-        lowLabel: `${lowValue.toFixed(1)}${unit}`,
-        highLabel: `${highValue.toFixed(1)}${unit}`,
-        totalRange: Math.abs(highImpact - lowImpact),
-        unit,
-      };
-    }).sort((a, b) => b.totalRange - a.totalRange);
-  };
 
   const chartData = useMemo(() => {
     if (!tornadoData) return [];

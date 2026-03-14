@@ -92,127 +92,17 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
 
   const revenueData = useMemo(() => {
     if (proFormaData?.revenueByCategory) return proFormaData.revenueByCategory;
-    
-    return [
-      { category: "Wet Slips", value: 2450000, breakdown: [
-        { name: "Year 1", value: 420000 },
-        { name: "Year 2", value: 450000 },
-        { name: "Year 3", value: 485000 },
-        { name: "Year 4", value: 520000 },
-        { name: "Year 5", value: 575000 },
-      ]},
-      { category: "Dry Storage", value: 1125000, breakdown: [
-        { name: "Year 1", value: 195000 },
-        { name: "Year 2", value: 210000 },
-        { name: "Year 3", value: 225000 },
-        { name: "Year 4", value: 240000 },
-        { name: "Year 5", value: 255000 },
-      ]},
-      { category: "Fuel Sales", value: 2850000, breakdown: [
-        { name: "Year 1", value: 520000 },
-        { name: "Year 2", value: 545000 },
-        { name: "Year 3", value: 570000 },
-        { name: "Year 4", value: 595000 },
-        { name: "Year 5", value: 620000 },
-      ]},
-      { category: "Ship Store", value: 625000, breakdown: [
-        { name: "Year 1", value: 110000 },
-        { name: "Year 2", value: 118000 },
-        { name: "Year 3", value: 126000 },
-        { name: "Year 4", value: 134000 },
-        { name: "Year 5", value: 137000 },
-      ]},
-      { category: "Ancillary", value: 450000, breakdown: [
-        { name: "Year 1", value: 80000 },
-        { name: "Year 2", value: 85000 },
-        { name: "Year 3", value: 90000 },
-        { name: "Year 4", value: 95000 },
-        { name: "Year 5", value: 100000 },
-      ]},
-    ];
+    return [];
   }, [proFormaData]);
 
   const expenseData = useMemo(() => {
     if (proFormaData?.expensesByCategory) return proFormaData.expensesByCategory;
-    
-    return [
-      { category: "Payroll", value: 1850000, breakdown: [
-        { name: "Management", value: 520000 },
-        { name: "Operations", value: 680000 },
-        { name: "Maintenance", value: 380000 },
-        { name: "Admin", value: 270000 },
-      ]},
-      { category: "Utilities", value: 425000, breakdown: [
-        { name: "Electric", value: 185000 },
-        { name: "Water/Sewer", value: 95000 },
-        { name: "Propane/Gas", value: 85000 },
-        { name: "Trash", value: 60000 },
-      ]},
-      { category: "Insurance", value: 285000, breakdown: [
-        { name: "Property", value: 145000 },
-        { name: "Liability", value: 85000 },
-        { name: "Workers Comp", value: 55000 },
-      ]},
-      { category: "Maintenance", value: 375000, breakdown: [
-        { name: "Dock Repairs", value: 165000 },
-        { name: "Equipment", value: 125000 },
-        { name: "Grounds", value: 85000 },
-      ]},
-      { category: "Admin", value: 195000, breakdown: [
-        { name: "Software", value: 65000 },
-        { name: "Marketing", value: 55000 },
-        { name: "Professional", value: 45000 },
-        { name: "Office", value: 30000 },
-      ]},
-    ];
+    return [];
   }, [proFormaData]);
 
   const noiWaterfallData = useMemo(() => {
     if (proFormaData?.noiWaterfall) return proFormaData.noiWaterfall;
-    
-    const totalRevenue = 7500000;
-    const payroll = -1850000;
-    const utilities = -425000;
-    const insurance = -285000;
-    const maintenance = -375000;
-    const admin = -195000;
-    const noi = totalRevenue + payroll + utilities + insurance + maintenance + admin;
-    
-    return [
-      { name: "Total Revenue", value: totalRevenue, isTotal: false, details: [
-        { label: "Wet Slips", value: 2450000 },
-        { label: "Fuel Sales", value: 2850000 },
-        { label: "Dry Storage", value: 1125000 },
-        { label: "Other", value: 1075000 },
-      ]},
-      { name: "Payroll", value: payroll, details: [
-        { label: "Management", value: 520000 },
-        { label: "Operations", value: 680000 },
-        { label: "Maintenance", value: 380000 },
-        { label: "Admin", value: 270000 },
-      ]},
-      { name: "Utilities", value: utilities, details: [
-        { label: "Electric", value: 185000 },
-        { label: "Water/Sewer", value: 95000 },
-        { label: "Other", value: 145000 },
-      ]},
-      { name: "Insurance", value: insurance, details: [
-        { label: "Property", value: 145000 },
-        { label: "Liability", value: 85000 },
-        { label: "Workers Comp", value: 55000 },
-      ]},
-      { name: "Maintenance", value: maintenance, details: [
-        { label: "Dock Repairs", value: 165000 },
-        { label: "Equipment", value: 125000 },
-        { label: "Grounds", value: 85000 },
-      ]},
-      { name: "Admin", value: admin, details: [
-        { label: "Software", value: 65000 },
-        { label: "Marketing", value: 55000 },
-        { label: "Other", value: 75000 },
-      ]},
-      { name: "NOI", value: noi, isTotal: true },
-    ];
+    return [];
   }, [proFormaData]);
 
   const revenueTrendData = useMemo(() => {
@@ -233,67 +123,29 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
 
   const revenueMixData = useMemo(() => {
     if (proFormaData?.revenueMix) return proFormaData.revenueMix;
-    
-    return [
-      { name: "Wet Slips", value: 2450000, children: [
-        { name: "Monthly", value: 1350000 },
-        { name: "Seasonal", value: 720000 },
-        { name: "Transient", value: 380000 },
-      ]},
-      { name: "Fuel Sales", value: 2850000, children: [
-        { name: "Gas", value: 1850000 },
-        { name: "Diesel", value: 1000000 },
-      ]},
-      { name: "Dry Storage", value: 1125000, children: [
-        { name: "Annual", value: 780000 },
-        { name: "Monthly", value: 345000 },
-      ]},
-      { name: "Ship Store", value: 625000, children: [
-        { name: "Parts", value: 285000 },
-        { name: "Supplies", value: 195000 },
-        { name: "Accessories", value: 145000 },
-      ]},
-      { name: "Ancillary", value: 450000, children: [
-        { name: "Electric", value: 185000 },
-        { name: "Water", value: 95000 },
-        { name: "Other", value: 170000 },
-      ]},
-    ];
+    return [];
   }, [proFormaData]);
 
   const kpis = proFormaData?.kpis || {
-    totalRevenue: 7500000,
-    revenueGrowth: 4.2,
-    totalExpenses: 3130000,
-    expenseRatio: 41.7,
-    noi: 4370000,
-    noiMargin: 58.3,
-    capRate: 6.8,
+    totalRevenue: 0,
+    revenueGrowth: 0,
+    totalExpenses: 0,
+    expenseRatio: 0,
+    noi: 0,
+    noiMargin: 0,
+    capRate: 0,
   };
 
   const comparisonData = useMemo(() => {
-    const allYears = years.map((year, idx) => {
-      const revenue = Math.round(1500000 * Math.pow(1.04, idx));
-      const expenses = Math.round(626000 * Math.pow(1.025, idx));
-      const noi = revenue - expenses;
-      const noiMargin = (noi / revenue) * 100;
-      const capRate = 6.5 + idx * 0.1;
-      const cashOnCash = 7.2 + idx * 0.3;
-      const debtService = Math.round(420000 * (1 + idx * 0.005));
-      const leveredCF = noi - debtService;
-      return {
-        period: `Year ${idx + 1}`,
-        year,
-        revenue,
-        expenses,
-        noi,
-        noiMargin: parseFloat(noiMargin.toFixed(2)),
-        capRate: parseFloat(capRate.toFixed(2)),
-        cashOnCash: parseFloat(cashOnCash.toFixed(2)),
-        debtService,
-        leveredCF,
-      };
-    });
+    if (proFormaData?.comparison) return proFormaData.comparison;
+    const allYears = years.map((year, idx) => ({
+      period: `Year ${idx + 1}`,
+      year,
+      revenue: 0,
+      expenses: 0,
+      noi: 0,
+      noiMargin: 0,
+    }));
     if (compareTimeframe === 'first3') return allYears.slice(0, 3);
     if (compareTimeframe === 'last3') return allYears.slice(-3);
     return allYears;
