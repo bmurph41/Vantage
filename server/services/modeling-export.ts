@@ -376,5 +376,78 @@ export async function exportCaseComparisonToExcel(
   XLSX.utils.book_append_sheet(workbook, comparisonSheet, 'Case Comparison');
 
 
+  // ─── DCF Analysis Sheet (from refactored DCF engine) ────────────────────
+  try {
+    const { computeDirectInputFinancials } = await import('./direct-input-engine');
+    const { computeMultiYearProjection } = await import('./multi-year-projection-engine');
+    const { calculateXIRR, calculateEquityMultiple } = await import('../../shared/finance/xirr');
+
+    const customMetrics = typeof project.customMetrics === 'string'
+      ? JSON.parse(project.customMetrics)
+      : project.customMetrics || {};
+    const inputAssumptions = customMetrics.inputAssumptions || {};
+    const unitMix = customMetrics.unitMix || [];
+
+    if (Object.keys(inputAssumptions).length > 0) {
+      const year1 = computeDirectInputFinancials(project.assetClass || 'str', inputAssumptions, unitMix);
+      const projection = computeMultiYearProjection(year1, {
+        holdPeriod: 5,
+        revenueGrowthRate: 0.03,
+        expenseGrowthRate: 0.025,
+        exitCapRate: 0.065,
+        sellingCostPct: 0.03,
+      });
+
+      const purchasePrice = Number(project.purchasePrice) || 0;
+      const equityInvested = purchasePrice;
+      const acqDate = new Date().toISOString().split('T')[0];
+      const flows = [
+        { date: acqDate, amount: -equityInvested },
+        ...projection.years.map((y: any, i: number) => {
+          const d = new Date(acqDate);
+          d.setFullYear(d.getFullYear() + y.year);
+          const isLast = i === projection.years.length - 1;
+          return {
+            date: d.toISOString().split('T')[0],
+            amount: y.ncf + (isLast ? projection.exit.netSaleProceeds : 0),
+          };
+        }),
+      ];
+
+      const irrResult = calculateXIRR(flows);
+      const em = calculateEquityMultiple(flows);
+      const irr = irrResult;
+
+      const dcfData: any[][] = [
+        ['DCF Analysis'],
+        [],
+        ['Key Metrics'],
+        ['IRR', irrResult.irr ? (irrResult.irr / 100).toFixed(4) : 'N/A'],
+        ['Equity Multiple', em ? em.toFixed(2) + 'x' : 'N/A'],
+        ['Purchase Price', purchasePrice],
+        [],
+        ['Cash Flow Projections'],
+        ['Year', 'Revenue', 'Expenses', 'NOI', 'CapEx', 'NCF'],
+        ...projection.years.map((y: any) => [
+          y.label, y.totalRevenue, y.totalExpenses, y.noi, y.capex, y.ncf,
+        ]),
+        [],
+        ['Exit Analysis'],
+        ['Exit NOI', projection.exit.exitNOI],
+        ['Exit Value', projection.exit.exitValue],
+        ['Selling Costs', projection.exit.sellingCosts],
+        ['Net Sale Proceeds', projection.exit.netSaleProceeds],
+      ];
+
+      const dcfSheet = XLSX.utils.aoa_to_sheet(dcfData);
+      dcfSheet['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(workbook, dcfSheet, 'DCF Analysis');
+    }
+  } catch (dcfErr) {
+    console.error('[Export] DCF sheet generation failed:', dcfErr);
+    // Non-fatal — export continues without DCF sheet
+  }
+
+
   return Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
 }

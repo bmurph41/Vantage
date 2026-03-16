@@ -24,7 +24,7 @@ export default function ExitSensitivity({ projectId }: SensitivityProps) {
   const [baseCase, setBaseCase] = useState({
     exitNOI: 1200000,
     exitCapRate: 6.5,
-    purchasePrice: project?.purchasePrice ? Number(project.purchasePrice) : 10000000,
+    purchasePrice: project?.purchasePrice ? Number(project.purchasePrice) : 0,
     holdingPeriod: 5
   });
 

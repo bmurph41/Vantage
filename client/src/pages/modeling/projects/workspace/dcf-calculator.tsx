@@ -29,7 +29,8 @@ import {
   Percent,
   Target,
   Activity,
-  Layers
+  Layers,
+  AlertCircle
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { cn, formatCurrency, formatPercent } from '@/lib/utils';

@@ -129,7 +129,7 @@ export default function WorkspaceExitStrategy({ projectId, onTabChange }: Worksp
       costBasis: purchasePrice,
       holdingPeriod: holdPeriod,
       currentDebtBalance: Number((project as any).currentDebtBalance) || 0,
-      depreciationTaken: Number((project as any).depreciationTaken) || 500000,
+      depreciationTaken: Number((project as any).depreciationTaken) || 0,
       capitalImprovements: Number((project as any).capitalImprovements) || 200000,
     });
   }, [projectId, activeCaseId, purchasePrice, holdPeriod, calculatedSalePrice, project, setMode, bulkUpdateMaster]);

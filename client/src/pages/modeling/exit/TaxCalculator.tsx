@@ -24,9 +24,9 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const [inputs, setInputs] = useState({
-    salePrice: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 10000000,
+    salePrice: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 0,
     originalBasis: project?.purchasePrice ? Number(project.purchasePrice) : 8000000,
-    accumulatedDepreciation: 500000,
+    accumulatedDepreciation: 0,
     sellingCosts: 300000,
     federalCapGainsRate: 20,
     stateCapGainsRate: 9.3,

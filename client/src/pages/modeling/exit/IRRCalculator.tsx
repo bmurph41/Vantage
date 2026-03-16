@@ -24,12 +24,12 @@ export default function ExitIRRCalculator({ projectId }: IRRCalculatorProps) {
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const [cashFlows, setCashFlows] = useState([
-    { id: 0, year: 0, amount: -(project?.purchasePrice ? Number(project.purchasePrice) : 10000000), description: "Initial Investment" },
+    { id: 0, year: 0, amount: -(project?.purchasePrice ? Number(project.purchasePrice) : 0), description: "Initial Investment" },
     { id: 1, year: 1, amount: 600000, description: "Year 1 Cash Flow" },
     { id: 2, year: 2, amount: 650000, description: "Year 2 Cash Flow" },
     { id: 3, year: 3, amount: 700000, description: "Year 3 Cash Flow" },
     { id: 4, year: 4, amount: 750000, description: "Year 4 Cash Flow" },
-    { id: 5, year: 5, amount: 13800000, description: "Year 5 Sale + Cash Flow" },
+    { id: 5, year: 5, amount: 0, description: "Year 5 Sale + Cash Flow" },
   ]);
 
   const addCashFlow = () => {

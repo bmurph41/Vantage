@@ -71,8 +71,8 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
 
   const basePath = `/modeling/projects/${projectId}/exit`;
 
-  const investmentAmount = masterInputs.salePrice - masterInputs.currentDebtBalance || 2500000;
-  const exchangeGain = masterInputs.salePrice - masterInputs.costBasis || 1500000;
+  const investmentAmount = masterInputs.salePrice - masterInputs.currentDebtBalance || 0;
+  const exchangeGain = masterInputs.salePrice - masterInputs.costBasis || 0;
   const federalTaxRate = masterInputs.federalTaxRate + 3.8 || 23.8;
   const stateTaxRate = masterInputs.stateTaxRate || 5;
   const [include1031, setInclude1031] = useState(true);

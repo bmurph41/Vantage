@@ -612,7 +612,7 @@ export default function ProjectWorkspace() {
                   {project.marinaName}
                 </h1>
                 <ProjectTypeBadge project={project} />
-                {(project as any).assetClass && (project as any).assetClass !== "marina" && (
+                {(project as any).assetClass && (
                   <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
                     {(project as any).assetClass.replace(/_/g, " ")}
                   </Badge>

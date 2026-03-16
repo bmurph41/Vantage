@@ -95,7 +95,11 @@ import {
   Sailboat,
   Hash,
   Shield
+,
+  Building2,
+  Settings2
 } from 'lucide-react';
+import { getModelConfig } from '@shared/asset-class-model-config';
 import { format } from 'date-fns';
 
 function PercentInput({
@@ -370,88 +374,74 @@ function buildYearlyGrowthRatesForEngine(
   return { revenue, expenses };
 }
 
-const storageTypesConfig = [
-  { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" />, locations: [
-    { id: 'wet_slips_a_dock', name: 'A Dock' },
-    { id: 'wet_slips_b_dock', name: 'B Dock' },
-    { id: 'wet_slips_c_dock', name: 'C Dock' },
-    { id: 'wet_slips_premium', name: 'Premium Slips' },
-  ]},
-  { id: 'lift_slips', name: 'Lift Slips', icon: <Waves className="h-4 w-4" />, locations: [
-    { id: 'lift_slips_main', name: 'Main Dock' },
-  ]},
-  { id: 'moorings', name: 'Moorings', icon: <Anchor className="h-4 w-4" />, locations: [
-    { id: 'moorings_inner', name: 'Inner Harbor' },
-    { id: 'moorings_outer', name: 'Outer Harbor' },
-  ]},
-  { id: 'dinghies', name: 'Dinghies', icon: <Sailboat className="h-4 w-4" />, locations: [
-    { id: 'dinghies_main', name: 'Main Dock' },
-  ]},
-  { id: 'jet_skis', name: 'Jet Skis', icon: <Waves className="h-4 w-4" />, locations: [
-    { id: 'jet_skis_main', name: 'PWC Dock' },
-  ]},
-  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', icon: <Warehouse className="h-4 w-4" />, locations: [
-    { id: 'dry_racks_indoor_main', name: 'Main Building' },
-    { id: 'dry_racks_indoor_annex', name: 'Annex Building' },
-  ]},
-  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', icon: <Container className="h-4 w-4" />, locations: [
-    { id: 'dry_racks_outdoor_lot_a', name: 'Lot A' },
-    { id: 'dry_racks_outdoor_lot_b', name: 'Lot B' },
-  ]},
-  { id: 'land_storage', name: 'Land Storage', icon: <MapPin className="h-4 w-4" />, locations: [
-    { id: 'land_storage_main', name: 'Main Lot' },
-  ]},
-  { id: 'boats_on_trailers', name: 'Boats on Trailers', icon: <Ship className="h-4 w-4" />, locations: [
-    { id: 'boats_on_trailers_lot', name: 'Trailer Lot' },
-  ]},
-  { id: 'trailers', name: 'Trailers', icon: <Car className="h-4 w-4" />, locations: [
-    { id: 'trailers_lot', name: 'Trailer Storage Lot' },
-  ]},
-  { id: 'carports', name: 'Carports', icon: <Home className="h-4 w-4" />, locations: [
-    { id: 'carports_main', name: 'Main Carport Area' },
-  ]},
-  { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, locations: [
-    { id: 'houseboats_dock', name: 'Houseboat Dock' },
-  ]},
-  { id: 'liveaboards', name: 'Liveaboards', icon: <Anchor className="h-4 w-4" />, locations: [
-    { id: 'liveaboards_dock', name: 'Liveaboard Dock' },
-  ]},
-  { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, locations: [
-    { id: 'rv_sites_main', name: 'RV Park' },
-  ]},
-];
+// ─── Dynamic Config-Driven Categories (from getModelConfig) ─────────────────
+// These were previously hardcoded marina arrays. Now driven by asset class config.
 
-const storageTypeCategories = [
-  { id: 'wet_slips', name: 'Wet Slips', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
-  { id: 'lift_slips', name: 'Lift Slips', icon: <Waves className="h-4 w-4" />, section: 'storage' },
-  { id: 'moorings', name: 'Moorings', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
-  { id: 'dinghies', name: 'Dinghies', icon: <Sailboat className="h-4 w-4" />, section: 'storage' },
-  { id: 'jet_skis', name: 'Jet Skis', icon: <Waves className="h-4 w-4" />, section: 'storage' },
-  { id: 'dry_racks_indoor', name: 'Dry Racks – Indoor', icon: <Warehouse className="h-4 w-4" />, section: 'storage' },
-  { id: 'dry_racks_outdoor', name: 'Dry Racks – Outdoor', icon: <Container className="h-4 w-4" />, section: 'storage' },
-  { id: 'land_storage', name: 'Land Storage', icon: <MapPin className="h-4 w-4" />, section: 'storage' },
-  { id: 'boats_on_trailers', name: 'Boats on Trailers', icon: <Ship className="h-4 w-4" />, section: 'storage' },
-  { id: 'trailers', name: 'Trailers', icon: <Car className="h-4 w-4" />, section: 'storage' },
-  { id: 'carports', name: 'Carports', icon: <Home className="h-4 w-4" />, section: 'storage' },
-  { id: 'houseboats', name: 'Houseboats', icon: <Home className="h-4 w-4" />, section: 'storage' },
-  { id: 'liveaboards', name: 'Liveaboards', icon: <Anchor className="h-4 w-4" />, section: 'storage' },
-  { id: 'rv_sites', name: 'RV Sites', icon: <Car className="h-4 w-4" />, section: 'storage' },
-];
+const ICON_MAP: Record<string, React.ReactNode> = {
+  anchor: <Anchor className="h-4 w-4" />,
+  waves: <Waves className="h-4 w-4" />,
+  sailboat: <Sailboat className="h-4 w-4" />,
+  warehouse: <Warehouse className="h-4 w-4" />,
+  container: <Container className="h-4 w-4" />,
+  ship: <Ship className="h-4 w-4" />,
+  home: <Home className="h-4 w-4" />,
+  car: <Car className="h-4 w-4" />,
+  'map-pin': <MapPin className="h-4 w-4" />,
+  fuel: <Fuel className="h-4 w-4" />,
+  store: <Store className="h-4 w-4" />,
+  wrench: <Wrench className="h-4 w-4" />,
+  users: <Users className="h-4 w-4" />,
+  utensils: <Utensils className="h-4 w-4" />,
+  building: <Building2 className="h-4 w-4" />,
+  'building-2': <Building2 className="h-4 w-4" />,
+  'shopping-cart': <ShoppingCart className="h-4 w-4" />,
+  'dollar-sign': <DollarSign className="h-4 w-4" />,
+  edit: <Settings2 className="h-4 w-4" />,
+  settings: <Settings2 className="h-4 w-4" />,
+};
 
-const designatedSpaceCategories = [
-  { id: 'boat_sales', name: 'Boat Sales', icon: <Store className="h-4 w-4" />, section: 'designated' },
-  { id: 'service', name: 'Service', icon: <Wrench className="h-4 w-4" />, section: 'designated' },
-  { id: 'commercial_tenants', name: 'Commercial Tenants', icon: <Warehouse className="h-4 w-4" />, section: 'designated' },
-  { id: 'rental_boats', name: 'Rental Boats', icon: <Ship className="h-4 w-4" />, section: 'designated' },
-  { id: 'boat_club', name: 'Boat Club', icon: <Users className="h-4 w-4" />, section: 'designated' },
-  { id: 'fuel_dock', name: 'Fuel Dock', icon: <Fuel className="h-4 w-4" />, section: 'designated' },
-  { id: 'liveaboard_designated', name: 'Liveaboard', icon: <Anchor className="h-4 w-4" />, section: 'designated' },
-  { id: 'transient', name: 'Transient', icon: <Anchor className="h-4 w-4" />, section: 'designated' },
-  { id: 'restaurant', name: 'Restaurant', icon: <Utensils className="h-4 w-4" />, section: 'designated' },
-  { id: 'ship_store', name: 'Ship Store', icon: <ShoppingCart className="h-4 w-4" />, section: 'designated' },
-];
+function getIcon(iconName: string | undefined): React.ReactNode {
+  return ICON_MAP[iconName || 'anchor'] || <Anchor className="h-4 w-4" />;
+}
 
-const allRevenueCategories = [...storageTypeCategories, ...designatedSpaceCategories];
+function buildStorageTypesConfig(assetClass: string | null | undefined) {
+  const config = getModelConfig(assetClass);
+  return config.unitMix.types.map(t => ({
+    id: t.id,
+    name: t.name,
+    icon: getIcon(t.icon),
+    locations: [{ id: t.id + '_main', name: 'Main' }], // Generic default location
+  }));
+}
+
+function buildStorageTypeCategories(assetClass: string | null | undefined) {
+  const config = getModelConfig(assetClass);
+  return config.unitMix.types.map(t => ({
+    id: t.id,
+    name: t.name,
+    icon: getIcon(t.icon),
+    section: t.section || 'storage',
+  }));
+}
+
+function buildDesignatedSpaceCategories(assetClass: string | null | undefined) {
+  const config = getModelConfig(assetClass);
+  if (!config.profitCenters?.departments) return [];
+  return config.profitCenters.departments.map(d => ({
+    id: d.id,
+    name: d.name,
+    icon: getIcon(d.icon),
+    section: 'designated',
+  }));
+}
+
+function buildAllRevenueCategories(assetClass: string | null | undefined) {
+  return [
+    ...buildStorageTypeCategories(assetClass),
+    ...buildDesignatedSpaceCategories(assetClass),
+  ];
+}
+
 
 const expenseCategories = [
   { id: 'payroll', name: 'Payroll & Benefits' },
@@ -527,6 +517,14 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
     queryKey: ['/api/modeling/projects', projectId],
     enabled: !!projectId,
   });
+
+  // Dynamic config-driven arrays (replaces hardcoded marina arrays)
+  const assetClass = (project as any)?.assetClass;
+  const storageTypesConfig = useMemo(() => buildStorageTypesConfig(assetClass), [assetClass]);
+  const storageTypeCategories = useMemo(() => buildStorageTypeCategories(assetClass), [assetClass]);
+  const designatedSpaceCategories = useMemo(() => buildDesignatedSpaceCategories(assetClass), [assetClass]);
+  const allRevenueCategories = useMemo(() => buildAllRevenueCategories(assetClass), [assetClass]);
+
   
   const { getLabel, getCaseColor } = useCaseLabels(project);
 

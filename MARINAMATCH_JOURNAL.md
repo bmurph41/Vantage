@@ -201,28 +201,84 @@ capital-stack — reverted to space-y-4, needs careful manual wrap of top-level 
 - debt-inputs.tsx header patch may need re-check
 - Add `fm-body` content wrap inside each tab after fm-header
 
-## DCF Refactor Complete — March 2026
+## DCF Refactor Complete — Phase 3 (March 14, 2026)
 
-### What Changed
-- **Layer 1 (Foundation):** DCF now consumes `computeMultiYearProjection()` as canonical source. No independent NOI modeling.
-- **Layer 2 (Validation):** Shared XIRR in `shared/finance/xirr.ts`, cash flow canonicalizer, 47 golden vector parity tests.
-- **Layer 3 (Simulation):** Monte Carlo (fast/exact modes, seeded PRNG), deterministic base/upside/downside scenarios with probability-weighted expected case.
-- **Layer 4 (Decision Support):** Tornado chart, OLS attribution, IC memo generator (3 tones: concise/ic/lender). Gated behind entitlement check (MVP: allow all).
+### What Was Built
+All four layers of the DCF refactor are live, tested, and integrated.
 
-### New Files (16)
-- `shared/finance/`: xirr.ts, distributions.ts, tornado.ts, attribution.ts, memo-generator.ts
-- `server/services/`: dcf-calculator-service.ts (replaced), dcf-scenario-layer.ts, dcf-simulation-service.ts, dcf-decision-support-service.ts, finance/cashflow-parity.ts
-- `server/routes/dcf-routes.ts`
-- `server/__tests__/`: irr-parity.test.ts (47), monte-carlo.test.ts (20), decision-support.test.ts (26)
-- `client/src/components/workspace/DCFMonteCarloPanel.tsx`
+**Layer 1 — Foundation:** DCF calculator now consumes `computeMultiYearProjection()` as the canonical source of truth. No independent NOI modeling. All values (growth, exit cap, debt, hold period) come from project config, capital stack, and scenario versions.
+
+**Layer 2 — Validation:** Centralized XIRR in `shared/finance/xirr.ts`. Cash flow canonicalizer enables parity comparison across pipelines. 47 golden vector tests (6 vectors × 7 assertions + percent convention + failure mode tests).
+
+**Layer 3 — Simulation:** Monte Carlo with seeded PRNG (fast mode: <40ms for 500 sims). Deterministic base/upside/downside scenarios with probability-weighted expected case. 20 tests covering stats sanity, seed determinism, distribution bounds.
+
+**Layer 4 — Decision Support:** Tornado chart (one-at-a-time driver perturbation), OLS factor attribution on MC samples, IC memo generator with 3 tones (concise/ic/lender). Gated behind entitlement check (MVP: allow all). 26 tests.
+
+### Additional Work (Same Session)
+
+**Dummy Data Purge:**
+- `pro-forma-charts.tsx` — Removed ~200 lines of hardcoded $7.5M revenue, payroll, NOI waterfall, revenue mix. Now shows real Pro Forma data or empty state.
+- `sensitivity-tornado.tsx` — Removed `generateSimulatedData()` with fake $15M valuation. Now pulls from DCF decision support tornado endpoint.
+- `debt-scenarios.tsx` — Removed $10M/$800K fallbacks. Shows 0 when no project data.
+- `lease-cashflow.tsx` — Removed hardcoded 3% market rent growth fallback.
+
+**Empty States:**
+- Created reusable `WorkspaceEmptyState` component (`client/src/components/workspace/WorkspaceEmptyState.tsx`) with configurable title, description, icon variant, and "Go to Inputs" CTA button.
+- Wired into pro-forma-charts, sensitivity-tornado, DCF panel.
+
+**E2E Pipeline Test:**
+- `server/__tests__/dcf-pipeline-e2e.test.ts` — 10 tests covering: Direct Input → Multi-Year Projection → DCF → Scenarios → Monte Carlo → Tornado → IRR consistency (DCF IRR matches MC P50 within 100bps).
+
+**Export:**
+- Added DCF Analysis sheet to Excel export (`modeling-export.ts`) — includes IRR, EM, yearly cash flows, exit metrics.
+
+**Marina Text Sweep:**
+- `assumptions.tsx` — Replaced ~120 lines of hardcoded marina storage/department arrays (`storageTypesConfig`, `storageTypeCategories`, `designatedSpaceCategories`, `allRevenueCategories`) with dynamic builder functions that read from `getModelConfig(assetClass)`. Categories now adapt per asset class.
+- `workspace.tsx` — Asset class badge now shows for all types including marina (was previously hidden).
+
+**Seasonality Derivation:**
+- DCF calculator service, decision support service, and MC route now auto-inject `inSeasonMonths` from project config (`season_months` column) or asset class defaults (`getModelConfig().seasonConfig.defaultInSeasonMonths`). Marina projects get Apr-Oct seasonality automatically.
+
+**XIRR Consolidation:**
+- `shared/finance/xirr.ts` is the CANONICAL implementation (returns PERCENT, accepts ISO date strings).
+- `server/utils/financial-calculations.ts` is now a thin wrapper (returns DECIMAL, converts Date objects → strings internally). Pro-forma-engine continues working without changes.
+- Both produce identical results (proven by 47 parity tests).
+
+### File Manifest
+
+**Shared Finance (new):**
+`shared/finance/xirr.ts`, `distributions.ts`, `tornado.ts`, `attribution.ts`, `memo-generator.ts`
+
+**Backend Services (new/replaced):**
+`server/services/dcf-calculator-service.ts` (replaced), `dcf-scenario-layer.ts`, `dcf-simulation-service.ts`, `dcf-decision-support-service.ts`, `finance/cashflow-parity.ts`, `server/routes/dcf-routes.ts`
+
+**Tests (new):**
+`server/__tests__/irr-parity.test.ts` (47), `monte-carlo.test.ts` (20), `decision-support.test.ts` (26), `dcf-pipeline-e2e.test.ts` (10)
+
+**Frontend (new/modified):**
+`client/src/components/workspace/DCFMonteCarloPanel.tsx` (new), `WorkspaceEmptyState.tsx` (new), `dcf-calculator.tsx` (wired MC + DS), `pro-forma-charts.tsx` (purged), `sensitivity-tornado.tsx` (rewired), `assumptions.tsx` (dynamic config)
 
 ### Endpoints
-- `POST /api/modeling/projects/:id/dcf` — Full DCF analysis
-- `POST /api/dcf/quick-irr` — Quick IRR (identical results)
-- `POST /api/modeling/projects/:id/dcf/monte-carlo` — Monte Carlo simulation
-- `GET /api/modeling/projects/:id/dcf/decision-support` — Fast decision support
-- `POST /api/modeling/projects/:id/dcf/decision-support` — Full with MC
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/modeling/projects/:id/dcf` | Full DCF analysis |
+| POST | `/api/dcf/quick-irr` | Quick IRR |
+| POST | `/api/modeling/projects/:id/dcf/monte-carlo` | Monte Carlo |
+| GET | `/api/modeling/projects/:id/dcf/decision-support` | Fast DS |
+| POST | `/api/modeling/projects/:id/dcf/decision-support` | Full DS + MC |
 
-### Test Results: 93/93 new + 51/51 existing = 144 passing
-### Old DCF/MC routes commented out in routes.ts (backup: routes.ts.pre-dcf-refactor)
-### Old dcf-calculator-service.ts backed up to .OLD
+### Verified Results (STR test project 6b3a9021)
+- DCF: 16.31% IRR, 1.95x EM
+- Quick IRR: 16.31% IRR, 1.95x EM (exact match)
+- Monte Carlo: P10=14.65%, P50=16.31%, P90=17.88% (500 sims, 32ms)
+- Decision Support: 5 tornado drivers, 3 scenarios (14.15%–17.88%), IC memo
+- **154/154 tests passing, 0 TypeScript errors**
+
+### Backups
+- `server/routes.ts.pre-dcf-refactor` — original routes before DCF wiring
+- `server/services/dcf-calculator-service.ts.OLD` — original DCF service
+
+### Remaining
+- Frontend visual QA (verify MC panel, Decision Support, tornado, empty states render in browser)
+- Feature gating: add `subscription_tier` to organizations table when billing system is built
+- Phase 2 remaining: marina text sweep in non-workspace pages (sidebar labels, etc.)

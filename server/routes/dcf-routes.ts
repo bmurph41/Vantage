@@ -18,6 +18,7 @@ import type { Express, Request, Response } from 'express';
 import { performDCFAnalysis, computeQuickIRR } from '../services/dcf-calculator-service';
 import { runMonteCarlo } from '../services/dcf-simulation-service';
 import { runDecisionSupport, checkEntitlement } from '../services/dcf-decision-support-service';
+import { getModelConfig } from '../../shared/asset-class-model-config';
 
 // Import your existing engine functions — adjust paths to match your project
 // import { computeDirectInputFinancials } from '../services/direct-input-engine';
@@ -102,9 +103,16 @@ export function registerDCFRoutes(
         const scenarioData = await loadScenarioQuick(pool, projectData.modelingProjectId);
         const capitalStack = await loadCapitalStackQuick(pool, projectData.modelingProjectId);
 
+        // Inject seasonality
+        const mcAssumptions = { ...projectData.inputAssumptions };
+        if (!mcAssumptions.inSeasonMonths || mcAssumptions.inSeasonMonths.length === 0) {
+          const mc = getModelConfig(projectData.assetClass);
+          mcAssumptions.inSeasonMonths = mc.seasonConfig.defaultInSeasonMonths || [];
+        }
+
         const year1 = computeDirectInputFinancials(
           projectData.assetClass,
-          projectData.inputAssumptions,
+          mcAssumptions,
           projectData.unitMix
         );
 

@@ -36,6 +36,7 @@ import {
 } from 'recharts';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { WorkspaceEmptyState } from '@/components/workspace/WorkspaceEmptyState';
 
 interface SensitivityTornadoProps {
   projectId: string;
@@ -192,6 +193,22 @@ export default function SensitivityTornado({ projectId, onTabChange }: Sensitivi
       </div>
     );
   }
+
+  // No tornado data — show empty state
+  if (!isLoading && (!tornadoData || tornadoData.length === 0)) {
+    return (
+      <div className="space-y-6" ref={pdfRef}>
+        <WorkspaceEmptyState
+          title="No Sensitivity Data Available"
+          description="Enter your deal inputs and run the DCF analysis to generate a tornado sensitivity chart showing which variables have the greatest impact on returns."
+          targetTab="inputs"
+          ctaLabel="Go to Inputs"
+          variant="analysis"
+        />
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6" ref={pdfRef}>

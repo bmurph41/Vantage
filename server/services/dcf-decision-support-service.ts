@@ -14,6 +14,7 @@ import { computeTornado, getDefaultDrivers, TornadoResult, TornadoConfig } from 
 import { computeAttribution, AttributionResult, MCAttributionSample } from '../../shared/finance/attribution';
 import { generateMemo, MemoResult, MemoTone, MemoInput } from '../../shared/finance/memo-generator';
 import { sampleDistribution, createSeededRNG, DistributionConfig } from '../../shared/finance/distributions';
+import { getModelConfig } from '../../shared/asset-class-model-config';
 import { DEFAULT_DISTRIBUTIONS } from './dcf-simulation-service';
 import { calculateXIRR, calculateNPV, DatedCashFlow } from '../../shared/finance/xirr';
 
@@ -138,9 +139,18 @@ export async function runDecisionSupport(
   const capitalStack = await loadCapitalStackForDS(pool, projectData.modelingProjectId);
 
   // Compute Year 1
+  // Inject seasonality
+  const dsAssumptions = { ...projectData.inputAssumptions };
+  if (!dsAssumptions.inSeasonMonths || dsAssumptions.inSeasonMonths.length === 0) {
+    const mc = getModelConfig(projectData.assetClass);
+    dsAssumptions.inSeasonMonths = scenarioData.seasonMonths?.length > 0
+      ? scenarioData.seasonMonths
+      : mc.seasonConfig.defaultInSeasonMonths || [];
+  }
+
   const year1 = computeDirectInputFinancials(
     projectData.assetClass,
-    projectData.inputAssumptions,
+    dsAssumptions,
     projectData.unitMix
   );
 
@@ -386,6 +396,7 @@ async function loadScenarioForDS(pool: any, modelingProjectId: string) {
     exitCapRate: Number(s.exit_cap_rate) || 7.0,
     holdPeriod: Number(c.hold_period) || 5,
     acquisitionCloseDate: c.acquisition_close_date ?? null,
+    seasonMonths: [],
   };
 }
 

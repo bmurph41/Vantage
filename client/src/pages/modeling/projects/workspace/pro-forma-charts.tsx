@@ -42,6 +42,7 @@ import { WorkflowNavigation } from '@/components/modeling/workflow-navigation';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import type { ProjectConfig, ProFormaChartData } from '@/types/modeling';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { WorkspaceEmptyState } from '@/components/workspace/WorkspaceEmptyState';
 
 interface WorkspaceProFormaChartsProps {
   projectId: string;
@@ -176,6 +177,27 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
       </div>
     );
   }
+
+  // No data available — show empty state with CTA
+  const hasData = proFormaData && (
+    (proFormaData.revenueByCategory?.length > 0) ||
+    (proFormaData.kpis?.totalRevenue > 0)
+  );
+
+  if (!isLoading && !hasData) {
+    return (
+      <div className="space-y-6" ref={pdfRef}>
+        <WorkspaceEmptyState
+          title="No Financial Data Available"
+          description="Enter your property's revenue and expense data in the Inputs tab to generate Pro Forma charts and projections."
+          targetTab="inputs"
+          ctaLabel="Go to Inputs"
+          variant="charts"
+        />
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6" ref={pdfRef}>
@@ -396,20 +418,15 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
             <TimeSeriesDrillDown
               title="NOI Trend by Year"
               description="Click to see revenue/expense breakdown"
-              data={years.map((year, idx) => {
-                const revenue = Math.round(1500000 * Math.pow(1.04, idx));
-                const expenses = Math.round(626000 * Math.pow(1.025, idx));
-                const noi = revenue - expenses;
-                return {
-                  period: `Year ${idx + 1}`,
-                  value: noi,
-                  breakdown: [
-                    { name: "Revenue", value: revenue },
-                    { name: "Expenses", value: -expenses },
-                    { name: "NOI", value: noi },
-                  ],
-                };
-              })}
+              data={comparisonData.map(y => ({
+                period: y.period,
+                value: y.noi,
+                breakdown: [
+                  { name: "Revenue", value: y.revenue },
+                  { name: "Expenses", value: -y.expenses },
+                  { name: "NOI", value: y.noi },
+                ],
+              }))}
               height={350}
               valueFormatter={(val) => formatCurrency(val)}
             />
@@ -423,18 +440,15 @@ export default function WorkspaceProFormaCharts({ projectId, onTabChange }: Work
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {years.map((year, idx) => {
-                    const revenue = Math.round(1500000 * Math.pow(1.04, idx));
-                    const expenses = Math.round(626000 * Math.pow(1.025, idx));
-                    const noi = revenue - expenses;
-                    const margin = (noi / revenue * 100);
-                    const prevMargin = idx > 0 ? 
-                      ((Math.round(1500000 * Math.pow(1.04, idx-1)) - Math.round(626000 * Math.pow(1.025, idx-1))) / 
-                       Math.round(1500000 * Math.pow(1.04, idx-1)) * 100) : margin;
+                  {comparisonData.map((y, idx) => {
+                    const margin = y.revenue > 0 ? (y.noi / y.revenue * 100) : 0;
+                    const prevMargin = idx > 0 && comparisonData[idx-1].revenue > 0
+                      ? (comparisonData[idx-1].noi / comparisonData[idx-1].revenue * 100) : margin;
                     const change = margin - prevMargin;
+                    const year = y.year || y.period;
                     
                     return (
-                      <div key={year} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div>
                           <p className="font-medium">Year {idx + 1} ({year})</p>
                           <p className="text-sm text-muted-foreground">NOI: {formatCurrency(noi)}</p>

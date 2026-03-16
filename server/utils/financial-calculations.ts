@@ -66,62 +66,29 @@ export function calculateXNPV(rate: number, cashFlows: DatedCashFlow[]): number 
  * @param tolerance - Convergence tolerance (default 1e-7)
  * @returns Annual IRR as decimal (e.g., 0.15 for 15%), or 0 if unsolvable
  */
+// ═══ CONSOLIDATED: Wraps shared/finance/xirr.ts canonical implementation ═══
+// Returns DECIMAL (0.15 for 15%) for backward compatibility.
+// New code should import directly from '../../shared/finance/xirr' (returns PERCENT).
+import { calculateXIRR as canonicalXIRR } from '../../shared/finance/xirr';
+
 export function calculateXIRR(
   cashFlows: DatedCashFlow[],
   guess: number = 0.1,
-  maxIterations: number = 1000,
-  tolerance: number = 0.0000001
+  _maxIterations: number = 1000,
+  _tolerance: number = 0.0000001
 ): number {
   if (cashFlows.length < 2) return 0;
-  
-  const hasPositive = cashFlows.some(cf => cf.amount > 0);
-  const hasNegative = cashFlows.some(cf => cf.amount < 0);
-  if (!hasPositive || !hasNegative) return 0;
-  
-  const sortedFlows = [...cashFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const baseDate = sortedFlows[0].date;
-  
-  const yearFractions = sortedFlows.map(cf => 
-    (cf.date.getTime() - baseDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-  );
-  
-  let rate = guess;
-  
-  for (let i = 0; i < maxIterations; i++) {
-    let npv = 0;
-    let npvDerivative = 0;
-    
-    for (let j = 0; j < sortedFlows.length; j++) {
-      const t = yearFractions[j];
-      const cf = sortedFlows[j].amount;
-      const factor = Math.pow(1 + rate, t);
-      
-      npv += cf / factor;
-      npvDerivative -= t * cf / (factor * (1 + rate));
-    }
-    
-    if (Math.abs(npv) < tolerance) {
-      return rate;
-    }
-    
-    if (Math.abs(npvDerivative) < tolerance) {
-      return 0;
-    }
-    
-    const newRate = rate - npv / npvDerivative;
-    
-    if (Math.abs(newRate - rate) < tolerance) {
-      return newRate;
-    }
-    
-    if (newRate < -0.99 || newRate > 100) {
-      return 0;
-    }
-    
-    rate = newRate;
-  }
-  
-  return 0;
+
+  // Convert Date objects to ISO strings for the canonical implementation
+  const stringFlows = cashFlows.map(cf => ({
+    date: cf.date instanceof Date ? cf.date.toISOString().split('T')[0] : String(cf.date),
+    amount: cf.amount,
+  }));
+
+  const result = canonicalXIRR(stringFlows, guess);
+
+  // Canonical returns PERCENT (15.0), we return DECIMAL (0.15)
+  return result.converged ? result.irr / 100 : 0;
 }
 
 /**

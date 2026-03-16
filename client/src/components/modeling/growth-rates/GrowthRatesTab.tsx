@@ -432,7 +432,7 @@ export function GrowthRatesTab({
           <SectionCard
             key="storage"
             title="Storage Revenue Growth"
-            description="Year-specific growth rates for marina storage revenue"
+            description="Year-specific growth rates for storage/unit revenue"
             accent="blue"
             icon={Warehouse}
             headerAction={

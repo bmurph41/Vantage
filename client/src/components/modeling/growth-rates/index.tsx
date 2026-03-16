@@ -8,6 +8,7 @@ import {
   Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin,
   Minus, Plus, Copy, ArrowRight
 } from 'lucide-react';
+import { getModelConfig } from "@shared/asset-class-model-config";
 import {
   Tooltip,
   TooltipContent,
@@ -682,14 +683,20 @@ export const REVENUE_ONLY_IDS = new Set([
   'marina_amenities', 'boat_sales', 'boat_finance', 'boat_brokerage', 'boat_club', 'commercial_tenants'
 ]);
 
-export const STORAGE_CATEGORIES = [
-  { id: 'wet_slips', label: 'Wet Slips', icon: Anchor },
-  { id: 'dry_racks_indoor', label: 'Dry Racks – Indoor', icon: Warehouse },
-  { id: 'dry_racks_outdoor', label: 'Dry Racks – Outdoor', icon: Container },
-  { id: 'moorings', label: 'Moorings', icon: Anchor },
-  { id: 'lift_slips', label: 'Lift Slips', icon: Waves },
-  { id: 'dinghies', label: 'Dinghies', icon: Ship },
-  { id: 'jet_skis', label: 'Jet Skis', icon: Waves },
-  { id: 'land_storage', label: 'Land Storage', icon: MapPin },
-  { id: 'boats_on_trailers', label: 'Boats on Trailers', icon: Ship },
-];
+// Dynamic: reads from asset class config, falls back to marina defaults
+const ICON_MAP_GR: Record<string, any> = {
+  anchor: Anchor, waves: Waves, warehouse: Warehouse, container: Container,
+  ship: Ship, home: Home, car: Car, 'map-pin': MapPin,
+};
+
+export function getStorageCategories(assetClass?: string | null) {
+  const config = getModelConfig(assetClass);
+  return config.unitMix.types.map(t => ({
+    id: t.id,
+    label: t.name,
+    icon: ICON_MAP_GR[t.icon || 'anchor'] || Anchor,
+  }));
+}
+
+// Backward compat: default marina categories for code that imports the constant
+export const STORAGE_CATEGORIES = getStorageCategories('marina');

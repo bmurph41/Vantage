@@ -285,7 +285,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
   const [showAddEquity, setShowAddEquity] = useState(false);
   const [editingDebt, setEditingDebt] = useState<DebtTranche | null>(null);
   const [editingEquity, setEditingEquity] = useState<EquityLayer | null>(null);
-  const [noi, setNoi] = useState('1000000');
+  const [noi, setNoi] = useState('0');
   const [noiGrowthRate, setNoiGrowthRate] = useState('0.02');
   const [promoteTiers, setPromoteTiers] = useState<{ irrHurdle: number; gpSplit: number; lpSplit: number }[]>([
     { irrHurdle: 0.08, gpSplit: 0.20, lpSplit: 0.80 },
@@ -329,7 +329,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
     ownershipPct: string;
     preferredReturn: string;
   }[]>([
-    { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '500000', ownershipPct: '10', preferredReturn: '8' },
+    { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '0', ownershipPct: '10', preferredReturn: '8' },
     { id: crypto.randomUUID(), name: 'LP Investor 1', type: 'lp', commitmentAmount: '2000000', ownershipPct: '40', preferredReturn: '8' },
   ]);
   const [stackPromoteTiers, setStackPromoteTiers] = useState<{
@@ -499,7 +499,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
     setWizardExitCapRate('7');
     setWizardNoiGrowthRate('2');
     setStackPartners([
-      { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '500000', ownershipPct: '10', preferredReturn: '8' },
+      { id: crypto.randomUUID(), name: 'GP Sponsor', type: 'gp', commitmentAmount: '0', ownershipPct: '10', preferredReturn: '8' },
       { id: crypto.randomUUID(), name: 'LP Investor 1', type: 'lp', commitmentAmount: '2000000', ownershipPct: '40', preferredReturn: '8' },
     ]);
     setStackPromoteTiers([
@@ -1163,8 +1163,8 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
             <CardContent>
               <LoanBuilder 
                 projectId={projectId}
-                purchasePrice={stackDetails?.stack?.purchasePrice ? parseNumber(stackDetails.stack.purchasePrice) : 10000000}
-                noi={parseFloat(noi) || 1000000}
+                purchasePrice={stackDetails?.stack?.purchasePrice ? parseNumber(stackDetails.stack.purchasePrice) : 0}
+                noi={parseFloat(noi) || 0}
                 onUpdate={() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/modeling/capital-stacks', selectedStackId] });
                 }}

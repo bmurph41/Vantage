@@ -65,14 +65,14 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
     noiGrowthRate: 3,
     monthlyDebtService: 35000,
     holdPeriodYears: 5,
-    outstandingDebt: 5000000,
+    outstandingDebt: 0,
   });
 
   const [yearEarnouts, setYearEarnouts] = useState<YearEarnout[]>(() =>
     Array.from({ length: 3 }, (_, i) => ({
       year: i + 1,
       metric: i === 0 ? "ebitda_noi" as MetricValue : i === 1 ? "revenue" as MetricValue : "occupancy" as MetricValue,
-      threshold: i === 0 ? 1200000 : i === 1 ? 5000000 : 85,
+      threshold: 0,
       probability: i === 0 ? 80 : i === 1 ? 65 : 50,
       maxEarnout: i === 0 ? 750000 : i === 1 ? 600000 : 400000,
     }))
@@ -90,9 +90,9 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
           return {
             year: yr,
             metric: lastRow?.metric || ("ebitda_noi" as MetricValue),
-            threshold: lastRow?.threshold || 1000000,
+            threshold: lastRow?.threshold || 0,
             probability: Math.max(20, (lastRow?.probability || 60) - 10),
-            maxEarnout: lastRow?.maxEarnout || 500000,
+            maxEarnout: lastRow?.maxEarnout || 0,
           };
         });
         return [...prev, ...additions];
@@ -111,7 +111,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
         if (config.unit === "percent" && ye.threshold > 100) {
           newThreshold = 85;
         } else if (config.unit === "currency" && ye.threshold <= 100) {
-          newThreshold = 1000000;
+          newThreshold = 0;
         } else if (config.unit === "number" && ye.threshold > 10000) {
           newThreshold = 200;
         }

@@ -199,7 +199,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const [inputs, setInputs] = useState({
-    totalDistribution: 15000000,
+    totalDistribution: 0,
     holdingPeriodYears: 5,
     waterfallType: 'american' as 'american' | 'european',
     preferredReturn: 8,
@@ -293,7 +293,7 @@ export default function ExitWaterfall({ projectId }: WaterfallProps) {
     const newInvestor: Investor = {
       id: `inv-${Date.now()}`,
       name: `Investor ${investors.length + 1}`,
-      contribution: 1000000,
+      contribution: 0,
       isGP: false,
     };
     setInvestors([...investors, newInvestor]);

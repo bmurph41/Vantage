@@ -28,6 +28,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { WorkspaceEmptyState } from '@/components/workspace/WorkspaceEmptyState';
 
 interface ModelReturnsProps {
   projectId: string;

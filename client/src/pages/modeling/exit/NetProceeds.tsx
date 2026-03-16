@@ -24,7 +24,7 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
   const basePath = `/modeling/projects/${projectId}/exit`;
 
   const [inputs, setInputs] = useState({
-    grossSalePrice: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 10000000,
+    grossSalePrice: project?.purchasePrice ? Number(project.purchasePrice) * 1.3 : 0,
     brokerCommission: 3,
     transferTax: 1.1,
     legalFees: 50000,

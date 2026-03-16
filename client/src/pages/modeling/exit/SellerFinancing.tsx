@@ -357,7 +357,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
   });
 
   const inputs = {
-    salePrice: masterInputs.salePrice || 10000000,
+    salePrice: masterInputs.salePrice || 0,
     adjustedBasis: (masterInputs.costBasis - masterInputs.depreciationTaken) || 6000000,
     ...financingOnlyInputs,
   };

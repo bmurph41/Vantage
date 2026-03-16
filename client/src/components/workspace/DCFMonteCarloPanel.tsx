@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react';
+import { WorkspaceEmptyState } from './WorkspaceEmptyState';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
 // ─── Types (match backend response shapes) ───────────────────────────────────

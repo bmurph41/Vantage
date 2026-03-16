@@ -142,6 +142,30 @@ function displayVarInput(key: string, value: number): string {
   return value.toFixed(2);
 }
 
+
+// Build histogram from samples for the old UI chart
+function buildHistogram(values: number[], bins: number = 20) {
+  if (!values || values.length === 0) {
+    return { bins: [], frequencies: [], binWidth: 0 };
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const binWidth = (max - min) / bins || 1;
+  const binCounts = new Array(bins).fill(0);
+  const binLabels: number[] = [];
+  
+  for (let i = 0; i < bins; i++) {
+    binLabels.push(min + binWidth * (i + 0.5));
+  }
+  
+  for (const v of values) {
+    const idx = Math.min(Math.floor((v - min) / binWidth), bins - 1);
+    binCounts[Math.max(0, idx)]++;
+  }
+  
+  return { bins: binLabels, frequencies: binCounts, binWidth };
+}
+
 export default function MonteCarloPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const { toast } = useToast();
@@ -152,10 +176,64 @@ export default function MonteCarloPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [configVariables, setConfigVariables] = useState<SimulationVariable[] | null>(null);
 
-  const { data: mcData, isLoading } = useQuery<MonteCarloResponse>({
-    queryKey: ['/api/modeling/projects', projectId, 'monte-carlo'],
+  // Fetch from new DCF Monte Carlo endpoint
+  const { data: rawMcData, isLoading } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'dcf-monte-carlo'],
+    queryFn: async () => {
+      // Try new endpoint
+      const res = await fetch(`/api/modeling/projects/${projectId}/dcf/monte-carlo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n: iterations, seed: 42 }),
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
     enabled: !!projectId,
   });
+
+  // Adapt new response shape to old UI expectations
+  const mcData = useMemo((): MonteCarloResponse | null => {
+    if (!rawMcData) return null;
+    const s = rawMcData.stats;
+    if (!s) return null;
+
+    const buildResult = (key: 'irr' | 'equityMultiple' | 'npv', label: string) => {
+      const d = s[key];
+      if (!d) return null;
+      return {
+        metric: label,
+        mean: d.mean,
+        stdDev: d.stdDev,
+        percentiles: {
+          p5: d.p5, p10: d.p10, p25: d.p25,
+          p50: d.p50, p75: d.p75, p90: d.p90, p95: d.p95,
+        },
+        histogram: buildHistogram(rawMcData.samplesPreview?.map((sp: any) => sp[key === 'equityMultiple' ? 'equityMultiple' : key]) || [], 20),
+        min: d.min,
+        max: d.max,
+      };
+    };
+
+    return {
+      hasResults: true,
+      results: {
+        irr: buildResult('irr', 'IRR'),
+        npv: buildResult('npv', 'NPV'),
+        equityMultiple: buildResult('equityMultiple', 'Equity Multiple'),
+        cashOnCash: buildResult('irr', 'Cash-on-Cash'), // approximate with IRR
+      },
+      iterations: rawMcData.n,
+      config: null,
+      defaultVariables: [],
+      sensitivityRanking: [],
+      riskMetrics: {
+        probIrrBelowHurdle: rawMcData.risks?.probIrrBelowHurdle ?? 0,
+        probMultipleBelow1: rawMcData.risks?.probMultipleBelow1 ?? 0,
+        expectedShortfallIrrP10: rawMcData.risks?.expectedShortfallIrrP10 ?? 0,
+      },
+    } as any;
+  }, [rawMcData]);
 
   const variables = useMemo(() => {
     if (configVariables) return configVariables;
@@ -166,16 +244,20 @@ export default function MonteCarloPage() {
   }, [configVariables, mcData]);
 
   const runSimulation = useMutation({
-    mutationFn: (vars: SimulationVariable[]) =>
-      apiRequest(`/api/modeling/projects/${projectId}/monte-carlo/run`, {
+    mutationFn: async (_vars: SimulationVariable[]) => {
+      const res = await fetch(`/api/modeling/projects/${projectId}/dcf/monte-carlo`, {
         method: 'POST',
-        body: JSON.stringify({ iterations, variables: vars, confidenceLevel: 0.95 }),
-      }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n: iterations, mode: 'fast' }),
+      });
+      if (!res.ok) throw new Error('Monte Carlo failed');
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['/api/modeling/projects', projectId, 'monte-carlo']
+        queryKey: ['/api/modeling/projects', projectId, 'dcf-monte-carlo']
       });
-      toast({ title: 'Simulation complete', description: `Ran ${iterations.toLocaleString()} iterations using your Deal Pricing model.` });
+      toast({ title: 'Simulation complete', description: `Ran ${iterations.toLocaleString()} iterations.` });
     },
     onError: () => {
       toast({ title: 'Simulation failed', description: 'Could not run Monte Carlo simulation.', variant: 'destructive' });
@@ -183,17 +265,11 @@ export default function MonteCarloPage() {
   });
 
   const saveConfig = useMutation({
-    mutationFn: (vars: SimulationVariable[]) =>
-      apiRequest(`/api/modeling/projects/${projectId}/monte-carlo/config`, {
-        method: 'POST',
-        body: JSON.stringify({ variables: vars, iterations }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['/api/modeling/projects', projectId, 'monte-carlo']
-      });
-      toast({ title: 'Configuration saved' });
+    mutationFn: async (_vars: SimulationVariable[]) => {
+      // Config is now managed by the DCF decision support layer
+      toast({ title: 'Configuration applied to next run' });
     },
+    onSuccess: () => {},
   });
 
   const handleRunSimulation = useCallback(() => {

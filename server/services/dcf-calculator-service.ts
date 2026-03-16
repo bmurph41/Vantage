@@ -27,6 +27,8 @@ import {
   DatedCashFlow,
 } from '../../shared/finance/xirr';
 
+import { getModelConfig } from '../../shared/asset-class-model-config';
+
 import {
   fromProjection,
   ProjectionInput,
@@ -140,9 +142,21 @@ export async function performDCFAnalysis(
   const capitalStackData = await loadCapitalStackData(pool, projectData.modelingProjectId);
 
   // ── Step 2: Compute Year 1 from Direct Input Engine ─────────────────────
+  // ── Inject seasonality if not already in inputAssumptions ──────────────
+  const assumptions = { ...projectData.inputAssumptions };
+  if (!assumptions.inSeasonMonths || assumptions.inSeasonMonths.length === 0) {
+    // Try project config first, then asset class default
+    const modelConfig = getModelConfig(projectData.assetClass);
+    if (scenarioData.seasonMonths?.length > 0) {
+      assumptions.inSeasonMonths = scenarioData.seasonMonths;
+    } else if (modelConfig.seasonConfig.defaultInSeasonMonths?.length) {
+      assumptions.inSeasonMonths = modelConfig.seasonConfig.defaultInSeasonMonths;
+    }
+  }
+
   const year1 = computeDirectInputFinancials(
     projectData.assetClass,
-    projectData.inputAssumptions,
+    assumptions,
     projectData.unitMix
   );
 
@@ -505,6 +519,7 @@ async function loadScenarioData(pool: any, modelingProjectId: string) {
     exitCapRate: Number(scenario.exit_cap_rate) || 7.0,
     holdPeriod: Number(config.hold_period) || 5,
     acquisitionCloseDate: config.acquisition_close_date ?? null,
+    seasonMonths: [],
     assumptions: typeof scenario.assumptions === 'string'
       ? JSON.parse(scenario.assumptions)
       : scenario.assumptions ?? {},

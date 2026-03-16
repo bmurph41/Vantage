@@ -93,9 +93,9 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
   };
 
   const [replacementProperties, setReplacementProperties] = useState<ReplacementProperty[]>([
-    { id: '1', name: 'Marina Bay Harbor', address: '123 Harbor Way, FL', value: 6000000, newDebt: 3500000, propertyType: 'marina', status: 'identified' },
-    { id: '2', name: 'Sunset Cove Marina', address: '456 Ocean Dr, FL', value: 4000000, newDebt: 2500000, propertyType: 'marina', status: 'identified' },
-    { id: '3', name: 'Coastal Yacht Club', address: '789 Beach Rd, FL', value: 5500000, newDebt: 3000000, propertyType: 'marina', status: 'under_contract' },
+    // Replacement properties loaded from project data
+    
+    
   ]);
 
   const [milestones, setMilestones] = useState<ExchangeMilestone[]>([
