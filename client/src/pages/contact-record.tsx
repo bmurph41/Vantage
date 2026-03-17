@@ -19,6 +19,13 @@ import {
 } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
 import { RelationshipScoreBadge } from '@/components/crm/RelationshipScoreBadge';
+import {
+  ContactPropertiesTab,
+  ContactIntelTab,
+  ContactModelsTab,
+  ContactActivitiesTab,
+  ContactDealsTabEnhanced,
+} from '@/components/crm/ContactRecordTabs';
 import { useProspectingActivity } from '@/contexts/ProspectingActivityContext';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -279,7 +286,29 @@ export default function ContactRecordPage() {
           value: 'deals',
           label: 'Deals',
           count: contact.deals?.length || 0,
-          content: <ContactDealsTab deals={contact.deals} onNavigate={setLocation} />,
+          content: <ContactDealsTabEnhanced deals={contact.deals || []} />,
+        },
+        {
+          value: 'properties',
+          label: 'Properties',
+          count: contact.properties?.length || 0,
+          content: <ContactPropertiesTab properties={contact.properties || []} />,
+        },
+        {
+          value: 'activities',
+          label: 'Activities',
+          count: contact.activities?.openCount || 0,
+          content: <ContactActivitiesTab contactId={id} />,
+        },
+        {
+          value: 'models',
+          label: 'Models',
+          content: <ContactModelsTab dealIds={contact.deals?.map((d: any) => d.id)} />,
+        },
+        {
+          value: 'intel',
+          label: 'Intel',
+          content: <ContactIntelTab state={contact.state} assetClasses={contact.targetAssetClasses} />,
         },
         {
           value: 'notes',

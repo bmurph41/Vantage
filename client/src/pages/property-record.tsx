@@ -20,6 +20,12 @@ import {
   CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard, AssociationRow,
 } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
+import {
+  PropertySalesCompsTab,
+  PropertyRateCompsTab,
+  PropertyIntelTab,
+  PropertyActivitiesTab,
+} from '@/components/crm/PropertyRecordTabs';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────
@@ -285,10 +291,38 @@ export default function PropertyRecordPage() {
           content: <StorageBreakdownTab entries={property.storageEntries} />,
         }] : []),
         {
+          value: 'sales-comps',
+          label: 'Sales Comps',
+          content: <PropertySalesCompsTab
+            state={property.state}
+            city={property.city}
+            propertyType={property.type}
+          />,
+        },
+        {
+          value: 'rate-comps',
+          label: 'Rate Comps',
+          content: <PropertyRateCompsTab
+            state={property.state}
+            city={property.city}
+          />,
+        },
+        {
+          value: 'activities',
+          label: 'Activities',
+          count: property.activities?.openCount || 0,
+          content: <PropertyActivitiesTab propertyId={id} />,
+        },
+        {
           value: 'deals',
           label: 'Deals',
           count: property.deals?.length || 0,
           content: <PropertyDealsTab deals={property.deals} onNavigate={setLocation} />,
+        },
+        {
+          value: 'intel',
+          label: 'Intel',
+          content: <PropertyIntelTab state={property.state} city={property.city} />,
         },
         {
           value: 'notes',

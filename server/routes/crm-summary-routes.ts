@@ -6,7 +6,7 @@ import {
   crmContactCompanies, crmCompanyProperties, crmContactProperties,
   crmPropertyStorageEntries
 } from '@shared/schema';
-import { eq, and, or, desc, asc, sql, gte, lt, inArray } from 'drizzle-orm';
+import { eq, and, or, ilike, desc, asc, sql, gte, lt, inArray } from 'drizzle-orm';
 
 const router = Router();
 
@@ -618,6 +618,97 @@ router.get('/deals/:id/summary', async (req, res) => {
   } catch (error) {
     console.error('Error fetching deal summary:', error);
     res.status(500).json({ error: 'Failed to fetch deal summary' });
+  }
+});
+
+
+// ── Global CRM Search ─────────────────────────────────────────────────
+router.get('/search', async (req, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const q = (req.query.q as string || '').trim();
+    if (!q || q.length < 2) return res.json({ contacts: [], companies: [], properties: [], deals: [] });
+
+    const pattern = `%${q}%`;
+    const limit = 5;
+
+    const [contacts, companies, properties, deals] = await Promise.all([
+      db.select({
+        id: crmContacts.id,
+        firstName: crmContacts.firstName,
+        lastName: crmContacts.lastName,
+        email: crmContacts.email,
+        position: crmContacts.position,
+        contactTag: crmContacts.contactTag,
+      }).from(crmContacts)
+        .where(and(
+          eq(crmContacts.orgId, orgId),
+          or(
+            ilike(crmContacts.firstName, pattern),
+            ilike(crmContacts.lastName, pattern),
+            ilike(crmContacts.email, pattern),
+            ilike(sql`coalesce(${crmContacts.company}, '')`, pattern),
+          )
+        )).limit(limit),
+
+      db.select({
+        id: crmCompanies.id,
+        name: crmCompanies.name,
+        industry: crmCompanies.industry,
+        city: crmCompanies.city,
+        state: crmCompanies.state,
+      }).from(crmCompanies)
+        .where(and(
+          eq(crmCompanies.orgId, orgId),
+          or(
+            ilike(crmCompanies.name, pattern),
+            ilike(sql`coalesce(${crmCompanies.city}, '')`, pattern),
+          )
+        )).limit(limit),
+
+      db.select({
+        id: crmProperties.id,
+        title: crmProperties.title,
+        type: crmProperties.type,
+        status: crmProperties.status,
+        city: crmProperties.city,
+        state: crmProperties.state,
+      }).from(crmProperties)
+        .where(and(
+          eq(crmProperties.orgId, orgId),
+          or(
+            ilike(crmProperties.title, pattern),
+            ilike(sql`coalesce(${crmProperties.city}, '')`, pattern),
+            ilike(sql`coalesce(${crmProperties.address}, '')`, pattern),
+          )
+        )).limit(limit),
+
+      db.select({
+        id: crmDeals.id,
+        name: crmDeals.title,
+        stage: crmDeals.stage,
+        value: crmDeals.value,
+      }).from(crmDeals)
+        .where(and(
+          eq(crmDeals.orgId, orgId),
+          or(
+            ilike(crmDeals.title, pattern),
+            ilike(sql`coalesce(${crmDeals.marinaName}, '')`, pattern),
+          )
+        )).limit(limit),
+    ]);
+
+    res.json({
+      contacts: contacts.map(c => ({ ...c, _type: 'contact', label: `${c.firstName} ${c.lastName}`, sub: c.email })),
+      companies: companies.map(c => ({ ...c, _type: 'company', label: c.name, sub: [c.city, c.state].filter(Boolean).join(', ') })),
+      properties: properties.map(p => ({ ...p, _type: 'property', label: p.title, sub: [p.city, p.state].filter(Boolean).join(', ') })),
+      deals: deals.map(d => ({ ...d, _type: 'deal', label: d.name, sub: d.stage })),
+    });
+  } catch (error) {
+    console.error('Error in CRM search:', error);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 

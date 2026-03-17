@@ -16,6 +16,14 @@ import {
   CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard, AssociationRow,
 } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
+import {
+  CompanyPortfolioTab,
+  CompanyIntelTab,
+  CompanyModelsTab,
+  CompanyActivitiesTab,
+  CompanyContactsTabEnhanced,
+  CompanyDealsTabEnhanced,
+} from '@/components/crm/CompanyRecordTabs';
 import { format } from 'date-fns';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -235,16 +243,41 @@ export default function CompanyRecordPage() {
       // ── CENTER: Tabbed content ──
       centerTabs={company ? [
         {
+          value: 'portfolio',
+          label: 'Portfolio',
+          count: company.properties?.length || 0,
+          content: <CompanyPortfolioTab properties={company.properties || []} />,
+        },
+        {
           value: 'contacts',
           label: 'Contacts',
           count: company.contacts?.length || 0,
-          content: <CompanyContactsTab contacts={company.contacts} onNavigate={setLocation} />,
+          content: <CompanyContactsTabEnhanced contacts={company.contacts || []} />,
         },
         {
           value: 'deals',
           label: 'Deals',
           count: company.deals?.length || 0,
-          content: <CompanyDealsTab deals={company.deals} onNavigate={setLocation} />,
+          content: <CompanyDealsTabEnhanced deals={company.deals || []} />,
+        },
+        {
+          value: 'activities',
+          label: 'Activities',
+          count: company.activities?.openCount || 0,
+          content: <CompanyActivitiesTab companyId={id} />,
+        },
+        {
+          value: 'models',
+          label: 'Models',
+          content: <CompanyModelsTab
+            dealIds={company.deals?.map((d: any) => d.id)}
+            propertyIds={company.properties?.map((p: any) => p.id)}
+          />,
+        },
+        {
+          value: 'intel',
+          label: 'Intel',
+          content: <CompanyIntelTab state={company.state} city={company.city} />,
         },
         {
           value: 'notes',
