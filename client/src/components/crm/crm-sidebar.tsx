@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useState } from 'react';
+import { CommandPalette, useCommandPaletteShortcut } from '@/components/CommandPalette';
+
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -103,7 +106,11 @@ export default function CrmSidebar() {
     const isActive = location === item.href || (item.href !== '/crm' && location.startsWith(item.href));
     const Icon = item.icon;
 
-    return (
+    
+  const [commandOpen, setCommandOpen] = useState(false);
+  useCommandPaletteShortcut(() => setCommandOpen(true));
+
+return (
       <Link
         href={item.href}
         className={cn(
@@ -298,6 +305,8 @@ export default function CrmSidebar() {
           </Button>
         </div>
       </div>
+    
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
   );
 }

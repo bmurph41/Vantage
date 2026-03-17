@@ -19,6 +19,7 @@ import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
+import { RelationshipScoreBadge } from '@/components/crm/RelationshipScoreBadge';
 import type { Contact, Company, Deal } from "@shared/schema";
 
 type ContactWithCompany = Contact & { 
@@ -53,6 +54,7 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [contactTagFilter, setContactTagFilter] = useState('all');
+  const [crmRoleFilter, setCrmRoleFilter] = useState('all');
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -260,7 +262,8 @@ export default function Contacts() {
       const contactStatus = getContactStatus(contact);
       const matchesStatus = statusFilter === 'all' || contactStatus === statusFilter;
       const matchesContactTag = contactTagFilter === 'all' || contact.contactTag === contactTagFilter;
-      return matchesSearch && matchesStatus && matchesContactTag;
+      const matchesCrmRole = crmRoleFilter === 'all' || (contact as any).crmRole === crmRoleFilter;
+      return matchesSearch && matchesStatus && matchesContactTag && matchesCrmRole;
     });
   }, [contacts, searchTerm, statusFilter, contactTagFilter]);
 
@@ -407,7 +410,23 @@ export default function Contacts() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 w-60 h-9" />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={crmRoleFilter} onValueChange={setCrmRoleFilter}>
+          <SelectTrigger className="h-8 w-36 text-xs">
+            <SelectValue placeholder="CRE Role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="owner">Owner</SelectItem>
+            <SelectItem value="listing_broker">Listing Broker</SelectItem>
+            <SelectItem value="buyers_broker">Buyer's Broker</SelectItem>
+            <SelectItem value="lender">Lender</SelectItem>
+            <SelectItem value="investor_lp">Investor (LP)</SelectItem>
+            <SelectItem value="investor_gp">Investor (GP)</SelectItem>
+            <SelectItem value="family_office">Family Office</SelectItem>
+            <SelectItem value="institutional_buyer">Institutional</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32 h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>

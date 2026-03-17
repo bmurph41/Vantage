@@ -46,7 +46,15 @@ export type ContactPayload = {
   photoDataUrl?: string; // base64 preview
   leadScore?: string; // hot, warm, cold, new (legacy)
   contactTag?: string; // lead, seller, competitor, broker, vendor, insurance, lender, attorney, other
-  leadStatus?: string | null; // none, new, contacted, qualified, unqualified, converted (only when contactTag = 'lead'), null clears field
+  leadStatus?: string | null;
+  crmRole?: string;
+  sourceType?: string;
+  linkedInUrl?: string;
+  targetAssetClasses?: string[];
+  targetGeographies?: string[];
+  dealSizeMin?: number | null;
+  dealSizeMax?: number | null;
+  investmentNotes?: string; // none, new, contacted, qualified, unqualified, converted (only when contactTag = 'lead'), null clears field
 };
 
 interface ContactFormModalProps {
@@ -101,6 +109,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
   const [leadScore, setLeadScore] = useState(contact?.leadScore ?? "new");
   const [contactTag, setContactTag] = useState<string>(contact?.contactTag ?? "lead");
   const [leadStatus, setLeadStatus] = useState<string | undefined>(contact?.leadStatus ?? undefined);
+  const [crmRole, setCrmRole] = useState<string>(contact?.crmRole ?? '');
+  const [sourceType, setSourceType] = useState<string>(contact?.sourceType ?? '');
+  const [linkedInUrl, setLinkedInUrl] = useState<string>(contact?.linkedInUrl ?? '');
+  const [targetAssetClasses, setTargetAssetClasses] = useState<string[]>(contact?.targetAssetClasses ?? []);
+  const [targetGeographies, setTargetGeographies] = useState<string[]>(contact?.targetGeographies ?? []);
+  const [dealSizeMin, setDealSizeMin] = useState<string>(contact?.dealSizeMin ? String(contact.dealSizeMin) : '');
+  const [dealSizeMax, setDealSizeMax] = useState<string>(contact?.dealSizeMax ? String(contact.dealSizeMax) : '');
+  const [investmentNotes, setInvestmentNotes] = useState<string>(contact?.investmentNotes ?? '');
 
   const [touched, setTouched] = useState(false);
   const firstNameRef = useRef<HTMLInputElement | null>(null);
@@ -162,6 +178,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setLeadScore(contact?.leadScore ?? "new");
     setContactTag(contact?.contactTag ?? "lead");
     setLeadStatus(contact?.leadStatus ?? undefined);
+    setCrmRole(contact?.crmRole ?? '');
+    setSourceType(contact?.sourceType ?? '');
+    setLinkedInUrl(contact?.linkedInUrl ?? '');
+    setTargetAssetClasses(contact?.targetAssetClasses ?? []);
+    setTargetGeographies(contact?.targetGeographies ?? []);
+    setDealSizeMin(contact?.dealSizeMin ? String(contact.dealSizeMin) : '');
+    setDealSizeMax(contact?.dealSizeMax ? String(contact.dealSizeMax) : '');
+    setInvestmentNotes(contact?.investmentNotes ?? '');
     setTouched(false);
   }, [isOpen, contact]);
 
@@ -326,6 +350,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
     setLeadScore("new");
     setContactTag("lead");
     setLeadStatus(undefined);
+    setCrmRole('');
+    setSourceType('');
+    setLinkedInUrl('');
+    setTargetAssetClasses([]);
+    setTargetGeographies([]);
+    setDealSizeMin('');
+    setDealSizeMax('');
+    setInvestmentNotes('');
     setTouched(false);
   }
 
@@ -361,6 +393,14 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
       leadScore, // Legacy field for backward compatibility
       contactTag,
       leadStatus: contactTag === 'lead' ? leadStatus : null, // Explicitly null to clear field when not lead
+      crmRole: crmRole || undefined,
+      sourceType: sourceType || undefined,
+      linkedInUrl: linkedInUrl.trim() || undefined,
+      targetAssetClasses: targetAssetClasses.length > 0 ? targetAssetClasses : undefined,
+      targetGeographies: targetGeographies.length > 0 ? targetGeographies : undefined,
+      dealSizeMin: dealSizeMin ? parseFloat(dealSizeMin) : undefined,
+      dealSizeMax: dealSizeMax ? parseFloat(dealSizeMax) : undefined,
+      investmentNotes: investmentNotes.trim() || undefined,
     };
 
     if (contact) {
@@ -841,6 +881,104 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 </div>
               </div>
             </div>
+            </CardContent>
+          </Card>
+
+          {/* Investment Profile Card */}
+          <Card className="border-muted">
+            <CardHeader className="pb-3 pt-4 px-5">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base font-semibold">Investment Profile</CardTitle>
+                <span className="text-xs text-muted-foreground ml-1">Optional — for investors, brokers & owners</span>
+              </div>
+            </CardHeader>
+            <CardContent className="px-5 pb-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">CRE Role</Label>
+                  <Select value={crmRole} onValueChange={setCrmRole}>
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-crm-role">
+                      <SelectValue placeholder="Select CRE role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="owner">Owner</SelectItem>
+                      <SelectItem value="listing_broker">Listing Broker</SelectItem>
+                      <SelectItem value="buyers_broker">Buyer's Broker</SelectItem>
+                      <SelectItem value="property_manager">Property Manager</SelectItem>
+                      <SelectItem value="lender">Lender</SelectItem>
+                      <SelectItem value="attorney">Attorney</SelectItem>
+                      <SelectItem value="appraiser">Appraiser</SelectItem>
+                      <SelectItem value="investor_lp">Investor (LP)</SelectItem>
+                      <SelectItem value="investor_gp">Investor (GP)</SelectItem>
+                      <SelectItem value="family_office">Family Office</SelectItem>
+                      <SelectItem value="institutional_buyer">Institutional Buyer</SelectItem>
+                      <SelectItem value="syndicator">Syndicator</SelectItem>
+                      <SelectItem value="government">Government / Authority</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Source</Label>
+                  <Select value={sourceType} onValueChange={setSourceType}>
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-source-type">
+                      <SelectValue placeholder="How did you meet?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="referral">Referral</SelectItem>
+                      <SelectItem value="conference">Conference</SelectItem>
+                      <SelectItem value="costar">CoStar</SelectItem>
+                      <SelectItem value="loopnet">LoopNet</SelectItem>
+                      <SelectItem value="cold_outreach">Cold Outreach</SelectItem>
+                      <SelectItem value="inbound">Inbound</SelectItem>
+                      <SelectItem value="broker_intro">Broker Introduction</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <Label className="text-sm">LinkedIn URL</Label>
+                  <Input
+                    value={linkedInUrl}
+                    onChange={e => setLinkedInUrl(e.target.value)}
+                    placeholder="https://linkedin.com/in/..."
+                    className="h-9 bg-white dark:bg-slate-900"
+                    data-testid="input-linkedin-url"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Min Deal Size</Label>
+                  <Input
+                    value={dealSizeMin}
+                    onChange={e => setDealSizeMin(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="e.g. 1000000"
+                    className="h-9 bg-white dark:bg-slate-900"
+                    data-testid="input-deal-size-min"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Max Deal Size</Label>
+                  <Input
+                    value={dealSizeMax}
+                    onChange={e => setDealSizeMax(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="e.g. 20000000"
+                    className="h-9 bg-white dark:bg-slate-900"
+                    data-testid="input-deal-size-max"
+                  />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <Label className="text-sm">Investment Notes</Label>
+                  <Textarea
+                    value={investmentNotes}
+                    onChange={e => setInvestmentNotes(e.target.value)}
+                    placeholder="Target cap rates, preferred hold periods, geography preferences, return hurdles..."
+                    rows={3}
+                    className="resize-none bg-white dark:bg-slate-900"
+                    data-testid="textarea-investment-notes"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 

@@ -99,6 +99,7 @@ export default function Companies() {
   const [searchTerm, setSearchTerm] = useState('');
   const [industryFilter, setIndustryFilter] = useState('all');
   const [sizeFilter, setSizeFilter] = useState('all');
+  const [firmTypeFilter, setFirmTypeFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isCreateWizardOpen, setIsCreateWizardOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -367,6 +368,7 @@ export default function Companies() {
       setActiveViewId(null);
       setIndustryFilter('all');
       setSizeFilter('all');
+      setFirmTypeFilter('all');
       return;
     }
     setActiveViewId(view.id);
@@ -386,7 +388,8 @@ export default function Companies() {
       const matchesIndustry = industryFilter === 'all' || companyIndustry === industryFilter;
       const companySize = getSizeCategory(company.size ?? undefined);
       const matchesSize = sizeFilter === 'all' || companySize === sizeFilter;
-      return matchesSearch && matchesIndustry && matchesSize;
+      const matchesFirmType = firmTypeFilter === 'all' || (company as any).companyType === firmTypeFilter;
+      return matchesSearch && matchesIndustry && matchesSize && matchesFirmType;
     }) || [];
   }, [companies, searchTerm, industryFilter, sizeFilter]);
 
@@ -436,10 +439,19 @@ export default function Companies() {
       header: 'Role',
       sortable: true,
       sortValue: (company) => company.industry || null,
-      render: (company) => company.industry ? (
-        <Badge className={industryColors[company.industry] || industryColors[getIndustryCategory(company.industry)] || 'bg-gray-100 text-gray-800'}>
-          {formatRole(company.industry)}
-        </Badge>
+      render: (company) => (
+        <div className="flex flex-col gap-1">
+          {company.industry && (
+            <Badge className={industryColors[company.industry] || industryColors[getIndustryCategory(company.industry)] || 'bg-gray-100 text-gray-800'}>
+              {formatRole(company.industry)}
+            </Badge>
+          )}
+          {(company as any).companyType && (
+            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 w-fit">
+              {(company as any).companyType.replace(/_/g, ' ')}
+            </Badge>
+          )}
+        </div>
       ) : <span className="text-gray-400">—</span>
     },
     {
@@ -536,7 +548,23 @@ export default function Companies() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input placeholder="Search companies..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 w-60 h-9" />
             </div>
-            <Select value={industryFilter} onValueChange={setIndustryFilter}>
+            <Select value={firmTypeFilter} onValueChange={setFirmTypeFilter}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="Firm Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Firm Types</SelectItem>
+            <SelectItem value="brokerage">Brokerage</SelectItem>
+            <SelectItem value="private_equity">Private Equity</SelectItem>
+            <SelectItem value="family_office">Family Office</SelectItem>
+            <SelectItem value="reit">REIT</SelectItem>
+            <SelectItem value="owner_operator">Owner-Operator</SelectItem>
+            <SelectItem value="debt_fund">Lender / Debt Fund</SelectItem>
+            <SelectItem value="syndicator">Syndicator</SelectItem>
+            <SelectItem value="property_management">Property Mgmt</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={industryFilter} onValueChange={setIndustryFilter}>
               <SelectTrigger className="w-36 h-9"><SelectValue placeholder="All Roles" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>

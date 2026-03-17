@@ -57,60 +57,6 @@ export const parseStatusEnum = pgEnum("parse_status", ["pending", "parsing", "pa
 export const embeddingsStatusEnum = pgEnum("embeddings_status", ["pending", "processing", "completed", "failed"]);
 export const severityEnum = pgEnum("severity", ["low", "med", "high", "critical"]);
 export const confidenceLevelEnum = pgEnum("confidence_level", ["low", "medium", "high"]);
-
-// ─── CRM Contact Role (investment context) ───────────────────────────────────
-export const crmContactRoleEnum = pgEnum('crm_contact_role', [
-  'owner',
-  'listing_broker',
-  'buyers_broker',
-  'property_manager',
-  'lender',
-  'attorney',
-  'appraiser',
-  'investor_lp',
-  'investor_gp',
-  'family_office',
-  'institutional_buyer',
-  'syndicator',
-  'government',
-  'other',
-]);
-
-// ─── CRM Company Type ─────────────────────────────────────────────────────────
-export const crmCompanyTypeEnum = pgEnum('crm_company_type', [
-  'brokerage',
-  'private_equity',
-  'family_office',
-  'reit',
-  'owner_operator',
-  'debt_fund',
-  'syndicator',
-  'property_management',
-  'legal_title',
-  'government',
-  'other',
-]);
-
-// ─── CRM AUM Range ────────────────────────────────────────────────────────────
-export const crmAumRangeEnum = pgEnum('crm_aum_range', [
-  'under_10m',
-  '10m_100m',
-  '100m_1b',
-  'over_1b',
-]);
-
-
-// ─── CRM Property Listing Status ─────────────────────────────────────────────
-export const crmListingStatusEnum = pgEnum('crm_listing_status', [
-  'off_market',
-  'on_market',
-  'under_loi',
-  'under_contract',
-  'closed',
-  'portfolio',
-  'watchlist',
-]);
-
 export const pendingPropertyStatusEnum = pgEnum("pending_property_status", ["pending", "accepted", "rejected"]);
 export const fuelTypeEnum = pgEnum("fuel_type", ["diesel", "regular_gas", "premium_gas", "ethanol_free"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "credit_card", "debit_card", "account_charge", "check"]);
@@ -10863,46 +10809,6 @@ export const marketingCampaigns = pgTable('marketing_campaigns', {
   goalLeads: integer('goal_leads'),
   goalRevenue: decimal('goal_revenue', { precision: 12, scale: 2 }),
   goalRoas: decimal('goal_roas', { precision: 5, scale: 2 }), // Target ROAS (e.g., 3.5 = 350%)
-
-  // ── CRM Investment Profile ──────────────────────────────────────────────────
-  crmRole: crmContactRoleEnum('crm_role'),                            // Owner, Broker, Investor, etc.
-  sourceType: varchar('source_type', { length: 50 }),                 // Referral, Conference, CoStar, etc.
-  linkedInUrl: varchar('linkedin_url', { length: 500 }),
-  targetAssetClasses: jsonb('target_asset_classes').$type<string[]>().default([]),
-  targetGeographies: jsonb('target_geographies').$type<string[]>().default([]),
-  dealSizeMin: numeric('deal_size_min', { precision: 15, scale: 2 }),
-  dealSizeMax: numeric('deal_size_max', { precision: 15, scale: 2 }),
-  returnCriteriaMin: numeric('return_criteria_min', { precision: 6, scale: 4 }), // min cap rate / IRR
-  investmentNotes: text('investment_notes'),
-  relationshipScore: integer('relationship_score').default(0),        // 0–100 computed score
-  lastContactedAt: timestamp('last_contacted_at'),
-  nextFollowupDate: date('next_followup_date'),
-  ndaOnFile: boolean('nda_on_file').default(false),
-  emailConsent: boolean('email_consent').default(false),
-  emailConsentDate: timestamp('email_consent_date'),
-  parentCompanyId: varchar('parent_company_id'),                      // Self-ref for hierarchy
-
-  // ── Listing & Deal Status ───────────────────────────────────────────────────
-  listingStatus: crmListingStatusEnum('listing_status').default('off_market'),
-  askingPrice: numeric('asking_price', { precision: 15, scale: 2 }),
-  lastSalePrice: numeric('last_sale_price', { precision: 15, scale: 2 }),
-  lastSaleDate: date('last_sale_date'),
-  // ── Geocode ─────────────────────────────────────────────────────────────────
-  latitude: numeric('latitude', { precision: 10, scale: 7 }),
-  longitude: numeric('longitude', { precision: 10, scale: 7 }),
-  // ── Environmental / Due Diligence Flags ─────────────────────────────────────
-  hasEnvIssues: boolean('has_env_issues').default(false),
-  hasTitleIssues: boolean('has_title_issues').default(false),
-  inFloodZone: boolean('in_flood_zone').default(false),
-  hasWetlands: boolean('has_wetlands').default(false),
-  // ── Marina-Specific ──────────────────────────────────────────────────────────
-  totalSlips: integer('total_slips'),
-  drySlips: integer('dry_slips'),
-  hasFuelDock: boolean('has_fuel_dock').default(false),
-  hasRepairYard: boolean('has_repair_yard').default(false),
-  waterDepthFt: numeric('water_depth_ft', { precision: 5, scale: 1 }),
-  dockMaterial: varchar('dock_material', { length: 100 }),
-  yearBuilt: integer('year_built'),
   ownerId: varchar('owner_id').references(() => users.id), // Campaign owner
   utmSource: text('utm_source'), // UTM tracking parameters
   utmMedium: text('utm_medium'),

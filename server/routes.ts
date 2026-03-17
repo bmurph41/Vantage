@@ -61,6 +61,7 @@ import crmTimelineRoutes from "./routes/crm-timeline-routes";
 import crmPreviewRoutes from "./routes/crm-preview-routes";
 import crmNotesRoutes from "./routes/crm-notes-routes";
 import crmSummaryRoutes from "./routes/crm-summary-routes";
+import crmRelationshipScoreRouter from './routes/crm-relationship-score';
 import crmSavedViewsRoutes from "./routes/crm-saved-views-routes";
 import crmAssociationsRoutes from "./routes/crm-associations-routes";
 import pipelineAnalyticsRoutes from "./routes/pipeline-analytics-routes";

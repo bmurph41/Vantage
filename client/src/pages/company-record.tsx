@@ -58,6 +58,14 @@ interface CompanyRecord {
   recentActivities: Array<{ id: string; type: string; subject: string; status: string; scheduledAt: string | null; completedAt: string | null }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
   rollups?: { lastActivityAt?: string; nextActivityAt?: string; openDealsCount?: number; pipelineValue?: number; engagementScore30d?: number };
+  // Institutional profile
+  companyType?: string | null;
+  aumRange?: string | null;
+  aumApprox?: string | null;
+  investmentMandate?: string | null;
+  ndaOnFile?: boolean;
+  ndaExpiryDate?: string | null;
+  targetAssetClasses?: string[] | null;
 }
 
 // ── Color maps ────────────────────────────────────────────
@@ -70,6 +78,27 @@ const industryColors: Record<string, string> = {
   finance: 'bg-amber-50 text-amber-700 border-amber-200',
   hospitality: 'bg-rose-50 text-rose-700 border-rose-200',
   construction: 'bg-orange-50 text-orange-700 border-orange-200',
+};
+
+const crmFirmTypeLabels: Record<string, string> = {
+  brokerage: 'Brokerage',
+  private_equity: 'Private Equity',
+  family_office: 'Family Office',
+  reit: 'REIT',
+  owner_operator: 'Owner-Operator',
+  debt_fund: 'Lender / Debt Fund',
+  syndicator: 'Syndicator',
+  property_management: 'Property Mgmt',
+  legal_title: 'Legal / Title',
+  government: 'Government',
+  other: 'Other',
+};
+
+const aumRangeLabels: Record<string, string> = {
+  under_10m: 'Under $10M',
+  '10m_100m': '$10M–$100M',
+  '100m_1b': '$100M–$1B',
+  over_1b: 'Over $1B',
 };
 
 const stageColors: Record<string, string> = {
@@ -185,6 +214,16 @@ export default function CompanyRecordPage() {
       )}
       status={company?.industry ? fmtLabel(company.industry) : undefined}
       statusColor={company?.industry ? industryColors[company.industry.toLowerCase()] || 'bg-gray-100 text-gray-700' : undefined}
+      statusExtra={company?.companyType ? (
+        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
+          {crmFirmTypeLabels[company.companyType] || company.companyType}
+        </Badge>
+      ) : undefined}
+      ndaBadge={company?.ndaOnFile ? (
+        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 gap-1">
+          <ShieldCheck className="h-3 w-3" />NDA
+        </Badge>
+      ) : undefined}
       owner={company?.owner}
       isLoading={isLoading}
       kpiChips={kpiChips}
@@ -265,6 +304,48 @@ function CompanyAboutSidebar({ company }: { company: CompanyRecord }) {
       )}
 
       {/* Portfolio */}
+      {/* Institutional Profile */}
+      {(company.companyType || company.aumRange || company.investmentMandate || company.targetAssetClasses?.length) && (
+        <RecordFieldGroup label="Institutional Profile" icon={TrendingUp}>
+          {company.companyType && (
+            <RecordField
+              label="Firm Type"
+              value={crmFirmTypeLabels[company.companyType] || company.companyType}
+              icon={Building2}
+            />
+          )}
+          {(company.aumRange || company.aumApprox) && (
+            <RecordField
+              label="AUM"
+              value={[
+                company.aumRange ? aumRangeLabels[company.aumRange] || company.aumRange : null,
+                company.aumApprox ? formatCurrency(company.aumApprox) : null,
+              ].filter(Boolean).join(' · ') || '—'}
+              icon={DollarSign}
+            />
+          )}
+          {company.targetAssetClasses && company.targetAssetClasses.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {company.targetAssetClasses.map(ac => (
+                <Badge key={ac} variant="secondary" className="text-[10px] capitalize">{ac.replace(/_/g, ' ')}</Badge>
+              ))}
+            </div>
+          )}
+          {company.investmentMandate && (
+            <RecordField label="Mandate" value={company.investmentMandate} icon={FileText} />
+          )}
+          {company.ndaOnFile && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+              <span className="text-xs text-green-700 font-medium">NDA on file</span>
+              {company.ndaExpiryDate && (
+                <span className="text-xs text-muted-foreground">· expires {company.ndaExpiryDate}</span>
+              )}
+            </div>
+          )}
+        </RecordFieldGroup>
+      )}
+
       {(company.isPortfolioCompany || company.portfolioCount) && (
         <RecordFieldGroup title="Portfolio" icon={Anchor}>
           {company.isPortfolioCompany && (

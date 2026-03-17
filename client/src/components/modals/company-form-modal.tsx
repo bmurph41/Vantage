@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X, User, Building, Star, MapPin, AlertTriangle, Check, AlertCircle } from "lucide-react";
+import { Plus, X, User, Building, Star, MapPin, AlertTriangle, Check, AlertCircle, TrendingUp, Shield } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AddressInput, type AddressComponents } from "@/components/address-input";
 import { StateSelect } from "@/components/ui/state-select";
@@ -77,6 +77,28 @@ const companyTypes = [
   { value: "other", label: "Other" },
 ];
 
+
+const creFirmTypes = [
+  { value: "brokerage", label: "Brokerage" },
+  { value: "private_equity", label: "Private Equity / REPE" },
+  { value: "family_office", label: "Family Office" },
+  { value: "reit", label: "REIT" },
+  { value: "owner_operator", label: "Owner-Operator" },
+  { value: "debt_fund", label: "Lender / Debt Fund" },
+  { value: "syndicator", label: "Syndicator" },
+  { value: "property_management", label: "Property Management Co." },
+  { value: "legal_title", label: "Legal / Title" },
+  { value: "government", label: "Government / Authority" },
+  { value: "other", label: "Other" },
+];
+
+const aumRangeOptions = [
+  { value: "under_10m", label: "Under $10M" },
+  { value: "10m_100m", label: "$10M – $100M" },
+  { value: "100m_1b", label: "$100M – $1B" },
+  { value: "over_1b", label: "Over $1B" },
+];
+
 const contactPositionOptions = [
   { value: "owner", label: "Owner" },
   { value: "investor", label: "Investor" },
@@ -120,6 +142,17 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
   const [isPortfolioCompany, setIsPortfolioCompany] = useState(false);
   const [capitalPartner, setCapitalPartner] = useState("");
   
+  // Institutional profile fields
+  const [crmFirmType, setCrmFirmType] = useState(company?.companyType ?? '');
+  const [aumRange, setAumRange] = useState((company as any)?.aumRange ?? '');
+  const [aumApprox, setAumApprox] = useState((company as any)?.aumApprox ? String((company as any).aumApprox) : '');
+  const [investmentMandate, setInvestmentMandate] = useState((company as any)?.investmentMandate ?? '');
+  const [ndaOnFile, setNdaOnFile] = useState((company as any)?.ndaOnFile ?? false);
+  const [linkedInUrlField, setLinkedInUrlField] = useState(company?.linkedInUrl ?? '');
+  const [targetAssetClassesStr, setTargetAssetClassesStr] = useState(
+    Array.isArray((company as any)?.targetAssetClasses) ? (company as any).targetAssetClasses.join(', ') : ''
+  );
+
   // Pending relationships for new companies
   const [pendingContacts, setPendingContacts] = useState<Array<{contact: Contact, role?: string}>>([]);
   const [pendingContactsToCreate, setPendingContactsToCreate] = useState<Array<{data: any, role?: string}>>([]);
@@ -256,6 +289,13 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       // Reset portfolio company fields
       setIsPortfolioCompany(company.isPortfolioCompany || false);
       setCapitalPartner(company.capitalPartner || "");
+      setCrmFirmType(company?.companyType ?? '');
+      setAumRange((company as any)?.aumRange ?? '');
+      setAumApprox((company as any)?.aumApprox ? String((company as any).aumApprox) : '');
+      setInvestmentMandate((company as any)?.investmentMandate ?? '');
+      setNdaOnFile((company as any)?.ndaOnFile ?? false);
+      setLinkedInUrlField(company?.linkedInUrl ?? '');
+      setTargetAssetClassesStr(Array.isArray((company as any)?.targetAssetClasses) ? (company as any).targetAssetClasses.join(', ') : '');
     } else {
       form.reset({
         name: "",
@@ -275,6 +315,13 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
       // Reset portfolio company fields
       setIsPortfolioCompany(false);
       setCapitalPartner("");
+      setCrmFirmType('');
+      setAumRange('');
+      setAumApprox('');
+      setInvestmentMandate('');
+      setNdaOnFile(false);
+      setLinkedInUrlField('');
+      setTargetAssetClassesStr('');
       // Reset pending relationships when creating a new company
       setPendingContacts([]);
       setPendingContactsToCreate([]);
@@ -296,6 +343,15 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         zipCode: zipCode.trim() || undefined,
         isPortfolioCompany,
         capitalPartner: isPortfolioCompany ? capitalPartner.trim() || undefined : undefined,
+        companyType: crmFirmType || undefined,
+        aumRange: aumRange || undefined,
+        aumApprox: aumApprox ? parseFloat(aumApprox) : undefined,
+        investmentMandate: investmentMandate.trim() || undefined,
+        ndaOnFile,
+        linkedInUrl: linkedInUrlField.trim() || undefined,
+        targetAssetClasses: targetAssetClassesStr.trim()
+          ? targetAssetClassesStr.split(',').map(s => s.trim()).filter(Boolean)
+          : undefined,
       };
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined) delete cleanData[key];
@@ -374,6 +430,15 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
         zipCode: zipCode.trim() || null,
         isPortfolioCompany,
         capitalPartner: isPortfolioCompany ? capitalPartner.trim() || null : null,
+        companyType: crmFirmType || null,
+        aumRange: aumRange || null,
+        aumApprox: aumApprox ? parseFloat(aumApprox) : null,
+        investmentMandate: investmentMandate.trim() || null,
+        ndaOnFile,
+        linkedInUrl: linkedInUrlField.trim() || null,
+        targetAssetClasses: targetAssetClassesStr.trim()
+          ? targetAssetClassesStr.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
       };
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "") cleanData[key] = null;
@@ -1067,6 +1132,100 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     </FormItem>
                   )}
                 />
+
+                {/* Institutional Profile Card */}
+                <Card className="border-blue-100 dark:border-blue-900">
+                  <CardHeader className="pb-2 pt-4 px-5">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-blue-600" />
+                      Institutional Profile
+                      <span className="text-xs font-normal text-muted-foreground">Optional — for investors, funds & brokerages</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">CRE Firm Type</Label>
+                        <Select value={crmFirmType} onValueChange={setCrmFirmType}>
+                          <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-cre-firm-type">
+                            <SelectValue placeholder="Select firm type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {creFirmTypes.map(t => (
+                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">AUM Range</Label>
+                        <Select value={aumRange} onValueChange={setAumRange}>
+                          <SelectTrigger className="h-9 bg-white dark:bg-slate-900" data-testid="select-aum-range">
+                            <SelectValue placeholder="Select AUM range" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {aumRangeOptions.map(o => (
+                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">AUM (approximate $)</Label>
+                        <Input
+                          value={aumApprox}
+                          onChange={e => setAumApprox(e.target.value.replace(/[^0-9.]/g, ''))}
+                          placeholder="e.g. 250000000"
+                          className="h-9 bg-white dark:bg-slate-900"
+                          data-testid="input-aum-approx"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">LinkedIn URL</Label>
+                        <Input
+                          value={linkedInUrlField}
+                          onChange={e => setLinkedInUrlField(e.target.value)}
+                          placeholder="https://linkedin.com/company/..."
+                          className="h-9 bg-white dark:bg-slate-900"
+                          data-testid="input-company-linkedin"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-2">
+                        <Label className="text-sm">Target Asset Classes</Label>
+                        <Input
+                          value={targetAssetClassesStr}
+                          onChange={e => setTargetAssetClassesStr(e.target.value)}
+                          placeholder="e.g. marina, multifamily, self_storage (comma-separated)"
+                          className="h-9 bg-white dark:bg-slate-900"
+                          data-testid="input-target-asset-classes"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-2">
+                        <Label className="text-sm">Investment Mandate</Label>
+                        <Textarea
+                          value={investmentMandate}
+                          onChange={e => setInvestmentMandate(e.target.value)}
+                          placeholder="Target returns, hold periods, geography, deal size requirements..."
+                          rows={2}
+                          className="resize-none bg-white dark:bg-slate-900"
+                          data-testid="textarea-investment-mandate"
+                        />
+                      </div>
+                      <div className="col-span-2 flex items-center gap-2">
+                        <Checkbox
+                          id="ndaOnFile"
+                          checked={ndaOnFile}
+                          onCheckedChange={v => setNdaOnFile(v === true)}
+                          data-testid="checkbox-nda-on-file"
+                        />
+                        <Label htmlFor="ndaOnFile" className="text-sm cursor-pointer flex items-center gap-1.5">
+                          <Shield className="h-3.5 w-3.5 text-green-600" />
+                          NDA on file
+                        </Label>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Portfolio Company Section */}
                 <Card className="border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-950/20">

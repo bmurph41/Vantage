@@ -18,6 +18,7 @@ import {
   CrmRecordPage, RecordFieldGroup, RecordField, AssociationCard, AssociationRow,
 } from '@/components/crm/CrmRecordPage';
 import { apiRequest } from '@/lib/queryClient';
+import { RelationshipScoreBadge } from '@/components/crm/RelationshipScoreBadge';
 import { useProspectingActivity } from '@/contexts/ProspectingActivityContext';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -64,9 +65,41 @@ interface ContactRecord {
   recentActivities: Array<{ id: string; type: string; subject: string; status: string; scheduledAt: string | null; completedAt: string | null; notes: string | null }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
   rollups?: { lastActivityAt?: string; nextActivityAt?: string; openDealsCount?: number; pipelineValue?: number; engagementScore30d?: number };
+  // Investment profile fields
+  crmRole?: string | null;
+  sourceType?: string | null;
+  linkedInUrl?: string | null;
+  targetAssetClasses?: string[] | null;
+  targetGeographies?: string[] | null;
+  dealSizeMin?: string | null;
+  dealSizeMax?: string | null;
+  investmentNotes?: string | null;
+  relationshipScore?: number | null;
+  nextFollowupDate?: string | null;
+  ndaOnFile?: boolean;
+  emailConsent?: boolean;
 }
 
 // ── Color maps ────────────────────────────────────────────
+
+const crmRoleLabels: Record<string, string> = {
+  owner: 'Owner', listing_broker: 'Listing Broker', buyers_broker: "Buyer's Broker",
+  property_manager: 'Property Manager', lender: 'Lender', attorney: 'Attorney',
+  appraiser: 'Appraiser', investor_lp: 'Investor (LP)', investor_gp: 'Investor (GP)',
+  family_office: 'Family Office', institutional_buyer: 'Institutional Buyer',
+  syndicator: 'Syndicator', government: 'Government', other: 'Other',
+};
+
+const crmRoleColors: Record<string, string> = {
+  owner: 'bg-purple-50 text-purple-700 border-purple-200',
+  listing_broker: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  buyers_broker: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  lender: 'bg-blue-50 text-blue-700 border-blue-200',
+  investor_lp: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  investor_gp: 'bg-violet-50 text-violet-700 border-violet-200',
+  family_office: 'bg-amber-50 text-amber-700 border-amber-200',
+  institutional_buyer: 'bg-teal-50 text-teal-700 border-teal-200',
+};
 
 const tagColors: Record<string, string> = {
   lead: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
@@ -152,7 +185,15 @@ export default function ContactRecordPage() {
     : undefined;
 
   // KPI chips for the highlights header
+  const relScoreChip = contact?.relationshipScore != null ? {
+    label: 'Relationship',
+    value: contact.relationshipScore >= 80 ? 'Hot' : contact.relationshipScore >= 60 ? 'Warm' : contact.relationshipScore >= 40 ? 'Lukewarm' : 'Cold',
+    icon: TrendingUp,
+    color: contact.relationshipScore >= 80 ? 'text-red-600' : contact.relationshipScore >= 60 ? 'text-amber-600' : contact.relationshipScore >= 40 ? 'text-blue-600' : 'text-gray-500',
+  } : null;
+
   const kpiChips = contact ? [
+    ...(relScoreChip ? [relScoreChip] : []),
     ...(contact.deals?.length ? [{
       label: 'Deals',
       value: contact.deals.length,
@@ -206,6 +247,11 @@ export default function ContactRecordPage() {
         </Avatar>
       )}
       status={contact?.contactTag ? fmtLabel(contact.contactTag) : contact?.leadStatus ? fmtLabel(contact.leadStatus) : undefined}
+      statusExtra={contact?.crmRole ? (
+        <Badge variant="outline" className={`text-xs ${crmRoleColors[contact.crmRole] || 'bg-gray-50 text-gray-700'}`}>
+          {crmRoleLabels[contact.crmRole] || contact.crmRole}
+        </Badge>
+      ) : undefined}
       statusColor={
         contact?.contactTag ? tagColors[contact.contactTag] || 'bg-gray-100 text-gray-700'
         : contact?.leadStatus ? leadStatusColors[contact.leadStatus] || 'bg-gray-100 text-gray-700'
@@ -214,6 +260,12 @@ export default function ContactRecordPage() {
       owner={contact?.owner}
       isLoading={isLoading}
       kpiChips={kpiChips}
+      belowHeader={{contact.nextFollowupDate && (
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+          <Clock className="h-3 w-3" />
+          Follow-up: {fmtDate(contact.nextFollowupDate)}
+        </div>
+      )}}
       nextActivity={nextActivity}
 
       // ── LEFT: About Sidebar ──
@@ -268,10 +320,52 @@ function ContactAboutSidebar({ contact }: { contact: ContactRecord }) {
         <RecordField label="Position" value={contact.position} icon={Briefcase} />
         <RecordField label="Company" value={contact.company || contact.primaryCompany?.name} icon={Building2} />
         {contact.role && <RecordField label="Role" value={fmtLabel(contact.role)} icon={Tag} />}
+        {contact.crmRole && <RecordField label="CRE Role" value={crmRoleLabels[contact.crmRole] || fmtLabel(contact.crmRole)} icon={Target} />}
+        {contact.sourceType && <RecordField label="Source" value={fmtLabel(contact.sourceType)} icon={Zap} />}
+        {contact.linkedInUrl && (
+          <RecordField label="LinkedIn" value={
+            <a href={contact.linkedInUrl} target="_blank" rel="noopener noreferrer"
+              className="text-blue-600 hover:underline flex items-center gap-1">
+              View Profile <ExternalLink className="h-3 w-3" />
+            </a>
+          } icon={Linkedin} />
+        )}
         {contact.contactType && <RecordField label="Type" value={fmtLabel(contact.contactType)} icon={Hash} />}
       </RecordFieldGroup>
 
       {/* Lead Info */}
+      {(contact.crmRole === 'investor_lp' || contact.crmRole === 'investor_gp' || contact.crmRole === 'family_office' || contact.crmRole === 'institutional_buyer' || contact.targetAssetClasses?.length || contact.dealSizeMin || contact.investmentNotes) && (
+        <RecordFieldGroup label="Investment Profile" icon={TrendingUp}>
+          {(contact.dealSizeMin || contact.dealSizeMax) && (
+            <RecordField
+              label="Deal Size Range"
+              value={[
+                contact.dealSizeMin ? formatCurrency(parseFloat(contact.dealSizeMin)) : null,
+                contact.dealSizeMax ? formatCurrency(parseFloat(contact.dealSizeMax)) : null,
+              ].filter(Boolean).join(' – ') || '—'}
+              icon={DollarSign}
+            />
+          )}
+          {contact.targetAssetClasses && contact.targetAssetClasses.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {contact.targetAssetClasses.map(ac => (
+                <Badge key={ac} variant="secondary" className="text-xs capitalize">{ac.replace(/_/g, ' ')}</Badge>
+              ))}
+            </div>
+          )}
+          {contact.targetGeographies && contact.targetGeographies.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {contact.targetGeographies.map(g => (
+                <Badge key={g} variant="outline" className="text-xs">{g}</Badge>
+              ))}
+            </div>
+          )}
+          {contact.investmentNotes && (
+            <RecordField label="Notes" value={contact.investmentNotes} icon={FileText} />
+          )}
+        </RecordFieldGroup>
+      )}
+
       {(contact.leadStatus || contact.leadScore || contact.leadSource) && (
         <RecordFieldGroup title="Lead Info" icon={Target}>
           {contact.leadStatus && (
