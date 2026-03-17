@@ -1,128 +1,103 @@
-# MarinaMatch Development Journal
+# MarinaMatch Platform Journal
 
-## Project Overview
-Full-stack CRE investment analysis and deal management platform. TypeScript/React frontend, Node.js/Express backend, PostgreSQL with Drizzle ORM, TanStack Query. 55+ asset classes. Modules: Financial Modeling, CRM, Due Diligence, Document Intelligence, Deal Workspace.
+## Current State (2026-03-17)
 
-**Test org:** `cd3719c3-ef82-4ccc-acb9-261c80fb64b4`  
-**Test project ID:** `6b3a9021-f393-489d-9274-321ac76eae08` (STR)
+### ✅ COMPLETE — CRM Record Pages (10x upgrade)
+All 4 record pages rebuilt with institutional 3-column CrmRecordPage layout.
 
----
+**Contact Record** (7 tabs): Timeline, Deals (pipeline chart), Properties, Activities, Models, Intel (DockTalk), Notes
+**Company Record** (8 tabs): Timeline, Portfolio (pie+bar charts), Contacts, Deals, Activities, Models, Intel, Notes
+**Property Record** (9 tabs): Timeline, Storage, Sales Comps (chart+cards), Rate Comps (chart+cards), Activities, Deals, Intel, Notes, Price History
+**Deal Record** (7 tabs): Timeline, Overview (KPI tiles, workspace links, dates), Activities, FM, Comps, Intel, Notes
 
-## Current State (as of 2026-03-17)
+New components:
+- client/src/components/crm/ContactRecordTabs.tsx
+- client/src/components/crm/CompanyRecordTabs.tsx
+- client/src/components/crm/PropertyRecordTabs.tsx
+- client/src/components/crm/PropertyFMPanel.tsx
+- client/src/components/crm/PropertyCompsPanel.tsx
+- client/src/components/crm/RelationshipScoreBadge.tsx
 
-### Phase 3 DCF Refactor — COMPLETE ✅
-- Layers 1–4 done: DCF consumes canonical Multi-Year Pro Forma engine
-- Monte Carlo simulation, Decision Support (tornado chart, OLS attribution, IC memo) implemented
-- 154/154 tests pass, zero TypeScript errors
-- Dummy data purged, empty states added, XIRR consolidated
-- assumptions.tsx dynamic via getModelConfig()
-- **Remaining:** frontend visual QA + feature gating (post-billing)
-
-### CRM Institutional Upgrade — COMPLETE ✅ (2026-03-17)
-Full audit + patch session. All patches applied and server running clean.
-
-#### Schema (applied via raw SQL — never use db:push)
-New enums: crm_contact_role, crm_company_type, crm_aum_range, crm_listing_status
-- crm_contacts: crmRole, sourceType, linkedInUrl, targetAssetClasses, targetGeographies, dealSizeMin/Max, investmentNotes, relationshipScore, lastContactedAt, nextFollowupDate, ndaOnFile, emailConsent
+### ✅ COMPLETE — CRM Schema (new columns)
+Applied via raw psql (never db:push):
+- crm_contacts: crmRole, sourceType, linkedInUrl, relationshipScore, lastContactedAt, nextFollowupDate, ndaOnFile, emailConsent, dealSizeMin/Max, investmentNotes, targetAssetClasses, targetGeographies
 - crm_companies: companyType, aumRange, aumApprox, investmentMandate, ndaOnFile, ndaExpiryDate, linkedInUrl, parentCompanyId, targetAssetClasses
 - crm_properties: listingStatus, askingPrice, lastSalePrice, lastSaleDate, latitude, longitude, totalSlips, drySlips, hasFuelDock, waterDepthFt, dockMaterial, yearBuilt
 
-#### Frontend Files Patched
-- PropertyFMPanel.tsx — NEW, financial model panel on property records
-- PropertyCompsPanel.tsx — NEW, sales + rate comps on property records
-- RelationshipScoreBadge.tsx — NEW, A/B/C/D tier badge
-- contact-form-modal.tsx — Investment Profile card (CRE role, source, LinkedIn, deal size)
-- contact-record.tsx — crmRole badge, investment section, rel score KPI chip
-- contacts.tsx — Strength column + CRE Role filter
-- company-form-modal.tsx — Institutional Profile card (firm type, AUM, mandate, NDA)
-- company-record.tsx — firm type + NDA badges, institutional profile sidebar
-- companies.tsx — Firm Type filter, dual badge on industry column
-- properties.tsx — full listing status filter + color badges
-- property-record.tsx — listingStatus header badge + KPI chip, lat/lng in interface
-- property-form-modal.tsx — 9-option status dropdown + Listing Price field
+### ✅ COMPLETE — CRM Server Routes
+- server/routes/crm-relationship-score.ts — score endpoint, bulk scores, stale contacts
+- server/routes/crm-activities-routes.ts — auto-updates last_contacted_at on activity create/complete
+- /api/crm/search — global search across contacts/companies/properties/deals (powers ⌘K)
 
-#### Server Files Patched
-- crm-relationship-score.ts — NEW, score endpoint + bulk + stale contacts
-- crm-activities-routes.ts — auto-update last_contacted_at on activity create
+### ✅ COMPLETE — DD Project Page
+Added Overview tab as default landing (was Tasks & Timeline):
+- 4 KPI tiles: Total/Completed/InProgress/Overdue tasks
+- Overall progress bar
+- Key dates countdown (PSA Signed, DD Expiration urgent <7d, Closing)
+- Progress by category (title/ESA/financial/legal/etc)
+- CRM cross-link to originating deal
+- KpisOverview + FindingsManager surfaced (were imported but unused)
+- All existing tabs (Tasks & Timeline, Documents, DD Request, etc.) unchanged
 
----
+### ✅ COMPLETE — Analytics Pages
+All CRM analytics pages assessed — fully built, no work needed:
+- pipeline.tsx (1078 lines) — full DnD Kanban
+- forecast.tsx (787 lines) — pipeline forecasting engine
+- scoring.tsx (756 lines) — lead scoring with websockets
+- PipelineInsights.tsx (484 lines) — AI pipeline insights
+- PipelineVelocity.tsx (500 lines) — velocity metrics with date ranges
+- DealAnalyticsPage.tsx — wrapper for PipelineAnalyticsDashboard
 
-## Key Gotchas
-
-- **db:push is dangerous** — use raw psql ADD COLUMN IF NOT EXISTS instead
-- **routes.ts does not auto-restart** — kill and restart server manually after changes
-- **Use pool.query() not Drizzle ORM** for enableRLS tables
-- **Raw SQL returns snake_case** — requires explicit camelCase mapping
-- **tsc OOM on full project** — use skipLibCheck on specific files only
-- **pkill -f 'tsx server'** to kill dev server (fuser not available on this system)
-- **Patching pattern:** node --input-type=module heredoc scripts
-
----
-
-## Architecture Notes
-
-- Schema: shared/schema.ts (~10,000+ lines)
-- Routes: server/routes.ts (~23,000 lines) — use surgical Node.js scripts, not manual edits
-- CRM summary: server/routes/crm-summary-routes.ts
-- Activities: server/routes/crm-activities-routes.ts
-- Relationship score: server/routes/crm-relationship-score.ts
-- Storage: server/storage.ts (8582 lines)
-- Asset class config: platform_asset_classes table, varchar-based enums
+### ✅ COMPLETE — DCF Refactor (Phase 3, Layers 1–4)
+- DCF consumes canonical Multi-Year Pro Forma engine
+- Monte Carlo simulation implemented
+- Decision Support tools: tornado chart, OLS attribution, IC memo generator
+- 154/154 tests passing, zero TypeScript errors
+- assumptions.tsx dynamic via getModelConfig()
+- XIRR consolidated, seasonality auto-derived, dummy data purged
 
 ---
 
-## Remaining Work (prioritized)
+## Active Technical Patterns
 
-### High Priority
-1. Company portfolio panel — replace portfolioCount with full linked-properties panel on company record
-2. next_followup_date reminder widget — surface on CRM dashboard/contact list
-3. ⌘K search UX test — verify /api/crm/search returns results in browser
-
-### Medium Priority
-4. Bulk CSV import for contacts
-5. last_contacted_at backfill — SQL to backfill from existing activity history
-6. Property form lat/lng geocode — auto-populate from address for comp radius queries
-
-### Lower Priority
-7. Frontend visual QA — DCF tabs, FM design system consistency
-8. Feature gating — post-billing tier enforcement
-9. Relationship score backfill — compute scores for existing contacts
+**DB changes**: Always `psql $DATABASE_URL` with `ADD COLUMN IF NOT EXISTS` — never `npm run db:push`
+**Kill server**: `pkill -f 'tsx server'`
+**Patch pattern**: `node --input-type=module << 'JS'` heredoc for file edits
+**RLS tables**: Use raw `pool.query()` not Drizzle ORM
+**Raw SQL returns**: snake_case — map explicitly
+**Test project**: ID `6b3a9021-f393-489d-9274-321ac76eae08`, org `cd3719c3-ef82-4ccc-acb9-261c80fb64b4`
 
 ---
 
-## Session Log
+## Remaining Work (priority order)
 
-### 2026-03-17 — CRM Institutional Audit + Full Patch Session
-- Full audit: 14 critical gaps, 23 high-priority gaps identified
-- Schema patched via raw SQL (safe, no data loss)
-- All frontend + server patches applied
-- CRM grade: C+ to B+ across all modules
-- Server running clean; Docket 403/405 errors are pre-existing noise from paywalled sources
+### 1. Feature Gating (HIGH — needed before real users)
+357 server + 204 client billing references exist. FM tabs and advanced CRM
+features are not gated yet. Billing infrastructure exists; needs enforcement layer.
 
-### Earlier
-- Phase 3 DCF Refactor (Layers 1-4) complete
-- FM Design System v2 across 9 tabs
-- Multi-Year Pro Forma engine as canonical source of truth
-- Investment document generation (IC Memo, DD Packet, OM, Executive Summary)
-- P&L parser v2 with geometry-based PDF extraction
-- CRM upgraded: 3-column records, PreviewDrawer, timeline, KPI chips
-- Exit Strategy Studio refactored to canonical exit-scenario-engine
-- Debt modeling: LTV/dollar toggles, DSCR timelines
+### 2. Real Data Import (HIGH — platform is data-ready)
+Sales Comps: /analysis/sales-comps/upload
+Rate Comps: /analysis/rate-comps
+Empty state CTAs now point directly to these flows.
 
-### 2026-03-17 — 10x CRM Record Pages session
-All 4 record pages upgraded to institutional-grade with rich tab content.
+### 3. CRM Dashboard Assessment (MEDIUM)
+crm-dashboard.tsx exists but not assessed. May need upgrade to match
+new record page quality. Check /crm root route.
 
-**Files added:**
-- client/src/components/crm/ContactRecordTabs.tsx
-- client/src/components/crm/CompanyRecordTabs.tsx  
-- client/src/components/crm/PropertyRecordTabs.tsx
+### 4. last_contacted_at Backfill (LOW — only 1 contact in DB now)
+SQL: UPDATE crm_contacts SET last_contacted_at = (
+  SELECT MAX(created_at) FROM crm_activities
+  WHERE entity_type='contact' AND entity_id=crm_contacts.id
+) WHERE org_id = '...';
 
-**Contact Record tabs:** Deals (chart), Properties, Activities, Models, Intel, Notes
-**Company Record tabs:** Portfolio (charts), Contacts, Deals (chart), Activities, Models, Intel, Notes
-**Property Record tabs:** Storage, Sales Comps (chart), Rate Comps (chart), Activities, Deals, Intel, Notes, Price History
-**Deal Record:** Full CrmRecordPage rebuild — Overview, Activities (chart), FM, Comps, Intel, Notes
+### 5. Frontend Visual QA (LOW)
+DCF tabs, FM design system consistency — post-billing.
 
-**Remaining work:**
-- Verify browser rendering on all 4 record types
-- Add data to test: create a comp or two to see charts populate
-- CRM summary route for deals is thin — consider expanding to return more fields
+### 6. Property Form Geocoding (LOW)
+Auto-populate lat/lng from address for comp radius queries.
+
+---
+
+## Session Instruction
+At the start of every MarinaMatch session, run:
+  cat ~/workspace/MARINAMATCH_JOURNAL.md

@@ -6,7 +6,7 @@ import {
   Caravan, Hotel, MoreHorizontal, Briefcase, Scale, Zap, Shield, Building,
   CreditCard, Key, Megaphone, RotateCcw, ChevronDown, ChevronUp, TrendingUp, 
   Receipt, PieChart, Globe, Layers, Sparkles, LucideIcon, Container, MapPin,
-  Minus, Plus, Copy, ArrowRight
+  Minus, Plus, Copy, ArrowRight, Home, Car
 } from 'lucide-react';
 import { getModelConfig } from "@shared/asset-class-model-config";
 import {
