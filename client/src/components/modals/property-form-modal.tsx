@@ -43,10 +43,16 @@ const propertyTypes = [
 ];
 
 const propertyStatuses = [
-  { value: "target", label: "Target" },
-  { value: "for_sale", label: "For Sale" },
-  { value: "under_loi", label: "Under LOI" },
+  { value: "off_market",     label: "Off Market" },
+  { value: "on_market",      label: "On Market" },
+  { value: "under_loi",      label: "Under LOI" },
   { value: "under_contract", label: "Under Contract" },
+  { value: "closed",         label: "Closed" },
+  { value: "portfolio",      label: "Portfolio" },
+  { value: "watchlist",      label: "Watchlist" },
+  // Legacy
+  { value: "target",         label: "Target (legacy)" },
+  { value: "for_sale",       label: "For Sale (legacy)" },
 ];
 
 const relationshipTypes = [
@@ -281,6 +287,8 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   const [lastSaleMonth, setLastSaleMonth] = useState("");
   const [lastSaleYear, setLastSaleYear] = useState("");
   const [lastSalePrice, setLastSalePrice] = useState("");
+  const [listingPrice, setListingPrice] = useState("");
+  const [listingStatus, setListingStatus] = useState("");
 
   const form = useForm({
     resolver: zodResolver(insertPropertySchema.extend({
@@ -336,6 +344,8 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setLastSaleMonth(propAny.lastSaleMonth?.toString() || "");
       setLastSaleYear(propAny.lastSaleYear?.toString() || "");
       setLastSalePrice(propAny.lastSalePrice?.toString() || "");
+      setListingPrice(propAny.listingPrice?.toString() || "");
+      setListingStatus(propAny.listingStatus || property.status || "");
     } else {
       form.reset({
         title: "",
@@ -360,6 +370,691 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setLastSaleMonth("");
       setLastSaleYear("");
       setLastSalePrice("");
+      setListingPrice("");
+      setListingStatus("");
+      setStorageEntries([]);
+      setTouched(false);
+    }
+  }, [property, isOpen]);
+
+  // Load storage entries from server when editing
+  useEffect(() => {
+    if (existingStorageEntries.length > 0) {
+      setStorageEntries(existingStorageEntries.map(entry => ({
+        id: entry.id,
+        storageType: entry.storageTypeName, // API returns storageTypeName
+        capacity: entry.capacity?.toString() || "",
+        occupied: entry.occupied?.toString() || "",
+        rate: entry.rate?.toString() || "",
+        rateType: (entry.rateType as "monthly" | "annual") || "monthly",
+      })));
+    }
+  }, [existingStorageEntries]);
+
+  // Storage entry management functions
+  const addStorageEntry = (storageType: string) => {
+    if (!storageType.trim()) return;
+    if (storageEntries.some(e => e.storageType.toLowerCase() === storageType.toLowerCase())) {
+      toast({ title: "Storage type already added", variant: "destructive" });
+      return;
+    }
+    setStorageEntries([...storageEntries, {
+      storageType: storageType.trim(),
+      capacity: "",
+      occupied: "",
+      rate: "",
+      rateType: "monthly",
+    }]);
+    setCustomStorageType("");
+  };
+
+  const removeStorageEntry = (index: number) => {
+    setStorageEntries(storageEntries.filter((_, i) => i !== index));
+  };
+
+  const updateStorageEntry = (index: number, field: keyof StorageEntryRow, value: string) => {
+    const updated = [...storageEntries];
+    updated[index] = { ...updated[index], [field]: value };
+    setStorageEntries(updated);
+  };
+
+  // Save storage entries mutation
+  const saveStorageEntriesMutation = useMutation({
+    mutationFn: async (propertyId: string) => {
+      const entries = storageEntries.map(e => ({
+        storageTypeName: e.storageType, // API expects storageTypeName
+        capacity: e.capacity ? parseInt(e.capacity) : null,
+        occupied: e.occupied ? parseInt(e.occupied) : null,
+        rate: e.rate ? e.rate : null,
+        rateType: e.rateType,
+      }));
+      return await apiRequest('PUT', `/api/properties/${propertyId}/storage-entries`, { entries });
+    },
+    onSuccess: (_, propertyId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', propertyId, 'storage-entries'] });
+    },
+  });
+
+  const createPropertyMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Store non-capacity specs in specifications object
+      const specifications: Record<string, string> = {};
+      if (totalAcres) specifications.totalAcres = totalAcres;
+      if (waterDepth) specifications.waterDepth = waterDepth;
+      if (linearFeet) specifications.linearFeet = linearFeet;
+      if (yearBuilt) specifications.yearBuilt = yearBuilt;
+
+      const cleanData: Record<string, any> = { 
+        ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+        specifications: Object.keys(specifications).length > 0 ? specifications : {},
+      };
+      
+      // Add storage capacity to top-level fields (matching crmProperties schema)
+      if (wetSlips) cleanData.wetSlips = parseInt(wetSlips);
+      if (drySlips) cleanData.drySlips = parseInt(drySlips);
+      if (moorings) cleanData.moorings = parseInt(moorings);
+      if (totalCapacity) cleanData.totalCapacity = parseInt(totalCapacity);
+      
+      // Add sale history fields (ensure proper types for backend)
+      if (lastSaleMonth) cleanData.lastSaleMonth = parseInt(lastSaleMonth);
+      if (lastSaleYear) cleanData.lastSaleYear = parseInt(lastSaleYear);
+      if (lastSalePrice) {
+        const parsedPrice = parseFloat(lastSalePrice);
+        if (!isNaN(parsedPrice)) cleanData.lastSalePrice = parsedPrice.toFixed(2);
+      }
+      
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key] === "" || cleanData[key] === undefined) {
+          delete cleanData[key];
+        }
+      });
+      
+      const result = await apiRequest('POST', '/api/properties', cleanData);
+      const createdProperty = await result.json();
+      // Save storage entries for the new property
+      if (storageEntries.length > 0 && createdProperty?.id) {
+        await saveStorageEntriesMutation.mutateAsync(createdProperty.id);
+      }
+      return createdProperty;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      toast({ title: "Property created successfully" });
+      onClose();
+      form.reset();
+      setWetSlips("");
+      setDrySlips("");
+      setMoorings("");
+      setTotalCapacity("");
+      setTotalAcres("");
+      setWaterDepth("");
+      setLinearFeet("");
+      setYearBuilt("");
+      setStorageEntries([]);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create property", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const updatePropertyMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Store non-capacity specs in specifications object
+      const specifications: Record<string, string> = {};
+      if (totalAcres) specifications.totalAcres = totalAcres;
+      if (waterDepth) specifications.waterDepth = waterDepth;
+      if (linearFeet) specifications.linearFeet = linearFeet;
+      if (yearBuilt) specifications.yearBuilt = yearBuilt;
+
+      const cleanData: Record<string, any> = { 
+        ...data,
+        address: address.trim() || undefined,
+        city: city.trim() || undefined,
+        state: state.trim() || undefined,
+        zipCode: zipCode.trim() || undefined,
+        specifications: Object.keys(specifications).length > 0 ? specifications : {},
+      };
+      
+      // Add storage capacity to top-level fields (matching crmProperties schema)
+      if (wetSlips) cleanData.wetSlips = parseInt(wetSlips);
+      if (drySlips) cleanData.drySlips = parseInt(drySlips);
+      if (moorings) cleanData.moorings = parseInt(moorings);
+      if (totalCapacity) cleanData.totalCapacity = parseInt(totalCapacity);
+      
+      // Add sale history fields (ensure proper types for backend)
+      if (lastSaleMonth) cleanData.lastSaleMonth = parseInt(lastSaleMonth);
+      if (lastSaleYear) cleanData.lastSaleYear = parseInt(lastSaleYear);
+      if (lastSalePrice) {
+        const parsedPrice = parseFloat(lastSalePrice);
+        if (!isNaN(parsedPrice)) cleanData.lastSalePrice = parsedPrice.toFixed(2);
+      }
+      
+      Object.keys(cleanData).forEach(key => {
+        if (cleanData[key] === "" || cleanData[key] === undefined) {
+          delete cleanData[key];
+        }
+      });
+      
+      await apiRequest('PUT', `/api/properties/${property!.id}`, cleanData);
+      // Save storage entries for this property
+      await saveStorageEntriesMutation.mutateAsync(property!.id);
+      return property;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      toast({ title: "Property updated successfully" });
+      onClose();
+      setStorageEntries([]);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update property", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const onSubmit = (data: any) => {
+    setTouched(true);
+    
+    // Validate required address fields using computed errors
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+    
+    if (property) {
+      updatePropertyMutation.mutate(data);
+    } else {
+      createPropertyMutation.mutate(data);
+    }
+  };
+
+  const isLoading = createPropertyMutation.isPending || updatePropertyMutation.isPending;
+
+  const handlePrimaryClick = () => {
+    formRef.current?.requestSubmit();
+  };
+
+  return (
+    <StandardDialogShell
+      open={isOpen}
+      onOpenChange={onClose}
+      title={property ? 'Edit Property' : 'Add New Property'}
+      icon={MapPin}
+      size="lg"
+      showProgressBar={true}
+      primaryAction={{
+        label: property ? "Update" : "Create",
+        onClick: handlePrimaryClick,
+        disabled: isLoading,
+        loading: isLoading,
+      }}
+      secondaryAction={{
+        label: "Back",
+        onClick: onClose,
+        disabled: isLoading,
+      }}
+    >
+      <Form {...form}>
+        <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="property-form-modal">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Property Name *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Property Name" className="bg-white dark:bg-slate-900" {...field} data-testid="input-property-title" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Property Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-property-type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {propertyTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Deal Status</FormLabel>
+                      <Select onValueChange={(v) => { field.onChange(v); setListingStatus(v); }} value={listingStatus || field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white dark:bg-slate-900" data-testid="select-property-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {propertyStatuses.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Listing Price */}
+                <FormItem>
+                  <FormLabel>Asking / Listing Price</FormLabel>
+                  <Input
+                    value={listingPrice}
+                    onChange={e => setListingPrice(e.target.value)}
+                    placeholder="e.g. 4500000"
+                    className="bg-white dark:bg-slate-900"
+                    data-testid="input-listing-price"
+                  />
+                </FormItem>eState, useEffect, useRef, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { StandardDialogShell } from "@/components/ui/standard-dialog-shell";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, X, User, Building, Link2, Search, MapPin } from "lucide-react";
+import { AddressInput, type AddressComponents } from "@/components/address-input";
+import { StateSelect } from "@/components/ui/state-select";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { insertPropertySchema, type Property, type Contact, type Company, PREDEFINED_CRM_STORAGE_TYPES, type CrmPropertyStorageEntry } from "@shared/schema";
+
+// Local type for form storage entries (before saving to DB)
+interface StorageEntryRow {
+  id?: string;
+  storageType: string;
+  capacity: string;
+  occupied: string;
+  rate: string;
+  rateType: "monthly" | "annual";
+}
+
+interface PropertyFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  property: Property | null;
+}
+
+const propertyTypes = [
+  { value: "marina", label: "Marina" },
+  { value: "boat_yard", label: "Boat Yard" },
+  { value: "marina_yard", label: "Marina & Yard" },
+];
+
+const propertyStatuses = [
+  { value: "off_market",     label: "Off Market" },
+  { value: "on_market",      label: "On Market" },
+  { value: "under_loi",      label: "Under LOI" },
+  { value: "under_contract", label: "Under Contract" },
+  { value: "closed",         label: "Closed" },
+  { value: "portfolio",      label: "Portfolio" },
+  { value: "watchlist",      label: "Watchlist" },
+  // Legacy
+  { value: "target",         label: "Target (legacy)" },
+  { value: "for_sale",       label: "For Sale (legacy)" },
+];
+
+const relationshipTypes = [
+  { value: "owner", label: "Owner" },
+  { value: "buyer", label: "Buyer" },
+  { value: "seller", label: "Seller" },
+  { value: "broker", label: "Broker" },
+  { value: "agent", label: "Agent" },
+  { value: "investor", label: "Investor" },
+  { value: "tenant", label: "Tenant" },
+  { value: "other", label: "Other" },
+];
+
+type LinkedContact = {
+  id: string;
+  contactId: string;
+  propertyId: string;
+  relationship?: string | null;
+  contact?: Contact | null;
+};
+
+type LinkedCompany = {
+  id: string;
+  companyId: string;
+  propertyId: string;
+  relationship?: string | null;
+  company?: Company | null;
+};
+
+export default function PropertyFormModal({ isOpen, onClose, property }: PropertyFormModalProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [contactSearch, setContactSearch] = useState("");
+  const [companySearch, setCompanySearch] = useState("");
+  const [selectedContactRelationship, setSelectedContactRelationship] = useState("owner");
+  const [selectedCompanyRelationship, setSelectedCompanyRelationship] = useState("owner");
+  const [showContactSearch, setShowContactSearch] = useState(false);
+  const [showCompanySearch, setShowCompanySearch] = useState(false);
+  
+  // Dynamic storage entries state
+  const [storageEntries, setStorageEntries] = useState<StorageEntryRow[]>([]);
+  const [customStorageType, setCustomStorageType] = useState("");
+  
+  // Validation state
+  const [touched, setTouched] = useState(false);
+
+  // Fetch existing storage entries (for edit mode)
+  const { data: existingStorageEntries = [] } = useQuery<CrmPropertyStorageEntry[]>({
+    queryKey: ['/api/properties', property?.id, 'storage-entries'],
+    queryFn: async () => {
+      const res = await fetch(`/api/properties/${property?.id}/storage-entries`);
+      if (!res.ok) throw new Error('Failed to fetch storage entries');
+      return res.json();
+    },
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch linked contacts (for edit mode)
+  const { data: linkedContacts = [], refetch: refetchLinkedContacts } = useQuery<LinkedContact[]>({
+    queryKey: [`/api/properties/${property?.id}/contacts`],
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch linked companies (for edit mode)
+  const { data: linkedCompanies = [], refetch: refetchLinkedCompanies } = useQuery<LinkedCompany[]>({
+    queryKey: [`/api/properties/${property?.id}/companies`],
+    enabled: isOpen && !!property?.id,
+  });
+
+  // Fetch all contacts for search
+  const { data: allContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts'],
+    enabled: isOpen && showContactSearch,
+  });
+
+  // Fetch all companies for search
+  const { data: allCompanies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: isOpen && showCompanySearch,
+  });
+
+  // Link contact mutation - also links the contact's company automatically
+  const linkContactMutation = useMutation({
+    mutationFn: async ({ contactId, relationship }: { contactId: string; relationship: string }) => {
+      const result = await apiRequest('POST', `/api/properties/${property!.id}/contacts`, { contactId, relationship });
+      
+      // Auto-link the contact's company if they have one
+      try {
+        const contactCompaniesRes = await fetch(`/api/contacts/${contactId}/companies`);
+        if (contactCompaniesRes.ok) {
+          const contactCompanies = await contactCompaniesRes.json();
+          if (contactCompanies.length > 0) {
+            const primaryCompany = contactCompanies.find((cc: any) => cc.isPrimary) || contactCompanies[0];
+            if (primaryCompany?.companyId) {
+              // Check if company is not already linked
+              const alreadyLinked = linkedCompanies.some(lc => lc.companyId === primaryCompany.companyId);
+              if (!alreadyLinked) {
+                await apiRequest('POST', `/api/properties/${property!.id}/companies`, { 
+                  companyId: primaryCompany.companyId, 
+                  relationship 
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Silently ignore auto-link failure - contact was still linked
+      }
+      
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/contacts`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/companies`] });
+      setShowContactSearch(false);
+      setContactSearch("");
+      toast({ title: "Contact linked successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to link contact", variant: "destructive" });
+    },
+  });
+
+  // Link company mutation - also links the company's primary contact automatically
+  const linkCompanyMutation = useMutation({
+    mutationFn: async ({ companyId, relationship }: { companyId: string; relationship: string }) => {
+      const result = await apiRequest('POST', `/api/properties/${property!.id}/companies`, { companyId, relationship });
+      
+      // Auto-link the company's primary contact if they have one
+      try {
+        const companyContactsRes = await fetch(`/api/companies/${companyId}/contacts`);
+        if (companyContactsRes.ok) {
+          const companyContacts = await companyContactsRes.json();
+          if (companyContacts.length > 0) {
+            const primaryContact = companyContacts.find((cc: any) => cc.isPrimary) || companyContacts[0];
+            if (primaryContact?.contactId) {
+              // Check if contact is not already linked
+              const alreadyLinked = linkedContacts.some(lc => lc.contactId === primaryContact.contactId);
+              if (!alreadyLinked) {
+                await apiRequest('POST', `/api/properties/${property!.id}/contacts`, { 
+                  contactId: primaryContact.contactId, 
+                  relationship 
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Silently ignore auto-link failure - company was still linked
+      }
+      
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/companies`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/contacts`] });
+      setShowCompanySearch(false);
+      setCompanySearch("");
+      toast({ title: "Company linked successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to link company", variant: "destructive" });
+    },
+  });
+
+  // Unlink contact mutation
+  const unlinkContactMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      return await apiRequest('DELETE', `/api/properties/${property!.id}/contacts/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/contacts`] });
+      toast({ title: "Contact unlinked" });
+    },
+  });
+
+  // Unlink company mutation
+  const unlinkCompanyMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      return await apiRequest('DELETE', `/api/properties/${property!.id}/companies/${linkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property!.id}/companies`] });
+      toast({ title: "Company unlinked" });
+    },
+  });
+
+  // Filter contacts for search
+  const filteredContacts = allContacts.filter(contact => {
+    if (!contactSearch) return true;
+    const searchLower = contactSearch.toLowerCase();
+    const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase();
+    return fullName.includes(searchLower) || contact.email?.toLowerCase().includes(searchLower);
+  }).filter(contact => !linkedContacts.some(lc => lc.contactId === contact.id));
+
+  // Filter companies for search
+  const filteredCompanies = allCompanies.filter(company => {
+    if (!companySearch) return true;
+    const searchLower = companySearch.toLowerCase();
+    return company.name?.toLowerCase().includes(searchLower);
+  }).filter(company => !linkedCompanies.some(lc => lc.companyId === company.id));
+
+  // Address fields state
+  const [address, setAddress] = useState("");
+  const [unit, setUnit] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zipCode, setZipCode] = useState("");
+
+  // Address field errors
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (!address.trim()) e.address = "Street address is required";
+    if (!city.trim()) e.city = "City is required";
+    if (!state.trim()) e.state = "State is required";
+    if (!zipCode.trim()) e.zipCode = "Zip code is required";
+    return e;
+  }, [address, city, state, zipCode]);
+
+  // Additional marina property fields
+  const [wetSlips, setWetSlips] = useState("");
+  const [drySlips, setDrySlips] = useState(""); // Changed from dryStorage to match schema
+  const [moorings, setMoorings] = useState("");
+  const [totalCapacity, setTotalCapacity] = useState("");
+  const [totalAcres, setTotalAcres] = useState("");
+  const [waterDepth, setWaterDepth] = useState("");
+  const [linearFeet, setLinearFeet] = useState("");
+  const [yearBuilt, setYearBuilt] = useState("");
+  
+  // Sale history fields
+  const [lastSaleMonth, setLastSaleMonth] = useState("");
+  const [lastSaleYear, setLastSaleYear] = useState("");
+  const [lastSalePrice, setLastSalePrice] = useState("");
+  const [listingPrice, setListingPrice] = useState("");
+  const [listingStatus, setListingStatus] = useState("");
+
+  const form = useForm({
+    resolver: zodResolver(insertPropertySchema.extend({
+      title: z.string().min(1, "Property name is required"),
+      address: z.string().optional(),
+      description: z.string().optional(),
+    })),
+    defaultValues: {
+      title: "",
+      type: "marina",
+      status: "target",
+      address: "",
+      description: "",
+    },
+  });
+
+  useEffect(() => {
+    if (property) {
+      form.reset({
+        title: property.title,
+        type: property.type,
+        status: property.status,
+        description: property.description || "",
+      });
+      
+      // Reset address fields from property data
+      setAddress(property.address || "");
+      setUnit("");
+      setCity(property.city || "");
+      setState(property.state || "");
+      setZipCode(property.zipCode || "");
+      
+      // Load storage capacity from top-level fields (matching crmProperties schema)
+      const propAny = property as any;
+      setWetSlips(propAny.wetSlips?.toString() || "");
+      setDrySlips(propAny.drySlips?.toString() || "");
+      setMoorings(propAny.moorings?.toString() || "");
+      setTotalCapacity(propAny.totalCapacity?.toString() || "");
+      
+      // Load marina specifications from specifications object (legacy support)
+      if (property.specifications && typeof property.specifications === 'object') {
+        const specs = property.specifications as Record<string, any>;
+        setTotalAcres(specs.totalAcres || "");
+        setWaterDepth(specs.waterDepth || "");
+        setLinearFeet(specs.linearFeet || "");
+        setYearBuilt(specs.yearBuilt || "");
+        // Fallback: if top-level fields empty, try specifications
+        if (!propAny.wetSlips && specs.wetSlips) setWetSlips(specs.wetSlips.toString());
+        if (!propAny.drySlips && specs.dryStorage) setDrySlips(specs.dryStorage.toString());
+      }
+      
+      // Load sale history from property
+      setLastSaleMonth(propAny.lastSaleMonth?.toString() || "");
+      setLastSaleYear(propAny.lastSaleYear?.toString() || "");
+      setLastSalePrice(propAny.lastSalePrice?.toString() || "");
+      setListingPrice(propAny.listingPrice?.toString() || "");
+      setListingStatus(propAny.listingStatus || property.status || "");
+    } else {
+      form.reset({
+        title: "",
+        type: "marina",
+        status: "target",
+        description: "",
+      });
+      // Reset address fields
+      setAddress("");
+      setUnit("");
+      setCity("");
+      setState("");
+      setZipCode("");
+      setWetSlips("");
+      setDrySlips("");
+      setMoorings("");
+      setTotalCapacity("");
+      setTotalAcres("");
+      setWaterDepth("");
+      setLinearFeet("");
+      setYearBuilt("");
+      setLastSaleMonth("");
+      setLastSaleYear("");
+      setLastSalePrice("");
+      setListingPrice("");
+      setListingStatus("");
       setStorageEntries([]);
       setTouched(false);
     }

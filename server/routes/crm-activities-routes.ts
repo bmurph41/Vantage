@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
-import { crmActivities, users } from '@shared/schema';
+import { crmActivities, crmContacts, users } from '@shared/schema';
 import { eq, and, or, gte, lte, lt, ilike, sql, desc, asc } from 'drizzle-orm';
 import { createTimelineEvent } from '../services/timeline-event-service';
 
