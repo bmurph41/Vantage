@@ -71,6 +71,32 @@ const statusColors: Record<string, string> = {
   sold: 'bg-gray-100 text-gray-800',
   off_market: 'bg-red-100 text-red-800'
 };
+const listingStatusColors: Record<string, string> = {
+  off_market:      'bg-gray-100 text-gray-700 border-gray-300',
+  on_market:       'bg-green-100 text-green-800 border-green-300',
+  under_loi:       'bg-amber-100 text-amber-800 border-amber-300',
+  under_contract:  'bg-blue-100 text-blue-800 border-blue-300',
+  closed:          'bg-purple-100 text-purple-800 border-purple-300',
+  portfolio:       'bg-teal-100 text-teal-800 border-teal-300',
+  watchlist:       'bg-orange-100 text-orange-800 border-orange-300',
+  // Legacy values
+  available:       'bg-green-100 text-green-800 border-green-300',
+  sold:            'bg-purple-100 text-purple-800 border-purple-300',
+};
+
+const listingStatusLabels: Record<string, string> = {
+  off_market: 'Off Market',
+  on_market: 'On Market',
+  under_loi: 'Under LOI',
+  under_contract: 'Under Contract',
+  closed: 'Closed',
+  portfolio: 'Portfolio',
+  watchlist: 'Watchlist',
+  available: 'Available',
+  sold: 'Sold',
+};
+
+
 
 function findDuplicateGroups(properties: Property[]): Map<string, string[]> {
   const groups = new Map<string, string[]>();
@@ -293,15 +319,17 @@ export default function Properties() {
         property.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         property.description?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter === 'all' || property.type === typeFilter;
-      const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' ||
+        (property as any).listingStatus === statusFilter ||
+        property.status === statusFilter;
       return matchesSearch && matchesType && matchesStatus;
     });
   }, [properties, searchTerm, typeFilter, statusFilter]);
 
   const totalProperties = properties.length;
   const marinas = properties.filter(p => p.type === 'marina').length;
-  const available = properties.filter(p => p.status === 'available').length;
-  const underContract = properties.filter(p => p.status === 'under_contract').length;
+  const available = properties.filter(p => p.status === 'available' || (p as any).listingStatus === 'on_market').length;
+  const underContract = properties.filter(p => p.status === 'under_contract' || (p as any).listingStatus === 'under_contract' || (p as any).listingStatus === 'under_loi').length;
 
   const columns: CrmColumn<Property>[] = [
     {
@@ -440,15 +468,20 @@ export default function Properties() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="under_contract">Under Contract</SelectItem>
-                <SelectItem value="sold">Sold</SelectItem>
-                <SelectItem value="off_market">Off Market</SelectItem>
-              </SelectContent>
-            </Select>
+          <SelectTrigger className="h-8 w-40 text-xs" data-testid="select-status-filter">
+            <SelectValue placeholder="Listing Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="off_market">Off Market</SelectItem>
+            <SelectItem value="on_market">On Market</SelectItem>
+            <SelectItem value="under_loi">Under LOI</SelectItem>
+            <SelectItem value="under_contract">Under Contract</SelectItem>
+            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="portfolio">Portfolio</SelectItem>
+            <SelectItem value="watchlist">Watchlist</SelectItem>
+          </SelectContent>
+        </Select>
           </>
         }
       />

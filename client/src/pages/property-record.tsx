@@ -74,6 +74,9 @@ interface PropertyRecord {
   recentActivities: Array<{ id: string; type: string; subject: string; status: string; scheduledAt: string | null; completedAt: string | null }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
   rollups?: { lastActivityAt?: string; nextActivityAt?: string; openDealsCount?: number; engagementScore30d?: number };
+  listingStatus?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
 }
 
 // ── Color maps ────────────────────────────────────────────
@@ -97,6 +100,19 @@ const statusColors: Record<string, string> = {
   active: 'bg-blue-50 text-blue-700 border-blue-200',
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
 };
+const listingStatusConfig: Record<string, { label: string; cls: string }> = {
+  off_market:     { label: 'Off Market',      cls: 'bg-gray-100 text-gray-700 border-gray-300' },
+  on_market:      { label: 'On Market',       cls: 'bg-green-100 text-green-800 border-green-300' },
+  under_loi:      { label: 'Under LOI',       cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  under_contract: { label: 'Under Contract',  cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+  closed:         { label: 'Closed',          cls: 'bg-purple-100 text-purple-800 border-purple-300' },
+  portfolio:      { label: 'Portfolio',       cls: 'bg-teal-100 text-teal-800 border-teal-300' },
+  watchlist:      { label: 'Watchlist',       cls: 'bg-orange-100 text-orange-800 border-orange-300' },
+  available:      { label: 'Available',       cls: 'bg-green-100 text-green-800 border-green-300' },
+  sold:           { label: 'Sold',            cls: 'bg-purple-100 text-purple-800 border-purple-300' },
+};
+
+
 
 const stageColors: Record<string, string> = {
   discovery: 'bg-blue-50 text-blue-700',
@@ -172,7 +188,21 @@ export default function PropertyRecordPage() {
     : property?.listCapRate;
 
   // KPI chips
+  // Listing status chip for prominence
+  const listingStatusChip = property?.listingStatus
+    ? {
+        label: 'Listing',
+        value: listingStatusConfig[property.listingStatus]?.label || property.listingStatus.replace(/_/g, ' '),
+        icon: Tag,
+        color: property.listingStatus === 'on_market' ? 'text-green-600'
+          : property.listingStatus === 'under_loi' ? 'text-amber-600'
+          : property.listingStatus === 'under_contract' ? 'text-blue-600'
+          : 'text-gray-500',
+      }
+    : null;
+
   const kpiChips = property ? [
+    ...(listingStatusChip ? [listingStatusChip] : []),
     ...(property.listingPrice || property.listPrice ? [{
       label: 'Asking',
       value: fmtCurrency(property.listingPrice || property.listPrice),
@@ -228,8 +258,16 @@ export default function PropertyRecordPage() {
           </AvatarFallback>
         </Avatar>
       )}
-      status={property?.status ? fmtLabel(property.status) : undefined}
-      statusColor={property?.status ? statusColors[property.status.toLowerCase()] || 'bg-gray-100 text-gray-700' : undefined}
+      status={(() => {
+        const ls = property?.listingStatus || property?.status;
+        const cfg = ls ? listingStatusConfig[ls] : null;
+        return cfg ? cfg.label : ls ? fmtLabel(ls) : undefined;
+      })()}
+      statusColor={(() => {
+        const ls = property?.listingStatus || property?.status;
+        const cfg = ls ? listingStatusConfig[ls] : null;
+        return cfg ? cfg.cls : ls ? statusColors[ls.toLowerCase()] || 'bg-gray-100 text-gray-700' : undefined;
+      })()}
       owner={property?.owner}
       isLoading={isLoading}
       kpiChips={kpiChips}
