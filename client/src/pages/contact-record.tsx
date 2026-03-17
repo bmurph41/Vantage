@@ -260,12 +260,12 @@ export default function ContactRecordPage() {
       owner={contact?.owner}
       isLoading={isLoading}
       kpiChips={kpiChips}
-      belowHeader={{contact.nextFollowupDate && (
+      belowHeader={contact.nextFollowupDate && (
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
           <Clock className="h-3 w-3" />
           Follow-up: {fmtDate(contact.nextFollowupDate)}
         </div>
-      )}}
+      )}
       nextActivity={nextActivity}
 
       // ── LEFT: About Sidebar ──

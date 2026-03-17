@@ -207,6 +207,16 @@ router.post('/', async (req, res) => {
       status: data.scheduledAt ? 'scheduled' : 'completed',
     }).returning();
     
+    // Auto-update last_contacted_at on linked contact
+    const contactId = data.entityType === 'contact' ? data.entityId : null;
+    if (contactId) {
+      try {
+        await db.update(crmContacts)
+          .set({ lastContactedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(crmContacts.id, contactId), eq(crmContacts.orgId, orgId)));
+      } catch { /* non-fatal */ }
+    }
+
     if (data.entityType && data.entityId) {
       await createTimelineEvent({
         orgId,

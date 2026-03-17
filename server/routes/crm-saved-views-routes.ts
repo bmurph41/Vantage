@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/', async (req: any, res) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.user.id;
     const orgId = req.user.orgId;
     const { objectType } = req.query;
@@ -35,6 +36,7 @@ router.get('/', async (req: any, res) => {
 
 router.post('/', async (req: any, res) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.user.id;
     const orgId = req.user.orgId;
     const { name, objectType, filters, columns, sortBy, sortOrder, isDefault, isShared } = req.body;
@@ -75,6 +77,7 @@ router.post('/', async (req: any, res) => {
 
 router.patch('/:id', async (req: any, res) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.user.id;
     const { id } = req.params;
     const updates = req.body;
@@ -107,6 +110,7 @@ router.patch('/:id', async (req: any, res) => {
 
 router.delete('/:id', async (req: any, res) => {
   try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
     const userId = req.user.id;
     const { id } = req.params;
 
