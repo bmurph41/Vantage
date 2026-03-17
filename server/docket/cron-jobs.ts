@@ -45,9 +45,9 @@ export function startDocketCronJobs(storage: IStorage): void {
     initializeDefaultRssSources().catch(console.error);
   });
   
-  // Schedule RSS fetching - every 5 minutes in dev, every 15 in production
+  // Schedule RSS fetching - every 2 hours in dev, every 15 minutes in production
   const cronSchedule = isDevelopment 
-    ? (process.env.DEV_CRON_SCHEDULE || "*/5 * * * *")
+    ? (process.env.DEV_CRON_SCHEDULE || "0 */2 * * *")
     : (process.env.CRON_SCHEDULE || "*/15 * * * *");
   
   console.log(`Docket cron jobs enabled (schedule: ${cronSchedule})`);

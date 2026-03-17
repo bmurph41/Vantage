@@ -102,15 +102,16 @@ export async function fetchRssFeeds(): Promise<number> {
           await storage.updateRssSourceLastFetched(source.id);
           await storage.recordRssSourceSuccess(source.id);
         }
-      } catch (error) {
-        console.error(`Error fetching source ${source.name}:`, error);
+      } catch (error: any) {
+        const msg = error?.response ? `HTTP ${error.response.status}` : (error?.message || String(error));
+        console.error(`Error fetching source ${source.name}: ${msg}`);
         await storage.recordRssSourceFailure(source.id);
       }
     }
     
     return totalNewArticles;
-  } catch (error) {
-    console.error("Error in RSS fetching process:", error);
+  } catch (error: any) {
+    console.error("Error in RSS fetching process:", error?.message || String(error));
     return totalNewArticles;
   }
 }
@@ -361,8 +362,8 @@ async function processScrapedArticle(article: ScrapedArticle, sourceName: string
     broadcastNewArticle(newArticle);
 
     return 1;
-  } catch (error) {
-    console.error("Error processing scraped article:", error);
+  } catch (error: any) {
+    console.error("Error processing scraped article:", error?.message || String(error));
     return 0;
   }
 }
@@ -540,8 +541,8 @@ async function processRssItem(item: FeedItem, sourceName: string, customKeywords
     broadcastNewArticle(newArticle);
 
     return 1;
-  } catch (error) {
-    console.error("Error processing RSS item:", error);
+  } catch (error: any) {
+    console.error("Error processing RSS item:", error?.message || String(error));
     return 0;
   }
 }
@@ -606,8 +607,8 @@ export async function fetchAllSourcesWithReport(): Promise<{
 
       sourceResults.push(result);
     }
-  } catch (error) {
-    console.error("[Docket Backfill] Fatal error:", error);
+  } catch (error: any) {
+    console.error("[Docket Backfill] Fatal error:", error?.message || String(error));
   }
 
   console.log(`[Docket Backfill] Complete: ${totalNew} new articles from ${sourceResults.length} sources`);

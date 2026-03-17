@@ -254,8 +254,9 @@ export async function scrapeWebPage(url: string): Promise<ScrapedArticle[]> {
 
     return articles;
 
-  } catch (error) {
-    console.error(`Error scraping ${url}:`, error);
+  } catch (error: any) {
+    const msg = error?.response ? `HTTP ${error.response.status}` : (error?.message || String(error));
+    console.error(`Error scraping ${url}: ${msg}`);
     return [];
   }
 }

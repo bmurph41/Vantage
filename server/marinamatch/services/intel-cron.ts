@@ -460,8 +460,8 @@ async function ensureDefaultSources(orgId: string): Promise<number> {
         created++;
         console.log(`[MarinaMatch Intel] Created default source: ${source.platform} for org ${orgId}`);
       }
-    } catch (error) {
-      console.error(`[MarinaMatch Intel] Error creating default source ${source.platform}:`, error);
+    } catch (error: any) {
+      console.error(`[MarinaMatch Intel] Error creating default source ${source.platform}: ${error?.message || String(error)}`);
     }
   }
 
@@ -510,15 +510,15 @@ async function runAutoScrape(): Promise<void> {
         const { runScrapeJob } = await import("./cre-scraper");
         await runScrapeJob(org.id, platforms);
         
-      } catch (error) {
-        console.error(`[MarinaMatch Intel] Error scraping for org ${org.id}:`, error);
+      } catch (error: any) {
+        console.error(`[MarinaMatch Intel] Error scraping for org ${org.id}: ${error?.message || String(error)}`);
       }
     }
 
     lastScrapeTime = new Date();
     console.log("[MarinaMatch Intel] Automatic scrape completed");
-  } catch (error) {
-    console.error("[MarinaMatch Intel] Error in auto-scrape:", error);
+  } catch (error: any) {
+    console.error("[MarinaMatch Intel] Error in auto-scrape:", error?.message || String(error));
   } finally {
     isScraping = false;
   }
@@ -546,7 +546,7 @@ export function startMarinaMatchIntelCronJobs(): void {
   const isDevelopment = process.env.NODE_ENV === 'development';
   
   // Schedule scraping - every hour in production, every 30 minutes in dev
-  const cronSchedule = isDevelopment ? "*/30 * * * *" : "0 * * * *";
+  const cronSchedule = isDevelopment ? "0 */4 * * *" : "0 * * * *";
   
   console.log(`[MarinaMatch Intel] Cron jobs enabled (schedule: ${cronSchedule})`);
   console.log(`[MarinaMatch Intel] Auto-scrape is ${autoScrapeEnabled ? 'ON' : 'OFF'}`);
