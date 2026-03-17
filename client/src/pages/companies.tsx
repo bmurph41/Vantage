@@ -439,7 +439,7 @@ export default function Companies() {
       header: 'Role',
       sortable: true,
       sortValue: (company) => company.industry || null,
-      render: (company) => (
+      render: (company) => (company.industry || (company as any).companyType) ? (
         <div className="flex flex-col gap-1">
           {company.industry && (
             <Badge className={industryColors[company.industry] || industryColors[getIndustryCategory(company.industry)] || 'bg-gray-100 text-gray-800'}>
