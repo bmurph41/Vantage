@@ -38824,6 +38824,123 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // ── Deal Comp Linking Endpoints ─────────────────────────────────────
+  app.get('/api/integrations/deals/:dealId/sales-comps', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dealId } = req.params;
+      const rows = await pool.query(
+        `SELECT dsc.*, sc.marina, sc.city, sc.state, sc.sale_price, sc.cap_rate, 
+                sc.sale_year, sc.wet_slips, sc.total_slips, sc.price_per_slip
+         FROM deal_sales_comps dsc
+         JOIN sales_comps sc ON sc.id = dsc.sales_comp_id
+         WHERE dsc.deal_id = $1 AND dsc.org_id = $2
+         ORDER BY dsc.is_primary DESC, dsc.relevance_score DESC NULLS LAST`,
+        [dealId, orgId]
+      );
+      res.json(rows.rows.map((r: any) => ({
+        id: r.id, dealId: r.deal_id, salesCompId: r.sales_comp_id,
+        isPrimary: r.is_primary, relevanceScore: r.relevance_score,
+        notes: r.notes, comparisonType: r.comparison_type,
+        distanceMiles: r.distance_miles,
+        salesComp: {
+          id: r.sales_comp_id, marinaName: r.marina, city: r.city, state: r.state,
+          salePrice: r.sale_price, capRate: r.cap_rate, saleYear: r.sale_year,
+          wetSlips: r.wet_slips, totalSlips: r.total_slips, pricePerSlip: r.price_per_slip,
+        },
+      })));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/integrations/deals/:dealId/sales-comps', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { dealId } = req.params;
+      const { salesCompId, isPrimary = false, notes, comparisonType = 'similar', relevanceScore } = req.body;
+      if (!salesCompId) return res.status(400).json({ error: 'salesCompId required' });
+      const result = await pool.query(
+        `INSERT INTO deal_sales_comps (id, org_id, deal_id, sales_comp_id, is_primary, notes, comparison_type, relevance_score, created_by)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (deal_id, sales_comp_id) DO UPDATE
+           SET is_primary=$4, notes=$5, comparison_type=$6, relevance_score=$7, updated_at=NOW()
+         RETURNING *`,
+        [orgId, dealId, salesCompId, isPrimary, notes || null, comparisonType, relevanceScore || null, userId]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/integrations/deals/:dealId/sales-comps/:salesCompId', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dealId, salesCompId } = req.params;
+      await pool.query(
+        `DELETE FROM deal_sales_comps WHERE deal_id=$1 AND sales_comp_id=$2 AND org_id=$3`,
+        [dealId, salesCompId, orgId]
+      );
+      res.status(204).send();
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get('/api/integrations/deals/:dealId/rate-comps', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dealId } = req.params;
+      const rows = await pool.query(
+        `SELECT drc.*, rc.marina, rc.city, rc.state, rc.wet_slip_rate_avg, 
+                rc.dry_slip_rate_avg, rc.total_slips, rc.occupancy_rate, rc.quality_tier
+         FROM deal_rate_comps drc
+         JOIN rate_comps rc ON rc.id = drc.rate_comp_id
+         WHERE drc.deal_id = $1 AND drc.org_id = $2
+         ORDER BY drc.is_primary DESC, drc.relevance_score DESC NULLS LAST`,
+        [dealId, orgId]
+      );
+      res.json(rows.rows.map((r: any) => ({
+        id: r.id, dealId: r.deal_id, rateCompId: r.rate_comp_id,
+        isPrimary: r.is_primary, relevanceScore: r.relevance_score,
+        notes: r.notes, comparisonType: r.comparison_type,
+        rateVariancePercent: r.rate_variance_percent,
+        rateComp: {
+          id: r.rate_comp_id, marinaName: r.marina, city: r.city, state: r.state,
+          wetSlipRateAvg: r.wet_slip_rate_avg, drySlipRateAvg: r.dry_slip_rate_avg,
+          totalSlips: r.total_slips, occupancyRate: r.occupancy_rate, qualityTier: r.quality_tier,
+        },
+      })));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/integrations/deals/:dealId/rate-comps', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { dealId } = req.params;
+      const { rateCompId, isPrimary = false, notes, comparisonType = 'benchmark', relevanceScore } = req.body;
+      if (!rateCompId) return res.status(400).json({ error: 'rateCompId required' });
+      const result = await pool.query(
+        `INSERT INTO deal_rate_comps (id, org_id, deal_id, rate_comp_id, is_primary, notes, comparison_type, relevance_score, created_by)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (deal_id, rate_comp_id) DO UPDATE
+           SET is_primary=$4, notes=$5, comparison_type=$6, relevance_score=$7, updated_at=NOW()
+         RETURNING *`,
+        [orgId, dealId, rateCompId, isPrimary, notes || null, comparisonType, relevanceScore || null, userId]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/integrations/deals/:dealId/rate-comps/:rateCompId', authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dealId, rateCompId } = req.params;
+      await pool.query(
+        `DELETE FROM deal_rate_comps WHERE deal_id=$1 AND rate_comp_id=$2 AND org_id=$3`,
+        [dealId, rateCompId, orgId]
+      );
+      res.status(204).send();
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   // Create new criteria profile with sub-tables
   app.post("/api/investment-criteria", async (req, res) => {
     try {

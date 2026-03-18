@@ -88,7 +88,7 @@ export default function DocumentBuilderPage({ documentId }: DocumentBuilderPageP
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(documentId ? '/crm/deals' : '/')}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -107,6 +107,7 @@ export default function DocumentBuilderPage({ documentId }: DocumentBuilderPageP
 
         {/* Main Builder Component */}
         <DocumentBuilder
+          documentId={documentId}
           onComplete={handleComplete}
           onCancel={handleCancel}
         />

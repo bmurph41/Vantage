@@ -479,18 +479,90 @@ class DataBindingService {
     requirement: DataBindingRequirement,
     context: BindingContext
   ): Promise<any> {
-    // Sales comps would come from a sales comps service/table
-    return null;
+    if (!context.dealId) return requirement.fallback ?? [];
+    try {
+      const { pool } = await import('../../db');
+      const result = await pool.query(
+        `SELECT sc.id, sc.marina, sc.city, sc.state, sc.sale_price, sc.cap_rate,
+                sc.sale_year, sc.wet_slips, sc.total_slips, sc.price_per_slip,
+                dsc.is_primary, dsc.notes, dsc.comparison_type, dsc.relevance_score
+         FROM deal_sales_comps dsc
+         JOIN sales_comps sc ON sc.id = dsc.sales_comp_id
+         WHERE dsc.deal_id = $1
+         ORDER BY dsc.is_primary DESC, dsc.relevance_score DESC NULLS LAST
+         LIMIT 20`,
+        [context.dealId]
+      );
+      const comps = result.rows.map((r: any) => ({
+        id: r.id, marinaName: r.marina, city: r.city, state: r.state,
+        salePrice: r.sale_price ? Number(r.sale_price) : null,
+        capRate: r.cap_rate ? Number(r.cap_rate) : null,
+        saleYear: r.sale_year, wetSlips: r.wet_slips, totalSlips: r.total_slips,
+        pricePerSlip: r.price_per_slip ? Number(r.price_per_slip) : null,
+        isPrimary: r.is_primary, notes: r.notes, comparisonType: r.comparison_type,
+        relevanceScore: r.relevance_score,
+      }));
+      if (requirement.field === 'comps') return comps;
+      if (requirement.field === 'primaryComp') return comps.find((c: any) => c.isPrimary) || comps[0] || null;
+      if (requirement.field === 'avgSalePrice') {
+        const prices = comps.filter((c: any) => c.salePrice).map((c: any) => c.salePrice);
+        return prices.length ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : null;
+      }
+      if (requirement.field === 'avgCapRate') {
+        const rates = comps.filter((c: any) => c.capRate).map((c: any) => c.capRate);
+        return rates.length ? rates.reduce((a: number, b: number) => a + b, 0) / rates.length : null;
+      }
+      return comps;
+    } catch (e) {
+      console.error('resolveSalesCompsBinding error:', e);
+      return requirement.fallback ?? [];
+    }
   }
 
   private async resolveRateCompsBinding(
     requirement: DataBindingRequirement,
     context: BindingContext
   ): Promise<any> {
-    // Rate comps would come from a rate comps service/table
-    return null;
+    if (!context.dealId) return requirement.fallback ?? [];
+    try {
+      const { pool } = await import('../../db');
+      const result = await pool.query(
+        `SELECT rc.id, rc.marina, rc.city, rc.state, rc.wet_slip_rate_avg,
+                rc.dry_slip_rate_avg, rc.total_slips, rc.occupancy_rate, rc.quality_tier,
+                drc.is_primary, drc.notes, drc.comparison_type, drc.relevance_score, drc.rate_variance_percent
+         FROM deal_rate_comps drc
+         JOIN rate_comps rc ON rc.id = drc.rate_comp_id
+         WHERE drc.deal_id = $1
+         ORDER BY drc.is_primary DESC, drc.relevance_score DESC NULLS LAST
+         LIMIT 20`,
+        [context.dealId]
+      );
+      const comps = result.rows.map((r: any) => ({
+        id: r.id, marinaName: r.marina, city: r.city, state: r.state,
+        wetSlipRateAvg: r.wet_slip_rate_avg ? Number(r.wet_slip_rate_avg) : null,
+        drySlipRateAvg: r.dry_slip_rate_avg ? Number(r.dry_slip_rate_avg) : null,
+        totalSlips: r.total_slips, occupancyRate: r.occupancy_rate, qualityTier: r.quality_tier,
+        isPrimary: r.is_primary, notes: r.notes, comparisonType: r.comparison_type,
+        relevanceScore: r.relevance_score, rateVariancePercent: r.rate_variance_percent,
+      }));
+      if (requirement.field === 'comps') return comps;
+      if (requirement.field === 'primaryComp') return comps.find((c: any) => c.isPrimary) || comps[0] || null;
+      if (requirement.field === 'avgWetRate') {
+        const rates = comps.filter((c: any) => c.wetSlipRateAvg).map((c: any) => c.wetSlipRateAvg);
+        return rates.length ? rates.reduce((a: number, b: number) => a + b, 0) / rates.length : null;
+      }
+      if (requirement.field === 'avgDryRate') {
+        const rates = comps.filter((c: any) => c.drySlipRateAvg).map((c: any) => c.drySlipRateAvg);
+        return rates.length ? rates.reduce((a: number, b: number) => a + b, 0) / rates.length : null;
+      }
+      return comps;
+    } catch (e) {
+      console.error('resolveRateCompsBinding error:', e);
+      return requirement.fallback ?? [];
+    }
   }
 
+  
   private async resolveDueDiligenceBinding(
     requirement: DataBindingRequirement,
     context: BindingContext
