@@ -17780,8 +17780,7 @@ Current context: Project ${req.params.projectId}`;
         purchasePrice: modelingProjects.purchasePrice,
         askingPrice: modelingProjects.askingPrice,
         year1CapRate: modelingProjects.year1CapRate,
-        status: modelingProjects.status,
-        customMetrics: modelingProjects.customMetrics,
+        dealOutcome: modelingProjects.dealOutcome,
       }).from(modelingProjects).where(eq(modelingProjects.orgId, orgId));
       const byClass: Record<string, { count: number; totalValue: number; assets: any[] }> = {};
       for (const p of projects) {
@@ -17789,7 +17788,7 @@ Current context: Project ${req.params.projectId}`;
         if (!byClass[ac]) byClass[ac] = { count: 0, totalValue: 0, assets: [] };
         byClass[ac].count++;
         byClass[ac].totalValue += Number(p.purchasePrice || p.askingPrice || 0);
-        byClass[ac].assets.push({ id: p.id, name: p.name, value: Number(p.purchasePrice || p.askingPrice || 0), capRate: p.year1CapRate, status: p.status });
+        byClass[ac].assets.push({ id: p.id, name: p.name, value: Number(p.purchasePrice || p.askingPrice || 0), capRate: p.year1CapRate, status: p.dealOutcome });
       }
       res.json({ totalProjects: projects.length, totalValue: projects.reduce((s, p) => s + Number(p.purchasePrice || p.askingPrice || 0), 0), byAssetClass: byClass });
     } catch (error: any) {

@@ -262,17 +262,45 @@ class DataBindingService {
       return { dealId };
     }
 
-    const context: BindingContext = {
-      dealId,
-      propertyId: deal.propertyId || undefined,
-    };
+    const context: BindingContext = { dealId };
 
-    // Get linked modeling project
-    if (deal.propertyId) {
+    // Resolve propertyId — try direct field first, then deal_property_address table
+    let propertyId: string | undefined = (deal as any).propertyId || undefined;
+    if (!propertyId) {
+      try {
+        const { pool } = await import('../../db');
+        const result = await pool.query(
+          `SELECT property_id FROM deal_property_address WHERE deal_id = $1 LIMIT 1`,
+          [dealId]
+        );
+        propertyId = result.rows[0]?.property_id || undefined;
+      } catch { /* table may not exist for all deals */ }
+    }
+
+    // Also check crmProperties linked via companyId/contactId if still nothing
+    if (!propertyId && (deal as any).companyId) {
+      try {
+        const { pool } = await import('../../db');
+        const result = await pool.query(
+          `SELECT id FROM crm_properties WHERE org_id = $1 
+            AND (owner_company_id = $2 OR id IN (
+              SELECT property_id FROM crm_company_properties WHERE company_id = $2 LIMIT 1
+            ))
+            ORDER BY created_at DESC LIMIT 1`,
+          [(deal as any).orgId, (deal as any).companyId]
+        );
+        propertyId = result.rows[0]?.id || undefined;
+      } catch { /* best effort */ }
+    }
+
+    if (propertyId) {
+      context.propertyId = propertyId;
+
+      // Get linked modeling project
       const [modelingProject] = await db
         .select({ id: modelingProjects.id })
         .from(modelingProjects)
-        .where(eq(modelingProjects.linkedPropertyId, deal.propertyId))
+        .where(eq(modelingProjects.linkedPropertyId, propertyId))
         .orderBy(desc(modelingProjects.createdAt))
         .limit(1);
 
@@ -284,13 +312,25 @@ class DataBindingService {
       const [rentRoll] = await db
         .select({ id: rentRolls.id })
         .from(rentRolls)
-        .where(eq(rentRolls.propertyId, deal.propertyId))
+        .where(eq(rentRolls.propertyId, propertyId))
         .orderBy(desc(rentRolls.createdAt))
         .limit(1);
 
       if (rentRoll) {
         context.rentRollId = rentRoll.id;
       }
+    }
+
+    // Also try to find modeling project directly linked to deal
+    if (!context.modelingProjectId) {
+      try {
+        const { pool } = await import('../../db');
+        const result = await pool.query(
+          `SELECT id FROM modeling_projects WHERE deal_id = $1 ORDER BY created_at DESC LIMIT 1`,
+          [dealId]
+        );
+        if (result.rows[0]) context.modelingProjectId = result.rows[0].id;
+      } catch { /* best effort */ }
     }
 
     return context;

@@ -403,6 +403,41 @@ class ExportJobProcessor {
   }
 }
 
+  /**
+   * Start polling for pending export jobs
+   */
+  startProcessing(intervalMs = 5000): void {
+    if ((this as any)._interval) return; // already running
+    (this as any)._interval = setInterval(async () => {
+      try {
+        const { db } = await import('../../db');
+        const { omExportJobs } = await import('../../../shared/document-builder/schema');
+        const { eq } = await import('drizzle-orm');
+        const pendingJobs = await db
+          .select({ id: omExportJobs.id })
+          .from(omExportJobs)
+          .where(eq(omExportJobs.status, 'pending'))
+          .limit(3);
+        for (const job of pendingJobs) {
+          await this.processJob(job.id.toString()).catch(err =>
+            console.error(`[ExportProcessor] Job ${job.id} failed:`, err.message)
+          );
+        }
+      } catch (err: any) {
+        console.error('[ExportProcessor] Poll error:', err.message);
+      }
+    }, intervalMs);
+    console.log(`[ExportProcessor] Polling every ${intervalMs}ms`);
+  }
+
+  stopProcessing(): void {
+    if ((this as any)._interval) {
+      clearInterval((this as any)._interval);
+      (this as any)._interval = null;
+    }
+  }
+}
+
 export const exportJobProcessor = new ExportJobProcessor();
 
 // =============================================================================

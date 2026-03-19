@@ -1521,6 +1521,70 @@ For each risk, provide likelihood (Low/Medium/High), impact, and specific mitiga
     marinaSpecific: false
   },
 
+
+  marina_operations: {
+    sectionKey: 'marina_operations',
+    name: 'Marina Operations',
+    description: 'Detailed overview of marina operations, services, staff, and revenue streams',
+    category: 'operations',
+    supportedDocTypes: ['offering_memorandum', 'ic_memo', 'lender_package', 'custom'],
+    requiredDataBindings: [
+      { bindingKey: 'totalSlips', label: 'Total Slips', source: 'property', field: 'totalSlips', type: 'number', required: true },
+      { bindingKey: 'wetSlips', label: 'Wet Slips', source: 'property', field: 'wetSlips', type: 'number', required: false },
+      { bindingKey: 'drySlips', label: 'Dry Slips', source: 'property', field: 'drySlips', type: 'number', required: false },
+    ],
+    optionalDataBindings: [
+      { bindingKey: 'occupancyRate', label: 'Occupancy Rate', source: 'valuator', field: 'occupancyRate', type: 'percent', required: false },
+      { bindingKey: 'avgSlipRate', label: 'Avg Slip Rate', source: 'rate_comps', field: 'avgWetRate', type: 'currency', required: false },
+      { bindingKey: 'annualRevenue', label: 'Annual Revenue', source: 'valuator', field: 'totalRevenue', type: 'currency', required: false },
+    ],
+    requiredMedia: [],
+    optionalMedia: [
+      { mediaKey: 'aerialPhoto', label: 'Aerial / Dock Photo', type: 'image', required: false }
+    ],
+    schema: {
+      type: 'object',
+      properties: {
+        operationsOverview: { type: 'string', description: 'Narrative overview of marina operations' },
+        services: { type: 'array', items: { type: 'string' }, description: 'List of services offered' },
+        staffCount: { type: 'number', description: 'Number of employees' },
+        managementType: { type: 'string', description: 'Self-managed or third-party' },
+        seasonality: { type: 'string', description: 'Seasonal operating notes' },
+        amenities: { type: 'array', items: { type: 'string' }, description: 'Key amenities' },
+      }
+    },
+    defaultLayouts: [
+      {
+        key: 'two_column',
+        name: 'Two Column',
+        pageCount: 1,
+        structure: {
+          gridColumns: 2,
+          gridGap: '24px',
+          placeholders: [
+            { id: 'narrative', blockType: 'text', x: 72, y: 72, width: 330, height: 400, bindingKey: 'operationsOverview' },
+            { id: 'metrics', blockType: 'metrics', x: 420, y: 72, width: 324, height: 400, bindingKey: 'totalSlips' }
+          ]
+        }
+      }
+    ],
+    aiPromptTemplates: [
+      {
+        key: 'operations_narrative',
+        name: 'Operations Narrative',
+        promptTemplate: 'Write a professional 3-paragraph operations overview for {{propertyName}}, a marina with {{totalSlips}} total slips ({{wetSlips}} wet, {{drySlips}} dry) located in {{location}}. Describe the operational strengths, revenue streams, and management approach. Annual revenue is approximately {{annualRevenue}}. Occupancy rate is {{occupancyRate}}. Write in institutional investment memo style.',
+        outputFormat: 'text',
+        requiredContext: ['propertyName', 'totalSlips'],
+        optionalContext: ['wetSlips', 'drySlips', 'location', 'annualRevenue', 'occupancyRate'],
+      }
+    ],
+    completionRules: [
+      { type: 'required_field', field: 'totalSlips', errorMessage: 'Total slip count is required' }
+    ],
+    estimatedPages: 1,
+    marinaSpecific: true,
+  },
+
   disclaimer: {
     sectionKey: 'disclaimer',
     name: 'Disclaimer',

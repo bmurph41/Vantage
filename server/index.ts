@@ -30,6 +30,9 @@ import { deprecationWarning } from './routes/api-versioning';
 import { exitStudioRouter } from './routes/exit-studio-routes';
 import legalBenchmarkingRoutes from './routes/legal-benchmarking-routes';
 
+import { EventEmitter } from 'events';
+EventEmitter.defaultMaxListeners = 50;
+
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
@@ -40,6 +43,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const app = express();
 
+app.use((req, res, next) => { res.setMaxListeners(50); next(); });
 app.use(requestIdMiddleware);
 
 configureSecurityMiddleware(app);
@@ -98,7 +102,13 @@ app.use(ddChecklistRouter);
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
-    server.listen({
+    // Start document export job processor
+import('./services/document-builder/export-job-processor').then(({ exportJobProcessor }) => {
+  exportJobProcessor.startProcessing(5000); // poll every 5s
+  console.log('[DocumentBuilder] Export job processor started');
+}).catch(err => console.warn('[DocumentBuilder] Export processor failed to start:', err.message));
+
+server.listen({
       port,
       host: "0.0.0.0",
       reusePort: true,
