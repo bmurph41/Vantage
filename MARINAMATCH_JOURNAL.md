@@ -88,6 +88,47 @@ Pack-based access control now enforced end-to-end. Infrastructure already existe
 - DD projects, VDR — separate from pack system
 - Stripe payment flow not yet implemented — packs are activated via admin/DB
 
+### ✅ COMPLETE — Demographics Overhaul to GIS-Grade (2026-03-19)
+Full overhaul of /analysis/demographics to match STDB / LandVision / ArcGIS Business Analyst.
+
+**Isochrone polygons (replaces simple circles for drive-time):**
+- drivetime-service.ts: generateIsochrone() binary-searches 36 bearings against
+  Google Distance Matrix API to build real road-network polygon boundaries
+- getDriveTimeBatch() batches 25 destinations/request (cost: ~98 API calls per
+  isochrone vs. 252 unbatched). 24hr cache per isochrone.
+- computePolygonAreaSqMiles() via Shoelace formula, pointInPolygon() ray-casting
+- Fallback: no API key → circle polygon at estimated radius
+
+**Census polygon aggregation:**
+- census-service.ts: getDemographicsForPolygon() generates dense grid within
+  polygon, resolves each point to tract, population-weighted aggregation
+- Added B11001_001E (total households) to all census queries
+- Derived: aggregateHouseholdIncome = totalHouseholds × medianHHI (spending power)
+- Fixed populationDensity for aggregated results (was always undefined)
+
+**Tract-level historical trends:**
+- fetchHistoricalYearData now tries tract-level first (was county-only)
+- Returns 5-year CAGR for population, income, home value
+- MarketTrendAnalysis shows geographic level badge + CAGR summary cards
+
+**API endpoints:**
+- New: POST /api/demographics/isochrone (lat/lng + targetMinutes → polygon)
+- Updated: POST /api/demographics/location accepts polygonBoundary param
+- Updated: POST /api/demographics/historical-trends returns cagr + geographicLevel
+
+**Client (Index.tsx + MarketTrendAnalysis.tsx):**
+- Drive-time mode renders Google Maps Polygon instead of Circle
+- Added Households, Spending Power, Pop. Density to stat cards + comparison table
+- CAGR cards with trend indicators above trend chart
+
+**Key files:**
+- server/services/drivetime-service.ts (isochrone generation, batch Distance Matrix)
+- server/services/census-service.ts (polygon aggregation, households, tract trends)
+- server/routes.ts (isochrone + polygon endpoints)
+- shared/schema.ts (totalHouseholds, aggregateHouseholdIncome on DemographicSummary)
+- client/src/pages/analysis/demographics/Index.tsx
+- client/src/components/demographics/MarketTrendAnalysis.tsx
+
 ---
 
 ## Active Technical Patterns
