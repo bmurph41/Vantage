@@ -113,21 +113,28 @@ Sales Comps: /analysis/sales-comps/upload
 Rate Comps: /analysis/rate-comps
 Empty state CTAs now point directly to these flows.
 
-### 3. CRM Dashboard Assessment (MEDIUM)
-crm-dashboard.tsx exists but not assessed. May need upgrade to match
-new record page quality. Check /crm root route.
+### 3. CRM Dashboard Assessment — ✅ DONE (2026-03-19)
+Assessed: already solid (684 lines, 6 KPI cards, pipeline bars, activity panels,
+asset class breakdown, property grid, quick actions). Quality matches record pages.
+No upgrade needed — flat layout is appropriate for dashboards.
 
-### 4. last_contacted_at Backfill (LOW — only 1 contact in DB now)
-SQL: UPDATE crm_contacts SET last_contacted_at = (
-  SELECT MAX(created_at) FROM crm_activities
-  WHERE entity_type='contact' AND entity_id=crm_contacts.id
-) WHERE org_id = '...';
+### 4. last_contacted_at Backfill — ✅ DONE (2026-03-19)
+Script at scripts/backfill-last-contacted.sql. Safe to re-run. Run via:
+  psql $DATABASE_URL -f scripts/backfill-last-contacted.sql
 
-### 5. Frontend Visual QA (LOW)
-DCF tabs, FM design system consistency.
+### 5. Frontend Visual QA — ✅ DONE (2026-03-19)
+FM design system (fm-page, fm-header, fm-panel, fm-body) was defined in index.css
+but 3 tabs used ad-hoc headers. Fixed: monte-carlo.tsx, debt-scenarios.tsx,
+scenario-comparison.tsx now use fm-header/fm-header-title/fm-header-sub/fm-header-actions
+and fm-body wrappers. Remaining tabs (dcf-calculator, pro-forma, historical-pl,
+exit-strategy, model-returns, deal-pricing, capital-stack, debt-inputs) already
+use FM design system correctly.
 
-### 6. Property Form Geocoding (LOW)
-Auto-populate lat/lng from address for comp radius queries.
+### 6. Property Form Geocoding — ✅ DONE (2026-03-19)
+AddressInput already extracted lat/lng from Google Maps but property-form-modal.tsx
+wasn't capturing them. Fixed: onAddressSelect now stores lat/lng in state,
+coordinates:{lat,lng} included in create/update mutations, existing coords
+populated when editing. crmProperties.coordinates jsonb field was already in schema.
 
 ---
 

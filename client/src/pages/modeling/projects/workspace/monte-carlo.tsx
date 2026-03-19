@@ -357,10 +357,10 @@ export default function MonteCarloPage() {
 
   return (
     <div className="fm-page" ref={pdfRef}>
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h1 className="text-2xl font-bold">Monte Carlo Simulation</h1>
-          <p className="text-muted-foreground">
+          <div className="fm-header-title">Monte Carlo Simulation</div>
+          <div className="fm-header-sub">
             {hasResults ? (
               <>
                 {mcData?.iterations?.toLocaleString()} iterations
@@ -377,9 +377,9 @@ export default function MonteCarloPage() {
             ) : (
               'Run a simulation to see probability distributions for your deal returns'
             )}
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="fm-header-actions">
           <Button
             variant="outline"
             size="sm"
@@ -424,6 +424,7 @@ export default function MonteCarloPage() {
         </div>
       </div>
 
+      <div className="fm-body">
       {showConfig && (
         <Card>
           <CardHeader className="pb-3">
@@ -1034,6 +1035,7 @@ export default function MonteCarloPage() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

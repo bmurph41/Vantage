@@ -486,14 +486,14 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
         <WorkflowNavigation currentTab="debt" onNavigate={onTabChange} />
       )}
       
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-semibold">Debt Scenarios</h2>
-          <p className="text-sm text-muted-foreground">
+          <div className="fm-header-title">Debt Scenarios</div>
+          <div className="fm-header-sub">
             Model financing options for {project?.marinaName}
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="fm-header-actions">
           <Button
             variant="outline"
             size="sm"
@@ -531,6 +531,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
         </div>
       </div>
 
+      <div className="fm-body">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
@@ -1076,6 +1077,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
         </TabsContent>
       </Tabs>
 
+      </div>
     </div>
   );
 }

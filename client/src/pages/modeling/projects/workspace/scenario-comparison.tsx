@@ -202,17 +202,17 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
 
   return (
     <div className="fm-page" ref={pdfRef}>
-      <div className="flex items-center justify-between">
+      <div className="fm-header">
         <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <GitCompare className="h-5 w-5" />
+          <div className="fm-header-title flex items-center gap-2">
+            <GitCompare className="h-4 w-4" />
             Scenario Comparison
-          </h2>
-          <p className="text-sm text-muted-foreground">
+          </div>
+          <div className="fm-header-sub">
             Compare assumptions and metrics across scenarios for IC review
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="fm-header-actions">
           <ExportPdfButton contentRef={pdfRef} filename="scenario-comparison" title="Scenario Comparison" />
           {selectedScenarios.length >= 2 && (
             <Button 
@@ -227,6 +227,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
         </div>
       </div>
 
+      <div className="fm-body">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Select Scenarios to Compare</CardTitle>
@@ -635,6 +636,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }

@@ -262,6 +262,8 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zipCode, setZipCode] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   // Address field errors
   const errors = useMemo(() => {
@@ -320,6 +322,9 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       setCity(property.city || "");
       setState(property.state || "");
       setZipCode(property.zipCode || "");
+      const coords = (property as any).coordinates;
+      setLatitude(coords?.lat ?? null);
+      setLongitude(coords?.lng ?? null);
       
       // Load storage capacity from top-level fields (matching crmProperties schema)
       const propAny = property as any;
@@ -444,13 +449,14 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       if (linearFeet) specifications.linearFeet = linearFeet;
       if (yearBuilt) specifications.yearBuilt = yearBuilt;
 
-      const cleanData: Record<string, any> = { 
+      const cleanData: Record<string, any> = {
         ...data,
         address: address.trim() || undefined,
         city: city.trim() || undefined,
         state: state.trim() || undefined,
         zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
+        ...(latitude != null && longitude != null ? { coordinates: { lat: latitude, lng: longitude } } : {}),
       };
       
       // Add storage capacity to top-level fields (matching crmProperties schema)
@@ -514,13 +520,14 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
       if (linearFeet) specifications.linearFeet = linearFeet;
       if (yearBuilt) specifications.yearBuilt = yearBuilt;
 
-      const cleanData: Record<string, any> = { 
+      const cleanData: Record<string, any> = {
         ...data,
         address: address.trim() || undefined,
         city: city.trim() || undefined,
         state: state.trim() || undefined,
         zipCode: zipCode.trim() || undefined,
         specifications: Object.keys(specifications).length > 0 ? specifications : {},
+        ...(latitude != null && longitude != null ? { coordinates: { lat: latitude, lng: longitude } } : {}),
       };
       
       // Add storage capacity to top-level fields (matching crmProperties schema)
@@ -712,6 +719,8 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                       if (components.city) setCity(components.city);
                       if (components.state) setState(components.state);
                       if (components.zipCode) setZipCode(components.zipCode);
+                      if (components.lat != null) setLatitude(components.lat);
+                      if (components.lng != null) setLongitude(components.lng);
                     }}
                     label="Street Address *"
                     placeholder="123 Harbor Way"
