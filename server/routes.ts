@@ -63,6 +63,7 @@ import crmNotesRoutes from "./routes/crm-notes-routes";
 import crmSummaryRoutes from "./routes/crm-summary-routes";
 import crmRelationshipScoreRouter from './routes/crm-relationship-score';
 import crmSavedViewsRoutes from "./routes/crm-saved-views-routes";
+import crmIntelligenceRoutes from "./routes/crm-intelligence-routes";
 import crmAssociationsRoutes from "./routes/crm-associations-routes";
 import pipelineAnalyticsRoutes from "./routes/pipeline-analytics-routes";
 import { getSlaRouter } from "./routes/sla-routes";
@@ -424,6 +425,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/notes", crmNotesRoutes);
   app.use("/api/crm/summary", crmSummaryRoutes);
   app.use("/api/crm/saved-views", authenticateUser, crmSavedViewsRoutes);
+  app.use("/api/comments", authenticateUser, enforceTenant, crmIntelligenceRoutes);
+  app.use("/api/crm", authenticateUser, enforceTenant, crmIntelligenceRoutes);
+  app.use("/api/sla", authenticateUser, enforceTenant, crmIntelligenceRoutes);
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, pipelineAnalyticsRoutes);
   app.use("/api/crm/associations", crmAssociationsRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);

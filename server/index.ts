@@ -132,6 +132,9 @@ server.listen({
         log(`[DocIntel] Recovery check failed: ${err.message}`);
       });
 
+      // DISABLED: Docket, MarinaMatch Intel, and Listing Scraper cron jobs turned off to reduce RAM usage.
+      // Re-enable by uncommenting the blocks below.
+      /*
       try {
         startDocketCronJobs(docketStorage);
         log('Docket background jobs started');
@@ -149,7 +152,7 @@ server.listen({
       try {
         startListingScheduler();
         log('MarinaMatch listing scrape scheduler started');
-        
+
         // Auto-seed global broker sources in background
         autoSeedGlobalBrokerSources().then(result => {
           if (result.created > 0 || result.updated > 0) {
@@ -161,6 +164,7 @@ server.listen({
       } catch (error) {
         log(`Failed to start MarinaMatch listing scheduler: ${error}`);
       }
+      */
 
       // Skip Docket WebSocket in development to avoid conflict with Vite HMR WebSocket
       if (process.env.NODE_ENV !== 'development') {
