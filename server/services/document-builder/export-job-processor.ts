@@ -401,7 +401,6 @@ class ExportJobProcessor {
       await this.processJob(job.id);
     }
   }
-}
 
   /**
    * Start polling for pending export jobs
@@ -416,7 +415,7 @@ class ExportJobProcessor {
         const pendingJobs = await db
           .select({ id: omExportJobs.id })
           .from(omExportJobs)
-          .where(eq(omExportJobs.status, 'pending'))
+          .where(eq(omExportJobs.status, 'queued'))
           .limit(3);
         for (const job of pendingJobs) {
           await this.processJob(job.id.toString()).catch(err =>

@@ -26,6 +26,8 @@ import {
   PropertyIntelTab,
   PropertyActivitiesTab,
 } from '@/components/crm/PropertyRecordTabs';
+import { PropertyStatusPanel } from '@/components/crm/_wip/PropertyStatusPanel';
+import { CommentThreadsPanel } from '@/components/crm/_wip/comment-threads-panel';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────
@@ -323,6 +325,15 @@ export default function PropertyRecordPage() {
           value: 'intel',
           label: 'Intel',
           content: <PropertyIntelTab state={property.state} city={property.city} />,
+        },
+        {
+          value: 'discussion',
+          label: 'Discussion',
+          content: <CommentThreadsPanel
+            entityType="property"
+            entityId={id}
+            entityName={property.title}
+          />,
         },
         {
           value: 'notes',

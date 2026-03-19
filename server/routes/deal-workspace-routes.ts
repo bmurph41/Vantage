@@ -370,13 +370,11 @@ dealWorkspaceRouter.get('/api/deals', async (req: Request, res: Response) => {
     const deals = await db
       .select({
         id: crmDeals.id,
-        name: crmDeals.dealName,
+        name: crmDeals.title,
         stage: crmDeals.stage,
         value: crmDeals.value,
         probability: crmDeals.probability,
-        expectedClose: crmDeals.expectedClose,
-        outcome: crmDeals.outcome,
-        propertyId: crmDeals.propertyId,
+        expectedClose: crmDeals.expectedCloseDate,
         createdAt: crmDeals.createdAt,
       })
       .from(crmDeals)

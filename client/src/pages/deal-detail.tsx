@@ -25,6 +25,11 @@ import ConvertToProjectModal from "@/components/modals/convert-to-project-modal"
 import DocumentGeneratorModal from "@/components/modals/document-generator-modal";
 import CompSetSelector from "@/components/comp-set-selector";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { RedFlagsPanel } from "@/components/crm/_wip/red-flags-panel";
+import { PhaseGatesPanel } from "@/components/crm/_wip/phase-gates-panel";
+import { DealPlaybookPanel } from "@/components/crm/_wip/deal-playbook-panel";
+import { CommentThreadsPanel } from "@/components/crm/_wip/comment-threads-panel";
+import { PipelineForecastingPanel } from "@/components/crm/_wip/pipeline-forecasting-panel";
 
 // ── Helpers ───────────────────────────────────────────────
 function fmtCurrency(v: string | number | null | undefined): string {
@@ -701,6 +706,35 @@ export default function DealDetail() {
             value: 'intel',
             label: 'Intel',
             content: <DealIntelTab state={deal.state} />,
+          },
+          {
+            value: 'playbook',
+            label: 'Playbook',
+            content: <DealPlaybookPanel
+              dealId={dealId}
+              dealType={deal.type || undefined}
+              stageId={deal.stageId || undefined}
+              pipelineId={deal.pipelineId || undefined}
+            />,
+          },
+          {
+            value: 'red-flags',
+            label: 'Red Flags',
+            content: <RedFlagsPanel dealId={dealId} />,
+          },
+          {
+            value: 'phase-gates',
+            label: 'Approvals',
+            content: <PhaseGatesPanel dealId={dealId} />,
+          },
+          {
+            value: 'discussion',
+            label: 'Discussion',
+            content: <CommentThreadsPanel
+              entityType="deal"
+              entityId={dealId}
+              entityName={deal.title || deal.name}
+            />,
           },
           {
             value: 'notes',
