@@ -119,7 +119,7 @@ type PendingItem = {
   status: string;
 };
 
-type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'owner' | 'investor' | 'broker' | 'operations';
+type PackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations' | 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'owner' | 'investor' | 'broker';
 
 type BootstrapData = {
   persona: any;
@@ -186,7 +186,10 @@ export default function UnifiedSidebar() {
   const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
 
   // Helper function to check if user has access to a pack
+  // In development mode, always grant access so the sidebar is usable without pack rows in the DB
   const hasPack = (packType: PackType): boolean => {
+    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+    if (isDev && activePacks.length === 0) return true;
     return activePacks.includes(packType);
   };
 
@@ -568,7 +571,7 @@ export default function UnifiedSidebar() {
         </div>
         
         {/* Operations Section - Flattened navigation with in-page tabs */}
-        {canViewSection('operations') && (
+        {canViewSection('operations') && hasPack('operations') && (
           <div className="mb-2">
             <SectionHeader 
               title="Operations" 
@@ -584,7 +587,7 @@ export default function UnifiedSidebar() {
         )}
         
         {/* CRM Section - Contacts, Companies, Properties */}
-        {canViewSection('crm') && (
+        {canViewSection('crm') && hasPack('crm_pipeline') && (
           <div className="mb-2">
             <SectionHeader 
               title="CRM" 
@@ -631,7 +634,7 @@ export default function UnifiedSidebar() {
         )}
         
         {/* Pipeline Section - Deal Board, Activity Log, Follow-Ups, Forecast */}
-        {canViewSection('crm') && (
+        {canViewSection('crm') && hasPack('crm_pipeline') && (
           <div className="mb-2">
             <SectionHeader 
               title="Pipeline" 
@@ -679,7 +682,7 @@ export default function UnifiedSidebar() {
         )}
         
         {/* Analysis Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
-        {canViewSection('modeling_tools') && (
+        {canViewSection('modeling_tools') && hasPack('modeling_tools') && (
           <div className="mb-2">
             <SectionHeader 
               title="Analysis" 
@@ -842,7 +845,7 @@ export default function UnifiedSidebar() {
         </div>
         
         {/* Market Intelligence Section */}
-        {canViewSection('market_intelligence') && (
+        {canViewSection('market_intelligence') && hasPack('analysis') && (
           <div className="mb-2">
             <SectionHeader 
               title="Market Intelligence" 

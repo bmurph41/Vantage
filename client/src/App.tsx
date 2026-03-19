@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { PackGate, type PackType } from "@/contexts/PackContext";
 import { AIAssistant } from "@/components/ai-assistant";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ThemeProvider } from '@/contexts/ThemeProvider';
@@ -394,6 +395,17 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Layout wrapper that enforces pack access — shows upgrade prompt if pack is not active
+function GatedLayout({ pack, children }: { pack: PackType | PackType[]; children: React.ReactNode }) {
+  return (
+    <UnifiedLayout>
+      <PackGate pack={pack}>
+        {children}
+      </PackGate>
+    </UnifiedLayout>
+  );
+}
+
 // Wrapper component to handle router props for notification settings
 function NotificationSettingsWrapper(props: any) {
   return <NotificationSettingsPage />;
@@ -721,227 +733,227 @@ function Router() {
       <Route path="/rent-roll">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Executive />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/executive">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Executive />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Projects />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ProjectLayout>
                   <RentRollV2Dashboard />
                 </RentRollV2ProjectLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/reports">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ProjectLayout>
                   <RentRollV2Reports />
                 </RentRollV2ProjectLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/scenarios">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ProjectLayout>
                   <RentRollV2Scenarios />
                 </RentRollV2ProjectLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/cohorts">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ProjectLayout>
                   <RentRollV2Cohorts />
                 </RentRollV2ProjectLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/projects/:id/data-quality">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ProjectLayout>
                   <RentRollV2DataQuality />
                 </RentRollV2ProjectLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2PortfolioLayout>
                   <RentRollV2Portfolio />
                 </RentRollV2PortfolioLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/reports">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2PortfolioLayout>
                   <RentRollV2Reports />
                 </RentRollV2PortfolioLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/cohorts">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2PortfolioLayout>
                   <RentRollV2Cohorts />
                 </RentRollV2PortfolioLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/portfolio/data-quality">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2PortfolioLayout>
                   <RentRollV2PortfolioDataQuality />
                 </RentRollV2PortfolioLayout>
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/cohorts">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Cohorts />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/reports">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Reports />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/scenarios">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Scenarios />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/admin-types">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2AdminTypes />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/gl-reconciliation">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2GLReconciliation />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/integrations">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Integrations />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/reconciliation">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Reconciliation />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
@@ -1004,33 +1016,33 @@ function Router() {
       <Route path="/rent-roll/report-packages">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2ReportPackages />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/snapshots">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2Snapshots />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
       <Route path="/rent-roll/interactive-analytics">
         {() => (
           <AuthGuard>
-            <UnifiedLayout>
+            <GatedLayout pack="operations">
               <Suspense fallback={<PageLoader />}>
                 <RentRollV2InteractiveAnalytics />
               </Suspense>
-            </UnifiedLayout>
+            </GatedLayout>
           </AuthGuard>
         )}
       </Route>
@@ -1038,16 +1050,16 @@ function Router() {
       {/* Portfolio Routes */}
       <Route path="/portfolio">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <Portfolio />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/portfolio/:id">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <MarinaDetail />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
@@ -1059,9 +1071,9 @@ function Router() {
       {/* Operations Routes - Tabbed Module Pages */}
       <Route path="/operations/dockit">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <DockitTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       {/* Redirect old rent-roll route to new V2 module */}
@@ -1070,16 +1082,16 @@ function Router() {
       </Route>
       <Route path="/operations/commercial-tenants">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <CommercialTenants />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/fuel">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <FuelSalesTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/integrations">
@@ -1089,51 +1101,51 @@ function Router() {
       </Route>
       <Route path="/operations/ship-store">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <ShipStoreTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/service">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <ServiceTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/payroll">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <PayrollTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-rentals">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <BoatRentalsTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-club">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <BoatClubTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-sales">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <BoatSalesTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/bookkeeping">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <BookkeepingTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/operations/budgeting">
@@ -1145,9 +1157,9 @@ function Router() {
       {/* Marketing - Standalone Route */}
       <Route path="/marketing">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="operations">
             <MarketingTabbed />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
@@ -1365,9 +1377,9 @@ function Router() {
       {/* CRM Routes with Unified Layout */}
       <Route path="/crm">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <CRMDashboard />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
@@ -1390,39 +1402,39 @@ function Router() {
 
       <Route path="/deal-workspace">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <DealWorkspace />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       {/* Pipeline sub-pages */}
       <Route path="/pipeline/deal-board">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Pipeline />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/pipeline/follow-ups">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <CrmTasks />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/pipeline/activity-log">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ActivityLog />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/pipeline/forecast">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Forecast />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
@@ -1442,67 +1454,67 @@ function Router() {
       {/* CRM Record Pages - must be before list routes */}
       <Route path="/crm/contacts/:id">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ContactRecordPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/companies/:id">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <CompanyRecordPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/properties/:id">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <PropertyRecordPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
       {/* CRM List Pages */}
       <Route path="/crm/contacts">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Contacts />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/companies">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Companies />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/properties">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Properties />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/pending-properties">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <PendingProperties />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/pending-contacts">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <PendingContacts />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/pending-companies">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <PendingCompanies />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/deals">
@@ -1513,37 +1525,37 @@ function Router() {
       </Route>
       <Route path="/crm/deals/compare">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <DealComparison />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/deals/:dealId">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <DealDetail />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/deals/:dealId/om">
         {(params: { dealId: string }) => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <DealOMBuilder dealId={params.dealId} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/tasks">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <CrmTasks />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/prospecting">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Prospecting />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/marketing-automation">
@@ -1561,123 +1573,123 @@ function Router() {
       </Route>
       <Route path="/crm/deal-analytics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <DealAnalyticsPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/pipeline-insights">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <PipelineInsights />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/pipeline-velocity">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Suspense fallback={<PageLoader />}>
               <PipelineVelocity />
             </Suspense>
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/analytics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Analytics />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/forecast">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Forecast />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/forms">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Forms />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/labels">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Labels />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/products">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Products />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/workflows">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Workflows />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/webhooks">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Webhooks />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/archive">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ArchivePage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/dedupe">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Dedupe />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/scoring">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <Scoring />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/import-contacts">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ImportContacts />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/import-history">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ImportHistory />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/activities">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <CrmActivitiesPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/crm/activity">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="crm_pipeline">
             <ActivityLog />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
@@ -1704,30 +1716,30 @@ function Router() {
       {/* New structure: Overview (merged Dashboard + Analytics) and Workroom (weekly cards) */}
       <Route path="/prospecting">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="prospecting">
             <ProspectingOverview />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/prospecting/workroom">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="prospecting">
             <ProspectingWorkroom />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/prospecting/markets">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="prospecting">
             <MarketTargets />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/prospecting/campaigns">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="prospecting">
             <ProspectingCampaigns />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/marinamatch">
@@ -1761,212 +1773,212 @@ function Router() {
       {/* Analysis / Sales Comps Routes */}
       <Route path="/analysis/sales-comps/map">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsMapView />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/analytics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsAnalytics />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/projects">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsProjects />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/upload">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsUpload />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/columns">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsColumnManager />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/bulk-edit">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsBulkEdit />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/compare">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsCompare />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/pending-profiles">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsPendingProfiles />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/pending-comps">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsPendingComps />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/sales-comps/:id">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <SalesCompsDetail {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/projects">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <ScProjectsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/projects/:id">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <ScProjectsReport {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/map">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsMapView />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/industry-standards">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
           <IndustryStandards />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/valuation-timeline">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <ValuationTimelineIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/marina-comps">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <MarinaCompsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/analytics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsAnalytics />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/upload">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsUpload />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/columns">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsColumnManager />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/bulk-edit">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsBulkEdit />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/compare">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsCompare />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/rate-comps/:id">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <RateCompsDetail {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/marina-database">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <MarinaDatabase />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/demographics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <DemographicsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/benchmarks">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <BenchmarksIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/capital-markets">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <CapitalMarketsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/hub">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <AnalysisHub />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/analysis/marinalytics">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <MarinalyticsPage />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/marinalytics/marina-map">
@@ -1978,9 +1990,9 @@ function Router() {
       </Route>
       <Route path="/analysis/financial-analysis">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="analysis">
             <FinancialAnalysis />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/marinalytics/financial-analysis">
@@ -1992,37 +2004,37 @@ function Router() {
       </Route>
       <Route path="/modeling/projects/new">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <SetupWizard />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ModelingProjectsIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/settings/chart-of-accounts">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ChartOfAccounts />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/settings/category-mapping">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <CategoryMapping />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/settings/normalization-status">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <NormalizationStatus />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/investment-criteria">
@@ -2032,159 +2044,159 @@ function Router() {
       </Route>
       <Route path="/modeling/settings">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ModelingSettings />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/portfolio/returns">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <PortfolioReturns />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/portfolio">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ModelingPortfolio />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/funds">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ModelingFunds />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/funds/:fundId">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <FundDetail />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/lp-portal">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <LPPortal />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/transaction-closing">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <TransactionClosingPage {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       {/* Project Workspace Route */}
       <Route path="/modeling/projects/:projectId">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ProjectWorkspace {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       {/* Document Intelligence Route */}
       <Route path="/modeling/projects/:projectId/doc-intel">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <DocumentIntelligence {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
       {/* COA Mapping Review Route */}
       <Route path="/modeling/doc-intel/:uploadId/coa-review">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <CoaMappingReview {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
       {/* Departmental P&L Route */}
       <Route path="/modeling/doc-intel/:uploadId/departmental-pl">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <DepartmentalPL {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       {/* Exit Strategy Suite Routes */}
       <Route path="/modeling/projects/:projectId/exit">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitStrategyDashboard {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/scenarios">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitScenarios {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/scenarios/:scenarioId">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitScenarioDetail {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/tax">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitTaxCalculator {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/net-proceeds">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitNetProceeds {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/1031">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <Exit1031Exchange {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/dst">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitDSTAnalysis {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/seller-financing">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitSellerFinancing {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/earnout">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitEarnout {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/waterfall">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitWaterfall {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/dev/exit-reconciliation">
@@ -2196,100 +2208,100 @@ function Router() {
       </Route>
       <Route path="/modeling/projects/:projectId/exit/irr">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitIRRCalculator {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/sensitivity">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitSensitivity {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/ai-insights">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitAIInsights {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/projects/:projectId/exit/compare">
         {(params) => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitScenarioComparison {...params} />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/returns-valuation">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ReturnsValuation />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
 
       <Route path="/modeling/scenarios/:rest*">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ScenariosIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/scenarios">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ScenariosIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       <Route path="/modeling/debt-scenarios">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ScenariosIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/pnl/upload">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <PnlUpload />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/pnl/review">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <PnlReview />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/pnl/keyword-bank">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <PnlKeywordBank />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/pnl-parser">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <PnlUploadReview />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       
       <Route path="/modeling/exit-strategies">
         {() => (
-          <UnifiedLayout>
+          <GatedLayout pack="modeling_tools">
             <ExitStrategiesIndex />
-          </UnifiedLayout>
+          </GatedLayout>
         )}
       </Route>
       

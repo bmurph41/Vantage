@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register auth routes (no authentication required for login/register)
   app.use("/api/auth", authRoutes);
   app.use("/api/dd", authenticateUser, enforceTenant);
-  app.use("/api/crm", authenticateUser, enforceTenant);
+  app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"));
   app.use("/api/crm", playbookRoutes);
   app.use("/api/crm/forecasting", forecastingRoutes);
   app.use("/api/crm/phase-gates", phaseGatesRoutes);
@@ -424,11 +424,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", crmPreviewRoutes);
   app.use("/api/crm/notes", crmNotesRoutes);
   app.use("/api/crm/summary", crmSummaryRoutes);
-  app.use("/api/crm/saved-views", authenticateUser, crmSavedViewsRoutes);
+  app.use("/api/crm/saved-views", authenticateUser, requirePack("crm_pipeline"), crmSavedViewsRoutes);
   app.use("/api/comments", authenticateUser, enforceTenant, crmIntelligenceRoutes);
-  app.use("/api/crm", authenticateUser, enforceTenant, crmIntelligenceRoutes);
-  app.use("/api/sla", authenticateUser, enforceTenant, crmIntelligenceRoutes);
-  app.use("/api/crm/analytics", authenticateUser, enforceTenant, pipelineAnalyticsRoutes);
+  app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
+  app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
+  app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/crm/associations", crmAssociationsRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api", authenticateUser, dealDDRoutes);
@@ -437,8 +437,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCommentRoutes(app);
   app.use("/api/email-marketing", authenticateUser, emailMarketingRoutes);
   app.use("/api/archive", authenticateUser, archiveRoutes);
-  app.use("/api/modeling/scenario-templates", authenticateUser, scenarioTemplateRoutes);
-  app.use("/api/modeling", authenticateUser, modelingValidationRoutes);
+  app.use("/api/modeling/scenario-templates", authenticateUser, requirePack("modeling_tools"), scenarioTemplateRoutes);
+  app.use("/api/modeling", authenticateUser, requirePack("modeling_tools"), modelingValidationRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
   app.use("/api/debt", authenticateUser, enhancedDebtRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
@@ -446,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);
   app.use(authenticateUser, tourProgressRoutes);
   app.use(authenticateUser, searchRoutes);
-  app.use("/api/crm", authenticateUser, bulkEmailRoutes);
+  app.use("/api/crm", authenticateUser, requirePack("crm_pipeline"), bulkEmailRoutes);
   // Utilization module routes
   const { createUtilizationRouter } = await import('./modules/utilization/utilization-routes');
   app.use("/api/utilization", authenticateUser, createUtilizationRouter());
@@ -475,18 +475,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/stages", authenticateUser);
   app.use("/api/pipeline-stages", authenticateUser);
   app.use("/api/activities", authenticateUser);
-  app.use("/api/sales-comps", authenticateUser, enforceTenant);
-  app.use("/api/comp-columns", authenticateUser);
-  app.use("/api/sc-projects", authenticateUser);
+  app.use("/api/sales-comps", authenticateUser, enforceTenant, requirePack("analysis"));
+  app.use("/api/comp-columns", authenticateUser, requirePack("analysis"));
+  app.use("/api/sc-projects", authenticateUser, requirePack("analysis"));
   app.use("/api/saved-searches", authenticateUser);
   app.use("/api/profit-centers", authenticateUser);
   app.use("/api/recommendations", authenticateUser);
   app.use("/api/pending-properties", authenticateUser);
   app.use("/api/pending-contacts", authenticateUser);
   app.use("/api/pending-companies", authenticateUser);
-  app.use("/api/rate-comps", authenticateUser, enforceTenant);
-  app.use("/api/rc-columns", authenticateUser);
-  app.use("/api/rc-projects", authenticateUser);
+  app.use("/api/rate-comps", authenticateUser, enforceTenant, requirePack("analysis"));
+  app.use("/api/rc-columns", authenticateUser, requirePack("analysis"));
+  app.use("/api/rc-projects", authenticateUser, requirePack("analysis"));
   app.use("/api/rc-saved-searches", authenticateUser);
   app.use("/api/rc-recommendations", authenticateUser);
   app.use("/api/rc-pending-properties", authenticateUser);
@@ -593,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/rent-roll", authenticateUser, enforceTenant, requireRentRoll(), rraRoutes);
   app.use("/api/valuator-export", authenticateUser, valuatorExportRoutes);
-  app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, modelingRentRollRoutes);
+  app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, requirePack("modeling_tools"), modelingRentRollRoutes);
   app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
   app.use("/api/budgets", authenticateUser, enforceTenant, budgetRoutes);
   app.use("/api/tax-waterfall", authenticateUser, enforceTenant, taxWaterfallRoutes);
@@ -690,13 +690,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/vdr", authenticateUser, vdrRouter);
   app.use(authenticateUser, enforceTenant, vdrActivityRouter);
   app.use(authenticateUser, enforceTenant, dealWorkspaceRouter);
-  app.use("/api/ship-store", authenticateUser, shipStoreRouter);
-  app.use("/api/service", authenticateUser, serviceRouter);
-  app.use("/api/boat-rentals", authenticateUser, boatRentalsRouter);
-  app.use("/api/boat-club", authenticateUser, boatClubRouter);
-  app.use("/api/boat-sales", authenticateUser, boatSalesRouter);
-  app.use("/api/operations", authenticateUser, enforceTenant, operationsSyncRoutes);
-  app.use("/api/operations-context", authenticateUser, enforceTenant, operationsContextRoutes);
+  app.use("/api/ship-store", authenticateUser, requirePack("operations"), shipStoreRouter);
+  app.use("/api/service", authenticateUser, requirePack("operations"), serviceRouter);
+  app.use("/api/boat-rentals", authenticateUser, requirePack("operations"), boatRentalsRouter);
+  app.use("/api/boat-club", authenticateUser, requirePack("operations"), boatClubRouter);
+  app.use("/api/boat-sales", authenticateUser, requirePack("operations"), boatSalesRouter);
+  app.use("/api/operations", authenticateUser, enforceTenant, requirePack("operations"), operationsSyncRoutes);
+  app.use("/api/operations-context", authenticateUser, enforceTenant, requirePack("operations"), operationsContextRoutes);
   app.use("/api/opssos", authenticateUser, enforceTenant, opssosRouter);
   app.use("/api/admin", authenticateUser, enforceTenant, adminRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
@@ -711,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Entity Linking API (Phase 2B) - Cross-module relationship management
   registerEntityLinkingRoutes(app);
   registerEventMonitoringRoutes(app);
-  app.use("/api/analytics", authenticateUser, analyticsRoutes);
+  app.use("/api/analytics", authenticateUser, requirePack("analytics_pro"), analyticsRoutes);
   app.use("/api/ai-assistant", authenticateUser, aiAssistantRoutes);
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
   app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);
@@ -37278,7 +37278,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   // ===== Fuel Integrations Routes =====
 
-  app.use("/api/operations/fuel-integrations", authenticateUser);
+  app.use("/api/operations/fuel-integrations", authenticateUser, requirePack("operations"));
 
   // Get organization's fuel integration settings
   app.get("/api/operations/fuel-integrations", requirePermission('fuel:read'), async (req: any, res) => {

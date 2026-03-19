@@ -28,6 +28,11 @@ export function requirePack(...requiredPacks: PackType[]) {
       const activePacks = await packService.getActivePacks(user.orgId);
       req.activePacks = activePacks;
 
+      // In development, bypass pack checks when org has no packs configured yet
+      if (process.env.NODE_ENV === "development" && activePacks.length === 0) {
+        return next();
+      }
+
       for (const requiredPack of requiredPacks) {
         if (!activePacks.includes(requiredPack)) {
           const packInfo = await packService.getPackInfo(requiredPack);

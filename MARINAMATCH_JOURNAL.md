@@ -1,6 +1,6 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-17)
+## Current State (2026-03-19)
 
 ### ✅ COMPLETE — CRM Record Pages (10x upgrade)
 All 4 record pages rebuilt with institutional 3-column CrmRecordPage layout.
@@ -56,6 +56,38 @@ All CRM analytics pages assessed — fully built, no work needed:
 - assumptions.tsx dynamic via getModelConfig()
 - XIRR consolidated, seasonality auto-derived, dummy data purged
 
+### ✅ COMPLETE — Feature Gating Enforcement Layer (2026-03-19)
+Pack-based access control now enforced end-to-end. Infrastructure already existed (pack-service, pack-guard middleware, PackGate/RequirePack components, organizationPacks table); this work wired it all up.
+
+**Server — `requirePack()` added to 20 route mount points in routes.ts:**
+- `crm_pipeline`: /api/crm (7 mounts), /api/sla, /api/crm/analytics, /api/crm/saved-views
+- `modeling_tools`: /api/modeling (2 mounts), /api/modeling-rent-roll
+- `analysis`: /api/sales-comps, /api/sc-projects, /api/comp-columns, /api/rate-comps, /api/rc-projects, /api/rc-columns
+- `operations`: /api/operations (2 mounts), /api/ship-store, /api/service, /api/boat-rentals, /api/boat-club, /api/boat-sales, /api/operations/fuel-integrations
+- `analytics_pro`: /api/analytics
+- Previously guarded (unchanged): /api/funds (requireFundManagement), /api/prospecting (requireProspecting), /api/rent-roll (requireRentRoll)
+
+**Client — App.tsx route gating (146 routes):**
+- Added `GatedLayout` component = `UnifiedLayout` + `PackGate`
+- All CRM, pipeline, modeling, analysis, operations, prospecting routes wrapped with `<GatedLayout pack="...">`
+- Ungated sections preserved: dashboard, settings, workspaces, DD, VDR
+
+**Client — Sidebar pack filtering (unified-sidebar.tsx):**
+- Added `hasPack()` checks to 5 sidebar sections: Operations, CRM, Pipeline, Analysis, Market Intelligence
+- Extended local `PackType` to include `crm_pipeline`, `modeling_tools`, `analysis`
+- Investor Services already had hasPack checks (unchanged)
+
+**Dev-mode bypass:**
+- Server: `pack-guard.ts` — when `NODE_ENV=development` and org has 0 packs, requests pass through
+- Client: sidebar `hasPack()` — when dev mode and activePacks is empty, returns true
+- Prevents dev environment from being locked out when no pack rows exist in DB
+
+**What's NOT gated (by design):**
+- Dashboard, settings, onboarding, auth pages
+- Deal Workspace (/workspaces) — cross-module hub
+- DD projects, VDR — separate from pack system
+- Stripe payment flow not yet implemented — packs are activated via admin/DB
+
 ---
 
 ## Active Technical Patterns
@@ -71,9 +103,10 @@ All CRM analytics pages assessed — fully built, no work needed:
 
 ## Remaining Work (priority order)
 
-### 1. Feature Gating (HIGH — needed before real users)
-357 server + 204 client billing references exist. FM tabs and advanced CRM
-features are not gated yet. Billing infrastructure exists; needs enforcement layer.
+### 1. Stripe Payment Integration (HIGH — packs activated via admin/DB only)
+Pack enforcement is live but there's no self-serve payment flow. Stripe fields
+exist in schema (stripePriceIdMonthly, stripeSubscriptionId, etc.) but no
+webhook handlers or checkout routes. Packs currently activated manually.
 
 ### 2. Real Data Import (HIGH — platform is data-ready)
 Sales Comps: /analysis/sales-comps/upload
@@ -91,7 +124,7 @@ SQL: UPDATE crm_contacts SET last_contacted_at = (
 ) WHERE org_id = '...';
 
 ### 5. Frontend Visual QA (LOW)
-DCF tabs, FM design system consistency — post-billing.
+DCF tabs, FM design system consistency.
 
 ### 6. Property Form Geocoding (LOW)
 Auto-populate lat/lng from address for comp radius queries.
