@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Autocomplete, GoogleMap, Circle, Marker } from "@react-google-maps/api";
+import { Autocomplete, GoogleMap, Circle, Marker, Polygon } from "@react-google-maps/api";
 import { useGoogleMaps } from "@/lib/google-maps-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -74,6 +74,8 @@ interface DemographicSummary {
   educationLevels?: Record<string, number>;
   employmentStats?: Record<string, number>;
   industryDistribution?: Record<string, number>;
+  totalHouseholds?: number;
+  aggregateHouseholdIncome?: number;
   housingStats?: Record<string, number>;
   householdSize?: number;
   medianHomeValue?: number;
@@ -221,12 +223,30 @@ function LocationDemographicsCard({ data, onRemove, label }: {
       icon: Home, 
       color: "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300" 
     },
-    { 
-      label: "Household Size", 
-      value: data.householdSize ? `${data.householdSize.toFixed(1)}` : "N/A", 
-      icon: Home, 
-      color: "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300" 
+    {
+      label: "Household Size",
+      value: data.householdSize ? `${data.householdSize.toFixed(1)}` : "N/A",
+      icon: Home,
+      color: "bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300"
     },
+    {
+      label: "Households",
+      value: data.totalHouseholds ? formatNumber(data.totalHouseholds) : "N/A",
+      icon: Home,
+      color: "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-300"
+    },
+    {
+      label: "Spending Power",
+      value: data.aggregateHouseholdIncome ? formatCurrency(data.aggregateHouseholdIncome) : "N/A",
+      icon: DollarSign,
+      color: "bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300"
+    },
+    ...(data.populationDensity ? [{
+      label: "Pop. Density",
+      value: `${formatNumber(Math.round(data.populationDensity))}/sq mi`,
+      icon: MapPin,
+      color: "bg-cyan-100 dark:bg-cyan-900 text-cyan-600 dark:text-cyan-300"
+    }] : []),
   ];
 
   return (
@@ -357,11 +377,13 @@ function LocationDemographicsCard({ data, onRemove, label }: {
 function TradeAreaDemographicsDisplay({ data }: { data: DemographicSummary }) {
   const keyStats = [
     { label: "Population", value: formatNumber(data.totalPopulation), icon: Users, color: "text-blue-600" },
+    { label: "Households", value: data.totalHouseholds ? formatNumber(data.totalHouseholds) : "N/A", icon: Home, color: "text-teal-600" },
     { label: "Median Age", value: data.medianAge ? `${data.medianAge.toFixed(1)} yrs` : "N/A", icon: Users, color: "text-indigo-600" },
-    { label: "Median Income", value: formatCurrency(data.medianHouseholdIncome), icon: DollarSign, color: "text-green-600" },
-    { label: "Per Capita Income", value: formatCurrency(data.perCapitaIncome), icon: DollarSign, color: "text-emerald-600" },
+    { label: "Median HHI", value: formatCurrency(data.medianHouseholdIncome), icon: DollarSign, color: "text-green-600" },
+    { label: "Spending Power", value: data.aggregateHouseholdIncome ? formatCurrency(data.aggregateHouseholdIncome) : "N/A", icon: DollarSign, color: "text-rose-600" },
     { label: "Home Value", value: formatCurrency(data.medianHomeValue), icon: Home, color: "text-purple-600" },
     { label: "Household Size", value: data.householdSize?.toFixed(1) || "N/A", icon: Home, color: "text-orange-600" },
+    ...(data.populationDensity ? [{ label: "Pop. Density", value: `${formatNumber(Math.round(data.populationDensity))}/mi²`, icon: MapPin, color: "text-cyan-600" }] : []),
   ];
 
   return (
@@ -624,7 +646,8 @@ function LocationAnalysisSection() {
   const { toast } = useToast();
   const [selectedLocations, setSelectedLocations] = useState<SelectedLocation[]>([]);
   const [locationData, setLocationData] = useState<Map<string, Map<string, TradeAreaData>>>(new Map());
-  
+  const [isochronePolygons, setIsochronePolygons] = useState<Map<string, Array<{ lat: number; lng: number }>>>(new Map());
+
   const [defaultDistanceRings, setDefaultDistanceRings] = useState<number[]>([1]);
   const [defaultDriveTimes, setDefaultDriveTimes] = useState<number[]>([]);
   const [defaultAnalysisMode, setDefaultAnalysisMode] = useState<'distance' | 'drivetime'>('distance');
@@ -736,16 +759,18 @@ function LocationAnalysisSection() {
   }, [savedLocations, selectedProjectId]);
   
   const fetchDemographicsMutation = useMutation({
-    mutationFn: async ({ location, radiusMiles, tradeAreaKey }: { 
-      location: SelectedLocation; 
+    mutationFn: async ({ location, radiusMiles, tradeAreaKey, polygonBoundary }: {
+      location: SelectedLocation;
       radiusMiles: number;
       tradeAreaKey: string;
+      polygonBoundary?: Array<{ lat: number; lng: number }>;
     }) => {
       const response = await apiRequest('POST', '/api/demographics/location', {
         latitude: location.latitude,
         longitude: location.longitude,
         address: location.address,
-        radiusMiles: radiusMiles
+        radiusMiles: radiusMiles,
+        ...(polygonBoundary ? { polygonBoundary } : {})
       });
       const data = await response.json() as LocationDemographicsResponse;
       return { location, data, tradeAreaKey };
@@ -794,14 +819,16 @@ function LocationAnalysisSection() {
       for (const minutes of config.driveTimes) {
         const driveTime = DRIVE_TIMES.find(d => d.value === minutes);
         if (!driveTime) continue;
-        
+
         const key = `drivetime-${minutes}`;
-        
+
         let radiusMiles = driveTime.estimatedMiles;
         let radiusSource = 'estimate';
-        
+        let polygonBoundary: Array<{ lat: number; lng: number }> | null = null;
+
+        // Fetch real isochrone polygon from server
         try {
-          const response = await fetch('/api/demographics/drivetime-radius', {
+          const isoResponse = await fetch('/api/demographics/isochrone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -811,31 +838,55 @@ function LocationAnalysisSection() {
               targetMinutes: minutes
             })
           });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.calculatedMiles) {
-              radiusMiles = data.calculatedMiles;
-              radiusSource = 'google_api';
-            } else if (data.radiusMiles) {
-              radiusMiles = data.radiusMiles;
+
+          if (isoResponse.ok) {
+            const isoData = await isoResponse.json();
+            if (isoData.boundaryPoints && isoData.boundaryPoints.length > 0) {
+              polygonBoundary = isoData.boundaryPoints;
+              radiusSource = isoData.source;
+              radiusMiles = Math.sqrt(isoData.approximateAreaSqMiles / Math.PI); // equivalent radius for display
+              // Store polygon for map rendering
+              const isoKey = `${locationKey}-${key}`;
+              setIsochronePolygons(prev => new Map(prev).set(isoKey, isoData.boundaryPoints));
             }
           }
         } catch (e) {
+          // Fall back to radius estimate
+          try {
+            const response = await fetch('/api/demographics/drivetime-radius', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                targetMinutes: minutes
+              })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (data.calculatedMiles) {
+                radiusMiles = data.calculatedMiles;
+                radiusSource = 'google_api';
+              }
+            }
+          } catch (_e) {}
         }
-        
+
         tradeAreas.set(key, {
           radiusMiles,
-          label: `${minutes} Min Drive${radiusSource === 'google_api' ? '' : ' (est.)'}`,
+          label: `${minutes} Min Drive${radiusSource === 'google_api' || radiusSource === 'estimate' ? '' : ' (est.)'}`,
           type: 'drivetime',
           demographics: null,
           isLoading: true
         });
-        
-        fetchDemographicsMutation.mutate({ 
-          location, 
-          radiusMiles, 
-          tradeAreaKey: key 
+
+        // Use polygon boundary for census aggregation if available, otherwise fall back to radius
+        fetchDemographicsMutation.mutate({
+          location,
+          radiusMiles,
+          tradeAreaKey: key,
+          ...(polygonBoundary ? { polygonBoundary } : {})
         });
       }
     }
@@ -1531,8 +1582,33 @@ function LocationAnalysisSection() {
                                 const ringColorMap = new Map(sortedBySize.map((ring, idx) => [ring.originalValue, idx]));
                                 const sortedForDrawing = [...rawRings].sort((a, b) => b.value - a.value);
                                 
+                                const locationKey = `${activeLoc.latitude},${activeLoc.longitude}`;
                                 return sortedForDrawing.map((ring) => {
                                   const colorIdx = ringColorMap.get(ring.originalValue) ?? 0;
+                                  const color = RING_COLORS[colorIdx % RING_COLORS.length].stroke;
+
+                                  // For drive-time mode, render isochrone polygon if available
+                                  if (!isDistance) {
+                                    const isoKey = `${locationKey}-drivetime-${ring.originalValue}`;
+                                    const polyPoints = isochronePolygons.get(isoKey);
+                                    if (polyPoints && polyPoints.length > 0) {
+                                      return (
+                                        <Polygon
+                                          key={`single-iso-${ring.originalValue}`}
+                                          paths={polyPoints}
+                                          options={{
+                                            fillColor: color,
+                                            fillOpacity: 0.10,
+                                            strokeColor: color,
+                                            strokeOpacity: 0.9,
+                                            strokeWeight: 2.5,
+                                          }}
+                                        />
+                                      );
+                                    }
+                                  }
+
+                                  // Distance mode or fallback: render circle
                                   const radiusMeters = ring.value * 1609.34;
                                   return (
                                     <Circle
@@ -1540,9 +1616,9 @@ function LocationAnalysisSection() {
                                       center={{ lat: activeLoc.latitude, lng: activeLoc.longitude }}
                                       radius={radiusMeters}
                                       options={{
-                                        fillColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                                        fillColor: color,
                                         fillOpacity: 0.08,
-                                        strokeColor: RING_COLORS[colorIdx % RING_COLORS.length].stroke,
+                                        strokeColor: color,
                                         strokeOpacity: 0.9,
                                         strokeWeight: 2.5,
                                       }}
@@ -1808,10 +1884,13 @@ function LocationAnalysisSection() {
                         <tbody>
                           {[
                             { label: "Population", key: "totalPopulation", format: formatNumber },
+                            { label: "Households", key: "totalHouseholds", format: (v: number) => v ? formatNumber(v) : "N/A" },
                             { label: "Median Age", key: "medianAge", format: (v: number) => v ? `${v.toFixed(1)} yrs` : "N/A" },
-                            { label: "Median Income", key: "medianHouseholdIncome", format: formatCurrency },
+                            { label: "Median HHI", key: "medianHouseholdIncome", format: formatCurrency },
+                            { label: "Spending Power", key: "aggregateHouseholdIncome", format: formatCurrency },
                             { label: "Per Capita Income", key: "perCapitaIncome", format: formatCurrency },
                             { label: "Median Home Value", key: "medianHomeValue", format: formatCurrency },
+                            { label: "Pop. Density", key: "populationDensity", format: (v: number) => v ? `${formatNumber(Math.round(v))}/mi²` : "N/A" },
                             { label: "Household Size", key: "householdSize", format: (v: number) => v ? v.toFixed(1) : "N/A" },
                           ].map((metric, mIdx) => (
                             <tr key={mIdx} className="border-b border-muted hover:bg-muted/30">

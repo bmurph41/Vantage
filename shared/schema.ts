@@ -17745,6 +17745,10 @@ export interface DemographicSummary {
   employmentStats?: Record<string, number>;
   industryDistribution?: Record<string, number>;
 
+  // Household Analytics
+  totalHouseholds?: number;
+  aggregateHouseholdIncome?: number; // totalHouseholds × medianHouseholdIncome
+
   // Housing Analytics
   housingStats?: Record<string, number>;
   householdSize?: number;

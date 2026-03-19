@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from "recharts";
 import { formatPercent, formatNumber } from "@/lib/utils";
@@ -198,12 +199,19 @@ export default function MarketTrendAnalysis({ demographics, locationLabel, fipsS
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-foreground">
-              Market Trend Analysis
-              {isEstimated && (
-                <span className="text-xs font-normal text-muted-foreground ml-2" data-testid="estimated-label">(estimated)</span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-foreground">
+                Market Trend Analysis
+              </h3>
+              {trendsData?.geographicLevel && trendsData.geographicLevel !== 'unknown' && (
+                <Badge variant="outline" className="text-[10px] capitalize">
+                  {trendsData.geographicLevel === 'tract' ? 'Census Tract' : trendsData.geographicLevel}
+                </Badge>
               )}
-            </h3>
+              {isEstimated && (
+                <Badge variant="secondary" className="text-[10px]">Estimated</Badge>
+              )}
+            </div>
             {locationLabel && (
               <p className="text-xs text-muted-foreground mt-0.5">{locationLabel}</p>
             )}
@@ -232,6 +240,26 @@ export default function MarketTrendAnalysis({ demographics, locationLabel, fipsS
         </div>
       </CardHeader>
       <CardContent>
+        {/* CAGR summary cards */}
+        {trendsData?.cagr && (trendsData.cagr.population !== 0 || trendsData.cagr.income !== 0 || trendsData.cagr.homeValue !== 0) && (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[
+              { label: "Population CAGR", value: trendsData.cagr.population, color: "text-blue-600" },
+              { label: "Income CAGR", value: trendsData.cagr.income, color: "text-green-600" },
+              { label: "Home Value CAGR", value: trendsData.cagr.homeValue, color: "text-amber-600" },
+            ].map((item) => (
+              <div key={item.label} className="bg-muted/50 rounded-lg p-3 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{item.label}</div>
+                <div className={`text-lg font-bold ${item.value > 0 ? item.color : item.value < 0 ? 'text-red-600' : 'text-muted-foreground'} flex items-center justify-center gap-1`}>
+                  {item.value > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : item.value < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                  {item.value > 0 ? '+' : ''}{item.value.toFixed(1)}%
+                </div>
+                <div className="text-[10px] text-muted-foreground">5-Year</div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="h-64 mb-4" data-testid="chart-container">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>

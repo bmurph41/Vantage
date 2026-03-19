@@ -81,7 +81,8 @@ export class CensusService {
         return this.getDemographicsForLocation(centerLat, centerLng);
       }
 
-      return this.aggregateDemographics(tractDemographics);
+      const areaSqMiles = Math.PI * radiusMiles * radiusMiles;
+      return this.aggregateDemographics(tractDemographics, areaSqMiles);
     } catch (error) {
       console.error("Census radius query error:", error);
       return this.getDemographicsForLocation(centerLat, centerLng);
@@ -161,17 +162,21 @@ export class CensusService {
       employmentStats: this.formatEmploymentStats(employmentData),
       industryDistribution: this.formatIndustryDistribution(industryData),
       
+      totalHouseholds: this.parseNumber(basicDemographics.B11001_001E) || 0,
+      aggregateHouseholdIncome: (this.parseNumber(basicDemographics.B11001_001E) || 0) *
+        (this.parseNumber(incomeData.B19013_001E) || 0),
+
       housingStats: this.formatHousingStats(housingData),
       householdSize: this.parseNumber(basicDemographics.B25010_001E) || 2.5,
       medianHomeValue: this.parseNumber(housingData.B25077_001E) || 0,
-      
+
       raceEthnicity: this.formatRaceEthnicity(raceData),
-      
+
       populationDensity: this.calculatePopulationDensity(
         this.parseNumber(basicDemographics.B01003_001E),
         geoData
       ),
-      
+
       geographicLevel: geoData.tract ? "tract" : geoData.county ? "county" : "state",
       fipsState: geoData.state,
       fipsCounty: geoData.county,
@@ -179,7 +184,7 @@ export class CensusService {
     };
   }
 
-  private aggregateDemographics(tractData: Array<{ demographics: DemographicSummary; weight: number }>): DemographicSummary {
+  private aggregateDemographics(tractData: Array<{ demographics: DemographicSummary; weight: number }>, areaSqMiles?: number): DemographicSummary {
     const totalPopulation = tractData.reduce((sum, t) => sum + (t.demographics.totalPopulation || 0), 0);
     
     const sumCounts = (getValue: (d: DemographicSummary) => number | undefined): number => {
@@ -350,14 +355,20 @@ export class CensusService {
       employmentStats: aggregateEmploymentStats(),
       industryDistribution: aggregatePercentageDistribution(d => d.industryDistribution),
       
+      totalHouseholds: sumCounts(d => d.totalHouseholds),
+      aggregateHouseholdIncome: sumCounts(d => d.totalHouseholds) *
+        popWeightedAvg(d => d.medianHouseholdIncome),
+
       housingStats: aggregateHousingStats(),
       householdSize: popWeightedAvg(d => d.householdSize),
       medianHomeValue: popWeightedAvg(d => d.medianHomeValue),
-      
+
       raceEthnicity: aggregatePercentageDistribution(d => d.raceEthnicity),
-      
-      populationDensity: undefined,
-      
+
+      populationDensity: areaSqMiles && areaSqMiles > 0
+        ? Math.round(totalPopulation / areaSqMiles)
+        : undefined,
+
       geographicLevel: "aggregated",
       fipsState: tractData[0]?.demographics.fipsState,
       fipsCounty: tractData[0]?.demographics.fipsCounty,
@@ -417,17 +428,21 @@ export class CensusService {
         employmentStats: this.formatEmploymentStats(employmentData),
         industryDistribution: this.formatIndustryDistribution(industryData),
         
+        totalHouseholds: this.parseNumber(basicDemographics.B11001_001E) || 0,
+        aggregateHouseholdIncome: (this.parseNumber(basicDemographics.B11001_001E) || 0) *
+          (this.parseNumber(incomeData.B19013_001E) || 0),
+
         housingStats: this.formatHousingStats(housingData),
         householdSize: this.parseNumber(basicDemographics.B25010_001E) || 2.5,
         medianHomeValue: this.parseNumber(housingData.B25077_001E) || 0,
-        
+
         raceEthnicity: this.formatRaceEthnicity(raceData),
-        
+
         populationDensity: this.calculatePopulationDensity(
           this.parseNumber(basicDemographics.B01003_001E),
           geoData
         ),
-        
+
         geographicLevel: geoData.tract ? "tract" : geoData.county ? "county" : "state",
         fipsState: geoData.state,
         fipsCounty: geoData.county,
@@ -539,7 +554,8 @@ export class CensusService {
       "B01002_001E",
       "B01002_002E",
       "B01002_003E",
-      "B25010_001E"
+      "B25010_001E",
+      "B11001_001E"  // Total households
     ], geoData);
   }
 
@@ -904,41 +920,63 @@ export class CensusService {
     latitude: number,
     longitude: number,
     radiusMiles?: number
-  ): Promise<Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number }>> {
+  ): Promise<{
+    trends: Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number; totalHouseholds: number }>;
+    cagr: { population: number; income: number; homeValue: number };
+    geographicLevel: string;
+  }> {
     if (!this.apiKey) {
       logger.debug({ latitude, longitude }, "Census API key not configured, returning empty historical trends");
-      return [];
+      return { trends: [], cagr: { population: 0, income: 0, homeValue: 0 }, geographicLevel: 'unknown' };
     }
 
     try {
       const geoData = await this.getGeographicCodes(latitude, longitude);
       const years = [2019, 2020, 2021, 2022, 2023];
-      const variables = ["B01003_001E", "B19013_001E", "B25077_001E", "B23025_003E", "B23025_005E"];
+      const variables = ["B01003_001E", "B19013_001E", "B25077_001E", "B23025_003E", "B23025_005E", "B11001_001E"];
 
-      const results: Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number }> = [];
+      const trends: Array<{ year: number; population: number; medianIncome: number; medianHomeValue: number; unemploymentRate: number; totalHouseholds: number }> = [];
+      let geographicLevel = 'unknown';
 
       for (const year of years) {
         try {
-          const data = await this.fetchHistoricalYearData(year, variables, geoData);
+          const { data, level } = await this.fetchHistoricalYearData(year, variables, geoData);
           if (data) {
+            if (geographicLevel === 'unknown') geographicLevel = level;
             const population = this.parseNumber(data.B01003_001E) || 0;
             const medianIncome = this.parseNumber(data.B19013_001E) || 0;
             const medianHomeValue = this.parseNumber(data.B25077_001E) || 0;
             const laborForce = this.parseNumber(data.B23025_003E) || 0;
             const unemployed = this.parseNumber(data.B23025_005E) || 0;
             const unemploymentRate = laborForce > 0 ? Math.round((unemployed / laborForce) * 1000) / 10 : 0;
+            const totalHouseholds = this.parseNumber(data.B11001_001E) || 0;
 
-            results.push({ year, population, medianIncome, medianHomeValue, unemploymentRate });
+            trends.push({ year, population, medianIncome, medianHomeValue, unemploymentRate, totalHouseholds });
           }
         } catch (e) {
           logger.debug({ year, error: e }, "Failed to fetch historical data for year");
         }
       }
 
-      return results;
+      // Compute 5-year CAGR
+      const cagr = { population: 0, income: 0, homeValue: 0 };
+      if (trends.length >= 2) {
+        const first = trends[0];
+        const last = trends[trends.length - 1];
+        const years = last.year - first.year;
+        if (years > 0) {
+          const calcCagr = (start: number, end: number) =>
+            start > 0 ? (Math.pow(end / start, 1 / years) - 1) * 100 : 0;
+          cagr.population = Math.round(calcCagr(first.population, last.population) * 100) / 100;
+          cagr.income = Math.round(calcCagr(first.medianIncome, last.medianIncome) * 100) / 100;
+          cagr.homeValue = Math.round(calcCagr(first.medianHomeValue, last.medianHomeValue) * 100) / 100;
+        }
+      }
+
+      return { trends, cagr, geographicLevel };
     } catch (error) {
       logger.error({ error }, "Failed to fetch historical trends");
-      return [];
+      return { trends: [], cagr: { population: 0, income: 0, homeValue: 0 }, geographicLevel: 'unknown' };
     }
   }
 
@@ -946,18 +984,26 @@ export class CensusService {
     year: number,
     variables: string[],
     geoData: GeographicCodes
-  ): Promise<CensusApiResponse | null> {
+  ): Promise<{ data: CensusApiResponse | null; level: string }> {
     const endpoint = `${year}/acs/acs5`;
     const url = `${this.baseUrl}/${endpoint}`;
 
     const geoLevels = [
+      // Try tract level first (most granular)
+      geoData.tract && geoData.county ? {
+        for: `tract:${geoData.tract}`,
+        in: `state:${geoData.state} county:${geoData.county}`,
+        level: 'tract'
+      } : null,
       geoData.county ? {
         for: `county:${geoData.county}`,
-        in: `state:${geoData.state}`
+        in: `state:${geoData.state}`,
+        level: 'county'
       } : null,
       {
         for: `state:${geoData.state}`,
-        in: null as string | null
+        in: null as string | null,
+        level: 'state'
       }
     ].filter((level): level is NonNullable<typeof level> => level !== null);
 
@@ -985,13 +1031,13 @@ export class CensusService {
           result[header] = values[index];
         });
 
-        return result;
+        return { data: result, level: geoLevel.level };
       } catch (error) {
         continue;
       }
     }
 
-    return null;
+    return { data: null, level: 'unknown' };
   }
 
   async getBusinessPatterns(
@@ -1082,6 +1128,114 @@ export class CensusService {
       logger.error({ error }, "Failed to fetch business patterns");
       return { totalEstablishments: 0, totalEmployees: 0, totalPayroll: 0, sectors: [] };
     }
+  }
+
+  /**
+   * Get demographics for an arbitrary polygon area (e.g., drive-time isochrone).
+   * Generates a grid of sample points within the polygon, resolves each to a
+   * census tract, and aggregates with population weighting.
+   */
+  async getDemographicsForPolygon(
+    boundaryPoints: Array<{ lat: number; lng: number }>,
+    areaSqMiles: number
+  ): Promise<DemographicSummary> {
+    if (!this.apiKey) {
+      const center = this.polygonCentroid(boundaryPoints);
+      return CensusService.getMockDemographics(center.lat, center.lng);
+    }
+
+    try {
+      // Import point-in-polygon helper
+      const { pointInPolygon } = await import('./drivetime-service');
+
+      // Compute bounding box
+      let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+      for (const p of boundaryPoints) {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng;
+        if (p.lng > maxLng) maxLng = p.lng;
+      }
+
+      // Generate grid at ~0.5 mile spacing
+      const stepLat = 0.5 / 69.0;
+      const center = this.polygonCentroid(boundaryPoints);
+      const stepLng = 0.5 / (69.0 * Math.cos(center.lat * Math.PI / 180));
+
+      const gridPoints: Array<{ lat: number; lng: number; weight: number }> = [];
+      for (let lat = minLat; lat <= maxLat; lat += stepLat) {
+        for (let lng = minLng; lng <= maxLng; lng += stepLng) {
+          const point = { lat, lng };
+          if (pointInPolygon(point, boundaryPoints)) {
+            // Weight by inverse distance from center
+            const dLat = (lat - center.lat) * 69;
+            const dLng = (lng - center.lng) * 69 * Math.cos(center.lat * Math.PI / 180);
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            const weight = 1 / (1 + dist * 0.5);
+            gridPoints.push({ lat, lng, weight });
+          }
+        }
+      }
+
+      if (gridPoints.length === 0) {
+        return this.getDemographicsForLocation(center.lat, center.lng);
+      }
+
+      // Resolve grid points to census tracts (concurrency-limited)
+      const uniqueTracts = new Map<string, { geoData: GeographicCodes; weight: number }>();
+      const CONCURRENCY = 10;
+
+      for (let i = 0; i < gridPoints.length; i += CONCURRENCY) {
+        const batch = gridPoints.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(p => this.getGeographicCodes(p.lat, p.lng))
+        );
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j];
+          if (result.status !== 'fulfilled') continue;
+          const geoData = result.value;
+          const tractKey = `${geoData.state}-${geoData.county}-${geoData.tract}`;
+          const existing = uniqueTracts.get(tractKey);
+          if (existing) {
+            existing.weight += batch[j].weight;
+          } else {
+            uniqueTracts.set(tractKey, { geoData, weight: batch[j].weight });
+          }
+        }
+      }
+
+      if (uniqueTracts.size === 0) {
+        return this.getDemographicsForLocation(center.lat, center.lng);
+      }
+
+      // Fetch demographics for each unique tract
+      const tractDemographics: Array<{ demographics: DemographicSummary; weight: number }> = [];
+      for (const [, { geoData, weight }] of uniqueTracts) {
+        try {
+          const demographics = await this.fetchDemographicsForGeoData(geoData);
+          tractDemographics.push({ demographics, weight });
+        } catch (e) {
+          // Skip failed tracts
+        }
+      }
+
+      if (tractDemographics.length === 0) {
+        return this.getDemographicsForLocation(center.lat, center.lng);
+      }
+
+      return this.aggregateDemographics(tractDemographics, areaSqMiles);
+    } catch (error) {
+      console.error("Census polygon query error:", error);
+      const center = this.polygonCentroid(boundaryPoints);
+      return this.getDemographicsForLocation(center.lat, center.lng);
+    }
+  }
+
+  private polygonCentroid(points: Array<{ lat: number; lng: number }>): { lat: number; lng: number } {
+    const n = points.length;
+    const sumLat = points.reduce((s, p) => s + p.lat, 0);
+    const sumLng = points.reduce((s, p) => s + p.lng, 0);
+    return { lat: sumLat / n, lng: sumLng / n };
   }
 
   static getMockDemographics(latitude?: number, longitude?: number): DemographicSummary {

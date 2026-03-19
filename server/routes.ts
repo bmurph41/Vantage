@@ -31328,34 +31328,61 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // Fetch Census demographics for a specific location (latitude/longitude) with optional radius aggregation
+  // Generate drive-time isochrone polygon for a location
+  app.post('/api/demographics/isochrone', authenticateUser, async (req: any, res) => {
+    try {
+      const { latitude, longitude, targetMinutes } = req.body;
+
+      if (latitude === undefined || longitude === undefined || !targetMinutes) {
+        return res.status(400).json({ error: 'latitude, longitude, and targetMinutes are required' });
+      }
+
+      const { driveTimeService } = await import('./services/drivetime-service');
+      const isochrone = await driveTimeService.generateIsochrone(
+        parseFloat(latitude), parseFloat(longitude), parseInt(targetMinutes)
+      );
+
+      res.json(isochrone);
+    } catch (error: any) {
+      console.error('Failed to generate isochrone:', error);
+      res.status(500).json({ error: 'Failed to generate isochrone polygon' });
+    }
+  });
+
+  // Fetch Census demographics for a specific location with optional radius or polygon aggregation
   app.post('/api/demographics/location', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { latitude, longitude, address, radiusMiles } = req.body;
-      
+      const { latitude, longitude, address, radiusMiles, polygonBoundary } = req.body;
+
       if (latitude === undefined || longitude === undefined) {
         return res.status(400).json({ error: 'Latitude and longitude are required' });
       }
-      
+
       const { CensusService } = await import('./services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
-      
+
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
       const radius = radiusMiles ? parseFloat(radiusMiles) : null;
-      
+
       let demographics;
       let dataSource = 'point';
-      
-      if (radius && radius > 0) {
+
+      if (polygonBoundary && Array.isArray(polygonBoundary) && polygonBoundary.length >= 3) {
+        // Drive-time isochrone polygon aggregation
+        const { computePolygonAreaSqMiles } = await import('./services/drivetime-service');
+        const area = computePolygonAreaSqMiles(polygonBoundary, lat);
+        demographics = await censusService.getDemographicsForPolygon(polygonBoundary, area);
+        dataSource = 'polygon_aggregated';
+      } else if (radius && radius > 0) {
         demographics = await censusService.getDemographicsForRadius(lat, lng, radius);
         dataSource = 'radius_aggregated';
       } else {
         demographics = await censusService.getDemographicsForLocation(lat, lng);
       }
-      
+
       res.json({
         location: { latitude: lat, longitude: lng, address },
         radiusMiles: radius,
@@ -31385,11 +31412,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const lng = parseFloat(longitude);
       const radius = radiusMiles ? parseFloat(radiusMiles) : undefined;
 
-      const trends = await censusService.getHistoricalTrends(lat, lng, radius);
+      const result = await censusService.getHistoricalTrends(lat, lng, radius);
 
       res.json({
         location: { latitude: lat, longitude: lng },
-        trends,
+        trends: result.trends,
+        cagr: result.cagr,
+        geographicLevel: result.geographicLevel,
         fetchedAt: new Date().toISOString()
       });
     } catch (error: any) {
