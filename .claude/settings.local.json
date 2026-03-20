@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(npx tsc:*)",
+      "Bash(grep:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(GIT_TERMINAL_PROMPT=0 git push origin feat/exit-engine-patches)",
+      "Bash(ls -lhS attached_assets/*.zip attached_assets/*.mp4)",
+      "Bash(git remote:*)"
+    ]
+  }
+}
