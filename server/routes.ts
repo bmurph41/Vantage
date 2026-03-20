@@ -19196,10 +19196,11 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const { modelingProjects, valuationSnapshots, modelingFinancialPeriods } = await import('@shared/schema');
 
+      // Scope: pipeline deals only — exclude owned_marina (portfolio properties)
       const rows = await db.execute(sql`
         SELECT
           p.id, p.marina_name, p.city, p.state, p.purchase_price, p.year_1_cap_rate,
-          p.ebitda, p.total_storage_units, p.deal_outcome, p.updated_at,
+          p.ebitda, p.total_storage_units, p.deal_outcome, p.deal_source, p.updated_at,
           p.custom_metrics,
           fp.noi AS t12_noi,
           fp.total_revenue AS t12_revenue,
@@ -19217,6 +19218,7 @@ Current context: Project ${req.params.projectId}`;
         LEFT JOIN modeling_financial_periods fp
           ON fp.modeling_project_id = p.id AND fp.org_id = ${orgId} AND fp.period_type = 't12'
         WHERE p.org_id = ${orgId}
+          AND (p.deal_source IS NULL OR p.deal_source != 'owned_marina')
         ORDER BY p.updated_at DESC
       `);
 
@@ -19273,6 +19275,7 @@ Current context: Project ${req.params.projectId}`;
           ebitda: toNum(r.ebitda),
           totalStorageUnits: r.total_storage_units,
           dealOutcome: r.deal_outcome,
+          dealSource: r.deal_source,
           updatedAt: r.updated_at,
           t12Noi,
           t12Revenue: toNum(r.t12_revenue),

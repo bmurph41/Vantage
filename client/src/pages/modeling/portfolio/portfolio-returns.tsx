@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import { queryClient } from '@/lib/queryClient';
 import { ExportPdfButton } from '@/components/ui/export-pdf-button';
+import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 
 function formatCurrencyCompact(value: number): string {
   const abs = Math.abs(value);
@@ -63,6 +64,7 @@ export default function PortfolioReturns() {
   const [view, setView] = useState<'levered' | 'unlevered'>('levered');
   const [activeTab, setActiveTab] = useState('dashboard');
   const pdfRef = useRef<HTMLDivElement>(null);
+  useDisplayPreferences(); // Sync global rounding from Model Settings
 
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ['/api/returns/portfolio', view],

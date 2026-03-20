@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { z } from "zod";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, or, desc, inArray } from "drizzle-orm";
 import {
   returnsLedger,
   returnsValuation,
@@ -72,7 +72,27 @@ router.get("/portfolio", async (req: Request, res: Response, next: NextFunction)
     const start = req.query.start as string | undefined;
     const end = req.query.end as string | undefined;
     const propertyIdsParam = req.query.propertyIds as string | undefined;
-    const propertyIds = propertyIdsParam ? propertyIdsParam.split(',') : undefined;
+    let propertyIds = propertyIdsParam ? propertyIdsParam.split(',') : undefined;
+
+    // If no explicit propertyIds provided, scope to owned properties only
+    // by filtering to modeling projects with dealOutcome='won' or dealSource='owned_marina'
+    if (!propertyIds) {
+      const ownedProjects = await db.select({ propertyId: modelingProjects.propertyId })
+        .from(modelingProjects)
+        .where(and(
+          eq(modelingProjects.orgId, orgId),
+          or(
+            eq(modelingProjects.dealOutcome, 'won'),
+            eq(modelingProjects.dealSource, 'owned_marina')
+          )
+        ));
+      const ownedPropIds = ownedProjects
+        .map(p => p.propertyId)
+        .filter((id): id is string => id !== null && id !== undefined);
+      if (ownedPropIds.length > 0) {
+        propertyIds = ownedPropIds;
+      }
+    }
 
     const result = await computePortfolioReturns(orgId, view, start, end, propertyIds);
     res.json(result);

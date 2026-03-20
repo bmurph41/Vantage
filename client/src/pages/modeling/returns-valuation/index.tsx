@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { ExportPdfButton } from "@/components/ui/export-pdf-button";
+import { useDisplayPreferences } from "@/hooks/use-display-preferences";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell,
@@ -87,6 +88,7 @@ interface ReturnsProject {
   ebitda: number | null;
   totalStorageUnits: number | null;
   dealOutcome: string;
+  dealSource: string | null;
   updatedAt: string;
   t12Noi: number | null;
   t12Revenue: number | null;
@@ -361,11 +363,23 @@ export default function ReturnsValuationPage() {
   const [, setLocation] = useLocation();
   const [expandedDeals, setExpandedDeals] = useState<Set<string>>(new Set());
   const [activePortfolioTab, setActivePortfolioTab] = useState("overview");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const pdfRef = useRef<HTMLDivElement>(null);
+  const { metricLabel } = useDisplayPreferences();
 
-  const { data: projects, isLoading } = useQuery<ReturnsProject[]>({
+  const { data: allProjects, isLoading } = useQuery<ReturnsProject[]>({
     queryKey: ["/api/modeling/returns-valuation"],
   });
+
+  // Filter to pipeline deals only (exclude owned properties)
+  const projects = useMemo(() => {
+    if (!allProjects) return undefined;
+    let filtered = allProjects.filter(p => p.dealSource !== 'owned_marina');
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(p => p.dealOutcome === statusFilter);
+    }
+    return filtered;
+  }, [allProjects, statusFilter]);
 
   const toggleDeal = (id: string) => {
     setExpandedDeals(prev => {
@@ -495,6 +509,25 @@ export default function ReturnsValuationPage() {
           <p className="text-muted-foreground mt-1">
             Returns, analytics, and risk metrics across your deal pipeline
           </p>
+          <div className="flex gap-1 mt-2">
+            {[
+              { value: 'all', label: 'All Pipeline' },
+              { value: 'active', label: 'Active' },
+              { value: 'under_review', label: 'Under Review' },
+              { value: 'won', label: 'Won' },
+              { value: 'lost', label: 'Lost' },
+              { value: 'passed', label: 'Passed' },
+            ].map(opt => (
+              <Badge
+                key={opt.value}
+                variant={statusFilter === opt.value ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => setStatusFilter(opt.value)}
+              >
+                {opt.label}
+              </Badge>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ExportPdfButton contentRef={pdfRef} filename="pipeline-returns" title="Pipeline Returns" />

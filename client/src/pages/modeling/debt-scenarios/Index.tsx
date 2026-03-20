@@ -194,6 +194,14 @@ export default function DebtScenariosIndex() {
     queryKey: ['/api/modeling/debt-scenarios'],
   });
 
+  // Query: Load modeling projects for linking
+  const { data: modelingProjectsList = [] } = useQuery<{ id: string; marinaName: string; dealOutcome: string }[]>({
+    queryKey: ['/api/modeling/projects'],
+  });
+
+  // State for linking scenarios to projects
+  const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+
   // Mutation: Save scenario
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -208,7 +216,7 @@ export default function DebtScenariosIndex() {
         loanTermYears: parseInt(inputs.loanTermYears),
         interestOnlyYears: parseInt(inputs.interestOnlyYears),
         dealId: null,
-        projectId: null,
+        projectId: linkedProjectId,
       };
 
       if (currentScenarioId) {
@@ -434,18 +442,34 @@ export default function DebtScenariosIndex() {
       <Card className="mb-6 bg-primary/5">
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <Label htmlFor="scenario-name" className="text-sm font-medium mb-1 block">
-                Scenario Name
-              </Label>
-              <Input
-                id="scenario-name"
-                value={inputs.name}
-                onChange={(e) => updateInput("name", e.target.value)}
-                placeholder="Enter scenario name"
-                data-testid="input-scenario-name"
-                className="max-w-md"
-              />
+            <div className="flex-1 flex gap-4">
+              <div className="flex-1">
+                <Label htmlFor="scenario-name" className="text-sm font-medium mb-1 block">
+                  Scenario Name
+                </Label>
+                <Input
+                  id="scenario-name"
+                  value={inputs.name}
+                  onChange={(e) => updateInput("name", e.target.value)}
+                  placeholder="Enter scenario name"
+                  data-testid="input-scenario-name"
+                  className="max-w-md"
+                />
+              </div>
+              <div className="w-64">
+                <Label className="text-sm font-medium mb-1 block">Linked Project</Label>
+                <Select value={linkedProjectId || 'none'} onValueChange={(v) => setLinkedProjectId(v === 'none' ? null : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No project linked" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No project linked</SelectItem>
+                    {modelingProjectsList.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.marinaName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex gap-2 pt-5">
               <Button
@@ -1030,6 +1054,12 @@ export default function DebtScenariosIndex() {
                           {currentScenarioId === scenario.id && (
                             <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
                               Active
+                            </span>
+                          )}
+                          {(scenario as any).projectId && (
+                            <span className="px-2 py-1 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400 text-xs rounded-full flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              {modelingProjectsList.find((p: any) => p.id === (scenario as any).projectId)?.marinaName || 'Linked Project'}
                             </span>
                           )}
                         </div>

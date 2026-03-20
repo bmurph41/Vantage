@@ -1011,11 +1011,12 @@ export default function ExitStrategiesPage() {
       project.city?.toLowerCase().includes(projectSearch.toLowerCase()) ||
       project.state?.toLowerCase().includes(projectSearch.toLowerCase());
     
-    const matchesStatus = statusFilter === "all" || 
+    const matchesStatus = statusFilter === "all" ||
       (statusFilter === "active" && project.dealOutcome === "active") ||
-      (statusFilter === "archived" && project.dealOutcome === "archived") ||
       (statusFilter === "under_review" && project.dealOutcome === "under_review") ||
-      (statusFilter === "closed" && (project.dealOutcome === "closed_won" || project.dealOutcome === "closed_lost"));
+      (statusFilter === "won" && project.dealOutcome === "won") ||
+      (statusFilter === "lost" && project.dealOutcome === "lost") ||
+      (statusFilter === "passed" && project.dealOutcome === "passed");
     
     return matchesSearch && matchesStatus;
   });
@@ -1074,8 +1075,9 @@ export default function ExitStrategiesPage() {
                     <SelectItem value="all">All Projects</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="under_review">Under Review</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
+                    <SelectItem value="won">Won</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                    <SelectItem value="passed">Passed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1119,11 +1121,12 @@ export default function ExitStrategiesPage() {
                               {project.dealOutcome && (
                                 <Badge variant={
                                   project.dealOutcome === "active" ? "default" :
-                                  project.dealOutcome === "archived" ? "secondary" :
+                                  project.dealOutcome === "won" ? "default" :
                                   project.dealOutcome === "under_review" ? "outline" :
+                                  project.dealOutcome === "lost" ? "destructive" :
                                   "secondary"
                                 }>
-                                  {project.dealOutcome.replace(/_/g, " ")}
+                                  {project.dealOutcome.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
                                 </Badge>
                               )}
                               <Button size="sm" variant="ghost">
