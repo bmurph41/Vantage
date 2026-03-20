@@ -285,6 +285,13 @@ import { exitStudioRouter } from './routes/exit-studio-routes';
 import coaRoutes from './routes/coa-routes';
 import coaTaxonomyRoutes from './routes/coa-taxonomy-routes';
 import { propertyDataRouter } from "./routes/property-data-routes";
+import icRouter from "./routes/ic-routes";
+import lpRouter from "./routes/lp-routes";
+import leadScoringRouter from "./routes/lead-scoring-routes";
+import crmExtendedRouter from "./routes/crm-extended-routes";
+import exitPlanningExtRouter from "./routes/exit-planning-extended-routes";
+import salesCompsExtRouter from "./routes/sales-comps-extended-routes";
+import docketExtRouter from "./routes/docket-extended-routes";
 
 // Calendar validation schemas
 const calendarQuerySchema = z.object({
@@ -748,6 +755,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
   app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);
   app.use(authenticateUser, propertyDataRouter);
+  app.use("/api/ic", authenticateUser, enforceTenant, icRouter);
+  app.use("/api/lp", authenticateUser, enforceTenant, lpRouter);
+  app.use("/api/lead-scoring", authenticateUser, enforceTenant, leadScoringRouter);
+  app.use("/api/crm-ext", authenticateUser, enforceTenant, crmExtendedRouter);
+  app.use("/api/exit-planning", authenticateUser, enforceTenant, exitPlanningExtRouter);
+  app.use("/api/sc", authenticateUser, enforceTenant, salesCompsExtRouter);
+  app.use("/api/docket", authenticateUser, enforceTenant, docketExtRouter);
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {
@@ -26346,8 +26360,65 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // Upload audit summary - processing status across recent uploads
+  app.get('/api/uploads/audit-summary', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const limitVal = Math.min(parseInt(req.query.limit as string) || 50, 200);
+
+      const { docIntelUploads } = await import('@shared/schema');
+
+      const uploads = await db
+        .select({
+          id: docIntelUploads.id,
+          filename: docIntelUploads.filename,
+          originalName: docIntelUploads.originalName,
+          docType: docIntelUploads.docType,
+          status: docIntelUploads.status,
+          createdAt: docIntelUploads.createdAt,
+          fileSize: docIntelUploads.fileSize,
+          mimeType: docIntelUploads.mimeType,
+          holdingStatus: docIntelUploads.holdingStatus,
+          isDuplicate: docIntelUploads.isDuplicate,
+          errorMessage: docIntelUploads.errorMessage,
+          year: docIntelUploads.year,
+          reviewCompletedAt: docIntelUploads.reviewCompletedAt,
+          appliedAt: docIntelUploads.appliedAt,
+        })
+        .from(docIntelUploads)
+        .where(eq(docIntelUploads.orgId, orgId))
+        .orderBy(desc(docIntelUploads.createdAt))
+        .limit(limitVal);
+
+      // Compute audit stats
+      const total = uploads.length;
+      const completed = uploads.filter(u => u.status === 'completed').length;
+      const reviewing = uploads.filter(u => u.status === 'reviewing').length;
+      const failed = uploads.filter(u => u.status === 'error').length;
+      const pending = uploads.filter(u => u.status === 'uploaded' || u.status === 'processing').length;
+      const duplicates = uploads.filter(u => u.isDuplicate).length;
+      const applied = uploads.filter(u => u.appliedAt !== null).length;
+
+      res.json({
+        stats: {
+          total,
+          completed,
+          reviewing,
+          failed,
+          pending,
+          duplicates,
+          applied,
+        },
+        uploads,
+      });
+    } catch (error: any) {
+      console.error('Error fetching upload audit summary:', error);
+      res.status(500).json({ error: 'Failed to fetch audit summary' });
+    }
+  });
+
   // --- Simplified routes for PLReviewGrid component ---
-  
+
   // Get extracted items by upload ID (simpler route)
   app.get('/api/doc-intel/uploads/:uploadId/items', authenticateUser, async (req: any, res) => {
     try {
@@ -39300,6 +39371,46 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     console.error('[DCF] ROUTE REGISTRATION FAILED:', dcfErr.message);
     console.error(dcfErr.stack);
   }
+
+  // POST /api/reports/send-email - Send report HTML content via email
+  app.post("/api/reports/send-email", async (req: any, res) => {
+    try {
+      const payload = z.object({
+        to: z.array(z.string().email()).min(1),
+        subject: z.string().min(1),
+        message: z.string().optional(),
+        htmlContent: z.string().min(1),
+      }).parse(req.body);
+
+      const { getSendGridClient } = await import('./services/email-service');
+      const { client, fromEmail } = await getSendGridClient();
+
+      const bodyHtml = payload.message
+        ? `<p style="font-family: Arial, sans-serif; color: #333; margin-bottom: 24px;">${payload.message.replace(/\n/g, '<br>')}</p><hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />${payload.htmlContent}`
+        : payload.htmlContent;
+
+      const msg = {
+        to: payload.to,
+        from: {
+          email: fromEmail,
+          name: 'MarinaMatch Reports',
+        },
+        subject: payload.subject,
+        html: bodyHtml,
+        text: `${payload.message || 'Please see the attached report.'}\n\n(This report is best viewed in an HTML-capable email client.)`,
+      };
+
+      await client.send(msg);
+
+      res.json({ success: true, message: `Report emailed to ${payload.to.length} recipient(s)` });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error('Error sending report email:', error);
+      res.status(500).json({ error: error.message || 'Failed to send email' });
+    }
+  });
 
   return httpServer;
 }

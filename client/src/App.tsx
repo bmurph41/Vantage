@@ -204,6 +204,8 @@ const OperationsIntegrations = lazy(() => import("@/pages/operations/integration
 const DockitTabbed = lazy(() => import("@/pages/operations/DockitTabbed"));
 const WorkspacesList = lazy(() => import("@/pages/workspaces/index"));
 const WorkspaceDetail = lazy(() => import("@/pages/workspaces/[workspaceId]"));
+const SimpleReportPage = lazy(() => import("@/pages/simple-report"));
+const OperationsHome = lazy(() => import("@/pages/operations/OperationsHome"));
 const MarketingTabbed = lazy(() => import("@/pages/operations/MarketingTabbed"));
 const ServiceTabbed = lazy(() => import("@/pages/operations/ServiceTabbed"));
 const BoatRentalsTabbed = lazy(() => import("@/pages/operations/BoatRentalsTabbed"));
@@ -1066,6 +1068,24 @@ function Router() {
           <GatedLayout pack="operations">
             <MarinaDetail />
           </GatedLayout>
+        )}
+      </Route>
+
+      {/* Simple Report (Quick Reports) */}
+      <Route path="/simple-report">
+        {() => (
+          <UnifiedLayout>
+            <SimpleReportPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Operations Home - Landing page */}
+      <Route path="/operations">
+        {() => (
+          <UnifiedLayout>
+            <OperationsHome />
+          </UnifiedLayout>
         )}
       </Route>
 

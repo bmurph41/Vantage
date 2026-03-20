@@ -1,4 +1,7 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig, SyncResult } from './base';
+import { db } from '../../db';
+import { chartOfAccounts, userIntegrations } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 const INTACCT_API_URL = 'https://api.intacct.com/ia/xml/xmlgw.phtml';
 
@@ -334,16 +337,149 @@ export class SageIntacctConnector extends BaseConnector {
   ): Promise<{ created: boolean; updated: boolean; id?: string }> {
     switch (entityType) {
       case 'chartOfAccounts':
-        return { created: true, updated: false, id: `glaccount_${data.externalId}` };
+        return this.saveGLAccount(data);
       case 'gl':
-        return { created: true, updated: false, id: `glentry_${data.externalId}` };
+        return this.saveGLEntry(data);
       case 'payables':
-        return { created: true, updated: false, id: `apbill_${data.externalId}` };
+        return this.saveAPBill(data);
       case 'receivables':
-        return { created: true, updated: false, id: `arinvoice_${data.externalId}` };
+        return this.saveARInvoice(data);
       default:
         throw new Error(`Cannot save entity type: ${entityType}`);
     }
+  }
+
+  private async saveGLAccount(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    const existing = await db.query.chartOfAccounts.findFirst({
+      where: and(
+        eq(chartOfAccounts.orgId, this.config.orgId),
+        eq(chartOfAccounts.externalAccountId, data.externalId),
+        eq(chartOfAccounts.externalSystem, 'sage_intacct')
+      )
+    });
+
+    if (existing) {
+      await db.update(chartOfAccounts)
+        .set({
+          accountNumber: data.accountNumber,
+          accountName: data.name,
+          accountType: data.accountType,
+          detailType: data.category || null,
+          isActive: data.status === 'active',
+          updatedAt: new Date(),
+        })
+        .where(eq(chartOfAccounts.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(chartOfAccounts).values({
+      orgId: this.config.orgId,
+      source: 'sage_intacct',
+      externalSystem: 'sage_intacct',
+      externalAccountId: data.externalId,
+      accountNumber: data.accountNumber,
+      accountName: data.name,
+      accountType: data.accountType,
+      detailType: data.category || null,
+      isActive: data.status === 'active',
+    }).returning({ id: chartOfAccounts.id });
+
+    return { created: true, updated: false, id: inserted.id };
+  }
+
+  /**
+   * Store GL entries, AP bills, and AR invoices in userIntegrations.settings JSONB.
+   * No dedicated tables exist for these, so we cache them keyed by externalId.
+   */
+  private async getIntegrationRecord() {
+    return db.query.userIntegrations.findFirst({
+      where: and(
+        eq(userIntegrations.userId, this.config.userId),
+        eq(userIntegrations.integrationKey, 'sage_intacct')
+      )
+    });
+  }
+
+  private async upsertSyncData(
+    collectionKey: string,
+    externalId: string,
+    record: Record<string, any>
+  ): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    const existing = await this.getIntegrationRecord();
+    if (!existing) {
+      return { created: false, updated: false };
+    }
+
+    const currentSettings = (existing.settings || {}) as Record<string, any>;
+    const collection = (currentSettings[collectionKey] || {}) as Record<string, any>;
+    const isUpdate = !!collection[externalId];
+
+    collection[externalId] = {
+      ...record,
+      syncedAt: new Date().toISOString(),
+    };
+
+    await db.update(userIntegrations)
+      .set({
+        settings: {
+          ...currentSettings,
+          [collectionKey]: collection,
+        },
+        lastSyncAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(userIntegrations.id, existing.id));
+
+    return {
+      created: !isUpdate,
+      updated: isUpdate,
+      id: externalId,
+    };
+  }
+
+  private async saveGLEntry(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('glEntries', data.externalId, {
+      recordNo: data.externalId,
+      batchDate: data.batchDate,
+      batchTitle: data.batchTitle,
+      accountNumber: data.accountNumber,
+      debit: data.debit,
+      credit: data.credit,
+      description: data.description,
+      departmentId: data.departmentId,
+      locationId: data.locationId,
+      createdAt: data.createdAt,
+    });
+  }
+
+  private async saveAPBill(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('apBills', data.externalId, {
+      recordNo: data.externalId,
+      vendorId: data.vendorId,
+      vendorName: data.vendorName,
+      totalDue: data.totalDue,
+      totalPaid: data.totalPaid,
+      dueDate: data.dueDate,
+      status: data.status,
+      description: data.description,
+      billNumber: data.billNumber,
+      createdAt: data.createdAt,
+    });
+  }
+
+  private async saveARInvoice(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('arInvoices', data.externalId, {
+      recordNo: data.externalId,
+      customerId: data.customerId,
+      customerName: data.customerName,
+      totalDue: data.totalDue,
+      totalPaid: data.totalPaid,
+      dueDate: data.dueDate,
+      status: data.status,
+      description: data.description,
+      invoiceNumber: data.invoiceNumber,
+      createdAt: data.createdAt,
+    });
   }
 
   private buildXmlRequest(functionBody: string): string {

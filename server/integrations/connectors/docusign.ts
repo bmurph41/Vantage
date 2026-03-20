@@ -1,4 +1,7 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig, SyncResult } from './base';
+import { db } from '../../db';
+import { userIntegrations } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 const DOCUSIGN_BASE_URL = 'https://na1.docusign.net/restapi/v2.1';
 const DOCUSIGN_DEMO_URL = 'https://demo.docusign.net/restapi/v2.1';
@@ -216,14 +219,103 @@ export class DocuSignConnector extends BaseConnector {
   ): Promise<{ created: boolean; updated: boolean; id?: string }> {
     switch (entityType) {
       case 'signatureEnvelopes':
-        return { created: true, updated: false, id: `envelope_${data.externalId}` };
+        return this.saveEnvelope(data);
       case 'signers':
-        return { created: true, updated: false, id: `signer_${data.externalId}` };
+        return this.saveSigner(data);
       case 'signatureTemplates':
-        return { created: true, updated: false, id: `template_${data.externalId}` };
+        return this.saveTemplate(data);
       default:
         throw new Error(`Cannot save entity type: ${entityType}`);
     }
+  }
+
+  /**
+   * Store DocuSign data in userIntegrations.settings as JSONB.
+   * Data is keyed by entity type with individual records indexed by externalId.
+   */
+  private async getIntegrationRecord() {
+    return db.query.userIntegrations.findFirst({
+      where: and(
+        eq(userIntegrations.userId, this.config.userId),
+        eq(userIntegrations.integrationKey, 'docusign')
+      )
+    });
+  }
+
+  private async upsertSyncData(
+    collectionKey: string,
+    externalId: string,
+    record: Record<string, any>
+  ): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    const existing = await this.getIntegrationRecord();
+    if (!existing) {
+      // No integration record to store data against
+      return { created: false, updated: false };
+    }
+
+    const currentSettings = (existing.settings || {}) as Record<string, any>;
+    const collection = (currentSettings[collectionKey] || {}) as Record<string, any>;
+    const isUpdate = !!collection[externalId];
+
+    collection[externalId] = {
+      ...record,
+      syncedAt: new Date().toISOString(),
+    };
+
+    await db.update(userIntegrations)
+      .set({
+        settings: {
+          ...currentSettings,
+          [collectionKey]: collection,
+        },
+        lastSyncAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(userIntegrations.id, existing.id));
+
+    return {
+      created: !isUpdate,
+      updated: isUpdate,
+      id: externalId,
+    };
+  }
+
+  private async saveEnvelope(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('envelopes', data.externalId, {
+      envelopeId: data.externalId,
+      status: data.status,
+      emailSubject: data.emailSubject,
+      sentDateTime: data.sentDateTime,
+      completedDateTime: data.completedDateTime,
+      createdDateTime: data.createdDateTime,
+      senderName: data.senderName,
+      senderEmail: data.senderEmail,
+      signerCount: data.signerCount,
+    });
+  }
+
+  private async saveSigner(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('signers', data.externalId, {
+      signerId: data.externalId,
+      name: data.name,
+      email: data.email,
+      status: data.status,
+      envelopeId: data.envelopeId,
+    });
+  }
+
+  private async saveTemplate(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('templates', data.externalId, {
+      templateId: data.externalId,
+      name: data.name,
+      description: data.description,
+      shared: data.shared,
+      created: data.created,
+      lastModified: data.lastModified,
+      ownerName: data.ownerName,
+      ownerEmail: data.ownerEmail,
+      folderName: data.folderName,
+    });
   }
 
   private async makeAuthenticatedRequest<T>(

@@ -14,7 +14,7 @@ import {
   updateCompSetSchema,
   insertCompSetItemSchema,
 } from '@shared/schema';
-import { eq, and, sql, desc, like, or, isNull } from 'drizzle-orm';
+import { eq, and, sql, desc, like, or, isNull, inArray } from 'drizzle-orm';
 import { computeCompSet, computeCapacityIndex } from '../services/marina-comp-engine';
 import { z } from 'zod';
 import { exportCompPackToExcel } from '../services/comp-pack-export';
@@ -560,14 +560,14 @@ router.post('/sets/:id/compute', async (req, res) => {
   }
 });
 
-// Export to Excel (stub - will implement with xlsx library)
+// Export to Excel
 router.post('/sets/:id/export/excel', async (req, res) => {
   try {
     const user = (req as any).user;
     const orgId = (req as any).orgId;
     const { id } = req.params;
-    
-    // Get comp set with details
+
+    // Get comp set to validate it exists
     const [compSet] = await db
       .select()
       .from(compSets)
@@ -575,11 +575,11 @@ router.post('/sets/:id/export/excel', async (req, res) => {
         eq(compSets.id, id),
         eq(compSets.orgId, orgId)
       ));
-    
+
     if (!compSet) {
       return res.status(404).json({ error: 'Comp set not found' });
     }
-    
+
     // Log audit event
     await db.insert(marinaCompAuditEvents).values({
       orgId,
@@ -588,26 +588,85 @@ router.post('/sets/:id/export/excel', async (req, res) => {
       compSetId: id,
       details: { format: 'xlsx' },
     });
-    
-    // TODO: Implement Excel export with xlsx library
-    res.json({ 
-      message: 'Excel export endpoint ready',
+
+    // Generate real Excel file using comp-pack-export service
+    const buffer = await exportCompPackToExcel({
       compSetId: id,
-      compType: compSet.compType,
+      orgId,
+      userId: user.id,
     });
+
+    const filename = `comp-set-${compSet.name?.replace(/[^a-zA-Z0-9]/g, '-') || id}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('Error exporting comp set:', error);
     res.status(500).json({ error: 'Failed to export comp set' });
   }
 });
 
-// Export to PDF (stub)
+// Export to PDF
 router.post('/sets/:id/export/pdf', async (req, res) => {
   try {
     const user = (req as any).user;
     const orgId = (req as any).orgId;
     const { id } = req.params;
-    
+
+    // Get comp set with details
+    const [compSet] = await db
+      .select()
+      .from(compSets)
+      .where(and(
+        eq(compSets.id, id),
+        eq(compSets.orgId, orgId)
+      ));
+
+    if (!compSet) {
+      return res.status(404).json({ error: 'Comp set not found' });
+    }
+
+    // Get subject marina
+    let subjectName = 'N/A';
+    let subjectCity = '';
+    let subjectState = '';
+    if (compSet.subjectId) {
+      const [subject] = await db
+        .select()
+        .from(marinaSubjects)
+        .where(and(
+          eq(marinaSubjects.id, compSet.subjectId),
+          eq(marinaSubjects.orgId, orgId),
+          isNull(marinaSubjects.deletedAt)
+        ));
+      if (subject) {
+        subjectName = subject.name || 'N/A';
+        subjectCity = subject.city || '';
+        subjectState = subject.state || '';
+      }
+    }
+
+    // Get comp set items with their comps
+    const items = await db
+      .select()
+      .from(compSetItems)
+      .where(and(eq(compSetItems.compSetId, id), eq(compSetItems.orgId, orgId)));
+
+    let compsData: any[] = [];
+    if (compSet.compType === 'RATE') {
+      const rateCompIds = items.filter(i => i.rateCompId).map(i => i.rateCompId!);
+      if (rateCompIds.length > 0) {
+        compsData = await db.select().from(rateComps)
+          .where(and(inArray(rateComps.id, rateCompIds), eq(rateComps.orgId, orgId)));
+      }
+    } else {
+      const salesCompIds = items.filter(i => i.salesCompId).map(i => i.salesCompId!);
+      if (salesCompIds.length > 0) {
+        compsData = await db.select().from(salesComps)
+          .where(and(inArray(salesComps.id, salesCompIds), eq(salesComps.orgId, orgId)));
+      }
+    }
+
     // Log audit event
     await db.insert(marinaCompAuditEvents).values({
       orgId,
@@ -616,11 +675,131 @@ router.post('/sets/:id/export/pdf', async (req, res) => {
       compSetId: id,
       details: { format: 'pdf' },
     });
-    
-    res.json({ 
-      message: 'PDF export endpoint ready (stub)',
-      compSetId: id,
-    });
+
+    // Generate PDF using pdf-lib
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    // -- Page 1: Cover & Summary --
+    let page = pdfDoc.addPage([612, 792]); // Letter size
+    const { height } = page.getSize();
+    let y = height - 60;
+
+    page.drawText('Marina Comp Pack Report', { x: 50, y, size: 22, font: fontBold, color: rgb(0.1, 0.1, 0.4) });
+    y -= 30;
+    page.drawText(`Comp Set: ${compSet.name || 'Untitled'}`, { x: 50, y, size: 14, font: fontBold });
+    y -= 20;
+    page.drawText(`Type: ${compSet.compType} Comparables`, { x: 50, y, size: 11, font });
+    y -= 16;
+    page.drawText(`Generated: ${new Date().toLocaleDateString()}`, { x: 50, y, size: 11, font });
+    y -= 30;
+
+    // Subject section
+    page.drawText('Subject Marina', { x: 50, y, size: 14, font: fontBold, color: rgb(0.1, 0.1, 0.4) });
+    y -= 20;
+    page.drawText(`Name: ${subjectName}`, { x: 60, y, size: 11, font });
+    y -= 16;
+    if (subjectCity || subjectState) {
+      page.drawText(`Location: ${subjectCity}${subjectCity && subjectState ? ', ' : ''}${subjectState}`, { x: 60, y, size: 11, font });
+      y -= 16;
+    }
+    y -= 10;
+
+    // Indicated Values
+    const result = compSet.lastComputeResult as Record<string, unknown> | null;
+    if (result) {
+      page.drawText('Indicated Values', { x: 50, y, size: 14, font: fontBold, color: rgb(0.1, 0.1, 0.4) });
+      y -= 20;
+      if (compSet.compType === 'RATE') {
+        const fmtRate = (v: unknown) => v != null ? `$${Number(v).toLocaleString()}` : 'N/A';
+        page.drawText(`Wet Slip Rate: ${fmtRate(result.indicatedWetRate)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+        page.drawText(`Rack Rate: ${fmtRate(result.indicatedRackRate)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+        page.drawText(`Land Rate: ${fmtRate(result.indicatedLandRate)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+      } else {
+        const fmtPrice = (v: unknown) => v != null ? `$${Number(v).toLocaleString()}` : 'N/A';
+        page.drawText(`Price/Slip: ${fmtPrice(result.indicatedPricePerSlip)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+        page.drawText(`Price/Rack: ${fmtPrice(result.indicatedPricePerRack)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+        page.drawText(`Total Indicated Value: ${fmtPrice(result.indicatedTotalValue)}`, { x: 60, y, size: 11, font });
+        y -= 16;
+      }
+      page.drawText(`Comps Used: ${result.compsUsed || 0}`, { x: 60, y, size: 11, font });
+      y -= 30;
+    }
+
+    // -- Page 2: Comparables Table --
+    page = pdfDoc.addPage([792, 612]); // Landscape for table
+    y = 612 - 50;
+
+    page.drawText('Comparable Properties', { x: 50, y, size: 16, font: fontBold, color: rgb(0.1, 0.1, 0.4) });
+    y -= 25;
+
+    // Table headers
+    const cols = compSet.compType === 'RATE'
+      ? [{ label: 'Marina', x: 50, w: 140 }, { label: 'City', x: 190, w: 80 }, { label: 'State', x: 270, w: 40 },
+         { label: 'Wet Slips', x: 310, w: 55 }, { label: 'Dry Racks', x: 365, w: 55 }, { label: 'Rate', x: 420, w: 60 },
+         { label: 'Score', x: 480, w: 50 }, { label: 'Weight', x: 530, w: 50 }, { label: 'Included', x: 580, w: 50 }]
+      : [{ label: 'Marina', x: 50, w: 130 }, { label: 'City', x: 180, w: 70 }, { label: 'State', x: 250, w: 40 },
+         { label: 'Sale Price', x: 290, w: 80 }, { label: 'Slips', x: 370, w: 45 }, { label: '$/Slip', x: 415, w: 65 },
+         { label: 'Date', x: 480, w: 60 }, { label: 'Score', x: 540, w: 50 }, { label: 'Weight', x: 590, w: 50 }, { label: 'Incl', x: 640, w: 40 }];
+
+    // Draw header row
+    page.drawRectangle({ x: 45, y: y - 4, width: 700, height: 18, color: rgb(0.9, 0.92, 0.96) });
+    for (const col of cols) {
+      page.drawText(col.label, { x: col.x, y, size: 9, font: fontBold });
+    }
+    y -= 20;
+
+    // Draw data rows
+    for (const item of items) {
+      if (y < 50) {
+        page = pdfDoc.addPage([792, 612]);
+        y = 612 - 50;
+      }
+      const comp = compsData.find((c: any) => c.id === (compSet.compType === 'RATE' ? item.rateCompId : item.salesCompId));
+      if (!comp) continue;
+
+      const truncate = (s: string, max: number) => s && s.length > max ? s.substring(0, max - 2) + '..' : (s || '');
+
+      if (compSet.compType === 'RATE') {
+        page.drawText(truncate(comp.marina, 22), { x: 50, y, size: 8, font });
+        page.drawText(truncate(comp.city || '', 12), { x: 190, y, size: 8, font });
+        page.drawText(comp.state || '', { x: 270, y, size: 8, font });
+        page.drawText(String(comp.wetSlips || ''), { x: 310, y, size: 8, font });
+        page.drawText(String(comp.dryRacks || ''), { x: 365, y, size: 8, font });
+        page.drawText(comp.wetRateValue ? `$${comp.wetRateValue}` : '', { x: 420, y, size: 8, font });
+      } else {
+        page.drawText(truncate(comp.marina, 20), { x: 50, y, size: 8, font });
+        page.drawText(truncate(comp.city || '', 10), { x: 180, y, size: 8, font });
+        page.drawText(comp.state || '', { x: 250, y, size: 8, font });
+        page.drawText(comp.salePrice ? `$${Number(comp.salePrice).toLocaleString()}` : '', { x: 290, y, size: 8, font });
+        page.drawText(String(comp.wetSlips || ''), { x: 370, y, size: 8, font });
+        page.drawText(comp.pricePerSlip ? `$${Number(comp.pricePerSlip).toLocaleString()}` : '', { x: 415, y, size: 8, font });
+        page.drawText(comp.saleYear ? `${comp.saleMonth || 1}/${comp.saleYear}` : '', { x: 480, y, size: 8, font });
+      }
+
+      const scoreX = compSet.compType === 'RATE' ? 480 : 540;
+      const weightX = compSet.compType === 'RATE' ? 530 : 590;
+      const inclX = compSet.compType === 'RATE' ? 580 : 640;
+      page.drawText(item.similarityScore != null ? `${Math.round(Number(item.similarityScore))}` : '', { x: scoreX, y, size: 8, font });
+      page.drawText(item.normalizedWeight != null ? `${(Number(item.normalizedWeight) * 100).toFixed(1)}%` : '', { x: weightX, y, size: 8, font });
+      page.drawText(item.included ? 'Yes' : 'No', { x: inclX, y, size: 8, font });
+
+      y -= 14;
+    }
+
+    // Generate PDF bytes and send
+    const pdfBytes = await pdfDoc.save();
+    const filename = `comp-set-${compSet.name?.replace(/[^a-zA-Z0-9]/g, '-') || id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(Buffer.from(pdfBytes));
   } catch (error) {
     console.error('Error exporting comp set:', error);
     res.status(500).json({ error: 'Failed to export comp set' });

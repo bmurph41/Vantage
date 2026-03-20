@@ -351,24 +351,202 @@ integrationsRouter.get('/api/integrations/pipeline/project/:projectId', async (r
   }
 });
 
-integrationsRouter.get('/api/integrations/:key/oauth/authorize', async (req: Request, res: Response) => {
-  const { key } = req.params;
-  const { state } = req.query;
+// OAuth2 provider configurations
+const OAUTH_CONFIGS: Record<string, { authUrl: string; tokenUrl: string; scopes: string[]; clientIdEnv: string; clientSecretEnv: string }> = {
+  quickbooks: { authUrl: 'https://appcenter.intuit.com/connect/oauth2', tokenUrl: 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', scopes: ['com.intuit.quickbooks.accounting'], clientIdEnv: 'QUICKBOOKS_CLIENT_ID', clientSecretEnv: 'QUICKBOOKS_CLIENT_SECRET' },
+  docusign: { authUrl: 'https://account-d.docusign.com/oauth/auth', tokenUrl: 'https://account-d.docusign.com/oauth/token', scopes: ['signature'], clientIdEnv: 'DOCUSIGN_CLIENT_ID', clientSecretEnv: 'DOCUSIGN_CLIENT_SECRET' },
+  google_drive: { authUrl: 'https://accounts.google.com/o/oauth2/v2/auth', tokenUrl: 'https://oauth2.googleapis.com/token', scopes: ['https://www.googleapis.com/auth/drive.file'], clientIdEnv: 'GOOGLE_CLIENT_ID', clientSecretEnv: 'GOOGLE_CLIENT_SECRET' },
+  xero: { authUrl: 'https://login.xero.com/identity/connect/authorize', tokenUrl: 'https://identity.xero.com/connect/token', scopes: ['openid', 'profile', 'email', 'accounting.transactions'], clientIdEnv: 'XERO_CLIENT_ID', clientSecretEnv: 'XERO_CLIENT_SECRET' },
+};
 
-  res.status(501).json({ 
-    error: 'OAuth not implemented', 
-    message: `OAuth authorization for ${key} would redirect to the provider. State: ${state}` 
-  });
+/** Generate a base64url-encoded random string */
+function base64url(buffer: Buffer): string {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+integrationsRouter.get('/api/integrations/:key/oauth/authorize', async (req: Request, res: Response) => {
+  const userId = requireUser(req, res);
+  if (!userId) return;
+  const orgId = getOrgId(req);
+
+  const { key } = req.params;
+  const oauthConfig = OAUTH_CONFIGS[key];
+  if (!oauthConfig) {
+    return res.status(400).json({ error: `OAuth not configured for integration: ${key}` });
+  }
+
+  const clientId = process.env[oauthConfig.clientIdEnv];
+  if (!clientId) {
+    return res.status(500).json({ error: `Missing environment variable: ${oauthConfig.clientIdEnv}` });
+  }
+
+  try {
+    // Generate CSRF state token: encrypt userId + key + random nonce
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const statePayload = JSON.stringify({ userId, key, nonce, ts: Date.now() });
+    const stateToken = encrypt(statePayload);
+
+    // Generate PKCE code verifier and challenge
+    const codeVerifier = base64url(crypto.randomBytes(32));
+    const codeChallenge = base64url(
+      crypto.createHash('sha256').update(codeVerifier).digest()
+    );
+
+    // Persist state + code verifier in the userIntegrations row so the callback can validate
+    const existing = await db.select().from(userIntegrations).where(
+      and(
+        eq(userIntegrations.userId, userId),
+        eq(userIntegrations.integrationKey, key),
+      )
+    ).limit(1);
+
+    const oauthStateData = JSON.stringify({ stateToken, codeVerifier });
+
+    if (existing.length > 0) {
+      await db.update(userIntegrations)
+        .set({ oauthState: encrypt(oauthStateData), updatedAt: new Date() })
+        .where(eq(userIntegrations.id, existing[0].id));
+    } else {
+      await db.insert(userIntegrations).values({
+        userId,
+        orgId,
+        integrationKey: key,
+        isConnected: false,
+        oauthState: encrypt(oauthStateData),
+        settings: {},
+      });
+    }
+
+    // Build the authorization URL
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/integrations/${key}/oauth/callback`;
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: oauthConfig.scopes.join(' '),
+      state: stateToken,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    });
+
+    res.redirect(`${oauthConfig.authUrl}?${params.toString()}`);
+  } catch (error) {
+    console.error('OAuth authorize error:', error);
+    res.status(500).json({ error: 'Failed to initiate OAuth flow' });
+  }
 });
 
 integrationsRouter.get('/api/integrations/:key/oauth/callback', async (req: Request, res: Response) => {
   const { key } = req.params;
-  const { code, state } = req.query;
+  const { code, state, error: oauthError } = req.query;
 
-  res.status(501).json({ 
-    error: 'OAuth callback not implemented',
-    message: `Would exchange code for tokens. Integration: ${key}, Code: ${code}, State: ${state}` 
-  });
+  if (oauthError) {
+    return res.redirect(`/integrations?error=${encodeURIComponent(String(oauthError))}`);
+  }
+
+  if (!code || !state) {
+    return res.redirect('/integrations?error=missing_code_or_state');
+  }
+
+  const oauthConfig = OAUTH_CONFIGS[key];
+  if (!oauthConfig) {
+    return res.redirect(`/integrations?error=unknown_integration`);
+  }
+
+  const clientId = process.env[oauthConfig.clientIdEnv];
+  const clientSecret = process.env[oauthConfig.clientSecretEnv];
+  if (!clientId || !clientSecret) {
+    return res.redirect('/integrations?error=missing_credentials');
+  }
+
+  try {
+    // Decrypt and validate state to extract userId and integration key
+    const statePayload = JSON.parse(decrypt(String(state)));
+    const { userId, key: stateKey } = statePayload;
+
+    if (stateKey !== key) {
+      return res.redirect('/integrations?error=state_mismatch');
+    }
+
+    // Check timestamp to prevent replay (15 minute window)
+    if (Date.now() - statePayload.ts > 15 * 60 * 1000) {
+      return res.redirect('/integrations?error=state_expired');
+    }
+
+    // Look up the stored oauth state to retrieve the PKCE code verifier
+    const userIntegration = await db.select().from(userIntegrations).where(
+      and(
+        eq(userIntegrations.userId, userId),
+        eq(userIntegrations.integrationKey, key),
+      )
+    ).limit(1);
+
+    if (!userIntegration.length || !userIntegration[0].oauthState) {
+      return res.redirect('/integrations?error=no_pending_oauth');
+    }
+
+    const storedOauthData = JSON.parse(decrypt(userIntegration[0].oauthState));
+
+    // Verify the state token matches what we stored
+    if (storedOauthData.stateToken !== String(state)) {
+      return res.redirect('/integrations?error=csrf_validation_failed');
+    }
+
+    const codeVerifier = storedOauthData.codeVerifier;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/integrations/${key}/oauth/callback`;
+
+    // Exchange authorization code for tokens
+    const tokenResponse = await fetch(oauthConfig.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: String(code),
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret,
+        code_verifier: codeVerifier,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorBody = await tokenResponse.text();
+      console.error(`OAuth token exchange failed for ${key}:`, errorBody);
+      return res.redirect('/integrations?error=token_exchange_failed');
+    }
+
+    const tokens = await tokenResponse.json() as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+      token_type?: string;
+    };
+
+    // Encrypt and store tokens
+    const tokenExpiresAt = tokens.expires_in
+      ? new Date(Date.now() + tokens.expires_in * 1000)
+      : null;
+
+    await db.update(userIntegrations)
+      .set({
+        isConnected: true,
+        encryptedAccessToken: encrypt(tokens.access_token),
+        encryptedRefreshToken: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
+        tokenExpiresAt,
+        oauthState: null, // Clear the OAuth state after successful exchange
+        errorMessage: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(userIntegrations.id, userIntegration[0].id));
+
+    res.redirect(`/integrations?connected=${key}`);
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect('/integrations?error=callback_failed');
+  }
 });
 
 integrationsRouter.post('/api/integrations/:key/test-connection', async (req: Request, res: Response) => {

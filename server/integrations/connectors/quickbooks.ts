@@ -1,5 +1,7 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig, SyncResult } from './base';
 import { db } from '../../db';
+import { chartOfAccounts, crmContacts, userIntegrations } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 const QBO_BASE_URL = 'https://quickbooks.api.intuit.com/v3';
 const QBO_SANDBOX_URL = 'https://sandbox-quickbooks.api.intuit.com/v3';
@@ -287,15 +289,126 @@ export class QuickBooksConnector extends BaseConnector {
   }
 
   private async saveProfitAndLoss(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `pl_${Date.now()}` };
+    // P&L data is read-only from QuickBooks. Store a snapshot in userIntegrations.settings
+    // so it can be referenced without re-fetching from QB.
+    const existing = await db.query.userIntegrations.findFirst({
+      where: and(
+        eq(userIntegrations.userId, this.config.userId),
+        eq(userIntegrations.integrationKey, 'quickbooks')
+      )
+    });
+
+    if (existing) {
+      const currentSettings = (existing.settings || {}) as Record<string, any>;
+      await db.update(userIntegrations)
+        .set({
+          settings: {
+            ...currentSettings,
+            lastProfitAndLoss: {
+              ...data,
+              cachedAt: new Date().toISOString(),
+            },
+          },
+          lastSyncAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(userIntegrations.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    // No userIntegration record found; P&L data is ephemeral read-only
+    return { created: false, updated: false };
   }
 
   private async saveAccount(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `acc_${data.externalId}` };
+    // Upsert into chartOfAccounts table
+    const existing = await db.query.chartOfAccounts.findFirst({
+      where: and(
+        eq(chartOfAccounts.orgId, this.config.orgId),
+        eq(chartOfAccounts.externalAccountId, data.externalId),
+        eq(chartOfAccounts.externalSystem, 'quickbooks')
+      )
+    });
+
+    if (existing) {
+      await db.update(chartOfAccounts)
+        .set({
+          accountName: data.name,
+          accountType: data.accountType,
+          detailType: data.accountSubType || null,
+          isActive: data.isActive ?? true,
+          updatedAt: new Date(),
+        })
+        .where(eq(chartOfAccounts.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(chartOfAccounts).values({
+      orgId: this.config.orgId,
+      source: 'quickbooks',
+      externalSystem: 'quickbooks',
+      externalAccountId: data.externalId,
+      accountNumber: data.externalId,
+      accountName: data.name,
+      accountType: data.accountType,
+      detailType: data.accountSubType || null,
+      isActive: data.isActive ?? true,
+    }).returning({ id: chartOfAccounts.id });
+
+    return { created: true, updated: false, id: inserted.id };
   }
 
   private async saveContact(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
-    return { created: true, updated: false, id: `contact_${data.externalId}` };
+    // Upsert QuickBooks customers into crmContacts
+    const existing = await db.query.crmContacts.findFirst({
+      where: and(
+        eq(crmContacts.orgId, this.config.orgId),
+        eq(crmContacts.externalId, data.externalId),
+        eq(crmContacts.integrationSource, 'quickbooks')
+      )
+    });
+
+    // Parse display name into first/last
+    const nameParts = (data.displayName || 'Unknown Contact').split(' ');
+    const firstName = nameParts[0] || 'Unknown';
+    const lastName = nameParts.slice(1).join(' ') || 'Contact';
+
+    if (existing) {
+      await db.update(crmContacts)
+        .set({
+          firstName,
+          lastName,
+          email: data.email || existing.email,
+          phone: data.phone,
+          address: data.address?.line1,
+          city: data.address?.city,
+          state: data.address?.state,
+          zipCode: data.address?.postalCode,
+          lastSyncedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(crmContacts.id, existing.id));
+      return { created: false, updated: true, id: existing.id };
+    }
+
+    const [inserted] = await db.insert(crmContacts).values({
+      orgId: this.config.orgId,
+      firstName,
+      lastName,
+      email: data.email || `qb-${data.externalId}@placeholder.local`,
+      phone: data.phone,
+      address: data.address?.line1,
+      city: data.address?.city,
+      state: data.address?.state,
+      zipCode: data.address?.postalCode,
+      contactTag: 'other',
+      externalId: data.externalId,
+      integrationSource: 'quickbooks',
+      lastSyncedAt: new Date(),
+      ownerId: this.config.userId,
+    }).returning({ id: crmContacts.id });
+
+    return { created: true, updated: false, id: inserted.id };
   }
 
   private async makeAuthenticatedRequest<T>(

@@ -1,4 +1,7 @@
 import { BaseConnector, ConnectorConfig, EntitySyncConfig, SyncResult } from './base';
+import { db } from '../../db';
+import { userIntegrations } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
 
 const QUALIA_BASE_URL = 'https://api.qualia.com/v1';
 const QUALIA_SANDBOX_URL = 'https://api.sandbox.qualia.com/v1';
@@ -292,16 +295,120 @@ export class QualiaConnector extends BaseConnector {
   ): Promise<{ created: boolean; updated: boolean; id?: string }> {
     switch (entityType) {
       case 'closingOrders':
-        return { created: true, updated: false, id: `order_${data.externalId}` };
+        return this.saveClosingOrder(data);
       case 'closingMilestones':
-        return { created: true, updated: false, id: `milestone_${data.externalId}` };
+        return this.saveMilestone(data);
       case 'closingDocs':
-        return { created: true, updated: false, id: `doc_${data.externalId}` };
+        return this.saveDocument(data);
       case 'closingCosts':
-        return { created: true, updated: false, id: `settlement_${data.externalId}` };
+        return this.saveSettlementStatement(data);
       default:
         throw new Error(`Cannot save entity type: ${entityType}`);
     }
+  }
+
+  /**
+   * Store Qualia data in userIntegrations.settings JSONB.
+   * crmDeals lacks externalId/integrationSource fields, so we cache all
+   * Qualia entity types in the integration settings keyed by externalId.
+   */
+  private async getIntegrationRecord() {
+    return db.query.userIntegrations.findFirst({
+      where: and(
+        eq(userIntegrations.userId, this.config.userId),
+        eq(userIntegrations.integrationKey, 'qualia')
+      )
+    });
+  }
+
+  private async upsertSyncData(
+    collectionKey: string,
+    externalId: string,
+    record: Record<string, any>
+  ): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    const existing = await this.getIntegrationRecord();
+    if (!existing) {
+      return { created: false, updated: false };
+    }
+
+    const currentSettings = (existing.settings || {}) as Record<string, any>;
+    const collection = (currentSettings[collectionKey] || {}) as Record<string, any>;
+    const isUpdate = !!collection[externalId];
+
+    collection[externalId] = {
+      ...record,
+      syncedAt: new Date().toISOString(),
+    };
+
+    await db.update(userIntegrations)
+      .set({
+        settings: {
+          ...currentSettings,
+          [collectionKey]: collection,
+        },
+        lastSyncAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(userIntegrations.id, existing.id));
+
+    return {
+      created: !isUpdate,
+      updated: isUpdate,
+      id: externalId,
+    };
+  }
+
+  private async saveClosingOrder(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('closingOrders', data.externalId, {
+      orderId: data.externalId,
+      orderNumber: data.orderNumber,
+      status: data.status,
+      propertyAddress: data.propertyAddress,
+      closingDate: data.closingDate,
+      buyerName: data.buyerName,
+      sellerName: data.sellerName,
+      transactionType: data.transactionType,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    });
+  }
+
+  private async saveMilestone(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('milestones', data.externalId, {
+      milestoneId: data.externalId,
+      orderId: data.orderId,
+      name: data.name,
+      status: data.status,
+      dueDate: data.dueDate,
+      completedDate: data.completedDate,
+      assignedTo: data.assignedTo,
+    });
+  }
+
+  private async saveDocument(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('documents', data.externalId, {
+      documentId: data.externalId,
+      orderId: data.orderId,
+      name: data.name,
+      type: data.type,
+      status: data.status,
+      uploadedAt: data.uploadedAt,
+      uploadedBy: data.uploadedBy,
+      fileSize: data.fileSize,
+    });
+  }
+
+  private async saveSettlementStatement(data: any): Promise<{ created: boolean; updated: boolean; id?: string }> {
+    return this.upsertSyncData('settlementStatements', data.externalId, {
+      statementId: data.externalId,
+      orderId: data.orderId,
+      type: data.type,
+      totalAmount: data.totalAmount,
+      buyerCredits: data.buyerCredits,
+      sellerCredits: data.sellerCredits,
+      status: data.status,
+      lineItems: data.lineItems,
+    });
   }
 
   private async makeAuthenticatedRequest<T>(

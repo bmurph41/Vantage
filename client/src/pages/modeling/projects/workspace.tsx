@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft,
@@ -52,7 +53,7 @@ import {
   FileCheck,
   Gauge,
   Leaf,
-  FileText,
+  Loader2,
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject, DocIntelUpload } from '@shared/schema';
@@ -66,6 +67,8 @@ import { useDisplayPreferences } from '@/hooks/use-display-preferences';
 import { apiRequest } from '@/lib/queryClient';
 import { toast } from '@/hooks/use-toast';
 import ProjectTypeBadge from '@/components/modeling/ProjectTypeBadge';
+import { useDisplayMode } from '@/stores/display-mode-store';
+import SimplifiedWorkspace from '@/components/analysis/SimplifiedWorkspace';
 
 import WorkspaceOverview from './workspace/overview';
 import { OverviewDynamic } from './workspace/overview-dynamic';
@@ -252,6 +255,7 @@ const TAB_GROUPS: TabGroup[] = [
     label: 'Output',
     icon: Download,
     tabs: [
+      { value: 'investment-materials', label: 'Investment Materials', icon: Briefcase },
       { value: 'comps', label: 'Comps & Links', icon: Link2 },
       { value: 'export', label: 'Export', icon: FileSpreadsheet },
     ],
@@ -455,6 +459,7 @@ function StorageLeasesWorkspace({ projectId, projectName, onTabChange }: { proje
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
   const [, navigate] = useLocation();
+  const { simplifiedMode } = useDisplayMode();
   const searchString = useSearch();
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(searchString);
@@ -644,6 +649,11 @@ export default function ProjectWorkspace() {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return formatCurrency(numValue);
   };
+
+  // Simplified mode: render single-page summary instead of 67-tab workspace
+  if (simplifiedMode) {
+    return <SimplifiedWorkspace projectId={projectId!} />;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -917,10 +927,66 @@ export default function ProjectWorkspace() {
           <AuditTrailViewer projectId={projectId!} />
         </TabsContent>
 
+        <TabsContent value="investment-materials" className="mt-4 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Investment Materials
+              </CardTitle>
+              <CardDescription>
+                Generate offering memorandums and investment reports with integrated comps, demographics, and financial data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  onClick={handleCreateOm}
+                  disabled={createOmMutation.isPending}
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                >
+                  {createOmMutation.isPending ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileText className="h-6 w-6" />}
+                  <span className="font-medium">Create Offering Memorandum</span>
+                  <span className="text-xs opacity-75">Full investment package with financials</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open('/simple-report', '_blank')}
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                >
+                  <Download className="h-6 w-6" />
+                  <span className="font-medium">Quick Report</span>
+                  <span className="text-xs opacity-75">Property summary or investor update</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/om')}
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                >
+                  <Briefcase className="h-6 w-6" />
+                  <span className="font-medium">Advanced OM Builder</span>
+                  <span className="text-xs opacity-75">Custom templates and branding</span>
+                </Button>
+              </div>
+              <Separator />
+              <div className="text-sm text-muted-foreground">
+                <p>Investment materials automatically include:</p>
+                <ul className="mt-2 space-y-1 list-disc list-inside">
+                  <li>Property overview and financial summary from your model</li>
+                  <li>Sales comps and rate comps from linked projects</li>
+                  <li>Market demographics for the property's state</li>
+                  <li>Rent roll analysis and occupancy data</li>
+                  <li>Revenue projections and exit strategy details</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="comps" className="mt-4 space-y-4">
-          <ModelingProjectIntegrationPanel 
-            projectId={projectId!} 
-            projectName={project.marinaName} 
+          <ModelingProjectIntegrationPanel
+            projectId={projectId!}
+            projectName={project.marinaName}
           />
         </TabsContent>
 

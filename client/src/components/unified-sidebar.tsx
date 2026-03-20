@@ -605,9 +605,16 @@ export default function UnifiedSidebar() {
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
             />
-            {operationsExpanded && filteredOperationsModulesNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {operationsExpanded && (
+              <>
+                {simplifiedMode && (
+                  <NavLink item={{ name: "Overview", href: "/operations" }} />
+                )}
+                {filteredOperationsModulesNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+              </>
+            )}
           </div>
         )}
         
@@ -778,13 +785,29 @@ export default function UnifiedSidebar() {
                 className={cn(
                   "flex items-center gap-2 w-full pl-4 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
                   location.startsWith('/document-builder')
-                    ? "text-blue-600 font-medium" 
+                    ? "text-blue-600 font-medium"
                     : "text-gray-500 hover:text-gray-700"
                 )}
                 data-testid="nav-document-builder"
               >
                 <FileText className="w-3 h-3" />
                 <span>Document Builder</span>
+              </div>
+            </Link>
+          )}
+          {!sidebarCollapsed && (
+            <Link href="/simple-report">
+              <div
+                className={cn(
+                  "flex items-center gap-2 w-full pl-4 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
+                  location.startsWith('/simple-report')
+                    ? "text-blue-600 font-medium"
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+                data-testid="nav-quick-reports"
+              >
+                <FileText className="w-3 h-3" />
+                <span>Quick Reports</span>
               </div>
             </Link>
           )}

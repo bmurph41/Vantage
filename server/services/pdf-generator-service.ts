@@ -1,6 +1,6 @@
 import { PDFDocument, PDFPage, PDFFont, StandardFonts, rgb, PageSizes } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import type { OMData, PropertyOverview, FinancialSummary, RentRollSummary, OperationsSummary } from './om-builder-service';
+import type { OMData, PropertyOverview, FinancialSummary, RentRollSummary, OperationsSummary, CompAnalytics, MarketDemographics } from './om-builder-service';
 
 export type PDFTemplateType = 'standard' | 'premium' | 'executive';
 
@@ -726,6 +726,125 @@ export class PDFGeneratorService {
     }
   }
 
+  private drawCompAnalysis(ctx: PDFContext, compAnalytics: CompAnalytics): void {
+    if (!compAnalytics) return;
+
+    // Sales Comps Section
+    if (compAnalytics.salesComps.length > 0) {
+      this.drawTitle(ctx, 'Comparable Sales Analysis');
+      ctx.yPosition -= 10;
+
+      // Stats summary
+      const stats = compAnalytics.salesCompStats;
+      const kpiWidth = 110;
+      const startX = ctx.margins.left;
+
+      this.drawKPIBox(ctx, 'Comps Found', String(stats.count), startX, kpiWidth);
+      this.drawKPIBox(ctx, 'Avg Sale Price', this.formatCurrency(stats.avgPrice), startX + kpiWidth + 8, kpiWidth);
+      this.drawKPIBox(ctx, 'Avg Cap Rate', this.formatPercent(stats.avgCapRate ? stats.avgCapRate * 100 : null), startX + (kpiWidth + 8) * 2, kpiWidth);
+      this.drawKPIBox(ctx, 'Avg $/Slip', this.formatCurrency(stats.avgPricePerSlip), startX + (kpiWidth + 8) * 3, kpiWidth);
+
+      ctx.yPosition -= 80;
+
+      // Comps table
+      const headers = ['Marina', 'Sale Price', 'Cap Rate', '$/Slip', 'Location', 'Year'];
+      const rows = compAnalytics.salesComps.slice(0, 12).map(c => [
+        c.marina || 'N/A',
+        this.formatCurrency(c.salePrice),
+        c.capRate ? this.formatPercent(c.capRate * 100) : 'N/A',
+        this.formatCurrency(c.pricePerSlip),
+        [c.city, c.state].filter(Boolean).join(', ') || 'N/A',
+        c.saleYear ? String(c.saleYear) : 'N/A',
+      ]);
+
+      this.drawTable(ctx, headers, rows, {
+        columnWidths: [120, 85, 70, 75, 85, 45],
+      });
+
+      ctx.yPosition -= 10;
+    }
+
+    // Rate Comps Section
+    if (compAnalytics.rateComps.length > 0) {
+      if (ctx.yPosition < 300) {
+        this.addPage(ctx);
+      }
+
+      this.drawTitle(ctx, 'Comparable Rate Analysis');
+      ctx.yPosition -= 10;
+
+      const rStats = compAnalytics.rateCompStats;
+      const kpiW = 140;
+      const sX = ctx.margins.left;
+
+      this.drawKPIBox(ctx, 'Rate Comps', String(rStats.count), sX, kpiW);
+      this.drawKPIBox(ctx, 'Avg Rate', this.formatCurrency(rStats.avgRate), sX + kpiW + 10, kpiW);
+      if (rStats.rateRange) {
+        this.drawKPIBox(ctx, 'Rate Range', `${this.formatCurrency(rStats.rateRange.min)} - ${this.formatCurrency(rStats.rateRange.max)}`, sX + (kpiW + 10) * 2, kpiW + 20);
+      }
+
+      ctx.yPosition -= 80;
+
+      const headers = ['Marina', 'Rate', 'Type', 'Slips', 'Season', 'Location'];
+      const rows = compAnalytics.rateComps.slice(0, 12).map(c => [
+        c.marina || 'N/A',
+        this.formatCurrency(c.rateAmount),
+        c.rateType || 'N/A',
+        c.wetSlips ? String(c.wetSlips) : 'N/A',
+        c.seasonality || 'N/A',
+        [c.city, c.state].filter(Boolean).join(', ') || 'N/A',
+      ]);
+
+      this.drawTable(ctx, headers, rows, {
+        columnWidths: [120, 75, 70, 50, 80, 85],
+      });
+    }
+  }
+
+  private drawDemographics(ctx: PDFContext, demographics: MarketDemographics): void {
+    if (!demographics) return;
+
+    this.drawTitle(ctx, `Market Demographics — ${demographics.state}`);
+    ctx.yPosition -= 10;
+
+    // Economic indicators
+    this.drawSubtitle(ctx, 'Economic Indicators');
+    ctx.yPosition -= 5;
+
+    if (demographics.population) {
+      this.drawKeyValue(ctx, 'Population:', this.formatNumber(demographics.population));
+    }
+    if (demographics.medianIncome) {
+      this.drawKeyValue(ctx, 'Median Household Income:', this.formatCurrency(demographics.medianIncome));
+    }
+    if (demographics.unemploymentRate != null) {
+      this.drawKeyValue(ctx, 'Unemployment Rate:', `${demographics.unemploymentRate.toFixed(1)}%`);
+    }
+    if (demographics.populationGrowth != null) {
+      this.drawKeyValue(ctx, 'Population Growth:', `${demographics.populationGrowth > 0 ? '+' : ''}${demographics.populationGrowth.toFixed(1)}%`);
+    }
+
+    ctx.yPosition -= 10;
+    this.drawHorizontalRule(ctx);
+
+    // Market stats
+    this.drawSubtitle(ctx, 'Marina Market Statistics');
+    ctx.yPosition -= 5;
+
+    if (demographics.transactionCount != null) {
+      this.drawKeyValue(ctx, 'Recent Transactions:', String(demographics.transactionCount));
+    }
+    if (demographics.avgSalePrice) {
+      this.drawKeyValue(ctx, 'Avg Market Sale Price:', this.formatCurrency(demographics.avgSalePrice));
+    }
+    if (demographics.avgCapRate) {
+      this.drawKeyValue(ctx, 'Market Cap Rate:', this.formatPercent(demographics.avgCapRate));
+    }
+    if (demographics.avgPricePerSlip) {
+      this.drawKeyValue(ctx, 'Market Avg $/Slip:', this.formatCurrency(demographics.avgPricePerSlip));
+    }
+  }
+
   private drawInvestmentHighlights(ctx: PDFContext, data: OMData): void {
     this.drawTitle(ctx, 'Investment Highlights');
     ctx.yPosition -= 10;
@@ -811,6 +930,21 @@ export class PDFGeneratorService {
     this.addPage(ctx);
     this.addHeader(ctx, data);
     this.drawRentRollSummary(ctx, data.rentRoll);
+
+    // Comp Analysis pages
+    if (data.compAnalytics && (data.compAnalytics.salesComps.length > 0 || data.compAnalytics.rateComps.length > 0)) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawCompAnalysis(ctx, data.compAnalytics);
+    }
+
+    // Demographics page
+    if (data.demographics) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawDemographics(ctx, data.demographics);
+    }
+
     ctx.yPosition -= 20;
     this.drawInvestmentHighlights(ctx, data);
     this.drawDisclaimer(ctx);
@@ -850,6 +984,20 @@ export class PDFGeneratorService {
     this.addPage(ctx);
     this.addHeader(ctx, data);
     this.drawRentRollSummary(ctx, data.rentRoll);
+
+    // Comp Analysis pages
+    if (data.compAnalytics && (data.compAnalytics.salesComps.length > 0 || data.compAnalytics.rateComps.length > 0)) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawCompAnalysis(ctx, data.compAnalytics);
+    }
+
+    // Demographics page
+    if (data.demographics) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawDemographics(ctx, data.demographics);
+    }
 
     this.addPage(ctx);
     this.addHeader(ctx, data);
@@ -953,12 +1101,26 @@ export class PDFGeneratorService {
     this.drawBulletPoint(ctx, 'Well-stocked ship store and marine supplies');
     this.drawBulletPoint(ctx, 'Comprehensive maintenance and repair services');
 
+    // Comp Analysis pages
+    if (data.compAnalytics && (data.compAnalytics.salesComps.length > 0 || data.compAnalytics.rateComps.length > 0)) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawCompAnalysis(ctx, data.compAnalytics);
+    }
+
+    // Demographics page
+    if (data.demographics) {
+      this.addPage(ctx);
+      this.addHeader(ctx, data);
+      this.drawDemographics(ctx, data.demographics);
+    }
+
     this.addPage(ctx);
     this.addHeader(ctx, data);
     this.drawTitle(ctx, 'Investment Highlights & Value Proposition');
     ctx.yPosition -= 10;
     this.drawInvestmentHighlights(ctx, data);
-    
+
     ctx.yPosition -= 20;
     this.drawSubtitle(ctx, 'Value-Add Opportunities');
     ctx.yPosition -= 5;

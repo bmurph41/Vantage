@@ -38,6 +38,9 @@ import DealScoringCard from '@/components/pipeline/DealScoringCard';
 import DDStatusReport from '@/components/dd/DDStatusReport';
 import DocumentVersions from '@/components/vdr/DocumentVersions';
 import { Swords, Award, ClipboardCheck, GitBranch } from 'lucide-react';
+import { useDisplayMode } from '@/stores/display-mode-store';
+import GuidedDealFlow from '@/components/deal-workspace/GuidedDealFlow';
+import SimplifiedDDChecklist from '@/components/dd/SimplifiedDDChecklist';
 
 // Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -77,6 +80,7 @@ export default function WorkspaceDetailPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
+  const { simplifiedMode } = useDisplayMode();
 
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab') || 'overview';
@@ -335,6 +339,11 @@ export default function WorkspaceDetailPage() {
         </div>
       </div>
 
+      {/* Guided Deal Flow - shown in simplified mode */}
+      {simplifiedMode && workspaceId && (
+        <GuidedDealFlow workspaceId={workspaceId} />
+      )}
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:grid-cols-none lg:flex">
@@ -488,22 +497,28 @@ export default function WorkspaceDetailPage() {
 
         {/* ═══ DILIGENCE TAB ═══ */}
         <TabsContent value="diligence" className="mt-6">
-          {!hasDDProject && (
-            <Card className="mb-4">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Due Diligence Project Not Created</p>
-                    <p className="text-xs text-muted-foreground">Create to set up tasks, data room, and milestones.</p>
-                  </div>
-                  <Button size="sm" onClick={() => setShowCreateDDDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />Create Due Diligence Project
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {simplifiedMode ? (
+            <SimplifiedDDChecklist workspaceId={workspaceId} />
+          ) : (
+            <>
+              {!hasDDProject && (
+                <Card className="mb-4">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Due Diligence Project Not Created</p>
+                        <p className="text-xs text-muted-foreground">Create to set up tasks, data room, and milestones.</p>
+                      </div>
+                      <Button size="sm" onClick={() => setShowCreateDDDialog(true)}>
+                        <Plus className="h-4 w-4 mr-2" />Create Due Diligence Project
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              <DdChecklistPanel workspaceId={workspaceId} />
+            </>
           )}
-          <DdChecklistPanel workspaceId={workspaceId} />
         </TabsContent>
 
         {/* ═══ DD STATUS TAB ═══ */}

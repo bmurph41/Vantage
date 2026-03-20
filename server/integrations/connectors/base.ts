@@ -1,4 +1,5 @@
 import { IntegrationDataTransformer } from '../../services/integration-data-transformer';
+import { logger } from '../../lib/logger';
 
 export type SyncDirection = 'read' | 'write' | 'bidirectional';
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
@@ -30,6 +31,11 @@ export interface SyncResult {
     error: string;
     field?: string;
   }>;
+  failedRecords: Array<{
+    record: any;
+    error: string;
+    entityType?: string;
+  }>;
   duration: number;
   syncedAt: Date;
 }
@@ -49,17 +55,50 @@ export interface ConnectorConfig {
   settings: Record<string, any>;
   userId: string;
   orgId: string;
+  /** Max requests per second for rate limiting (default: 10) */
+  maxRequestsPerSecond?: number;
+  /** Request timeout in milliseconds (default: 30000) */
+  requestTimeoutMs?: number;
+  /** Max retry attempts for failed requests (default: 3) */
+  maxRetries?: number;
 }
+
+/** Retryable HTTP status codes */
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+
+/** Base delay in ms for exponential backoff */
+const BASE_BACKOFF_MS = 1000;
 
 export abstract class BaseConnector {
   protected config: ConnectorConfig;
   protected transformer: IntegrationDataTransformer;
   protected integrationKey: string;
 
+  // Rate limiter state (token bucket)
+  private rateLimitTokens: number;
+  private rateLimitMax: number;
+  private rateLimitRefillRate: number; // tokens per ms
+  private rateLimitLastRefill: number;
+
+  // Retry config
+  private maxRetries: number;
+  private requestTimeoutMs: number;
+
   constructor(config: ConnectorConfig) {
     this.config = config;
     this.integrationKey = config.integrationKey;
     this.transformer = new IntegrationDataTransformer(config.integrationKey);
+
+    // Initialize rate limiter (token bucket)
+    const maxRps = config.maxRequestsPerSecond ?? 10;
+    this.rateLimitMax = maxRps;
+    this.rateLimitTokens = maxRps;
+    this.rateLimitRefillRate = maxRps / 1000; // tokens per ms
+    this.rateLimitLastRefill = Date.now();
+
+    // Retry and timeout config
+    this.maxRetries = config.maxRetries ?? 3;
+    this.requestTimeoutMs = config.requestTimeoutMs ?? 30000;
   }
 
   abstract testConnection(): Promise<{ connected: boolean; message: string; details?: any }>;
@@ -82,6 +121,7 @@ export abstract class BaseConnector {
       recordsUpdated: 0,
       recordsSkipped: 0,
       errors: [],
+      failedRecords: [],
       duration: 0,
       syncedAt: new Date(),
     };
@@ -111,9 +151,15 @@ export abstract class BaseConnector {
             );
 
             if (!validation.isValid) {
+              const errorMsg = validation.errors.map(e => e.message).join('; ');
               result.errors.push({
                 record,
-                error: validation.errors.map(e => e.message).join('; '),
+                error: errorMsg,
+              });
+              result.failedRecords.push({
+                record,
+                error: errorMsg,
+                entityType: entityConfig.sourceEntity,
               });
               result.recordsSkipped++;
               continue;
@@ -121,7 +167,7 @@ export abstract class BaseConnector {
 
             const saveResult = await this.saveEntity(entityConfig.targetEntity, transformed);
             result.recordsProcessed++;
-            
+
             if (saveResult.created) {
               result.recordsCreated++;
             } else if (saveResult.updated) {
@@ -130,9 +176,15 @@ export abstract class BaseConnector {
               result.recordsSkipped++;
             }
           } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
             result.errors.push({
               record,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: errorMsg,
+            });
+            result.failedRecords.push({
+              record,
+              error: errorMsg,
+              entityType: entityConfig.sourceEntity,
             });
             result.recordsSkipped++;
           }
@@ -146,6 +198,11 @@ export abstract class BaseConnector {
       result.errors.push({
         error: error instanceof Error ? error.message : 'Sync failed',
       });
+    }
+
+    // Mark as partial success if some records failed but others succeeded
+    if (result.failedRecords.length > 0 && result.recordsProcessed > 0) {
+      result.success = true; // partial success — some records went through
     }
 
     result.duration = Date.now() - startTime;
@@ -183,24 +240,190 @@ export abstract class BaseConnector {
     return (this.config.settings[key] as T) ?? (defaultValue as T);
   }
 
+  /**
+   * Wait for a rate limit token to become available (token bucket algorithm).
+   * Refills tokens based on elapsed time, then consumes one. If no tokens
+   * are available, sleeps until one is refilled.
+   */
+  private async acquireRateLimitToken(): Promise<void> {
+    while (true) {
+      const now = Date.now();
+      const elapsed = now - this.rateLimitLastRefill;
+
+      // Refill tokens based on elapsed time
+      this.rateLimitTokens = Math.min(
+        this.rateLimitMax,
+        this.rateLimitTokens + elapsed * this.rateLimitRefillRate
+      );
+      this.rateLimitLastRefill = now;
+
+      if (this.rateLimitTokens >= 1) {
+        this.rateLimitTokens -= 1;
+        return;
+      }
+
+      // Calculate wait time until one token is available
+      const waitMs = Math.ceil((1 - this.rateLimitTokens) / this.rateLimitRefillRate);
+      await this.sleep(waitMs);
+    }
+  }
+
+  /**
+   * Calculate backoff delay with jitter for a given retry attempt.
+   * Uses exponential backoff: base * 2^attempt, with random jitter of +/- 25%.
+   */
+  private getBackoffDelay(attempt: number): number {
+    const exponentialDelay = BASE_BACKOFF_MS * Math.pow(2, attempt);
+    const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1); // +/- 25%
+    return Math.max(0, exponentialDelay + jitter);
+  }
+
+  /**
+   * Parse the Retry-After header value into milliseconds.
+   * Supports both delta-seconds and HTTP-date formats.
+   */
+  private parseRetryAfter(headerValue: string | null): number | null {
+    if (!headerValue) return null;
+
+    // Try parsing as integer seconds first
+    const seconds = parseInt(headerValue, 10);
+    if (!isNaN(seconds)) {
+      return seconds * 1000;
+    }
+
+    // Try parsing as HTTP-date
+    const date = new Date(headerValue);
+    if (!isNaN(date.getTime())) {
+      const delayMs = date.getTime() - Date.now();
+      return Math.max(0, delayMs);
+    }
+
+    return null;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   protected async makeRequest<T>(
     url: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    // Wait for rate limit token before making the request
+    await this.acquireRateLimitToken();
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed (${response.status}): ${errorText}`);
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      // Set up abort controller for request timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          return response.json();
+        }
+
+        // Check if this status code is retryable
+        if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < this.maxRetries) {
+          const errorText = await response.text();
+          lastError = new Error(`API request failed (${response.status}): ${errorText}`);
+
+          // Determine delay: use Retry-After header for 429, otherwise exponential backoff
+          let delayMs: number;
+          if (response.status === 429) {
+            const retryAfterMs = this.parseRetryAfter(response.headers.get('Retry-After'));
+            delayMs = retryAfterMs ?? this.getBackoffDelay(attempt);
+          } else {
+            delayMs = this.getBackoffDelay(attempt);
+          }
+
+          logger.warn({
+            connector: this.integrationKey,
+            url,
+            status: response.status,
+            attempt: attempt + 1,
+            maxRetries: this.maxRetries,
+            delayMs,
+          }, `Request failed with status ${response.status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})`);
+
+          await this.sleep(delayMs);
+
+          // Re-acquire rate limit token for retry
+          await this.acquireRateLimitToken();
+          continue;
+        }
+
+        // Non-retryable error or exhausted retries
+        const errorText = await response.text();
+        throw new Error(`API request failed (${response.status}): ${errorText}`);
+
+      } catch (error) {
+        clearTimeout(timeoutId);
+
+        // Handle abort/timeout
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          lastError = new Error(
+            `Request to ${url} timed out after ${this.requestTimeoutMs}ms`
+          );
+
+          if (attempt < this.maxRetries) {
+            const delayMs = this.getBackoffDelay(attempt);
+            logger.warn({
+              connector: this.integrationKey,
+              url,
+              attempt: attempt + 1,
+              maxRetries: this.maxRetries,
+              delayMs,
+            }, `Request timed out, retrying in ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})`);
+
+            await this.sleep(delayMs);
+            await this.acquireRateLimitToken();
+            continue;
+          }
+
+          throw lastError;
+        }
+
+        // Re-throw non-retryable errors (e.g. network errors that aren't timeouts)
+        if (error instanceof Error && !RETRYABLE_STATUS_CODES.has(0)) {
+          // Network errors are retryable
+          if (attempt < this.maxRetries && !(error.message.startsWith('API request failed'))) {
+            lastError = error;
+            const delayMs = this.getBackoffDelay(attempt);
+
+            logger.warn({
+              connector: this.integrationKey,
+              url,
+              error: error.message,
+              attempt: attempt + 1,
+              maxRetries: this.maxRetries,
+              delayMs,
+            }, `Request failed with network error, retrying in ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})`);
+
+            await this.sleep(delayMs);
+            await this.acquireRateLimitToken();
+            continue;
+          }
+        }
+
+        throw error;
+      }
     }
 
-    return response.json();
+    // Should not reach here, but just in case
+    throw lastError ?? new Error(`Request to ${url} failed after ${this.maxRetries} retries`);
   }
 }
 

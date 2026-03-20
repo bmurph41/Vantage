@@ -32,6 +32,8 @@ import { DealTemplateSelector } from '@/components/modeling/DealTemplateSelector
 import { ModelingEmptyState } from '@/components/ui/_primitives/enhanced-empty-state';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { computeDealSignal, getSignalBadgeProps } from '@/lib/dealSignal';
+import { useDisplayMode } from '@/stores/display-mode-store';
+import QuickAnalysisDashboard from '@/components/analysis/QuickAnalysisDashboard';
 
 type ModelingProject = {
   id: string;
@@ -68,6 +70,7 @@ type ModelingProject = {
 };
 
 export default function ModelingProjectsPage() {
+  const { simplifiedMode } = useDisplayMode();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -184,6 +187,11 @@ export default function ModelingProjectsPage() {
     };
     return outcomeMap[outcome] || outcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
+
+  // Simplified mode: show card-based dashboard instead of complex table
+  if (simplifiedMode) {
+    return <QuickAnalysisDashboard />;
+  }
 
   return (
     <div className="p-6 space-y-6">

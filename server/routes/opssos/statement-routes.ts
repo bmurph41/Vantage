@@ -1,7 +1,8 @@
 import { Router } from "express";
+import * as XLSX from "xlsx";
 import { db } from "../../db";
-import { 
-  opssosStatementTemplates, 
+import {
+  opssosStatementTemplates,
   opssosStatements,
   opssosStatementExports
 } from "../../../shared/schema";
@@ -75,15 +76,86 @@ statementRouter.post("/generate", async (req, res) => {
       })
       .returning();
 
-    // TODO: Generate actual XLSX file here
-    // For now, create a placeholder export record
+    // Fetch the template to get column/filter/total configuration
+    const [template] = await db
+      .select()
+      .from(opssosStatementTemplates)
+      .where(and(eq(opssosStatementTemplates.id, templateId), eq(opssosStatementTemplates.orgId, orgId)));
+
+    // Generate XLSX workbook
+    const workbook = XLSX.utils.book_new();
+
+    // Build statement header info
+    const headerData = [
+      ["Operating Statement"],
+      ["Period", `${periodStart || "N/A"} to ${periodEnd || "N/A"}`],
+      ["Template", template?.name || "Custom"],
+      ["Generated", new Date().toISOString()],
+      ["Status", "Draft"],
+      [],
+    ];
+
+    // Build data columns from template config
+    const columns = (template?.columns as any[]) || [
+      { key: "description", label: "Description" },
+      { key: "amount", label: "Amount" },
+      { key: "budget", label: "Budget" },
+      { key: "variance", label: "Variance" },
+      { key: "variancePct", label: "Variance %" },
+    ];
+
+    const columnLabels = columns.map((c: any) => c.label || c.key);
+    const dataRows: any[][] = [];
+
+    // Build statement line items based on filters
+    const filters = (template?.filters as any) || {};
+    const categories = filters.categories || [
+      "Revenue", "Cost of Goods Sold", "Operating Expenses",
+      "Administrative Expenses", "Other Income/Expenses",
+    ];
+
+    // Generate structured line items per category
+    for (const category of categories) {
+      dataRows.push([category, "", "", "", ""]);
+      // Placeholder line items per category (will be populated from actual GL data when available)
+      dataRows.push(["  (Line items from GL)", "", "", "", ""]);
+      dataRows.push([]);
+    }
+
+    // Totals section
+    const totalsConfig = (template?.totals as any) || {};
+    dataRows.push([]);
+    dataRows.push(["TOTALS"]);
+    if (totalsConfig.showNetIncome !== false) {
+      dataRows.push(["Net Operating Income", "", "", "", ""]);
+    }
+    if (totalsConfig.showCashFlow !== false) {
+      dataRows.push(["Cash Flow", "", "", "", ""]);
+    }
+
+    // Combine into sheet
+    const sheetData = [...headerData, columnLabels, ...dataRows];
+    const sheet = XLSX.utils.aoa_to_sheet(sheetData);
+
+    // Set column widths
+    sheet["!cols"] = columns.map((_: any, i: number) => ({ wch: i === 0 ? 35 : 15 }));
+
+    XLSX.utils.book_append_sheet(workbook, sheet, "Statement");
+
+    // Generate buffer
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    // Encode as base64 data URL for storage
+    const base64 = Buffer.from(buffer).toString("base64");
+    const fileUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64}`;
+
     const [exportRecord] = await db
       .insert(opssosStatementExports)
       .values({
         orgId,
         statementId: statement.id,
         format: "xlsx",
-        fileUrl: `/exports/statements/${statement.id}.xlsx`,
+        fileUrl,
       })
       .returning();
 

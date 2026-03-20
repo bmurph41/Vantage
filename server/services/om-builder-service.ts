@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { 
-  crmDeals, 
+import {
+  crmDeals,
   crmProperties,
   crmContacts,
   modelingProjects,
@@ -8,11 +8,18 @@ import {
   rentRollEntries,
   omTemplates,
   omDocuments,
+  salesComps,
+  rateComps,
+  scProjects,
+  scProjectComps,
+  rcProjects,
+  rcProjectComps,
+  demographicsCache,
   insertOmDocumentSchema,
   type InsertOmDocument,
   type OmDocument
 } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { pdfGeneratorService, type PDFTemplateType, type PDFGeneratorOptions } from "./pdf-generator-service";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -74,6 +81,63 @@ export interface OperationsSummary {
   managementNotes: string | null;
 }
 
+export interface SalesCompSummary {
+  compId: string;
+  marina: string;
+  salePrice: number | null;
+  capRate: number | null;
+  pricePerSlip: number | null;
+  saleYear: number | null;
+  city: string | null;
+  state: string | null;
+  wetSlips: number | null;
+  dryRacks: number | null;
+  bodyOfWater: string | null;
+}
+
+export interface RateCompSummary {
+  compId: string;
+  marina: string;
+  rateAmount: number | null;
+  rateType: string | null;
+  wetSlips: number | null;
+  dryRacks: number | null;
+  seasonality: string | null;
+  occupancyRate: number | null;
+  city: string | null;
+  state: string | null;
+  bodyOfWater: string | null;
+}
+
+export interface MarketDemographics {
+  state: string;
+  population: number | null;
+  medianIncome: number | null;
+  unemploymentRate: number | null;
+  populationGrowth: number | null;
+  avgSalePrice: number | null;
+  avgCapRate: number | null;
+  avgPricePerSlip: number | null;
+  transactionCount: number | null;
+}
+
+export interface CompAnalytics {
+  salesComps: SalesCompSummary[];
+  rateComps: RateCompSummary[];
+  salesCompStats: {
+    count: number;
+    avgPrice: number | null;
+    avgCapRate: number | null;
+    avgPricePerSlip: number | null;
+    priceRange: { min: number; max: number } | null;
+  };
+  rateCompStats: {
+    count: number;
+    avgRate: number | null;
+    rateRange: { min: number; max: number } | null;
+  };
+}
+
 export interface OMData {
   dealId: string;
   dealName: string;
@@ -81,6 +145,8 @@ export interface OMData {
   financialSummary: FinancialSummary;
   rentRoll: RentRollSummary;
   operations: OperationsSummary;
+  compAnalytics: CompAnalytics;
+  demographics: MarketDemographics | null;
   generatedAt: Date;
 }
 
@@ -242,6 +308,152 @@ class OMBuilderService {
       managementNotes: null,
     };
 
+    // === Fetch Sales Comps linked to org projects ===
+    let salesCompData: SalesCompSummary[] = [];
+    let rateCompData: RateCompSummary[] = [];
+
+    try {
+      const allScProjects = await db
+        .select({ id: scProjects.id })
+        .from(scProjects)
+        .where(eq(scProjects.orgId, deal.orgId));
+
+      if (allScProjects.length > 0) {
+        const scProjectIds = allScProjects.map(p => p.id);
+        const linkedScComps = await db
+          .select({
+            compId: salesComps.id,
+            marina: salesComps.marina,
+            salePrice: salesComps.salePrice,
+            capRate: salesComps.capRate,
+            pricePerSlip: salesComps.pricePerSlip,
+            saleYear: salesComps.saleYear,
+            city: salesComps.city,
+            state: salesComps.state,
+            wetSlips: salesComps.wetSlips,
+            dryRacks: salesComps.dryRacks,
+            bodyOfWater: salesComps.bodyOfWater,
+          })
+          .from(scProjectComps)
+          .innerJoin(salesComps, eq(scProjectComps.salesCompId, salesComps.id))
+          .where(inArray(scProjectComps.scProjectId, scProjectIds))
+          .limit(50);
+
+        salesCompData = linkedScComps.map(c => ({
+          compId: c.compId,
+          marina: c.marina,
+          salePrice: c.salePrice,
+          capRate: c.capRate ? Number(c.capRate) / 100 : null,
+          pricePerSlip: c.pricePerSlip,
+          saleYear: c.saleYear,
+          city: c.city,
+          state: c.state,
+          wetSlips: c.wetSlips,
+          dryRacks: c.dryRacks,
+          bodyOfWater: c.bodyOfWater,
+        }));
+      }
+
+      // Rate Comps
+      const allRcProjects = await db
+        .select({ id: rcProjects.id })
+        .from(rcProjects)
+        .where(eq(rcProjects.orgId, deal.orgId));
+
+      if (allRcProjects.length > 0) {
+        const rcProjectIds = allRcProjects.map(p => p.id);
+        const linkedRcComps = await db
+          .select({
+            compId: rateComps.id,
+            marina: rateComps.marina,
+            rateAmount: rateComps.rateAmount,
+            rateType: rateComps.rateType,
+            wetSlips: rateComps.wetSlips,
+            dryRacks: rateComps.dryRacks,
+            seasonality: rateComps.seasonality,
+            city: rateComps.city,
+            state: rateComps.state,
+            bodyOfWater: rateComps.bodyOfWater,
+          })
+          .from(rcProjectComps)
+          .innerJoin(rateComps, eq(rcProjectComps.rateCompId, rateComps.id))
+          .where(inArray(rcProjectComps.rcProjectId, rcProjectIds))
+          .limit(50);
+
+        rateCompData = linkedRcComps.map(c => ({
+          compId: c.compId,
+          marina: c.marina,
+          rateAmount: c.rateAmount,
+          rateType: c.rateType,
+          wetSlips: c.wetSlips,
+          dryRacks: c.dryRacks,
+          seasonality: c.seasonality,
+          occupancyRate: null,
+          city: c.city,
+          state: c.state,
+          bodyOfWater: c.bodyOfWater,
+        }));
+      }
+    } catch (err) {
+      console.warn('[OMBuilder] Comp aggregation error (non-fatal):', err);
+    }
+
+    // Compute comp statistics
+    const salesPrices = salesCompData.filter(c => c.salePrice != null).map(c => c.salePrice!);
+    const salesCapRates = salesCompData.filter(c => c.capRate != null).map(c => c.capRate!);
+    const salesPPS = salesCompData.filter(c => c.pricePerSlip != null).map(c => c.pricePerSlip!);
+    const rateAmounts = rateCompData.filter(c => c.rateAmount != null).map(c => c.rateAmount!);
+
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+    const compAnalytics: CompAnalytics = {
+      salesComps: salesCompData,
+      rateComps: rateCompData,
+      salesCompStats: {
+        count: salesCompData.length,
+        avgPrice: avg(salesPrices),
+        avgCapRate: avg(salesCapRates),
+        avgPricePerSlip: avg(salesPPS),
+        priceRange: salesPrices.length > 0 ? { min: Math.min(...salesPrices), max: Math.max(...salesPrices) } : null,
+      },
+      rateCompStats: {
+        count: rateCompData.length,
+        avgRate: avg(rateAmounts),
+        rateRange: rateAmounts.length > 0 ? { min: Math.min(...rateAmounts), max: Math.max(...rateAmounts) } : null,
+      },
+    };
+
+    // === Fetch Demographics for the property's state ===
+    let demographics: MarketDemographics | null = null;
+    const propertyState = property?.state || deal.state;
+    if (propertyState) {
+      try {
+        const [cached] = await db
+          .select()
+          .from(demographicsCache)
+          .where(eq(demographicsCache.stateCode, propertyState.toUpperCase()))
+          .orderBy(desc(demographicsCache.fetchedAt))
+          .limit(1);
+
+        if (cached && cached.data) {
+          const d = cached.data as any;
+          demographics = {
+            state: propertyState,
+            population: d.population ?? null,
+            medianIncome: d.medianIncome ?? null,
+            unemploymentRate: d.unemploymentRate ?? null,
+            populationGrowth: d.populationGrowth ?? null,
+            avgSalePrice: d.avgSalePrice ?? null,
+            avgCapRate: d.avgCapRate ?? null,
+            avgPricePerSlip: d.avgPricePerSlip ?? null,
+            transactionCount: d.transactionCount ?? null,
+          };
+        }
+      } catch (err) {
+        console.warn('[OMBuilder] Demographics fetch error (non-fatal):', err);
+      }
+    }
+
     return {
       dealId,
       dealName: deal.dealName || 'Untitled Deal',
@@ -249,6 +461,8 @@ class OMBuilderService {
       financialSummary,
       rentRoll: rentRollData,
       operations,
+      compAnalytics,
+      demographics,
       generatedAt: new Date(),
     };
   }

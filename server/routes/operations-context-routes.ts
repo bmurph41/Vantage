@@ -3684,4 +3684,175 @@ router.post('/push-budget-to-asset', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// COMBINED MODULE KPI SUMMARY (single call for OperationsHome dashboard)
+// ============================================================================
+router.get('/modules/kpi-summary', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const now = new Date();
+    const mtdStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const today = now.toISOString().slice(0, 10);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+
+    // Run all queries in parallel
+    const [
+      fuelMTD,
+      fuelLastMonth,
+      fuelToday,
+      shipStoreMTD,
+      shipStoreLastMonth,
+      shipStoreToday,
+      serviceOpen,
+      serviceToday,
+      activeRentals,
+      rentalsToday,
+      activeMembers,
+      boatSalesInventory,
+      boatSalesToday,
+      glPending,
+    ] = await Promise.all([
+      // Fuel MTD revenue
+      db.select({
+        totalRevenue: sql<string>`COALESCE(sum(${opsFuelTransactions.grossSales}), '0')`,
+        txnCount: sql<number>`count(*)`,
+      }).from(opsFuelTransactions)
+        .where(and(eq(opsFuelTransactions.orgId, orgId), gte(opsFuelTransactions.txnDate, mtdStart), lte(opsFuelTransactions.txnDate, today))),
+      // Fuel last month revenue (for trend)
+      db.select({
+        totalRevenue: sql<string>`COALESCE(sum(${opsFuelTransactions.grossSales}), '0')`,
+      }).from(opsFuelTransactions)
+        .where(and(eq(opsFuelTransactions.orgId, orgId), gte(opsFuelTransactions.txnDate, lastMonthStart), lte(opsFuelTransactions.txnDate, lastMonthEnd))),
+      // Fuel today activity
+      db.select({ count: sql<number>`count(*)` }).from(opsFuelTransactions)
+        .where(and(eq(opsFuelTransactions.orgId, orgId), eq(opsFuelTransactions.txnDate, today))),
+      // Ship store MTD
+      db.select({
+        totalRevenue: sql<string>`COALESCE(sum(${opsShipStoreSales.grossSales}), '0')`,
+        txnCount: sql<number>`COALESCE(sum(${opsShipStoreSales.txnCount}), 0)`,
+      }).from(opsShipStoreSales)
+        .where(and(eq(opsShipStoreSales.orgId, orgId), gte(opsShipStoreSales.txnDate, mtdStart), lte(opsShipStoreSales.txnDate, today))),
+      // Ship store last month
+      db.select({
+        totalRevenue: sql<string>`COALESCE(sum(${opsShipStoreSales.grossSales}), '0')`,
+      }).from(opsShipStoreSales)
+        .where(and(eq(opsShipStoreSales.orgId, orgId), gte(opsShipStoreSales.txnDate, lastMonthStart), lte(opsShipStoreSales.txnDate, lastMonthEnd))),
+      // Ship store today
+      db.select({ count: sql<number>`count(*)` }).from(opsShipStoreSales)
+        .where(and(eq(opsShipStoreSales.orgId, orgId), eq(opsShipStoreSales.txnDate, today))),
+      // Service open work orders (status is lowercase: 'open', 'in_progress')
+      db.select({ count: sql<number>`count(*)` }).from(opsServiceWorkOrders)
+        .where(and(eq(opsServiceWorkOrders.orgId, orgId), inArray(opsServiceWorkOrders.status, ['open', 'in_progress']))),
+      // Service today activity
+      db.select({ count: sql<number>`count(*)` }).from(opsServiceWorkOrders)
+        .where(and(eq(opsServiceWorkOrders.orgId, orgId), eq(opsServiceWorkOrders.openDate, today))),
+      // Active boat rentals (count MTD rentals as proxy for active)
+      db.select({
+        count: sql<number>`count(*)`,
+        totalRevenue: sql<string>`COALESCE(sum(${opsBoatRentals.grossSales}), '0')`,
+      }).from(opsBoatRentals)
+        .where(and(eq(opsBoatRentals.orgId, orgId), gte(opsBoatRentals.rentalDate, mtdStart), lte(opsBoatRentals.rentalDate, today))),
+      // Rentals today
+      db.select({ count: sql<number>`count(*)` }).from(opsBoatRentals)
+        .where(and(eq(opsBoatRentals.orgId, orgId), eq(opsBoatRentals.rentalDate, today))),
+      // Active boat club members
+      db.select({ count: sql<number>`count(*)` }).from(opsBoatClubMemberships)
+        .where(and(eq(opsBoatClubMemberships.orgId, orgId), eq(opsBoatClubMemberships.status, 'active'))),
+      // Boat sales MTD count
+      db.select({
+        count: sql<number>`count(*)`,
+        totalRevenue: sql<string>`COALESCE(sum(${opsBoatSales.grossSales}), '0')`,
+      }).from(opsBoatSales)
+        .where(and(eq(opsBoatSales.orgId, orgId), gte(opsBoatSales.saleDate, mtdStart), lte(opsBoatSales.saleDate, today))),
+      // Boat sales today
+      db.select({ count: sql<number>`count(*)` }).from(opsBoatSales)
+        .where(and(eq(opsBoatSales.orgId, orgId), eq(opsBoatSales.saleDate, today))),
+      // Bookkeeping GL entries this month (recent activity = up to date)
+      db.select({ count: sql<number>`count(*)` }).from(opsBookkeepingGl)
+        .where(and(eq(opsBookkeepingGl.orgId, orgId), gte(opsBookkeepingGl.periodStart, mtdStart))),
+    ]);
+
+    const fuelRevMTD = parseFloat(fuelMTD[0]?.totalRevenue || '0');
+    const fuelRevLast = parseFloat(fuelLastMonth[0]?.totalRevenue || '0');
+    const shipRevMTD = parseFloat(shipStoreMTD[0]?.totalRevenue || '0');
+    const shipRevLast = parseFloat(shipStoreLastMonth[0]?.totalRevenue || '0');
+
+    const calcTrend = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    res.json({
+      fuel: {
+        value: fuelRevMTD,
+        label: 'Revenue MTD',
+        format: 'currency',
+        trend: calcTrend(fuelRevMTD, fuelRevLast),
+        activeToday: (fuelToday[0]?.count || 0) > 0,
+        pendingCount: 0,
+      },
+      ship_store: {
+        value: shipRevMTD,
+        label: 'Sales MTD',
+        format: 'currency',
+        trend: calcTrend(shipRevMTD, shipRevLast),
+        activeToday: (shipStoreToday[0]?.count || 0) > 0,
+        pendingCount: 0,
+      },
+      service: {
+        value: serviceOpen[0]?.count || 0,
+        label: 'Open Work Orders',
+        format: 'number',
+        trend: 0,
+        activeToday: (serviceToday[0]?.count || 0) > 0,
+        pendingCount: serviceOpen[0]?.count || 0,
+      },
+      boat_rentals: {
+        value: activeRentals[0]?.count || 0,
+        label: 'Rentals MTD',
+        format: 'number',
+        trend: 0,
+        activeToday: (rentalsToday[0]?.count || 0) > 0,
+        pendingCount: 0,
+      },
+      boat_club: {
+        value: activeMembers[0]?.count || 0,
+        label: 'Active Members',
+        format: 'number',
+        trend: 0,
+        activeToday: false,
+        pendingCount: 0,
+      },
+      boat_sales: {
+        value: boatSalesInventory[0]?.count || 0,
+        label: 'Sales MTD',
+        format: 'number',
+        trend: 0,
+        activeToday: (boatSalesToday[0]?.count || 0) > 0,
+        pendingCount: 0,
+      },
+      bookkeeping: {
+        value: glPending[0]?.count || 0,
+        label: (glPending[0]?.count || 0) > 0 ? 'Entries this month' : 'Up to date',
+        format: 'number',
+        trend: 0,
+        activeToday: (glPending[0]?.count || 0) > 0,
+        pendingCount: 0,
+      },
+      payroll: {
+        value: 0,
+        label: 'Next run TBD',
+        format: 'number',
+        trend: 0,
+        activeToday: false,
+        pendingCount: 0,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching module KPI summary:', error);
+    res.status(500).json({ error: 'Failed to fetch module KPI summary' });
+  }
+});
+
 export default router;

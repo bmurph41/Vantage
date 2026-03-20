@@ -59,6 +59,70 @@ router.get('/api/om-builder/templates', async (req: Request, res: Response) => {
   }
 });
 
+// Get enriched OM data by modeling project ID (includes comps, demographics)
+router.get('/api/om-builder/project/:projectId/data', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+
+    const { db } = await import('../db');
+    const { modelingProjects, crmDeals } = await import('@shared/schema');
+    const { eq } = await import('drizzle-orm');
+
+    const [project] = await db
+      .select()
+      .from(modelingProjects)
+      .where(eq(modelingProjects.id, projectId))
+      .limit(1);
+
+    if (!project) {
+      return res.status(404).json({ error: 'Modeling project not found' });
+    }
+
+    // Find associated deal
+    let dealId: string | null = null;
+    if ((project as any).linkedDealId) {
+      dealId = (project as any).linkedDealId;
+    } else if ((project as any).linkedPropertyId) {
+      const [deal] = await db
+        .select({ id: crmDeals.id })
+        .from(crmDeals)
+        .where(eq(crmDeals.propertyId, (project as any).linkedPropertyId))
+        .limit(1);
+      dealId = deal?.id || null;
+    }
+
+    if (!dealId) {
+      return res.json({
+        projectId,
+        dealId: null,
+        propertyOverview: {
+          name: (project as any).marinaName || (project as any).propertyName || 'Unnamed Project',
+          city: (project as any).city || null,
+          state: (project as any).state || null,
+        },
+        financialSummary: {
+          purchasePrice: (project as any).purchasePrice ? Number((project as any).purchasePrice) : null,
+          noiEstimate: (project as any).noi ? Number((project as any).noi) : null,
+          capRate: (project as any).capRate ? Number((project as any).capRate) : null,
+        },
+        compAnalytics: { salesComps: [], rateComps: [], salesCompStats: { count: 0 }, rateCompStats: { count: 0 } },
+        demographics: null,
+        generatedAt: new Date(),
+      });
+    }
+
+    const data = await omBuilderService.aggregateOMData(dealId);
+    if (!data) {
+      return res.status(404).json({ error: 'Could not aggregate data' });
+    }
+
+    res.json({ ...data, projectId });
+  } catch (error) {
+    console.error('Error aggregating project OM data:', error);
+    res.status(500).json({ error: 'Failed to aggregate project data' });
+  }
+});
+
 router.get('/api/om-builder/:dealId/data', async (req: Request, res: Response) => {
   try {
     const { dealId } = req.params;

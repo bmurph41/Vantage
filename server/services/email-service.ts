@@ -2,7 +2,7 @@ import sgMail from '@sendgrid/mail';
 import { logger } from '../lib/logger';
 import crypto from 'crypto';
 
-async function getSendGridClient() {
+export async function getSendGridClient() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
