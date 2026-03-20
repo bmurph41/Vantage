@@ -78,6 +78,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import FundReturns from './FundReturns';
+import InvestorReporting from './InvestorReporting';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1363,6 +1364,10 @@ export default function FundDetailPage() {
             <TrendingUp className="h-4 w-4 mr-2" />
             Returns
           </TabsTrigger>
+          <TabsTrigger value="reporting" data-testid="tab-reporting">
+            <Activity className="h-4 w-4 mr-2" />
+            Reporting
+          </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">
             <Settings className="h-4 w-4 mr-2" />
             Settings
@@ -1395,6 +1400,10 @@ export default function FundDetailPage() {
 
         <TabsContent value="returns">
           {fundId && <FundReturns fundId={fundId} />}
+        </TabsContent>
+
+        <TabsContent value="reporting">
+          <InvestorReporting />
         </TabsContent>
 
         <TabsContent value="settings">

@@ -35,7 +35,9 @@ import {
 import { format } from 'date-fns';
 import CompetitiveTracker from '@/components/pipeline/CompetitiveTracker';
 import DealScoringCard from '@/components/pipeline/DealScoringCard';
-import { Swords, Award } from 'lucide-react';
+import DDStatusReport from '@/components/dd/DDStatusReport';
+import DocumentVersions from '@/components/vdr/DocumentVersions';
+import { Swords, Award, ClipboardCheck, GitBranch } from 'lucide-react';
 
 // Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -85,6 +87,8 @@ export default function WorkspaceDetailPage() {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCADialog, setShowCADialog] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
   // Form state
   const [ddExpiration, setDdExpiration] = useState('');
@@ -281,6 +285,19 @@ export default function WorkspaceDetailPage() {
                   <FileText className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-sm">{doc.filename}</span>
                   <span className="text-xs text-muted-foreground ml-auto">{doc.mimeType || ''}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedDocId(doc.id);
+                      setShowVersionHistory(true);
+                    }}
+                  >
+                    <GitBranch className="h-3 w-3 mr-1" />
+                    Versions
+                  </Button>
                 </div>
               ))}
               {folder.children && renderFolderTree(folder.children, depth + 1)}
@@ -320,7 +337,7 @@ export default function WorkspaceDetailPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
@@ -330,6 +347,9 @@ export default function WorkspaceDetailPage() {
           <TabsTrigger value="diligence" className="gap-2" data-testid="tab-diligence">
             <ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">Diligence</span>
             {stats.dd.overdue > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">{stats.dd.overdue}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="dd-status" className="gap-2" data-testid="tab-dd-status">
+            <ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">DD Status</span>
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
             <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">Documents</span>
@@ -484,6 +504,24 @@ export default function WorkspaceDetailPage() {
             </Card>
           )}
           <DdChecklistPanel workspaceId={workspaceId} />
+        </TabsContent>
+
+        {/* ═══ DD STATUS TAB ═══ */}
+        <TabsContent value="dd-status" className="mt-6">
+          {hasDDProject && workspace.ddProjectId ? (
+            <DDStatusReport projectId={workspace.ddProjectId} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No Due Diligence Project</h3>
+                <p className="text-muted-foreground mb-4">Create a Due Diligence project to view status reports.</p>
+                <Button variant="outline" onClick={() => { handleTabChange('diligence'); setShowCreateDDDialog(true); }}>
+                  Go to Diligence
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ═══ DOCUMENTS TAB ═══ */}
@@ -694,6 +732,17 @@ export default function WorkspaceDetailPage() {
               Send Invite
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ DOCUMENT VERSION HISTORY DIALOG ═══ */}
+      <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Version History</DialogTitle>
+            <DialogDescription>View and manage document versions</DialogDescription>
+          </DialogHeader>
+          {selectedDocId && <DocumentVersions documentId={selectedDocId} />}
         </DialogContent>
       </Dialog>
 

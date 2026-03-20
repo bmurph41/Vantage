@@ -26,6 +26,8 @@ import {
   ContactActivitiesTab,
   ContactDealsTabEnhanced,
 } from '@/components/crm/ContactRecordTabs';
+import { ContactTimeline } from '@/components/crm/ContactTimeline';
+import { RelationshipMap } from '@/components/crm/RelationshipMap';
 import { useProspectingActivity } from '@/contexts/ProspectingActivityContext';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -315,6 +317,16 @@ export default function ContactRecordPage() {
           label: 'Notes',
           count: contact.notes?.length || 0,
           content: <ContactNotesTab notes={contact.notes} />,
+        },
+        {
+          value: 'timeline',
+          label: 'Timeline',
+          content: <ContactTimeline contactId={id} />,
+        },
+        {
+          value: 'relationships',
+          label: 'Relationships',
+          content: <RelationshipMap entityId={id} entityType="contact" />,
         },
       ] : []}
 
