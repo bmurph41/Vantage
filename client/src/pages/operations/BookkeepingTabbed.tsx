@@ -1,12 +1,14 @@
 import { lazy } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, LayoutDashboard, FileText, Calculator, History, DollarSign } from "lucide-react";
+import { BookOpen, LayoutDashboard, FileText, Calculator, History, DollarSign, TableProperties, Upload } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition } from "@/components/layout/TabbedModuleLayout";
 
 const BookkeepingDashboard = lazy(() => import("./bookkeeping/Dashboard"));
 const BookkeepingStatements = lazy(() => import("./bookkeeping/Statements"));
 const BookkeepingChartOfAccounts = lazy(() => import("./bookkeeping/ChartOfAccounts"));
 const BookkeepingSyncHistory = lazy(() => import("./bookkeeping/SyncHistory"));
+const BookkeepingGLViewer = lazy(() => import("./bookkeeping/GLViewer"));
+const BookkeepingGLImport = lazy(() => import("./bookkeeping/GLImport"));
 const BudgetingTabbed = lazy(() => import("./BudgetingTabbed"));
 
 type PackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
@@ -45,6 +47,20 @@ export default function BookkeepingTabbed() {
       icon: FileText,
       component: BookkeepingStatements,
       description: "P&L statements and balance sheets",
+    },
+    {
+      id: "gl-viewer",
+      label: "GL Viewer",
+      icon: TableProperties,
+      component: BookkeepingGLViewer,
+      description: "Browse and manage general ledger entries",
+    },
+    {
+      id: "gl-import",
+      label: "GL Import",
+      icon: Upload,
+      component: BookkeepingGLImport,
+      description: "Import GL entries from CSV files",
     },
     {
       id: "chart-of-accounts",

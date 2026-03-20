@@ -211,6 +211,10 @@ const BoatSalesTabbed = lazy(() => import("@/pages/operations/BoatSalesTabbed"))
 const BudgetingTabbed = lazy(() => import("@/pages/operations/BudgetingTabbed"));
 const BookkeepingTabbed = lazy(() => import("@/pages/operations/BookkeepingTabbed"));
 const PayrollTabbed = lazy(() => import("@/pages/operations/PayrollTabbed"));
+const HotelTabbed = lazy(() => import("@/pages/operations/HotelTabbed"));
+const MultifamilyTabbed = lazy(() => import("@/pages/operations/MultifamilyTabbed"));
+const RetailOfficeTabbed = lazy(() => import("@/pages/operations/RetailOfficeTabbed"));
+const SelfStorageTabbed = lazy(() => import("@/pages/operations/SelfStorageTabbed"));
 const SalesCompsIndex = lazy(() => import("@/pages/analysis/sales-comps/Index"));
 const SalesCompsAnalytics = lazy(() => import("@/pages/analysis/sales-comps/Analytics"));
 const SalesCompsProjects = lazy(() => import("@/pages/analysis/sales-comps/Projects"));
@@ -1174,6 +1178,34 @@ function Router() {
           window.location.href = '/operations/bookkeeping?tab=budgeting';
           return null;
         }}
+      </Route>
+      <Route path="/operations/hotel">
+        {() => (
+          <GatedLayout pack="operations">
+            <HotelTabbed />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/operations/multifamily">
+        {() => (
+          <GatedLayout pack="operations">
+            <MultifamilyTabbed />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/operations/retail-office">
+        {() => (
+          <GatedLayout pack="operations">
+            <RetailOfficeTabbed />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/operations/self-storage">
+        {() => (
+          <GatedLayout pack="operations">
+            <SelfStorageTabbed />
+          </GatedLayout>
+        )}
       </Route>
       {/* Marketing - Standalone Route */}
       <Route path="/marketing">

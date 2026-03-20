@@ -9,7 +9,8 @@ import {
   asmpFuel, asmpShipStore, asmpService, asmpCommercialTenants, asmpBoatRentals,
   asmpBoatClub, asmpBoatSales, asmpBookkeeping, modelingProjects,
   ownedAssets, crmProperties, modelingActuals, modelingFinancialPeriods,
-  assetPerformanceSnapshots, returnsLedger
+  assetPerformanceSnapshots, returnsLedger,
+  budgets, budgetVersions, budgetLines, budgetAmounts
 } from '@shared/schema';
 import { eq, and, desc, between, sql, gte, lte, SQL, inArray } from 'drizzle-orm';
 import { z } from 'zod';
@@ -3415,6 +3416,271 @@ router.get('/projects/:projectId/ops/parking-lot/summary', async (req: Request, 
   } catch (error) {
     console.error('Error fetching parking lot summary:', error);
     res.status(500).json({ error: 'Failed to fetch parking lot summary' });
+  }
+});
+
+// ============================================================================
+// SYNC STATUS ENDPOINT
+// ============================================================================
+
+// GET /api/operations-context/sync-status?module=fuel&marinaId=<uuid>
+// Returns sync status for a given module (and optionally a specific marina).
+// The module parameter maps to the import event's scope field (e.g., "fuel", "ship_store").
+router.get('/sync-status', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).orgId || (req as any).user?.orgId;
+    const { module: moduleName, marinaId } = req.query;
+
+    if (!moduleName || typeof moduleName !== 'string') {
+      return res.status(400).json({ error: 'module query parameter is required' });
+    }
+
+    // Build conditions for import events query
+    const conditions: SQL[] = [];
+    if (orgId) {
+      conditions.push(eq(opsImportEvents.orgId, orgId));
+    }
+    // Map module name to the scope enum used in import events
+    conditions.push(eq(opsImportEvents.scope, moduleName as any));
+    if (marinaId && typeof marinaId === 'string') {
+      conditions.push(eq(opsImportEvents.marinaId, marinaId));
+    }
+
+    // Get the most recent import event for this module
+    const latestSync = await db
+      .select({
+        id: opsImportEvents.id,
+        status: opsImportEvents.status,
+        rowsWritten: opsImportEvents.rowsWritten,
+        createdAt: opsImportEvents.createdAt,
+      })
+      .from(opsImportEvents)
+      .where(and(...conditions))
+      .orderBy(desc(opsImportEvents.createdAt))
+      .limit(1);
+
+    if (latestSync.length === 0) {
+      return res.json({
+        module: moduleName,
+        lastSyncAt: null,
+        status: 'never',
+        recordCount: 0,
+      });
+    }
+
+    const event = latestSync[0];
+    let syncStatus: 'synced' | 'syncing' | 'error' | 'never' = 'never';
+
+    if (event.status === 'completed') {
+      syncStatus = 'synced';
+    } else if (event.status === 'processing' || event.status === 'pending') {
+      syncStatus = 'syncing';
+    } else if (event.status === 'failed') {
+      syncStatus = 'error';
+    }
+
+    res.json({
+      module: moduleName,
+      lastSyncAt: event.createdAt,
+      status: syncStatus,
+      recordCount: Number(event.rowsWritten || 0),
+    });
+  } catch (error) {
+    console.error('Error fetching sync status:', error);
+    res.status(500).json({ error: 'Failed to fetch sync status' });
+  }
+});
+
+// ============================================================================
+// SYNC OPERATIONS TO RETURNS LEDGER
+// ============================================================================
+
+router.post('/sync-to-returns-ledger', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+
+    const schema = z.object({
+      ownedAssetId: z.string(),
+      rangeStart: z.string(),
+      rangeEnd: z.string(),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+    }
+
+    const { ownedAssetId, rangeStart, rangeEnd } = parsed.data;
+
+    // Verify asset ownership
+    const [asset] = await db.select()
+      .from(ownedAssets)
+      .where(and(eq(ownedAssets.id, ownedAssetId), eq(ownedAssets.orgId, orgId)));
+
+    if (!asset) {
+      return res.status(404).json({ error: 'Owned asset not found' });
+    }
+
+    // Find linked marina for this asset
+    const linkedProjectId = asset.projectId;
+    let marinaId: string | null = null;
+
+    if (linkedProjectId) {
+      const [marina] = await db.select({ id: opsMarinas.id })
+        .from(opsMarinas)
+        .where(and(eq(opsMarinas.orgId, orgId), eq(opsMarinas.linkedProjectId, linkedProjectId)));
+      if (marina) marinaId = marina.id;
+    }
+
+    let entriesWritten = 0;
+
+    if (marinaId) {
+      // Aggregate GL data by month and account type for the date range
+      const glData = await db.select({
+        month: sql<string>`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
+        accountType: opsBookkeepingGl.accountType,
+        accountName: opsBookkeepingGl.accountName,
+        total: sql<string>`sum(${opsBookkeepingGl.amount})`,
+      })
+        .from(opsBookkeepingGl)
+        .where(and(
+          eq(opsBookkeepingGl.marinaId, marinaId),
+          between(opsBookkeepingGl.periodStart, rangeStart, rangeEnd)
+        ))
+        .groupBy(
+          sql`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
+          opsBookkeepingGl.accountType,
+          opsBookkeepingGl.accountName
+        );
+
+      // Map GL entries to returns ledger entries
+      for (const row of glData) {
+        const isExpense = row.accountType === 'expense' || row.accountType === 'EXPENSE';
+        const bucket = isExpense ? 'FEES_OTHER' : 'OPERATING_CASHFLOW';
+
+        await db.insert(returnsLedger).values({
+          orgId,
+          userId,
+          propertyId: asset.propertyId || null,
+          modelId: linkedProjectId || null,
+          asOfDate: row.month,
+          frequency: 'MONTHLY',
+          bucket,
+          amount: row.total,
+          source: 'OPS_SYNC',
+          memo: `${row.accountName || 'GL'} - ${row.accountType}`,
+        });
+        entriesWritten++;
+      }
+    }
+
+    res.json({ success: true, entriesWritten });
+  } catch (error) {
+    console.error('Error syncing to returns ledger:', error);
+    res.status(500).json({ error: 'Failed to sync operations data to returns ledger' });
+  }
+});
+
+// ============================================================================
+// PUSH BUDGET TO ASSET PERFORMANCE SNAPSHOTS
+// ============================================================================
+
+router.post('/push-budget-to-asset', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+
+    const schema = z.object({
+      ownedAssetId: z.string(),
+      budgetId: z.string(),
+      fiscalYear: z.number().int(),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+    }
+
+    const { ownedAssetId, budgetId, fiscalYear } = parsed.data;
+
+    // Verify asset ownership
+    const [asset] = await db.select()
+      .from(ownedAssets)
+      .where(and(eq(ownedAssets.id, ownedAssetId), eq(ownedAssets.orgId, orgId)));
+
+    if (!asset) {
+      return res.status(404).json({ error: 'Owned asset not found' });
+    }
+
+    // Fetch budget
+    const [budget] = await db.select()
+      .from(budgets)
+      .where(and(eq(budgets.id, budgetId), eq(budgets.userId, userId)));
+
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found' });
+    }
+
+    // Get the primary version
+    const [primaryVersion] = await db.select()
+      .from(budgetVersions)
+      .where(and(eq(budgetVersions.budgetId, budgetId), eq(budgetVersions.isPrimary, true)));
+
+    if (!primaryVersion) {
+      return res.status(404).json({ error: 'No primary budget version found' });
+    }
+
+    // Get all budget lines for this version
+    const lines = await db.select()
+      .from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, primaryVersion.id));
+
+    let targetsWritten = 0;
+
+    for (const line of lines) {
+      // Get amounts for this line
+      const amounts = await db.select()
+        .from(budgetAmounts)
+        .where(eq(budgetAmounts.budgetLineId, line.id));
+
+      for (const amt of amounts) {
+        const periodDate = amt.periodStart;
+
+        // Write as asset performance snapshot with budget targets in metrics
+        await db.insert(assetPerformanceSnapshots)
+          .values({
+            ownedAssetId,
+            snapshotDate: periodDate,
+            metrics: {
+              budgetTarget: true,
+              category: line.displayName,
+              accountKey: line.accountKey,
+              lineType: line.lineType,
+              amount: Number(amt.amount),
+              fiscalYear,
+              budgetId,
+              source: 'budget_push',
+            },
+          })
+          .onConflictDoUpdate({
+            target: [assetPerformanceSnapshots.ownedAssetId, assetPerformanceSnapshots.snapshotDate],
+            set: {
+              metrics: sql`jsonb_set(
+                COALESCE(${assetPerformanceSnapshots.metrics}, '{}'::jsonb),
+                ${sql.raw(`'{budgetTargets,${line.accountKey}}'`)},
+                ${sql`${JSON.stringify({ amount: Number(amt.amount), category: line.displayName, lineType: line.lineType })}::jsonb`}
+              )`,
+            },
+          });
+        targetsWritten++;
+      }
+    }
+
+    res.json({ success: true, targetsWritten });
+  } catch (error) {
+    console.error('Error pushing budget to asset:', error);
+    res.status(500).json({ error: 'Failed to push budget targets to asset' });
   }
 });
 

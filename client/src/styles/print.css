@@ -1,0 +1,78 @@
+@media print {
+  /* Hide navigation elements */
+  nav,
+  aside,
+  .sidebar,
+  [data-sidebar],
+  [data-testid="unified-sidebar"],
+  [data-testid="button-mobile-menu"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Full width content */
+  main,
+  .main-content,
+  [data-testid="main-content"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Remove background colors for printing */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure charts render properly and don't break across pages */
+  .recharts-wrapper {
+    page-break-inside: avoid;
+  }
+
+  /* Card styling for print */
+  .card,
+  [class*="Card"] {
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Tables should not break mid-row */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure links show their URL in print */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* Hide interactive elements in print */
+  button:not(.print-include),
+  [role="tablist"],
+  .tabs-list {
+    display: none !important;
+  }
+
+  /* Keep tab content visible */
+  [role="tabpanel"] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* Expand all accordions */
+  [data-state="closed"] > [data-accordion-content] {
+    display: block !important;
+    height: auto !important;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 1cm;
+  }
+}

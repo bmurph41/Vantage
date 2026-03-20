@@ -92,10 +92,13 @@ import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
 import institutionalAnalysisRoutes from "./routes/institutional-analysis-routes";
 import returnsRoutes from "./routes/returns-routes";
 import budgetRoutes from "./routes/budget-routes";
+import bookkeepingGlRoutes from "./routes/bookkeeping-gl-routes";
 import taxWaterfallRoutes from "./routes/tax-waterfall-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import searchRoutes from "./routes/search-routes";
 import bulkEmailRoutes from "./routes/bulk-email-routes";
+import campaignScheduleRoutes from "./routes/campaign-schedule-routes";
+import camReconciliationRoutes from "./routes/cam-reconciliation-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings, outreachCampaigns, outreachTemplates, insertOutreachCampaignSchema, insertOutreachTemplateSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
@@ -449,6 +452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authenticateUser, tourProgressRoutes);
   app.use(authenticateUser, searchRoutes);
   app.use("/api/crm", authenticateUser, requirePack("crm_pipeline"), bulkEmailRoutes);
+  app.use("/api/marketing", authenticateUser, campaignScheduleRoutes);
+  app.use("/api/cam", authenticateUser, camReconciliationRoutes);
   // Utilization module routes
   const { createUtilizationRouter } = await import('./modules/utilization/utilization-routes');
   app.use("/api/utilization", authenticateUser, createUtilizationRouter());
@@ -598,6 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/modeling-rent-roll", authenticateUser, enforceTenant, requirePack("modeling_tools"), modelingRentRollRoutes);
   app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
   app.use("/api/budgets", authenticateUser, enforceTenant, budgetRoutes);
+  app.use("/api/bookkeeping", authenticateUser, enforceTenant, bookkeepingGlRoutes);
   app.use("/api/tax-waterfall", authenticateUser, enforceTenant, taxWaterfallRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);

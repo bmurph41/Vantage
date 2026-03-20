@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import {
   DropdownMenu,
@@ -20,11 +21,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Plus, 
-  Search, 
-  Upload, 
-  MoreVertical, 
+import {
+  Plus,
+  Search,
+  Upload,
+  MoreVertical,
   FileSpreadsheet,
   AlertTriangle,
   Building2,
@@ -37,6 +38,7 @@ import {
   ChevronDown,
   FileText,
   TrendingUp,
+  Calculator,
 } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +49,8 @@ import { TOUR_IDS, commercialTenantsTourSteps } from "@/lib/tour-configs";
 import { UnifiedTenantFormDialog } from "@/components/commercial-tenants/UnifiedTenantFormDialog";
 import { TenantDetailSheet } from "@/components/commercial-tenants/TenantDetailSheet";
 import { LeaseImportWizard } from "./LeaseImportWizard";
+
+const CAMReconciliation = lazy(() => import("./CAMReconciliation"));
 
 const formatCurrency = (value: string | number | null | undefined) => {
   if (!value) return "-";
@@ -186,6 +190,22 @@ export default function CommercialTenants() {
           <h1 className="text-2xl font-bold">Commercial Tenants</h1>
           <p className="text-muted-foreground">Manage retail and commercial lease abstracts</p>
         </div>
+      </div>
+
+      <Tabs defaultValue="tenants" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tenants" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Tenants
+          </TabsTrigger>
+          <TabsTrigger value="cam" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            CAM Reconciliation
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tenants" className="space-y-4">
+      <div className="flex justify-end">
         <div className="flex gap-2" data-tour="tenants-add">
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
@@ -385,6 +405,15 @@ export default function CommercialTenants() {
           )}
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        <TabsContent value="cam">
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <CAMReconciliation />
+          </Suspense>
+        </TabsContent>
+      </Tabs>
 
       <UnifiedTenantFormDialog
         open={isFormOpen}

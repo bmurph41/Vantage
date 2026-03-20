@@ -19,7 +19,11 @@ export type OpsModuleKey =
   | 'bookkeeping'
   | 'payroll'
   | 'budgeting'
-  | 'marketing';
+  | 'marketing'
+  | 'hotel_ops'
+  | 'multifamily_ops'
+  | 'retail_office_ops'
+  | 'self_storage_ops';
 
 export interface OpsModuleDefinition {
   key: OpsModuleKey;
@@ -41,6 +45,10 @@ export const OPS_MODULE_DEFINITIONS: Record<OpsModuleKey, OpsModuleDefinition> =
   payroll: { key: 'payroll', label: 'Payroll', route: '/operations/payroll' },
   budgeting: { key: 'budgeting', label: 'Budgeting', route: '/operations/budgeting' },
   marketing: { key: 'marketing', label: 'Marketing', route: '/marketing' },
+  hotel_ops: { key: 'hotel_ops', label: 'Hotel Ops', route: '/operations/hotel' },
+  multifamily_ops: { key: 'multifamily_ops', label: 'Multifamily Ops', route: '/operations/multifamily' },
+  retail_office_ops: { key: 'retail_office_ops', label: 'Retail/Office Ops', route: '/operations/retail-office' },
+  self_storage_ops: { key: 'self_storage_ops', label: 'Self-Storage Ops', route: '/operations/self-storage' },
 };
 
 /**
@@ -52,13 +60,13 @@ export const ASSET_CLASS_OPS_MODULES: Record<string, OpsModuleKey[]> = {
     'rent_roll', 'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
   ],
   multifamily: [
-    'rent_roll', 'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
+    'rent_roll', 'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing', 'multifamily_ops',
   ],
   retail: [
-    'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
+    'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing', 'retail_office_ops',
   ],
   office: [
-    'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
+    'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing', 'retail_office_ops',
   ],
   industrial: [
     'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
@@ -67,13 +75,13 @@ export const ASSET_CLASS_OPS_MODULES: Record<string, OpsModuleKey[]> = {
     'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',
   ],
   hotel: [
-    'bookkeeping', 'payroll', 'budgeting', 'marketing',
+    'bookkeeping', 'payroll', 'budgeting', 'marketing', 'hotel_ops',
   ],
   str: [
     'bookkeeping', 'budgeting', 'marketing',
   ],
   self_storage: [
-    'rent_roll', 'bookkeeping', 'budgeting', 'marketing',
+    'rent_roll', 'bookkeeping', 'budgeting', 'marketing', 'self_storage_ops',
   ],
   mixed_use: [
     'rent_roll', 'commercial_tenants', 'bookkeeping', 'payroll', 'budgeting', 'marketing',

@@ -11030,6 +11030,38 @@ export const emailCampaigns = pgTable('email_campaigns', {
   externalIdx: index('email_campaigns_external_idx').on(table.externalId),
 }));
 
+// Email Campaign Schedules - Internal campaign scheduling and sending
+export const emailCampaignSchedules = pgTable("email_campaign_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  audienceType: text("audience_type").notNull().default('all'), // all, segment, list, manual
+  audienceFilter: jsonb("audience_filter").default('{}'),
+  recipientCount: integer("recipient_count").default(0),
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default('draft'), // draft, scheduled, sending, sent, failed, cancelled
+  openRate: decimal("open_rate", { precision: 5, scale: 2 }),
+  clickRate: decimal("click_rate", { precision: 5, scale: 2 }),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index('email_campaign_schedules_org_idx').on(table.orgId),
+  statusIdx: index('email_campaign_schedules_status_idx').on(table.status),
+}));
+
+export const insertEmailCampaignScheduleSchema = createInsertSchema(emailCampaignSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type EmailCampaignSchedule = typeof emailCampaignSchedules.$inferSelect;
+export type InsertEmailCampaignSchedule = typeof emailCampaignSchedules.$inferInsert;
+
 // Email Marketing Providers - Supported email platforms
 export const emailMarketingProviders = pgTable('email_marketing_providers', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -23242,6 +23274,66 @@ export const opsCommercialLeases = pgTable("ops_commercial_leases", {
   marinaIdx: index("ops_commercial_leases_marina_idx").on(table.marinaId),
   orgIdx: index("ops_commercial_leases_org_idx").on(table.orgId),
 }));
+
+// ============================================================================
+// CAM_EXPENSE_POOLS - Common Area Maintenance expense tracking
+// ============================================================================
+export const camExpensePools = pgTable("cam_expense_pools", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id),
+  fiscalYear: integer("fiscal_year").notNull(),
+  category: text("category").notNull(), // insurance, taxes, maintenance, utilities, management, landscaping, security, other
+  description: text("description"),
+  budgetAmount: decimal("budget_amount", { precision: 14, scale: 2 }).notNull(),
+  actualAmount: decimal("actual_amount", { precision: 14, scale: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  marinaYearIdx: index("cam_expense_pools_marina_year_idx").on(table.marinaId, table.fiscalYear),
+  orgIdx: index("cam_expense_pools_org_idx").on(table.orgId),
+}));
+
+export const insertCamExpensePoolSchema = createInsertSchema(camExpensePools).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CamExpensePool = typeof camExpensePools.$inferSelect;
+export type InsertCamExpensePool = typeof camExpensePools.$inferInsert;
+
+// ============================================================================
+// CAM_RECONCILIATIONS - Tenant CAM reconciliation records
+// ============================================================================
+export const camReconciliations = pgTable("cam_reconciliations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id),
+  leaseId: varchar("lease_id").notNull().references(() => opsCommercialLeases.id),
+  fiscalYear: integer("fiscal_year").notNull(),
+  tenantProRataShare: decimal("tenant_pro_rata_share", { precision: 8, scale: 4 }), // % based on sq ft
+  estimatedCam: decimal("estimated_cam", { precision: 14, scale: 2 }),
+  actualCam: decimal("actual_cam", { precision: 14, scale: 2 }),
+  varianceAmount: decimal("variance_amount", { precision: 14, scale: 2 }), // actual - estimated (positive = tenant owes more)
+  status: text("status").notNull().default('pending'), // pending, reconciled, invoiced, paid
+  reconciledAt: timestamp("reconciled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  marinaYearIdx: index("cam_reconciliations_marina_year_idx").on(table.marinaId, table.fiscalYear),
+  leaseIdx: index("cam_reconciliations_lease_idx").on(table.leaseId),
+  orgIdx: index("cam_reconciliations_org_idx").on(table.orgId),
+}));
+
+export const insertCamReconciliationSchema = createInsertSchema(camReconciliations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CamReconciliation = typeof camReconciliations.$inferSelect;
+export type InsertCamReconciliation = typeof camReconciliations.$inferInsert;
 
 // ============================================================================
 // OPS_BOOKKEEPING_GL - General ledger actuals

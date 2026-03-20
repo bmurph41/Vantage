@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Ship, LayoutDashboard, Calendar, Anchor, Users, DollarSign, ClipboardCheck, BarChart3 } from "lucide-react";
+import { Ship, LayoutDashboard, Calendar, CalendarDays, Anchor, Users, DollarSign, ClipboardCheck, BarChart3 } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition, PlaceholderTab } from "@/components/layout/TabbedModuleLayout";
+import BoatRentalsCalendar from "./boat-rentals/Calendar";
 
 function RentalsDashboard() {
   return (
@@ -204,6 +205,13 @@ export default function BoatRentalsTabbed() {
       icon: ClipboardCheck,
       component: RentalsCheckInOut,
       description: "Rental handoff",
+    },
+    {
+      id: "calendar",
+      label: "Calendar",
+      icon: CalendarDays,
+      component: BoatRentalsCalendar,
+      description: "Reservation calendar view",
     },
     {
       id: "reports",

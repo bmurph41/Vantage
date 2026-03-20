@@ -12,6 +12,8 @@ import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
+import { useDisplayMode } from "@/stores/display-mode-store";
 
 // CRM Navigation (Core CRM - Entity Management)
 const crmNav = [
@@ -71,6 +73,10 @@ const operationsModulesNav = [
   { name: "Boat Sales", href: "/operations/boat-sales", opsModuleKey: "boat_sales" },
   { name: "Marketing", href: "/marketing", opsModuleKey: "marketing" },
   { name: "Budgeting", href: "/operations/budgeting", opsModuleKey: "budgeting" },
+  { name: "Hotel Ops", href: "/operations/hotel", opsModuleKey: "hotel_ops" },
+  { name: "Multifamily Ops", href: "/operations/multifamily", opsModuleKey: "multifamily_ops" },
+  { name: "Retail/Office Ops", href: "/operations/retail-office", opsModuleKey: "retail_office_ops" },
+  { name: "Self-Storage Ops", href: "/operations/self-storage", opsModuleKey: "self_storage_ops" },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
@@ -150,6 +156,7 @@ export default function UnifiedSidebar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { simplifiedMode } = useDisplayMode();
   
   // Sidebar collapse state with localStorage persistence
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -708,9 +715,25 @@ export default function UnifiedSidebar() {
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
-            {analysisExpanded && analysisNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {analysisExpanded && analysisNav
+              // In simplified mode, hide advanced analysis items:
+              // - Debt Scenarios (Monte Carlo / Stress Testing)
+              // - Pipeline Returns (IRR Decomposition)
+              // - Portfolio Returns (Benchmark Overlay)
+              // - Exit Strategies (Sensitivity Analysis)
+              .filter((item) => {
+                if (!simplifiedMode) return true;
+                const hiddenInSimplifiedMode = [
+                  "/modeling/scenarios",       // Debt Scenarios (Monte Carlo / Stress Testing)
+                  "/modeling/returns-valuation", // Pipeline Returns (IRR Decomposition)
+                  "/modeling/portfolio/returns", // Portfolio Returns (Benchmark Overlay)
+                  "/modeling/exit-strategies",   // Exit Strategies (Sensitivity Analysis)
+                ];
+                return !hiddenInSimplifiedMode.includes(item.href);
+              })
+              .map((item) => (
+                <NavLink key={item.name} item={item} />
+              ))}
           </div>
         )}
         
@@ -963,6 +986,11 @@ export default function UnifiedSidebar() {
         </div>
       </nav>
       
+      {/* Simplified Mode Toggle */}
+      <div className="border-t border-sidebar-border bg-sidebar flex-shrink-0 hidden md:block">
+        <SimplifiedModeToggle collapsed={sidebarCollapsed} />
+      </div>
+
       {/* Collapse Toggle Button */}
       <div className={cn(
         "border-t border-sidebar-border bg-sidebar flex-shrink-0 hidden md:flex",

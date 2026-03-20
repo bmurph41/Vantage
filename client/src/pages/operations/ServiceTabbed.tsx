@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Wrench, LayoutDashboard, ClipboardList, Calendar, Users, Box, FileText, Receipt, BarChart3 } from "lucide-react";
+import { Wrench, LayoutDashboard, ClipboardList, Calendar, CalendarDays, Users, Box, FileText, Receipt, BarChart3 } from "lucide-react";
 import { TabbedModuleLayout, TabDefinition, PlaceholderTab } from "@/components/layout/TabbedModuleLayout";
+import ServiceCalendar from "./service/Calendar";
 
 function ServiceDashboard() {
   return (
@@ -224,6 +225,13 @@ export default function ServiceTabbed() {
       icon: Receipt,
       component: ServiceInvoicing,
       description: "Billing and payments",
+    },
+    {
+      id: "calendar",
+      label: "Calendar",
+      icon: CalendarDays,
+      component: ServiceCalendar,
+      description: "Work order calendar view",
     },
     {
       id: "reports",

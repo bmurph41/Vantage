@@ -51,6 +51,7 @@ import {
   PieChartIcon
 } from 'lucide-react';
 import { Link } from 'wouter';
+import SyncAllAssetsButton from '@/components/operations/SyncAllAssetsButton';
 
 interface PortfolioSummary {
   totalProjects: number;
@@ -815,6 +816,7 @@ export default function PortfolioAnalytics() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <SyncAllAssetsButton />
           <Link href="/modeling/projects">
             <Button variant="outline" data-testid="button-back-to-projects">
               <Building2 className="h-4 w-4 mr-2" />

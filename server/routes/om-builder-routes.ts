@@ -3,6 +3,7 @@ import { omBuilderService } from '../services/om-builder-service';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import * as fs from 'fs';
+import { omTemplateRegistry, getOMTemplateById, getOMTemplatesByAssetClass } from '../templates/om-templates';
 
 const router = Router();
 
@@ -18,6 +19,33 @@ function getOrgId(req: Request): string | null {
 const generateOMSchema = z.object({
   templateId: z.string().nullable().optional(),
   title: z.string().min(1, 'Title is required'),
+});
+
+// Asset-class-specific OM templates from the registry
+router.get('/api/om-builder/asset-templates', async (req: Request, res: Response) => {
+  try {
+    const assetClass = req.query.assetClass as string | undefined;
+    const templates = assetClass
+      ? getOMTemplatesByAssetClass(assetClass)
+      : omTemplateRegistry;
+    res.json(templates);
+  } catch (error) {
+    console.error('Error fetching asset OM templates:', error);
+    res.status(500).json({ error: 'Failed to fetch asset templates' });
+  }
+});
+
+router.get('/api/om-builder/asset-templates/:id', async (req: Request, res: Response) => {
+  try {
+    const template = getOMTemplateById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  } catch (error) {
+    console.error('Error fetching asset OM template:', error);
+    res.status(500).json({ error: 'Failed to fetch asset template' });
+  }
 });
 
 router.get('/api/om-builder/templates', async (req: Request, res: Response) => {
