@@ -89,6 +89,7 @@ import operationsSyncRoutes from "./routes/operations-sync-routes";
 import ddAutomationRoutes from "./routes/dd-automation-routes";
 import modelingValidationRoutes from "./routes/modeling-validation-routes";
 import enhancedDebtRoutes from "./routes/enhanced-debt-routes";
+import institutionalAnalysisRoutes from "./routes/institutional-analysis-routes";
 import returnsRoutes from "./routes/returns-routes";
 import budgetRoutes from "./routes/budget-routes";
 import taxWaterfallRoutes from "./routes/tax-waterfall-routes";
@@ -441,6 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/modeling", authenticateUser, requirePack("modeling_tools"), modelingValidationRoutes);
   app.use("/api/marinalytics", authenticateUser, marinalyticsRoutes);
   app.use("/api/debt", authenticateUser, enhancedDebtRoutes);
+  app.use("/api/institutional-analysis", authenticateUser, institutionalAnalysisRoutes);
   app.use("/api/commercial-tenants", authenticateUser, commercialTenantsRoutes);
   app.use("/api/commercial-leases", authenticateUser, commercialLeaseRoutes);
   app.use("/api/commercial-leases", authenticateUser, unifiedLeaseRoutes);

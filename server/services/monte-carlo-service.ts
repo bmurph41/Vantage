@@ -124,6 +124,123 @@ function pertRandom(random: () => number, min: number, max: number, mode: number
   return triangularRandom(random, min, max, mode);
 }
 
+// Cholesky decomposition for correlated sampling
+function choleskyDecomposition(matrix: number[][]): number[][] {
+  const n = matrix.length;
+  const L: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = 0; k < j; k++) {
+        sum += L[i][k] * L[j][k];
+      }
+      if (i === j) {
+        const val = matrix[i][i] - sum;
+        L[i][j] = val > 0 ? Math.sqrt(val) : 0;
+      } else {
+        L[i][j] = L[j][j] > 0 ? (matrix[i][j] - sum) / L[j][j] : 0;
+      }
+    }
+  }
+  return L;
+}
+
+// Generate correlated standard normal samples using Cholesky factor
+function generateCorrelatedSamples(
+  random: () => number,
+  choleskyL: number[][],
+  n: number
+): number[] {
+  // Generate independent standard normals
+  const independent: number[] = [];
+  for (let i = 0; i < n; i++) {
+    independent.push(normalRandom(random, 0, 1));
+  }
+  // Multiply by Cholesky factor to introduce correlation
+  const correlated: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      correlated[i] += choleskyL[i][j] * independent[j];
+    }
+  }
+  return correlated;
+}
+
+// Build correlation matrix from user-specified pairs
+function buildCorrelationMatrix(
+  variables: string[],
+  correlations: { var1: string; var2: string; correlation: number }[]
+): number[][] {
+  const n = variables.length;
+  const matrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+  // Identity diagonal
+  for (let i = 0; i < n; i++) matrix[i][i] = 1.0;
+  // Fill in user correlations
+  for (const corr of correlations) {
+    const i = variables.indexOf(corr.var1);
+    const j = variables.indexOf(corr.var2);
+    if (i >= 0 && j >= 0 && i !== j) {
+      const c = Math.max(-0.99, Math.min(0.99, corr.correlation));
+      matrix[i][j] = c;
+      matrix[j][i] = c;
+    }
+  }
+  return matrix;
+}
+
+// Transform correlated standard normal to target distribution via inverse CDF mapping
+function transformCorrelatedSample(
+  correlatedZ: number,
+  config: DistributionConfig,
+  baseValue: number
+): number {
+  // Convert standard normal Z to uniform [0,1] via normal CDF approximation
+  const u = normalCDF(correlatedZ);
+  // Map uniform to target distribution via inverse CDF
+  switch (config.type) {
+    case 'normal': {
+      const mean = config.mean ?? baseValue;
+      const std = config.stdDev ?? baseValue * 0.1;
+      return mean + std * correlatedZ; // direct since input is already normal
+    }
+    case 'triangular': {
+      const min = config.min ?? baseValue * 0.8;
+      const max = config.max ?? baseValue * 1.2;
+      const mode = config.mode ?? baseValue;
+      const fc = (mode - min) / (max - min);
+      if (u < fc) return min + Math.sqrt(u * (max - min) * (mode - min));
+      return max - Math.sqrt((1 - u) * (max - min) * (max - mode));
+    }
+    case 'uniform': {
+      const min = config.min ?? baseValue * 0.8;
+      const max = config.max ?? baseValue * 1.2;
+      return min + u * (max - min);
+    }
+    case 'lognormal': {
+      const mean = config.mean ?? baseValue;
+      const std = config.stdDev ?? baseValue * 0.1;
+      const variance = std * std;
+      const mu = Math.log(mean * mean / Math.sqrt(variance + mean * mean));
+      const sigma = Math.sqrt(Math.log(variance / (mean * mean) + 1));
+      return Math.exp(mu + sigma * correlatedZ);
+    }
+    default:
+      return baseValue;
+  }
+}
+
+// Normal CDF approximation (Abramowitz & Stegun)
+function normalCDF(x: number): number {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.SQRT2;
+  const t = 1.0 / (1.0 + p * x);
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return 0.5 * (1.0 + sign * y);
+}
+
 function sampleDistribution(random: () => number, config: DistributionConfig): number {
   switch (config.type) {
     case 'normal':
@@ -320,6 +437,15 @@ class MonteCarloService {
     const random = createSeededRandom(seed);
 
     const enabledVars = variables.filter(v => v.enabled);
+    const userCorrelations = input?.correlations || savedConfig.correlations || [];
+
+    // Build correlation matrix and Cholesky factor if correlations specified
+    let choleskyL: number[][] | null = null;
+    const enabledKeys = enabledVars.map(v => v.key);
+    if (userCorrelations.length > 0) {
+      const corrMatrix = buildCorrelationMatrix(enabledKeys, userCorrelations);
+      choleskyL = choleskyDecomposition(corrMatrix);
+    }
 
     const baseInputs = {
       holdPeriod,
@@ -342,10 +468,23 @@ class MonteCarloService {
 
     for (let i = 0; i < iterations; i++) {
       const sampled: Record<string, number> = {};
-      for (const variable of enabledVars) {
-        const sampledValue = sampleDistribution(random, variable.distribution);
-        variableSamples[variable.key].push(sampledValue);
-        sampled[variable.key] = sampledValue;
+
+      if (choleskyL && enabledVars.length > 1) {
+        // Correlated sampling via Cholesky decomposition
+        const correlatedZ = generateCorrelatedSamples(random, choleskyL, enabledVars.length);
+        for (let vi = 0; vi < enabledVars.length; vi++) {
+          const variable = enabledVars[vi];
+          const sampledValue = transformCorrelatedSample(correlatedZ[vi], variable.distribution, variable.baseValue);
+          variableSamples[variable.key].push(sampledValue);
+          sampled[variable.key] = sampledValue;
+        }
+      } else {
+        // Independent sampling (original behavior)
+        for (const variable of enabledVars) {
+          const sampledValue = sampleDistribution(random, variable.distribution);
+          variableSamples[variable.key].push(sampledValue);
+          sampled[variable.key] = sampledValue;
+        }
       }
 
       const iterPurchasePrice = sampled.purchasePrice ?? purchasePrice;

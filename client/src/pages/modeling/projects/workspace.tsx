@@ -43,6 +43,16 @@ import {
   Save,
   Check,
   Receipt,
+  Shield,
+  Hammer,
+  Scale,
+  Landmark,
+  PieChart,
+  GitBranch,
+  FileCheck,
+  Gauge,
+  Leaf,
+  FileText,
   type LucideIcon
 } from 'lucide-react';
 import type { ModelingProject, DocIntelUpload } from '@shared/schema';
@@ -96,6 +106,29 @@ import { UploadDropzone } from '@/pages/modeling/doc-intel/UploadDropzone';
 import { getModelConfig, getTabOverrides } from "@shared/asset-class-model-config";
 import UnitMixLeases from "./workspace/unit-mix-leases";
 import ProfitCentersDynamic from "./workspace/profit-centers-dynamic";
+
+// Institutional Analysis Pages
+import IRRDecomposition from './workspace/irr-decomposition';
+import MarkToMarket from './workspace/mark-to-market';
+import CapExBudget from './workspace/capex-budget';
+import StabilizedNOI from './workspace/stabilized-noi';
+import HoldPeriodSummary from './workspace/hold-period-summary';
+import PEWaterfall from './workspace/pe-waterfall';
+import FundMetrics from './workspace/fund-metrics';
+import ReplacementCost from './workspace/replacement-cost';
+import LoanSizing from './workspace/loan-sizing';
+import StressTesting from './workspace/stress-testing';
+import DepreciationSchedule from './workspace/depreciation-schedule';
+import CompAdjustmentGrid from './workspace/comp-adjustment-grid';
+import OperatorBenchmarking from './workspace/operator-benchmarking';
+import BenchmarkOverlay from './workspace/benchmark-overlay';
+import PortfolioRisk from './workspace/portfolio-risk';
+import LPReporting from './workspace/lp-reporting';
+import EnvironmentalRisk from './workspace/environmental-risk';
+import ICMemo from './workspace/ic-memo';
+import WaterfallSensitivity from './workspace/waterfall-sensitivity';
+import ModelVersioning from './workspace/model-versioning';
+import AssumptionAudit from './workspace/assumption-audit';
 
 interface TabItem {
   value: string;
@@ -168,6 +201,39 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'scenario-compare', label: 'Compare', icon: Layers },
       { value: 'sensitivity', label: 'Sensitivity', icon: Tornado },
       { value: 'monte-carlo', label: 'Monte Carlo', icon: Activity },
+      { value: 'stress-testing', label: 'Stress Tests', icon: Shield },
+      { value: 'benchmark-overlay', label: 'Benchmarks', icon: Target },
+    ],
+  },
+  {
+    id: 'institutional',
+    label: 'Institutional',
+    icon: Landmark,
+    tabs: [
+      { value: 'irr-decomposition', label: 'IRR Attribution', icon: TrendingUp },
+      { value: 'hold-period-summary', label: 'Hold Period CF', icon: DollarSign },
+      { value: 'mark-to-market', label: 'Mark-to-Market', icon: Scale },
+      { value: 'stabilized-noi', label: 'Stabilized NOI', icon: Target },
+      { value: 'capex-budget', label: 'CapEx Budget', icon: Hammer },
+      { value: 'replacement-cost', label: 'Replacement Cost', icon: Building2 },
+      { value: 'loan-sizing', label: 'Loan Sizing', icon: Calculator },
+      { value: 'pe-waterfall', label: 'PE Waterfall', icon: Layers },
+      { value: 'waterfall-sensitivity', label: 'Waterfall Sensitivity', icon: Activity },
+      { value: 'depreciation', label: 'Depreciation', icon: Receipt },
+      { value: 'comp-grid', label: 'Comp Adjustments', icon: SlidersHorizontal },
+      { value: 'operator-bench', label: 'Operator Benchmark', icon: Gauge },
+      { value: 'environmental', label: 'Environmental Risk', icon: Leaf },
+      { value: 'ic-memo', label: 'IC Memo', icon: FileText },
+    ],
+  },
+  {
+    id: 'fund',
+    label: 'Fund & Portfolio',
+    icon: PieChart,
+    tabs: [
+      { value: 'fund-metrics', label: 'Fund Metrics', icon: BarChart3 },
+      { value: 'lp-reporting', label: 'LP Reporting', icon: Users },
+      { value: 'portfolio-risk', label: 'Portfolio Risk', icon: Shield },
     ],
   },
   {
@@ -176,6 +242,8 @@ const TAB_GROUPS: TabGroup[] = [
     icon: Layers,
     tabs: [
       { value: 'cases', label: 'Scenario Config', icon: Layers },
+      { value: 'model-versions', label: 'Model Versions', icon: GitBranch },
+      { value: 'assumption-audit', label: 'Assumption Audit', icon: FileCheck },
       { value: 'audit', label: 'Audit Trail', icon: History },
     ],
   },
@@ -921,6 +989,75 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="tax-dist" className="mt-4 space-y-4">
           <TaxAndDistributionsPage projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        {/* ─── Institutional Analysis ─── */}
+        <TabsContent value="irr-decomposition" className="mt-4 space-y-4">
+          <IRRDecomposition projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="hold-period-summary" className="mt-4 space-y-4">
+          <HoldPeriodSummary projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="mark-to-market" className="mt-4 space-y-4">
+          <MarkToMarket projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="stabilized-noi" className="mt-4 space-y-4">
+          <StabilizedNOI projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="capex-budget" className="mt-4 space-y-4">
+          <CapExBudget projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="replacement-cost" className="mt-4 space-y-4">
+          <ReplacementCost projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="loan-sizing" className="mt-4 space-y-4">
+          <LoanSizing projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="pe-waterfall" className="mt-4 space-y-4">
+          <PEWaterfall projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="waterfall-sensitivity" className="mt-4 space-y-4">
+          <WaterfallSensitivity projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="depreciation" className="mt-4 space-y-4">
+          <DepreciationSchedule projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="comp-grid" className="mt-4 space-y-4">
+          <CompAdjustmentGrid projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="operator-bench" className="mt-4 space-y-4">
+          <OperatorBenchmarking projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="environmental" className="mt-4 space-y-4">
+          <EnvironmentalRisk projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="ic-memo" className="mt-4 space-y-4">
+          <ICMemo projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="stress-testing" className="mt-4 space-y-4">
+          <StressTesting projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="benchmark-overlay" className="mt-4 space-y-4">
+          <BenchmarkOverlay projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        {/* ─── Fund & Portfolio ─── */}
+        <TabsContent value="fund-metrics" className="mt-4 space-y-4">
+          <FundMetrics projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="lp-reporting" className="mt-4 space-y-4">
+          <LPReporting projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="portfolio-risk" className="mt-4 space-y-4">
+          <PortfolioRisk projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+
+        {/* ─── Scenario Management ─── */}
+        <TabsContent value="model-versions" className="mt-4 space-y-4">
+          <ModelVersioning projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="assumption-audit" className="mt-4 space-y-4">
+          <AssumptionAudit projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>
     </div>
