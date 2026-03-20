@@ -14,12 +14,11 @@
 import { calculateBasisLedger } from './basis-ledger';
 import { calculate1031ExchangeEngine } from './exchange-1031-engine';
 import { calculateSellerFinancing } from './seller-financing-engine';
-import type { SellerFinancingEngineResult, NoteAmortizationEntry, InstallmentTaxEntry } from './seller-financing-engine';
+import type { SellerFinancingEngineResult } from './seller-financing-engine';
 import { calculateEarnout } from './earnout-engine';
-import type { EarnoutEngineResult, EarnoutTrancheResult as OldEarnoutTrancheResult } from './earnout-engine';
+import type { EarnoutEngineResult } from './earnout-engine';
 import { calculateWaterfallV2 } from './waterfall-engine-v2';
 import type { WaterfallV2Result } from './waterfall-engine-v2';
-import { runTaxEngine } from './tax-engine';
 import { runExitScenario } from './exit-scenario-engine';
 
 import {
@@ -46,8 +45,6 @@ import type {
   GainCharacterization,
   ProceedsTimeline,
   TimelineEvent,
-  TimelineSource,
-  TimelinePaymentType,
   YearlyProceedsSummary,
 } from './types/03-sale-and-gain';
 import type {
@@ -738,7 +735,7 @@ function buildProceedsTimeline(
   }
 
   // Estimate tax per year
-  for (const yr of yearMap.values()) {
+  for (const yr of Array.from(yearMap.values())) {
     yr.taxEstimate = yr.ordinaryIncome * 0.37 + yr.capitalGain * 0.238;
     yr.afterTaxCash = yr.cashReceived - yr.taxEstimate;
   }
