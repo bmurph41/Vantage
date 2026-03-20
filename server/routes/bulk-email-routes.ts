@@ -69,6 +69,16 @@ router.post('/bulk-email/send', async (req: Request, res: Response) => {
       errors.push({ contactId: id, error: 'Contact not found' });
     }
 
+    // Log the bulk email send
+    try {
+      await db.execute(
+        sql`INSERT INTO crm_bulk_email_logs (id, org_id, sent_by_id, subject, body, recipient_count, sent_count, failed_count, status, error_details, created_at)
+            VALUES (gen_random_uuid(), 'org-1', NULL, ${subject}, ${htmlBody}, ${contactIds.length}, ${sent}, ${failed}, 'completed', ${JSON.stringify(errors)}::jsonb, NOW())`
+      );
+    } catch (_logErr) {
+      // Log table may not exist yet; non-critical
+    }
+
     res.json({ sent, failed, errors });
   } catch (error: any) {
     console.error('Bulk email send error:', error);

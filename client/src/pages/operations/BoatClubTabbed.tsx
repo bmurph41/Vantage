@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Users, LayoutDashboard, UserPlus, Calendar, Anchor, CreditCard, GraduationCap, Receipt, BarChart3 } from "lucide-react";
+import { Users, LayoutDashboard, UserPlus, Calendar, Anchor, CreditCard, GraduationCap, Receipt, BarChart3, LineChart as LineChartIcon } from "lucide-react";
+import BoatClubAnalytics from "./boat-club/Analytics";
 import { TabbedModuleLayout, TabDefinition, PlaceholderTab } from "@/components/layout/TabbedModuleLayout";
 
 function ClubDashboard() {
@@ -245,6 +246,13 @@ export default function BoatClubTabbed() {
       icon: BarChart3,
       component: ClubReports,
       description: "Club analytics",
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: LineChartIcon,
+      component: BoatClubAnalytics,
+      description: "Club analytics charts",
     },
   ];
 

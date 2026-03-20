@@ -46,7 +46,7 @@ export default function HotelRevenueManagement() {
   const [selectedSeason, setSelectedSeason] = useState<string>("");
 
   const { data, isLoading, isError } = useQuery<RevenueManagementData>({
-    queryKey: ["/api/operations-context/hotel/revenue-management"],
+    queryKey: ["/api/hotel-ops/rates"],
     retry: false,
   });
 

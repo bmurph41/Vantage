@@ -50,7 +50,7 @@ export default function SelfStorageRateManagement() {
   const [adjustmentType, setAdjustmentType] = useState("");
 
   const { data, isLoading, isError } = useQuery<RateManagementData>({
-    queryKey: ["/api/operations-context/self-storage/rate-management"],
+    queryKey: ["/api/self-storage-ops/rates"],
     retry: false,
   });
 

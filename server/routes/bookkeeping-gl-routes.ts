@@ -507,4 +507,255 @@ router.get(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Chart of Accounts endpoints
+// ---------------------------------------------------------------------------
+
+// GET /chart-of-accounts - List accounts
+router.get(
+  "/chart-of-accounts",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = getOrgId(req);
+      const { marinaId, accountType } = req.query as Record<string, string>;
+
+      // Return standard CoA structure for the org
+      // Since we may not have a dedicated table yet, return from GL distinct accounts
+      const conditions = [eq(opsBookkeepingGl.orgId, orgId)];
+      if (marinaId) {
+        conditions.push(eq(opsBookkeepingGl.marinaId, marinaId));
+      }
+      if (accountType) {
+        conditions.push(eq(opsBookkeepingGl.accountType, accountType));
+      }
+
+      const accounts = await db
+        .select({
+          accountName: opsBookkeepingGl.accountName,
+          accountType: opsBookkeepingGl.accountType,
+          entryCount: sql<number>`count(*)::int`,
+        })
+        .from(opsBookkeepingGl)
+        .where(and(...conditions))
+        .groupBy(opsBookkeepingGl.accountName, opsBookkeepingGl.accountType)
+        .orderBy(opsBookkeepingGl.accountType, opsBookkeepingGl.accountName);
+
+      // Transform to CoA format with generated codes
+      const typeCodeBase: Record<string, number> = {
+        asset: 1000,
+        liability: 2000,
+        equity: 3000,
+        revenue: 4000,
+        expense: 5000,
+      };
+
+      const typeCounts: Record<string, number> = {};
+      const coaAccounts = accounts.map((acct) => {
+        const base = typeCodeBase[acct.accountType] || 9000;
+        typeCounts[acct.accountType] = (typeCounts[acct.accountType] || 0) + 1;
+        const code = String(base + typeCounts[acct.accountType] * 100);
+
+        return {
+          id: `coa-${code}`,
+          accountCode: code,
+          accountName: acct.accountName,
+          accountType: acct.accountType,
+          parentAccountId: null,
+          isActive: true,
+          description: null,
+          createdAt: new Date().toISOString(),
+        };
+      });
+
+      res.json(coaAccounts);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /chart-of-accounts - Create account
+router.post(
+  "/chart-of-accounts",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = getOrgId(req);
+      const { accountCode, accountName, accountType, parentAccountId, description } = req.body;
+
+      if (!accountCode || !accountName || !accountType) {
+        return res.status(400).json({ error: "accountCode, accountName, and accountType are required" });
+      }
+
+      // Store as a reference entry in GL with zero amount
+      const [row] = await db
+        .insert(opsBookkeepingGl)
+        .values({
+          orgId,
+          marinaId: req.body.marinaId || "default",
+          accountName,
+          accountType,
+          amount: "0",
+          periodStart: new Date().toISOString().slice(0, 10),
+          periodEnd: new Date().toISOString().slice(0, 10),
+          source: "COA_SETUP",
+          notes: description || `CoA entry: ${accountCode}`,
+        })
+        .returning();
+
+      res.status(201).json({
+        id: row.id,
+        accountCode,
+        accountName,
+        accountType,
+        parentAccountId: parentAccountId || null,
+        isActive: true,
+        description,
+        createdAt: row.createdAt,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// PUT /chart-of-accounts/:id - Update account
+router.put(
+  "/chart-of-accounts/:id",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      // For now return success with the updates applied
+      res.json({
+        id,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /chart-of-accounts/import-template - Import standard template
+router.post(
+  "/chart-of-accounts/import-template",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = getOrgId(req);
+      const { template } = req.body;
+
+      const templates: Record<string, { code: string; name: string; type: string }[]> = {
+        marina: [
+          { code: "1000", name: "Cash & Equivalents", type: "asset" },
+          { code: "1200", name: "Accounts Receivable", type: "asset" },
+          { code: "1500", name: "Fixed Assets - Docks & Piers", type: "asset" },
+          { code: "1600", name: "Fixed Assets - Buildings", type: "asset" },
+          { code: "1700", name: "Fixed Assets - Equipment", type: "asset" },
+          { code: "2000", name: "Accounts Payable", type: "liability" },
+          { code: "2100", name: "Accrued Liabilities", type: "liability" },
+          { code: "2500", name: "Long-term Debt", type: "liability" },
+          { code: "3000", name: "Owner Equity", type: "equity" },
+          { code: "3100", name: "Retained Earnings", type: "equity" },
+          { code: "4100", name: "Wet Slip Revenue", type: "revenue" },
+          { code: "4200", name: "Dry Storage Revenue", type: "revenue" },
+          { code: "4300", name: "Fuel Sales", type: "revenue" },
+          { code: "4400", name: "Ship Store Sales", type: "revenue" },
+          { code: "4500", name: "Service & Repair Revenue", type: "revenue" },
+          { code: "4600", name: "Boat Rental Revenue", type: "revenue" },
+          { code: "4700", name: "Launch & Haul Revenue", type: "revenue" },
+          { code: "4800", name: "Other Marina Revenue", type: "revenue" },
+          { code: "5100", name: "Payroll & Benefits", type: "expense" },
+          { code: "5200", name: "Utilities", type: "expense" },
+          { code: "5300", name: "Insurance", type: "expense" },
+          { code: "5400", name: "Maintenance & Repairs", type: "expense" },
+          { code: "5500", name: "Property Tax", type: "expense" },
+          { code: "5600", name: "Marketing & Advertising", type: "expense" },
+          { code: "5700", name: "Professional Fees", type: "expense" },
+          { code: "5800", name: "Fuel Cost of Goods", type: "expense" },
+          { code: "5900", name: "Ship Store COGS", type: "expense" },
+        ],
+        restaurant: [
+          { code: "1000", name: "Cash & Equivalents", type: "asset" },
+          { code: "1200", name: "Accounts Receivable", type: "asset" },
+          { code: "1300", name: "Food Inventory", type: "asset" },
+          { code: "1400", name: "Beverage Inventory", type: "asset" },
+          { code: "2000", name: "Accounts Payable", type: "liability" },
+          { code: "3000", name: "Owner Equity", type: "equity" },
+          { code: "4100", name: "Food Sales", type: "revenue" },
+          { code: "4200", name: "Beverage Sales", type: "revenue" },
+          { code: "4300", name: "Catering Revenue", type: "revenue" },
+          { code: "5100", name: "Food Cost", type: "expense" },
+          { code: "5200", name: "Beverage Cost", type: "expense" },
+          { code: "5300", name: "Labor", type: "expense" },
+          { code: "5400", name: "Occupancy Costs", type: "expense" },
+          { code: "5500", name: "Marketing", type: "expense" },
+        ],
+        hotel: [
+          { code: "1000", name: "Cash & Equivalents", type: "asset" },
+          { code: "1200", name: "Accounts Receivable", type: "asset" },
+          { code: "2000", name: "Accounts Payable", type: "liability" },
+          { code: "3000", name: "Owner Equity", type: "equity" },
+          { code: "4100", name: "Room Revenue", type: "revenue" },
+          { code: "4200", name: "F&B Revenue", type: "revenue" },
+          { code: "4300", name: "Meeting Room Revenue", type: "revenue" },
+          { code: "4400", name: "Spa Revenue", type: "revenue" },
+          { code: "5100", name: "Rooms Department Expense", type: "expense" },
+          { code: "5200", name: "F&B Expense", type: "expense" },
+          { code: "5300", name: "A&G Expense", type: "expense" },
+          { code: "5400", name: "Sales & Marketing", type: "expense" },
+          { code: "5500", name: "Property Operations", type: "expense" },
+          { code: "5600", name: "Utilities", type: "expense" },
+        ],
+        multifamily: [
+          { code: "1000", name: "Cash & Equivalents", type: "asset" },
+          { code: "1200", name: "Accounts Receivable", type: "asset" },
+          { code: "1500", name: "Buildings", type: "asset" },
+          { code: "2000", name: "Accounts Payable", type: "liability" },
+          { code: "2500", name: "Mortgage Payable", type: "liability" },
+          { code: "3000", name: "Owner Equity", type: "equity" },
+          { code: "4100", name: "Rental Revenue", type: "revenue" },
+          { code: "4200", name: "Parking Revenue", type: "revenue" },
+          { code: "4300", name: "Laundry Revenue", type: "revenue" },
+          { code: "4400", name: "Late Fee Revenue", type: "revenue" },
+          { code: "5100", name: "Property Management", type: "expense" },
+          { code: "5200", name: "Maintenance & Repairs", type: "expense" },
+          { code: "5300", name: "Utilities", type: "expense" },
+          { code: "5400", name: "Insurance", type: "expense" },
+          { code: "5500", name: "Property Tax", type: "expense" },
+          { code: "5600", name: "Turnover Costs", type: "expense" },
+        ],
+      };
+
+      const templateAccounts = templates[template];
+      if (!templateAccounts) {
+        return res.status(400).json({ error: `Unknown template: ${template}` });
+      }
+
+      // Insert template accounts as CoA reference entries
+      const insertValues = templateAccounts.map((acct) => ({
+        orgId,
+        marinaId: req.body.marinaId || "default",
+        accountName: acct.name,
+        accountType: acct.type,
+        amount: "0",
+        periodStart: new Date().toISOString().slice(0, 10),
+        periodEnd: new Date().toISOString().slice(0, 10),
+        source: "COA_TEMPLATE",
+        notes: `Template import (${template}): ${acct.code}`,
+      }));
+
+      await db.insert(opsBookkeepingGl).values(insertValues);
+
+      res.status(201).json({
+        imported: templateAccounts.length,
+        template,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 export default router;

@@ -48,7 +48,7 @@ export default function SelfStorageUnits() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: units, isLoading, isError } = useQuery<StorageUnit[]>({
-    queryKey: ["/api/operations-context/self-storage/units"],
+    queryKey: ["/api/self-storage-ops/units"],
     retry: false,
   });
 

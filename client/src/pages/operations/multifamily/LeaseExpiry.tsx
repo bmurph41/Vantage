@@ -50,7 +50,7 @@ export default function MultifamilyLeaseExpiry() {
   const [renewalFilter, setRenewalFilter] = useState<string>("all");
 
   const { data: leases, isLoading, isError } = useQuery<LeaseRecord[]>({
-    queryKey: ["/api/operations-context/multifamily/lease-expiry"],
+    queryKey: ["/api/multifamily-ops/lease-expiry"],
     retry: false,
   });
 

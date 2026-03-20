@@ -4096,6 +4096,21 @@ export const crmEmailTemplates = pgTable("crm_email_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Bulk Email Logs - Track sent bulk emails
+export const crmBulkEmailLogs = pgTable("crm_bulk_email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  sentById: varchar("sent_by_id").references(() => users.id),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  status: text("status").notNull().default('pending'), // pending, sending, completed, failed
+  errorDetails: jsonb("error_details"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Territory Management
 
 export const crmTerritories = pgTable("crm_territories", {
@@ -23844,6 +23859,177 @@ export type InsertValuatorProjectContext = z.infer<typeof insertValuatorProjectC
 export * from "./models/auth";
 
 // ============================================================================
+// HOTEL OPERATIONS
+// ============================================================================
+export const opsHotelRooms = pgTable("ops_hotel_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  roomNumber: text("room_number").notNull(),
+  roomType: text("room_type").notNull().default("standard"),
+  floor: integer("floor"),
+  status: text("status").notNull().default("available"),
+  baseRate: decimal("base_rate", { precision: 10, scale: 2 }),
+  currentRate: decimal("current_rate", { precision: 10, scale: 2 }),
+  amenities: jsonb("amenities").default('[]'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const opsHotelReservations = pgTable("ops_hotel_reservations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  roomId: varchar("room_id").references(() => opsHotelRooms.id),
+  guestName: text("guest_name").notNull(),
+  guestEmail: text("guest_email"),
+  checkIn: date("check_in").notNull(),
+  checkOut: date("check_out").notNull(),
+  nightlyRate: decimal("nightly_rate", { precision: 10, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
+  status: text("status").notNull().default("confirmed"),
+  source: text("source").default("direct"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertOpsHotelRoomSchema = createInsertSchema(opsHotelRooms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsHotelRoom = typeof opsHotelRooms.$inferSelect;
+export type InsertOpsHotelRoom = z.infer<typeof insertOpsHotelRoomSchema>;
+
+export const insertOpsHotelReservationSchema = createInsertSchema(opsHotelReservations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsHotelReservation = typeof opsHotelReservations.$inferSelect;
+export type InsertOpsHotelReservation = z.infer<typeof insertOpsHotelReservationSchema>;
+
+// ============================================================================
+// MULTIFAMILY OPERATIONS
+// ============================================================================
+export const opsMultifamilyUnits = pgTable("ops_multifamily_units", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  unitNumber: text("unit_number").notNull(),
+  unitType: text("unit_type").notNull().default("1br"),
+  sqft: integer("sqft"),
+  floor: integer("floor"),
+  bedrooms: integer("bedrooms").default(1),
+  bathrooms: decimal("bathrooms", { precision: 3, scale: 1 }).default("1"),
+  status: text("status").notNull().default("vacant"),
+  currentRent: decimal("current_rent", { precision: 10, scale: 2 }),
+  marketRent: decimal("market_rent", { precision: 10, scale: 2 }),
+  tenantName: text("tenant_name"),
+  leaseStart: date("lease_start"),
+  leaseEnd: date("lease_end"),
+  moveInDate: date("move_in_date"),
+  amenities: jsonb("amenities").default('[]'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const opsMultifamilyTurns = pgTable("ops_multifamily_turns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  unitId: varchar("unit_id").references(() => opsMultifamilyUnits.id),
+  unitNumber: text("unit_number").notNull(),
+  moveOutDate: date("move_out_date").notNull(),
+  targetMoveIn: date("target_move_in"),
+  actualMoveIn: date("actual_move_in"),
+  scope: text("scope").notNull().default("standard"),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 10, scale: 2 }),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertOpsMultifamilyUnitSchema = createInsertSchema(opsMultifamilyUnits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsMultifamilyUnit = typeof opsMultifamilyUnits.$inferSelect;
+export type InsertOpsMultifamilyUnit = z.infer<typeof insertOpsMultifamilyUnitSchema>;
+
+export const insertOpsMultifamilyTurnSchema = createInsertSchema(opsMultifamilyTurns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsMultifamilyTurn = typeof opsMultifamilyTurns.$inferSelect;
+export type InsertOpsMultifamilyTurn = z.infer<typeof insertOpsMultifamilyTurnSchema>;
+
+// ============================================================================
+// SELF-STORAGE OPERATIONS
+// ============================================================================
+export const opsSelfStorageUnits = pgTable("ops_self_storage_units", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  unitNumber: text("unit_number").notNull(),
+  size: text("size").notNull().default("10x10"),
+  unitType: text("unit_type").notNull().default("standard"),
+  status: text("status").notNull().default("available"),
+  monthlyRate: decimal("monthly_rate", { precision: 10, scale: 2 }),
+  streetRate: decimal("street_rate", { precision: 10, scale: 2 }),
+  tenantName: text("tenant_name"),
+  moveInDate: date("move_in_date"),
+  insuranceActive: boolean("insurance_active").default(false),
+  autopayEnabled: boolean("autopay_enabled").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertOpsSelfStorageUnitSchema = createInsertSchema(opsSelfStorageUnits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsSelfStorageUnit = typeof opsSelfStorageUnits.$inferSelect;
+export type InsertOpsSelfStorageUnit = z.infer<typeof insertOpsSelfStorageUnitSchema>;
+
+// ============================================================================
+// RETAIL/OFFICE TI TRACKING
+// ============================================================================
+export const opsRetailTiAllowances = pgTable("ops_retail_ti_allowances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id").notNull().references(() => opsMarinas.id, { onDelete: "cascade" }),
+  leaseId: varchar("lease_id").references(() => opsCommercialLeases.id),
+  tenantName: text("tenant_name").notNull(),
+  suite: text("suite"),
+  tiAllowance: decimal("ti_allowance", { precision: 14, scale: 2 }).notNull(),
+  amountDrawn: decimal("amount_drawn", { precision: 14, scale: 2 }).default("0"),
+  drawSchedule: jsonb("draw_schedule").default('[]'),
+  status: text("status").notNull().default("active"),
+  expirationDate: date("expiration_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertOpsRetailTiAllowanceSchema = createInsertSchema(opsRetailTiAllowances).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type OpsRetailTiAllowance = typeof opsRetailTiAllowances.$inferSelect;
+export type InsertOpsRetailTiAllowance = z.infer<typeof insertOpsRetailTiAllowanceSchema>;
+
+// ============================================================================
 // DOCKET_KEYWORD_BANK - Configurable keywords for article filtering
 // ============================================================================
 export const docketKeywordCategoryEnum = pgEnum('docket_keyword_category', [
@@ -26205,6 +26391,86 @@ export const platformDataSourceMappings = pgTable("platform_data_source_mappings
 }, (table) => ({
   dataSourceIdx: index("pdsm_source_idx").on(table.dataSourceId),
 }));
+
+// ─── Pipeline Automation Rules ───────────────────────────────────────────────
+export const pipelineAutomationRules = pgTable("pipeline_automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  triggerType: text("trigger_type").notNull(), // stage_change, days_in_stage, field_update, manual
+  triggerConfig: jsonb("trigger_config").notNull().default('{}'),
+  actionType: text("action_type").notNull(), // move_stage, send_notification, create_task, update_field, assign_owner
+  actionConfig: jsonb("action_config").notNull().default('{}'),
+  isActive: boolean("is_active").notNull().default(true),
+  executionCount: integer("execution_count").default(0),
+  lastExecutedAt: timestamp("last_executed_at"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type PipelineAutomationRule = typeof pipelineAutomationRules.$inferSelect;
+export type InsertPipelineAutomationRule = typeof pipelineAutomationRules.$inferInsert;
+
+// ─── Deal Scoring Models & Scores ────────────────────────────────────────────
+export const dealScoringModels = pgTable("deal_scoring_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull().default("Default"),
+  criteria: jsonb("criteria").notNull().default('[]'),
+  isDefault: boolean("is_default").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type DealScoringModel = typeof dealScoringModels.$inferSelect;
+export type InsertDealScoringModel = typeof dealScoringModels.$inferInsert;
+
+export const dealScores = pgTable("deal_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull(),
+  modelId: varchar("model_id").references(() => dealScoringModels.id),
+  scores: jsonb("scores").notNull().default('{}'),
+  totalScore: decimal("total_score", { precision: 5, scale: 1 }),
+  grade: text("grade"),
+  scoredBy: varchar("scored_by").references(() => users.id),
+  scoredAt: timestamp("scored_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type DealScore = typeof dealScores.$inferSelect;
+export type InsertDealScore = typeof dealScores.$inferInsert;
+
+// ─── Pipeline Templates ──────────────────────────────────────────────────────
+export const pipelineTemplates = pgTable("pipeline_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  dealType: text("deal_type").notNull(),
+  stages: jsonb("stages").notNull().default('[]'),
+  defaultChecklistTemplate: varchar("default_checklist_template"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type PipelineTemplate = typeof pipelineTemplates.$inferSelect;
+export type InsertPipelineTemplate = typeof pipelineTemplates.$inferInsert;
+
+// ─── Deal Competitors ────────────────────────────────────────────────────────
+export const dealCompetitors = pgTable("deal_competitors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull(),
+  competitorName: text("competitor_name").notNull(),
+  estimatedBid: decimal("estimated_bid", { precision: 12, scale: 2 }),
+  strengths: text("strengths"),
+  weaknesses: text("weaknesses"),
+  intelSource: text("intel_source"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type DealCompetitor = typeof dealCompetitors.$inferSelect;
+export type InsertDealCompetitor = typeof dealCompetitors.$inferInsert;
 
 export const insertPlatformDataSourceMappingSchema = createInsertSchema(platformDataSourceMappings).omit({
   id: true,

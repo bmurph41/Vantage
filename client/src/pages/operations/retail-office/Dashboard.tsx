@@ -88,7 +88,7 @@ function KpiCard({
 
 export default function RetailOfficeDashboard() {
   const { data: stats, isLoading, isError } = useQuery<RetailOfficeStats>({
-    queryKey: ["/api/operations-context/retail-office/stats"],
+    queryKey: ["/api/retail-office-ops/stats"],
     retry: false,
   });
 

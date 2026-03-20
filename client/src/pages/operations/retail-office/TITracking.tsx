@@ -54,7 +54,7 @@ export default function RetailOfficeTITracking() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data, isLoading, isError } = useQuery<TISummary>({
-    queryKey: ["/api/operations-context/retail-office/ti-tracking"],
+    queryKey: ["/api/retail-office-ops/ti-allowances"],
     retry: false,
   });
 

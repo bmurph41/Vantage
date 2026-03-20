@@ -74,7 +74,7 @@ function SummaryCard({
 
 export default function MultifamilyTurnTracking() {
   const { data, isLoading, isError } = useQuery<TurnSummary>({
-    queryKey: ["/api/operations-context/multifamily/turns"],
+    queryKey: ["/api/multifamily-ops/turns"],
     retry: false,
   });
 

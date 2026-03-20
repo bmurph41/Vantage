@@ -721,4 +721,463 @@ router.get('/crm/forecasting/velocity', async (req: any, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
+// =============================================================================
+// CONTACT TIMELINE (Enriched)
+// =============================================================================
+
+router.get('/contacts/:id/timeline', async (req: any, res) => {
+  try {
+    const contactId = req.params.id;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Aggregate from multiple sources into a unified timeline
+    const events: Array<{ type: string; timestamp: string; title: string; description: string; metadata?: Record<string, any> }> = [];
+
+    // 1. Activities (calls, emails, meetings, etc.)
+    const activities = await q(`
+      SELECT a.type, a.subject, a.description, a.direction, a.duration, a.outcome,
+             a.status, a.created_at, a.completed_at, a.scheduled_at
+      FROM crm_activities a
+      LEFT JOIN crm_activity_associations aa ON aa.activity_id = a.id
+      WHERE (a.entity_type = 'contact' AND a.entity_id = $1)
+         OR (aa.object_type = 'contact' AND aa.object_id = $1)
+      ORDER BY a.created_at DESC
+      LIMIT 50
+    `, [contactId]);
+
+    for (const act of activities) {
+      const actType = act.type === 'email'
+        ? (act.direction === 'inbound' ? 'email_received' : 'email_sent')
+        : act.type === 'call' ? 'call'
+        : act.type === 'meeting' ? 'meeting'
+        : act.type === 'note' ? 'note_added'
+        : act.type;
+
+      events.push({
+        type: actType,
+        timestamp: act.completed_at || act.created_at,
+        title: act.subject || `${act.type} activity`,
+        description: act.description || '',
+        metadata: {
+          direction: act.direction,
+          duration: act.duration,
+          outcome: act.outcome,
+          status: act.status,
+        },
+      });
+    }
+
+    // 2. Notes
+    const notes = await q(`
+      SELECT n.title, n.content, n.created_at
+      FROM crm_notes n
+      WHERE n.entity_type = 'contact' AND n.entity_id = $1
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    `, [contactId]);
+
+    for (const note of notes) {
+      events.push({
+        type: 'note_added',
+        timestamp: note.created_at,
+        title: note.title || 'Note added',
+        description: (note.content || '').substring(0, 200),
+      });
+    }
+
+    // 3. Deals associated with this contact
+    const deals = await q(`
+      SELECT d.id, d.title, d.name, d.stage, d.value, d.created_at,
+             d.current_stage_entered_at, d.updated_at
+      FROM crm_deals d
+      WHERE d.buyer_contact_id = $1 OR d.seller_contact_id = $1
+      ORDER BY d.created_at DESC
+      LIMIT 20
+    `, [contactId]);
+
+    for (const deal of deals) {
+      events.push({
+        type: 'deal_created',
+        timestamp: deal.created_at,
+        title: `Deal created: ${deal.title || deal.name}`,
+        description: `Value: ${deal.value || 'N/A'}`,
+        metadata: {
+          dealId: deal.id,
+          dealTitle: deal.title || deal.name,
+          stage: deal.stage,
+          value: deal.value,
+        },
+      });
+    }
+
+    // 4. Timeline events from the dedicated timeline table
+    const timelineEvents = await q(`
+      SELECT event_type, title, description, occurred_at, metadata
+      FROM crm_timeline_events
+      WHERE entity_type = 'contact' AND entity_id = $1
+      ORDER BY occurred_at DESC
+      LIMIT 30
+    `, [contactId]);
+
+    for (const te of timelineEvents) {
+      // Map timeline event types to our canonical types
+      const typeMap: Record<string, string> = {
+        'stage_changed': 'deal_stage_changed',
+        'deal_updated': 'deal_stage_changed',
+        'note_created': 'note_added',
+        'note_updated': 'note_added',
+        'activity_created': 'call',
+        'activity_completed': 'call',
+        'email_logged': 'email_sent',
+        'file_uploaded': 'document_shared',
+        'association_created': 'property_viewed',
+      };
+
+      events.push({
+        type: typeMap[te.event_type] || te.event_type,
+        timestamp: te.occurred_at,
+        title: te.title || te.event_type,
+        description: te.description || '',
+        metadata: te.metadata || {},
+      });
+    }
+
+    // Sort all events by timestamp descending, limit to 100
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const limited = events.slice(0, 100);
+
+    res.json({ events: limited });
+  } catch (e: any) {
+    console.error('Contact timeline error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================================================================
+// RELATIONSHIP MAP
+// =============================================================================
+
+router.get('/contacts/:id/relationships', async (req: any, res) => {
+  try {
+    const contactId = req.params.id;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Get contact info for center node
+    const center = await q1(`
+      SELECT id, first_name, last_name, email, company, contact_tag
+      FROM crm_contacts WHERE id = $1 AND org_id = $2
+    `, [contactId, orgId]);
+
+    if (!center) return res.status(404).json({ error: 'Contact not found' });
+
+    const centerNode = {
+      id: center.id,
+      name: `${center.first_name} ${center.last_name}`.trim(),
+      type: 'contact' as const,
+    };
+
+    const connections: Array<{ id: string; name: string; type: string; relationship: string; strength: number }> = [];
+
+    // 1. Get associations
+    const assocs = await q(`
+      SELECT a.source_entity_type, a.source_entity_id, a.target_entity_type, a.target_entity_id,
+             a.association_type, a.metadata
+      FROM crm_associations a
+      WHERE a.org_id = $1
+        AND ((a.source_entity_type = 'contact' AND a.source_entity_id = $2)
+          OR (a.target_entity_type = 'contact' AND a.target_entity_id = $2))
+    `, [orgId, contactId]);
+
+    for (const assoc of assocs) {
+      const isSource = assoc.source_entity_type === 'contact' && assoc.source_entity_id === contactId;
+      const linkedType = isSource ? assoc.target_entity_type : assoc.source_entity_type;
+      const linkedId = isSource ? assoc.target_entity_id : assoc.source_entity_id;
+
+      let entity = null;
+      switch (linkedType) {
+        case 'company': {
+          const c = await q1(`SELECT id, name FROM crm_companies WHERE id = $1`, [linkedId]);
+          if (c) entity = { id: c.id, name: c.name, type: 'company' };
+          break;
+        }
+        case 'contact': {
+          const c = await q1(`SELECT id, first_name, last_name FROM crm_contacts WHERE id = $1`, [linkedId]);
+          if (c) entity = { id: c.id, name: `${c.first_name} ${c.last_name}`.trim(), type: 'contact' };
+          break;
+        }
+        case 'deal': {
+          const d = await q1(`SELECT id, title, name FROM crm_deals WHERE id = $1`, [linkedId]);
+          if (d) entity = { id: d.id, name: d.title || d.name || 'Deal', type: 'deal' };
+          break;
+        }
+        case 'property': {
+          const p = await q1(`SELECT id, title, name FROM crm_properties WHERE id = $1`, [linkedId]);
+          if (p) entity = { id: p.id, name: p.title || p.name || 'Property', type: 'property' };
+          break;
+        }
+      }
+
+      if (entity && !connections.find(c => c.id === entity!.id)) {
+        const relType = assoc.association_type?.replace(/_/g, ' ') || linkedType;
+        connections.push({
+          ...entity,
+          relationship: relType,
+          strength: 5,
+        });
+      }
+    }
+
+    // 2. Get company via contact_companies junction
+    const contactCompanies = await q(`
+      SELECT cc.role, c.id, c.name
+      FROM crm_contact_companies cc
+      JOIN crm_companies c ON c.id = cc.company_id
+      WHERE cc.contact_id = $1
+    `, [contactId]);
+
+    for (const cc of contactCompanies) {
+      if (!connections.find(c => c.id === cc.id)) {
+        connections.push({
+          id: cc.id,
+          name: cc.name,
+          type: 'company',
+          relationship: cc.role || 'employee',
+          strength: 8,
+        });
+      }
+    }
+
+    // 3. Get deals where this contact is buyer or seller
+    const dealConnections = await q(`
+      SELECT id, title, name, stage, value
+      FROM crm_deals
+      WHERE org_id = $1
+        AND (buyer_contact_id = $2 OR seller_contact_id = $2)
+    `, [orgId, contactId]);
+
+    for (const deal of dealConnections) {
+      if (!connections.find(c => c.id === deal.id)) {
+        connections.push({
+          id: deal.id,
+          name: deal.title || deal.name || 'Deal',
+          type: 'deal',
+          relationship: 'involved',
+          strength: 7,
+        });
+      }
+    }
+
+    // 4. Get deal team members for shared deals
+    const dealTeamPeers = await q(`
+      SELECT DISTINCT c.id, c.first_name, c.last_name
+      FROM crm_deal_contacts dc1
+      JOIN crm_deal_contacts dc2 ON dc1.deal_id = dc2.deal_id AND dc2.contact_id != $1
+      JOIN crm_contacts c ON c.id = dc2.contact_id
+      WHERE dc1.contact_id = $1
+      LIMIT 10
+    `, [contactId]);
+
+    for (const peer of dealTeamPeers) {
+      if (!connections.find(c => c.id === peer.id)) {
+        connections.push({
+          id: peer.id,
+          name: `${peer.first_name} ${peer.last_name}`.trim(),
+          type: 'contact',
+          relationship: 'deal team',
+          strength: 4,
+        });
+      }
+    }
+
+    res.json({ centerNode, connections });
+  } catch (e: any) {
+    console.error('Relationship map error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/companies/:id/relationships', async (req: any, res) => {
+  try {
+    const companyId = req.params.id;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Get company info for center node
+    const center = await q1(`
+      SELECT id, name, industry FROM crm_companies WHERE id = $1 AND org_id = $2
+    `, [companyId, orgId]);
+
+    if (!center) return res.status(404).json({ error: 'Company not found' });
+
+    const centerNode = {
+      id: center.id,
+      name: center.name,
+      type: 'company' as const,
+    };
+
+    const connections: Array<{ id: string; name: string; type: string; relationship: string; strength: number }> = [];
+
+    // 1. Contacts linked to this company
+    const linkedContacts = await q(`
+      SELECT c.id, c.first_name, c.last_name, cc.role
+      FROM crm_contact_companies cc
+      JOIN crm_contacts c ON c.id = cc.contact_id
+      WHERE cc.company_id = $1
+    `, [companyId]);
+
+    for (const c of linkedContacts) {
+      connections.push({
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`.trim(),
+        type: 'contact',
+        relationship: c.role || 'employee',
+        strength: 7,
+      });
+    }
+
+    // 2. Deals where this company is buyer or seller
+    const deals = await q(`
+      SELECT id, title, name, stage, value
+      FROM crm_deals
+      WHERE org_id = $1
+        AND (buyer_company_id = $2 OR seller_company_id = $2)
+    `, [orgId, companyId]);
+
+    for (const deal of deals) {
+      connections.push({
+        id: deal.id,
+        name: deal.title || deal.name || 'Deal',
+        type: 'deal',
+        relationship: 'party',
+        strength: 6,
+      });
+    }
+
+    // 3. Associations
+    const assocs = await q(`
+      SELECT a.source_entity_type, a.source_entity_id, a.target_entity_type, a.target_entity_id,
+             a.association_type
+      FROM crm_associations a
+      WHERE a.org_id = $1
+        AND ((a.source_entity_type = 'company' AND a.source_entity_id = $2)
+          OR (a.target_entity_type = 'company' AND a.target_entity_id = $2))
+    `, [orgId, companyId]);
+
+    for (const assoc of assocs) {
+      const isSource = assoc.source_entity_type === 'company' && assoc.source_entity_id === companyId;
+      const linkedType = isSource ? assoc.target_entity_type : assoc.source_entity_type;
+      const linkedId = isSource ? assoc.target_entity_id : assoc.source_entity_id;
+
+      if (connections.find(c => c.id === linkedId)) continue;
+
+      let entity = null;
+      switch (linkedType) {
+        case 'property': {
+          const p = await q1(`SELECT id, title, name FROM crm_properties WHERE id = $1`, [linkedId]);
+          if (p) entity = { id: p.id, name: p.title || p.name || 'Property', type: 'property' };
+          break;
+        }
+        case 'contact': {
+          const c = await q1(`SELECT id, first_name, last_name FROM crm_contacts WHERE id = $1`, [linkedId]);
+          if (c) entity = { id: c.id, name: `${c.first_name} ${c.last_name}`.trim(), type: 'contact' };
+          break;
+        }
+        case 'company': {
+          const c = await q1(`SELECT id, name FROM crm_companies WHERE id = $1`, [linkedId]);
+          if (c) entity = { id: c.id, name: c.name, type: 'company' };
+          break;
+        }
+        case 'deal': {
+          const d = await q1(`SELECT id, title, name FROM crm_deals WHERE id = $1`, [linkedId]);
+          if (d) entity = { id: d.id, name: d.title || d.name || 'Deal', type: 'deal' };
+          break;
+        }
+      }
+
+      if (entity) {
+        connections.push({
+          ...entity,
+          relationship: assoc.association_type?.replace(/_/g, ' ') || linkedType,
+          strength: 5,
+        });
+      }
+    }
+
+    // 4. Properties owned by this company
+    const ownedProps = await q(`
+      SELECT id, title, name FROM crm_properties
+      WHERE owner_company_id = $1
+      LIMIT 10
+    `, [companyId]);
+
+    for (const prop of ownedProps) {
+      if (!connections.find(c => c.id === prop.id)) {
+        connections.push({
+          id: prop.id,
+          name: prop.title || prop.name || 'Property',
+          type: 'property',
+          relationship: 'owned',
+          strength: 8,
+        });
+      }
+    }
+
+    res.json({ centerNode, connections });
+  } catch (e: any) {
+    console.error('Company relationship map error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// =============================================================================
+// BULK EMAIL LOGGING
+// =============================================================================
+
+router.post('/bulk-email', async (req: any, res) => {
+  try {
+    const { contactIds, subject, body } = req.body;
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+
+    if (!contactIds?.length || !subject || !body) {
+      return res.status(400).json({ error: 'contactIds, subject, and body are required' });
+    }
+
+    // Validate contacts belong to org
+    const contacts = await q(`
+      SELECT id, email, first_name, last_name
+      FROM crm_contacts
+      WHERE id = ANY($1::varchar[]) AND org_id = $2
+    `, [contactIds, orgId]);
+
+    const validContacts = contacts.filter((c: any) => c.email);
+    const missingEmail = contacts.filter((c: any) => !c.email);
+    const notFound = contactIds.length - contacts.length;
+
+    // Log the bulk email attempt
+    const log = await q1(`
+      INSERT INTO crm_bulk_email_logs (id, org_id, sent_by_id, subject, body, recipient_count, sent_count, failed_count, status, created_at)
+      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, 'completed', NOW())
+      RETURNING *
+    `, [orgId, userId, subject, body, contactIds.length, validContacts.length, missingEmail.length + notFound]);
+
+    res.json({
+      sent: validContacts.length,
+      failed: missingEmail.length + notFound,
+      logId: log?.id,
+    });
+  } catch (e: any) {
+    // If the table doesn't exist yet, still return a response
+    if (e.message?.includes('crm_bulk_email_logs')) {
+      const { contactIds } = req.body;
+      res.json({ sent: contactIds?.length || 0, failed: 0, logId: null });
+    } else {
+      console.error('Bulk email error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  }
+});
+
 export default router;

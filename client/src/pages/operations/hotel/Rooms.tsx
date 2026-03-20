@@ -57,7 +57,7 @@ export default function HotelRooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: rooms, isLoading, isError } = useQuery<Room[]>({
-    queryKey: ["/api/operations-context/hotel/rooms"],
+    queryKey: ["/api/hotel-ops/rooms"],
     retry: false,
   });
 

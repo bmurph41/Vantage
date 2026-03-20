@@ -59,7 +59,7 @@ export default function MultifamilyUnits() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: units, isLoading, isError } = useQuery<Unit[]>({
-    queryKey: ["/api/operations-context/multifamily/units"],
+    queryKey: ["/api/multifamily-ops/units"],
     retry: false,
   });
 

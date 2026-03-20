@@ -76,7 +76,7 @@ function KpiCard({
 
 export default function HotelDashboard() {
   const { data: stats, isLoading, isError } = useQuery<HotelStats>({
-    queryKey: ["/api/operations-context/hotel/stats"],
+    queryKey: ["/api/hotel-ops/stats"],
     retry: false,
   });
 

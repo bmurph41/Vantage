@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingBag, LayoutDashboard, Package, UserPlus, TrendingUp, CreditCard, ArrowLeftRight, Handshake, FileCheck, BarChart3 } from "lucide-react";
+import { ShoppingBag, LayoutDashboard, Package, UserPlus, TrendingUp, CreditCard, ArrowLeftRight, Handshake, FileCheck, BarChart3, LineChart as LineChartIcon } from "lucide-react";
+import BoatSalesAnalytics from "./boat-sales/Analytics";
 import { TabbedModuleLayout, TabDefinition, PlaceholderTab } from "@/components/layout/TabbedModuleLayout";
 
 function SalesDashboard() {
@@ -274,6 +275,13 @@ export default function BoatSalesTabbed() {
       icon: BarChart3,
       component: SalesReports,
       description: "Sales analytics",
+    },
+    {
+      id: "analytics",
+      label: "Analytics",
+      icon: LineChartIcon,
+      component: BoatSalesAnalytics,
+      description: "Sales analytics charts",
     },
   ];
 

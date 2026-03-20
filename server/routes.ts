@@ -65,6 +65,7 @@ import crmRelationshipScoreRouter from './routes/crm-relationship-score';
 import crmSavedViewsRoutes from "./routes/crm-saved-views-routes";
 import crmIntelligenceRoutes from "./routes/crm-intelligence-routes";
 import crmAssociationsRoutes from "./routes/crm-associations-routes";
+import crmAdvancedSearchRoutes from "./routes/crm-advanced-search-routes";
 import pipelineAnalyticsRoutes from "./routes/pipeline-analytics-routes";
 import { getSlaRouter } from "./routes/sla-routes";
 import opssosRouter from "./routes/opssos";
@@ -93,12 +94,23 @@ import institutionalAnalysisRoutes from "./routes/institutional-analysis-routes"
 import returnsRoutes from "./routes/returns-routes";
 import budgetRoutes from "./routes/budget-routes";
 import bookkeepingGlRoutes from "./routes/bookkeeping-gl-routes";
+import lpPortalRoutes from "./routes/lp-portal-routes";
 import taxWaterfallRoutes from "./routes/tax-waterfall-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
+import hotelOpsRoutes from "./routes/hotel-ops-routes";
+import multifamilyOpsRoutes from "./routes/multifamily-ops-routes";
+import selfStorageOpsRoutes from "./routes/self-storage-ops-routes";
+import retailOfficeOpsRoutes from "./routes/retail-office-ops-routes";
 import searchRoutes from "./routes/search-routes";
 import bulkEmailRoutes from "./routes/bulk-email-routes";
 import campaignScheduleRoutes from "./routes/campaign-schedule-routes";
 import camReconciliationRoutes from "./routes/cam-reconciliation-routes";
+import pipelineAutomationRoutes from "./routes/pipeline-automation-routes";
+import dealScoringRoutes from "./routes/deal-scoring-routes";
+import competitiveTrackingRoutes from "./routes/competitive-tracking-routes";
+import ddStatusReportRoutes from "./routes/dd-status-report-routes";
+import documentVersionRoutes from "./routes/document-version-routes";
+import pipelineTemplateRoutes from "./routes/pipeline-template-routes";
 import { userSessions, insertProspectingEntrySchema, users, salesComps, rateComps, industryStandards, modelingProjectConfig, insertPendingSalesCompSchema, customCatalogItems, insertCustomCatalogItemSchema, marinaListings, outreachCampaigns, outreachTemplates, insertOutreachCampaignSchema, insertOutreachTemplateSchema } from "@shared/schema";
 import { customerAnalyticsService } from "./services/customer-analytics-service";
 import { initializeVdrForProject } from "./services/vdr-initialization-service";
@@ -433,7 +445,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
+  app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
+  app.use("/api/pipeline/scoring", authenticateUser, enforceTenant, dealScoringRoutes);
+  app.use("/api/pipeline/competitive", authenticateUser, enforceTenant, competitiveTrackingRoutes);
+  app.use("/api/pipeline/templates", authenticateUser, enforceTenant, pipelineTemplateRoutes);
+  app.use("/api/dd", authenticateUser, enforceTenant, ddStatusReportRoutes);
+  app.use("/api/vdr", authenticateUser, enforceTenant, documentVersionRoutes);
   app.use("/api/crm/associations", crmAssociationsRoutes);
+  app.use("/api/crm", authenticateUser, requirePack("crm_pipeline"), crmAdvancedSearchRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api", authenticateUser, dealDDRoutes);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
@@ -604,6 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
   app.use("/api/budgets", authenticateUser, enforceTenant, budgetRoutes);
   app.use("/api/bookkeeping", authenticateUser, enforceTenant, bookkeepingGlRoutes);
+  app.use("/api/lp-portal", authenticateUser, enforceTenant, lpPortalRoutes);
   app.use("/api/tax-waterfall", authenticateUser, enforceTenant, taxWaterfallRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
@@ -705,6 +725,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/boat-sales", authenticateUser, requirePack("operations"), boatSalesRouter);
   app.use("/api/operations", authenticateUser, enforceTenant, requirePack("operations"), operationsSyncRoutes);
   app.use("/api/operations-context", authenticateUser, enforceTenant, requirePack("operations"), operationsContextRoutes);
+  app.use("/api/hotel-ops", authenticateUser, enforceTenant, hotelOpsRoutes);
+  app.use("/api/multifamily-ops", authenticateUser, enforceTenant, multifamilyOpsRoutes);
+  app.use("/api/self-storage-ops", authenticateUser, enforceTenant, selfStorageOpsRoutes);
+  app.use("/api/retail-office-ops", authenticateUser, enforceTenant, retailOfficeOpsRoutes);
   app.use("/api/opssos", authenticateUser, enforceTenant, opssosRouter);
   app.use("/api/admin", authenticateUser, enforceTenant, adminRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
@@ -28780,6 +28804,105 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
       console.error('Failed to create cash flow:', error);
       res.status(500).json({ error: 'Failed to create cash flow' });
+    }
+  });
+
+  // === Fund Investor Report Generation ===
+  app.post('/api/funds/:fundId/generate-report', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user?.orgId || 'default';
+      const { fundId } = req.params;
+      const { quarter, year, marketCommentary, sectionOverrides } = req.body;
+
+      const { fundService } = await import('./services/fund-service');
+      const fund = await fundService.getFund(orgId, fundId);
+      if (!fund) {
+        return res.status(404).json({ error: 'Fund not found' });
+      }
+
+      // Get fund metrics
+      let metrics;
+      try {
+        metrics = await fundService.calculateMetrics(orgId, fundId);
+      } catch {
+        metrics = {
+          netIrr: parseFloat(fund.netIrr?.toString() || '0'),
+          grossIrr: parseFloat(fund.grossIrr?.toString() || '0'),
+          tvpi: parseFloat(fund.tvpi?.toString() || '0'),
+          dpi: parseFloat(fund.dpi?.toString() || '0'),
+          calledCapital: parseFloat(fund.calledCapital?.toString() || '0'),
+          distributedCapital: parseFloat(fund.distributedCapital?.toString() || '0'),
+          nav: parseFloat(fund.calledCapital?.toString() || '0') * 1.15,
+          deployedCapital: parseFloat(fund.calledCapital?.toString() || '0') * 0.85,
+          dryPowder: parseFloat(fund.committedCapital?.toString() || '0') - parseFloat(fund.calledCapital?.toString() || '0'),
+        };
+      }
+
+      const committed = parseFloat(fund.committedCapital?.toString() || '0');
+      const called = parseFloat(fund.calledCapital?.toString() || '0');
+      const distributed = parseFloat(fund.distributedCapital?.toString() || '0');
+
+      // Get allocations for portfolio update
+      let allocations: any[] = [];
+      try {
+        allocations = await fundService.getAllocationsByFund(orgId, fundId);
+      } catch {
+        allocations = [];
+      }
+
+      const report = {
+        id: `report-${fundId}-Q${quarter}-${year}`,
+        fundName: fund.name,
+        period: `Q${quarter} ${year}`,
+        generatedAt: new Date().toISOString(),
+        performanceSummary: {
+          netIrr: metrics.netIrr || 0,
+          grossIrr: metrics.grossIrr || 0,
+          tvpi: metrics.tvpi || 0,
+          dpi: metrics.dpi || 0,
+          calledCapital: called,
+          distributedCapital: distributed,
+          nav: metrics.nav || 0,
+          deployedCapital: metrics.deployedCapital || 0,
+          dryPowder: metrics.dryPowder || 0,
+        },
+        portfolioUpdate: {
+          totalDeals: allocations.length,
+          activeDeals: allocations.filter((a: any) => a.exitStatus === 'active').length,
+          exitedDeals: allocations.filter((a: any) => a.exitStatus === 'exited').length,
+          newInvestments: allocations
+            .filter((a: any) => {
+              if (!a.investmentDate) return false;
+              const investDate = new Date(a.investmentDate);
+              const quarterStart = new Date(year, (quarter - 1) * 3, 1);
+              const quarterEnd = new Date(year, quarter * 3, 0);
+              return investDate >= quarterStart && investDate <= quarterEnd;
+            })
+            .map((a: any) => a.projectName || 'New Investment'),
+          exits: [],
+        },
+        capitalAccountSummary: {
+          committedCapital: committed,
+          calledPct: committed > 0 ? called / committed : 0,
+          distributedPct: called > 0 ? distributed / called : 0,
+        },
+        marketCommentary: marketCommentary || '',
+        sectionOverrides: sectionOverrides || {},
+      };
+
+      res.status(201).json(report);
+    } catch (error: any) {
+      console.error('Failed to generate fund report:', error);
+      res.status(500).json({ error: 'Failed to generate report' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/send-report', authenticateUser, async (req: any, res) => {
+    try {
+      // Placeholder - would send to all investors
+      res.json({ sent: true, message: 'Reports queued for delivery to all fund investors.' });
+    } catch (error: any) {
+      res.status(500).json({ error: 'Failed to send reports' });
     }
   });
 

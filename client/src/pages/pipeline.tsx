@@ -43,6 +43,8 @@ import PipelineSettingsModal from "@/components/modals/pipeline-settings-modal";
 import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/schema";
 import { formatCurrency } from "@/lib/utils";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
+import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
+import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSelector";
 import {
   ASSET_CLASSES,
   DEAL_PRIORITIES,
@@ -435,7 +437,7 @@ export default function Pipeline() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "automations" | "templates">("kanban");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -849,6 +851,22 @@ export default function Pipeline() {
               </PopoverContent>
             </Popover>
 
+            <Button
+              variant="outline" size="sm"
+              className={`h-8 text-xs ${viewMode === 'automations' ? 'bg-amber-50 border-amber-300 text-amber-700' : ''}`}
+              onClick={() => setViewMode(viewMode === 'automations' ? 'kanban' : 'automations')}
+            >
+              <Zap className="w-3.5 h-3.5 mr-1" /> Automations
+            </Button>
+
+            <Button
+              variant="outline" size="sm"
+              className={`h-8 text-xs ${viewMode === 'templates' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : ''}`}
+              onClick={() => setViewMode(viewMode === 'templates' ? 'kanban' : 'templates')}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 mr-1" /> Templates
+            </Button>
+
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setIsSettingsOpen(true)}>
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Stages
             </Button>
@@ -1064,6 +1082,23 @@ export default function Pipeline() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Automations View */}
+        {viewMode === "automations" && (
+          <div className="flex-1 overflow-y-auto p-4" data-testid="automations-view">
+            <AutomationRulesPanel />
+          </div>
+        )}
+
+        {/* Templates View */}
+        {viewMode === "templates" && (
+          <div className="flex-1 overflow-y-auto p-4" data-testid="templates-view">
+            <PipelineTemplateSelector
+              pipelineId={selectedPipelineId}
+              onDealCreated={() => setViewMode("kanban")}
+            />
           </div>
         )}
       </div>

@@ -33,6 +33,9 @@ import {
   Upload, UserPlus, Users, AlertCircle, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import CompetitiveTracker from '@/components/pipeline/CompetitiveTracker';
+import DealScoringCard from '@/components/pipeline/DealScoringCard';
+import { Swords, Award } from 'lucide-react';
 
 // Matches existing workspace_status enum: active, pending, under_contract, due_diligence, closing, closed, dead, on_hold
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -317,7 +320,7 @@ export default function WorkspaceDetailPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
             <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
@@ -330,6 +333,12 @@ export default function WorkspaceDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
             <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">Documents</span>
+          </TabsTrigger>
+          <TabsTrigger value="competition" className="gap-2" data-testid="tab-competition">
+            <Swords className="h-4 w-4" /><span className="hidden sm:inline">Competition</span>
+          </TabsTrigger>
+          <TabsTrigger value="scoring" className="gap-2" data-testid="tab-scoring">
+            <Award className="h-4 w-4" /><span className="hidden sm:inline">Scoring</span>
           </TabsTrigger>
           <TabsTrigger value="team" className="gap-2" data-testid="tab-team">
             <Users className="h-4 w-4" /><span className="hidden sm:inline">Team</span>
@@ -593,6 +602,19 @@ export default function WorkspaceDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ═══ COMPETITION TAB ═══ */}
+        <TabsContent value="competition" className="mt-6">
+          <CompetitiveTracker
+            dealId={workspaceId!}
+            ourBid={workspace.targetPrice ? Number(workspace.targetPrice) : undefined}
+          />
+        </TabsContent>
+
+        {/* ═══ SCORING TAB ═══ */}
+        <TabsContent value="scoring" className="mt-6">
+          <DealScoringCard dealId={workspaceId!} dealTitle={workspace.name} />
         </TabsContent>
       </Tabs>
 

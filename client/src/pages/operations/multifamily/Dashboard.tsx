@@ -82,7 +82,7 @@ function KpiCard({
 
 export default function MultifamilyDashboard() {
   const { data: stats, isLoading, isError } = useQuery<MultifamilyStats>({
-    queryKey: ["/api/operations-context/multifamily/stats"],
+    queryKey: ["/api/multifamily-ops/stats"],
     retry: false,
   });
 

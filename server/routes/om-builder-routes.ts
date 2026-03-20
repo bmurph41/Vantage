@@ -198,6 +198,52 @@ router.get('/api/om-builder/documents/:documentId/download-pdf', async (req: Req
   }
 });
 
+// ---------------------------------------------------------------------------
+// Brand Settings
+// ---------------------------------------------------------------------------
+
+// In-memory brand settings store (would be DB in production)
+const brandSettingsStore = new Map<string, any>();
+
+router.get('/api/om-builder/brand-settings', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req) || 'default';
+    const settings = brandSettingsStore.get(orgId) || {
+      primaryColor: '#1e3a5f',
+      secondaryColor: '#c9a96e',
+      fontFamily: 'sans-serif',
+      logoUrl: null,
+      companyName: '',
+    };
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching brand settings:', error);
+    res.status(500).json({ error: 'Failed to fetch brand settings' });
+  }
+});
+
+router.put('/api/om-builder/brand-settings', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req) || 'default';
+    const { primaryColor, secondaryColor, fontFamily, logoUrl, companyName } = req.body;
+
+    const settings = {
+      primaryColor: primaryColor || '#1e3a5f',
+      secondaryColor: secondaryColor || '#c9a96e',
+      fontFamily: fontFamily || 'sans-serif',
+      logoUrl: logoUrl || null,
+      companyName: companyName || '',
+      updatedAt: new Date().toISOString(),
+    };
+
+    brandSettingsStore.set(orgId, settings);
+    res.json(settings);
+  } catch (error) {
+    console.error('Error saving brand settings:', error);
+    res.status(500).json({ error: 'Failed to save brand settings' });
+  }
+});
+
 router.delete('/api/om-builder/documents/:documentId', async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;

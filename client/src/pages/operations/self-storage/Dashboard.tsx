@@ -74,7 +74,7 @@ function KpiCard({
 
 export default function SelfStorageDashboard() {
   const { data: stats, isLoading, isError } = useQuery<SelfStorageStats>({
-    queryKey: ["/api/operations-context/self-storage/stats"],
+    queryKey: ["/api/self-storage-ops/stats"],
     retry: false,
   });
 

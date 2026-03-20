@@ -46,7 +46,7 @@ export default function RetailOfficeTenants() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: tenants, isLoading, isError } = useQuery<Tenant[]>({
-    queryKey: ["/api/operations-context/retail-office/tenants"],
+    queryKey: ["/api/retail-office-ops/tenants"],
     retry: false,
   });
 
