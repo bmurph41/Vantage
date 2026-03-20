@@ -21,6 +21,7 @@ import { GoogleMapsProvider } from "@/lib/google-maps-provider";
 // Lazy load all pages for optimal bundle splitting
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
+const CrmSettings = lazy(() => import("@/pages/crm-settings"));
 const AllProjectsSummaryPage = lazy(() => import("@/pages/all-projects-summary"));
 
 // Lazy load layout components
@@ -1428,6 +1429,13 @@ function Router() {
       </Route>
 
       {/* CRM Routes with Unified Layout */}
+      <Route path="/crm/settings">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <CrmSettings />
+          </GatedLayout>
+        )}
+      </Route>
       <Route path="/crm">
         {() => (
           <GatedLayout pack="crm_pipeline">

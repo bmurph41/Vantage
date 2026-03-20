@@ -23,6 +23,7 @@ const crmNav = [
   { name: "Properties", href: "/crm/properties" },
   { name: "Prospecting", href: "/prospecting" },
   { name: "Marketing", href: "/marketing" },
+  { name: "Settings", href: "/crm/settings" },
 ];
 
 // Pipeline Navigation (Deal flow, marketing, analytics)

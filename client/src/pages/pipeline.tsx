@@ -44,6 +44,7 @@ import type { Deal, Contact, Company, PipelineStage, Pipeline } from "@shared/sc
 import { formatCurrency } from "@/lib/utils";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
+import { ForecastChart } from "@/components/pipeline/ForecastChart";
 import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSelector";
 import {
   ASSET_CLASSES,
@@ -437,7 +438,7 @@ export default function Pipeline() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "automations" | "templates">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "automations" | "templates" | "forecast">("kanban");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -867,6 +868,14 @@ export default function Pipeline() {
               <LayoutGrid className="w-3.5 h-3.5 mr-1" /> Templates
             </Button>
 
+            <Button
+              variant="outline" size="sm"
+              className={`h-8 text-xs ${viewMode === 'forecast' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : ''}`}
+              onClick={() => setViewMode(viewMode === 'forecast' ? 'kanban' : 'forecast')}
+            >
+              <TrendingUp className="w-3.5 h-3.5 mr-1" /> Forecast
+            </Button>
+
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setIsSettingsOpen(true)}>
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Stages
             </Button>
@@ -1099,6 +1108,13 @@ export default function Pipeline() {
               pipelineId={selectedPipelineId}
               onDealCreated={() => setViewMode("kanban")}
             />
+          </div>
+        )}
+
+        {/* Forecast View */}
+        {viewMode === "forecast" && (
+          <div className="flex-1 overflow-y-auto" data-testid="forecast-view">
+            <ForecastChart pipelineId={selectedPipelineId} />
           </div>
         )}
       </div>

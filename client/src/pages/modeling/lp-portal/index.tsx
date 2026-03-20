@@ -33,6 +33,9 @@ import {
   Activity
 } from 'lucide-react';
 import type { Fund, FundInvestor, FundDealAllocation, FundCapitalMovement, FundCashFlow } from '@shared/schema';
+import { lazy, Suspense } from 'react';
+const InvestorStatements = lazy(() => import('./InvestorStatements'));
+const CapitalAccountSummary = lazy(() => import('./CapitalAccountSummary'));
 
 interface FundWithMetrics extends Fund {
   netIrr?: number;
@@ -597,75 +600,9 @@ function LPPortalContent() {
             </TabsContent>
 
             <TabsContent value="statements">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Fund Statements</CardTitle>
-                  <CardDescription>
-                    Quarterly reports, K-1s, and capital account statements
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4" ref={statementsRef}>
-                    <Card className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => {
-                      toast({ title: 'Generating Capital Account Statement...', description: 'Preparing your Q4 2024 capital account statement.' });
-                      setTimeout(() => toast({ title: 'Capital Account Statement Ready', description: 'Your statement has been generated and downloaded.' }), 1500);
-                    }}>
-                      <CardContent className="pt-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Capital Account Statement</div>
-                          <div className="text-sm text-muted-foreground">Q4 2024</div>
-                        </div>
-                        <Download className="h-4 w-4 ml-auto text-muted-foreground" />
-                      </CardContent>
-                    </Card>
-                    <Card className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => {
-                      toast({ title: 'Generating K-1...', description: 'Preparing your Tax Year 2024 Schedule K-1.' });
-                      setTimeout(() => toast({ title: 'Schedule K-1 Ready', description: 'Your K-1 has been generated and downloaded.' }), 1500);
-                    }}>
-                      <CardContent className="pt-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-green-500" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Schedule K-1</div>
-                          <div className="text-sm text-muted-foreground">Tax Year 2024</div>
-                        </div>
-                        <Download className="h-4 w-4 ml-auto text-muted-foreground" />
-                      </CardContent>
-                    </Card>
-                    <Card className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => {
-                      toast({ title: 'Generating Quarterly Report...', description: 'Preparing your Q4 2024 quarterly report.' });
-                      setTimeout(() => toast({ title: 'Quarterly Report Ready', description: 'Your report has been generated and downloaded.' }), 1500);
-                    }}>
-                      <CardContent className="pt-4 flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                          <BarChart3 className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Quarterly Report</div>
-                          <div className="text-sm text-muted-foreground">Q4 2024</div>
-                        </div>
-                        <Download className="h-4 w-4 ml-auto text-muted-foreground" />
-                      </CardContent>
-                    </Card>
-                  </div>
-                  <div className="mt-4">
-                    <Button className="w-full" variant="outline" onClick={() => {
-                      toast({ title: 'Generating All Statements...', description: 'Preparing all fund statements for download.' });
-                      setTimeout(() => toast({ title: 'All Statements Ready', description: 'All statements have been generated and downloaded.' }), 2000);
-                    }}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Generate All Statements
-                    </Button>
-                  </div>
-                  <div className="mt-4 text-center text-sm text-muted-foreground">
-                    Click any statement to generate and download as PDF
-                  </div>
-                </CardContent>
-              </Card>
+              <Suspense fallback={<Skeleton className="h-96" />}>
+                <InvestorStatements />
+              </Suspense>
             </TabsContent>
           </Tabs>
         </>
