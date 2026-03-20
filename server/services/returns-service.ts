@@ -428,3 +428,73 @@ export async function computePortfolioReturns(
 
   return { aggregate, byProperty };
 }
+
+/**
+ * Compute fund-level returns by filtering returnsLedger entries
+ * that are tagged with the given fundId.
+ */
+export async function computeFundReturns(
+  orgId: string,
+  fundId: string,
+  view: ReturnView = 'levered',
+  startDate?: string,
+  endDate?: string
+): Promise<{
+  aggregate: ReturnsResponse;
+  byDeal: { modelId: string; propertyId?: string; metrics: ReturnMetrics }[];
+}> {
+  const conditions: any[] = [
+    eq(returnsLedger.orgId, orgId),
+    eq(returnsLedger.fundId, fundId),
+  ];
+  if (startDate) conditions.push(gte(returnsLedger.asOfDate, startDate));
+  if (endDate) conditions.push(lte(returnsLedger.asOfDate, endDate));
+
+  const entries = await db
+    .select()
+    .from(returnsLedger)
+    .where(and(...conditions))
+    .orderBy(returnsLedger.asOfDate);
+
+  // Group by model/deal
+  const modelIds = [...new Set(entries.map(e => e.modelId).filter(Boolean))] as string[];
+
+  const byDeal: { modelId: string; propertyId?: string; metrics: ReturnMetrics }[] = [];
+
+  for (const modelId of modelIds) {
+    const result = await computeModelReturns(
+      { orgId, modelId, startDate, endDate },
+      view
+    );
+    const propertyId = entries.find(e => e.modelId === modelId && e.propertyId)?.propertyId || undefined;
+    byDeal.push({
+      modelId,
+      propertyId,
+      metrics: result.metrics,
+    });
+  }
+
+  // Aggregate across fund
+  const aggregate = await computeModelReturns(
+    { orgId, startDate, endDate },
+    view
+  );
+
+  // If we have fund-specific entries, recompute with just those
+  if (entries.length > 0) {
+    const cashflows: { date: string; amount: number }[] = entries.map(e => ({
+      date: e.asOfDate as string,
+      amount: parseFloat(e.amount),
+    }));
+
+    const irr = computeXIRR(cashflows);
+    const totalCashIn = cashflows.filter(cf => cf.amount < 0).reduce((s, cf) => s + Math.abs(cf.amount), 0);
+    const totalCashOut = cashflows.filter(cf => cf.amount > 0).reduce((s, cf) => s + cf.amount, 0);
+    const moic = totalCashIn > 0 ? totalCashOut / totalCashIn : null;
+
+    aggregate.metrics.irr = irr !== null ? irr * 100 : null;
+    aggregate.metrics.moic = moic;
+  }
+
+  return { aggregate, byDeal };
+}

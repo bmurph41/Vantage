@@ -1,8 +1,9 @@
 import { db } from '../db';
-import { 
+import {
   modelingProjects,
   modelingActuals,
-  modelingScenarioVersions
+  modelingScenarioVersions,
+  capitalStacks
 } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte, inArray } from 'drizzle-orm';
 
@@ -245,7 +246,33 @@ export class PortfolioRollupService {
 
       const occupancy = parseFloat(project.currentOccupancy?.toString() || '0');
       const capRate = parseFloat(project.capRate?.toString() || '0');
-      const noi = capRate > 0 ? value * (capRate / 100) : 0;
+
+      // Try to compute NOI from actual operations data (trailing 12 months)
+      let noi = 0;
+      const now = new Date();
+      const t12Start = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+      const actualsData = await db.select({
+        totalAmount: sql<string>`sum(${modelingActuals.amount})`,
+        category: modelingActuals.category,
+      })
+        .from(modelingActuals)
+        .where(and(
+          eq(modelingActuals.modelingProjectId, project.id),
+          gte(modelingActuals.year, t12Start.getFullYear())
+        ))
+        .groupBy(modelingActuals.category);
+
+      const revenueActuals = actualsData.find(a => a.category === 'Revenue');
+      const expenseActuals = actualsData.find(a => a.category === 'Expense');
+
+      if (revenueActuals) {
+        const totalRevenue = parseFloat(revenueActuals.totalAmount || '0');
+        const totalExpenses = parseFloat(expenseActuals?.totalAmount || '0');
+        noi = totalRevenue - Math.abs(totalExpenses);
+      } else {
+        // Fallback to cap rate estimate if no actuals
+        noi = capRate > 0 ? value * (capRate / 100) : 0;
+      }
 
       rollups.push({
         id: project.id,
@@ -512,16 +539,36 @@ export class PortfolioRollupService {
       }
     }
 
+    // Try to get actual hold period from capital stack data
+    let actualHoldPeriod = 5; // default
+    try {
+      const capitalStacks = await db.select({
+        holdPeriodYears: capitalStacks.holdPeriodYears,
+      })
+        .from(capitalStacks)
+        .where(inArray(capitalStacks.modelingProjectId, projectIds));
+
+      const holdPeriods = capitalStacks
+        .map(cs => parseFloat(cs.holdPeriodYears?.toString() || '0'))
+        .filter(hp => hp > 0);
+
+      if (holdPeriods.length > 0) {
+        actualHoldPeriod = holdPeriods.reduce((a, b) => a + b, 0) / holdPeriods.length;
+      }
+    } catch {
+      // Fallback to default hold period
+    }
+
     const calculateIRR = (exitCaps: number[], growthRates: number[]): number => {
       if (exitCaps.length === 0 || growthRates.length === 0) return 0;
-      
+
       const avgExitCap = exitCaps.reduce((a, b) => a + b, 0) / exitCaps.length;
       const avgGrowth = growthRates.reduce((a, b) => a + b, 0) / growthRates.length;
-      
-      const holdPeriod = 5;
+
+      const holdPeriod = actualHoldPeriod;
       const capRateSpread = 1.5;
       const estimatedIRR = avgGrowth + (capRateSpread / holdPeriod) + (1 / avgExitCap) - 1;
-      
+
       return Math.max(0, Math.min(estimatedIRR * 100, 50));
     };
 

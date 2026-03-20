@@ -8,6 +8,7 @@ import {
   fundCapitalStackTemplates,
   fundWaterfallCalculations,
   modelingProjects,
+  returnsLedger,
   insertFundSchema,
   insertFundInvestorSchema,
   insertFundDealAllocationSchema,
@@ -1192,6 +1193,64 @@ export class FundService {
         updatedAt: new Date(),
       })
       .where(eq(fundInvestors.id, investorId));
+  }
+
+  /**
+   * Sync deal-level IRR/MOIC from returnsLedger into fundDealAllocations.
+   * For each allocation in the fund, compute deal returns and update dealIrr/dealMoic.
+   */
+  async syncDealReturns(orgId: string, fundId: string): Promise<{ updatedDeals: number }> {
+    const allocations = await this.getAllocationsByFund(orgId, fundId);
+    let updatedDeals = 0;
+
+    for (const alloc of allocations) {
+      if (!alloc.modelingProjectId) continue;
+
+      // Get the project's propertyId
+      const [project] = await db.select({ propertyId: modelingProjects.propertyId })
+        .from(modelingProjects)
+        .where(eq(modelingProjects.id, alloc.modelingProjectId))
+        .limit(1);
+
+      if (!project?.propertyId) continue;
+
+      // Get returnsLedger entries for this property
+      const entries = await db.select()
+        .from(returnsLedger)
+        .where(and(
+          eq(returnsLedger.orgId, orgId),
+          eq(returnsLedger.propertyId, project.propertyId)
+        ))
+        .orderBy(returnsLedger.asOfDate);
+
+      if (entries.length < 2) continue;
+
+      // Compute XIRR
+      const cashflows: { date: Date; amount: number }[] = entries.map(e => ({
+        date: new Date(e.asOfDate as string),
+        amount: parseFloat(e.amount),
+      }));
+
+      const irr = this.computeXIRR(cashflows);
+
+      // Compute MOIC
+      const totalIn = cashflows.filter(cf => cf.amount < 0).reduce((s, cf) => s + Math.abs(cf.amount), 0);
+      const totalOut = cashflows.filter(cf => cf.amount > 0).reduce((s, cf) => s + cf.amount, 0);
+      const moic = totalIn > 0 ? totalOut / totalIn : null;
+
+      // Update the allocation
+      await db.update(fundDealAllocations)
+        .set({
+          dealIrr: irr !== null ? String(Math.round(irr * 10000) / 100) : null,
+          dealMoic: moic !== null ? String(Math.round(moic * 100) / 100) : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(fundDealAllocations.id, alloc.id));
+
+      updatedDeals++;
+    }
+
+    return { updatedDeals };
   }
 
   async recalculateFundMetrics(orgId: string, fundId: string): Promise<void> {

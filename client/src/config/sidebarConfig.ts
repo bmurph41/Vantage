@@ -68,6 +68,7 @@ export interface SidebarItem {
   requiredModules?: FeatureModule[];  // Modules needed to see this item
   featureFlag?: boolean;              // Additional feature flag (for dev/beta)
   disabled?: boolean;
+  opsModuleKey?: string;              // Maps to asset-class-ops-modules key for dynamic filtering
 }
 
 export interface SidebarGroup {
@@ -411,6 +412,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Ship,
         matchRoutes: ['/operations/dockit', '/dockit'],
         requiredModules: [FEATURE_MODULES.OPS_DOCKAGE],
+        opsModuleKey: 'dockage',
       },
       {
         id: 'commercial-tenants',
@@ -419,6 +421,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Building2,
         matchRoutes: ['/operations/commercial-tenants', '/commercial-tenants'],
         requiredModules: [FEATURE_MODULES.OPS_TENANTS],
+        opsModuleKey: 'commercial_tenants',
       },
       {
         id: 'fuel-sales',
@@ -427,6 +430,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Fuel,
         matchRoutes: ['/operations/fuel-sales', '/fuel-sales'],
         requiredModules: [FEATURE_MODULES.OPS_FUEL],
+        opsModuleKey: 'fuel',
       },
       {
         id: 'ship-store',
@@ -435,6 +439,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: ShoppingBag,
         matchRoutes: ['/operations/ship-store', '/ship-store'],
         requiredModules: [FEATURE_MODULES.OPS_SHIP_STORE],
+        opsModuleKey: 'ship_store',
       },
       {
         id: 'marina-integrations',
@@ -451,6 +456,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: WrenchIcon,
         matchRoutes: ['/operations/service-dept', '/service-dept'],
         requiredModules: [FEATURE_MODULES.OPS_SERVICE],
+        opsModuleKey: 'service',
       },
       {
         id: 'payroll',
@@ -458,7 +464,7 @@ export const sidebarConfig: SidebarGroup[] = [
         href: '/operations/payroll',
         icon: DollarSign,
         matchRoutes: ['/operations/payroll', '/payroll'],
-        
+        opsModuleKey: 'payroll',
       },
       {
         id: 'boat-rentals',
@@ -467,6 +473,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Key,
         matchRoutes: ['/operations/boat-rentals', '/boat-rentals'],
         requiredModules: [FEATURE_MODULES.OPS_RENTALS],
+        opsModuleKey: 'boat_rentals',
       },
       {
         id: 'boat-club',
@@ -475,6 +482,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: UsersIcon,
         matchRoutes: ['/operations/boat-club', '/boat-club'],
         requiredModules: [FEATURE_MODULES.OPS_CLUB],
+        opsModuleKey: 'boat_club',
       },
       {
         id: 'boat-sales',
@@ -483,6 +491,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Sailboat,
         matchRoutes: ['/operations/boat-sales', '/boat-sales'],
         requiredModules: [FEATURE_MODULES.OPS_SALES],
+        opsModuleKey: 'boat_sales',
       },
       {
         id: 'bookkeeping',
@@ -491,6 +500,7 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: BookOpen,
         matchRoutes: ['/operations/bookkeeping', '/bookkeeping'],
         requiredModules: [FEATURE_MODULES.OPS_BOOKKEEPING],
+        opsModuleKey: 'bookkeeping',
       },
     ],
   },

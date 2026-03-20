@@ -1,18 +1,18 @@
 /**
  * Integration Data Pipeline Service
- * 
+ *
  * This service manages the flow of data from connected integrations (Operations modules)
- * to the Modeling/Valuator module. It ensures that only data from "owned marinas" 
- * (dealSource === 'owned_marina') is synced for live valuation modeling.
- * 
+ * to the Modeling/Valuator module. Projects linked to owned assets of any type
+ * can receive live operational data for real-time valuation updates.
+ *
  * Architecture:
  * 1. Operations modules (Dockit, Boat Rentals, Fuel, Ship Store, Service, Bookkeeping)
  *    have integrations that sync external data into canonical tables
- * 2. Data mappings define how external entities map to MarinaMatch entities
- * 3. When a modeling project is linked to an owned marina, the Valuator can
+ * 2. Data mappings define how external entities map to platform entities
+ * 3. When a modeling project is linked to an owned asset, the Valuator can
  *    pull live operational data for real-time valuation updates
  * 4. Valuation snapshots can be triggered by operational data changes
- * 
+ *
  * Data Flow:
  *   [External System] → [Integration Sync] → [Canonical Tables] → [Modeling/Valuator]
  *                                              ↓
@@ -26,6 +26,7 @@ import {
   valuationSnapshots,
   userIntegrations,
   integrations,
+  ownedAssets,
 } from "@shared/schema";
 
 export interface IntegrationSyncResult {
@@ -72,6 +73,12 @@ export interface OperationsDataSummary {
     lastSyncAt: Date | null;
     source: string;
   };
+  // Dynamic profit center data for non-marina asset classes
+  profitCenters?: Record<string, {
+    monthlyRevenue: number;
+    lastUpdated: Date | null;
+  }>;
+  assetType?: string;
 }
 
 export interface LiveDataAvailability {
@@ -93,8 +100,8 @@ export class IntegrationDataPipelineService {
   }
 
   /**
-   * Check if a modeling project is eligible for live data sync
-   * Only projects with dealSource = 'owned_marina' can have live data
+   * Check if a modeling project is eligible for live data sync.
+   * Projects linked to any owned asset (not just marinas) are eligible.
    */
   async isProjectEligibleForLiveData(projectId: string): Promise<boolean> {
     const [project] = await db
@@ -108,7 +115,24 @@ export class IntegrationDataPipelineService {
       )
       .limit(1);
 
-    return project?.dealSource === "owned_marina";
+    // Legacy marina check
+    if (project?.dealSource === "owned_marina") {
+      return true;
+    }
+
+    // Check if any owned asset links to this project
+    const [linkedAsset] = await db
+      .select({ id: ownedAssets.id })
+      .from(ownedAssets)
+      .where(
+        and(
+          eq(ownedAssets.projectId, projectId),
+          eq(ownedAssets.orgId, this.orgId)
+        )
+      )
+      .limit(1);
+
+    return !!linkedAsset;
   }
 
   /**
@@ -174,7 +198,7 @@ export class IntegrationDataPipelineService {
     const isEligible = await this.isProjectEligibleForLiveData(projectId);
     
     if (!isEligible) {
-      return null; // Only owned marinas get live data
+      return null; // Only owned assets get live data
     }
 
     const connectedIntegrations = await this.getConnectedIntegrationsForModeling();

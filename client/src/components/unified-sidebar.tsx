@@ -55,19 +55,22 @@ const crmToolsNav = [
 ];
 
 // Operations Navigation - Flattened module links (tabs handle sub-navigation)
+// Each item includes an opsModuleKey for dynamic filtering based on owned asset classes
 const operationsModulesNav = [
-  { name: "Portfolio", href: "/portfolio" },
-  { name: "Bookkeeping", href: "/operations/bookkeeping" },
-  { name: "Payroll", href: "/operations/payroll" },
-  { name: "Dockit", href: "/operations/dockit" },
-  { name: "Rent Roll", href: "/rent-roll/executive" },
-  { name: "Commercial Tenants", href: "/operations/commercial-tenants" },
-  { name: "Fuel Sales", href: "/operations/fuel" },
-  { name: "Ship Store", href: "/operations/ship-store" },
-  { name: "Service & Parts", href: "/operations/service" },
-  { name: "Boat Rentals", href: "/operations/boat-rentals" },
-  { name: "Boat Club", href: "/operations/boat-club" },
-  { name: "Boat Sales", href: "/operations/boat-sales" },
+  { name: "Portfolio", href: "/portfolio", opsModuleKey: null },
+  { name: "Bookkeeping", href: "/operations/bookkeeping", opsModuleKey: "bookkeeping" },
+  { name: "Payroll", href: "/operations/payroll", opsModuleKey: "payroll" },
+  { name: "Dockit", href: "/operations/dockit", opsModuleKey: "dockage" },
+  { name: "Rent Roll", href: "/rent-roll/executive", opsModuleKey: "rent_roll" },
+  { name: "Commercial Tenants", href: "/operations/commercial-tenants", opsModuleKey: "commercial_tenants" },
+  { name: "Fuel Sales", href: "/operations/fuel", opsModuleKey: "fuel" },
+  { name: "Ship Store", href: "/operations/ship-store", opsModuleKey: "ship_store" },
+  { name: "Service & Parts", href: "/operations/service", opsModuleKey: "service" },
+  { name: "Boat Rentals", href: "/operations/boat-rentals", opsModuleKey: "boat_rentals" },
+  { name: "Boat Club", href: "/operations/boat-club", opsModuleKey: "boat_club" },
+  { name: "Boat Sales", href: "/operations/boat-sales", opsModuleKey: "boat_sales" },
+  { name: "Marketing", href: "/marketing", opsModuleKey: "marketing" },
+  { name: "Budgeting", href: "/operations/budgeting", opsModuleKey: "budgeting" },
 ];
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
@@ -178,6 +181,13 @@ export default function UnifiedSidebar() {
     refetchOnWindowFocus: false,
   });
 
+  // Fetch enabled ops modules based on owned asset classes
+  const { data: opsModulesData } = useQuery<{ modules: string[]; assetClasses: string[] }>({
+    queryKey: ['/api/operations-context/modules'],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   // Extract data from bootstrap response
   const userPersona = bootstrapData?.persona;
   const activePacks = bootstrapData?.activePacks || [];
@@ -202,11 +212,18 @@ export default function UnifiedSidebar() {
     return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations') || hasPack('modeling_tools');
   };
 
-  // Filter operations nav to hide Rent Roll if user doesn't have access
+  // Filter operations nav based on enabled modules (from owned asset classes) and access
+  const enabledModules = opsModulesData?.modules || [];
   const filteredOperationsModulesNav = operationsModulesNav.filter(item => {
-    if (item.href === '/rent-roll/executive') {
-      return hasRentRollAccess();
+    // Always show Portfolio
+    if (item.opsModuleKey === null) return true;
+    // Rent Roll requires special pack access
+    if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
+    // If we have module resolution data, filter by enabled modules
+    if (enabledModules.length > 0) {
+      return enabledModules.includes(item.opsModuleKey);
     }
+    // Default: show all modules (fallback when no owned assets exist)
     return true;
   });
 

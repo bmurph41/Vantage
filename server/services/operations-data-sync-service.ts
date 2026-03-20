@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { 
-  modelingActuals, 
+import {
+  modelingActuals,
   operationsDataSyncJobs,
   operationsDataMappings,
   rentRolls,
@@ -8,15 +8,23 @@ import {
   fuelSales,
   shipStoreTransactions,
   shipStoreProducts,
-  modelingProjects
+  modelingProjects,
+  returnsLedger,
+  ownedAssets,
+  crmProperties,
+  fundDealAllocations,
+  opsCommercialLeases,
+  opsBookkeepingGl,
+  opsMarinas
 } from '@shared/schema';
 import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm';
+import { getPnlMappingForAssetClass } from '@shared/asset-class-pnl-categories';
 
 export interface SyncConfig {
   projectId: string;
   orgId: string;
   userId?: string;
-  dataSources: ('rent_roll' | 'fuel_sales' | 'ship_store')[];
+  dataSources: ('rent_roll' | 'fuel_sales' | 'ship_store' | 'commercial_tenants' | 'bookkeeping_gl' | 'payroll')[];
   dateRangeStart?: Date;
   dateRangeEnd?: Date;
   syncType: 'full' | 'incremental' | 'manual';
@@ -473,6 +481,259 @@ export class OperationsDataSyncService {
     .groupBy(modelingActuals.dataSource);
 
     return actuals;
+  }
+
+  /**
+   * Sync commercial tenant data into modelingActuals
+   */
+  async syncCommercialTenantData(
+    projectId: string,
+    orgId: string,
+    marinaId: string,
+    assetClass: string,
+    dateRange?: { start: Date; end: Date }
+  ): Promise<{ records: number; revenue: number }> {
+    const conditions: any[] = [
+      eq(opsCommercialLeases.marinaId, marinaId),
+      eq(opsCommercialLeases.status, 'active'),
+    ];
+
+    const tenantData = await db.select({
+      month: sql<string>`date_trunc('month', ${opsCommercialLeases.startDate})::date`,
+      revenue: sql<string>`sum(${opsCommercialLeases.baseRent} + coalesce(${opsCommercialLeases.cam}, 0))`,
+    })
+      .from(opsCommercialLeases)
+      .where(and(...conditions))
+      .groupBy(sql`date_trunc('month', ${opsCommercialLeases.startDate})::date`);
+
+    const pnlMappings = getPnlMappingForAssetClass(assetClass);
+    const mapping = pnlMappings.find(m => m.profitCenter === 'base_rent' || m.profitCenter === 'commercial_tenants');
+    let totalRevenue = 0;
+
+    for (const row of tenantData) {
+      const d = new Date(row.month);
+      const amount = parseFloat(row.revenue || '0');
+      totalRevenue += amount;
+
+      await db.insert(modelingActuals).values({
+        orgId,
+        modelingProjectId: projectId,
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        category: mapping?.category || 'Revenue',
+        subcategory: mapping?.subcategory || 'Commercial Tenant Revenue',
+        department: mapping?.department || 'Leasing',
+        amount: row.revenue,
+        dataSource: 'ops_sync',
+        syncedAt: new Date(),
+      });
+    }
+
+    return { records: tenantData.length, revenue: totalRevenue };
+  }
+
+  /**
+   * Sync bookkeeping GL data into modelingActuals
+   */
+  async syncBookkeepingGlData(
+    projectId: string,
+    orgId: string,
+    marinaId: string,
+    assetClass: string,
+    dateRange?: { start: Date; end: Date }
+  ): Promise<{ records: number; revenue: number; expenses: number }> {
+    const conditions: any[] = [eq(opsBookkeepingGl.marinaId, marinaId)];
+    if (dateRange) {
+      conditions.push(gte(opsBookkeepingGl.periodStart, dateRange.start.toISOString().slice(0, 10)));
+      conditions.push(lte(opsBookkeepingGl.periodEnd, dateRange.end.toISOString().slice(0, 10)));
+    }
+
+    const glData = await db.select({
+      month: sql<string>`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
+      accountType: opsBookkeepingGl.accountType,
+      accountName: opsBookkeepingGl.accountName,
+      total: sql<string>`sum(${opsBookkeepingGl.amount})`,
+    })
+      .from(opsBookkeepingGl)
+      .where(and(...conditions))
+      .groupBy(
+        sql`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
+        opsBookkeepingGl.accountType,
+        opsBookkeepingGl.accountName
+      );
+
+    let totalRevenue = 0;
+    let totalExpenses = 0;
+
+    for (const row of glData) {
+      const d = new Date(row.month);
+      const amount = parseFloat(row.total || '0');
+      const isExpense = row.accountType === 'expense' || row.accountType === 'EXPENSE';
+
+      if (isExpense) {
+        totalExpenses += Math.abs(amount);
+      } else {
+        totalRevenue += amount;
+      }
+
+      await db.insert(modelingActuals).values({
+        orgId,
+        modelingProjectId: projectId,
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        category: isExpense ? 'Expense' : 'Revenue',
+        subcategory: row.accountName || 'General',
+        department: 'Operations',
+        amount: row.total,
+        dataSource: 'ops_sync',
+        syncedAt: new Date(),
+      });
+    }
+
+    return { records: glData.length, revenue: totalRevenue, expenses: totalExpenses };
+  }
+
+  /**
+   * Sync payroll data into modelingActuals (from bookkeeping GL with payroll account types)
+   */
+  async syncPayrollData(
+    projectId: string,
+    orgId: string,
+    marinaId: string,
+    dateRange?: { start: Date; end: Date }
+  ): Promise<{ records: number; total: number }> {
+    const conditions: any[] = [
+      eq(opsBookkeepingGl.marinaId, marinaId),
+      sql`lower(${opsBookkeepingGl.accountName}) like '%payroll%' or lower(${opsBookkeepingGl.accountName}) like '%salary%' or lower(${opsBookkeepingGl.accountName}) like '%wages%'`,
+    ];
+    if (dateRange) {
+      conditions.push(gte(opsBookkeepingGl.periodStart, dateRange.start.toISOString().slice(0, 10)));
+      conditions.push(lte(opsBookkeepingGl.periodEnd, dateRange.end.toISOString().slice(0, 10)));
+    }
+
+    const payrollData = await db.select({
+      month: sql<string>`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`,
+      total: sql<string>`sum(${opsBookkeepingGl.amount})`,
+    })
+      .from(opsBookkeepingGl)
+      .where(and(...conditions))
+      .groupBy(sql`date_trunc('month', ${opsBookkeepingGl.periodStart})::date`);
+
+    let totalAmount = 0;
+
+    for (const row of payrollData) {
+      const d = new Date(row.month);
+      const amount = parseFloat(row.total || '0');
+      totalAmount += Math.abs(amount);
+
+      await db.insert(modelingActuals).values({
+        orgId,
+        modelingProjectId: projectId,
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        category: 'Expense',
+        subcategory: 'Payroll',
+        department: 'Administration',
+        amount: row.total,
+        dataSource: 'ops_sync',
+        syncedAt: new Date(),
+      });
+    }
+
+    return { records: payrollData.length, total: totalAmount };
+  }
+
+  /**
+   * Sync operations cashflow to returnsLedger.
+   * Computes monthly NOI from ops data and inserts/updates returnsLedger
+   * with bucket OPERATING_CASHFLOW.
+   */
+  async syncToReturnsLedger(
+    ownedAssetId: string,
+    orgId: string,
+    userId: string,
+    dateRange: { start: string; end: string }
+  ): Promise<{ entriesWritten: number }> {
+    // Look up the owned asset
+    const [asset] = await db.select({
+      id: ownedAssets.id,
+      propertyId: ownedAssets.propertyId,
+      projectId: ownedAssets.projectId,
+      propertyType: crmProperties.type,
+    })
+      .from(ownedAssets)
+      .innerJoin(crmProperties, eq(ownedAssets.propertyId, crmProperties.id))
+      .where(and(eq(ownedAssets.id, ownedAssetId), eq(ownedAssets.orgId, orgId)));
+
+    if (!asset || !asset.projectId) {
+      return { entriesWritten: 0 };
+    }
+
+    // Get monthly NOI from modelingActuals
+    const monthlyData = await db.select({
+      year: modelingActuals.year,
+      month: modelingActuals.month,
+      category: modelingActuals.category,
+      total: sql<string>`sum(${modelingActuals.amount}::numeric)`,
+    })
+      .from(modelingActuals)
+      .where(and(
+        eq(modelingActuals.modelingProjectId, asset.projectId),
+        gte(modelingActuals.year, parseInt(dateRange.start.slice(0, 4))),
+        lte(modelingActuals.year, parseInt(dateRange.end.slice(0, 4)))
+      ))
+      .groupBy(modelingActuals.year, modelingActuals.month, modelingActuals.category);
+
+    // Group by year-month to compute NOI
+    const monthMap = new Map<string, { revenue: number; expense: number }>();
+    for (const row of monthlyData) {
+      const key = `${row.year}-${String(row.month).padStart(2, '0')}`;
+      if (!monthMap.has(key)) {
+        monthMap.set(key, { revenue: 0, expense: 0 });
+      }
+      const entry = monthMap.get(key)!;
+      const amount = parseFloat(row.total || '0');
+      if (row.category === 'Revenue') {
+        entry.revenue += amount;
+      } else {
+        entry.expense += Math.abs(amount);
+      }
+    }
+
+    // Look up if this asset is part of a fund
+    let fundId: string | null = null;
+    if (asset.projectId) {
+      const [alloc] = await db.select({ fundId: fundDealAllocations.fundId })
+        .from(fundDealAllocations)
+        .where(eq(fundDealAllocations.modelingProjectId, asset.projectId))
+        .limit(1);
+      if (alloc) {
+        fundId = alloc.fundId;
+      }
+    }
+
+    let entriesWritten = 0;
+    for (const [monthKey, data] of monthMap) {
+      const noi = data.revenue - data.expense;
+      const asOfDate = `${monthKey}-01`;
+
+      await db.insert(returnsLedger).values({
+        orgId,
+        userId,
+        propertyId: asset.propertyId,
+        modelId: asset.projectId,
+        fundId,
+        asOfDate,
+        frequency: 'MONTHLY',
+        bucket: 'OPERATING_CASHFLOW',
+        amount: String(noi),
+        source: 'OPS_SYNC',
+        memo: `Auto-synced from operations data for ${asset.propertyType || 'unknown'} asset`,
+      });
+      entriesWritten++;
+    }
+
+    return { entriesWritten };
   }
 }
 

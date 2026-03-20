@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Calendar, Download, Plus, ArrowRightToLine, Filter } from "lucide-react";
+import { Building2, Calendar, Download, Plus, ArrowRightToLine, Filter, Home, Hotel, Warehouse, Store, Trees } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -12,12 +12,56 @@ import {
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { addDays, subDays, startOfYear, endOfYear, subMonths } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
+interface OwnedAsset {
+  id: string;
+  name: string;
+  assetType: string;
+  propertyId: string;
+  projectId: string | null;
+  status: string;
+}
+
+// Legacy Marina interface for backward compatibility
 interface Marina {
   id: string;
   name: string;
   ownershipStatus: "OWNED" | "DEAL";
 }
+
+const ASSET_TYPE_ICONS: Record<string, typeof Building2> = {
+  marina: Building2,
+  multifamily: Home,
+  hotel: Hotel,
+  industrial: Warehouse,
+  retail: Store,
+  office: Building2,
+  self_storage: Warehouse,
+  land: Trees,
+};
+
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  marina: 'Marina',
+  multifamily: 'Multifamily',
+  retail: 'Retail',
+  office: 'Office',
+  industrial: 'Industrial',
+  hotel: 'Hotel',
+  str: 'STR',
+  self_storage: 'Self Storage',
+  mixed_use: 'Mixed Use',
+  medical_office: 'Medical Office',
+  sfr: 'SFR',
+  duplex: 'Duplex',
+  triplex: 'Triplex',
+  quad: 'Quad',
+  rv_park: 'RV Park',
+  mobile_home: 'Mobile Home',
+  land: 'Land',
+  business: 'Business',
+  laundromat: 'Laundromat',
+};
 
 interface GlobalControlsBarProps {
   selectedMarinaId: string | null;
@@ -57,10 +101,37 @@ export function GlobalControlsBar({
   showValuatorButton = true,
 }: GlobalControlsBarProps) {
   const [showCustomRange, setShowCustomRange] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
+  // Fetch universal owned assets (all asset types)
+  const { data: ownedAssets = [] } = useQuery<OwnedAsset[]>({
+    queryKey: ["/api/operations-context/assets/owned"],
+  });
+
+  // Backward compatible: also fetch marinas for legacy consumers
   const { data: marinas = [] } = useQuery<Marina[]>({
     queryKey: ["/api/operations-context/marinas/owned"],
   });
+
+  // Combine: prefer owned assets, fall back to marinas
+  const allAssets: OwnedAsset[] = ownedAssets.length > 0
+    ? ownedAssets
+    : marinas.map(m => ({
+        id: m.id,
+        name: m.name,
+        assetType: 'marina',
+        propertyId: '',
+        projectId: null,
+        status: 'under_management',
+      }));
+
+  // Apply type filter
+  const filteredAssets = typeFilter
+    ? allAssets.filter(a => a.assetType === typeFilter)
+    : allAssets;
+
+  // Get unique asset types for filter chips
+  const assetTypes = [...new Set(allAssets.map(a => a.assetType))];
 
   const handleTimeframeChange = (value: string) => {
     onTimeframeChange(value);
@@ -104,18 +175,46 @@ export function GlobalControlsBar({
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-muted-foreground" />
         <Select value={selectedMarinaId || ""} onValueChange={onMarinaChange}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select Marina" />
+          <SelectTrigger className="w-[240px]">
+            <SelectValue placeholder="Select Asset" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Owned Marinas</SelectItem>
-            {marinas.map((marina) => (
-              <SelectItem key={marina.id} value={marina.id}>
-                {marina.name}
+            <SelectItem value="all">All Assets (Portfolio)</SelectItem>
+            {filteredAssets.map((asset) => (
+              <SelectItem key={asset.id} value={asset.id}>
+                <span className="flex items-center gap-2">
+                  {asset.name}
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                    {ASSET_TYPE_LABELS[asset.assetType] || asset.assetType}
+                  </Badge>
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {assetTypes.length > 1 && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant={typeFilter === null ? "secondary" : "ghost"}
+              size="sm"
+              className="h-6 text-xs px-2"
+              onClick={() => setTypeFilter(null)}
+            >
+              All
+            </Button>
+            {assetTypes.map(type => (
+              <Button
+                key={type}
+                variant={typeFilter === type ? "secondary" : "ghost"}
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => setTypeFilter(typeFilter === type ? null : type)}
+              >
+                {ASSET_TYPE_LABELS[type] || type}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

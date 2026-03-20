@@ -2789,6 +2789,40 @@ export const marinaBudgetActualsRelations = relations(marinaBudgetActuals, ({ on
 }));
 
 // ================================================================================
+// UNIVERSAL ASSET BUDGETS (Phase 5.1)
+// ================================================================================
+
+export const assetBudgets = pgTable("asset_budgets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  ownedAssetId: varchar("owned_asset_id").notNull().references(() => ownedAssets.id, { onDelete: 'cascade' }),
+  fiscalYear: integer("fiscal_year").notNull(),
+  name: text("name"),
+  description: text("description"),
+  status: text("status").notNull().default('draft'),
+  // jsonb categories column that adapts per asset class
+  categories: jsonb("categories").default('{}'),
+  totalBudgetAmount: decimal("total_budget_amount", { precision: 15, scale: 2 }),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("asset_budgets_org_idx").on(table.orgId),
+  assetIdx: index("asset_budgets_asset_idx").on(table.ownedAssetId),
+  yearIdx: index("asset_budgets_year_idx").on(table.fiscalYear),
+}));
+
+export const insertAssetBudgetSchema = createInsertSchema(assetBudgets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type AssetBudget = typeof assetBudgets.$inferSelect;
+export type InsertAssetBudget = typeof assetBudgets.$inferInsert;
+
+// ================================================================================
 // RENT ROLL SNAPSHOTS & BUDGET INTEGRATION
 // ================================================================================
 
@@ -16885,7 +16919,8 @@ export const actualsDataSourceEnum = pgEnum("actuals_data_source", [
   "quickbooks",     // From QuickBooks Online sync
   "manual_entry",   // Manually entered by user
   "csv_import",     // Imported from CSV file
-  "doc_intel"       // Parsed from Document Intelligence
+  "doc_intel",      // Parsed from Document Intelligence
+  "ops_sync"        // From operations data sync (any asset class)
 ]);
 
 // Sync status for data pipeline jobs
@@ -17008,6 +17043,9 @@ export const modelingFinancialPeriods = pgTable('modeling_financial_periods', {
   createdBy: varchar('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Universal revenue/expense breakdowns keyed by profit center (Phase 2.3)
+  revenueBreakdown: jsonb('revenue_breakdown'),
+  expenseBreakdown: jsonb('expense_breakdown'),
 }, (table) => ({
   orgIdx: index('modeling_fin_periods_org_idx').on(table.orgId),
   projectIdx: index('modeling_fin_periods_project_idx').on(table.modelingProjectId),
@@ -22978,7 +23016,7 @@ export const ownershipStatusEnum = pgEnum("ownership_status", ["OWNED", "DEAL"])
 
 // Import Scope Enum - For import operations
 export const importScopeEnum = pgEnum("import_scope", [
-  "ALL", "FUEL", "SHIP_STORE", "SERVICE", "TENANTS", "RENTALS", "CLUB", "BOAT_SALES", "BOOKKEEPING"
+  "ALL", "FUEL", "SHIP_STORE", "SERVICE", "TENANTS", "RENTALS", "CLUB", "BOAT_SALES", "BOOKKEEPING", "COMMERCIAL", "PAYROLL"
 ]);
 
 // Data Source Enum - Track where data came from
@@ -24838,6 +24876,7 @@ export const returnsLedgerSourceEnum = pgEnum('returns_ledger_source', [
   'QBO',
   'UPLOAD',
   'MANUAL',
+  'OPS_SYNC',
 ]);
 
 export const returnsValuationSourceEnum = pgEnum('returns_valuation_source', [
@@ -24863,6 +24902,7 @@ export const returnsLedger = pgTable('returns_ledger', {
   amount: decimal('amount', { precision: 14, scale: 2 }).notNull(),
   source: returnsLedgerSourceEnum('source').notNull().default('MANUAL'),
   memo: text('memo'),
+  fundId: varchar('fund_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => ({
@@ -24871,6 +24911,7 @@ export const returnsLedger = pgTable('returns_ledger', {
   modelIdx: index('returns_ledger_model_idx').on(table.modelId),
   propertyIdx: index('returns_ledger_property_idx').on(table.propertyId),
   dateIdx: index('returns_ledger_date_idx').on(table.asOfDate),
+  fundIdx: index('returns_ledger_fund_idx').on(table.fundId),
 }));
 
 export const insertReturnsLedgerSchema = createInsertSchema(returnsLedger).omit({

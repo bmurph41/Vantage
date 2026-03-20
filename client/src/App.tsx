@@ -11,6 +11,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PackGate, type PackType } from "@/contexts/PackContext";
 import { AIAssistant } from "@/components/ai-assistant";
+import { OpsModuleGuard } from "@/components/operations/OpsModuleGuard";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ThemeProvider } from '@/contexts/ThemeProvider';
 import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityContext";
@@ -1068,11 +1069,13 @@ function Router() {
         {() => <Redirect to="/portfolio" />}
       </Route>
 
-      {/* Operations Routes - Tabbed Module Pages */}
+      {/* Operations Routes - Tabbed Module Pages (guarded by asset class) */}
       <Route path="/operations/dockit">
         {() => (
           <GatedLayout pack="operations">
-            <DockitTabbed />
+            <OpsModuleGuard moduleKey="dockage">
+              <DockitTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
@@ -1083,14 +1086,18 @@ function Router() {
       <Route path="/operations/commercial-tenants">
         {() => (
           <GatedLayout pack="operations">
-            <CommercialTenants />
+            <OpsModuleGuard moduleKey="commercial_tenants">
+              <CommercialTenants />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/fuel">
         {() => (
           <GatedLayout pack="operations">
-            <FuelSalesTabbed />
+            <OpsModuleGuard moduleKey="fuel">
+              <FuelSalesTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
@@ -1102,49 +1109,63 @@ function Router() {
       <Route path="/operations/ship-store">
         {() => (
           <GatedLayout pack="operations">
-            <ShipStoreTabbed />
+            <OpsModuleGuard moduleKey="ship_store">
+              <ShipStoreTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/service">
         {() => (
           <GatedLayout pack="operations">
-            <ServiceTabbed />
+            <OpsModuleGuard moduleKey="service">
+              <ServiceTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/payroll">
         {() => (
           <GatedLayout pack="operations">
-            <PayrollTabbed />
+            <OpsModuleGuard moduleKey="payroll">
+              <PayrollTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-rentals">
         {() => (
           <GatedLayout pack="operations">
-            <BoatRentalsTabbed />
+            <OpsModuleGuard moduleKey="boat_rentals">
+              <BoatRentalsTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-club">
         {() => (
           <GatedLayout pack="operations">
-            <BoatClubTabbed />
+            <OpsModuleGuard moduleKey="boat_club">
+              <BoatClubTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/boat-sales">
         {() => (
           <GatedLayout pack="operations">
-            <BoatSalesTabbed />
+            <OpsModuleGuard moduleKey="boat_sales">
+              <BoatSalesTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>
       <Route path="/operations/bookkeeping">
         {() => (
           <GatedLayout pack="operations">
-            <BookkeepingTabbed />
+            <OpsModuleGuard moduleKey="bookkeeping">
+              <BookkeepingTabbed />
+            </OpsModuleGuard>
           </GatedLayout>
         )}
       </Route>

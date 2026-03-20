@@ -12,7 +12,7 @@ import {
   modelingProjects,
 } from "@shared/schema";
 import { AuthenticatedRequest } from "../middleware/auth-resolver";
-import { computeModelReturns, computePortfolioReturns, ReturnView } from "../services/returns-service";
+import { computeModelReturns, computePortfolioReturns, computeFundReturns, ReturnView } from "../services/returns-service";
 
 const router = Router();
 
@@ -74,8 +74,8 @@ router.get("/portfolio", async (req: Request, res: Response, next: NextFunction)
     const propertyIdsParam = req.query.propertyIds as string | undefined;
     let propertyIds = propertyIdsParam ? propertyIdsParam.split(',') : undefined;
 
-    // If no explicit propertyIds provided, scope to owned properties only
-    // by filtering to modeling projects with dealOutcome='won' or dealSource='owned_marina'
+    // If no explicit propertyIds provided, scope to owned properties
+    // by filtering to modeling projects with dealOutcome='won' or any owned asset link
     if (!propertyIds) {
       const ownedProjects = await db.select({ propertyId: modelingProjects.propertyId })
         .from(modelingProjects)
@@ -95,6 +95,21 @@ router.get("/portfolio", async (req: Request, res: Response, next: NextFunction)
     }
 
     const result = await computePortfolioReturns(orgId, view, start, end, propertyIds);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/fund/:fundId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { fundId } = req.params;
+    const view = (req.query.view as ReturnView) || 'levered';
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
+
+    const result = await computeFundReturns(orgId, fundId, view, start, end);
     res.json(result);
   } catch (err) {
     next(err);
