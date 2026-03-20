@@ -48,7 +48,7 @@ integrations = ["javascript_database:1.0.0", "javascript_mem_db:1.0.0", "javascr
 [userenv]
 
 [userenv.shared]
-VITE_GOOGLE_MAPS_API_KEY = "AIzaSyAXTQZQtPhsjad_BOWC0E-h6HXgpPSZUYE"
+VITE_GOOGLE_MAPS_API_KEY = "AIzaSyArPCkcnXDypKbbxwbtNIjfnv6e_LHzG7k"
 FEATURE_COA_MAPPING = "true"
 
 [userenv.development]

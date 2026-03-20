@@ -767,23 +767,3 @@ const activityIconMap: Record<string, typeof Activity> = {
   call: Phone, email: Mail, meeting: Users, task: FileText,
   note: MessageSquare, follow_up: Clock, site_visit: MapPin,
 };
-{/* Financial Models */}
-<div className="rounded-lg border bg-card p-4">
-  <PropertyFMPanel
-    propertyId={property.id}
-    dealId={property.deals?.[0]?.id}
-  />
-</div>
-
-{/* Market Comps */}
-<div className="rounded-lg border bg-card p-4">
-  <PropertyCompsPanel
-    propertyId={property.id}
-    assetClass={property.type}
-    latitude={property.latitude ? Number(property.latitude) : null}
-    longitude={property.longitude ? Number(property.longitude) : null}
-    city={property.city}
-    state={property.state}
-    unitLabel={property.type === 'marina' ? '$/slip' : '$/SF'}
-  />
-</div>

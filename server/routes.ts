@@ -17781,10 +17781,9 @@ Current context: Project ${req.params.projectId}`;
       const orgId = req.user.orgId;
       const projects = await db.select({
         id: modelingProjects.id,
-        name: modelingProjects.name,
+        marinaName: modelingProjects.marinaName,
         assetClass: modelingProjects.assetClass,
         purchasePrice: modelingProjects.purchasePrice,
-        askingPrice: modelingProjects.askingPrice,
         year1CapRate: modelingProjects.year1CapRate,
         dealOutcome: modelingProjects.dealOutcome,
       }).from(modelingProjects).where(eq(modelingProjects.orgId, orgId));
@@ -17793,10 +17792,10 @@ Current context: Project ${req.params.projectId}`;
         const ac = (p as any).assetClass || 'other';
         if (!byClass[ac]) byClass[ac] = { count: 0, totalValue: 0, assets: [] };
         byClass[ac].count++;
-        byClass[ac].totalValue += Number(p.purchasePrice || p.askingPrice || 0);
-        byClass[ac].assets.push({ id: p.id, name: p.name, value: Number(p.purchasePrice || p.askingPrice || 0), capRate: p.year1CapRate, status: p.dealOutcome });
+        byClass[ac].totalValue += Number(p.purchasePrice || 0);
+        byClass[ac].assets.push({ id: p.id, name: p.marinaName, value: Number(p.purchasePrice || 0), capRate: p.year1CapRate, status: p.dealOutcome });
       }
-      res.json({ totalProjects: projects.length, totalValue: projects.reduce((s, p) => s + Number(p.purchasePrice || p.askingPrice || 0), 0), byAssetClass: byClass });
+      res.json({ totalProjects: projects.length, totalValue: projects.reduce((s, p) => s + Number(p.purchasePrice || 0), 0), byAssetClass: byClass });
     } catch (error: any) {
       console.error('Failed to fetch portfolio breakdown:', error);
       res.status(500).json({ error: 'Failed to fetch portfolio breakdown' });

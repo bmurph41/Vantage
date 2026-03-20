@@ -20,6 +20,7 @@ import {
 import { runExitScenarioV2, ENGINE_VERSION } from '@shared/exit/orchestrator-v2';
 import { ExitScenarioInputSchema } from '@shared/exit/types/08-zod-schemas';
 import type { ExitScenarioKPIs } from '@shared/exit/types/07-master-types';
+import { exitIntegrationService } from '../services/exit-integration-service';
 
 const router = Router();
 
@@ -391,6 +392,146 @@ router.get('/api/exit-studio/assumption-sets', async (req: any, res) => {
   } catch (error: any) {
     console.error('Exit studio assumption sets error:', error);
     res.status(500).json({ error: 'Failed to fetch assumption sets' });
+  }
+});
+
+// ============================================================
+// POST /api/exit-studio/sync/exit-to-financial-model
+// Push exit results → financial model (DCF, scenario versions, capital stack)
+// ============================================================
+router.post('/api/exit-studio/sync/exit-to-financial-model', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const { projectId, scenarioId } = req.body;
+
+    if (!projectId || !scenarioId) {
+      return res.status(400).json({ error: 'projectId and scenarioId are required' });
+    }
+
+    const result = await exitIntegrationService.syncExitToFinancialModel(projectId, scenarioId, orgId);
+    if (!result) {
+      return res.status(404).json({ error: 'Exit scenario not found for this project' });
+    }
+
+    res.json({ synced: true, ...result });
+  } catch (error: any) {
+    console.error('Exit→FM sync error:', error);
+    res.status(500).json({ error: 'Sync failed', message: error.message });
+  }
+});
+
+// ============================================================
+// POST /api/exit-studio/sync/financial-model-to-exit
+// Pull financial model assumptions → exit scenario
+// ============================================================
+router.post('/api/exit-studio/sync/financial-model-to-exit', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const { projectId, scenarioId } = req.body;
+
+    if (!projectId || !scenarioId) {
+      return res.status(400).json({ error: 'projectId and scenarioId are required' });
+    }
+
+    const result = await exitIntegrationService.syncFinancialModelToExit(projectId, scenarioId, orgId);
+    if (!result) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    res.json({ synced: true, ...result });
+  } catch (error: any) {
+    console.error('FM→Exit sync error:', error);
+    res.status(500).json({ error: 'Sync failed', message: error.message });
+  }
+});
+
+// ============================================================
+// POST /api/exit-studio/sync/deal-pricing
+// Sync deal pricing ↔ exit scenarios
+// ============================================================
+router.post('/api/exit-studio/sync/deal-pricing', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const { projectId, direction } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId is required' });
+    }
+
+    if (direction === 'exit-to-pricing') {
+      const { scenarioId } = req.body;
+      if (!scenarioId) {
+        return res.status(400).json({ error: 'scenarioId required for exit-to-pricing' });
+      }
+      const success = await exitIntegrationService.syncExitToDealPricing(projectId, scenarioId, orgId);
+      return res.json({ synced: success });
+    }
+
+    // Default: pricing-to-exit
+    const result = await exitIntegrationService.syncDealPricingToExit(projectId, orgId);
+    if (!result) {
+      return res.status(404).json({ error: 'No pricing data found' });
+    }
+
+    res.json({ synced: true, ...result });
+  } catch (error: any) {
+    console.error('Deal pricing sync error:', error);
+    res.status(500).json({ error: 'Sync failed', message: error.message });
+  }
+});
+
+// ============================================================
+// POST /api/exit-studio/sync/hold-period
+// Sync hold period across all systems
+// ============================================================
+router.post('/api/exit-studio/sync/hold-period', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const { projectId, holdPeriodYears } = req.body;
+
+    if (!projectId || !holdPeriodYears || holdPeriodYears < 1 || holdPeriodYears > 30) {
+      return res.status(400).json({ error: 'projectId and holdPeriodYears (1-30) are required' });
+    }
+
+    const result = await exitIntegrationService.syncHoldPeriod(projectId, holdPeriodYears, orgId);
+    res.json({ synced: true, ...result });
+  } catch (error: any) {
+    console.error('Hold period sync error:', error);
+    res.status(500).json({ error: 'Sync failed', message: error.message });
+  }
+});
+
+// ============================================================
+// GET /api/exit-studio/portfolio/exit-kpis
+// Get actual exit KPIs for portfolio rollup (replaces hardcoded caps)
+// ============================================================
+router.get('/api/exit-studio/portfolio/exit-kpis', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const projectIds = (req.query.projectIds as string)?.split(',').filter(Boolean);
+
+    const kpis = await exitIntegrationService.getPortfolioExitKPIs(orgId, projectIds);
+    res.json(kpis);
+  } catch (error: any) {
+    console.error('Portfolio exit KPIs error:', error);
+    res.status(500).json({ error: 'Failed to fetch portfolio exit KPIs' });
+  }
+});
+
+// ============================================================
+// GET /api/exit-studio/portfolio/irr
+// Compute portfolio IRR from actual exit KPIs
+// ============================================================
+router.get('/api/exit-studio/portfolio/irr', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    const projectIds = (req.query.projectIds as string)?.split(',').filter(Boolean);
+
+    const result = await exitIntegrationService.computePortfolioIRRFromExitKPIs(orgId, projectIds);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Portfolio IRR error:', error);
+    res.status(500).json({ error: 'Failed to compute portfolio IRR' });
   }
 });
 

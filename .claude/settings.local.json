@@ -10,7 +10,8 @@
       "Bash(git push:*)",
       "Bash(GIT_TERMINAL_PROMPT=0 git push origin feat/exit-engine-patches)",
       "Bash(ls -lhS attached_assets/*.zip attached_assets/*.mp4)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(node:*)"
     ]
   }
 }
