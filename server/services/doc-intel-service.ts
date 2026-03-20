@@ -42,7 +42,7 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import path from 'path';
 import * as XLSX from 'xlsx';
-import { extractDocument } from '../utils/ocr';
+import { extractDocument, assessOcrQuality } from '../utils/ocr';
 import { findAliasMatch, getMatchResult, learnAlias, buildCoaCode } from "./pnl-alias-matcher";
 import { onLineItemConfirmed, applyLearningRulesOnRetrieval } from './learning-rules.integration';
 
@@ -1052,6 +1052,9 @@ class DocIntelService {
     return datePatterns.some(p => p.test(str.trim()));
   }
 
+  // Unified extraction pipeline: handles all doc types (pnl, rent_roll, balance_sheet,
+  // rate_sheet, invoice) via the same Excel/PDF extraction logic. No docType guards —
+  // the extraction engine runs identically regardless of document classification.
   async parseAndExtract(orgId: string, uploadId: string): Promise<DocIntelExtractedItem[]> {
     const upload = await this.getUpload(orgId, uploadId);
     if (!upload) {
@@ -1090,7 +1093,18 @@ class DocIntelService {
         if (usedOcrFallback) {
           console.log(`[DocIntelService] OCR fallback was used for ${upload.originalName}`);
         }
-        
+
+        // OCR quality gate assessment
+        const ocrQuality = assessOcrQuality(ocrResult);
+        if (ocrQuality.quality === 'low') {
+          console.warn(`[DocIntelService] Low OCR quality for ${upload.originalName}: ${ocrQuality.details} (entropy=${ocrQuality.charEntropy.toFixed(2)}, wordRecog=${(ocrQuality.wordRecognitionRate * 100).toFixed(1)}%, numDensity=${(ocrQuality.numericDensity * 100).toFixed(1)}%)`);
+          await this.updateUpload(orgId, uploadId, {
+            holdingNotes: `OCR quality: low — ${ocrQuality.details}`,
+          });
+        } else if (ocrQuality.quality === 'medium') {
+          console.log(`[DocIntelService] Medium OCR quality for ${upload.originalName}: ${ocrQuality.details}`);
+        }
+
         parsedItems = this.parsePdfOcrResult(ocrResult);
         if (granularity === 'annual') {
           if (isMultiYear && multiYears && multiYears.length > 0) {
@@ -2404,9 +2418,25 @@ Respond with JSON only:
                 return weights;
               }
             }
-          } catch (_e) { /* fallthrough to even split */ }
+          } catch (_e) { /* fallthrough to seasonal default */ }
 
-          return even;
+          // Priority 3: Marina-specific seasonal distribution defaults
+          // Based on typical marina revenue patterns: peak May-Oct, off-season Nov-Apr
+          const MARINA_SEASONAL_WEIGHTS: Record<number, number> = {
+            1: 0.04,   // January
+            2: 0.04,   // February
+            3: 0.06,   // March
+            4: 0.08,   // April
+            5: 0.12,   // May
+            6: 0.14,   // June
+            7: 0.15,   // July
+            8: 0.14,   // August
+            9: 0.10,   // September
+            10: 0.07,  // October
+            11: 0.04,  // November
+            12: 0.02,  // December
+          };
+          return MARINA_SEASONAL_WEIGHTS;
         };
         
         const monthWeights = await getMonthWeights(inferredDept);

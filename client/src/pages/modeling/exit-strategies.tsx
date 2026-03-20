@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +67,7 @@ import {
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { InfoTooltip, StrategyOverview } from "@/components/ui/info-tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { useExitStrategiesStore, type MasterInputs, type SavedScenario } from "@/stores/exitStrategiesStore";
 import type { ModelingProject } from "@shared/schema";
 
@@ -998,7 +999,9 @@ export default function ExitStrategiesPage() {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const { savedScenarios, activeScenarioId, masterInputs } = useExitStrategiesStore();
+  const { savedScenarios, activeScenarioId, masterInputs, hydrateFromProject, setMode, mode } = useExitStrategiesStore();
+  const [linkedProjectName, setLinkedProjectName] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ModelingProject[]>({
     queryKey: ['/api/modeling/projects'],
@@ -1021,9 +1024,56 @@ export default function ExitStrategiesPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const linkToProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      const res = await apiRequest('GET', `/api/modeling/projects/${projectId}`);
+      return res.json();
+    },
+    onSuccess: (project: any, projectId: string) => {
+      const customMetrics = project.customMetrics || {};
+      const purchasePrice = parseFloat(project.purchasePrice) || undefined;
+      const indicatedValue = parseFloat(project.indicatedValue) || undefined;
+      const depreciation = parseFloat(customMetrics.depreciation ?? customMetrics.depreciationTaken) || undefined;
+      const capitalImprovements = parseFloat(customMetrics.capitalImprovements) || undefined;
+      const debtBalance = parseFloat(customMetrics.debtBalance ?? customMetrics.totalDebt ?? project.totalDebt) || undefined;
+      const acquisitionDate = customMetrics.acquisitionDate || project.acquisitionDate || undefined;
+
+      hydrateFromProject({
+        purchasePrice,
+        depreciation,
+        capitalImprovements,
+        debtBalance,
+        acquisitionDate,
+      }, projectId);
+
+      setMode({
+        type: 'project-linked',
+        projectId,
+        lastSyncedAt: new Date().toISOString(),
+        isDirty: false,
+      });
+
+      setLinkedProjectName(project.marinaName || 'Unknown Project');
+      setIsLinkModalOpen(false);
+
+      toast({
+        title: "Project linked",
+        description: `Financial data loaded from "${project.marinaName}".`,
+      });
+
+      navigate(`/modeling/projects/${projectId}?tab=exit`);
+    },
+    onError: () => {
+      toast({
+        title: "Failed to link project",
+        description: "Could not fetch project data. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleLinkToProject = (projectId: string) => {
-    navigate(`/modeling/projects/${projectId}?tab=exit`);
-    setIsLinkModalOpen(false);
+    linkToProjectMutation.mutate(projectId);
   };
 
   return (
@@ -1144,10 +1194,34 @@ export default function ExitStrategiesPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700" data-no-print>
-          <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
-          <span><span className="font-medium text-blue-800">Standalone Mode</span> — Master inputs are shared across all tabs.</span>
-        </div>
+        {mode.type === 'project-linked' && linkedProjectName ? (
+          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-green-50 border border-green-200 text-sm text-green-700" data-no-print>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+              <span>
+                <span className="font-medium text-green-800">Linked to Project</span> —{" "}
+                <Badge variant="outline" className="ml-1 text-green-700 border-green-300">{linkedProjectName}</Badge>
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-green-600 hover:text-green-800"
+              onClick={() => {
+                setMode({ type: 'standalone' });
+                setLinkedProjectName(null);
+              }}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Unlink
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-sm text-blue-700" data-no-print>
+            <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <span><span className="font-medium text-blue-800">Standalone Mode</span> — Master inputs are shared across all tabs.</span>
+          </div>
+        )}
 
         <div data-no-print>
           <SharedInputsPanel />

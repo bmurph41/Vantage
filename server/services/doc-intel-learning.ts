@@ -52,6 +52,7 @@ function normalizeLabel(label: string): string {
 export async function recordConfirm(
   orgId: string,
   items: ConfirmedItemUpdate[],
+  modelingProjectId?: string,
 ): Promise<number> {
   let upserted = 0;
 
@@ -68,18 +69,20 @@ export async function recordConfirm(
     const normalized = normalizeLabel(rawText);
 
     try {
-      // Check for existing rule (org-wide)
+      // Check for existing rule (project-scoped first, then org-wide)
+      const ruleConditions = [
+        eq(lineItemLearningRules.tenantId, orgId),
+        eq(lineItemLearningRules.normalizedLineItem, normalized),
+        eq(lineItemLearningRules.category, categoryTierConfirmed),
+        eq(lineItemLearningRules.department, dept),
+      ];
+      if (modelingProjectId) {
+        ruleConditions.push(eq(lineItemLearningRules.marinaId, modelingProjectId));
+      }
       const existing = await db
         .select({ id: lineItemLearningRules.id, timesUsed: lineItemLearningRules.timesUsed })
         .from(lineItemLearningRules)
-        .where(
-          and(
-            eq(lineItemLearningRules.tenantId, orgId),
-            eq(lineItemLearningRules.normalizedLineItem, normalized),
-            eq(lineItemLearningRules.category, categoryTierConfirmed),
-            eq(lineItemLearningRules.department, dept),
-          )
-        )
+        .where(and(...ruleConditions))
         .limit(1);
 
       if (existing.length > 0) {
@@ -95,6 +98,7 @@ export async function recordConfirm(
       } else {
         await db.insert(lineItemLearningRules).values({
           tenantId: orgId,
+          marinaId: modelingProjectId || null,
           normalizedLineItem: normalized,
           originalLineItem: rawText,
           category: categoryTierConfirmed,
@@ -131,24 +135,47 @@ export async function recordConfirm(
 export async function applyLearningRules(
   orgId: string,
   items: ExtractedItemRow[],
+  modelingProjectId?: string,
 ): Promise<{ items: ExtractedItemRow[]; appliedCount: number }> {
   const pending = items.filter(i => i.status === 'pending' || i.status === 'needs_review');
   if (pending.length === 0) return { items, appliedCount: 0 };
 
-  // Load all rules for this org once
-  const rules = await db
-    .select()
-    .from(lineItemLearningRules)
-    .where(
-      and(
-        eq(lineItemLearningRules.tenantId, orgId),
-        eq(lineItemLearningRules.confidenceTier, 'high'),
-      )
-    );
+  // Load rules with project-scoped priority:
+  // 1. First try project-specific rules (if projectId available)
+  // 2. Fall back to org-wide rules
+  let rules: Awaited<ReturnType<typeof db.select>>[] = [];
+
+  if (modelingProjectId) {
+    const projectRules = await db
+      .select()
+      .from(lineItemLearningRules)
+      .where(
+        and(
+          eq(lineItemLearningRules.tenantId, orgId),
+          eq(lineItemLearningRules.confidenceTier, 'high'),
+          eq(lineItemLearningRules.marinaId, modelingProjectId),
+        )
+      );
+    rules = projectRules;
+  }
+
+  // Fall back to org-wide rules (no marinaId / project scope)
+  if (rules.length === 0) {
+    rules = await db
+      .select()
+      .from(lineItemLearningRules)
+      .where(
+        and(
+          eq(lineItemLearningRules.tenantId, orgId),
+          eq(lineItemLearningRules.confidenceTier, 'high'),
+        )
+      );
+  }
 
   if (rules.length === 0) return { items, appliedCount: 0 };
 
   // Build lookup map: normalizedLabel → rule
+  // Project-specific rules take priority (loaded first if available)
   const ruleMap = new Map<string, typeof rules[0]>();
   for (const rule of rules) {
     ruleMap.set(rule.normalizedLineItem, rule);

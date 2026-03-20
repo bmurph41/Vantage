@@ -708,4 +708,102 @@ router.post('/export/pdf-package', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// RENT ROLL → MARK-TO-MARKET BRIDGE
+// ============================================================================
+
+router.post('/rent-roll-mtm/:projectId', async (req: Request, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || 'org-1';
+
+    // Import schema tables
+    const { rentRolls, rentRollEntries, rateComps, modelingProjects } = await import('@shared/schema');
+    const { db } = await import('../db');
+    const { eq, and, desc } = await import('drizzle-orm');
+
+    // Get project's rent rolls
+    const projectRentRolls = await db.select().from(rentRolls)
+      .where(and(eq(rentRolls.orgId, orgId), eq(rentRolls.modelingProjectId, projectId)))
+      .orderBy(desc(rentRolls.createdAt))
+      .limit(1);
+
+    if (projectRentRolls.length === 0) {
+      return res.json({ units: [], message: 'No rent roll found for this project' });
+    }
+
+    const rentRoll = projectRentRolls[0];
+
+    // Get rent roll entries
+    const entries = await db.select().from(rentRollEntries)
+      .where(eq(rentRollEntries.rentRollId, rentRoll.id));
+
+    // Get rate comps for market rate comparison (org-wide, latest)
+    const marketRates = await db.select().from(rateComps)
+      .where(eq(rateComps.orgId, orgId))
+      .orderBy(desc(rateComps.createdAt))
+      .limit(200);
+
+    // Build market rate lookup by storage type and size
+    const ratesByType = new Map<string, number[]>();
+    for (const comp of marketRates) {
+      const key = (comp as any).storageType || 'wet_slip';
+      if (!ratesByType.has(key)) ratesByType.set(key, []);
+      const rate = parseFloat((comp as any).monthlyRate || (comp as any).annualRate || '0');
+      if (rate > 0) ratesByType.get(key)!.push(rate);
+    }
+
+    // Calculate median market rate per type
+    const medianRate = (rates: number[]) => {
+      if (rates.length === 0) return 0;
+      const sorted = [...rates].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    };
+
+    const marketMedians: Record<string, number> = {};
+    for (const [type, rates] of ratesByType.entries()) {
+      marketMedians[type] = medianRate(rates);
+    }
+
+    // Build mark-to-market units
+    const units = entries.map(entry => {
+      const currentRent = parseFloat((entry as any).monthlyRate || (entry as any).amount || '0');
+      const unitType = (entry as any).storageType || (entry as any).entryType || 'wet_slip';
+      const marketRent = marketMedians[unitType] || currentRent; // fallback to current if no comps
+
+      return {
+        unitId: entry.id,
+        unitName: (entry as any).unitNumber || (entry as any).slipNumber || `Unit ${entry.id.slice(-4)}`,
+        unitType,
+        size: (entry as any).boatLength ? `${(entry as any).boatLength}ft` : '',
+        currentRent,
+        marketRent,
+        leaseExpiry: (entry as any).leaseEndDate || undefined,
+        occupancyStatus: ((entry as any).status === 'vacant' ? 'vacant' : 'occupied') as 'occupied' | 'vacant' | 'pending',
+      };
+    });
+
+    // Get purchase price for cap rate impact
+    const [project] = await db.select().from(modelingProjects)
+      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+    const purchasePrice = project?.purchasePrice ? parseFloat(project.purchasePrice) : 0;
+
+    // Compute MTM using the institutional analysis service
+    const { computeMarkToMarket } = await import('../services/institutional-analysis-service');
+    const result = computeMarkToMarket(units, purchasePrice || 1);
+
+    res.json({
+      ...result,
+      rentRollId: rentRoll.id,
+      rentRollDate: rentRoll.createdAt,
+      rateCompCount: marketRates.length,
+      marketMedians,
+    });
+  } catch (error: any) {
+    console.error('Error computing rent roll MTM:', error);
+    res.status(400).json({ error: error.message || 'Failed to compute rent roll mark-to-market' });
+  }
+});
+
 export default router;

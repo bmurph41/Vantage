@@ -25780,45 +25780,23 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         });
       }
       
-      const isPnlDoc = (req.body.docType === 'pnl');
-      
-      if (isPnlDoc) {
-        res.status(201).json({
-          ...result.upload,
-          isDuplicate: result.isDuplicate,
-          savedToDataRoom: false,
-          originalUpload: result.originalUpload ? {
-            id: result.originalUpload.id,
-            originalName: result.originalUpload.originalName,
-            createdAt: result.originalUpload.createdAt,
-          } : null,
-        });
-        
-        setImmediate(async () => {
-          try {
-            console.log(`[DocIntel] Starting automatic AI parsing for upload ${result.upload.id}`);
-            await docIntelService.parseAndExtract(orgId, result.upload.id);
-            console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
-            await docIntelService.categorizeItems(orgId, result.upload.id);
-            console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
-            await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
-          } catch (parseError: any) {
-            console.error(`[DocIntel] Background parsing failed for upload ${result.upload.id}:`, parseError.message);
-          }
-        });
-      } else {
-        let savedToVdr = false;
+      const docType = req.body.docType;
+      const isParseable = ['pnl', 'rent_roll', 'balance_sheet', 'rate_sheet', 'invoice'].includes(docType);
+
+      // Save to VDR for all non-P&L documents (alongside parsing)
+      let savedToVdr = false;
+      if (docType !== 'pnl') {
         try {
           const ddProjectId = project.ddProjectId;
           if (ddProjectId) {
             const { vdrFolders, vdrDocuments: vdrDocsTable } = await import('@shared/schema');
-            const docTypeLabel = req.body.docType === 'rent_roll' ? 'Rent Rolls'
-              : req.body.docType === 'balance_sheet' ? 'Balance Sheets'
-              : req.body.docType === 'rate_sheet' ? 'Rate Sheets'
-              : req.body.docType === 'invoice' ? 'Invoices'
+            const docTypeLabel = docType === 'rent_roll' ? 'Rent Rolls'
+              : docType === 'balance_sheet' ? 'Balance Sheets'
+              : docType === 'rate_sheet' ? 'Rate Sheets'
+              : docType === 'invoice' ? 'Invoices'
               : 'Other Documents';
             const folderPath = `/Financial Documents/${docTypeLabel}`;
-            
+
             let [parentFolder] = await db.select().from(vdrFolders)
               .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, 'Financial Documents')))
               .limit(1);
@@ -25828,7 +25806,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
                 createdBy: userId,
               }).returning();
             }
-            
+
             let [targetFolder] = await db.select().from(vdrFolders)
               .where(and(eq(vdrFolders.projectId, ddProjectId), eq(vdrFolders.orgId, orgId), eq(vdrFolders.name, docTypeLabel), eq(vdrFolders.parentFolderId, parentFolder.id)))
               .limit(1);
@@ -25838,10 +25816,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
                 parentFolderId: parentFolder.id, createdBy: userId,
               }).returning();
             }
-            
+
             const fileBuffer = await fs.readFile(req.file.path);
             const hashHex = require('crypto').createHash('sha256').update(fileBuffer).digest('hex');
-            
+
             await db.insert(vdrDocsTable).values({
               folderId: targetFolder.id, projectId: ddProjectId, orgId,
               filename: displayName, originalFilename: req.file.originalname,
@@ -25852,25 +25830,45 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               tags: [req.body.docType],
             });
             savedToVdr = true;
-            console.log(`[DocIntel] Non-P&L document ${result.upload.id} saved to VDR folder: ${folderPath}`);
+            console.log(`[DocIntel] Document ${result.upload.id} saved to VDR folder: ${folderPath}`);
           }
         } catch (vdrError: any) {
           console.error(`[DocIntel] Failed to save to VDR for upload ${result.upload.id}:`, vdrError.message);
         }
-        
-        await docIntelService.updateUpload(orgId, result.upload.id, { status: 'completed' });
-        
-        res.status(201).json({
-          ...result.upload,
-          status: 'completed',
-          isDuplicate: result.isDuplicate,
-          savedToDataRoom: savedToVdr,
-          originalUpload: result.originalUpload ? {
-            id: result.originalUpload.id,
-            originalName: result.originalUpload.originalName,
-            createdAt: result.originalUpload.createdAt,
-          } : null,
+      }
+
+      // Respond immediately, then process in background
+      res.status(201).json({
+        ...result.upload,
+        isDuplicate: result.isDuplicate,
+        savedToDataRoom: savedToVdr,
+        originalUpload: result.originalUpload ? {
+          id: result.originalUpload.id,
+          originalName: result.originalUpload.originalName,
+          createdAt: result.originalUpload.createdAt,
+        } : null,
+      });
+
+      if (isParseable) {
+        // Auto-parse ALL parseable document types in background (P&L, rent rolls, balance sheets, rate sheets, invoices)
+        setImmediate(async () => {
+          try {
+            console.log(`[DocIntel] Starting automatic AI parsing for ${docType} upload ${result.upload.id}`);
+            await docIntelService.parseAndExtract(orgId, result.upload.id);
+            console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
+            await docIntelService.categorizeItems(orgId, result.upload.id);
+            console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
+            await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
+          } catch (parseError: any) {
+            console.error(`[DocIntel] Background parsing failed for ${docType} upload ${result.upload.id}:`, parseError.message);
+            try {
+              await docIntelService.updateUpload(orgId, result.upload.id, { status: 'completed' });
+            } catch (_) {}
+          }
         });
+      } else {
+        // Non-parseable doc types (e.g., 'other') just go to completed
+        await docIntelService.updateUpload(orgId, result.upload.id, { status: 'completed' });
       }
     } catch (error: any) {
       console.error('Failed to upload document:', error);
@@ -26685,6 +26683,45 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       res.status(500).json({ error: 'Failed to reimport actuals' });
     }
   });
+  // Re-import: clear existing actuals for this upload and re-import confirmed items
+  app.post('/api/modeling/projects/:projectId/documents/:uploadId/reimport', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { projectId, uploadId } = req.params;
+
+      // Verify project access
+      const [project] = await db.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)));
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      // Clear previous actuals from this upload
+      const { modelingActuals } = await import('@shared/schema');
+      await db.delete(modelingActuals).where(
+        and(
+          eq(modelingActuals.orgId, orgId),
+          eq(modelingActuals.modelingProjectId, projectId),
+          eq(modelingActuals.sourceRecordType, 'doc_intel_extracted_item'),
+          sql`${modelingActuals.sourceRecordId} IN (
+            SELECT id FROM doc_intel_extracted_items WHERE upload_id = ${uploadId}
+          )`
+        )
+      );
+
+      // Re-import confirmed items
+      const imported = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId);
+
+      res.json({
+        reimported: imported.length,
+        cleared: true,
+        message: `Cleared previous import and re-imported ${imported.length} line items`
+      });
+    } catch (error: any) {
+      console.error('Failed to reimport:', error);
+      res.status(500).json({ error: error.message || 'Failed to reimport' });
+    }
+  });
+
   // Reprocess a completed document - reset to review state
   app.post('/api/modeling/projects/:projectId/documents/:uploadId/reprocess', authenticateUser, async (req: any, res) => {
     try {

@@ -1,11 +1,12 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { 
-  commercialTenants, 
-  commercialTenantRentSchedule, 
+import {
+  commercialTenants,
+  commercialTenantRentSchedule,
   commercialTenantAmendments,
   commercialTenantScenarios,
   commercialTenantOptions,
+  crmContacts,
   insertCommercialTenantSchema,
   insertCommercialTenantRentScheduleSchema,
   insertCommercialTenantAmendmentSchema,
@@ -444,6 +445,30 @@ router.post("/bulk-import", async (req: Request, res: Response) => {
         }
       } catch (err: any) {
         errors.push(`Failed to import tenant ${lease.tenantName}: ${err.message}`);
+      }
+    }
+
+    // CRM contact linking for commercial tenants
+    if (req.body.linkToCrm !== false) {
+      for (const tenant of imported) {
+        const tenantName = tenant.tenantName;
+        if (tenantName) {
+          try {
+            const [matchedContact] = await db.select().from(crmContacts)
+              .where(and(
+                eq(crmContacts.orgId, orgId),
+                sql`LOWER(${crmContacts.firstName} || ' ' || ${crmContacts.lastName}) = LOWER(${tenantName})`
+              ))
+              .limit(1);
+            if (matchedContact) {
+              await db.update(commercialTenants)
+                .set({ contactName: matchedContact.firstName + ' ' + matchedContact.lastName, contactEmail: matchedContact.email, customFields: sql`jsonb_set(COALESCE(${commercialTenants.customFields}, '{}'::jsonb), '{crmContactId}', ${JSON.stringify(matchedContact.id)}::jsonb)` })
+                .where(eq(commercialTenants.id, tenant.id));
+            }
+          } catch (linkErr: any) {
+            console.warn(`[CommercialTenants] CRM link failed for tenant ${tenantName}:`, linkErr.message);
+          }
+        }
       }
     }
 
