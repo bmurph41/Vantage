@@ -259,6 +259,452 @@ const BUSINESS_FIELDS: COAFieldDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Office
+// ---------------------------------------------------------------------------
+const OFFICE_FIELDS: COAFieldDef[] = [
+  { key: 'totalSquareFeet', label: 'Total Rentable SF', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'rentPerSF', label: 'Rent per SF / Year', category: 'revenue', inputType: 'currency', hint: '$/SF/yr', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy Rate', category: 'revenue', inputType: 'percent', defaultValue: 90, group: 'Revenue Assumptions' },
+  { key: 'annualExpenseReimbursements', label: 'Expense Reimbursements', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualParkingIncome', label: 'Parking Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 4, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPayroll', label: 'Payroll / On-Site Staff', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualJanitorial', label: 'Janitorial', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualSecurity', label: 'Security', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualElevator', label: 'Elevator Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualLandscaping', label: 'Landscaping', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Industrial
+// ---------------------------------------------------------------------------
+const INDUSTRIAL_FIELDS: COAFieldDef[] = [
+  { key: 'totalSquareFeet', label: 'Total Rentable SF', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'rentPerSF', label: 'Rent per SF / Year', category: 'revenue', inputType: 'currency', hint: '$/SF/yr (NNN)', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy Rate', category: 'revenue', inputType: 'percent', defaultValue: 95, group: 'Revenue Assumptions' },
+  { key: 'annualNNNReimbursements', label: 'NNN Reimbursements', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 3, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualCAM', label: 'CAM / Common Area', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Medical Office
+// ---------------------------------------------------------------------------
+const MEDICAL_OFFICE_FIELDS: COAFieldDef[] = [
+  { key: 'totalSquareFeet', label: 'Total Rentable SF', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'rentPerSF', label: 'Rent per SF / Year', category: 'revenue', inputType: 'currency', hint: '$/SF/yr', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy Rate', category: 'revenue', inputType: 'percent', defaultValue: 92, group: 'Revenue Assumptions' },
+  { key: 'annualExpenseReimbursements', label: 'Expense Reimbursements', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 5, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualJanitorial', label: 'Janitorial / Biohazard Disposal', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualHVACMedical', label: 'HVAC / Medical-Grade Systems', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualSecurity', label: 'Security', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualLandscaping', label: 'Landscaping', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Car Wash
+// ---------------------------------------------------------------------------
+const CAR_WASH_FIELDS: COAFieldDef[] = [
+  { key: 'selfServeBays', label: 'Self-Serve Bays', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'tunnelLanes', label: 'Tunnel Lanes', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgWashPrice', label: 'Avg Wash Price', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'dailyCarCount', label: 'Daily Car Count', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'membershipCount', label: 'Membership Count', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions', showWhen: 'nonzero' },
+  { key: 'membershipPriceMonthly', label: 'Membership Price / Mo', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions', showWhen: 'nonzero' },
+  { key: 'annualVendingIncome', label: 'Vending / Vacuum Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualDetailRevenue', label: 'Detail Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualChemistry', label: 'Chemistry / Chemicals', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualWaterSewer', label: 'Water / Sewer', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualEquipmentMaintenance', label: 'Equipment Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', hint: 'Electric, gas', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'monthlyRent', label: 'Rent / Lease (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Golf Course
+// ---------------------------------------------------------------------------
+const GOLF_COURSE_FIELDS: COAFieldDef[] = [
+  { key: 'totalHoles', label: 'Total Holes', category: 'revenue', inputType: 'number', defaultValue: 18, group: 'Revenue Assumptions' },
+  { key: 'avgGreenFee', label: 'Avg Green Fee', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'roundsPerYear', label: 'Rounds / Year', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'membershipCount', label: 'Membership Count', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions', showWhen: 'nonzero' },
+  { key: 'membershipDuesYear', label: 'Membership Dues / Year', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions', showWhen: 'nonzero' },
+  { key: 'avgCartFee', label: 'Cart Fee (per round)', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'annualProShopRevenue', label: 'Pro Shop Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue' },
+  { key: 'annualFBRevenue', label: 'F&B Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue' },
+  { key: 'annualRangeRevenue', label: 'Driving Range Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualTournamentIncome', label: 'Tournament / Events Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualCourseMaintenance', label: 'Course Maintenance (Labor)', category: 'expense', inputType: 'currency', group: 'Course Maintenance' },
+  { key: 'annualChemicals', label: 'Chemicals / Fertilizer', category: 'expense', inputType: 'currency', group: 'Course Maintenance' },
+  { key: 'annualIrrigation', label: 'Irrigation', category: 'expense', inputType: 'currency', group: 'Course Maintenance' },
+  { key: 'annualEquipmentLease', label: 'Equipment Lease / Maintenance', category: 'expense', inputType: 'currency', group: 'Course Maintenance' },
+  { key: 'annualProShopCOGS', label: 'Pro Shop COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualFBCOGS', label: 'F&B COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualPayroll', label: 'Payroll (Admin / Pro Staff)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Restaurant
+// ---------------------------------------------------------------------------
+const RESTAURANT_FIELDS: COAFieldDef[] = [
+  { key: 'seats', label: 'Seats', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgCheck', label: 'Average Check', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'turnsPerDay', label: 'Turns / Day', category: 'revenue', inputType: 'number', defaultValue: 2, group: 'Revenue Assumptions' },
+  { key: 'daysOpenPerYear', label: 'Days Open / Year', category: 'revenue', inputType: 'number', defaultValue: 360, group: 'Revenue Assumptions' },
+  { key: 'annualFoodRevenue', label: 'Food Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown' },
+  { key: 'annualBeverageRevenue', label: 'Beverage Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown' },
+  { key: 'annualCateringRevenue', label: 'Catering Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualDeliveryRevenue', label: 'Delivery / Takeout Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'foodCostPct', label: 'Food Cost %', category: 'expense', inputType: 'percent', defaultValue: 30, pctOf: 'revenue', group: 'COGS' },
+  { key: 'beverageCostPct', label: 'Beverage Cost %', category: 'expense', inputType: 'percent', defaultValue: 22, pctOf: 'revenue', group: 'COGS' },
+  { key: 'payrollPct', label: 'Payroll & Benefits %', category: 'expense', inputType: 'percent', defaultValue: 30, pctOf: 'revenue', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Rent (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualSupplies', label: 'Smallwares / Supplies', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualTechnology', label: 'Technology / POS', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// RV Park
+// ---------------------------------------------------------------------------
+const RV_PARK_FIELDS: COAFieldDef[] = [
+  { key: 'totalSites', label: 'Total Sites', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'monthlySeasonalSites', label: 'Monthly / Seasonal Sites', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'transientSites', label: 'Transient / Nightly Sites', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyRate', label: 'Avg Monthly Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'avgNightlyRate', label: 'Avg Nightly Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy %', category: 'revenue', inputType: 'percent', defaultValue: 70, group: 'Revenue Assumptions' },
+  { key: 'annualCampStoreRevenue', label: 'Camp Store Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPropaneRevenue', label: 'Propane Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualLaundryIncome', label: 'Laundry Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualActivityFees', label: 'Activity / Amenity Fees', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 5, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Grounds', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualSoftware', label: 'Software / Reservations', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Shopping Center
+// ---------------------------------------------------------------------------
+const SHOPPING_CENTER_FIELDS: COAFieldDef[] = [
+  { key: 'totalGLA', label: 'GLA (Total SF)', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgRentPerSF', label: 'Avg Rent / SF / Year', category: 'revenue', inputType: 'currency', hint: '$/SF/yr', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy %', category: 'revenue', inputType: 'percent', defaultValue: 93, group: 'Revenue Assumptions' },
+  { key: 'anchorTenantPct', label: 'Anchor Tenant % of GLA', category: 'revenue', inputType: 'percent', group: 'Revenue Assumptions' },
+  { key: 'inlineTenantPct', label: 'In-Line Tenant % of GLA', category: 'revenue', inputType: 'percent', group: 'Revenue Assumptions' },
+  { key: 'annualCAMRecovery', label: 'CAM Recovery', category: 'revenue', inputType: 'currency', group: 'Other Revenue' },
+  { key: 'annualPercentageRent', label: 'Percentage Rent', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOutparcelRevenue', label: 'Outparcel Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPylonSignRevenue', label: 'Pylon Sign Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 4, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualCAMExpenses', label: 'CAM Expenses', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualSecurity', label: 'Security', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMarketing', label: 'Marketing / Tenant Coordination', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualJanitorial', label: 'Janitorial', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Mixed-Use
+// ---------------------------------------------------------------------------
+const MIXED_USE_FIELDS: COAFieldDef[] = [
+  { key: 'residentialUnits', label: 'Residential Units', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgResidentialRent', label: 'Avg Residential Monthly Rent', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'commercialSF', label: 'Commercial SF', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'commercialRentPerSF', label: 'Commercial Rent / SF / Year', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'vacancyRate', label: 'Vacancy Rate', category: 'revenue', inputType: 'percent', defaultValue: 5, group: 'Revenue Assumptions' },
+  { key: 'annualCAMReimbursements', label: 'CAM Reimbursements', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualParkingIncome', label: 'Parking Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 5, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPayroll', label: 'Payroll', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualJanitorial', label: 'Janitorial', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Mobile Home Park
+// ---------------------------------------------------------------------------
+const MOBILE_HOME_PARK_FIELDS: COAFieldDef[] = [
+  { key: 'totalLots', label: 'Total Lots / Pads', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyLotRent', label: 'Avg Monthly Lot Rent', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'vacancyRate', label: 'Vacancy Rate', category: 'revenue', inputType: 'percent', defaultValue: 5, group: 'Revenue Assumptions' },
+  { key: 'parkOwnedHomes', label: 'Park-Owned Homes (POH)', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions', showWhen: 'nonzero' },
+  { key: 'annualUtilityReimbursement', label: 'Utility Reimbursement', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualHomeSalesRevenue', label: 'Home Sales Revenue (POH)', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherIncome', label: 'Other Income', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management Fee %', category: 'expense', inputType: 'percent', defaultValue: 6, pctOf: 'egi', group: 'Management' },
+  { key: 'annualPayroll', label: 'Payroll', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly, common area)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualWaterSewer', label: 'Water / Sewer', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualRoadMaintenance', label: 'Road / Common Area Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Parking (Garage / Surface Lot)
+// ---------------------------------------------------------------------------
+const PARKING_FIELDS: COAFieldDef[] = [
+  { key: 'totalSpaces', label: 'Total Spaces', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'monthlyPermitSpaces', label: 'Monthly Permit Spaces', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyPermitRate', label: 'Avg Monthly Permit Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'avgHourlyRate', label: 'Avg Hourly / Transient Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'transientOccupancy', label: 'Transient Occupancy %', category: 'revenue', inputType: 'percent', defaultValue: 60, group: 'Revenue Assumptions' },
+  { key: 'annualEventRevenue', label: 'Event Parking Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualValetRevenue', label: 'Valet Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'propertyManagementPct', label: 'Management / Operator Fee %', category: 'expense', inputType: 'percent', defaultValue: 5, pctOf: 'revenue', group: 'Management' },
+  { key: 'annualPayroll', label: 'Payroll / Attendants', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities / Lighting (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualTechnology', label: 'Technology / Access Systems', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Data Center
+// ---------------------------------------------------------------------------
+const DATA_CENTER_FIELDS: COAFieldDef[] = [
+  { key: 'totalRacks', label: 'Total Racks / Cabinets', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyRackRate', label: 'Avg Monthly Rack Rate', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'occupancyRate', label: 'Occupancy %', category: 'revenue', inputType: 'percent', defaultValue: 85, group: 'Revenue Assumptions' },
+  { key: 'totalMW', label: 'Total MW Capacity', category: 'revenue', inputType: 'number', hint: 'Megawatts of power', group: 'Revenue Assumptions' },
+  { key: 'annualManagedServices', label: 'Managed Services Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualInterconnect', label: 'Interconnection / Cross-Connect', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPowerRevenue', label: 'Power Revenue (pass-through)', category: 'revenue', inputType: 'currency', group: 'Other Revenue' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPowerCost', label: 'Power / Electricity', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCooling', label: 'Cooling / HVAC', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualBandwidth', label: 'Bandwidth / Connectivity', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualSecurity', label: 'Security (Physical & Cyber)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualGeneratorFuel', label: 'Generator / Fuel', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Car Dealership
+// ---------------------------------------------------------------------------
+const CAR_DEALERSHIP_FIELDS: COAFieldDef[] = [
+  { key: 'annualNewVehicleSales', label: 'New Vehicle Sales', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualUsedVehicleSales', label: 'Used Vehicle Sales', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualFIRevenue', label: 'F&I Revenue', category: 'revenue', inputType: 'currency', hint: 'Finance & insurance products', group: 'Revenue' },
+  { key: 'annualServiceRevenue', label: 'Service Department Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualPartsRevenue', label: 'Parts Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualBodyShopRevenue', label: 'Body Shop Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualVehicleCOGS', label: 'Vehicle COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualPartsCOGS', label: 'Parts / Service COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualPayroll', label: 'Payroll & Commissions', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualFloorplan', label: 'Floorplan Interest', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Rent / Lease (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualAdvertising', label: 'Advertising', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualTechnology', label: 'Technology / DMS', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Facility Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Gas Station / C-Store
+// ---------------------------------------------------------------------------
+const GAS_STATION_FIELDS: COAFieldDef[] = [
+  { key: 'annualGallonsSold', label: 'Annual Gallons Sold', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'fuelMarginPerGallon', label: 'Fuel Margin per Gallon', category: 'revenue', inputType: 'currency', hint: '$/gallon margin', group: 'Revenue Assumptions' },
+  { key: 'annualCStoreRevenue', label: 'C-Store / Inside Sales', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualCarWashRevenue', label: 'Car Wash Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualLotteryCommission', label: 'Lottery / ATM Commission', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualFuelCOGS', label: 'Fuel COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualMerchandiseCOGS', label: 'Merchandise COGS', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Rent / Lease (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses', showWhen: 'nonzero' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualCreditCardFees', label: 'Credit Card Processing Fees', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualEnvironmental', label: 'Environmental / Tank Compliance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Gym / Fitness Center
+// ---------------------------------------------------------------------------
+const GYM_FIELDS: COAFieldDef[] = [
+  { key: 'membershipCount', label: 'Total Members', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyDues', label: 'Avg Monthly Dues', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'annualPersonalTraining', label: 'Personal Training Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue' },
+  { key: 'annualClassRevenue', label: 'Class / Group Fitness Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualRetailRevenue', label: 'Retail / Pro Shop Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualJuiceBarRevenue', label: 'Juice Bar / F&B Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Rent / Lease (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualEquipmentLease', label: 'Equipment Lease / Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualSoftware', label: 'Software / Member Management', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualCleaning', label: 'Cleaning / Janitorial', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMaintenance', label: 'Facility Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Daycare
+// ---------------------------------------------------------------------------
+const DAYCARE_FIELDS: COAFieldDef[] = [
+  { key: 'licensedCapacity', label: 'Licensed Capacity (children)', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgWeeklyTuition', label: 'Avg Weekly Tuition', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'enrollmentRate', label: 'Enrollment Rate %', category: 'revenue', inputType: 'percent', defaultValue: 85, group: 'Revenue Assumptions' },
+  { key: 'annualRegistrationFees', label: 'Registration Fees', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualAfterSchool', label: 'After-School / Drop-In Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualMealRevenue', label: 'Meal / Snack Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualSubsidyRevenue', label: 'Government Subsidy Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits (Teachers/Staff)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Rent / Lease (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualFoodSupplies', label: 'Food & Supplies', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance (Liability/Property)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCurriculum', label: 'Curriculum / Educational Materials', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualLicensing', label: 'Licensing / Compliance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualMaintenance', label: 'Maintenance & Repairs', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualCapEx', label: 'Capital Reserves', category: 'expense', inputType: 'currency', group: 'Reserves' },
+];
+
+// ---------------------------------------------------------------------------
+// Landscaping Business
+// ---------------------------------------------------------------------------
+const LANDSCAPING_FIELDS: COAFieldDef[] = [
+  { key: 'maintenanceContracts', label: 'Number of Maintenance Contracts', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgMonthlyContractValue', label: 'Avg Monthly Contract Value', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'annualDesignInstall', label: 'Design / Install Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualHardscape', label: 'Hardscape Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualIrrigation', label: 'Irrigation Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualSnowRemoval', label: 'Snow Removal Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualMaterials', label: 'Materials / Plants / Supplies', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualPayroll', label: 'Payroll & Benefits (Crews)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'ownerSalary', label: "Owner's Salary (SDE add-back)", category: 'expense', inputType: 'currency', hint: 'Added back for SDE calc', group: 'Operating Expenses' },
+  { key: 'annualVehicleFuel', label: 'Vehicle / Fuel', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualEquipmentLease', label: 'Equipment Lease / Maintenance', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance (GL / Workers Comp)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'monthlyRent', label: 'Yard / Office Rent (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualSubcontractors', label: 'Subcontractors', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualOtherExpenses', label: 'Other Expenses', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+];
+
+// ---------------------------------------------------------------------------
+// Construction Company
+// ---------------------------------------------------------------------------
+const CONSTRUCTION_FIELDS: COAFieldDef[] = [
+  { key: 'annualContractRevenue', label: 'Contract Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue' },
+  { key: 'annualChangeOrders', label: 'Change Order Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualServiceRevenue', label: 'Service / Warranty Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualMaterials', label: 'Materials / Supplies', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualDirectLabor', label: 'Direct Labor', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualSubcontractors', label: 'Subcontractors', category: 'expense', inputType: 'currency', group: 'COGS' },
+  { key: 'annualEquipmentRental', label: 'Equipment Rental / Lease', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualVehicleFuel', label: 'Vehicle / Fuel', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance (GL / WC / Bonding)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualPermits', label: 'Permits / Licensing', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualOfficePayroll', label: 'Office Payroll / Admin', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'ownerSalary', label: "Owner's Salary (SDE add-back)", category: 'expense', inputType: 'currency', hint: 'Added back for SDE calc', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Office / Yard Rent (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualOtherExpenses', label: 'Other Expenses', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+];
+
+// ---------------------------------------------------------------------------
+// Accounting Firm
+// ---------------------------------------------------------------------------
+const ACCOUNTING_FIRM_FIELDS: COAFieldDef[] = [
+  { key: 'totalClients', label: 'Total Clients', category: 'revenue', inputType: 'number', group: 'Revenue Assumptions' },
+  { key: 'avgRevenuePerClient', label: 'Avg Revenue / Client / Year', category: 'revenue', inputType: 'currency', group: 'Revenue Assumptions' },
+  { key: 'annualTaxPrepRevenue', label: 'Tax Preparation Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown' },
+  { key: 'annualBookkeepingRevenue', label: 'Bookkeeping Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown' },
+  { key: 'annualAuditRevenue', label: 'Audit / Assurance Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown', showWhen: 'nonzero' },
+  { key: 'annualAdvisoryRevenue', label: 'Advisory / Consulting Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown', showWhen: 'nonzero' },
+  { key: 'annualPayrollServices', label: 'Payroll Services Revenue', category: 'revenue', inputType: 'currency', group: 'Revenue Breakdown', showWhen: 'nonzero' },
+  { key: 'annualOtherRevenue', label: 'Other Revenue', category: 'revenue', inputType: 'currency', group: 'Other Revenue', showWhen: 'nonzero' },
+  { key: 'annualStaffPayroll', label: 'Staff Payroll & Benefits', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'ownerComp', label: "Owner's Compensation (SDE add-back)", category: 'expense', inputType: 'currency', hint: 'Added back for SDE calc', group: 'Operating Expenses' },
+  { key: 'monthlyRent', label: 'Office Rent (monthly)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualSoftware', label: 'Software / Subscriptions', category: 'expense', inputType: 'currency', hint: 'Tax software, accounting platforms', group: 'Operating Expenses' },
+  { key: 'annualInsurance', label: 'Insurance (E&O / GL)', category: 'expense', inputType: 'currency', group: 'Fixed Expenses' },
+  { key: 'annualCPE', label: 'Continuing Education / CPE', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualMarketing', label: 'Marketing', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'monthlyUtilities', label: 'Utilities (monthly)', category: 'expense', inputType: 'currency', group: 'Operating Expenses' },
+  { key: 'annualOfficeSupplies', label: 'Office Supplies', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+  { key: 'annualOtherExpenses', label: 'Other Expenses', category: 'expense', inputType: 'currency', group: 'Operating Expenses', showWhen: 'nonzero' },
+];
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -274,11 +720,26 @@ export const COA_FIELD_REGISTRY: Record<string, COAFieldDef[]> = {
   self_storage: SELF_STORAGE_FIELDS,
   laundromat: LAUNDROMAT_FIELDS,
   retail: COMMERCIAL_FIELDS,
-  office: COMMERCIAL_FIELDS,
-  industrial: COMMERCIAL_FIELDS,
-  medical_office: COMMERCIAL_FIELDS,
-  mixed_use: COMMERCIAL_FIELDS,
+  office: OFFICE_FIELDS,
+  industrial: INDUSTRIAL_FIELDS,
+  medical_office: MEDICAL_OFFICE_FIELDS,
+  mixed_use: MIXED_USE_FIELDS,
   business: BUSINESS_FIELDS,
+  car_wash: CAR_WASH_FIELDS,
+  golf_course: GOLF_COURSE_FIELDS,
+  restaurant: RESTAURANT_FIELDS,
+  rv_park: RV_PARK_FIELDS,
+  shopping_center: SHOPPING_CENTER_FIELDS,
+  mobile_home_park: MOBILE_HOME_PARK_FIELDS,
+  parking: PARKING_FIELDS,
+  data_center: DATA_CENTER_FIELDS,
+  car_dealership: CAR_DEALERSHIP_FIELDS,
+  gas_station: GAS_STATION_FIELDS,
+  gym: GYM_FIELDS,
+  daycare: DAYCARE_FIELDS,
+  landscaping: LANDSCAPING_FIELDS,
+  construction: CONSTRUCTION_FIELDS,
+  accounting_firm: ACCOUNTING_FIRM_FIELDS,
 };
 
 /**
