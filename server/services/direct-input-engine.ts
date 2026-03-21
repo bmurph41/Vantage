@@ -72,7 +72,7 @@ const STR_COA: COALine[] = [
   // Revenue
   { key: 'grossRentalIncome', label: 'Gross Rental Income', category: 'revenue', inputKeys: [], computeType: 'formula',
     formulaFn: (i, c) => {
-      const rate = num(i.nightlyRate ?? i.averageDailyRate);
+      const rate = num(i.avgNightlyRate ?? i.nightlyRate ?? i.averageDailyRate);
       const occ = pct(i.occupancy ?? i.occupancyRate);
       const units = Math.max(1, num(i.numberOfUnits ?? i.units ?? 1));
       const amt = rate * occ * 365 * units;
@@ -84,8 +84,8 @@ const STR_COA: COALine[] = [
   { key: 'platformFees', label: 'Platform Fees (Airbnb/VRBO)', category: 'expense', inputKeys: ['annualPlatformFees'], computeType: 'pct_of_revenue', pctKey: 'platformFeePct', defaultPct: 0.03 },
   { key: 'cleaning', label: 'Cleaning / Turnover', category: 'expense', inputKeys: ['annualCleaning', 'cleaningExpense'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_revenue', pctKey: 'propertyManagementPct', defaultPct: 0 },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'annualHOA', label: 'HOA / Condo Fees', category: 'expense', inputKeys: ['annualHOA', 'hoa'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
@@ -107,15 +107,15 @@ const SFR_COA: COALine[] = [
     }},
   { key: 'vacancy', label: 'Less: Vacancy', category: 'revenue', inputKeys: [], computeType: 'formula', isSubtraction: true,
     formulaFn: (i, c) => {
-      const vac = pct(i.vacancyRate ?? i.vacancy ?? 0.05);
+      const vac = pct(i.vacancyPct ?? i.vacancyRate ?? i.vacancy ?? 0.05);
       const gpr = c.grossPotentialRent ?? 0;
       const amt = gpr * vac;
       return { amount: amt, formula: `$${fmtC(gpr)} × ${fmtP(vac)} = ($${fmtC(amt)})` };
     }},
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_egi', pctKey: 'propertyManagementPct', defaultPct: 0 },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'annualHOA', label: 'HOA', category: 'expense', inputKeys: ['annualHOA', 'hoa'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
@@ -135,7 +135,7 @@ const RESIDENTIAL_MULTI_COA: COALine[] = [
     }},
   { key: 'vacancy', label: 'Less: Vacancy & Credit Loss', category: 'revenue', inputKeys: [], computeType: 'formula', isSubtraction: true,
     formulaFn: (i, c) => {
-      const vac = pct(i.vacancyRate ?? i.vacancy ?? 0.05);
+      const vac = pct(i.vacancyPct ?? i.vacancyRate ?? i.vacancy ?? 0.05);
       const gpr = c.grossPotentialRent ?? 0;
       const amt = gpr * vac;
       return { amount: amt, formula: `$${fmtC(gpr)} × ${fmtP(vac)} = ($${fmtC(amt)})` };
@@ -144,8 +144,8 @@ const RESIDENTIAL_MULTI_COA: COALine[] = [
   { key: 'parkingIncome', label: 'Parking Income', category: 'revenue', inputKeys: ['annualParkingIncome', 'parkingIncome'], computeType: 'direct' },
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_egi', pctKey: 'propertyManagementPct', defaultPct: 0.08 },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'landscaping', label: 'Landscaping', category: 'expense', inputKeys: ['annualLandscaping', 'landscaping'], computeType: 'direct' },
@@ -158,14 +158,14 @@ const MULTIFAMILY_COA: COALine[] = [
   { key: 'grossPotentialRent', label: 'Gross Potential Rent', category: 'revenue', inputKeys: [], computeType: 'formula',
     formulaFn: (i) => {
       const units = num(i.totalUnits ?? i.numberOfUnits ?? i.units);
-      const avgRent = num(i.averageRent ?? i.monthlyRent ?? i.rent);
+      const avgRent = num(i.avgInPlaceRent ?? i.avgMarketRent ?? i.averageRent ?? i.monthlyRent ?? i.rent);
       const amt = avgRent * 12 * Math.max(1, units);
       return { amount: amt, formula: `$${fmtC(avgRent)}/mo × 12 × ${units} units = $${fmtC(amt)}` };
     }},
   { key: 'vacancy', label: 'Less: Vacancy', category: 'revenue', inputKeys: [], computeType: 'formula', isSubtraction: true,
-    formulaFn: (i, c) => { const v = pct(i.vacancyRate ?? i.vacancy ?? 0.05); const g = c.grossPotentialRent ?? 0; const a = g * v; return { amount: a, formula: `$${fmtC(g)} × ${fmtP(v)} = ($${fmtC(a)})` }; }},
+    formulaFn: (i, c) => { const v = pct(i.vacancyPct ?? i.vacancyRate ?? i.vacancy ?? 0.05); const g = c.grossPotentialRent ?? 0; const a = g * v; return { amount: a, formula: `$${fmtC(g)} × ${fmtP(v)} = ($${fmtC(a)})` }; }},
   { key: 'concessions', label: 'Less: Concessions', category: 'revenue', inputKeys: [], computeType: 'formula', isSubtraction: true,
-    formulaFn: (i, c) => { const v = pct(i.concessionsPct ?? i.concessions ?? 0); const g = c.grossPotentialRent ?? 0; const a = g * v; return { amount: a, formula: `$${fmtC(g)} × ${fmtP(v)} = ($${fmtC(a)})` }; }},
+    formulaFn: (i, c) => { const v = pct(i.concessionPct ?? i.concessionsPct ?? i.concessions ?? 0); const g = c.grossPotentialRent ?? 0; const a = g * v; return { amount: a, formula: `$${fmtC(g)} × ${fmtP(v)} = ($${fmtC(a)})` }; }},
   { key: 'badDebt', label: 'Less: Bad Debt', category: 'revenue', inputKeys: [], computeType: 'formula', isSubtraction: true,
     formulaFn: (i, c) => { const v = pct(i.badDebtPct ?? i.badDebt ?? 0.01); const g = c.grossPotentialRent ?? 0; const a = g * v; return { amount: a, formula: `$${fmtC(g)} × ${fmtP(v)} = ($${fmtC(a)})` }; }},
   { key: 'utilityReimbursements', label: 'Utility Reimbursements', category: 'revenue', inputKeys: ['annualUtilityReimbursements', 'utilityReimbursements'], computeType: 'direct' },
@@ -175,8 +175,8 @@ const MULTIFAMILY_COA: COALine[] = [
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Property Management', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_egi', pctKey: 'propertyManagementPct', defaultPct: 0.05 },
   { key: 'payroll', label: 'Payroll & Benefits', category: 'expense', inputKeys: ['annualPayroll', 'payroll'], computeType: 'direct' },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'admin', label: 'Admin & General', category: 'expense', inputKeys: ['annualAdmin', 'adminExpense'], computeType: 'direct' },
@@ -192,7 +192,7 @@ const HOTEL_COA: COALine[] = [
   { key: 'roomRevenue', label: 'Room Revenue', category: 'revenue', inputKeys: [], computeType: 'formula',
     formulaFn: (i) => {
       const rooms = num(i.numberOfRooms ?? i.rooms ?? i.totalRooms);
-      const adr = num(i.averageDailyRate ?? i.adr ?? i.nightlyRate);
+      const adr = num(i.avgDailyRate ?? i.averageDailyRate ?? i.adr ?? i.nightlyRate);
       const occ = pct(i.occupancyRate ?? i.occupancy ?? 0.65);
       const amt = rooms * adr * occ * 365;
       const revPAR = adr * occ;
@@ -206,8 +206,8 @@ const HOTEL_COA: COALine[] = [
   { key: 'departmental', label: 'Departmental Expenses', category: 'expense', inputKeys: ['annualDepartmentalExpenses'], computeType: 'pct_of_revenue', pctKey: 'departmentalExpensePct', defaultPct: 0.35 },
   { key: 'undistributed', label: 'Undistributed Expenses', category: 'expense', inputKeys: ['annualUndistributedExpenses'], computeType: 'pct_of_revenue', pctKey: 'undistributedExpensePct', defaultPct: 0.20 },
   { key: 'mgmtFee', label: 'Management Fee', category: 'expense', inputKeys: ['annualManagementFee'], computeType: 'pct_of_revenue', pctKey: 'managementFeePct', defaultPct: 0.03 },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'ffeReserve', label: 'FF&E Reserve', category: 'expense', inputKeys: ['annualFFEReserve'], computeType: 'pct_of_revenue', pctKey: 'ffAndEReservePct', defaultPct: 0.04 },
 ];
 
@@ -236,8 +236,8 @@ const MARINA_COA: COALine[] = [
   { key: 'fuelCOGS', label: 'Fuel COGS', category: 'expense', inputKeys: ['annualFuelCOGS', 'fuelCOGS'], computeType: 'direct' },
   { key: 'storeCOGS', label: 'Ship Store COGS', category: 'expense', inputKeys: ['annualStoreCOGS', 'storeCOGS'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'dredging', label: 'Dredging', category: 'expense', inputKeys: ['annualDredging', 'dredging'], computeType: 'direct' },
   { key: 'mgmtFee', label: 'Management Fee', category: 'expense', inputKeys: ['annualManagementFee'], computeType: 'pct_of_revenue', pctKey: 'managementFeePct', defaultPct: 0 },
@@ -263,8 +263,8 @@ const SELF_STORAGE_COA: COALine[] = [
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'propertyManagement', label: 'Management Fee', category: 'expense', inputKeys: ['annualPropertyManagement'], computeType: 'pct_of_egi', pctKey: 'propertyManagementPct', defaultPct: 0.06 },
   { key: 'payroll', label: 'Payroll', category: 'expense', inputKeys: ['annualPayroll', 'payroll'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
   { key: 'maintenance', label: 'Maintenance', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'marketing', label: 'Marketing', category: 'expense', inputKeys: ['annualMarketing', 'marketing'], computeType: 'direct' },
@@ -288,11 +288,11 @@ const LAUNDROMAT_COA: COALine[] = [
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'rent', label: 'Rent / Lease', category: 'expense', inputKeys: ['annualRent'], computeType: 'monthly_x12' },
   { key: 'utilities', label: 'Utilities (Water/Gas/Electric)', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'maintenance', label: 'Machine Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'payroll', label: 'Payroll / Attendant', category: 'expense', inputKeys: ['annualPayroll', 'payroll'], computeType: 'direct' },
   { key: 'supplies', label: 'Supplies (Soap/Softener)', category: 'expense', inputKeys: ['annualSupplies', 'supplies'], computeType: 'direct' },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
   { key: 'trash', label: 'Trash Removal', category: 'expense', inputKeys: ['annualTrash', 'trash'], computeType: 'direct' },
   { key: 'pest', label: 'Pest Control', category: 'expense', inputKeys: ['annualPestControl', 'pestControl'], computeType: 'direct' },
   { key: 'otherExpenses', label: 'Other Expenses', category: 'expense', inputKeys: ['annualOtherExpenses', 'otherExpenses'], computeType: 'direct' },
@@ -313,8 +313,8 @@ const COMMERCIAL_COA: COALine[] = [
   { key: 'percentageRent', label: 'Percentage Rent', category: 'revenue', inputKeys: ['annualPercentageRent', 'percentageRent'], computeType: 'direct' },
   { key: 'otherIncome', label: 'Other Income', category: 'revenue', inputKeys: ['annualOtherIncome', 'otherIncome'], computeType: 'direct' },
   { key: 'mgmtFee', label: 'Management Fee', category: 'expense', inputKeys: ['annualManagementFee'], computeType: 'pct_of_egi', pctKey: 'propertyManagementPct', defaultPct: 0.04 },
-  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTax'], computeType: 'direct' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualPropertyTax', label: 'Property Tax', category: 'expense', inputKeys: ['annualPropertyTax', 'propertyTaxAnnual', 'propertyTax'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'cam', label: 'CAM / Common Area', category: 'expense', inputKeys: ['annualCAM', 'cam'], computeType: 'direct' },
   { key: 'maintenance', label: 'Maintenance & Repairs', category: 'expense', inputKeys: ['annualMaintenance', 'maintenance'], computeType: 'direct' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
@@ -332,7 +332,7 @@ const BUSINESS_COA: COALine[] = [
   { key: 'ownerSalary', label: "Owner's Salary (SDE add-back)", category: 'expense', inputKeys: ['ownerSalary', 'ownerCompensation'], computeType: 'direct' },
   { key: 'rent', label: 'Rent / Lease', category: 'expense', inputKeys: ['annualRent'], computeType: 'monthly_x12' },
   { key: 'utilities', label: 'Utilities', category: 'expense', inputKeys: ['annualUtilities'], computeType: 'monthly_x12' },
-  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insurance'], computeType: 'direct' },
+  { key: 'annualInsurance', label: 'Insurance', category: 'expense', inputKeys: ['annualInsurance', 'insuranceAnnual', 'insurance'], computeType: 'direct' },
   { key: 'marketing', label: 'Marketing & Advertising', category: 'expense', inputKeys: ['annualMarketing', 'marketing'], computeType: 'direct' },
   { key: 'accounting', label: 'Accounting / Legal', category: 'expense', inputKeys: ['annualAccounting', 'accounting'], computeType: 'direct' },
   { key: 'software', label: 'Software / Subscriptions', category: 'expense', inputKeys: ['annualSoftware', 'software'], computeType: 'direct' },
