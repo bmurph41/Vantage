@@ -45,7 +45,9 @@
       "Bash(find /home/runner/workspace/client/src/hooks -type f -name *om* -o -name *document* -o -name *autosave*)",
       "Bash(find /home/runner/workspace/client/src/stores -name *om* -o -name *document*)",
       "Bash(node -e \"require\\(''''./shared/asset-class-model-config.ts''''\\)\")",
-      "Bash(node --loader ts-node/esm -e \"import { getModelConfig, MODEL_CONFIG_REGISTRY } from ''''./shared/asset-class-model-config.ts''''; console.log\\(Object.keys\\(MODEL_CONFIG_REGISTRY\\).sort\\(\\).join\\('''', ''''\\)\\); console.log\\(''''land config:'''', getModelConfig\\(''''land''''\\).label\\);\")"
+      "Bash(node --loader ts-node/esm -e \"import { getModelConfig, MODEL_CONFIG_REGISTRY } from ''''./shared/asset-class-model-config.ts''''; console.log\\(Object.keys\\(MODEL_CONFIG_REGISTRY\\).sort\\(\\).join\\('''', ''''\\)\\); console.log\\(''''land config:'''', getModelConfig\\(''''land''''\\).label\\);\")",
+      "Bash(/tmp/summary.txt:*)",
+      "Read(//tmp/**)"
     ]
   }
 }
