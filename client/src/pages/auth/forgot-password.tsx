@@ -7,9 +7,8 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Anchor, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { Loader2, Anchor, Mail, ArrowLeft, CheckCircle, Lock, ShieldCheck, KeyRound, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const forgotPasswordSchema = z.object({
@@ -54,111 +53,220 @@ export default function ForgotPasswordPage() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 rounded-full bg-green-100">
+      <div className="min-h-screen flex">
+        {/* Left Panel - Success State */}
+        <div className="flex-1 flex flex-col bg-white">
+          <div className="p-6 flex items-center">
+            <Link href="/">
+              <div className="flex items-center gap-2 cursor-pointer">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <Anchor className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
+              </div>
+            </Link>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center px-8 pb-8">
+            <div className="w-full max-w-sm text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6 animate-in zoom-in-50 duration-300">
                 <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
+
+              <h1 className="text-2xl font-bold text-slate-800 mb-2">
+                Check Your Email
+              </h1>
+              <p className="text-slate-500 mb-2">
+                We've sent password reset instructions to:
+              </p>
+              <p className="font-medium text-slate-800 mb-6">{submittedEmail}</p>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-left">
+                <div className="flex gap-2">
+                  <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">
+                    Don't see the email? Check your spam or junk folder. The reset link will expire in 1 hour.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full h-12 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-cyan-300"
+                  onClick={() => {
+                    setEmailSent(false);
+                    form.reset();
+                  }}
+                >
+                  Try a different email
+                </Button>
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    className="w-full h-12 text-slate-600 hover:text-cyan-600"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Sign In
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <CardTitle className="text-2xl font-bold">
-              Check Your Email
-            </CardTitle>
-            <CardDescription>
-              We've sent password reset instructions to:
-            </CardDescription>
-            <p className="font-medium text-foreground">{submittedEmail}</p>
-          </CardHeader>
-          <CardContent className="space-y-4 text-center text-sm text-muted-foreground">
-            <p>
-              If you don't see the email, check your spam folder. The reset link will expire in 1 hour.
+          </div>
+
+          <div className="p-6 border-t border-slate-100 text-center text-sm text-slate-400">
+            <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+          </div>
+        </div>
+
+        {/* Right Panel - Feature Panel */}
+        <div className="hidden lg:flex flex-1 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 items-center justify-center p-12 relative overflow-hidden">
+          <div className="absolute top-1/4 -right-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 -left-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+
+          <div className="relative text-center text-white max-w-lg">
+            <div className="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
+              <ShieldCheck className="w-10 h-10 text-cyan-400" />
+            </div>
+            <h2 className="text-3xl font-bold mb-4">Account Security</h2>
+            <p className="text-lg text-slate-300 leading-relaxed mb-10">
+              Your account security is our priority. The password reset process is fast, secure, and easy.
             </p>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setEmailSent(false);
-                form.reset();
-              }}
-            >
-              Try a different email
-            </Button>
-            <Link href="/login" className="w-full">
-              <Button variant="ghost" className="w-full">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Sign In
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
+
+            <div className="space-y-5 text-left">
+              {[
+                { icon: Mail, title: "Check your inbox", desc: "We'll send a secure, one-time reset link to your email" },
+                { icon: KeyRound, title: "Create a new password", desc: "Choose a strong password that you haven't used before" },
+                { icon: Lock, title: "Stay protected", desc: "Enable two-factor authentication for extra security" },
+              ].map((tip, i) => (
+                <div key={i} className="flex items-start gap-4 bg-white/5 rounded-xl p-4">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shrink-0">
+                    <tip.icon className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white text-sm">{tip.title}</h4>
+                    <p className="text-slate-400 text-sm">{tip.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Anchor className="h-8 w-8 text-primary" />
+    <div className="min-h-screen flex">
+      {/* Left Panel - Form */}
+      <div className="flex-1 flex flex-col bg-white">
+        <div className="p-6 flex items-center">
+          <Link href="/">
+            <div className="flex items-center gap-2 cursor-pointer">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <Anchor className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
             </div>
-          </div>
-          <CardTitle className="text-2xl font-bold">
-            Forgot Password?
-          </CardTitle>
-          <CardDescription>
-            Enter your email address and we'll send you instructions to reset your password.
-          </CardDescription>
-        </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder="you@example.com"
-                          autoComplete="email"
-                          className="pl-10"
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col space-y-4">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={forgotPasswordMutation.isPending}
-              >
-                {forgotPasswordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Reset Instructions
-              </Button>
-              <Link href="/login" className="w-full">
-                <Button variant="ghost" className="w-full">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Sign In
+          </Link>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center px-8 pb-8">
+          <div className="w-full max-w-sm">
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">
+              Reset your password
+            </h1>
+            <p className="text-slate-500 mb-8">
+              Enter your email address and we'll send you instructions to reset your password.
+            </p>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-slate-700">Email Address</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="you@example.com"
+                            autoComplete="email"
+                            className="h-12 pl-10 border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50"
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-medium shadow-lg shadow-cyan-500/25"
+                  disabled={forgotPasswordMutation.isPending}
+                >
+                  {forgotPasswordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Reset Instructions
                 </Button>
-              </Link>
-            </CardFooter>
-          </form>
-        </Form>
-      </Card>
+
+                <Link href="/login">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full h-12 text-slate-600 hover:text-cyan-600"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Sign In
+                  </Button>
+                </Link>
+              </form>
+            </Form>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-slate-100 text-center text-sm text-slate-400">
+          <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+        </div>
+      </div>
+
+      {/* Right Panel - Feature Panel */}
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 items-center justify-center p-12 relative overflow-hidden">
+        <div className="absolute top-1/4 -right-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 -left-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+
+        <div className="relative text-center text-white max-w-lg">
+          <div className="w-20 h-20 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8">
+            <ShieldCheck className="w-10 h-10 text-cyan-400" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4">Account Security</h2>
+          <p className="text-lg text-slate-300 leading-relaxed mb-10">
+            Your account security is our priority. The password reset process is fast, secure, and easy.
+          </p>
+
+          <div className="space-y-5 text-left">
+            {[
+              { icon: Mail, title: "Check your inbox", desc: "We'll send a secure, one-time reset link to your email" },
+              { icon: KeyRound, title: "Create a new password", desc: "Choose a strong password that you haven't used before" },
+              { icon: Lock, title: "Stay protected", desc: "Enable two-factor authentication for extra security" },
+            ].map((tip, i) => (
+              <div key={i} className="flex items-start gap-4 bg-white/5 rounded-xl p-4">
+                <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shrink-0">
+                  <tip.icon className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-white text-sm">{tip.title}</h4>
+                  <p className="text-slate-400 text-sm">{tip.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
