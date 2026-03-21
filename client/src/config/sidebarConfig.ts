@@ -280,17 +280,17 @@ export const sidebarConfig: SidebarGroup[] = [
       {
         id: 'om-builder',
         label: 'Investment Materials',
-        href: '/underwriting/om-builder',
+        href: '/document-studio',
         icon: FileText,
-        matchRoutes: ['/underwriting/om-builder', '/om-builder'],
+        matchRoutes: ['/document-studio', '/om', '/om-builder', '/document-builder'],
         requiredModules: [FEATURE_MODULES.UNDERWRITING_OM],
       },
       {
         id: 'modeling-settings',
         label: 'Model Settings',
-        href: '/underwriting/modeling-settings',
+        href: '/modeling/settings',
         icon: Settings,
-        matchRoutes: ['/underwriting/modeling-settings', '/modeling-settings'],
+        matchRoutes: ['/modeling/settings', '/modeling-settings'],
         requiredModules: [FEATURE_MODULES.UNDERWRITING_SETTINGS],
       },
       {
