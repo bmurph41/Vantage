@@ -11,7 +11,26 @@
       "Bash(GIT_TERMINAL_PROMPT=0 git push origin feat/exit-engine-patches)",
       "Bash(ls -lhS attached_assets/*.zip attached_assets/*.mp4)",
       "Bash(git remote:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(gh pr:*)",
+      "Bash(conda install:*)",
+      "Bash(npm install:*)",
+      "Bash(npx -y @anthropic-ai/claude-code --version)",
+      "Bash(curl -sL https://github.com/cli/cli/releases/download/v2.49.0/gh_2.49.0_linux_amd64.tar.gz)",
+      "Bash(tar xz:*)",
+      "Bash(/tmp/gh_2.49.0_linux_amd64/bin/gh --version)",
+      "Bash(/tmp/gh_2.49.0_linux_amd64/bin/gh pr:*)",
+      "Bash(find /home/runner/workspace -name *mapping* -o -name *asset*module*)",
+      "Bash(__NEW_LINE_3f0f1161cab3620f__ echo:*)",
+      "Bash(head -3 __NEW_LINE_3f0f1161cab3620f__ echo \"\" echo \"API: /api/crm/properties\" grep -r \"crm/properties\\\\|''''/properties\\\\|properties''''\" /home/runner/workspace/server/routes --include=\"*.ts\")",
+      "Bash(find /home/runner/workspace/server -name *export* -o -name *pdf*)",
+      "Bash(ls -1 /home/runner/workspace/server/routes/*.ts)",
+      "Bash(npx vitest:*)",
+      "Bash(ls /home/runner/workspace/server/routes/crm-*.ts)",
+      "Bash(npm run:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx esbuild:*)",
+      "Bash(env)"
     ]
   }
 }
