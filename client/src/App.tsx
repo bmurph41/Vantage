@@ -323,6 +323,11 @@ const OMBrandKits = lazy(() => import("@/modules/om-builder/pages/om-brand-kits"
 const OMCanvasEditor = lazy(() => import("@/pages/om-builder-editor"));
 const DocumentBuilderPage = lazy(() => import("@/pages/document-builder/DocumentBuilderPage"));
 
+// Document Studio (unified documents hub)
+const DocumentStudioHub = lazy(() => import("@/pages/document-studio/DocumentStudioHub"));
+const DocumentEditor = lazy(() => import("@/pages/document-studio/DocumentEditor"));
+const TemplateGallery = lazy(() => import("@/pages/document-studio/TemplateGallery"));
+
 // Onboarding Wizard (lazy loaded)
 const OnboardingWizard = lazy(() => import("@/components/onboarding/OnboardingWizard").then(m => ({ default: m.OnboardingWizard })));
 
@@ -1071,7 +1076,37 @@ function Router() {
         )}
       </Route>
 
-      {/* Simple Report (Quick Reports) */}
+      {/* Document Studio (unified documents) */}
+      <Route path="/document-studio">
+        {() => (
+          <UnifiedLayout>
+            <DocumentStudioHub />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/document-studio/templates">
+        {() => (
+          <UnifiedLayout>
+            <TemplateGallery />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/document-studio/editor/:documentId">
+        {(params: { documentId: string }) => (
+          <UnifiedLayout>
+            <DocumentEditor documentId={params.documentId} />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/document-studio/new">
+        {() => (
+          <UnifiedLayout>
+            <DocumentStudioHub />
+          </UnifiedLayout>
+        )}
+      </Route>
+
+      {/* Simple Report (Quick Reports) - redirects to Document Studio */}
       <Route path="/simple-report">
         {() => (
           <UnifiedLayout>
