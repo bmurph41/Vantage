@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 import {
   FileText,
   Search,
@@ -620,12 +622,15 @@ const DEFAULT_TEMPLATES: TemplateData[] = [
 // ---------------------------------------------------------------------------
 
 export default function TemplateGallery() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [docTypeFilter, setDocTypeFilter] = useState<DocumentType | 'all'>('all');
   const [assetFilter, setAssetFilter] = useState<AssetClassFilter>('all');
   const [audienceFilter, setAudienceFilter] = useState<AudienceFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('popular');
   const [search, setSearch] = useState('');
   const [previewTemplate, setPreviewTemplate] = useState<TemplateData | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const filtered = useMemo(() => {
     let result = DEFAULT_TEMPLATES.filter((t) => {
@@ -670,7 +675,7 @@ export default function TemplateGallery() {
               Professional templates for every document type and asset class
             </p>
           </div>
-          <Button>
+          <Button onClick={() => navigate('/document-studio/new?type=custom')}>
             <Plus className="mr-2 h-4 w-4" />
             Create Custom Template
           </Button>
@@ -770,7 +775,33 @@ export default function TemplateGallery() {
                       </p>
                     </CardContent>
                     <CardFooter className="pt-0">
-                      <Button size="sm" className="w-full">
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={isCreating}
+                        onClick={async () => {
+                          try {
+                            setIsCreating(true);
+                            const res = await fetch('/api/document-builder/documents', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                title: t.name,
+                                documentType: t.type,
+                                templateId: String(t.id),
+                                assetClass: t.assetClasses?.[0] || null,
+                              }),
+                            });
+                            if (!res.ok) throw new Error('Failed to create document');
+                            const doc = await res.json();
+                            navigate(`/document-studio/editor/${doc.id}`);
+                          } catch {
+                            toast({ title: 'Failed to create document', variant: 'destructive' });
+                          } finally {
+                            setIsCreating(false);
+                          }
+                        }}
+                      >
                         Use Template
                         <ArrowRight className="ml-2 h-3.5 w-3.5" />
                       </Button>
@@ -860,7 +891,34 @@ export default function TemplateGallery() {
                     </CardContent>
 
                     <CardFooter className="pt-0 pb-3 gap-2">
-                      <Button size="sm" variant="default" className="flex-1 h-8 text-xs">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="flex-1 h-8 text-xs"
+                        disabled={isCreating}
+                        onClick={async () => {
+                          try {
+                            setIsCreating(true);
+                            const res = await fetch('/api/document-builder/documents', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                title: t.name,
+                                documentType: t.type,
+                                templateId: String(t.id),
+                                assetClass: t.assetClasses?.[0] || null,
+                              }),
+                            });
+                            if (!res.ok) throw new Error('Failed');
+                            const doc = await res.json();
+                            navigate(`/document-studio/editor/${doc.id}`);
+                          } catch {
+                            toast({ title: 'Failed to create document', variant: 'destructive' });
+                          } finally {
+                            setIsCreating(false);
+                          }
+                        }}
+                      >
                         Use Template
                       </Button>
                       <Button
@@ -965,10 +1023,63 @@ export default function TemplateGallery() {
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setPreviewTemplate(null)}>
+              <Button
+                variant="outline"
+                disabled={isCreating}
+                onClick={async () => {
+                  if (!previewTemplate) return;
+                  try {
+                    setIsCreating(true);
+                    const res = await fetch('/api/document-builder/documents', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: previewTemplate.name,
+                        documentType: previewTemplate.type,
+                        templateId: String(previewTemplate.id),
+                        assetClass: previewTemplate.assetClasses?.[0] || null,
+                      }),
+                    });
+                    if (!res.ok) throw new Error('Failed');
+                    const doc = await res.json();
+                    setPreviewTemplate(null);
+                    navigate(`/document-studio/editor/${doc.id}?customize=true`);
+                  } catch {
+                    toast({ title: 'Failed to create document', variant: 'destructive' });
+                  } finally {
+                    setIsCreating(false);
+                  }
+                }}
+              >
                 Customize First
               </Button>
-              <Button>
+              <Button
+                disabled={isCreating}
+                onClick={async () => {
+                  if (!previewTemplate) return;
+                  try {
+                    setIsCreating(true);
+                    const res = await fetch('/api/document-builder/documents', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: previewTemplate.name,
+                        documentType: previewTemplate.type,
+                        templateId: String(previewTemplate.id),
+                        assetClass: previewTemplate.assetClasses?.[0] || null,
+                      }),
+                    });
+                    if (!res.ok) throw new Error('Failed');
+                    const doc = await res.json();
+                    setPreviewTemplate(null);
+                    navigate(`/document-studio/editor/${doc.id}`);
+                  } catch {
+                    toast({ title: 'Failed to create document', variant: 'destructive' });
+                  } finally {
+                    setIsCreating(false);
+                  }
+                }}
+              >
                 Use This Template
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

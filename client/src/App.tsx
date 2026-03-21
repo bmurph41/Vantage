@@ -1094,7 +1094,7 @@ function Router() {
       <Route path="/document-studio/editor/:documentId">
         {(params: { documentId: string }) => (
           <UnifiedLayout>
-            <DocumentEditor documentId={params.documentId} />
+            <DocumentEditor documentId={parseInt(params.documentId, 10)} />
           </UnifiedLayout>
         )}
       </Route>

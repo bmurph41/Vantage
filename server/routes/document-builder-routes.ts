@@ -5,6 +5,9 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { eq, desc } from 'drizzle-orm';
+import { db } from '../db';
+import { omBuilderDocuments, omDocumentSections, omExemplars } from '@shared/document-builder/schema';
 import { documentBuilderService } from '../services/document-builder/document-builder-service';
 import { dataBindingService } from '../services/document-builder/data-binding-service';
 import { aiContentGenerationService } from '../services/document-builder/ai-content-service';
@@ -164,6 +167,115 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 // =============================================================================
 // Document CRUD Routes
 // =============================================================================
+
+/**
+ * GET /api/document-builder/documents
+ * List all documents for the current user/org
+ */
+router.get(
+  '/documents',
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id;
+    const docs = await db
+      .select()
+      .from(omBuilderDocuments)
+      .where(eq(omBuilderDocuments.createdBy, userId))
+      .orderBy(desc(omBuilderDocuments.updatedAt));
+    res.json(docs);
+  })
+);
+
+/**
+ * GET /api/document-builder/templates
+ * List available document templates
+ */
+router.get(
+  '/templates',
+  asyncHandler(async (req: Request, res: Response) => {
+    const templates = await db
+      .select()
+      .from(omExemplars)
+      .where(eq(omExemplars.isPublic, true))
+      .orderBy(desc(omExemplars.createdAt));
+
+    // If no db templates, return built-in template metadata
+    if (templates.length === 0) {
+      const builtIn = [
+        { id: 1, name: 'Marina Acquisition OM', documentType: 'offering_memorandum', assetClass: 'marina', description: 'Full 30+ page offering memorandum for marina acquisitions', estimatedPages: 32, sections: 10, popularity: 95 },
+        { id: 2, name: 'Multifamily Offering Memorandum', documentType: 'offering_memorandum', assetClass: 'multifamily', description: 'Institutional-grade OM for multifamily properties', estimatedPages: 28, sections: 9, popularity: 90 },
+        { id: 3, name: 'Self-Storage Acquisition OM', documentType: 'offering_memorandum', assetClass: 'self_storage', description: 'Self-storage investment offering memorandum', estimatedPages: 24, sections: 8, popularity: 80 },
+        { id: 4, name: 'Hotel Investment Memorandum', documentType: 'offering_memorandum', assetClass: 'hotel', description: 'Hospitality investment memorandum with USALI metrics', estimatedPages: 30, sections: 10, popularity: 75 },
+        { id: 5, name: 'Executive Summary', documentType: 'executive_summary', assetClass: null, description: 'Concise 2-3 page investment summary for any asset class', estimatedPages: 3, sections: 5, popularity: 85 },
+        { id: 6, name: 'Investment Memo', documentType: 'ic_memo', assetClass: null, description: 'IC-ready investment committee memo', estimatedPages: 8, sections: 7, popularity: 82 },
+        { id: 7, name: 'Pitch Deck', documentType: 'pitch_deck', assetClass: null, description: 'Visual 10-slide investment presentation', estimatedPages: 10, sections: 10, popularity: 78 },
+        { id: 8, name: 'Lender Package', documentType: 'lender_package', assetClass: null, description: 'Debt financing package for lenders', estimatedPages: 20, sections: 8, popularity: 70 },
+        { id: 9, name: 'Vacation Rental Portfolio Summary', documentType: 'executive_summary', assetClass: 'str', description: 'STR portfolio investment summary', estimatedPages: 5, sections: 6, popularity: 65 },
+        { id: 10, name: 'Commercial Property OM', documentType: 'offering_memorandum', assetClass: 'retail', description: 'Commercial property offering memorandum', estimatedPages: 26, sections: 9, popularity: 72 },
+      ];
+      return res.json(builtIn);
+    }
+    res.json(templates);
+  })
+);
+
+/**
+ * POST /api/document-builder/documents/:id/duplicate
+ * Duplicate an existing document
+ */
+router.post(
+  '/documents/:id/duplicate',
+  asyncHandler(async (req: Request, res: Response) => {
+    const docId = req.params.id;
+    const userId = (req as any).user?.id;
+
+    // Fetch the original document
+    const [original] = await db
+      .select()
+      .from(omBuilderDocuments)
+      .where(eq(omBuilderDocuments.id, docId));
+
+    if (!original) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    // Create a copy (omit id so the DB generates a new one)
+    const { id: _id, createdAt: _ca, updatedAt: _ua, ...rest } = original;
+    const [copy] = await db
+      .insert(omBuilderDocuments)
+      .values({
+        ...rest,
+        title: `${original.title} (Copy)`,
+        status: 'draft',
+        createdBy: userId || original.createdBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Copy sections
+    const sections = await db
+      .select()
+      .from(omDocumentSections)
+      .where(eq(omDocumentSections.documentId, docId));
+
+    if (sections.length > 0) {
+      await db.insert(omDocumentSections).values(
+        sections.map((s) => {
+          const { id: _sid, createdAt: _sca, updatedAt: _sua, ...srest } = s;
+          return {
+            ...srest,
+            documentId: copy.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        })
+      );
+    }
+
+    res.json(copy);
+  })
+);
 
 /**
  * POST /api/document-builder/documents

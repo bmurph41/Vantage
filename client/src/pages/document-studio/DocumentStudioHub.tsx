@@ -15,6 +15,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   FileText, Plus, Search, Filter, MoreHorizontal, Edit, Copy, Download,
   Share2, Trash2, FileSpreadsheet, Presentation, BookOpen, FileCheck,
   Briefcase, Building, Clock, Star, ChevronRight, FolderOpen, Sparkles,
@@ -148,10 +152,16 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   quick_report: "Quick Report",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-amber-100 text-amber-800",
-  published: "bg-green-100 text-green-800",
-  archived: "bg-gray-100 text-gray-600",
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-gray-100 text-gray-700" },
+  in_progress: { label: "In Progress", className: "bg-blue-100 text-blue-700" },
+  review: { label: "In Review", className: "bg-yellow-100 text-yellow-700" },
+  approved: { label: "Approved", className: "bg-green-100 text-green-700" },
+  generating: { label: "Generating", className: "bg-purple-100 text-purple-700" },
+  completed: { label: "Published", className: "bg-green-100 text-green-700" },
+  failed: { label: "Failed", className: "bg-red-100 text-red-700" },
+  published: { label: "Published", className: "bg-green-100 text-green-700" },
+  archived: { label: "Archived", className: "bg-gray-100 text-gray-600" },
 };
 
 // ---------------------------------------------------------------------------
@@ -171,6 +181,9 @@ export default function DocumentStudioHub() {
   const [newDocName, setNewDocName] = useState("");
   const [newDocAudience, setNewDocAudience] = useState<string>("");
   const [newDocAssetClass, setNewDocAssetClass] = useState<string>("");
+
+  // Delete confirmation state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -220,6 +233,9 @@ export default function DocumentStudioHub() {
       queryClient.invalidateQueries({ queryKey: ["document-builder", "documents"] });
       toast({ title: "Document deleted" });
     },
+    onError: () => {
+      toast({ title: "Operation failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    },
   });
 
   const duplicateMutation = useMutation({
@@ -232,14 +248,17 @@ export default function DocumentStudioHub() {
       queryClient.invalidateQueries({ queryKey: ["document-builder", "documents"] });
       toast({ title: "Document duplicated" });
     },
+    onError: () => {
+      toast({ title: "Operation failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    },
   });
 
   const createMutation = useMutation({
     mutationFn: async (input: {
       documentType: DocumentType;
       title: string;
-      dealId?: number;
-      templateId?: number;
+      dealId?: string;
+      templateId?: string;
       audience?: string;
       assetClass?: string;
     }) => {
@@ -257,6 +276,9 @@ export default function DocumentStudioHub() {
       setShowNewDialog(false);
       resetWizard();
       navigate(`/document-studio/editor/${data.id}`);
+    },
+    onError: () => {
+      toast({ title: "Operation failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     },
   });
 
@@ -316,8 +338,8 @@ export default function DocumentStudioHub() {
     createMutation.mutate({
       documentType: selectedType,
       title: newDocName.trim(),
-      dealId: selectedProjectId ? Number(selectedProjectId) : undefined,
-      templateId: selectedTemplateId ?? undefined,
+      dealId: (selectedProjectId && selectedProjectId !== "none") ? selectedProjectId : undefined,
+      templateId: selectedTemplateId ? String(selectedTemplateId) : undefined,
       audience: newDocAudience || undefined,
       assetClass: newDocAssetClass || undefined,
     });
@@ -568,6 +590,12 @@ export default function DocumentStudioHub() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="review">In Review</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="generating">Generating</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="published">Published</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
@@ -612,8 +640,8 @@ export default function DocumentStudioHub() {
                           {doc.projectName ?? doc.dealName ?? "-"}
                         </td>
                         <td className="py-3 px-4">
-                          <Badge className={`text-[10px] ${STATUS_STYLES[doc.status] ?? ""}`}>
-                            {doc.status}
+                          <Badge className={`text-[10px] ${STATUS_STYLES[doc.status]?.className ?? ""}`}>
+                            {STATUS_STYLES[doc.status]?.label ?? doc.status}
                           </Badge>
                         </td>
                         <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">
@@ -644,15 +672,99 @@ export default function DocumentStudioHub() {
                                   <Copy className="h-3.5 w-3.5 mr-2" />
                                   Duplicate
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(`/api/document-builder/documents/${doc.id}/export?format=pdf`)}>
+                                <DropdownMenuItem onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ format: 'pdf' }),
+                                    });
+                                    if (!res.ok) throw new Error('Export failed');
+                                    const json = await res.json();
+                                    const job = json.data ?? json;
+                                    toast({ title: 'Export started', description: `PDF export is being generated. Job ID: ${job.id}` });
+                                    const checkJob = async () => {
+                                      const jobRes = await fetch(`/api/document-builder/export/${job.id}`);
+                                      const jobJson = await jobRes.json();
+                                      const jobData = jobJson.data ?? jobJson;
+                                      if (jobData.status === 'completed' && jobData.downloadUrl) {
+                                        window.open(jobData.downloadUrl);
+                                        toast({ title: 'Export ready', description: 'Your PDF is downloading.' });
+                                      } else if (jobData.status === 'failed') {
+                                        toast({ title: 'Export failed', variant: 'destructive' });
+                                      } else {
+                                        setTimeout(checkJob, 2000);
+                                      }
+                                    };
+                                    setTimeout(checkJob, 2000);
+                                  } catch {
+                                    toast({ title: 'Export failed', variant: 'destructive' });
+                                  }
+                                }}>
                                   <Download className="h-3.5 w-3.5 mr-2" />
                                   Export PDF
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(`/api/document-builder/documents/${doc.id}/export?format=docx`)}>
+                                <DropdownMenuItem onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ format: 'docx' }),
+                                    });
+                                    if (!res.ok) throw new Error('Export failed');
+                                    const json = await res.json();
+                                    const job = json.data ?? json;
+                                    toast({ title: 'Export started', description: `DOCX export is being generated. Job ID: ${job.id}` });
+                                    const checkJob = async () => {
+                                      const jobRes = await fetch(`/api/document-builder/export/${job.id}`);
+                                      const jobJson = await jobRes.json();
+                                      const jobData = jobJson.data ?? jobJson;
+                                      if (jobData.status === 'completed' && jobData.downloadUrl) {
+                                        window.open(jobData.downloadUrl);
+                                        toast({ title: 'Export ready', description: 'Your DOCX is downloading.' });
+                                      } else if (jobData.status === 'failed') {
+                                        toast({ title: 'Export failed', variant: 'destructive' });
+                                      } else {
+                                        setTimeout(checkJob, 2000);
+                                      }
+                                    };
+                                    setTimeout(checkJob, 2000);
+                                  } catch {
+                                    toast({ title: 'Export failed', variant: 'destructive' });
+                                  }
+                                }}>
                                   <Download className="h-3.5 w-3.5 mr-2" />
                                   Export DOCX
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(`/api/document-builder/documents/${doc.id}/export?format=pptx`)}>
+                                <DropdownMenuItem onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/document-builder/documents/${doc.id}/export`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ format: 'pptx' }),
+                                    });
+                                    if (!res.ok) throw new Error('Export failed');
+                                    const json = await res.json();
+                                    const job = json.data ?? json;
+                                    toast({ title: 'Export started', description: `PPTX export is being generated. Job ID: ${job.id}` });
+                                    const checkJob = async () => {
+                                      const jobRes = await fetch(`/api/document-builder/export/${job.id}`);
+                                      const jobJson = await jobRes.json();
+                                      const jobData = jobJson.data ?? jobJson;
+                                      if (jobData.status === 'completed' && jobData.downloadUrl) {
+                                        window.open(jobData.downloadUrl);
+                                        toast({ title: 'Export ready', description: 'Your PPTX is downloading.' });
+                                      } else if (jobData.status === 'failed') {
+                                        toast({ title: 'Export failed', variant: 'destructive' });
+                                      } else {
+                                        setTimeout(checkJob, 2000);
+                                      }
+                                    };
+                                    setTimeout(checkJob, 2000);
+                                  } catch {
+                                    toast({ title: 'Export failed', variant: 'destructive' });
+                                  }
+                                }}>
                                   <Download className="h-3.5 w-3.5 mr-2" />
                                   Export PPTX
                                 </DropdownMenuItem>
@@ -667,7 +779,7 @@ export default function DocumentStudioHub() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-destructive"
-                                  onClick={() => deleteMutation.mutate(doc.id)}
+                                  onClick={() => setDeleteConfirmId(doc.id)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5 mr-2" />
                                   Delete
@@ -737,8 +849,8 @@ export default function DocumentStudioHub() {
                           >
                             {d.title}
                           </button>
-                          <Badge className={`text-[10px] ${STATUS_STYLES[d.status] ?? ""}`}>
-                            {d.status}
+                          <Badge className={`text-[10px] ${STATUS_STYLES[d.status]?.className ?? ""}`}>
+                            {STATUS_STYLES[d.status]?.label ?? d.status}
                           </Badge>
                         </div>
                       ))}
@@ -954,6 +1066,24 @@ export default function DocumentStudioHub() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the document.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deleteConfirmId) { deleteMutation.mutate(deleteConfirmId); setDeleteConfirmId(null); } }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

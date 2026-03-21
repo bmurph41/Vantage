@@ -54,6 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { queryClient } from '@/lib/queryClient';
 
 import {
   FileText, ArrowLeft, Save, Download, Share2, Settings, Eye, Sparkles,
@@ -441,6 +442,8 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
 
   // --- Section blocks (local state per section) ---
   const [sectionBlocks, setSectionBlocks] = useState<Record<string, ContentBlock[]>>({});
+  const sectionBlocksRef = useRef(sectionBlocks);
+  useEffect(() => { sectionBlocksRef.current = sectionBlocks; }, [sectionBlocks]);
 
   // --- Auto-save ---
   const lastSavedRef = useRef<Date | null>(null);
@@ -497,7 +500,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     return () => {
       if (saveTimerRef.current) clearInterval(saveTimerRef.current);
     };
-  }, [document, activeSectionId, sectionBlocks]);
+  }, [document, activeSectionId]);
 
   // Export job completion notification
   useEffect(() => {
@@ -526,7 +529,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     if (!document || !activeSectionId) return;
     setIsSaving(true);
     try {
-      const blocks = sectionBlocks[activeSectionId] || [];
+      const blocks = sectionBlocksRef.current[activeSectionId] || [];
       const narrative = blocks.filter(b => b.type === 'text' || b.type === 'heading').map(b => b.content.text).filter(Boolean).join('\n\n');
       const bullets = blocks.filter(b => b.type === 'bullet_list').flatMap(b => (b.content.text || '').split('\n').filter(Boolean));
       const tables = blocks.filter(b => b.type === 'table').map(b => b.content);
@@ -555,12 +558,13 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
         },
       });
       lastSavedRef.current = new Date();
-    } catch {
-      // Silently fail auto-save
+    } catch (err) {
+      console.warn('Auto-save failed:', err);
+      // Don't show error toast to avoid spamming user, but log it
     } finally {
       setIsSaving(false);
     }
-  }, [document, activeSectionId, sectionBlocks, updateDocMutation]);
+  }, [document, activeSectionId, updateDocMutation]);
 
   const handleTitleSave = useCallback(() => {
     if (titleDraft.trim() && titleDraft !== document?.title) {
@@ -627,12 +631,14 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     });
   }, []);
 
-  const handleUpdateBlock = useCallback((sectionId: string, blockId: string, content: Record<string, any>) => {
+  const handleUpdateBlock = useCallback((sectionId: string, blockId: string, content: Record<string, any>, bindings?: Record<string, any>) => {
     setSectionBlocks((prev) => {
       const current = prev[sectionId] || [];
       return {
         ...prev,
-        [sectionId]: current.map(b => b.id === blockId ? { ...b, content } : b),
+        [sectionId]: current.map((b) =>
+          b.id === blockId ? { ...b, content, ...(bindings !== undefined ? { bindings } : {}) } : b
+        ),
       };
     });
   }, []);
@@ -931,6 +937,8 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                 const shareUrl = `${window.location.origin}/document-studio/editor/${documentId}`;
                 navigator.clipboard.writeText(shareUrl).then(() => {
                   toast({ title: 'Link Copied', description: 'Document link copied to clipboard.' });
+                }).catch(() => {
+                  toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
                 });
               }}>
                 <Share2 className="w-4 h-4" />
@@ -1084,18 +1092,18 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             block={block}
                             isSelected={block.id === selectedBlockId}
                             onSelect={() => setSelectedBlockId(block.id)}
-                            onUpdate={(content) => handleUpdateBlock(activeSectionId!, block.id, content)}
-                            onRemove={() => handleRemoveBlock(activeSectionId!, block.id)}
-                            onCopy={() => handleCopyBlock(activeSectionId!, block)}
+                            onUpdate={(content) => { if (!activeSectionId) return; handleUpdateBlock(activeSectionId, block.id, content); }}
+                            onRemove={() => { if (!activeSectionId) return; handleRemoveBlock(activeSectionId, block.id); }}
+                            onCopy={() => { if (!activeSectionId) return; handleCopyBlock(activeSectionId, block); }}
                           />
-                          <AddBlockButton onAdd={(type) => handleAddBlock(activeSectionId!, type)} />
+                          <AddBlockButton onAdd={(type) => { if (!activeSectionId) return; handleAddBlock(activeSectionId, type); }} />
                         </React.Fragment>
                       ))}
                       {activeBlocks.length === 0 && (
                         <div className="text-center py-12 text-muted-foreground">
                           <Type className="w-10 h-10 mx-auto mb-3 opacity-30" />
                           <p className="text-sm mb-3">This section is empty</p>
-                          <AddBlockButton onAdd={(type) => handleAddBlock(activeSectionId!, type)} />
+                          <AddBlockButton onAdd={(type) => { if (!activeSectionId) return; handleAddBlock(activeSectionId, type); }} />
                         </div>
                       )}
                     </div>
@@ -1157,7 +1165,16 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                           </div>
                           <div className="flex items-center justify-between">
                             <label className="text-xs text-muted-foreground">Page Break Before</label>
-                            <Switch />
+                            <Switch
+                              checked={activeSection?.content?.pageBreakBefore || false}
+                              onCheckedChange={(checked) => {
+                                if (activeSection) {
+                                  updateDocMutation.mutate({
+                                    metadata: { ...document.metadata, pageBreaks: { ...(document.metadata?.pageBreaks || {}), [activeSection.sectionKey]: checked } },
+                                  });
+                                }
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -1175,11 +1192,27 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             </div>
                             <div>
                               <label className="text-xs text-muted-foreground">Font Size</label>
-                              <Slider defaultValue={[14]} min={10} max={36} step={1} className="mt-2" />
+                              <Slider
+                                value={[selectedBlock?.content?.fontSize || 14]}
+                                min={10} max={36} step={1}
+                                className="mt-2"
+                                onValueChange={([val]) => {
+                                  if (selectedBlock && activeSectionId) {
+                                    handleUpdateBlock(activeSectionId, selectedBlock.id, { ...selectedBlock.content, fontSize: val });
+                                  }
+                                }}
+                              />
                             </div>
                             <div>
                               <label className="text-xs text-muted-foreground">Alignment</label>
-                              <Select defaultValue="left">
+                              <Select
+                                value={selectedBlock?.content?.alignment || 'left'}
+                                onValueChange={(val) => {
+                                  if (selectedBlock && activeSectionId) {
+                                    handleUpdateBlock(activeSectionId, selectedBlock.id, { ...selectedBlock.content, alignment: val });
+                                  }
+                                }}
+                              >
                                 <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="left">Left</SelectItem>
@@ -1190,15 +1223,40 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             </div>
                             <div>
                               <label className="text-xs text-muted-foreground">Text Color</label>
-                              <Input className="h-8 text-xs mt-1" type="color" defaultValue="#000000" />
+                              <Input
+                                type="color"
+                                value={selectedBlock?.content?.color || '#000000'}
+                                className="h-8 w-full cursor-pointer mt-1"
+                                onChange={(e) => {
+                                  if (selectedBlock && activeSectionId) {
+                                    handleUpdateBlock(activeSectionId, selectedBlock.id, { ...selectedBlock.content, color: e.target.value });
+                                  }
+                                }}
+                              />
                             </div>
                             <div>
                               <label className="text-xs text-muted-foreground">Padding</label>
-                              <Slider defaultValue={[16]} min={0} max={64} step={4} className="mt-2" />
+                              <Slider
+                                value={[selectedBlock?.content?.padding || 0]}
+                                min={0} max={48} step={4}
+                                className="mt-2"
+                                onValueChange={([val]) => {
+                                  if (selectedBlock && activeSectionId) {
+                                    handleUpdateBlock(activeSectionId, selectedBlock.id, { ...selectedBlock.content, padding: val });
+                                  }
+                                }}
+                              />
                             </div>
                             <div className="flex items-center justify-between">
                               <label className="text-xs text-muted-foreground">Visible</label>
-                              <Switch defaultChecked />
+                              <Switch
+                                checked={selectedBlock?.content?.visible !== false}
+                                onCheckedChange={(checked) => {
+                                  if (selectedBlock && activeSectionId) {
+                                    handleUpdateBlock(activeSectionId, selectedBlock.id, { ...selectedBlock.content, visible: checked });
+                                  }
+                                }}
+                              />
                             </div>
                           </div>
                         ) : (
@@ -1238,16 +1296,23 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                               </Button>
                               <input type="file" className="hidden" accept="image/*" onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    updateDocMutation.mutate({
-                                      metadata: { ...document.metadata, logoUrl: reader.result as string },
-                                    });
-                                    toast({ title: 'Logo uploaded' });
-                                  };
-                                  reader.readAsDataURL(file);
+                                if (!file) return;
+                                if (file.size > 5 * 1024 * 1024) {
+                                  toast({ title: 'File too large', description: 'Logo must be under 5MB.', variant: 'destructive' });
+                                  return;
                                 }
+                                if (!file.type.startsWith('image/')) {
+                                  toast({ title: 'Invalid file', description: 'Please select an image file.', variant: 'destructive' });
+                                  return;
+                                }
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  updateDocMutation.mutate({
+                                    metadata: { ...document.metadata, logoUrl: reader.result as string },
+                                  });
+                                  toast({ title: 'Logo uploaded' });
+                                };
+                                reader.readAsDataURL(file);
                               }} />
                             </label>
                           </div>
@@ -1302,12 +1367,11 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                                       className="h-5 px-2 text-[10px] opacity-0 group-hover:opacity-100"
                                       onClick={() => {
                                         if (selectedBlock && activeSectionId) {
-                                          const updatedBlock = { ...selectedBlock };
-                                          updatedBlock.bindings = {
-                                            ...(updatedBlock.bindings || {}),
+                                          const updatedBindings = {
+                                            ...(selectedBlock.bindings || {}),
                                             [field]: { source: source.key, field },
                                           };
-                                          handleUpdateBlock(activeSectionId, selectedBlock.id, updatedBlock.content);
+                                          handleUpdateBlock(activeSectionId, selectedBlock.id, selectedBlock.content, updatedBindings);
                                           toast({ title: 'Binding Added', description: `Bound ${source.label}.${field}` });
                                         }
                                       }}
@@ -1356,15 +1420,17 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                               <span className="text-muted-foreground">{source.label}</span>
                               <div className="flex items-center gap-1.5">
                                 <Clock className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-muted-foreground">--</span>
+                                <span className="text-muted-foreground">
+                                  {document?.updatedAt ? new Date(document.updatedAt).toLocaleDateString() : '--'}
+                                </span>
                               </div>
                             </div>
                           ))}
                         </div>
                         <Button variant="outline" size="sm" className="w-full mt-3 text-xs" onClick={() => {
-                          if (document.dealId) {
+                          if (document?.dealId) {
                             toast({ title: 'Refreshing data...', description: 'Pulling latest data from project.' });
-                            window.location.reload();
+                            queryClient.invalidateQueries({ queryKey: ['document-builder'] });
                           } else {
                             toast({ title: 'No project linked', description: 'Link a project first to refresh data.', variant: 'destructive' });
                           }
@@ -1610,15 +1676,18 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowChangeProject(false)}>Cancel</Button>
               <Button onClick={() => {
-                if (newDealId) {
-                  updateDocMutation.mutate({ metadata: { ...document.metadata, linkedDealId: Number(newDealId) } }, {
-                    onSuccess: () => {
-                      toast({ title: 'Project updated' });
-                      setShowChangeProject(false);
-                      setNewDealId('');
-                    },
-                  });
+                const dealId = parseInt(newDealId, 10);
+                if (isNaN(dealId) || dealId <= 0) {
+                  toast({ title: 'Invalid deal ID', variant: 'destructive' });
+                  return;
                 }
+                updateDocMutation.mutate({ dealId: String(dealId), metadata: { ...document.metadata, linkedDealId: dealId } }, {
+                  onSuccess: () => {
+                    toast({ title: 'Project updated' });
+                    setShowChangeProject(false);
+                    setNewDealId('');
+                  },
+                });
               }} disabled={!newDealId || updateDocMutation.isPending}>
                 Link Project
               </Button>
