@@ -306,7 +306,7 @@ export default function DuplicateResolutionModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
+        <DialogContent className="w-full sm:max-w-3xl max-h-[90vh] overflow-hidden p-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
             <div className="flex items-start gap-3">
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${hasDuplicate ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>

@@ -973,7 +973,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium">Won Deals & Win Rate</span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Won This Period</p>
                   <p className="text-2xl font-bold truncate" data-testid="crm-won-deals">{data?.wonDeals || 0}</p>
@@ -999,7 +999,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium">Financial Models</span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground mb-1">Active Models</p>
                   <p className="text-2xl font-bold truncate" data-testid="modeling-active">{modelingData?.activeProjects || 0}</p>

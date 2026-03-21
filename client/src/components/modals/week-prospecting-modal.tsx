@@ -1450,7 +1450,7 @@ export default function WeekProspectingModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-7xl h-[90vh] overflow-hidden bg-white dark:bg-gray-900 border-0 shadow-2xl rounded-2xl flex flex-col p-0">
+        <DialogContent className="w-full sm:max-w-7xl h-[90vh] overflow-hidden bg-white dark:bg-gray-900 border-0 shadow-2xl rounded-2xl flex flex-col p-0">
           {/* MM-UI Style Header */}
           <div className="flex-shrink-0 px-6 pt-6 pb-4">
             <div className="flex items-center justify-between">
@@ -1987,7 +1987,7 @@ export default function WeekProspectingModal({
       
       {/* Activity Box Detail Modal */}
       <Dialog open={activityBoxModal.open} onOpenChange={(open) => !open && setActivityBoxModal({ open: false, day: '', boxId: '' })}>
-        <DialogContent className="max-w-2xl bg-white dark:bg-gray-900 border-0 shadow-2xl rounded-2xl p-0">
+        <DialogContent className="w-full sm:max-w-2xl bg-white dark:bg-gray-900 border-0 shadow-2xl rounded-2xl p-0">
           {/* MM-UI Style Header */}
           <div className="px-6 pt-6 pb-4">
             <div className="flex items-center gap-4">

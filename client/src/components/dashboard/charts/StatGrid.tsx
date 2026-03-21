@@ -39,8 +39,18 @@ export function StatGrid({
     }
   };
 
-  const gridClass = layout === 'grid' 
-    ? `grid grid-cols-${Math.min(columns, stats.length)} gap-4`
+  // Static class mapping — dynamic `grid-cols-${n}` breaks Tailwind JIT purging
+  const colCount = Math.min(columns, stats.length);
+  const gridColsMap: Record<number, string> = {
+    1: 'grid grid-cols-1 gap-4',
+    2: 'grid grid-cols-1 sm:grid-cols-2 gap-4',
+    3: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4',
+    4: 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4',
+    5: 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4',
+    6: 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4',
+  };
+  const gridClass = layout === 'grid'
+    ? gridColsMap[colCount] || gridColsMap[3]
     : 'flex flex-col gap-4';
 
   return (

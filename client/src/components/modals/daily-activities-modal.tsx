@@ -242,7 +242,7 @@ export function DailyActivitiesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+      <DialogContent className="w-full sm:max-w-4xl max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Calendar className="w-6 h-6 text-blue-600" />

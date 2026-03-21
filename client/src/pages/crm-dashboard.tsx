@@ -635,7 +635,7 @@ export default function CRMDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
                 { label: "Log a Call", icon: Phone, color: "bg-blue-100", textColor: "text-blue-600", href: "/crm/activities" },
                 { label: "Send Email", icon: Mail, color: "bg-purple-100", textColor: "text-purple-600", href: "/crm/activities" },

@@ -232,7 +232,7 @@ export function ProspectingSettingsDialog() {
           <Settings className="w-4 h-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Prospecting Settings</DialogTitle>
           <DialogDescription>
