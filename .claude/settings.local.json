@@ -30,7 +30,22 @@
       "Bash(npm run:*)",
       "Bash(npx vite:*)",
       "Bash(npx esbuild:*)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(find /home/runner/workspace/client/src -type f -path */contexts/* -name *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(ls -la /home/runner/workspace/server/integrations/connectors/*.ts)",
+      "Bash(ls /home/runner/workspace/server/integrations/connectors/*.ts)",
+      "Bash(npx tsx:*)",
+      "Bash(find /home/runner/workspace/client/src/pages -type f \\\\\\(-name *investment* -o -name *material* -o -name *document* -o -name *builder* -o -name *report* -o -name *offering* -o -name *om* \\\\\\))",
+      "Bash(find /home/runner/workspace/server -type f \\\\\\(-name *investment* -o -name *material* -o -name *document* -o -name *builder* -o -name *report* -o -name *offering* -o -name *om* \\\\\\))",
+      "Bash(find /home/runner/workspace/client/src -type f \\\\\\(-name *pdf* -o -name *template* -o -name *export* \\\\\\))",
+      "Bash(find /home/runner/workspace/server -type f \\\\\\(-name *pdf* -o -name *template* -o -name *export* \\\\\\))",
+      "Bash(find /home/runner/workspace/shared -type f -name *document* -o -name *om*)",
+      "Bash(wc:*)",
+      "Bash(find /home/runner/workspace/client/src/hooks -type f -name *om* -o -name *document* -o -name *autosave*)",
+      "Bash(find /home/runner/workspace/client/src/stores -name *om* -o -name *document*)",
+      "Bash(node -e \"require\\(''''./shared/asset-class-model-config.ts''''\\)\")",
+      "Bash(node --loader ts-node/esm -e \"import { getModelConfig, MODEL_CONFIG_REGISTRY } from ''''./shared/asset-class-model-config.ts''''; console.log\\(Object.keys\\(MODEL_CONFIG_REGISTRY\\).sort\\(\\).join\\('''', ''''\\)\\); console.log\\(''''land config:'''', getModelConfig\\(''''land''''\\).label\\);\")"
     ]
   }
 }
