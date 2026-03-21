@@ -56,6 +56,7 @@ export interface IntegrationItem {
   category: string;
   contexts: string[];
   uiPlacements?: string[];
+  assetClasses: string[];
   authType: "oauth" | "apiKey" | "none";
   websiteUrl: string | null;
   iconUrl: string | null;
