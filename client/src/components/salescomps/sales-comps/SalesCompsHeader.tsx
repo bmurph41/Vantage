@@ -38,17 +38,17 @@ export default function SalesCompsHeader({
   return (
     <div className="sticky top-0 z-40 bg-background">
       {/* Top Actions Bar */}
-      <div className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <div className="flex items-center gap-1">
+      <div className="bg-card border-b border-border px-3 md:px-6 py-3 md:py-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 min-w-0">
+            <div className="flex items-center gap-1 flex-1 min-w-0">
               {onSearchChange && (
                 <>
-                  <div className="relative">
+                  <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
                       placeholder="Search marina, location, seller..."
-                      className="pl-10 w-72"
+                      className="pl-10 w-full sm:w-72"
                       value={searchQuery}
                       onChange={(e) => onSearchChange(e.target.value)}
                       data-testid="input-search"
@@ -72,12 +72,12 @@ export default function SalesCompsHeader({
                 </>
               )}
             </div>
-            <div className="text-sm text-muted-foreground ml-4 px-3 py-1 bg-muted rounded-md">
+            <div className="text-sm text-muted-foreground sm:ml-4 px-3 py-1 bg-muted rounded-md whitespace-nowrap hidden sm:block">
               <span data-testid="text-count" className="font-semibold">{total.toLocaleString()}</span> comps found
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
+
+          <div className="flex items-center gap-2 flex-wrap overflow-x-auto">
             {canManageColumns && onColumnsClick && (
               <Button
                 variant="secondary"
@@ -143,8 +143,8 @@ export default function SalesCompsHeader({
       </div>
 
       {/* Navigation Tabs */}
-      <div className="px-6 border-b border-border bg-background">
-        <div className="flex items-center gap-2 py-2">
+      <div className="px-3 md:px-6 border-b border-border bg-background overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 md:gap-2 py-2 min-w-max">
           <Link href="/analysis/sales-comps">
             <Button 
               variant="ghost" 

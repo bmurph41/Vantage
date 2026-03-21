@@ -385,7 +385,7 @@ export default function UnifiedSidebar() {
         onClick={handleNavClick}
         className={cn(
           "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-          sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-2.5",
+          sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-3 md:py-2.5",
           isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
@@ -493,20 +493,40 @@ export default function UnifiedSidebar() {
   return (
     <TooltipProvider delayDuration={0}>
       <>
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="fixed top-4 left-4 z-50 md:hidden bg-sidebar p-2 rounded-lg shadow-lg hover:bg-sidebar-accent transition-colors"
-          data-testid="button-mobile-menu"
-          aria-label="Open menu"
-        >
-          <Menu className="w-6 h-6 text-sidebar-foreground" />
-        </button>
+        {/* Mobile Header Bar - replaces floating hamburger to avoid overlap */}
+        <div className="fixed top-0 left-0 right-0 z-40 md:hidden bg-sidebar border-b border-sidebar-border shadow-sm mobile-header-bar">
+          <div className="flex items-center justify-between px-3 h-14 safe-area-top">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 -ml-1 rounded-lg hover:bg-sidebar-accent transition-colors touch-target"
+              data-testid="button-mobile-menu"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5 text-sidebar-foreground" />
+            </button>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
+                <Anchor className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-base font-bold text-sidebar-foreground">MarinaMatch</span>
+            </Link>
+            <button
+              onClick={() => {
+                const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+                document.dispatchEvent(event);
+              }}
+              className="p-2 -mr-1 rounded-lg hover:bg-sidebar-accent transition-colors touch-target"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5 text-sidebar-foreground/70" />
+            </button>
+          </div>
+        </div>
 
         {/* Mobile Overlay */}
         {mobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"
+            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}
             data-testid="mobile-menu-overlay"
           />
@@ -520,7 +540,8 @@ export default function UnifiedSidebar() {
             "transition-all duration-300 ease-in-out",
             "md:translate-x-0",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-            sidebarCollapsed ? "w-16" : "w-64"
+            // On mobile, always show full-width sidebar (never collapsed icon mode)
+            sidebarCollapsed ? "w-64 md:w-16" : "w-64"
           )}
           data-testid="unified-sidebar"
         >
@@ -1012,7 +1033,7 @@ export default function UnifiedSidebar() {
       </nav>
       
       {/* Simplified Mode Toggle */}
-      <div className="border-t border-sidebar-border bg-sidebar flex-shrink-0 hidden md:block">
+      <div className="border-t border-sidebar-border bg-sidebar flex-shrink-0">
         <SimplifiedModeToggle collapsed={sidebarCollapsed} />
       </div>
 
@@ -1050,7 +1071,7 @@ export default function UnifiedSidebar() {
             </div>
           )}
           <div className={cn(
-            "border-t border-sidebar-border bg-sidebar flex-shrink-0",
+            "border-t border-sidebar-border bg-sidebar flex-shrink-0 safe-area-bottom",
             sidebarCollapsed ? "p-2" : "p-4"
           )} data-testid="user-profile">
             {user && (

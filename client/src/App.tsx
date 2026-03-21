@@ -381,12 +381,12 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
         <Breadcrumb />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto mobile-main-content">
           <Suspense fallback={<PageLoader />}>
             {children}
           </Suspense>

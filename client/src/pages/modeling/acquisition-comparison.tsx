@@ -297,31 +297,32 @@ export default function AcquisitionComparison() {
   return (
     <div className="flex-1 flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b shadow-sm">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="p-3 md:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setLocation('/modeling/projects')}
-                className="gap-2"
+                className="gap-2 flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Projects
+                <span className="hidden sm:inline">Back to Projects</span>
+                <span className="sm:hidden">Back</span>
               </Button>
-              <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Scale className="h-5 w-5 text-primary" />
-                  Acquisition Comparison
+              <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block" />
+              <div className="min-w-0">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Scale className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="truncate">Acquisition Comparison</span>
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                   Compare 2–4 modeling projects side-by-side
                 </p>
               </div>
             </div>
             {selectedIds.size > 0 && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="text-sm flex-shrink-0">
                 {selectedIds.size} project{selectedIds.size > 1 ? 's' : ''} selected
               </Badge>
             )}
@@ -329,8 +330,8 @@ export default function AcquisitionComparison() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-80 border-r bg-white dark:bg-gray-800 flex flex-col">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-white dark:bg-gray-800 flex flex-col max-h-[40vh] md:max-h-none">
           <div className="p-4 border-b dark:border-gray-700">
             <h3 className="font-semibold mb-3 dark:text-white">Select Projects to Compare</h3>
             <div className="relative">

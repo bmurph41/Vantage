@@ -249,14 +249,14 @@ export default function CRMDashboard() {
   }, [deals]);
 
   return (
-    <div ref={reportRef} className="p-6 space-y-6 max-w-[1400px] mx-auto">
+    <div ref={reportRef} className="p-3 md:p-6 space-y-4 md:space-y-6 max-w-[1400px] mx-auto">
       {/* ── Header ── */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM Dashboard</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">CRM Dashboard</h1>
           <p className="text-gray-500 text-sm mt-0.5">Investment pipeline command center</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <ExportPdfButton contentRef={reportRef} filename="crm-dashboard" title="CRM Dashboard" />
           <Link href="/crm/deals">
             <Button size="sm"><DollarSign className="w-4 h-4 mr-1.5" />New Deal</Button>
@@ -268,7 +268,7 @@ export default function CRMDashboard() {
       </div>
 
       {/* ── Top KPI Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
         <StatCard title="Pipeline Value" value={formatCompactCurrency(metrics.activePipelineValue)}
           subtitle={`${deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals`}
           icon={DollarSign} color="text-green-600" bgColor="bg-green-100" link="/crm/pipeline" isLoading={isAnyLoading} />

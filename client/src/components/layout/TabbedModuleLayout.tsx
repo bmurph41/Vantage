@@ -79,34 +79,34 @@ export function TabbedModuleLayout({
     <div className={cn("min-h-screen bg-background", className)}>
       <Tabs value={activeTab?.id} onValueChange={handleTabChange} className="w-full">
         <div className="sticky top-0 z-10 bg-background border-b">
-          <div className="px-6 pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
+          <div className="px-3 md:px-6 pt-3 md:pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 md:mb-4 gap-2">
+              <div className="flex items-center gap-3 min-w-0">
                 {ModuleIcon && (
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <ModuleIcon className="h-6 w-6 text-primary" />
+                  <div className="p-1.5 md:p-2 rounded-lg bg-primary/10 flex-shrink-0">
+                    <ModuleIcon className="h-5 w-5 md:h-6 md:w-6 text-primary" />
                   </div>
                 )}
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground" data-testid="module-title">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-foreground truncate" data-testid="module-title">
                     {moduleName}
                   </h1>
                   {moduleDescription && (
-                    <p className="text-sm text-muted-foreground" data-testid="module-description">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate" data-testid="module-description">
                       {moduleDescription}
                     </p>
                   )}
                 </div>
               </div>
               {headerActions && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto">
                   {headerActions}
                 </div>
               )}
             </div>
           </div>
-          
-          <TabsList className="w-full justify-start rounded-none border-b-0 bg-transparent px-6 pb-0 h-auto flex-wrap">
+
+          <TabsList className="w-full justify-start rounded-none border-b-0 bg-transparent px-3 md:px-6 pb-0 h-auto overflow-x-auto scrollbar-hide flex-nowrap md:flex-wrap">
             {visibleTabs.map((tab) => {
               const TabIcon = tab.icon;
               return (

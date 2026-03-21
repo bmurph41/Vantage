@@ -342,7 +342,7 @@ export function AIAssistant() {
       <Button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50",
+          "fixed bottom-4 right-4 md:bottom-6 md:right-6 h-12 w-12 md:h-14 md:w-14 rounded-full shadow-lg z-50",
           "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700",
           "transition-all duration-300 hover:scale-105",
           isOpen && "hidden"
@@ -352,7 +352,7 @@ export function AIAssistant() {
       </Button>
 
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-[420px] h-[650px] max-h-[85vh] bg-background border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 md:inset-auto md:bottom-6 md:right-6 w-full md:w-[420px] h-[100dvh] md:h-[650px] md:max-h-[85vh] bg-background border-0 md:border md:rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-white" />

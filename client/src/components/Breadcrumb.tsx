@@ -1071,12 +1071,12 @@ export function Breadcrumb() {
   }
 
   return (
-    <nav 
-      aria-label="Breadcrumb" 
-      className="flex items-center text-sm px-6 py-2 border-b border-border bg-card/50"
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center text-sm px-3 md:px-6 py-2 border-b border-border bg-card/50 overflow-x-auto"
       data-testid="breadcrumb-nav"
     >
-      <ol className="flex items-center gap-1.5">
+      <ol className="flex items-center gap-1.5 whitespace-nowrap min-w-0">
         {breadcrumbs.map((item, index) => {
           const isLast = index === breadcrumbs.length - 1;
           const Icon = item.icon;

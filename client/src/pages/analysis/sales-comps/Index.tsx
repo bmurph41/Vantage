@@ -315,7 +315,7 @@ export default function SalesCompsIndex() {
 
           {/* Bulk Actions Bar */}
           {selectedIds?.length > 0 && (
-            <div className="bg-card border-b border-border px-6 py-3">
+            <div className="bg-card border-b border-border px-3 md:px-6 py-3">
               <div className="p-3 bg-muted rounded-md flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-foreground font-medium">
@@ -404,7 +404,7 @@ export default function SalesCompsIndex() {
           {/* Content Area */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             {/* Collapsible Filters Panel */}
-            <div className="px-6 py-4 border-b border-border">
+            <div className="px-3 md:px-6 py-3 md:py-4 border-b border-border">
               <div className="flex items-center justify-end mb-3">
                 <Button
                   variant="ghost"
@@ -499,7 +499,7 @@ export default function SalesCompsIndex() {
             
             {/* Pagination Controls */}
             {total > 0 && (
-              <div className="border-t border-border bg-background px-6 py-3 flex items-center justify-between flex-shrink-0">
+              <div className="border-t border-border bg-background px-3 md:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 flex-shrink-0">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>
                     Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} comps
