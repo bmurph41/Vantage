@@ -195,12 +195,14 @@ function BlockRenderer({
   onSelect,
   onUpdate,
   onRemove,
+  onCopy,
 }: {
   block: ContentBlock;
   isSelected: boolean;
   onSelect: () => void;
   onUpdate: (content: Record<string, any>) => void;
   onRemove: () => void;
+  onCopy: () => void;
 }) {
   const hasBoundFields = block.bindings && Object.keys(block.bindings).length > 0;
 
@@ -221,7 +223,7 @@ function BlockRenderer({
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onRemove(); }}>
           <Trash2 className="w-3 h-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6">
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onCopy(); }}>
           <Copy className="w-3 h-3" />
         </Button>
       </div>
@@ -427,6 +429,12 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTitle, setSettingsTitle] = useState('');
+  const [settingsType, setSettingsType] = useState('');
+  const [settingsAudience, setSettingsAudience] = useState('');
+  const [settingsStatus, setSettingsStatus] = useState('');
+  const [showChangeProject, setShowChangeProject] = useState(false);
+  const [newDealId, setNewDealId] = useState('');
   const [showSectionLibrary, setShowSectionLibrary] = useState(false);
   const [exportJobId, setExportJobId] = useState<number | null>(null);
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
@@ -502,6 +510,16 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     }
   }, [exportJob?.status]);
 
+  // Sync settings dialog values when opened
+  useEffect(() => {
+    if (showSettings && document) {
+      setSettingsTitle(document.title);
+      setSettingsType(document.documentType);
+      setSettingsAudience(document.audience || '');
+      setSettingsStatus(document.status);
+    }
+  }, [showSettings, document]);
+
   // --- Callbacks ---
 
   const handleAutoSave = useCallback(async () => {
@@ -509,9 +527,33 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     setIsSaving(true);
     try {
       const blocks = sectionBlocks[activeSectionId] || [];
-      const narrativeBlocks = blocks.filter(b => b.type === 'text').map(b => b.content.text).join('\n\n');
-      const bulletBlocks = blocks.filter(b => b.type === 'bullet_list').flatMap(b => (b.content.text || '').split('\n').filter(Boolean));
-      await updateDocMutation.mutateAsync({ metadata: { ...document.metadata, lastAutoSave: new Date().toISOString() } });
+      const narrative = blocks.filter(b => b.type === 'text' || b.type === 'heading').map(b => b.content.text).filter(Boolean).join('\n\n');
+      const bullets = blocks.filter(b => b.type === 'bullet_list').flatMap(b => (b.content.text || '').split('\n').filter(Boolean));
+      const tables = blocks.filter(b => b.type === 'table').map(b => b.content);
+      const charts = blocks.filter(b => b.type === 'chart').map(b => b.content);
+      const kpis = blocks.filter(b => b.type === 'kpi' || b.type === 'metric_grid').map(b => b.content);
+      const images = blocks.filter(b => b.type === 'image' || b.type === 'image_grid').map(b => b.content);
+
+      const sectionContent = {
+        narrative,
+        bullets,
+        tables,
+        charts,
+        kpis,
+        images,
+        blocks: blocks.map(b => ({ id: b.id, type: b.type, content: b.content, order: b.order, bindings: b.bindings })),
+      };
+
+      await updateDocMutation.mutateAsync({
+        metadata: {
+          ...document.metadata,
+          lastAutoSave: new Date().toISOString(),
+          sectionContent: {
+            ...(document.metadata?.sectionContent || {}),
+            [activeSectionId]: sectionContent,
+          },
+        },
+      });
       lastSavedRef.current = new Date();
     } catch {
       // Silently fail auto-save
@@ -541,6 +583,36 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
       onSuccess: () => toast({ title: 'Section Removed' }),
     });
   }, [removeSectionMutation, toast]);
+
+  const handleToggleSection = useCallback((sectionId: string, currentEnabled: boolean) => {
+    const disabledSections = { ...(document?.metadata?.disabledSections || {}) };
+    if (currentEnabled) {
+      disabledSections[sectionId] = true;
+    } else {
+      delete disabledSections[sectionId];
+    }
+    updateDocMutation.mutate({
+      metadata: { ...document?.metadata, disabledSections },
+    });
+  }, [document?.metadata, updateDocMutation]);
+
+  const handleCopyBlock = useCallback((sectionId: string, block: ContentBlock) => {
+    setSectionBlocks((prev) => {
+      const current = prev[sectionId] || [];
+      const idx = current.findIndex(b => b.id === block.id);
+      const newBlock: ContentBlock = {
+        id: `${sectionId}-${block.type}-${Date.now()}`,
+        type: block.type,
+        content: { ...block.content },
+        order: block.order + 0.5,
+        bindings: block.bindings ? { ...block.bindings } : undefined,
+      };
+      const updated = [...current];
+      updated.splice(idx + 1, 0, newBlock);
+      return { ...prev, [sectionId]: updated.map((b, i) => ({ ...b, order: i })) };
+    });
+    toast({ title: 'Block duplicated' });
+  }, [toast]);
 
   const handleAddBlock = useCallback((sectionId: string, type: ContentBlock['type']) => {
     setSectionBlocks((prev) => {
@@ -606,9 +678,63 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     });
   }, [createExportMutation, toast]);
 
+  const resolveBindingsMutation = useResolveBindings();
+
   const handleResolveAll = useCallback(() => {
+    if (!document?.dealId) {
+      toast({ title: 'No project linked', description: 'Link a project to resolve data bindings.', variant: 'destructive' });
+      return;
+    }
     toast({ title: 'Resolving Bindings', description: 'Populating bound fields from project data...' });
-  }, [toast]);
+    // Collect all bindings from all section blocks
+    const allBindings: Array<{ key: string; source: string; field: string }> = [];
+    Object.values(sectionBlocks).forEach((blocks) => {
+      blocks.forEach((block) => {
+        if (block.bindings) {
+          Object.entries(block.bindings).forEach(([key, binding]) => {
+            allBindings.push({ key: `${block.id}.${key}`, source: binding.source, field: binding.field });
+          });
+        }
+      });
+    });
+
+    if (allBindings.length === 0) {
+      toast({ title: 'No bindings found', description: 'Add data bindings to blocks first.', variant: 'destructive' });
+      return;
+    }
+
+    resolveBindingsMutation.mutate(
+      { dealId: document.dealId, bindings: allBindings },
+      {
+        onSuccess: (resolved) => {
+          setSectionBlocks((prev) => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach((sectionId) => {
+              updated[sectionId] = updated[sectionId].map((block) => {
+                if (block.bindings) {
+                  const newContent = { ...block.content };
+                  Object.entries(block.bindings).forEach(([key, binding]) => {
+                    const resolvedVal = resolved?.[`${block.id}.${key}`];
+                    if (resolvedVal !== undefined) {
+                      const value = typeof resolvedVal === 'object' && resolvedVal !== null && 'value' in resolvedVal ? resolvedVal.value : resolvedVal;
+                      newContent[key] = value;
+                    }
+                  });
+                  return { ...block, content: newContent };
+                }
+                return block;
+              });
+            });
+            return updated;
+          });
+          toast({ title: 'Bindings Resolved', description: 'Data fields have been populated from the project.' });
+        },
+        onError: () => {
+          toast({ title: 'Resolution Failed', description: 'Could not resolve bindings.', variant: 'destructive' });
+        },
+      }
+    );
+  }, [document?.dealId, sectionBlocks, resolveBindingsMutation, toast]);
 
   // --- Derived data ---
 
@@ -629,6 +755,14 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   const selectedBlock = useMemo(() => {
     return activeBlocks.find(b => b.id === selectedBlockId) ?? null;
   }, [activeBlocks, selectedBlockId]);
+
+  const [localSectionTitle, setLocalSectionTitle] = useState('');
+
+  useEffect(() => {
+    if (activeSection) {
+      setLocalSectionTitle(activeSection.customTitle || activeSectionDef?.name || activeSection.sectionKey);
+    }
+  }, [activeSectionId, activeSection?.customTitle, activeSectionDef?.name]);
 
   const sortedSections = useMemo(() => {
     return [...(document?.sections || [])].sort((a, b) => a.order - b.order);
@@ -674,7 +808,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
           <p className="text-sm text-muted-foreground mb-4">
             {docError instanceof Error ? docError.message : 'Unable to load the requested document.'}
           </p>
-          <Button onClick={() => navigate('/documents')}>
+          <Button onClick={() => navigate('/document-studio')}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Documents
           </Button>
         </Card>
@@ -693,7 +827,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
         <header className="flex items-center gap-2 px-4 h-14 border-b bg-background shrink-0 z-20">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={() => navigate('/documents')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/document-studio')}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
@@ -762,7 +896,10 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
           {/* Right-side toolbar buttons */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-xs">
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => {
+                handleAutoSave();
+                window.open(`/document-builder/${documentId}?preview=true`, '_blank', 'width=900,height=700');
+              }}>
                 <Eye className="w-4 h-4 mr-1" /> Preview
               </Button>
             </TooltipTrigger>
@@ -790,7 +927,12 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" onClick={() => {
+                const shareUrl = `${window.location.origin}/document-studio/editor/${documentId}`;
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                  toast({ title: 'Link Copied', description: 'Document link copied to clipboard.' });
+                });
+              }}>
                 <Share2 className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
@@ -839,7 +981,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                           definition={sectionLibrary?.[section.sectionKey]}
                           isActive={section.id === activeSectionId}
                           onSelect={() => { setActiveSectionId(section.id); setSelectedBlockId(null); }}
-                          onToggle={() => {/* toggle via mutation */}}
+                          onToggle={() => handleToggleSection(section.id, section.enabled)}
                           onRemove={() => handleRemoveSection(Number(section.id))}
                         />
                       ))}
@@ -908,8 +1050,15 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                     <div className="flex items-center gap-3 mb-6">
                       <Input
                         className="text-xl font-bold border-none p-0 focus-visible:ring-0 flex-1"
-                        value={activeSection.customTitle || activeSectionDef?.name || activeSection.sectionKey}
-                        onChange={() => {/* would update customTitle */}}
+                        value={localSectionTitle}
+                        onChange={(e) => setLocalSectionTitle(e.target.value)}
+                        onBlur={() => {
+                          if (activeSection && localSectionTitle !== (activeSection.customTitle || activeSectionDef?.name || activeSection.sectionKey)) {
+                            updateDocMutation.mutate({
+                              metadata: { ...document.metadata, sectionTitles: { ...(document.metadata?.sectionTitles || {}), [activeSection.sectionKey]: localSectionTitle } },
+                            });
+                          }
+                        }}
                         placeholder="Section Title"
                       />
                       <Badge variant="outline" className="text-xs capitalize shrink-0">
@@ -937,6 +1086,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             onSelect={() => setSelectedBlockId(block.id)}
                             onUpdate={(content) => handleUpdateBlock(activeSectionId!, block.id, content)}
                             onRemove={() => handleRemoveBlock(activeSectionId!, block.id)}
+                            onCopy={() => handleCopyBlock(activeSectionId!, block)}
                           />
                           <AddBlockButton onAdd={(type) => handleAddBlock(activeSectionId!, type)} />
                         </React.Fragment>
@@ -1082,9 +1232,24 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                           </div>
                           <div>
                             <label className="text-xs text-muted-foreground">Logo</label>
-                            <Button variant="outline" size="sm" className="w-full text-xs mt-1">
-                              <Image className="w-3.5 h-3.5 mr-1" /> Upload Logo
-                            </Button>
+                            <label className="cursor-pointer">
+                              <Button variant="outline" size="sm" className="w-full text-xs mt-1" asChild>
+                                <span><Image className="w-3.5 h-3.5 mr-1" /> Upload Logo</span>
+                              </Button>
+                              <input type="file" className="hidden" accept="image/*" onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    updateDocMutation.mutate({
+                                      metadata: { ...document.metadata, logoUrl: reader.result as string },
+                                    });
+                                    toast({ title: 'Logo uploaded' });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }} />
+                            </label>
                           </div>
                         </div>
                       </div>
@@ -1175,7 +1340,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             <div>Type: <span className="text-foreground capitalize">{document.documentType.replace('_', ' ')}</span></div>
                             <div>Asset Class: <span className="text-foreground capitalize">{document.assetClass || 'N/A'}</span></div>
                           </div>
-                          <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
+                          <Button variant="outline" size="sm" className="w-full mt-3 text-xs" onClick={() => setShowChangeProject(true)}>
                             Change Project
                           </Button>
                         </Card>
@@ -1196,7 +1361,14 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                             </div>
                           ))}
                         </div>
-                        <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
+                        <Button variant="outline" size="sm" className="w-full mt-3 text-xs" onClick={() => {
+                          if (document.dealId) {
+                            toast({ title: 'Refreshing data...', description: 'Pulling latest data from project.' });
+                            window.location.reload();
+                          } else {
+                            toast({ title: 'No project linked', description: 'Link a project first to refresh data.', variant: 'destructive' });
+                          }
+                        }}>
                           <RefreshCw className="w-3 h-3 mr-1" /> Refresh Data
                         </Button>
                       </div>
@@ -1358,11 +1530,11 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Document Title</label>
-                <Input className="mt-1" defaultValue={document.title} />
+                <Input className="mt-1" value={settingsTitle} onChange={(e) => setSettingsTitle(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm font-medium">Document Type</label>
-                <Select defaultValue={document.documentType}>
+                <Select value={settingsType} onValueChange={setSettingsType}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="offering_memorandum">Offering Memorandum</SelectItem>
@@ -1378,7 +1550,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
               </div>
               <div>
                 <label className="text-sm font-medium">Audience</label>
-                <Select defaultValue={document.audience || undefined}>
+                <Select value={settingsAudience} onValueChange={setSettingsAudience}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select audience" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="institutional_investor">Institutional Investor</SelectItem>
@@ -1391,7 +1563,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
               </div>
               <div>
                 <label className="text-sm font-medium">Status</label>
-                <Select defaultValue={document.status}>
+                <Select value={settingsStatus} onValueChange={setSettingsStatus}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="draft">Draft</SelectItem>
@@ -1404,7 +1576,52 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
-              <Button onClick={() => setShowSettings(false)}>Save Settings</Button>
+              <Button onClick={() => {
+                updateDocMutation.mutate({
+                  title: settingsTitle,
+                  audience: (settingsAudience || null) as any,
+                  status: settingsStatus as any,
+                  metadata: { ...document.metadata, documentType: settingsType },
+                }, {
+                  onSuccess: () => {
+                    toast({ title: 'Settings saved' });
+                    setShowSettings(false);
+                  },
+                });
+              }} disabled={updateDocMutation.isPending}>
+                {updateDocMutation.isPending ? 'Saving...' : 'Save Settings'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ================================================================ */}
+        {/* Change Project Dialog                                             */}
+        {/* ================================================================ */}
+        <Dialog open={showChangeProject} onOpenChange={setShowChangeProject}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Linked Project</DialogTitle>
+            </DialogHeader>
+            <div>
+              <label className="text-sm font-medium">Deal ID</label>
+              <Input className="mt-1" type="number" placeholder="Enter deal ID..." value={newDealId} onChange={(e) => setNewDealId(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowChangeProject(false)}>Cancel</Button>
+              <Button onClick={() => {
+                if (newDealId) {
+                  updateDocMutation.mutate({ metadata: { ...document.metadata, linkedDealId: Number(newDealId) } }, {
+                    onSuccess: () => {
+                      toast({ title: 'Project updated' });
+                      setShowChangeProject(false);
+                      setNewDealId('');
+                    },
+                  });
+                }
+              }} disabled={!newDealId || updateDocMutation.isPending}>
+                Link Project
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
