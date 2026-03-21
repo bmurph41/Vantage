@@ -153,7 +153,7 @@ export function PipelineAnalyticsDashboard() {
       </div>
 
       {/* ── KPI Summary Row ───────────────────────────────────────── */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <SummaryCard
           title="Pipeline Value"
           value={formatCurrency(health?.summary.pipelineValue)}
@@ -193,7 +193,7 @@ export function PipelineAnalyticsDashboard() {
       </div>
 
       {/* ── Main Grid: Health + Velocity ──────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Health Score */}
         <Card className="col-span-1">
           <CardHeader className="pb-2">

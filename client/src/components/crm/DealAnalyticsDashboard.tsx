@@ -320,7 +320,7 @@ export function DealAnalyticsDashboard() {
                   </div>
                   <p className="text-sm text-muted-foreground">Average Win Probability</p>
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                   <div className="p-2 rounded bg-red-50">
                     <div className="text-lg font-semibold text-red-600">
                       {winDistribution.distribution.low}
@@ -552,7 +552,7 @@ export function DealAnalyticsDashboard() {
             </div>
           ) : winLossData ? (
             <Tabs defaultValue="summary" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-5">
                 <TabsTrigger value="summary">Summary</TabsTrigger>
                 <TabsTrigger value="source">By Source</TabsTrigger>
                 <TabsTrigger value="size">By Size</TabsTrigger>

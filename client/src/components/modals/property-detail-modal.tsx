@@ -581,7 +581,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-9 flex-shrink-0">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-9 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="intelligence" data-testid="tab-intelligence">
               <BarChart3 className="w-3 h-3 mr-1" />

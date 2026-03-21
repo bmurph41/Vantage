@@ -196,7 +196,7 @@ export function CrmActionComposerModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-7 h-auto">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-7 h-auto">
             <TabsTrigger value="note" className="gap-1 flex-col py-2 text-xs">
               <StickyNote className="h-3.5 w-3.5" />
               Note

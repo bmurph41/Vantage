@@ -184,7 +184,7 @@ export function ContactModelsTab({ dealIds }: { dealIds?: string[] }) {
                   <ArrowUpRight className="h-4 w-4 text-gray-400" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {proj.goingInCapRate != null && <div className="rounded-lg bg-blue-50 p-2 text-center"><p className="text-[10px] text-blue-400">Cap Rate</p><p className="text-xs font-bold text-blue-700">{(proj.goingInCapRate * 100).toFixed(2)}%</p></div>}
                 {proj.projectedIrr != null && <div className="rounded-lg bg-emerald-50 p-2 text-center"><p className="text-[10px] text-emerald-400">IRR</p><p className="text-xs font-bold text-emerald-700">{(proj.projectedIrr * 100).toFixed(1)}%</p></div>}
                 {proj.equityMultiple != null && <div className="rounded-lg bg-purple-50 p-2 text-center"><p className="text-[10px] text-purple-400">EM</p><p className="text-xs font-bold text-purple-700">{proj.equityMultiple.toFixed(2)}x</p></div>}
@@ -263,7 +263,7 @@ export function ContactDealsTabEnhanced({ deals }: { deals: any[] }) {
   const chartData = Object.entries(deals.reduce((acc: any, d: any) => { const s = fmtLabel(d.stage); acc[s] = (acc[s] || 0) + (parseFloat(d.value || '0') || 0); return acc; }, {})).map(([name, value]) => ({ name, value }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-center"><p className="text-xs text-blue-400">Total</p><p className="text-2xl font-bold text-blue-700">{deals.length}</p></div>
         <div className="rounded-xl bg-emerald-50 p-3 text-center"><p className="text-xs text-emerald-400">Open</p><p className="text-2xl font-bold text-emerald-700">{openDeals.length}</p></div>
         <div className="rounded-xl bg-purple-50 p-3 text-center"><p className="text-xs text-purple-400">Pipeline</p><p className="text-lg font-bold text-purple-700">{fmtCurrency(totalPipeline)}</p></div>

@@ -1021,7 +1021,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3">
                 <TabsTrigger value="details" className="flex items-center gap-2" data-testid="tab-deal-details">
                   <FileText className="w-4 h-4" />
                   Deal Details

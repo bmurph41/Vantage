@@ -167,7 +167,7 @@ export function UnifiedLeaseDetail({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[600px] sm:max-w-[600px] overflow-y-auto">
+      <SheetContent className="w-full sm:w-[600px] sm:max-w-[600px] overflow-y-auto">
         <SheetHeader>
           <div className="flex items-start justify-between">
             <div>

@@ -197,7 +197,7 @@ export function ContactEngagementCard({ contactId }: { contactId: string }) {
             <Skeleton className="h-32 w-full" />
           ) : emailActivity ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <Mail className="h-4 w-4 mx-auto mb-1 text-blue-500" />
                   <div className="text-xl font-bold">{emailActivity.totalSent}</div>

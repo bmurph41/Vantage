@@ -310,7 +310,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
     >
       <div data-testid="modal-lead-detail">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-4 flex-shrink-0">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="company" data-testid="tab-company">Company</TabsTrigger>
             <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>

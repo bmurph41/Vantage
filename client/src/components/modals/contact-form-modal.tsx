@@ -656,7 +656,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                       )}
                     </div>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[300px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                     <Command>
                       <CommandList>
                         {companySuggestions.length === 0 && companySearchQuery.length >= 2 && (

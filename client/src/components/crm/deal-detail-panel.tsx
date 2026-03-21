@@ -228,7 +228,7 @@ function ColumnsLayout({
   relatedCompany?: Company | null;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {/* Left: Fields + Relationships */}
       <div className="col-span-1 space-y-3">
         <AssetClassFieldGroups 
@@ -283,7 +283,7 @@ function TabbedLayout({
 }) {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="w-full grid grid-cols-4 h-8">
+      <TabsList className="w-full flex overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-4 h-8">
         <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
         <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
         <TabsTrigger value="documents" className="text-xs">Docs</TabsTrigger>

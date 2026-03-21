@@ -83,7 +83,7 @@ export function CompanyPortfolioTab({ properties }: { properties: any[] }) {
   const pieData = Object.entries(statusGroups).map(([name, value]) => ({ name, value }));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-center"><p className="text-xs text-blue-400">Properties</p><p className="text-2xl font-bold text-blue-700">{properties.length}</p></div>
         <div className="rounded-xl bg-teal-50 p-3 text-center"><p className="text-xs text-teal-400">Total Slips</p><p className="text-2xl font-bold text-teal-700">{totalSlips.toLocaleString()}</p></div>
         <div className="rounded-xl bg-emerald-50 p-3 text-center"><p className="text-xs text-emerald-400">On Market</p><p className="text-2xl font-bold text-emerald-700">{onMarket}</p></div>
@@ -233,7 +233,7 @@ export function CompanyModelsTab({ dealIds, propertyIds }: { dealIds?: string[];
                 <div><p className="text-sm font-semibold text-gray-900">{proj.name}</p><div className="flex items-center gap-2 mt-0.5"><Badge className={`text-[10px] ${statusCls}`}>{proj.status||'draft'}</Badge>{proj.assetClass && <span className="text-[10px] text-gray-400">{fmtLabel(proj.assetClass)}</span>}</div></div>
                 <ArrowUpRight className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {proj.purchasePrice != null && <div className="rounded-lg bg-gray-50 p-2 text-center"><p className="text-[10px] text-gray-400">Price</p><p className="text-xs font-bold text-gray-700">{fmtCurrency(proj.purchasePrice)}</p></div>}
                 {proj.goingInCapRate != null && <div className="rounded-lg bg-blue-50 p-2 text-center"><p className="text-[10px] text-blue-400">Cap Rate</p><p className="text-xs font-bold text-blue-700">{(proj.goingInCapRate*100).toFixed(2)}%</p></div>}
                 {proj.projectedIrr != null && <div className="rounded-lg bg-emerald-50 p-2 text-center"><p className="text-[10px] text-emerald-400">IRR</p><p className="text-xs font-bold text-emerald-700">{(proj.projectedIrr*100).toFixed(1)}%</p></div>}
@@ -372,7 +372,7 @@ export function CompanyDealsTabEnhanced({ deals }: { deals: any[] }) {
   const stageData = Object.entries(deals.reduce((acc:any,d:any) => { const s=fmtLabel(d.stage); acc[s]=(acc[s]||0)+(parseFloat(d.value||'0')||0); return acc; }, {})).map(([name,value]) => ({name,value}));
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-center"><p className="text-xs text-blue-400">Total</p><p className="text-2xl font-bold text-blue-700">{deals.length}</p></div>
         <div className="rounded-xl bg-emerald-50 p-3 text-center"><p className="text-xs text-emerald-400">Open</p><p className="text-2xl font-bold text-emerald-700">{openDeals.length}</p></div>
         <div className="rounded-xl bg-purple-50 p-3 text-center"><p className="text-xs text-purple-400">Pipeline</p><p className="text-base font-bold text-purple-700">{fmtCurrency(totalPipeline)}</p></div>

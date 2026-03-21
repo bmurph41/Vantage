@@ -17,7 +17,7 @@ export function CrmSplitView({
   details, 
   isDetailOpen, 
   onCloseDetail,
-  detailWidth = "w-[480px]",
+  detailWidth = "w-full md:w-[480px]",
   className 
 }: CrmSplitViewProps) {
   useEffect(() => {

@@ -320,7 +320,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
     >
       <div data-testid="modal-lead-form">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-4">
             <TabsTrigger value="manual">New Contact</TabsTrigger>
             <TabsTrigger value="contacts">From Contact</TabsTrigger>
             <TabsTrigger value="companies">From Company</TabsTrigger>

@@ -461,7 +461,7 @@ export default function PropertyIntegrationPanel({ propertyId, propertyTitle }: 
         </CardHeader>
         <CardContent className="px-0">
           <Tabs defaultValue="sales" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3">
               <TabsTrigger value="sales" data-testid="tab-property-sales-comps">
                 <Building2 className="w-4 h-4 mr-2" />
                 Sales ({salesComps.length})

@@ -637,7 +637,7 @@ export function SlaTrackingPanel({ entityType, entityId }: SlaTrackingPanelProps
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="space-y-2">
                 <Label className="text-xs">Warning (hrs)</Label>
                 <Input

@@ -106,7 +106,7 @@ export function PropertySalesCompsTab({ state, city, propertyType }: { state?: s
 
       {/* Summary KPIs */}
       {comps.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl bg-blue-50 p-3 text-center">
             <p className="text-xs text-blue-400 mb-0.5">Avg Sale Price</p>
             <p className="text-lg font-bold text-blue-700">{fmtCurrency(avgPrice)}</p>
@@ -239,7 +239,7 @@ export function PropertyRateCompsTab({ state, city }: { state?: string | null; c
       </div>
 
       {comps.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl bg-emerald-50 p-3 text-center">
             <p className="text-xs text-emerald-400 mb-0.5">Avg Wet Rate</p>
             <p className="text-lg font-bold text-emerald-700">{avgWet ? `$${avgWet.toFixed(0)}/mo` : '—'}</p>

@@ -919,7 +919,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
     >
       <div data-testid="company-form-modal">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3">
             <TabsTrigger value="basic" className="flex items-center gap-2">
               <Building className="h-4 w-4" />
               Company Info

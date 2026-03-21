@@ -351,7 +351,7 @@ export default function EntityConversionModal({
       <Form {...form}>
         <form id="entity-conversion-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid grid-cols-3 w-full">
+              <TabsList className="flex w-full overflow-x-auto scrollbar-hide sm:grid sm:grid-cols-3">
                 <TabsTrigger value="basic" className="text-sm">Basic Info</TabsTrigger>
                 <TabsTrigger value="contact" className="text-sm">Contact Details</TabsTrigger>
                 <TabsTrigger value="organization" className="text-sm">Organization</TabsTrigger>

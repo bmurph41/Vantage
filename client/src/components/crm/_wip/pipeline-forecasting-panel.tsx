@@ -558,7 +558,7 @@ export function PipelineForecastingPanel({ pipelineId }: PipelineForecastingPane
               <CardTitle className="text-lg">Deal Velocity Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                 <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
                     {velocity?.distribution.fast || 0}
