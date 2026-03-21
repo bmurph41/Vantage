@@ -162,8 +162,8 @@ export default function RateCompsIndex() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen p-6 space-y-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="min-h-screen p-3 md:p-6 space-y-4 md:space-y-6">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
           <div className="h-8 w-48 bg-muted animate-pulse rounded" />
           <div className="h-10 w-32 bg-muted animate-pulse rounded" />
         </div>
@@ -493,7 +493,7 @@ export default function RateCompsIndex() {
             </div>
             
             {total > 0 && (
-              <div className="border-t border-border bg-background px-6 py-3 flex items-center justify-between flex-shrink-0">
+              <div className="border-t border-border bg-background px-3 md:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 flex-shrink-0">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>
                     Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} comps

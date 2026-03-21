@@ -240,7 +240,7 @@ export default function FinancialAnalysisDashboard() {
         <div className="absolute inset-0 opacity-[0.05]"
           style={{ backgroundImage: 'linear-gradient(hsl(0,0%,100%) 1px, transparent 1px), linear-gradient(90deg, hsl(0,0%,100%) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
         />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute top-0 right-0 w-48 sm:w-80 h-48 sm:h-80 bg-blue-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
 
         <div className="relative flex items-start justify-between gap-4 flex-wrap mb-6">
           <div>

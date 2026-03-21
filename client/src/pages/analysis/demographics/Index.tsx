@@ -1165,7 +1165,7 @@ function LocationAnalysisSection() {
             </div>
             <div className="flex items-center gap-2">
               <Select value={selectedProjectId} onValueChange={handleProjectChange}>
-                <SelectTrigger className="w-64" data-testid="select-project">
+                <SelectTrigger className="w-44 sm:w-64" data-testid="select-project">
                   <Building2 className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Select a project to save locations" />
                 </SelectTrigger>
@@ -1423,7 +1423,7 @@ function LocationAnalysisSection() {
                                     Settings
                                   </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-80" align="end">
+                                <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80" align="end">
                                   <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                       <h4 className="font-medium text-sm">Trade Area Settings</h4>

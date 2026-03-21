@@ -974,7 +974,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
                         </Button>
                       </SheetTrigger>
-                      <SheetContent className="w-[380px] sm:w-[420px]">
+                      <SheetContent className="w-full sm:w-[380px] md:w-[420px]">
                         <SheetHeader>
                           <SheetTitle className="flex items-center gap-2">
                             <ArrowUpCircle className="h-5 w-5 text-amber-600" />
@@ -1036,7 +1036,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
                         </Button>
                       </SheetTrigger>
-                      <SheetContent className="w-[380px] sm:w-[420px]">
+                      <SheetContent className="w-full sm:w-[380px] md:w-[420px]">
                         <SheetHeader>
                           <SheetTitle className="flex items-center gap-2">
                             <ArrowUpCircle className="h-5 w-5 text-amber-600" />
@@ -1138,7 +1138,7 @@ export default function WorkspaceHistoricalPL({ projectId, onTabChange }: Worksp
                           {activeAddbacks.length} Addback{activeAddbacks.length !== 1 ? 's' : ''}
                         </Button>
                       </SheetTrigger>
-                      <SheetContent className="w-[380px] sm:w-[420px]">
+                      <SheetContent className="w-full sm:w-[380px] md:w-[420px]">
                         <SheetHeader>
                           <SheetTitle className="flex items-center gap-2">
                             <ArrowUpCircle className="h-5 w-5 text-amber-600" />

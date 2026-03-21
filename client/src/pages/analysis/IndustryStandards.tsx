@@ -132,7 +132,7 @@ export default function IndustryStandards() {
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-32 sm:w-40">
                 <SelectValue placeholder="Region" />
               </SelectTrigger>
               <SelectContent>

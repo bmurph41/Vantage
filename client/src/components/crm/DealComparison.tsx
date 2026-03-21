@@ -353,7 +353,7 @@ export function DealComparison({ dealIds: initialDealIds }: DealComparisonProps)
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[200px]">Criterion</TableHead>
+                    <TableHead className="min-w-[120px] sm:min-w-[200px]">Criterion</TableHead>
                     <TableHead className="w-20">Weight</TableHead>
                     {selectedDeals.map((deal) => (
                       <TableHead

@@ -128,7 +128,7 @@ export default function BenchmarksIndex() {
       </div>
 
       <Tabs defaultValue="treasury10y" className="space-y-6">
-        <TabsList className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
           <TabsTrigger value="treasury2y" data-testid="tab-treasury2y">2Y Treasury</TabsTrigger>
           <TabsTrigger value="treasury5y" data-testid="tab-treasury5y">5Y Treasury</TabsTrigger>
           <TabsTrigger value="treasury10y" data-testid="tab-treasury10y">10Y Treasury</TabsTrigger>

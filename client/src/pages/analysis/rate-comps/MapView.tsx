@@ -379,9 +379,9 @@ export default function RateCompsMapView() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Map */}
-          <div className={cn("flex-1 relative", viewMode === 'split' ? 'min-w-0' : '')}>
+          <div className={cn("flex-1 relative", viewMode === 'split' ? 'min-w-0 min-h-[40vh] md:min-h-0' : '')}>
             {!isLoaded ? (
               <div className="flex items-center justify-center h-full bg-slate-100 dark:bg-slate-800">
                 <div className="text-center space-y-3">
@@ -539,7 +539,7 @@ export default function RateCompsMapView() {
 
           {/* Side panel */}
           {viewMode === 'split' && (
-            <div className="w-[380px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
+            <div className="w-full md:w-[380px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
               {/* Stats section */}
               <div className="px-3 py-3 border-b bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-900">
                 <div className="flex items-center gap-2 mb-3">

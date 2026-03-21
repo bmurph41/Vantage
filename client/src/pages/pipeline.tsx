@@ -792,7 +792,7 @@ export default function Pipeline() {
                   {hasActiveFilters && <Badge variant="secondary" className="ml-1.5 px-1 py-0 text-[10px] h-4">ON</Badge>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80" align="start">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80" align="start">
                 <div className="space-y-4">
                   <h4 className="font-semibold text-sm">Filter Deals</h4>
 

@@ -247,7 +247,7 @@ export default function SalesCompsMapView() {
       <div className="flex flex-col" style={{ height: 'calc(100vh - 200px)' }}>
         {/* Toolbar */}
         <div className="px-3 py-2 border-b bg-white dark:bg-slate-900 flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px] max-w-md">
+          <div className="relative flex-1 min-w-[120px] sm:min-w-[180px] max-w-md">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search marinas by name..."
@@ -386,9 +386,9 @@ export default function SalesCompsMapView() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Map */}
-          <div className={cn("flex-1 relative", viewMode === 'split' ? 'min-w-0' : '')}>
+          <div className={cn("flex-1 relative", viewMode === 'split' ? 'min-w-0 min-h-[40vh] md:min-h-0' : '')}>
             {!isLoaded ? (
               <div className="flex items-center justify-center h-full bg-slate-100 dark:bg-slate-800">
                 <div className="text-center space-y-3">
@@ -444,7 +444,7 @@ export default function SalesCompsMapView() {
                     position={{ lat: parseFloat(selectedComp.lat), lng: parseFloat(selectedComp.lng) }}
                     onCloseClick={() => setSelectedComp(null)}
                   >
-                    <div className="p-1 min-w-[260px] max-w-[340px]">
+                    <div className="p-1 min-w-[200px] sm:min-w-[260px] max-w-[calc(100vw-2rem)] sm:max-w-[340px]">
                       <div className="flex items-start gap-2 mb-2">
                         <div
                           className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
@@ -532,7 +532,7 @@ export default function SalesCompsMapView() {
 
           {/* Side panel */}
           {viewMode === 'split' && (
-            <div className="w-[380px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
+            <div className="w-full md:w-[380px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
               {/* Stats section */}
               <div className="px-3 py-3 border-b bg-gradient-to-b from-amber-50 to-white dark:from-amber-950/20 dark:to-slate-900">
                 <div className="flex items-center gap-2 mb-3">

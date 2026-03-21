@@ -449,7 +449,7 @@ export default function ImportHistory() {
               </div>
 
               {/* Record Counts */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Processed</label>
                   <p className="text-lg font-semibold" data-testid="detail-processed">

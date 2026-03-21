@@ -352,7 +352,7 @@ function AddDealCard({
           </CardContent>
         </Card>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[300px] p-0" align="start">
         <Command>
           <CommandInput placeholder="Search deals..." />
           <CommandList>
