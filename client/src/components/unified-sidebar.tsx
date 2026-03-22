@@ -153,6 +153,7 @@ export default function UnifiedSidebar() {
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
+  const [documentStudioExpanded, setDocumentStudioExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
@@ -279,6 +280,7 @@ export default function UnifiedSidebar() {
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
     const isMarketIntelPage = location.startsWith('/analysis/');
+    const isDocumentStudioPage = location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/document-builder') || location.startsWith('/simple-report');
 
     // Set expanded states - Operations stays expanded by default, others expand when active
     if (isOperationsPage) {
@@ -292,6 +294,7 @@ export default function UnifiedSidebar() {
     setAnalysisExpanded(isUnderwritingToolsPage);
     setInvestorServicesExpanded(isInvestorServicesPage);
     setMarketIntelExpanded(isMarketIntelPage);
+    setDocumentStudioExpanded(isDocumentStudioPage);
   }, [location]);
 
   // Check if there are any pending items to show the Pending section
@@ -766,72 +769,21 @@ export default function UnifiedSidebar() {
           </div>
         )}
         
-        {/* Document Studio - Unified documents section */}
+        {/* Document Studio - Collapsible section with sub-navigation */}
         <div className="mb-2">
-          {sidebarCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/document-studio">
-                  <div
-                    className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
-                  >
-                    <FileText className={cn("w-4 h-4", (location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/document-builder') || location.startsWith('/simple-report')) ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
-                  </div>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                <p>Document Studio</p>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/document-studio">
-              <div
-                className={cn(
-                  "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
-                  (location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/document-builder') || location.startsWith('/simple-report'))
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )}
-                data-testid="nav-document-studio"
-              >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Document Studio</span>
-                </div>
-              </div>
-            </Link>
-          )}
-          {!sidebarCollapsed && (
-            <Link href="/document-studio/templates">
-              <div
-                className={cn(
-                  "flex items-center gap-2 w-full pl-4 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
-                  location.startsWith('/document-studio/templates')
-                    ? "text-blue-600 font-medium"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-                data-testid="nav-template-gallery"
-              >
-                <FileText className="w-3 h-3" />
-                <span>Template Gallery</span>
-              </div>
-            </Link>
-          )}
-          {!sidebarCollapsed && (
-            <Link href="/simple-report">
-              <div
-                className={cn(
-                  "flex items-center gap-2 w-full pl-4 pr-4 py-1.5 text-[11px] transition-colors cursor-pointer",
-                  location.startsWith('/simple-report')
-                    ? "text-blue-600 font-medium"
-                    : "text-gray-500 hover:text-gray-700"
-                )}
-                data-testid="nav-quick-reports"
-              >
-                <FileText className="w-3 h-3" />
-                <span>Quick Reports</span>
-              </div>
-            </Link>
+          <SectionHeader
+            title="Document Studio"
+            icon={FileText}
+            expanded={documentStudioExpanded}
+            onToggle={() => setDocumentStudioExpanded(!documentStudioExpanded)}
+            isActive={location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/document-builder') || location.startsWith('/simple-report')}
+          />
+          {documentStudioExpanded && (
+            <>
+              <NavLink item={{ name: "All Documents", href: "/document-studio" }} />
+              <NavLink item={{ name: "Template Gallery", href: "/document-studio/templates" }} />
+              <NavLink item={{ name: "Quick Reports", href: "/simple-report" }} />
+            </>
           )}
         </div>
         

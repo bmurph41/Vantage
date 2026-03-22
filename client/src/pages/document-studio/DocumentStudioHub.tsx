@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -22,7 +22,8 @@ import {
   FileText, Plus, Search, Filter, MoreHorizontal, Edit, Copy, Download,
   Share2, Trash2, FileSpreadsheet, Presentation, BookOpen, FileCheck,
   Briefcase, Building, Clock, Star, ChevronRight, FolderOpen, Sparkles,
-  Zap, Layout, Eye, ExternalLink, ArrowRight,
+  Zap, Layout, Eye, ExternalLink, ArrowRight, ImagePlus, CheckCircle2,
+  Upload, Camera, Database,
 } from "lucide-react";
 import type { DocumentType, AssetClass, AudiencePersona } from "@shared/document-builder/types";
 
@@ -222,6 +223,59 @@ export default function DocumentStudioHub() {
     },
   });
 
+  // Fetch preview data for the selected project to show what will auto-populate
+  const { data: projectPreview, isLoading: previewLoading } = useQuery<{
+    propertyName?: string;
+    address?: string;
+    assetClass?: string;
+    purchasePrice?: number;
+    noi?: number;
+    capRate?: number;
+    units?: number;
+    sqft?: number;
+    yearBuilt?: number;
+  }>({
+    queryKey: ["project-preview", selectedProjectId],
+    queryFn: async () => {
+      if (!selectedProjectId || selectedProjectId === "none") return {};
+      const res = await fetch(`/api/om-builder/project/${selectedProjectId}/data`);
+      if (!res.ok) return {};
+      const json = await res.json();
+      const d = json.data ?? json;
+      return {
+        propertyName: d.propertyName || d.property?.name,
+        address: d.address || d.property?.address,
+        assetClass: d.assetClass || d.property?.assetClass,
+        purchasePrice: d.purchasePrice || d.financials?.purchasePrice,
+        noi: d.noi || d.financials?.noi,
+        capRate: d.capRate || d.financials?.capRate,
+        units: d.units || d.property?.totalUnits,
+        sqft: d.sqft || d.property?.totalSqft,
+        yearBuilt: d.yearBuilt || d.property?.yearBuilt,
+      };
+    },
+    enabled: !!selectedProjectId && selectedProjectId !== "none",
+  });
+
+  // Hero photo upload state
+  const [heroPhotoFile, setHeroPhotoFile] = useState<File | null>(null);
+  const [heroPhotoPreview, setHeroPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  function handleHeroPhotoSelect(file: File) {
+    setHeroPhotoFile(file);
+    const url = URL.createObjectURL(file);
+    setHeroPhotoPreview(url);
+  }
+
+  function handleHeroPhotoDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      handleHeroPhotoSelect(file);
+    }
+  }
+
   // ---- Mutations ----
 
   const deleteMutation = useMutation({
@@ -331,6 +385,9 @@ export default function DocumentStudioHub() {
     setNewDocName("");
     setNewDocAudience("");
     setNewDocAssetClass("");
+    setHeroPhotoFile(null);
+    if (heroPhotoPreview) URL.revokeObjectURL(heroPhotoPreview);
+    setHeroPhotoPreview(null);
   }
 
   function handleCreateSubmit() {
@@ -469,7 +526,15 @@ export default function DocumentStudioHub() {
                     variant="outline"
                     size="sm"
                     className="w-full"
-                    onClick={() => navigate(action.route)}
+                    onClick={() => {
+                      setSelectedType(action.type === "quick_report" ? "custom" as DocumentType : action.type as DocumentType);
+                      if (action.type === "quick_report") {
+                        navigate("/simple-report");
+                        return;
+                      }
+                      setWizardStep(2);
+                      setShowNewDialog(true);
+                    }}
                   >
                     Create
                     <ArrowRight className="h-3 w-3 ml-1" />
@@ -537,7 +602,7 @@ export default function DocumentStudioHub() {
                           setSelectedTemplateId(tpl.id);
                           setSelectedType(tpl.documentType);
                           setNewDocName(tpl.name);
-                          setWizardStep(4);
+                          setWizardStep(3);
                           setShowNewDialog(true);
                         }}
                       >
@@ -873,20 +938,19 @@ export default function DocumentStudioHub() {
           setShowNewDialog(open);
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Document</DialogTitle>
             <DialogDescription>
               {wizardStep === 1 && "Choose a document type to get started"}
-              {wizardStep === 2 && "Link this document to a project (optional)"}
-              {wizardStep === 3 && "Start from a template or blank"}
-              {wizardStep === 4 && "Configure your document details"}
+              {wizardStep === 2 && "Link a project to auto-fill financials, property data, and comps"}
+              {wizardStep === 3 && "Add your cover photo and finalize document settings"}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Progress indicator */}
+          {/* Progress indicator — 3 steps */}
           <div className="flex items-center gap-1 mb-2">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3].map((step) => (
               <div
                 key={step}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -898,7 +962,7 @@ export default function DocumentStudioHub() {
 
           {/* Step 1: Document type */}
           {wizardStep === 1 && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {QUICK_ACTIONS.filter((a) => a.type !== "quick_report").map((action) => (
                 <button
                   key={action.type}
@@ -919,74 +983,167 @@ export default function DocumentStudioHub() {
             </div>
           )}
 
-          {/* Step 2: Link project */}
+          {/* Step 2: Link project — shows auto-populate preview */}
           {wizardStep === 2 && (
             <div className="space-y-4">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a project (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No project</SelectItem>
-                  {(projects ?? []).map((p) => (
-                    <SelectItem key={p.id} value={String(p.dealId)}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Linking a project auto-populates deal data into your document sections.
-              </p>
-            </div>
-          )}
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Link to Project</label>
+                <Select
+                  value={selectedProjectId}
+                  onValueChange={(val) => {
+                    setSelectedProjectId(val);
+                    // Auto-populate name from project if blank
+                    if (val && val !== "none") {
+                      const proj = (projects ?? []).find((p) => String(p.dealId) === val);
+                      if (proj && !newDocName) {
+                        const typeLabel = DOC_TYPE_LABELS[selectedType || ""] || "Document";
+                        setNewDocName(`${proj.name} - ${typeLabel}`);
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <Database className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Select a project to auto-fill data..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No project — enter data manually</SelectItem>
+                    {(projects ?? []).map((p) => (
+                      <SelectItem key={p.id} value={String(p.dealId)}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Step 3: Choose template */}
-          {wizardStep === 3 && (
-            <div className="space-y-4">
-              <button
-                className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                  selectedTemplateId === null
-                    ? "border-primary bg-primary/5"
-                    : "border-muted hover:border-primary/40"
-                }`}
-                onClick={() => setSelectedTemplateId(null)}
-              >
-                <div className="flex items-center gap-2">
-                  <Layout className="h-4 w-4 text-primary" />
-                  <span className="font-medium text-sm">Start Blank</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Begin with default sections for your document type
-                </p>
-              </button>
-              {(templates ?? [])
-                .filter((t) => !selectedType || t.documentType === selectedType)
-                .map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
-                      selectedTemplateId === tpl.id
-                        ? "border-primary bg-primary/5"
-                        : "border-muted hover:border-primary/40"
-                    }`}
-                    onClick={() => setSelectedTemplateId(tpl.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-sm">{tpl.name}</span>
+              {/* Auto-populate preview when project is selected */}
+              {selectedProjectId && selectedProjectId !== "none" && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="py-4 px-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Data that will auto-populate</span>
                     </div>
-                    {tpl.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{tpl.description}</p>
+                    {previewLoading ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8" />)}
+                      </div>
+                    ) : projectPreview && Object.values(projectPreview).some(Boolean) ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                        {projectPreview.propertyName && (
+                          <><span className="text-muted-foreground">Property</span><span className="font-medium truncate">{projectPreview.propertyName}</span></>
+                        )}
+                        {projectPreview.address && (
+                          <><span className="text-muted-foreground">Address</span><span className="font-medium truncate">{projectPreview.address}</span></>
+                        )}
+                        {projectPreview.assetClass && (
+                          <><span className="text-muted-foreground">Asset Class</span><span className="font-medium capitalize">{projectPreview.assetClass.replace(/_/g, " ")}</span></>
+                        )}
+                        {projectPreview.purchasePrice && (
+                          <><span className="text-muted-foreground">Purchase Price</span><span className="font-medium">${projectPreview.purchasePrice.toLocaleString()}</span></>
+                        )}
+                        {projectPreview.noi && (
+                          <><span className="text-muted-foreground">NOI</span><span className="font-medium">${projectPreview.noi.toLocaleString()}</span></>
+                        )}
+                        {projectPreview.capRate && (
+                          <><span className="text-muted-foreground">Cap Rate</span><span className="font-medium">{(projectPreview.capRate * 100).toFixed(2)}%</span></>
+                        )}
+                        {projectPreview.units && (
+                          <><span className="text-muted-foreground">Units</span><span className="font-medium">{projectPreview.units.toLocaleString()}</span></>
+                        )}
+                        {projectPreview.yearBuilt && (
+                          <><span className="text-muted-foreground">Year Built</span><span className="font-medium">{projectPreview.yearBuilt}</span></>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Financial and property data from this project will populate document sections automatically.
+                      </p>
                     )}
-                  </button>
-                ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {(!selectedProjectId || selectedProjectId === "none") && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Database className="h-3 w-3" />
+                  Linking a project auto-fills financials, property details, comps, and market data into every section.
+                </p>
+              )}
             </div>
           )}
 
-          {/* Step 4: Configure */}
-          {wizardStep === 4 && (
-            <div className="space-y-4">
+          {/* Step 3: Hero photo upload + document name + configure */}
+          {wizardStep === 3 && (
+            <div className="space-y-5">
+              {/* Hero Photo Upload — the primary variable element */}
+              <div>
+                <label className="text-sm font-medium mb-2 block flex items-center gap-1.5">
+                  <Camera className="h-4 w-4 text-primary" />
+                  Cover Photo
+                  <Badge variant="outline" className="text-[9px] ml-1">Key Visual</Badge>
+                </label>
+                <div
+                  className={`relative border-2 border-dashed rounded-xl transition-colors cursor-pointer overflow-hidden ${
+                    heroPhotoPreview
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-muted-foreground/25 hover:border-primary/50 bg-muted/30"
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleHeroPhotoDrop}
+                >
+                  {heroPhotoPreview ? (
+                    <div className="relative">
+                      <img
+                        src={heroPhotoPreview}
+                        alt="Cover preview"
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="text-white text-sm font-medium flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
+                          Replace Photo
+                        </div>
+                      </div>
+                      <Badge className="absolute top-2 right-2 bg-primary text-white text-[10px]">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Uploaded
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="py-10 flex flex-col items-center text-center px-4">
+                      <div className="rounded-full bg-primary/10 p-3 mb-3">
+                        <ImagePlus className="h-8 w-8 text-primary" />
+                      </div>
+                      <p className="text-sm font-medium mb-1">
+                        Drop your cover photo here or click to browse
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Property exterior, aerial view, or hero image. PNG, JPG up to 10MB.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleHeroPhotoSelect(file);
+                  }}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  This is the most impactful element — it appears on the cover page of every generated document.
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Document Name */}
               <div>
                 <label className="text-sm font-medium mb-1 block">Document Name</label>
                 <Input
@@ -995,38 +1152,76 @@ export default function DocumentStudioHub() {
                   onChange={(e) => setNewDocName(e.target.value)}
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Target Audience</label>
-                <Select value={newDocAudience} onValueChange={setNewDocAudience}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select audience" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="institutional_investor">Institutional Investor</SelectItem>
-                    <SelectItem value="private_equity">Private Equity</SelectItem>
-                    <SelectItem value="family_office">Family Office</SelectItem>
-                    <SelectItem value="lender">Lender</SelectItem>
-                    <SelectItem value="investment_committee">Investment Committee</SelectItem>
-                    <SelectItem value="board_of_directors">Board of Directors</SelectItem>
-                    <SelectItem value="potential_buyer">Potential Buyer</SelectItem>
-                    <SelectItem value="broker">Broker</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Audience + Asset Class in a row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Target Audience</label>
+                  <Select value={newDocAudience} onValueChange={setNewDocAudience}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select audience" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="institutional_investor">Institutional Investor</SelectItem>
+                      <SelectItem value="private_equity">Private Equity</SelectItem>
+                      <SelectItem value="family_office">Family Office</SelectItem>
+                      <SelectItem value="lender">Lender</SelectItem>
+                      <SelectItem value="investment_committee">Investment Committee</SelectItem>
+                      <SelectItem value="board_of_directors">Board of Directors</SelectItem>
+                      <SelectItem value="potential_buyer">Potential Buyer</SelectItem>
+                      <SelectItem value="broker">Broker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Asset Class</label>
+                  <Select
+                    value={newDocAssetClass || (projectPreview?.assetClass ?? "")}
+                    onValueChange={setNewDocAssetClass}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="marina">Marina</SelectItem>
+                      <SelectItem value="rv_park">RV Park</SelectItem>
+                      <SelectItem value="mobile_home_park">Mobile Home Park</SelectItem>
+                      <SelectItem value="self_storage">Self Storage</SelectItem>
+                      <SelectItem value="multifamily">Multifamily</SelectItem>
+                      <SelectItem value="mixed_use">Mixed Use</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {/* Optional template choice inline */}
               <div>
-                <label className="text-sm font-medium mb-1 block">Asset Class</label>
-                <Select value={newDocAssetClass} onValueChange={setNewDocAssetClass}>
+                <label className="text-sm font-medium mb-1.5 block">Template (optional)</label>
+                <Select
+                  value={selectedTemplateId ? String(selectedTemplateId) : "blank"}
+                  onValueChange={(val) => setSelectedTemplateId(val === "blank" ? null : Number(val))}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select asset class" />
+                    <SelectValue placeholder="Start blank or choose a template" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="marina">Marina</SelectItem>
-                    <SelectItem value="rv_park">RV Park</SelectItem>
-                    <SelectItem value="mobile_home_park">Mobile Home Park</SelectItem>
-                    <SelectItem value="self_storage">Self Storage</SelectItem>
-                    <SelectItem value="multifamily">Multifamily</SelectItem>
-                    <SelectItem value="mixed_use">Mixed Use</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="blank">
+                      <span className="flex items-center gap-2">
+                        <Layout className="h-3.5 w-3.5" />
+                        Start Blank — default sections
+                      </span>
+                    </SelectItem>
+                    {(templates ?? [])
+                      .filter((t) => !selectedType || t.documentType === selectedType)
+                      .map((tpl) => (
+                        <SelectItem key={tpl.id} value={String(tpl.id)}>
+                          <span className="flex items-center gap-2">
+                            <Star className="h-3.5 w-3.5" />
+                            {tpl.name}
+                          </span>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1045,7 +1240,7 @@ export default function DocumentStudioHub() {
               <Button variant="ghost" onClick={() => { setShowNewDialog(false); resetWizard(); }}>
                 Cancel
               </Button>
-              {wizardStep < 4 ? (
+              {wizardStep < 3 ? (
                 <Button
                   onClick={() => setWizardStep((s) => s + 1)}
                   disabled={wizardStep === 1 && !selectedType}
