@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1884,18 +1885,11 @@ export function Exchange1031Panel() {
                     </div>
                     <div>
                       <Label className="text-xs">Type</Label>
-                      <Select value={prop.type} onValueChange={(v) => updateProperty(index, 'type', v)}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="marina">Marina</SelectItem>
-                          <SelectItem value="multifamily">Multifamily</SelectItem>
-                          <SelectItem value="industrial">Industrial</SelectItem>
-                          <SelectItem value="retail">Retail</SelectItem>
-                          <SelectItem value="mixed-use">Mixed-Use</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <AssetClassSelect
+                        value={prop.type}
+                        onValueChange={(v) => updateProperty(index, 'type', v)}
+                        className="h-8 text-xs"
+                      />
                     </div>
                   </div>
                 </div>
@@ -2613,19 +2607,11 @@ export function DSTAnalysisPanel() {
                       </div>
                       <div>
                         <Label className="text-xs">Property Type</Label>
-                        <Select value={dst.propertyType} onValueChange={(v) => updateDstAllocation(index, 'propertyType', v)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="multifamily">Multifamily</SelectItem>
-                            <SelectItem value="industrial">Industrial</SelectItem>
-                            <SelectItem value="medical-office">Medical Office</SelectItem>
-                            <SelectItem value="retail">Retail</SelectItem>
-                            <SelectItem value="self-storage">Self Storage</SelectItem>
-                            <SelectItem value="office">Office</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <AssetClassSelect
+                          value={dst.propertyType}
+                          onValueChange={(v) => updateDstAllocation(index, 'propertyType', v)}
+                          className="h-8 text-xs"
+                        />
                       </div>
                     </div>
                   </div>

@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { AssetClassSelect } from '@/components/ui/asset-class-select';
 
 // =============================================================================
 // Constants
@@ -70,15 +71,8 @@ const AUDIENCE_OPTIONS: { value: AudiencePersona; label: string; description: st
   },
 ];
 
-const ASSET_CLASS_OPTIONS: { value: AssetClass; label: string }[] = [
-  { value: 'marina', label: 'Marina' },
-  { value: 'rv_park', label: 'RV Park' },
-  { value: 'mobile_home_park', label: 'Mobile Home Park' },
-  { value: 'self_storage', label: 'Self Storage' },
-  { value: 'multifamily', label: 'Multifamily' },
-  { value: 'mixed_use', label: 'Mixed Use' },
-  { value: 'other', label: 'Other' },
-];
+
+
 
 const COLOR_SCHEMES = [
   { value: 'navy', label: 'Navy & Gold', primary: '#1e3a5f', accent: '#c5a355', description: 'Classic institutional' },
@@ -241,21 +235,10 @@ export const DocumentConfigurator: React.FC = () => {
           <Building2 className="w-4 h-4" />
           Asset Class
         </Label>
-        <Select
+        <AssetClassSelect
           value={assetClass}
           onValueChange={(value) => setAssetClass(value as AssetClass)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select asset class" />
-          </SelectTrigger>
-          <SelectContent>
-            {ASSET_CLASS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <p className="text-sm text-muted-foreground">
           Enables asset-specific sections and terminology
         </p>

@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -106,14 +107,6 @@ const SECURITY_DEPOSIT_TYPE_OPTIONS = [
   { value: "NONE", label: "None" },
 ] as const;
 
-const ASSET_CLASS_OPTIONS = [
-  { value: "retail", label: "Retail" },
-  { value: "office", label: "Office" },
-  { value: "industrial", label: "Industrial" },
-  { value: "marina", label: "Marina" },
-  { value: "mixed_use", label: "Mixed-Use" },
-  { value: "other", label: "Other" },
-] as const;
 
 const TENANT_TYPE_OPTIONS = [
   { value: "national", label: "National" },
@@ -934,16 +927,7 @@ export function UnifiedTenantFormDialog({
               control={form.control}
               name="assetClassTemplate"
               render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger className="h-7 w-[130px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ASSET_CLASS_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AssetClassSelect value={field.value} onValueChange={field.onChange} className="h-7 w-[130px] text-xs" />
               )}
             />
           </div>

@@ -54,10 +54,11 @@ import { DealStageTracker } from "./deal-stage-tracker";
 import { DealFinancialKPIs } from "./deal-financial-kpis";
 import { DealActivityTimeline } from "./deal-activity-timeline";
 import { DealDocumentsPanel } from "./deal-documents-panel";
-import { 
-  getAssetClassConfig, ASSET_CLASS_OPTIONS, 
-  type AssetClass, type FieldDefinition, type AssetClassConfig 
+import {
+  getAssetClassConfig,
+  type AssetClass, type FieldDefinition, type AssetClassConfig
 } from "./asset-class-fields";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -119,21 +120,7 @@ export function DealDetailPanel({
             {config.label}
           </Badge>
           {isEditing && (
-            <Select 
-              value={assetClass} 
-              onValueChange={(v) => updateField("assetClass", v)}
-            >
-              <SelectTrigger className="h-6 w-auto text-[10px] border-dashed">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ASSET_CLASS_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AssetClassSelect value={assetClass} onValueChange={(v) => updateField("assetClass", v)} className="h-6 w-auto text-[10px] border-dashed" />
           )}
         </div>
         

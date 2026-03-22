@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -729,22 +730,13 @@ export default function Pipeline() {
             </div>
 
             {/* Asset Class Filter */}
-            <Select value={activeAssetClass} onValueChange={setActiveAssetClass}>
-              <SelectTrigger className="w-40 h-8 text-sm">
-                <SelectValue placeholder="Asset Class" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Asset Classes</SelectItem>
-                {ASSET_CLASSES.map(ac => (
-                  <SelectItem key={ac.value} value={ac.value}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ac.color }} />
-                      {ac.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AssetClassSelect
+              value={activeAssetClass}
+              onValueChange={setActiveAssetClass}
+              allowAll
+              allLabel="All Asset Classes"
+              className="w-40 h-8 text-sm"
+            />
 
             {/* Sort */}
             <Select value={sortBy} onValueChange={setSortBy}>

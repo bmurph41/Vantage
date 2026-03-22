@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 import { useToast } from '@/hooks/use-toast';
 import {
   FileText,
@@ -107,18 +108,7 @@ const DOC_TYPE_OPTIONS: { value: DocumentType | 'all'; label: string }[] = [
   { value: 'due_diligence_summary', label: 'DD Summary' },
 ];
 
-const ASSET_CLASS_OPTIONS: { value: AssetClassFilter; label: string }[] = [
-  { value: 'all', label: 'All Assets' },
-  { value: 'marina', label: 'Marina' },
-  { value: 'multifamily', label: 'Multifamily' },
-  { value: 'self_storage', label: 'Self-Storage' },
-  { value: 'hotel', label: 'Hotel' },
-  { value: 'str', label: 'STR' },
-  { value: 'rv_park', label: 'RV Park' },
-  { value: 'commercial', label: 'Commercial' },
-  { value: 'residential', label: 'Residential' },
-  { value: 'business', label: 'Business' },
-];
+
 
 const AUDIENCE_OPTIONS: { value: AudienceFilter; label: string }[] = [
   { value: 'all', label: 'All Audiences' },
@@ -696,16 +686,7 @@ export default function TemplateGallery() {
             </SelectContent>
           </Select>
 
-          <Select value={assetFilter} onValueChange={(v) => setAssetFilter(v as any)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Asset Class" />
-            </SelectTrigger>
-            <SelectContent>
-              {ASSET_CLASS_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AssetClassSelect value={assetFilter} onValueChange={(v) => setAssetFilter(v as any)} allowAll allLabel="All Asset Classes" className="w-[160px]" />
 
           <Select value={audienceFilter} onValueChange={(v) => setAudienceFilter(v as any)}>
             <SelectTrigger className="w-[180px]">

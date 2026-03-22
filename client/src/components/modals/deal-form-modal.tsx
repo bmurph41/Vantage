@@ -11,6 +11,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 import { Switch } from "@/components/ui/switch";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Calendar } from "@/components/ui/calendar";
@@ -63,14 +64,8 @@ const commissionTypes = [
   { value: "tiered", label: "Tiered" },
 ];
 
-const propertyTypes = [
-  { value: "slip", label: "Slip/Berth" },
-  { value: "mooring", label: "Mooring" },
-  { value: "dry_storage", label: "Dry Storage" },
-  { value: "live_aboard", label: "Live Aboard" },
-  { value: "marina_business", label: "Marina Business" },
-  { value: "waterfront_property", label: "Waterfront Property" },
-];
+
+
 
 // Stage Combobox Component
 function StageCombobox({ value, onChange, stages, onCreateStage }: {
@@ -1840,20 +1835,14 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Property Type</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-property-type">
-                                <SelectValue placeholder="Select property type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {propertyTypes.map((type) => (
-                                <SelectItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <AssetClassSelect
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              testId="select-property-type"
+                              placeholder="Select property type"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

@@ -26,6 +26,7 @@ import {
   Upload, Camera, Database,
 } from "lucide-react";
 import type { DocumentType, AssetClass, AudiencePersona } from "@shared/document-builder/types";
+import { AssetClassSelect } from "@/components/ui/asset-class-select";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1175,23 +1176,11 @@ export default function DocumentStudioHub() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Asset Class</label>
-                  <Select
+                  <AssetClassSelect
                     value={newDocAssetClass || (projectPreview?.assetClass ?? "")}
                     onValueChange={setNewDocAssetClass}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select asset class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="marina">Marina</SelectItem>
-                      <SelectItem value="rv_park">RV Park</SelectItem>
-                      <SelectItem value="mobile_home_park">Mobile Home Park</SelectItem>
-                      <SelectItem value="self_storage">Self Storage</SelectItem>
-                      <SelectItem value="multifamily">Multifamily</SelectItem>
-                      <SelectItem value="mixed_use">Mixed Use</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select asset class"
+                  />
                 </div>
               </div>
 
