@@ -1,16 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import sgMail from '@sendgrid/mail';
+import { getSendGridClient } from '../services/email-service';
 
 const router = Router();
-
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com';
-
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-}
 
 router.post('/bulk-email/send', async (req: Request, res: Response) => {
   try {
@@ -26,9 +19,7 @@ router.post('/bulk-email/send', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'contactIds, subject, and htmlBody are required' });
     }
 
-    if (!SENDGRID_API_KEY) {
-      return res.status(500).json({ error: 'SendGrid is not configured' });
-    }
+    const { client: sgMail, fromEmail } = await getSendGridClient();
 
     const result = await db.execute(
       sql`SELECT id, email, first_name, last_name FROM crm_contacts WHERE id = ANY(${contactIds})`
@@ -50,7 +41,7 @@ router.post('/bulk-email/send', async (req: Request, res: Response) => {
         await sgMail.send({
           to: contact.email,
           from: {
-            email: FROM_EMAIL,
+            email: fromEmail,
             name: fromName || 'MarinaMatch',
           },
           subject,

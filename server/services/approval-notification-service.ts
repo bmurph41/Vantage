@@ -7,12 +7,8 @@ import {
   organizations
 } from '@shared/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
-import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
-
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { getSendGridClient } from './email-service';
 
 export interface ApprovalRequest {
   id: string;
@@ -273,9 +269,11 @@ export class ApprovalNotificationService {
     const appUrl = process.env.APP_URL || 'https://your-app.replit.app';
     const reviewUrl = `${appUrl}/modeling/projects/${params.projectId}/workspace/assumptions`;
 
+    const { client, fromEmail } = await getSendGridClient();
+
     const msg = {
       to: params.to,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com',
+      from: { email: fromEmail, name: 'MarinaMatch' },
       subject: `[Action Required] Scenario Approval Request: ${params.scenarioName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -296,7 +294,7 @@ export class ApprovalNotificationService {
       `
     };
 
-    await sgMail.send(msg);
+    await client.send(msg);
   }
 
   private async sendApprovalDecisionEmail(params: {
@@ -315,9 +313,11 @@ export class ApprovalNotificationService {
     const statusColor = params.decision === 'approved' ? '#38a169' : '#e53e3e';
     const statusText = params.decision === 'approved' ? 'Approved' : 'Rejected';
 
+    const { client, fromEmail } = await getSendGridClient();
+
     const msg = {
       to: params.to,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com',
+      from: { email: fromEmail, name: 'MarinaMatch' },
       subject: `Scenario ${statusText}: ${params.scenarioName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -336,7 +336,7 @@ export class ApprovalNotificationService {
       `
     };
 
-    await sgMail.send(msg);
+    await client.send(msg);
   }
 
   async getApprovalStats(orgId: string): Promise<{

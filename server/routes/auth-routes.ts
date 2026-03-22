@@ -345,6 +345,25 @@ router.post('/register', async (req: Request, res: Response) => {
       })
       .returning();
 
+    // Send welcome/verification email
+    try {
+      const verificationToken = generateVerificationToken();
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      await db.update(users)
+        .set({
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: verificationExpires,
+        })
+        .where(eq(users.id, newUser.id));
+
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+      const verificationUrl = `${baseUrl}/auth/verify-email/${verificationToken}`;
+      await sendEmailVerification(email, verificationUrl, name);
+    } catch (emailError) {
+      logger.warn({ emailError, email }, 'Failed to send verification email during registration');
+    }
+
     const deviceInfo = getDeviceInfo(req);
     const result = await enterpriseAuthService.authenticateWithPassword(email, password, deviceInfo);
 
@@ -416,12 +435,12 @@ router.post('/magic-link', async (req: Request, res: Response) => {
         })
         .where(eq(users.id, user.id));
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
         : process.env.REPLIT_DOMAIN
         ? `https://${process.env.REPLIT_DOMAIN}`
-        : 'http://localhost:5000';
-      
+        : process.env.APP_URL || 'http://localhost:5000';
+
       const magicLinkUrl = `${baseUrl}/auth/magic-link/${token}`;
       await sendMagicLinkEmail(user.email, magicLinkUrl, user.name);
     }

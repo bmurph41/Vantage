@@ -1,17 +1,11 @@
-import { MailService } from '@sendgrid/mail';
-import { 
+import {
   type Task, type Project, type User, type Contact, type NotificationLog,
-  type CalendarEvent 
+  type CalendarEvent
 } from '@shared/schema';
 import { storage } from './storage';
 import { resolveRecipient } from '@shared/recipient-utils';
 import { db } from './db';
-
-// Initialize SendGrid client
-const sgMail = new MailService();
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { getSendGridClient } from './services/email-service';
 
 interface EmailTemplate {
   subject: string;
@@ -30,8 +24,7 @@ interface NotificationContext {
 }
 
 export class NotificationService {
-  private readonly defaultFromEmail = 'noreply@duesoon.com';
-  private readonly defaultFromName = 'DueSoon Due Diligence';
+  private readonly defaultFromName = 'MarinaMatch Due Diligence';
 
   /**
    * Generate professional HTML email template
@@ -341,10 +334,8 @@ This task is critically overdue and may impact project deadlines.`
     leadOffsetDays: number = 0
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      // Check if SendGrid is configured
-      if (!process.env.SENDGRID_API_KEY) {
-        return { success: false, error: 'SendGrid not configured' };
-      }
+      // Get SendGrid client (supports both env vars and Replit connector)
+      const { client: sgMail, fromEmail } = await getSendGridClient();
 
       // Check for duplicate notification
       if (context.task) {
@@ -370,7 +361,7 @@ This task is critically overdue and may impact project deadlines.`
       const message = {
         to: context.recipient.email,
         from: {
-          email: this.defaultFromEmail,
+          email: fromEmail,
           name: this.defaultFromName,
         },
         subject: template.subject,
