@@ -430,6 +430,97 @@ router.post("/projects/:projectId/import-from-rra/:rraLocationId", async (req: R
   }
 });
 
+// Re-sync a modeling project from its linked RRA location
+// POST /projects/:projectId/re-sync
+router.post("/projects/:projectId/re-sync", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { projectId } = req.params;
+
+    const config = await db.query.modelingRentRollConfig.findFirst({
+      where: and(
+        eq(modelingRentRollConfig.orgId, orgId),
+        eq(modelingRentRollConfig.modelingProjectId, projectId)
+      ),
+    });
+
+    if (!config?.linkedRraLocationId) {
+      return res.status(400).json({ error: 'No linked RRA location configured for this project' });
+    }
+
+    const rraLocation = await db.query.rraMarinaLocations.findFirst({
+      where: and(
+        eq(rraMarinaLocations.orgId, orgId),
+        eq(rraMarinaLocations.id, config.linkedRraLocationId)
+      ),
+    });
+
+    if (!rraLocation) {
+      return res.status(404).json({ error: 'Linked RRA location not found' });
+    }
+
+    // Wipe and rebuild from current active leases
+    await db.delete(modelingRentRollUnits).where(and(
+      eq(modelingRentRollUnits.orgId, orgId),
+      eq(modelingRentRollUnits.modelingProjectId, projectId)
+    ));
+
+    const rraLeasesData = await db.query.rraLeases.findMany({
+      where: and(
+        eq(rraLeases.orgId, orgId),
+        eq(rraLeases.locationId, config.linkedRraLocationId),
+        eq(rraLeases.isActive, true)
+      ),
+      with: { tenant: true },
+    });
+
+    let imported: any[] = [];
+    if (rraLeasesData.length > 0) {
+      const unitsToInsert = rraLeasesData.map((lease: any, index: number) => ({
+        orgId,
+        modelingProjectId: projectId,
+        unitNumber: lease.unitNumber || lease.unitLocation || `Unit-${index + 1}`,
+        storageType: mapRraStorageType(lease.storageType),
+        status: lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant',
+        length: lease.slipLength ? parseFloat(lease.slipLength) : null,
+        width: lease.slipWidth ? parseFloat(lease.slipWidth) : null,
+        monthlyRent: lease.leaseAmount ? String(parseFloat(lease.leaseAmount) / 12) : '0',
+        annualRent: lease.leaseAmount || null,
+        tenantName: lease.tenant?.name || null,
+        boatName: null,
+        boatLength: null,
+        boatType: lease.boatType || null,
+        leaseStartDate: lease.leaseCommencement || null,
+        leaseEndDate: lease.leaseExpiration || null,
+        isMonthToMonth: lease.contractTerm?.toLowerCase().includes('month') || false,
+        electricCharge: String(parseFloat(lease.additionalCharge1 || '0')),
+        waterCharge: String(parseFloat(lease.additionalCharge2 || '0')),
+        otherCharges: String(parseFloat(lease.additionalCharge3 || '0')),
+        notes: `Re-synced from RRA: ${(rraLocation as any).name}`,
+        createdBy: userId,
+      }));
+      imported = await db.insert(modelingRentRollUnits).values(unitsToInsert as any).returning();
+    }
+
+    await db.update(modelingRentRollConfig)
+      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(modelingRentRollConfig.orgId, orgId),
+        eq(modelingRentRollConfig.modelingProjectId, projectId)
+      ));
+
+    res.json({
+      success: true,
+      syncedCount: imported.length,
+      sourceLocation: (rraLocation as any).name,
+      lastSyncAt: new Date(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 function mapRraStorageType(rraType: string | null): string {
   const mapping: Record<string, string> = {
     'Wet Slip': 'Wet Slip',

@@ -16,6 +16,11 @@ import { eq, and, desc, between, sql, gte, lte, SQL, inArray } from 'drizzle-orm
 import { z } from 'zod';
 import { resolveOpsModulesForOrg, getOwnedAssetsForOrg } from '../services/operations-module-resolver';
 import { getPnlMappingForAssetClass } from '@shared/asset-class-pnl-categories';
+import {
+  payments as dockitPayments,
+  leases as dockitLeases,
+  reservations as dockitReservations,
+} from '../../modules/dockit/shared/schema';
 
 const router = Router();
 
@@ -353,7 +358,10 @@ router.post('/push-to-model', async (req: Request, res: Response) => {
     // For marina assets, use existing fuel/ship-store/service tables
     if (assetType === 'marina') {
       // Find the marina linked to this asset
-      const [marina] = await db.select({ id: opsMarinas.id })
+      const [marina] = await db.select({
+        id: opsMarinas.id,
+        linkedDockitMarinaId: opsMarinas.linkedDockitMarinaId,
+      })
         .from(opsMarinas)
         .where(and(eq(opsMarinas.orgId, orgId), eq(opsMarinas.linkedProjectId, asset.projectId)));
 
@@ -477,6 +485,148 @@ router.post('/push-to-model', async (req: Request, res: Response) => {
               syncedAt: new Date(),
             });
             rowsWritten++;
+          }
+
+          // Sync service department revenue (labor + parts)
+          const serviceRevenueData = await db.select({
+            month: sql<string>`date_trunc('month', coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate}))::date`,
+            laborRevenue: sql<string>`sum(coalesce(${opsServiceWorkOrders.laborRevenue}, 0))`,
+            partsRevenue: sql<string>`sum(coalesce(${opsServiceWorkOrders.partsRevenue}, 0))`,
+          })
+            .from(opsServiceWorkOrders)
+            .where(and(
+              eq(opsServiceWorkOrders.marinaId, marina.id),
+              between(
+                sql`coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate})`,
+                rangeStart,
+                rangeEnd
+              )
+            ))
+            .groupBy(sql`date_trunc('month', coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate}))::date`);
+
+          for (const row of serviceRevenueData) {
+            const d = new Date(row.month);
+            const totalServiceRevenue = Number(row.laborRevenue) + Number(row.partsRevenue);
+            if (totalServiceRevenue > 0) {
+              await db.insert(modelingActuals).values({
+                orgId,
+                modelingProjectId: asset.projectId!,
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                category: 'Revenue',
+                subcategory: 'Service Revenue',
+                department: 'Service',
+                amount: String(totalServiceRevenue),
+                dataSource: 'ops_sync',
+                syncedAt: new Date(),
+              });
+              rowsWritten++;
+            }
+          }
+
+          // Sync Dockit dockage revenue (lease payments + transient reservations)
+          if (marina.linkedDockitMarinaId) {
+            // Paid lease payments from Dockit
+            const dockitPaymentData = await db.select({
+              month: sql<string>`date_trunc('month', ${dockitPayments.paidDate})::date`,
+              total: sql<string>`sum(${dockitPayments.amount})`,
+            })
+              .from(dockitPayments)
+              .where(and(
+                eq(dockitPayments.marinaId, marina.linkedDockitMarinaId),
+                sql`${dockitPayments.status} = 'paid'`,
+                sql`${dockitPayments.paidDate} between ${rangeStart}::date and ${rangeEnd}::date`
+              ))
+              .groupBy(sql`date_trunc('month', ${dockitPayments.paidDate})::date`);
+
+            for (const row of dockitPaymentData) {
+              const d = new Date(row.month);
+              if (Number(row.total) > 0) {
+                await db.insert(modelingActuals).values({
+                  orgId,
+                  modelingProjectId: asset.projectId!,
+                  year: d.getFullYear(),
+                  month: d.getMonth() + 1,
+                  category: 'Revenue',
+                  subcategory: 'Dockage Revenue',
+                  department: 'Dockage',
+                  amount: row.total,
+                  dataSource: 'ops_sync',
+                  syncedAt: new Date(),
+                });
+                rowsWritten++;
+              }
+            }
+
+            // Transient reservation revenue from Dockit (checked-out/confirmed)
+            const dockitTransientData = await db.select({
+              month: sql<string>`date_trunc('month', ${dockitReservations.checkInDate})::date`,
+              total: sql<string>`sum(${dockitReservations.totalAmount})`,
+            })
+              .from(dockitReservations)
+              .where(and(
+                eq(dockitReservations.marinaId, marina.linkedDockitMarinaId),
+                sql`${dockitReservations.status} in ('checked_out', 'confirmed', 'checked_in')`,
+                sql`${dockitReservations.type} = 'transient'`,
+                sql`${dockitReservations.checkInDate} between ${rangeStart}::date and ${rangeEnd}::date`
+              ))
+              .groupBy(sql`date_trunc('month', ${dockitReservations.checkInDate})::date`);
+
+            for (const row of dockitTransientData) {
+              const d = new Date(row.month);
+              if (Number(row.total) > 0) {
+                await db.insert(modelingActuals).values({
+                  orgId,
+                  modelingProjectId: asset.projectId!,
+                  year: d.getFullYear(),
+                  month: d.getMonth() + 1,
+                  category: 'Revenue',
+                  subcategory: 'Transient Dockage Revenue',
+                  department: 'Dockage',
+                  amount: row.total,
+                  dataSource: 'ops_sync',
+                  syncedAt: new Date(),
+                });
+                rowsWritten++;
+              }
+            }
+          }
+        }
+
+        // Sync service department COGS (expenses)
+        if (scope === 'ALL' || scope === 'EXPENSES') {
+          const serviceCogData = await db.select({
+            month: sql<string>`date_trunc('month', coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate}))::date`,
+            cogs: sql<string>`sum(coalesce(${opsServiceWorkOrders.cogs}, 0))`,
+          })
+            .from(opsServiceWorkOrders)
+            .where(and(
+              eq(opsServiceWorkOrders.marinaId, marina.id),
+              between(
+                sql`coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate})`,
+                rangeStart,
+                rangeEnd
+              )
+            ))
+            .groupBy(sql`date_trunc('month', coalesce(${opsServiceWorkOrders.closeDate}, ${opsServiceWorkOrders.openDate}))::date`);
+
+          for (const row of serviceCogData) {
+            const d = new Date(row.month);
+            if (Number(row.cogs) > 0) {
+              await db.insert(modelingActuals).values({
+                orgId,
+                modelingProjectId: asset.projectId!,
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                category: 'Expense',
+                subcategory: 'Service COGS',
+                department: 'Service',
+                amount: row.cogs,
+                dataSource: 'ops_sync',
+                syncedAt: new Date(),
+              });
+              rowsWritten++;
+            }
           }
         }
       }
@@ -825,6 +975,33 @@ router.put('/marinas/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error updating marina:', error);
     res.status(500).json({ error: 'Failed to update marina' });
+  }
+});
+
+// ============================================================================
+// DOCKIT MARINA LINK ENDPOINT
+// Link an ops marina to its corresponding Dockit marina for revenue sync
+// ============================================================================
+
+router.put('/marinas/:marinaId/dockit-link', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { marinaId } = req.params;
+    const { linkedDockitMarinaId } = req.body;
+
+    const [marina] = await db.update(opsMarinas)
+      .set({ linkedDockitMarinaId: linkedDockitMarinaId || null, updatedAt: new Date() })
+      .where(and(eq(opsMarinas.id, marinaId), eq(opsMarinas.orgId, orgId)))
+      .returning();
+
+    if (!marina) {
+      return res.status(404).json({ error: 'Marina not found' });
+    }
+
+    res.json({ success: true, marina });
+  } catch (error) {
+    console.error('Error setting Dockit link:', error);
+    res.status(500).json({ error: 'Failed to update Dockit marina link' });
   }
 });
 

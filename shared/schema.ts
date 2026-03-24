@@ -23113,6 +23113,7 @@ export const opsMarinas = pgTable("ops_marinas", {
   // Integration hooks
   integrationId: varchar("integration_id"), // Link to marina integration
   lastSyncAt: timestamp("last_sync_at"),
+  linkedDockitMarinaId: varchar("linked_dockit_marina_id"), // Link to Dockit marina for dockage revenue sync
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -30,6 +30,10 @@ import {
   insertRraModelingProjectLinkSchema,
   crmDeals,
   crmProperties,
+  modelingRentRollConfig,
+  modelingRentRollUnits,
+  rraLeases,
+  rraMarinaLocations,
 } from "@shared/schema";
 
 const router = Router();
@@ -1654,6 +1658,7 @@ router.get("/leases/:id", async (req: Request, res: Response, next: NextFunction
 router.post("/leases", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
+    const userId = getUserId(req);
     const leaseKey = `${req.body.tenantId}|${req.body.locationId || 'none'}|${Date.now()}`;
     const validated = insertRraLeaseSchema.parse({
       ...req.body,
@@ -1662,6 +1667,11 @@ router.post("/leases", async (req: Request, res: Response, next: NextFunction) =
     });
     const lease = await rraService.createLease(validated);
     res.status(201).json(lease);
+    // Auto-sync to linked modeling projects (fire and forget)
+    if ((lease as any).locationId) {
+      syncRraLocationToModeling(orgId, userId, (lease as any).locationId)
+        .catch(e => console.error('[RRA AutoSync] Error syncing after lease create:', e));
+    }
   } catch (error) {
     next(error);
   }
@@ -1670,11 +1680,18 @@ router.post("/leases", async (req: Request, res: Response, next: NextFunction) =
 router.patch("/leases/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
+    const userId = getUserId(req);
     const lease = await rraService.updateLease(orgId, req.params.id, req.body);
     if (!lease) {
       return res.status(404).json({ error: "Lease not found" });
     }
     res.json(lease);
+    // Auto-sync to linked modeling projects (fire and forget)
+    const locationId = (lease as any).locationId || req.body.locationId;
+    if (locationId) {
+      syncRraLocationToModeling(orgId, userId, locationId)
+        .catch(e => console.error('[RRA AutoSync] Error syncing after lease update:', e));
+    }
   } catch (error) {
     next(error);
   }
@@ -1683,8 +1700,18 @@ router.patch("/leases/:id", async (req: Request, res: Response, next: NextFuncti
 router.delete("/leases/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    // Capture locationId before deletion for auto-sync
+    const existingLease = await db.query.rraLeases.findFirst({
+      where: and(eq(rraLeases.id, req.params.id), eq(rraLeases.orgId, orgId)),
+    });
     await rraService.deleteLease(orgId, req.params.id);
     res.status(204).send();
+    // Auto-sync after deletion
+    if (existingLease?.locationId) {
+      syncRraLocationToModeling(orgId, userId, existingLease.locationId)
+        .catch(e => console.error('[RRA AutoSync] Error syncing after lease delete:', e));
+    }
   } catch (error) {
     next(error);
   }
@@ -3225,6 +3252,204 @@ router.get("/leases/upcoming-renewals", async (req: Request, res: Response, next
         totalRevenueAtRisk: leasesWithReminders.reduce((sum: number, l: any) => sum + l.monthlyRent, 0),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================================================
+// RRA STORAGE TYPE MAPPER (for modeling rent roll sync)
+// ============================================================================
+function mapRraToModelingStorageType(rraType: string | null): string {
+  const mapping: Record<string, string> = {
+    'Wet Slip': 'Wet Slip',
+    'Dry Storage': 'Dry Storage',
+    'Dry Rack': 'Dry Rack',
+    'Dry Stack': 'Dry Stack',
+    'Mooring': 'Mooring',
+    'Trailer Storage': 'Trailer Storage',
+    'Lift Storage': 'Lift Storage',
+  };
+  return mapping[rraType || ''] || 'Other';
+}
+
+// ============================================================================
+// AUTO-SYNC ENGINE: Syncs RRA lease data → linked modeling rent roll projects
+// Called after every lease create/update/delete when autoSyncEnabled=true
+// ============================================================================
+async function syncRraLocationToModeling(orgId: string, userId: string, locationId: string): Promise<number> {
+  const linkedConfigs = await db.select().from(modelingRentRollConfig)
+    .where(and(
+      eq(modelingRentRollConfig.orgId, orgId),
+      eq(modelingRentRollConfig.linkedRraLocationId, locationId),
+      eq(modelingRentRollConfig.autoSyncEnabled, true)
+    ));
+
+  if (linkedConfigs.length === 0) return 0;
+
+  let totalSynced = 0;
+  for (const config of linkedConfigs) {
+    // Wipe and rebuild the modeling rent roll units from current active RRA leases
+    await db.delete(modelingRentRollUnits).where(and(
+      eq(modelingRentRollUnits.orgId, orgId),
+      eq(modelingRentRollUnits.modelingProjectId, config.modelingProjectId)
+    ));
+
+    const activeLeasesData = await db.query.rraLeases.findMany({
+      where: and(
+        eq(rraLeases.orgId, orgId),
+        eq(rraLeases.locationId, locationId),
+        eq(rraLeases.isActive, true)
+      ),
+      with: { tenant: true },
+    });
+
+    if (activeLeasesData.length > 0) {
+      const units = activeLeasesData.map((lease: any, index: number) => ({
+        orgId,
+        modelingProjectId: config.modelingProjectId,
+        unitNumber: lease.unitNumber || lease.unitLocation || `Unit-${index + 1}`,
+        storageType: mapRraToModelingStorageType(lease.storageType),
+        status: lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant',
+        length: lease.slipLength ? parseFloat(lease.slipLength) : null,
+        width: lease.slipWidth ? parseFloat(lease.slipWidth) : null,
+        monthlyRent: lease.leaseAmount ? String(parseFloat(lease.leaseAmount) / 12) : '0',
+        annualRent: lease.leaseAmount || null,
+        tenantName: lease.tenant?.name || null,
+        boatType: lease.boatType || null,
+        leaseStartDate: lease.leaseCommencement || null,
+        leaseEndDate: lease.leaseExpiration || null,
+        isMonthToMonth: lease.contractTerm?.toLowerCase().includes('month') || false,
+        electricCharge: String(parseFloat(lease.additionalCharge1 || '0')),
+        waterCharge: String(parseFloat(lease.additionalCharge2 || '0')),
+        otherCharges: String(parseFloat(lease.additionalCharge3 || '0')),
+        notes: `Auto-synced from RRA`,
+        createdBy: userId,
+      }));
+      await db.insert(modelingRentRollUnits).values(units as any);
+      totalSynced += units.length;
+    }
+
+    // Update sync timestamp
+    await db.update(modelingRentRollConfig)
+      .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+      .where(eq(modelingRentRollConfig.id, config.id));
+  }
+
+  return totalSynced;
+}
+
+// ============================================================================
+// MANUAL SYNC: POST /locations/:locationId/sync-to-modeling
+// Re-syncs a specific RRA location to all linked modeling projects
+// ============================================================================
+router.post("/locations/:locationId/sync-to-modeling", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const userId = getUserId(req);
+    const { locationId } = req.params;
+
+    const location = await db.query.rraMarinaLocations.findFirst({
+      where: and(eq(rraMarinaLocations.orgId, orgId), eq(rraMarinaLocations.id, locationId)),
+    });
+
+    if (!location) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+
+    // Find all linked modeling projects (regardless of autoSync setting for manual trigger)
+    const linkedConfigs = await db.select().from(modelingRentRollConfig)
+      .where(and(
+        eq(modelingRentRollConfig.orgId, orgId),
+        eq(modelingRentRollConfig.linkedRraLocationId, locationId),
+      ));
+
+    if (linkedConfigs.length === 0) {
+      return res.json({ success: true, synced: 0, message: 'No linked modeling projects found' });
+    }
+
+    let totalSynced = 0;
+    for (const config of linkedConfigs) {
+      await db.delete(modelingRentRollUnits).where(and(
+        eq(modelingRentRollUnits.orgId, orgId),
+        eq(modelingRentRollUnits.modelingProjectId, config.modelingProjectId)
+      ));
+
+      const activeLeasesData = await db.query.rraLeases.findMany({
+        where: and(
+          eq(rraLeases.orgId, orgId),
+          eq(rraLeases.locationId, locationId),
+          eq(rraLeases.isActive, true)
+        ),
+        with: { tenant: true },
+      });
+
+      if (activeLeasesData.length > 0) {
+        const units = activeLeasesData.map((lease: any, index: number) => ({
+          orgId,
+          modelingProjectId: config.modelingProjectId,
+          unitNumber: lease.unitNumber || lease.unitLocation || `Unit-${index + 1}`,
+          storageType: mapRraToModelingStorageType(lease.storageType),
+          status: lease.slipStatus === 'Occupied' ? 'occupied' : 'vacant',
+          length: lease.slipLength ? parseFloat(lease.slipLength) : null,
+          width: lease.slipWidth ? parseFloat(lease.slipWidth) : null,
+          monthlyRent: lease.leaseAmount ? String(parseFloat(lease.leaseAmount) / 12) : '0',
+          annualRent: lease.leaseAmount || null,
+          tenantName: lease.tenant?.name || null,
+          boatType: lease.boatType || null,
+          leaseStartDate: lease.leaseCommencement || null,
+          leaseEndDate: lease.leaseExpiration || null,
+          isMonthToMonth: lease.contractTerm?.toLowerCase().includes('month') || false,
+          electricCharge: String(parseFloat(lease.additionalCharge1 || '0')),
+          waterCharge: String(parseFloat(lease.additionalCharge2 || '0')),
+          otherCharges: String(parseFloat(lease.additionalCharge3 || '0')),
+          notes: `Manually synced from RRA: ${(location as any).name}`,
+          createdBy: getUserId(req),
+        }));
+        await db.insert(modelingRentRollUnits).values(units as any);
+        totalSynced += units.length;
+      }
+
+      await db.update(modelingRentRollConfig)
+        .set({ lastSyncAt: new Date(), updatedAt: new Date() })
+        .where(eq(modelingRentRollConfig.id, config.id));
+    }
+
+    res.json({
+      success: true,
+      synced: totalSynced,
+      linkedProjects: linkedConfigs.length,
+      message: `Synced ${totalSynced} units across ${linkedConfigs.length} linked modeling project(s)`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================================================
+// TOGGLE AUTO-SYNC: PATCH /locations/:locationId/auto-sync
+// Enable or disable automatic sync for a location's linked modeling projects
+// ============================================================================
+router.patch("/locations/:locationId/auto-sync", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { locationId } = req.params;
+    const { modelingProjectId, autoSyncEnabled } = req.body;
+
+    if (typeof autoSyncEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'autoSyncEnabled must be a boolean' });
+    }
+
+    const updated = await db.update(modelingRentRollConfig)
+      .set({ autoSyncEnabled, updatedAt: new Date() })
+      .where(and(
+        eq(modelingRentRollConfig.orgId, orgId),
+        eq(modelingRentRollConfig.linkedRraLocationId, locationId),
+        modelingProjectId ? eq(modelingRentRollConfig.modelingProjectId, modelingProjectId) : undefined as any,
+      ))
+      .returning();
+
+    res.json({ success: true, updated: updated.length, autoSyncEnabled });
   } catch (error) {
     next(error);
   }
