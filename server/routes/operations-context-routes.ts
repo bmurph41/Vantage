@@ -387,6 +387,67 @@ router.post('/push-to-model', async (req: Request, res: Response) => {
               syncedAt: new Date(),
             });
             rowsWritten++;
+            // Also write fuel COGS as an expense
+            if (row.cogs && Number(row.cogs) > 0) {
+              await db.insert(modelingActuals).values({
+                orgId,
+                modelingProjectId: asset.projectId!,
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                category: 'Expense',
+                subcategory: 'Fuel COGS',
+                department: 'Fuel',
+                amount: row.cogs,
+                dataSource: 'ops_sync',
+                syncedAt: new Date(),
+              });
+              rowsWritten++;
+            }
+          }
+
+          // Sync ship store revenue
+          const shipStoreData = await db.select({
+            month: sql<string>`date_trunc('month', ${opsShipStoreSales.txnDate})::date`,
+            revenue: sql<string>`sum(${opsShipStoreSales.grossSales})`,
+            cogs: sql<string>`sum(${opsShipStoreSales.cogs})`,
+          })
+            .from(opsShipStoreSales)
+            .where(and(
+              eq(opsShipStoreSales.marinaId, marina.id),
+              between(opsShipStoreSales.txnDate, rangeStart, rangeEnd)
+            ))
+            .groupBy(sql`date_trunc('month', ${opsShipStoreSales.txnDate})::date`);
+
+          for (const row of shipStoreData) {
+            const d = new Date(row.month);
+            await db.insert(modelingActuals).values({
+              orgId,
+              modelingProjectId: asset.projectId!,
+              year: d.getFullYear(),
+              month: d.getMonth() + 1,
+              category: 'Revenue',
+              subcategory: 'Ship Store Revenue',
+              department: 'Ship Store',
+              amount: row.revenue,
+              dataSource: 'ops_sync',
+              syncedAt: new Date(),
+            });
+            rowsWritten++;
+            if (row.cogs && Number(row.cogs) > 0) {
+              await db.insert(modelingActuals).values({
+                orgId,
+                modelingProjectId: asset.projectId!,
+                year: d.getFullYear(),
+                month: d.getMonth() + 1,
+                category: 'Expense',
+                subcategory: 'Ship Store COGS',
+                department: 'Ship Store',
+                amount: row.cogs,
+                dataSource: 'ops_sync',
+                syncedAt: new Date(),
+              });
+              rowsWritten++;
+            }
           }
 
           // Sync commercial tenant data

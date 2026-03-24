@@ -48,7 +48,10 @@
       "Bash(node --loader ts-node/esm -e \"import { getModelConfig, MODEL_CONFIG_REGISTRY } from ''''./shared/asset-class-model-config.ts''''; console.log\\(Object.keys\\(MODEL_CONFIG_REGISTRY\\).sort\\(\\).join\\('''', ''''\\)\\); console.log\\(''''land config:'''', getModelConfig\\(''''land''''\\).label\\);\")",
       "Bash(/tmp/summary.txt:*)",
       "Read(//tmp/**)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)",
+      "Bash(find /home/runner/workspace/client/src -name *Onboarding* -o -name *onboarding*)",
+      "Bash(find /home/runner/workspace/db/migrations -name \"*.sql\" -exec basename {})",
+      "Bash(find /home/runner/workspace/modules/dockit -name *email* -o -name *mail*)"
     ]
   }
 }

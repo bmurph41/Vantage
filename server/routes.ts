@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { storage } from "./storage";
 import { db } from "./db";
-import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray, ilike } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, lte, sql, gt, inArray, notInArray, ilike, isNull } from "drizzle-orm";
 import { resolveRecipient } from "@shared/recipient-utils";
 import { AIRiskAnalyzer } from "./ai-risk-analyzer";
 import { AINotesEnhancer } from "./ai-notes-enhancer";
@@ -694,11 +694,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analysis/hub-stats", authenticateUser, enforceTenant, async (req: any, res) => {
     try {
-      const orgId = req.user?.organizationId || '';
+      const orgId = req.user?.orgId || '';
       const [salesResult, rateResult, dealsResult] = await Promise.all([
         db.execute(sql`SELECT COUNT(*)::int as count FROM sales_comps WHERE org_id = ${orgId}`),
         db.execute(sql`SELECT COUNT(*)::int as count FROM rate_comps WHERE org_id = ${orgId}`),
-        db.execute(sql`SELECT COUNT(*)::int as count FROM docket_deals`),
+        db.execute(sql`SELECT COUNT(*)::int as count FROM docket_deals WHERE org_id = ${orgId}`),
       ]);
 
       let marketRatesCount = 0;
@@ -720,6 +720,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ salesCompsCount: 0, rateCompsCount: 0, dealsCount: 0, marketRatesCount: 0 });
     }
   });
+
+  // Analysis state-scoped sales comps (used by MarinaDetail and similar views)
+  app.get("/api/analysis/sales-comps", authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user?.orgId || '';
+      const { state } = req.query as { state?: string };
+      const conditions: any[] = [eq(salesComps.orgId, orgId), isNull(salesComps.deletedAt)];
+      if (state) conditions.push(eq(salesComps.state, state));
+      const rows = await db.select({
+        id: salesComps.id,
+        marinaName: salesComps.marina,
+        city: salesComps.city,
+        state: salesComps.state,
+        saleMonth: salesComps.saleMonth,
+        saleYear: salesComps.saleYear,
+        salePrice: salesComps.salePrice,
+        wetSlips: salesComps.wetSlips,
+        dryRacks: salesComps.dryRacks,
+        capRate: salesComps.capRate,
+        brokerage: salesComps.brokerage,
+        notes: salesComps.notes,
+      }).from(salesComps).where(and(...conditions)).orderBy(desc(salesComps.createdAt)).limit(50);
+      const result = rows.map(r => ({
+        id: r.id,
+        marinaName: r.marinaName,
+        location: [r.city, r.state].filter(Boolean).join(', '),
+        state: r.state,
+        saleDate: r.saleYear ? `${r.saleYear}-${String(r.saleMonth || 1).padStart(2, '0')}-01` : null,
+        salePrice: r.salePrice,
+        pricePerSlip: r.salePrice && (r.wetSlips || r.dryRacks) ? Math.round(r.salePrice / ((r.wetSlips || 0) + (r.dryRacks || 0))) : null,
+        totalSlips: (r.wetSlips || 0) + (r.dryRacks || 0) || null,
+        capRate: r.capRate,
+        source: r.brokerage,
+      }));
+      res.json(result);
+    } catch (error: any) {
+      console.error("Analysis sales-comps error:", error);
+      res.status(500).json({ error: "Failed to fetch sales comparables" });
+    }
+  });
+
+  // Analysis state-scoped rate comps (used by MarinaDetail and similar views)
+  app.get("/api/analysis/rate-comps", authenticateUser, enforceTenant, async (req: any, res) => {
+    try {
+      const orgId = req.user?.orgId || '';
+      const { state } = req.query as { state?: string };
+      const conditions: any[] = [eq(rateComps.orgId, orgId), isNull(rateComps.deletedAt)];
+      if (state) conditions.push(eq(rateComps.state, state));
+      const rows = await db.select({
+        id: rateComps.id,
+        marina: rateComps.marina,
+        city: rateComps.city,
+        state: rateComps.state,
+        rateCollectionDate: rateComps.rateCollectionDate,
+        rateAmount: rateComps.rateAmount,
+        boatLengthMin: rateComps.boatLengthMin,
+        boatLengthMax: rateComps.boatLengthMax,
+        notes: rateComps.notes,
+      }).from(rateComps).where(and(...conditions)).orderBy(desc(rateComps.createdAt)).limit(50);
+      const result = rows.map(r => ({
+        id: r.id,
+        marinaName: r.marina,
+        location: [r.city, r.state].filter(Boolean).join(', '),
+        state: r.state,
+        effectiveDate: r.rateCollectionDate,
+        avgMonthlyRate: r.rateAmount,
+        slipSize: r.boatLengthMin && r.boatLengthMax ? `${r.boatLengthMin}–${r.boatLengthMax} ft` : r.boatLengthMin ? `${r.boatLengthMin}+ ft` : null,
+        amenities: null,
+        notes: r.notes,
+      }));
+      res.json(result);
+    } catch (error: any) {
+      console.error("Analysis rate-comps error:", error);
+      res.status(500).json({ error: "Failed to fetch rate comparables" });
+    }
+  });
+
   app.use("/api/listings/v2", authenticateUser, enforceTenant, liv2Routes);
   app.use("/api/marketplace", authenticateUser, enforceTenant, marketplaceRoutes);
   app.use("/api/funds", authenticateUser, requireFundManagement());
