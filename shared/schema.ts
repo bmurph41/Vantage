@@ -26692,3 +26692,1617 @@ export const workflowExecutionLog = pgTable("workflow_execution_log", {
 
 export type WorkflowExecutionLog = typeof workflowExecutionLog.$inferSelect;
 export type InsertWorkflowExecutionLog = typeof workflowExecutionLog.$inferInsert;
+
+// ── 1.1 Ask Your Deal — AI Chat Sessions ───────────────────────────────
+
+export const dealChatSessions = pgTable("deal_chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  userId: varchar("user_id").references(() => users.id),
+  sessionTitle: varchar("session_title", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type DealChatSession = typeof dealChatSessions.$inferSelect;
+export type InsertDealChatSession = typeof dealChatSessions.$inferInsert;
+
+export const dealChatMessages = pgTable("deal_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => dealChatSessions.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(), // user | assistant | system
+  content: text("content").notNull(),
+  contextSnapshot: jsonb("context_snapshot"),
+  toolCallsUsed: jsonb("tool_calls_used"),
+  tokensUsed: integer("tokens_used"),
+  latencyMs: integer("latency_ms"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DealChatMessage = typeof dealChatMessages.$inferSelect;
+export type InsertDealChatMessage = typeof dealChatMessages.$inferInsert;
+
+export const dealChatFeedback = pgTable("deal_chat_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => dealChatMessages.id, { onDelete: "cascade" }),
+  rating: integer("rating"), // 1-5
+  comment: text("comment"),
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DealChatFeedback = typeof dealChatFeedback.$inferSelect;
+export type InsertDealChatFeedback = typeof dealChatFeedback.$inferInsert;
+
+// ── 1.2 AI Narrative Generator ──────────────────────────────────────────
+
+export const aiNarratives = pgTable("ai_narratives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").references(() => users.id),
+  narrativeType: varchar("narrative_type", { length: 100 }).notNull(),
+  promptVersion: varchar("prompt_version", { length: 20 }),
+  generatedContent: text("generated_content"),
+  editedContent: text("edited_content"),
+  isApproved: boolean("is_approved").default(false),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  contextSnapshot: jsonb("context_snapshot"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type AiNarrative = typeof aiNarratives.$inferSelect;
+export type InsertAiNarrative = typeof aiNarratives.$inferInsert;
+
+// ── 1.3 AI Lease Abstractor ─────────────────────────────────────────────
+
+export const leaseAbstractions = pgTable("lease_abstractions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  leaseId: varchar("lease_id"),
+  fileName: varchar("file_name", { length: 500 }),
+  fileUrl: varchar("file_url", { length: 500 }),
+  extractedData: jsonb("extracted_data"), // LeaseAbstractionResult
+  riskFlags: jsonb("risk_flags"),
+  status: varchar("status", { length: 30 }).default("pending"), // pending | processing | completed | failed
+  extractedAt: timestamp("extracted_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type LeaseAbstraction = typeof leaseAbstractions.$inferSelect;
+export type InsertLeaseAbstraction = typeof leaseAbstractions.$inferInsert;
+
+// ── 1.4 Deal Risk Scoring ───────────────────────────────────────────────
+
+export const dealRiskScores = pgTable("deal_risk_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  compositeScore: numeric("composite_score", { precision: 5, scale: 2 }),
+  riskTier: varchar("risk_tier", { length: 2 }), // A, B, C, D, F
+  dimensions: jsonb("dimensions"),
+  narrativeSummary: text("narrative_summary"),
+  topRisks: jsonb("top_risks"),
+  topStrengths: jsonb("top_strengths"),
+  generatedBy: varchar("generated_by").references(() => users.id),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow(),
+});
+export type DealRiskScore = typeof dealRiskScores.$inferSelect;
+export type InsertDealRiskScore = typeof dealRiskScores.$inferInsert;
+
+// ── 2.1 LP / Investor Portal ────────────────────────────────────────────
+
+export const investors = pgTable("investors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  investorType: varchar("investor_type", { length: 50 }),
+  legalName: varchar("legal_name", { length: 255 }).notNull(),
+  taxId: varchar("tax_id", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  accreditedStatus: varchar("accredited_status", { length: 50 }),
+  accreditedVerifiedAt: timestamp("accredited_verified_at"),
+  preferredDistributionMethod: varchar("preferred_distribution_method", { length: 50 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Investor = typeof investors.$inferSelect;
+export type InsertInvestor = typeof investors.$inferInsert;
+
+export const investments = pgTable("investments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  investmentType: varchar("investment_type", { length: 50 }),
+  commitmentAmount: numeric("commitment_amount", { precision: 15, scale: 2 }),
+  fundedAmount: numeric("funded_amount", { precision: 15, scale: 2 }),
+  ownershipPct: numeric("ownership_pct", { precision: 8, scale: 4 }),
+  preferredReturn: numeric("preferred_return", { precision: 5, scale: 2 }),
+  investmentDate: date("investment_date"),
+  status: varchar("status", { length: 50 }).default("committed"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Investment = typeof investments.$inferSelect;
+export type InsertInvestment = typeof investments.$inferInsert;
+
+export const distributions = pgTable("distributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  distributionDate: date("distribution_date"),
+  distributionType: varchar("distribution_type", { length: 50 }),
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }),
+  notes: text("notes"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  status: varchar("status", { length: 30 }).default("draft"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Distribution = typeof distributions.$inferSelect;
+export type InsertDistribution = typeof distributions.$inferInsert;
+
+export const distributionAllocations = pgTable("distribution_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  distributionId: varchar("distribution_id").notNull().references(() => distributions.id, { onDelete: "cascade" }),
+  investmentId: varchar("investment_id").references(() => investments.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  amount: numeric("amount", { precision: 15, scale: 2 }),
+  returnOfCapital: numeric("return_of_capital", { precision: 15, scale: 2 }),
+  preferredReturnAmount: numeric("preferred_return_amount", { precision: 15, scale: 2 }),
+  profitShare: numeric("profit_share", { precision: 15, scale: 2 }),
+  status: varchar("status", { length: 30 }).default("pending"),
+  sentAt: timestamp("sent_at"),
+  confirmedAt: timestamp("confirmed_at"),
+});
+export type DistributionAllocation = typeof distributionAllocations.$inferSelect;
+export type InsertDistributionAllocation = typeof distributionAllocations.$inferInsert;
+
+// ── 2.2 Capital Call Workflow ───────────────────────────────────────────
+
+export const capitalCalls = pgTable("capital_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  callNumber: integer("call_number"),
+  callDate: date("call_date"),
+  dueDate: date("due_date"),
+  totalAmount: numeric("total_amount", { precision: 15, scale: 2 }),
+  purpose: varchar("purpose", { length: 255 }),
+  status: varchar("status", { length: 30 }).default("draft"),
+  notes: text("notes"),
+  noticeSentAt: timestamp("notice_sent_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type CapitalCall = typeof capitalCalls.$inferSelect;
+export type InsertCapitalCall = typeof capitalCalls.$inferInsert;
+
+export const capitalCallLineItems = pgTable("capital_call_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  capitalCallId: varchar("capital_call_id").notNull().references(() => capitalCalls.id, { onDelete: "cascade" }),
+  investmentId: varchar("investment_id").references(() => investments.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  amountCalled: numeric("amount_called", { precision: 15, scale: 2 }),
+  amountReceived: numeric("amount_received", { precision: 15, scale: 2 }).default("0"),
+  dueDate: date("due_date"),
+  status: varchar("status", { length: 30 }).default("pending"),
+  receivedAt: timestamp("received_at"),
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  referenceNumber: varchar("reference_number", { length: 100 }),
+  notes: text("notes"),
+});
+export type CapitalCallLineItem = typeof capitalCallLineItems.$inferSelect;
+export type InsertCapitalCallLineItem = typeof capitalCallLineItems.$inferInsert;
+
+// ── 2.4 K-1 / Tax Document Vault ───────────────────────────────────────
+
+export const taxDocuments = pgTable("tax_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  documentType: varchar("document_type", { length: 50 }).notNull(),
+  taxYear: integer("tax_year").notNull(),
+  documentUrl: varchar("document_url", { length: 500 }),
+  fileName: varchar("file_name", { length: 255 }),
+  fileSize: integer("file_size"),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow(),
+  sentAt: timestamp("sent_at"),
+  downloadedByInvestorAt: timestamp("downloaded_by_investor_at"),
+  isAvailableToInvestor: boolean("is_available_to_investor").default(false),
+});
+export type TaxDocument = typeof taxDocuments.$inferSelect;
+export type InsertTaxDocument = typeof taxDocuments.$inferInsert;
+
+// ── 3.2 Market Benchmarks ───────────────────────────────────────────────
+
+export const marketBenchmarks = pgTable("market_benchmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  assetClass: varchar("asset_class", { length: 100 }),
+  market: varchar("market", { length: 100 }),
+  submarket: varchar("submarket", { length: 100 }),
+  period: varchar("period", { length: 20 }),
+  avgCapRate: numeric("avg_cap_rate", { precision: 5, scale: 2 }),
+  avgRentGrowth: numeric("avg_rent_growth", { precision: 5, scale: 2 }),
+  avgOccupancy: numeric("avg_occupancy", { precision: 5, scale: 2 }),
+  avgPricePerUnit: numeric("avg_price_per_unit", { precision: 10, scale: 2 }),
+  source: varchar("source", { length: 100 }),
+  sourceUrl: varchar("source_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type MarketBenchmark = typeof marketBenchmarks.$inferSelect;
+export type InsertMarketBenchmark = typeof marketBenchmarks.$inferInsert;
+
+// ── 3.3 Asset Rebalancing Alerts ────────────────────────────────────────
+
+export const portfolioAlerts = pgTable("portfolio_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  alertType: varchar("alert_type", { length: 50 }).notNull(),
+  severity: varchar("severity", { length: 20 }).notNull(), // critical | warning | info
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  currentValue: numeric("current_value", { precision: 15, scale: 4 }),
+  thresholdValue: numeric("threshold_value", { precision: 15, scale: 4 }),
+  suggestedActions: jsonb("suggested_actions"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: varchar("acknowledged_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type PortfolioAlert = typeof portfolioAlerts.$inferSelect;
+export type InsertPortfolioAlert = typeof portfolioAlerts.$inferInsert;
+
+// ── 4.1 Live Cap Rate Feed ──────────────────────────────────────────────
+
+export const capRateFeed = pgTable("cap_rate_feed", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  assetClass: varchar("asset_class", { length: 100 }),
+  market: varchar("market", { length: 100 }),
+  submarket: varchar("submarket", { length: 100 }),
+  asOfDate: date("as_of_date"),
+  minCapRate: numeric("min_cap_rate", { precision: 5, scale: 2 }),
+  maxCapRate: numeric("max_cap_rate", { precision: 5, scale: 2 }),
+  avgCapRate: numeric("avg_cap_rate", { precision: 5, scale: 2 }),
+  dataPoints: integer("data_points"),
+  source: varchar("source", { length: 100 }),
+  sourceDocument: varchar("source_document", { length: 255 }),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type CapRateFeedEntry = typeof capRateFeed.$inferSelect;
+export type InsertCapRateFeedEntry = typeof capRateFeed.$inferInsert;
+
+// ── 4.2 Rent Comps ──────────────────────────────────────────────────────
+
+export const rentComps = pgTable("rent_comps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  assetClass: varchar("asset_class", { length: 100 }),
+  propertyName: varchar("property_name", { length: 255 }),
+  address: varchar("address", { length: 500 }),
+  latitude: numeric("latitude", { precision: 9, scale: 6 }),
+  longitude: numeric("longitude", { precision: 9, scale: 6 }),
+  distanceMiles: numeric("distance_miles", { precision: 5, scale: 2 }),
+  unitType: varchar("unit_type", { length: 100 }),
+  rentPerUnit: numeric("rent_per_unit", { precision: 10, scale: 2 }),
+  rentPSF: numeric("rent_psf", { precision: 8, scale: 4 }),
+  occupancy: numeric("occupancy", { precision: 5, scale: 2 }),
+  yearBuilt: integer("year_built"),
+  totalUnits: integer("total_units"),
+  amenities: jsonb("amenities"),
+  source: varchar("source", { length: 100 }),
+  dataDate: date("data_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type RentComp = typeof rentComps.$inferSelect;
+export type InsertRentComp = typeof rentComps.$inferInsert;
+
+// ── 4.4 Zoning + Entitlement Tracker ────────────────────────────────────
+
+export const propertyZoning = pgTable("property_zoning", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  currentZoningCode: varchar("current_zoning_code", { length: 100 }),
+  currentZoningDescription: varchar("current_zoning_description", { length: 500 }),
+  currentUse: varchar("current_use", { length: 255 }),
+  permittedUses: jsonb("permitted_uses"),
+  conditionalUses: jsonb("conditional_uses"),
+  maxFAR: numeric("max_far", { precision: 5, scale: 2 }),
+  maxHeight: integer("max_height"),
+  parkingRequirements: text("parking_requirements"),
+  municipality: varchar("municipality", { length: 255 }),
+  county: varchar("county", { length: 255 }),
+  planningDepartmentContact: jsonb("planning_department_contact"),
+  zoningMapUrl: varchar("zoning_map_url", { length: 500 }),
+  lastVerifiedAt: date("last_verified_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type PropertyZoning = typeof propertyZoning.$inferSelect;
+export type InsertPropertyZoning = typeof propertyZoning.$inferInsert;
+
+export const entitlements = pgTable("entitlements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  entitlementType: varchar("entitlement_type", { length: 100 }),
+  description: text("description"),
+  status: varchar("status", { length: 50 }).default("not_started"),
+  applicationDate: date("application_date"),
+  expectedDecisionDate: date("expected_decision_date"),
+  actualDecisionDate: date("actual_decision_date"),
+  approvedBy: varchar("approved_by_authority", { length: 255 }),
+  conditions: text("conditions"),
+  documentIds: jsonb("document_ids"),
+  estimatedCost: numeric("estimated_cost", { precision: 12, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Entitlement = typeof entitlements.$inferSelect;
+export type InsertEntitlement = typeof entitlements.$inferInsert;
+
+// ── 5.1 Work Orders ─────────────────────────────────────────────────────
+
+export const workOrders = pgTable("work_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  workOrderNumber: varchar("work_order_number", { length: 50 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  priority: varchar("priority", { length: 20 }).default("medium"),
+  status: varchar("status", { length: 30 }).default("submitted"),
+  requestedBy: varchar("requested_by", { length: 255 }),
+  requestSource: varchar("request_source", { length: 50 }),
+  unitOrArea: varchar("unit_or_area", { length: 100 }),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  estimatedCost: numeric("estimated_cost", { precision: 10, scale: 2 }),
+  actualCost: numeric("actual_cost", { precision: 10, scale: 2 }),
+  laborHours: numeric("labor_hours", { precision: 6, scale: 2 }),
+  scheduledDate: date("scheduled_date"),
+  completedDate: date("completed_date"),
+  isBillableToTenant: boolean("is_billable_to_tenant").default(false),
+  photos: jsonb("photos"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrder = typeof workOrders.$inferSelect;
+export type InsertWorkOrder = typeof workOrders.$inferInsert;
+
+export const workOrderUpdates = pgTable("work_order_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id").notNull().references(() => workOrders.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id),
+  updateType: varchar("update_type", { length: 50 }),
+  previousStatus: varchar("previous_status", { length: 30 }),
+  newStatus: varchar("new_status", { length: 30 }),
+  note: text("note"),
+  photoUrl: varchar("photo_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WorkOrderUpdate = typeof workOrderUpdates.$inferSelect;
+export type InsertWorkOrderUpdate = typeof workOrderUpdates.$inferInsert;
+
+// ── 5.2 Vendor Management ───────────────────────────────────────────────
+
+export const vendors = pgTable("vendors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  contactName: varchar("contact_name", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  trades: jsonb("trades"),
+  serviceArea: jsonb("service_area"),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  licenseExpiry: date("license_expiry"),
+  insuranceCertUrl: varchar("insurance_cert_url", { length: 500 }),
+  insuranceExpiry: date("insurance_expiry"),
+  insuranceCoverageAmount: numeric("insurance_coverage_amount", { precision: 12, scale: 2 }),
+  isPreferred: boolean("is_preferred").default(false),
+  isApproved: boolean("is_approved").default(false),
+  avgRating: numeric("avg_rating", { precision: 3, scale: 2 }),
+  totalWorkOrdersCompleted: integer("total_work_orders_completed").default(0),
+  totalSpendAllTime: numeric("total_spend_all_time", { precision: 12, scale: 2 }),
+  notes: text("notes"),
+  w9DocUrl: varchar("w9_doc_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Vendor = typeof vendors.$inferSelect;
+export type InsertVendor = typeof vendors.$inferInsert;
+
+export const vendorRatings = pgTable("vendor_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").notNull().references(() => vendors.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => workOrders.id),
+  ratedBy: varchar("rated_by").references(() => users.id),
+  rating: integer("rating"),
+  qualityScore: integer("quality_score"),
+  responseTimeScore: integer("response_time_score"),
+  priceScore: integer("price_score"),
+  comment: text("comment"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type VendorRating = typeof vendorRatings.$inferSelect;
+export type InsertVendorRating = typeof vendorRatings.$inferInsert;
+
+// ── 5.3 CapEx Tracker ───────────────────────────────────────────────────
+
+export const capexProjects = pgTable("capex_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  projectName: varchar("project_name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  description: text("description"),
+  status: varchar("status", { length: 50 }).default("planning"),
+  budgetedAmount: numeric("budgeted_amount", { precision: 12, scale: 2 }),
+  contractedAmount: numeric("contracted_amount", { precision: 12, scale: 2 }),
+  actualSpendToDate: numeric("actual_spend_to_date", { precision: 12, scale: 2 }),
+  projectedTotalCost: numeric("projected_total_cost", { precision: 12, scale: 2 }),
+  startDate: date("start_date"),
+  projectedCompletionDate: date("projected_completion_date"),
+  actualCompletionDate: date("actual_completion_date"),
+  primaryVendorId: varchar("primary_vendor_id").references(() => vendors.id),
+  permitRequired: boolean("permit_required").default(false),
+  permitNumber: varchar("permit_number", { length: 100 }),
+  valueAddImpact: text("value_add_impact"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type CapexProject = typeof capexProjects.$inferSelect;
+export type InsertCapexProject = typeof capexProjects.$inferInsert;
+
+// ── 5.4 Inspection Workflow ─────────────────────────────────────────────
+
+export const inspectionTemplates = pgTable("inspection_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  assetClass: varchar("asset_class", { length: 100 }),
+  inspectionType: varchar("inspection_type", { length: 100 }),
+  sections: jsonb("sections"), // [{ sectionName, items: [{ id, description, type }] }]
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type InspectionTemplate = typeof inspectionTemplates.$inferSelect;
+export type InsertInspectionTemplate = typeof inspectionTemplates.$inferInsert;
+
+export const inspections = pgTable("inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  templateId: varchar("template_id").references(() => inspectionTemplates.id),
+  inspectionType: varchar("inspection_type", { length: 100 }),
+  status: varchar("status", { length: 30 }).default("scheduled"),
+  scheduledDate: date("scheduled_date"),
+  conductedDate: date("conducted_date"),
+  conductedBy: varchar("conducted_by").references(() => users.id),
+  externalInspectorName: varchar("external_inspector_name", { length: 255 }),
+  findings: jsonb("findings"),
+  overallRating: varchar("overall_rating", { length: 20 }),
+  summaryNotes: text("summary_notes"),
+  punchListGenerated: boolean("punch_list_generated").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Inspection = typeof inspections.$inferSelect;
+export type InsertInspection = typeof inspections.$inferInsert;
+
+// ── 6.1 Lender Matching Engine ──────────────────────────────────────────
+
+export const lenders = pgTable("lenders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  lenderName: varchar("lender_name", { length: 255 }).notNull(),
+  lenderType: varchar("lender_type", { length: 100 }),
+  contactName: varchar("contact_name", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  preferredAssetClasses: jsonb("preferred_asset_classes"),
+  preferredMarkets: jsonb("preferred_markets"),
+  minLoanAmount: numeric("min_loan_amount", { precision: 15, scale: 2 }),
+  maxLoanAmount: numeric("max_loan_amount", { precision: 15, scale: 2 }),
+  typicalLTVMax: numeric("typical_ltv_max", { precision: 5, scale: 2 }),
+  typicalDSCRMin: numeric("typical_dscr_min", { precision: 4, scale: 2 }),
+  typicalTermsYears: jsonb("typical_terms_years"),
+  recourseRequirement: varchar("recourse_requirement", { length: 50 }),
+  currentRateIndex: varchar("current_rate_index", { length: 50 }),
+  currentSpreadMin: numeric("current_spread_min", { precision: 4, scale: 2 }),
+  currentSpreadMax: numeric("current_spread_max", { precision: 4, scale: 2 }),
+  ratesAsOf: date("rates_as_of"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  lastContactDate: date("last_contact_date"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Lender = typeof lenders.$inferSelect;
+export type InsertLender = typeof lenders.$inferInsert;
+
+export const lenderDeals = pgTable("lender_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  lenderId: varchar("lender_id").notNull().references(() => lenders.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  status: varchar("status", { length: 50 }).default("prospect"),
+  contactDate: date("contact_date"),
+  termSheetDate: date("term_sheet_date"),
+  closedDate: date("closed_date"),
+  loanAmount: numeric("loan_amount", { precision: 15, scale: 2 }),
+  rate: numeric("rate", { precision: 6, scale: 4 }),
+  ltv: numeric("ltv", { precision: 5, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type LenderDeal = typeof lenderDeals.$inferSelect;
+export type InsertLenderDeal = typeof lenderDeals.$inferInsert;
+
+// ── 6.2 Term Sheet Comparator ───────────────────────────────────────────
+
+export const termSheets = pgTable("term_sheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  lenderId: varchar("lender_id").references(() => lenders.id),
+  lenderName: varchar("lender_name", { length: 255 }),
+  dateReceived: date("date_received"),
+  expirationDate: date("expiration_date"),
+  status: varchar("status", { length: 30 }).default("received"),
+  loanAmount: numeric("loan_amount", { precision: 15, scale: 2 }),
+  ltv: numeric("ltv", { precision: 5, scale: 2 }),
+  rateType: varchar("rate_type", { length: 20 }),
+  rate: numeric("rate", { precision: 6, scale: 4 }),
+  spread: numeric("spread", { precision: 5, scale: 3 }),
+  amortizationYears: integer("amortization_years"),
+  ioMonths: integer("io_months"),
+  termYears: integer("term_years"),
+  originationFee: numeric("origination_fee", { precision: 5, scale: 3 }),
+  exitFee: numeric("exit_fee", { precision: 5, scale: 3 }),
+  prepaymentPenalty: varchar("prepayment_penalty", { length: 255 }),
+  recourse: varchar("recourse", { length: 50 }),
+  financialCovenants: jsonb("financial_covenants"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type TermSheet = typeof termSheets.$inferSelect;
+export type InsertTermSheet = typeof termSheets.$inferInsert;
+
+// ── 6.3 Deal Debt / Debt Maturity ───────────────────────────────────────
+
+export const dealDebt = pgTable("deal_debt", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  lenderId: varchar("lender_id").references(() => lenders.id),
+  debtTranche: varchar("debt_tranche", { length: 50 }),
+  loanAmount: numeric("loan_amount", { precision: 15, scale: 2 }),
+  currentBalance: numeric("current_balance", { precision: 15, scale: 2 }),
+  rate: numeric("rate", { precision: 6, scale: 4 }),
+  rateType: varchar("rate_type", { length: 20 }),
+  originationDate: date("origination_date"),
+  maturityDate: date("maturity_date"),
+  extensionOptions: jsonb("extension_options"),
+  annualDebtService: numeric("annual_debt_service", { precision: 12, scale: 2 }),
+  dscr: numeric("dscr", { precision: 5, scale: 3 }),
+  covenants: jsonb("covenants"),
+  refinanceRisk: varchar("refinance_risk", { length: 20 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DealDebtEntry = typeof dealDebt.$inferSelect;
+export type InsertDealDebtEntry = typeof dealDebt.$inferInsert;
+
+// ── 6.4 Preferred Equity / Mezz Tracker ─────────────────────────────────
+
+export const mezzPositions = pgTable("mezz_positions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealDebtId: varchar("deal_debt_id").notNull().references(() => dealDebt.id, { onDelete: "cascade" }),
+  mezzType: varchar("mezz_type", { length: 50 }),
+  preferredReturnRate: numeric("preferred_return_rate", { precision: 5, scale: 2 }),
+  accruedPreferredReturn: numeric("accrued_preferred_return", { precision: 12, scale: 2 }),
+  paidPreferredReturnYTD: numeric("paid_preferred_return_ytd", { precision: 12, scale: 2 }),
+  isCompounding: boolean("is_compounding").default(false),
+  participationRights: text("participation_rights"),
+  controlRights: text("control_rights"),
+  payoffAmount: numeric("payoff_amount", { precision: 12, scale: 2 }),
+  payoffAsOf: date("payoff_as_of"),
+  convertible: boolean("convertible").default(false),
+  conversionTerms: text("conversion_terms"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type MezzPosition = typeof mezzPositions.$inferSelect;
+export type InsertMezzPosition = typeof mezzPositions.$inferInsert;
+
+// ── 7.1 Relationship Graph ──────────────────────────────────────────────
+
+export const contactRelationships = pgTable("contact_relationships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  fromContactId: varchar("from_contact_id").notNull().references(() => crmContacts.id),
+  toContactId: varchar("to_contact_id").notNull().references(() => crmContacts.id),
+  relationshipType: varchar("relationship_type", { length: 100 }),
+  strength: varchar("strength", { length: 20 }),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ContactRelationship = typeof contactRelationships.$inferSelect;
+export type InsertContactRelationship = typeof contactRelationships.$inferInsert;
+
+// ── 7.4 Contact Intelligence / News ─────────────────────────────────────
+
+export const contactNewsMentions = pgTable("contact_news_mentions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id),
+  articleUrl: varchar("article_url", { length: 500 }),
+  headline: varchar("headline", { length: 500 }),
+  snippet: text("snippet"),
+  source: varchar("source", { length: 100 }),
+  publishedAt: timestamp("published_at"),
+  relevanceScore: integer("relevance_score"),
+  mentionType: varchar("mention_type", { length: 30 }),
+  actionableNote: varchar("actionable_note", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ContactNewsMention = typeof contactNewsMentions.$inferSelect;
+export type InsertContactNewsMention = typeof contactNewsMentions.$inferInsert;
+
+// ── 8.4 White-Label / Org Branding ──────────────────────────────────────
+
+export const orgBranding = pgTable("org_branding", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  firmName: varchar("firm_name", { length: 255 }),
+  logoUrl: varchar("logo_url", { length: 500 }),
+  faviconUrl: varchar("favicon_url", { length: 500 }),
+  primaryColor: varchar("primary_color", { length: 7 }),
+  secondaryColor: varchar("secondary_color", { length: 7 }),
+  accentColor: varchar("accent_color", { length: 7 }),
+  customDomain: varchar("custom_domain", { length: 255 }),
+  loginPageTagline: varchar("login_page_tagline", { length: 255 }),
+  supportEmail: varchar("support_email", { length: 255 }),
+  isWhiteLabeled: boolean("is_white_labeled").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type OrgBranding = typeof orgBranding.$inferSelect;
+export type InsertOrgBranding = typeof orgBranding.$inferInsert;
+
+// ── 9.1 SMS / Push Deal Alerts ──────────────────────────────────────────
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  alertType: varchar("alert_type", { length: 50 }).notNull(),
+  inApp: boolean("in_app").default(true),
+  email: boolean("email").default(true),
+  sms: boolean("sms").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
+export const userNotifications = pgTable("user_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  alertType: varchar("alert_type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: text("body"),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  linkUrl: varchar("link_url", { length: 500 }),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+  deliveryChannels: jsonb("delivery_channels"), // ['in_app', 'email', 'sms']
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = typeof userNotifications.$inferInsert;
+
+// ── 9.2 E-Signature Integration ─────────────────────────────────────────
+
+export const signatureRequests = pgTable("signature_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  documentUrl: varchar("document_url", { length: 500 }),
+  provider: varchar("provider", { length: 30 }),
+  externalEnvelopeId: varchar("external_envelope_id", { length: 255 }),
+  status: varchar("status", { length: 30 }).default("created"),
+  signers: jsonb("signers"),
+  sentAt: timestamp("sent_at"),
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at"),
+  executedDocUrl: varchar("executed_doc_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type SignatureRequest = typeof signatureRequests.$inferSelect;
+export type InsertSignatureRequest = typeof signatureRequests.$inferInsert;
+
+// ── 9.3 Zapier/Make Webhooks ────────────────────────────────────────────
+
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }),
+  url: varchar("url", { length: 500 }).notNull(),
+  events: jsonb("events").notNull(),
+  secret: varchar("secret", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  failureCount: integer("failure_count").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+export type InsertWebhookEndpoint = typeof webhookEndpoints.$inferInsert;
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  webhookId: varchar("webhook_id").notNull().references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+  event: varchar("event", { length: 100 }).notNull(),
+  payload: jsonb("payload"),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  attempt: integer("attempt").default(1),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+export type InsertWebhookDelivery = typeof webhookDeliveries.$inferInsert;
+
+// ── 9.5 Custom Deal Stage Labels Per Asset Class ────────────────────────
+
+export const dealStageConfigs = pgTable("deal_stage_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  assetClass: varchar("asset_class", { length: 100 }).notNull(),
+  stages: jsonb("stages").notNull(), // [{ id, label, color, order, probability, requiredFields, defaultTasks }]
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type DealStageConfig = typeof dealStageConfigs.$inferSelect;
+export type InsertDealStageConfig = typeof dealStageConfigs.$inferInsert;
+
+// ── 10.6 Email Send Integration ─────────────────────────────────────────
+
+export const emailMessages = pgTable("email_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  fromUserId: varchar("from_user_id").references(() => users.id),
+  toContactId: varchar("to_contact_id").references(() => crmContacts.id),
+  toEmail: varchar("to_email", { length: 255 }),
+  subject: varchar("subject", { length: 500 }),
+  bodyHtml: text("body_html"),
+  bodyText: text("body_text"),
+  status: varchar("status", { length: 30 }).default("draft"),
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  externalMessageId: varchar("external_message_id", { length: 255 }),
+  templateId: varchar("template_id"),
+  attachments: jsonb("attachments"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type EmailMessage = typeof emailMessages.$inferSelect;
+export type InsertEmailMessage = typeof emailMessages.$inferInsert;
+
+export const emailSendTemplates = pgTable("email_send_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  subject: varchar("subject", { length: 500 }),
+  bodyHtml: text("body_html"),
+  mergeFields: jsonb("merge_fields"),
+  isShared: boolean("is_shared").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type EmailSendTemplate = typeof emailSendTemplates.$inferSelect;
+export type InsertEmailSendTemplate = typeof emailSendTemplates.$inferInsert;
+
+// ── A.1 Billing & Subscription Engine ───────────────────────────────────
+
+export const billingSubscriptions = pgTable("billing_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id).unique(),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  tier: varchar("tier", { length: 50 }).notNull(), // starter | growth | institutional | enterprise
+  status: varchar("status", { length: 50 }).notNull().default("trialing"),
+  // trialing | active | past_due | canceled | paused | incomplete
+  billingCycle: varchar("billing_cycle", { length: 20 }).default("monthly"),
+  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  trialStart: timestamp("trial_start", { withTimezone: true }),
+  trialEnd: timestamp("trial_end", { withTimezone: true }),
+  cancelAt: timestamp("cancel_at", { withTimezone: true }),
+  canceledAt: timestamp("canceled_at", { withTimezone: true }),
+  seatCount: integer("seat_count").default(1),
+  seatLimit: integer("seat_limit"),
+  dealLimit: integer("deal_limit"),
+  aiQueryLimit: integer("ai_query_limit"),
+  storageGbLimit: integer("storage_gb_limit"),
+  addonIds: jsonb("addon_ids"),
+  cancelReason: text("cancel_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type BillingSubscription = typeof billingSubscriptions.$inferSelect;
+export type InsertBillingSubscription = typeof billingSubscriptions.$inferInsert;
+
+export const billingInvoices = pgTable("billing_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
+  amount: integer("amount"), // cents
+  currency: varchar("currency", { length: 3 }).default("usd"),
+  status: varchar("status", { length: 30 }), // draft | open | paid | uncollectible | void
+  invoiceUrl: varchar("invoice_url", { length: 500 }),
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type BillingInvoice = typeof billingInvoices.$inferSelect;
+export type InsertBillingInvoice = typeof billingInvoices.$inferInsert;
+
+export const billingUsageMetrics = pgTable("billing_usage_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  metricType: varchar("metric_type", { length: 100 }).notNull(),
+  // ai_query | document_storage_mb | deal_count | seat_count | lp_count
+  value: integer("value").notNull(),
+  period: varchar("period", { length: 20 }).notNull(), // YYYY-MM
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow(),
+});
+export type BillingUsageMetric = typeof billingUsageMetrics.$inferSelect;
+export type InsertBillingUsageMetric = typeof billingUsageMetrics.$inferInsert;
+
+export const billingFeatureFlags = pgTable("billing_feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  feature: varchar("feature", { length: 100 }).notNull(),
+  isEnabled: boolean("is_enabled").default(false),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  isOverride: boolean("is_override").default(false),
+  overrideExpiresAt: timestamp("override_expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  orgFeatureIdx: uniqueIndex("idx_bff_org_feature").on(table.orgId, table.feature),
+}));
+export type BillingFeatureFlag = typeof billingFeatureFlags.$inferSelect;
+export type InsertBillingFeatureFlag = typeof billingFeatureFlags.$inferInsert;
+
+// ── A.2 RBAC ────────────────────────────────────────────────────────────
+
+export const rbacRoles = pgTable("rbac_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  label: varchar("label", { length: 100 }),
+  description: text("description"),
+  isSystem: boolean("is_system").default(false),
+  permissions: jsonb("permissions"), // PermissionSet JSON
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type RbacRole = typeof rbacRoles.$inferSelect;
+export type InsertRbacRole = typeof rbacRoles.$inferInsert;
+
+export const rbacUserRoles = pgTable("rbac_user_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  roleId: varchar("role_id").notNull().references(() => rbacRoles.id),
+  dealScope: varchar("deal_scope", { length: 20 }).default("all"),
+  specificDealIds: jsonb("specific_deal_ids"),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow(),
+  assignedBy: varchar("assigned_by").references(() => users.id),
+});
+export type RbacUserRole = typeof rbacUserRoles.$inferSelect;
+export type InsertRbacUserRole = typeof rbacUserRoles.$inferInsert;
+
+export const rbacFieldPermissions = pgTable("rbac_field_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  roleId: varchar("role_id").notNull().references(() => rbacRoles.id),
+  module: varchar("module", { length: 100 }).notNull(),
+  fieldPath: varchar("field_path", { length: 255 }).notNull(),
+  permission: varchar("permission", { length: 20 }).notNull(), // hidden | read | write
+});
+export type RbacFieldPermission = typeof rbacFieldPermissions.$inferSelect;
+export type InsertRbacFieldPermission = typeof rbacFieldPermissions.$inferInsert;
+
+// ── A.3 Audit Trail ─────────────────────────────────────────────────────
+
+export const auditTrail = pgTable("audit_trail", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
+  userId: varchar("user_id"),
+  userEmail: varchar("user_email", { length: 255 }),
+  userIp: varchar("user_ip", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 500 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  module: varchar("module", { length: 100 }),
+  entityType: varchar("entity_type", { length: 100 }),
+  entityId: varchar("entity_id", { length: 100 }),
+  entityLabel: varchar("entity_label", { length: 255 }),
+  previousValues: jsonb("previous_values"),
+  newValues: jsonb("new_values"),
+  changedFields: jsonb("changed_fields"),
+  requestPath: varchar("request_path", { length: 500 }),
+  requestMethod: varchar("request_method", { length: 10 }),
+  statusCode: integer("status_code"),
+  checksum: varchar("checksum", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  // IMMUTABLE — no updatedAt
+});
+export type AuditTrailEntry = typeof auditTrail.$inferSelect;
+export type InsertAuditTrailEntry = typeof auditTrail.$inferInsert;
+
+// ── A.4 SSO ─────────────────────────────────────────────────────────────
+
+export const ssoConfigs = pgTable("sso_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id).unique(),
+  provider: varchar("provider", { length: 50 }),
+  protocol: varchar("protocol", { length: 10 }),
+  entryPoint: varchar("entry_point", { length: 500 }),
+  issuer: varchar("issuer", { length: 500 }),
+  cert: text("cert"),
+  discoveryUrl: varchar("discovery_url", { length: 500 }),
+  clientId: varchar("client_id", { length: 255 }),
+  clientSecret: varchar("client_secret", { length: 255 }),
+  scope: varchar("scope", { length: 255 }),
+  emailAttribute: varchar("email_attribute", { length: 100 }),
+  nameAttribute: varchar("name_attribute", { length: 100 }),
+  enforceSSO: boolean("enforce_sso").default(false),
+  jitProvisioning: boolean("jit_provisioning").default(true),
+  defaultRole: varchar("default_role", { length: 50 }).default("analyst"),
+  isActive: boolean("is_active").default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type SsoConfig = typeof ssoConfigs.$inferSelect;
+export type InsertSsoConfig = typeof ssoConfigs.$inferInsert;
+
+// ── A.5 Two-Factor Authentication ───────────────────────────────────────
+
+export const userTwoFactor = pgTable("user_two_factor", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  method: varchar("method", { length: 20 }), // totp | sms
+  totpSecret: varchar("totp_secret", { length: 255 }),
+  phoneNumber: varchar("phone_number", { length: 50 }),
+  isEnabled: boolean("is_enabled").default(false),
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  backupCodes: jsonb("backup_codes"),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type UserTwoFactor = typeof userTwoFactor.$inferSelect;
+export type InsertUserTwoFactor = typeof userTwoFactor.$inferInsert;
+
+// ── B.1 Fund-Level Model ────────────────────────────────────────────────
+
+export const fundsV2 = pgTable("funds_v2", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  shortName: varchar("short_name", { length: 100 }),
+  fundType: varchar("fund_type", { length: 50 }),
+  vintage: integer("vintage"),
+  legalEntity: varchar("legal_entity", { length: 255 }),
+  jurisdiction: varchar("jurisdiction", { length: 100 }),
+  targetSize: numeric("target_size", { precision: 15, scale: 2 }),
+  hardCap: numeric("hard_cap", { precision: 15, scale: 2 }),
+  minimumLP: numeric("minimum_lp", { precision: 12, scale: 2 }),
+  totalCommitted: numeric("total_committed", { precision: 15, scale: 2 }).default("0"),
+  totalCalled: numeric("total_called", { precision: 15, scale: 2 }).default("0"),
+  totalDistributed: numeric("total_distributed", { precision: 15, scale: 2 }).default("0"),
+  nav: numeric("nav", { precision: 15, scale: 2 }).default("0"),
+  closingDate: date("closing_date"),
+  finalClosingDate: date("final_closing_date"),
+  investmentPeriodEnd: date("investment_period_end"),
+  fundTermEnd: date("fund_term_end"),
+  managementFeeRate: numeric("management_fee_rate", { precision: 5, scale: 3 }),
+  managementFeeBasis: varchar("management_fee_basis", { length: 50 }),
+  preferredReturn: numeric("preferred_return", { precision: 5, scale: 3 }),
+  carriedInterest: numeric("carried_interest", { precision: 5, scale: 3 }),
+  waterfallType: varchar("waterfall_type", { length: 50 }),
+  gpCatchUp: boolean("gp_catch_up").default(false),
+  status: varchar("status", { length: 30 }).default("fundraising"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type FundV2 = typeof fundsV2.$inferSelect;
+export type InsertFundV2 = typeof fundsV2.$inferInsert;
+
+export const fundDealsV2 = pgTable("fund_deals_v2", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  allocationPct: numeric("allocation_pct", { precision: 8, scale: 4 }),
+  allocatedEquity: numeric("allocated_equity", { precision: 15, scale: 2 }),
+  currentValue: numeric("current_value", { precision: 15, scale: 2 }),
+  realizedProceeds: numeric("realized_proceeds", { precision: 15, scale: 2 }).default("0"),
+  isRealized: boolean("is_realized").default(false),
+  addedAt: timestamp("added_at", { withTimezone: true }).defaultNow(),
+});
+export type FundDealV2 = typeof fundDealsV2.$inferSelect;
+export type InsertFundDealV2 = typeof fundDealsV2.$inferInsert;
+
+export const managementFeeInvoices = pgTable("management_fee_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  period: varchar("period", { length: 20 }),
+  periodStart: date("period_start"),
+  periodEnd: date("period_end"),
+  basis: numeric("basis", { precision: 15, scale: 2 }),
+  feeRate: numeric("fee_rate", { precision: 5, scale: 4 }),
+  grossFee: numeric("gross_fee", { precision: 12, scale: 2 }),
+  expenseOffset: numeric("expense_offset", { precision: 12, scale: 2 }).default("0"),
+  netFee: numeric("net_fee", { precision: 12, scale: 2 }),
+  status: varchar("status", { length: 20 }).default("draft"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ManagementFeeInvoice = typeof managementFeeInvoices.$inferSelect;
+export type InsertManagementFeeInvoice = typeof managementFeeInvoices.$inferInsert;
+
+// ── B.2 Fund Formation Documents ────────────────────────────────────────
+
+export const fundDocuments = pgTable("fund_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  documentType: varchar("document_type", { length: 100 }),
+  version: varchar("version", { length: 20 }),
+  status: varchar("status", { length: 30 }).default("draft"),
+  documentUrl: varchar("document_url", { length: 500 }),
+  keyTerms: jsonb("key_terms"),
+  executedAt: timestamp("executed_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type FundDocument = typeof fundDocuments.$inferSelect;
+export type InsertFundDocument = typeof fundDocuments.$inferInsert;
+
+export const sideLetters = pgTable("side_letters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  documentUrl: varchar("document_url", { length: 500 }),
+  provisions: jsonb("provisions"),
+  executedAt: timestamp("executed_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type SideLetter = typeof sideLetters.$inferSelect;
+export type InsertSideLetter = typeof sideLetters.$inferInsert;
+
+// ── B.3 Investor Verification / KYC ────────────────────────────────────
+
+export const investorVerification = pgTable("investor_verification", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  accreditationMethod: varchar("accreditation_method", { length: 100 }),
+  accreditationStatus: varchar("accreditation_status", { length: 30 }).default("pending"),
+  accreditationExpiresAt: timestamp("accreditation_expires_at"),
+  kycStatus: varchar("kyc_status", { length: 30 }).default("pending"),
+  kycProvider: varchar("kyc_provider", { length: 50 }),
+  kycExternalId: varchar("kyc_external_id", { length: 255 }),
+  kycCompletedAt: timestamp("kyc_completed_at"),
+  amlStatus: varchar("aml_status", { length: 30 }).default("pending"),
+  amlScreenedAt: timestamp("aml_screened_at"),
+  overallStatus: varchar("overall_status", { length: 30 }).default("pending"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type InvestorVerificationRecord = typeof investorVerification.$inferSelect;
+export type InsertInvestorVerification = typeof investorVerification.$inferInsert;
+
+// ── B.4 Capital Account Ledger ──────────────────────────────────────────
+
+export const capitalAccounts = pgTable("capital_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  openingBalance: numeric("opening_balance", { precision: 15, scale: 2 }).default("0"),
+  totalContributions: numeric("total_contributions", { precision: 15, scale: 2 }).default("0"),
+  totalDistributions: numeric("total_distributions", { precision: 15, scale: 2 }).default("0"),
+  endingBalance: numeric("ending_balance", { precision: 15, scale: 2 }).default("0"),
+  ownershipPct: numeric("ownership_pct", { precision: 8, scale: 6 }),
+  lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }).defaultNow(),
+});
+export type CapitalAccount = typeof capitalAccounts.$inferSelect;
+export type InsertCapitalAccount = typeof capitalAccounts.$inferInsert;
+
+export const capitalAccountEntries = pgTable("capital_account_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  capitalAccountId: varchar("capital_account_id").notNull().references(() => capitalAccounts.id),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  investorId: varchar("investor_id").notNull().references(() => investors.id),
+  entryDate: date("entry_date"),
+  period: varchar("period", { length: 20 }),
+  entryType: varchar("entry_type", { length: 50 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  debitAmount: numeric("debit_amount", { precision: 15, scale: 2 }).default("0"),
+  creditAmount: numeric("credit_amount", { precision: 15, scale: 2 }).default("0"),
+  netAmount: numeric("net_amount", { precision: 15, scale: 2 }),
+  referenceId: varchar("reference_id"),
+  referenceType: varchar("reference_type", { length: 50 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  // IMMUTABLE
+});
+export type CapitalAccountEntry = typeof capitalAccountEntries.$inferSelect;
+export type InsertCapitalAccountEntry = typeof capitalAccountEntries.$inferInsert;
+
+// ── C.1 Tenant Portal ───────────────────────────────────────────────────
+
+export const tenantUsers = pgTable("tenant_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  email: varchar("email", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  phone: varchar("phone", { length: 50 }),
+  passwordHash: varchar("password_hash", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  inviteSentAt: timestamp("invite_sent_at"),
+  inviteAcceptedAt: timestamp("invite_accepted_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type TenantUser = typeof tenantUsers.$inferSelect;
+export type InsertTenantUser = typeof tenantUsers.$inferInsert;
+
+export const tenantMessages = pgTable("tenant_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  tenantUserId: varchar("tenant_user_id").notNull().references(() => tenantUsers.id),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  body: text("body"),
+  isRead: boolean("is_read").default(false),
+  attachments: jsonb("attachments"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type TenantMessage = typeof tenantMessages.$inferSelect;
+export type InsertTenantMessage = typeof tenantMessages.$inferInsert;
+
+// ── C.2 Rent Payments ───────────────────────────────────────────────────
+
+export const rentPayments = pgTable("rent_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  tenantUserId: varchar("tenant_user_id").references(() => tenantUsers.id),
+  amount: numeric("amount", { precision: 10, scale: 2 }),
+  lateFeeAmount: numeric("late_fee_amount", { precision: 10, scale: 2 }).default("0"),
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }),
+  method: varchar("method", { length: 20 }),
+  status: varchar("status", { length: 20 }).default("pending"),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  periodStart: date("period_start"),
+  periodEnd: date("period_end"),
+  processedAt: timestamp("processed_at"),
+  failedAt: timestamp("failed_at"),
+  failureReason: varchar("failure_reason", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type RentPayment = typeof rentPayments.$inferSelect;
+export type InsertRentPayment = typeof rentPayments.$inferInsert;
+
+// ── C.3 Lease Renewal Workflow ──────────────────────────────────────────
+
+export const leaseRenewalOpportunities = pgTable("lease_renewal_opportunities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  leaseExpiryDate: date("lease_expiry_date"),
+  status: varchar("status", { length: 50 }).default("monitoring"),
+  currentRent: numeric("current_rent", { precision: 10, scale: 2 }),
+  offerRent: numeric("offer_rent", { precision: 10, scale: 2 }),
+  offerTermMonths: integer("offer_term_months"),
+  offerSentAt: timestamp("offer_sent_at"),
+  agreedRent: numeric("agreed_rent", { precision: 10, scale: 2 }),
+  agreedTermMonths: integer("agreed_term_months"),
+  rentIncreasePct: numeric("rent_increase_pct", { precision: 5, scale: 2 }),
+  marketRentEstimate: numeric("market_rent_estimate", { precision: 10, scale: 2 }),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type LeaseRenewalOpportunity = typeof leaseRenewalOpportunities.$inferSelect;
+export type InsertLeaseRenewalOpportunity = typeof leaseRenewalOpportunities.$inferInsert;
+
+// ── C.5 Vacancy & Leasing Pipeline ─────────────────────────────────────
+
+export const vacancyListings = pgTable("vacancy_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  unitId: varchar("unit_id", { length: 100 }),
+  status: varchar("status", { length: 30 }).default("vacant"),
+  vacantSince: date("vacant_since"),
+  availableDate: date("available_date"),
+  askingRent: numeric("asking_rent", { precision: 10, scale: 2 }),
+  squareFootage: integer("square_footage"),
+  listingDescription: text("listing_description"),
+  photos: jsonb("photos"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type VacancyListing = typeof vacancyListings.$inferSelect;
+export type InsertVacancyListing = typeof vacancyListings.$inferInsert;
+
+export const leasingProspects = pgTable("leasing_prospects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  vacancyListingId: varchar("vacancy_listing_id").references(() => vacancyListings.id),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  source: varchar("source", { length: 50 }),
+  stage: varchar("stage", { length: 50 }).default("inquiry"),
+  maxBudget: numeric("max_budget", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type LeasingProspect = typeof leasingProspects.$inferSelect;
+export type InsertLeasingProspect = typeof leasingProspects.$inferInsert;
+
+export const showings = pgTable("showings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id").notNull().references(() => leasingProspects.id),
+  vacancyListingId: varchar("vacancy_listing_id").references(() => vacancyListings.id),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  status: varchar("status", { length: 30 }).default("scheduled"),
+  agentId: varchar("agent_id").references(() => users.id),
+  feedback: text("feedback"),
+  interested: boolean("interested"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type Showing = typeof showings.$inferSelect;
+export type InsertShowing = typeof showings.$inferInsert;
+
+// ── D.1 Construction Projects ───────────────────────────────────────────
+
+export const constructionProjects = pgTable("construction_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  projectType: varchar("project_type", { length: 50 }),
+  projectName: varchar("project_name", { length: 255 }).notNull(),
+  status: varchar("status", { length: 30 }).default("pre_construction"),
+  totalBudget: numeric("total_budget", { precision: 15, scale: 2 }),
+  totalActual: numeric("total_actual", { precision: 15, scale: 2 }).default("0"),
+  contingencyBudget: numeric("contingency_budget", { precision: 15, scale: 2 }),
+  contingencyUsed: numeric("contingency_used", { precision: 15, scale: 2 }).default("0"),
+  constructionStartDate: date("construction_start_date"),
+  projectedCompletionDate: date("projected_completion_date"),
+  actualCompletionDate: date("actual_completion_date"),
+  generalContractor: varchar("general_contractor", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ConstructionProject = typeof constructionProjects.$inferSelect;
+export type InsertConstructionProject = typeof constructionProjects.$inferInsert;
+
+export const constructionBudgetLines = pgTable("construction_budget_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => constructionProjects.id, { onDelete: "cascade" }),
+  category: varchar("category", { length: 50 }), // hard_cost | soft_cost | contingency
+  lineItem: varchar("line_item", { length: 255 }).notNull(),
+  budgetedAmount: numeric("budgeted_amount", { precision: 12, scale: 2 }),
+  contractedAmount: numeric("contracted_amount", { precision: 12, scale: 2 }),
+  actualToDate: numeric("actual_to_date", { precision: 12, scale: 2 }).default("0"),
+  projectedTotal: numeric("projected_total", { precision: 12, scale: 2 }),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ConstructionBudgetLine = typeof constructionBudgetLines.$inferSelect;
+export type InsertConstructionBudgetLine = typeof constructionBudgetLines.$inferInsert;
+
+export const constructionDraws = pgTable("construction_draws", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => constructionProjects.id),
+  drawNumber: integer("draw_number").notNull(),
+  requestDate: date("request_date"),
+  amount: numeric("amount", { precision: 12, scale: 2 }),
+  status: varchar("status", { length: 30 }).default("draft"),
+  lineItems: jsonb("line_items"), // [{ budgetLineId, amount, pctComplete }]
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  fundedAt: timestamp("funded_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ConstructionDraw = typeof constructionDraws.$inferSelect;
+export type InsertConstructionDraw = typeof constructionDraws.$inferInsert;
+
+// ── D.2 Renovation Unit Tracker ─────────────────────────────────────────
+
+export const unitRenovations = pgTable("unit_renovations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  unitId: varchar("unit_id", { length: 100 }).notNull(),
+  status: varchar("status", { length: 30 }).default("queued"),
+  // queued | in_progress | complete_vacant | leased
+  scope: text("scope"),
+  budgetedCost: numeric("budgeted_cost", { precision: 10, scale: 2 }),
+  actualCost: numeric("actual_cost", { precision: 10, scale: 2 }),
+  preRenovationRent: numeric("pre_renovation_rent", { precision: 10, scale: 2 }),
+  targetRent: numeric("target_rent", { precision: 10, scale: 2 }),
+  achievedRent: numeric("achieved_rent", { precision: 10, scale: 2 }),
+  startDate: date("start_date"),
+  completionDate: date("completion_date"),
+  leasedDate: date("leased_date"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type UnitRenovation = typeof unitRenovations.$inferSelect;
+export type InsertUnitRenovation = typeof unitRenovations.$inferInsert;
+
+// ── E.1 Custom Report Builder ───────────────────────────────────────────
+
+export const customReports = pgTable("custom_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  reportType: varchar("report_type", { length: 50 }), // tabular | chart | dashboard
+  dataSources: jsonb("data_sources"), // array of data source configs
+  columns: jsonb("columns"), // for tabular
+  chartConfig: jsonb("chart_config"), // for chart
+  filters: jsonb("filters"),
+  isTemplate: boolean("is_template").default(false),
+  scheduleConfig: jsonb("schedule_config"), // cron + recipients
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type CustomReport = typeof customReports.$inferSelect;
+export type InsertCustomReport = typeof customReports.$inferInsert;
+
+// ── E.3 Portfolio Stress Testing ────────────────────────────────────────
+
+export const stressTestScenarios = pgTable("stress_test_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  scenarioType: varchar("scenario_type", { length: 50 }), // mild_recession | gfc | rate_shock | custom
+  assumptions: jsonb("assumptions"), // { vacancyIncrease, rentDecline, capRateExpansion, rateIncrease }
+  results: jsonb("results"), // computed results per deal
+  portfolioImpact: jsonb("portfolio_impact"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type StressTestScenario = typeof stressTestScenarios.$inferSelect;
+export type InsertStressTestScenario = typeof stressTestScenarios.$inferInsert;
+
+// ── F.1 Accounting Integration ──────────────────────────────────────────
+
+export const accountingIntegrations = pgTable("accounting_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  provider: varchar("provider", { length: 50 }).notNull(), // quickbooks | xero
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  realmId: varchar("realm_id", { length: 100 }),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  syncFrequency: varchar("sync_frequency", { length: 20 }).default("daily"),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncStatus: varchar("sync_status", { length: 30 }),
+  entityMappings: jsonb("entity_mappings"), // deal → QB class/location
+  accountMappings: jsonb("account_mappings"), // MM account → QB account
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type AccountingIntegration = typeof accountingIntegrations.$inferSelect;
+export type InsertAccountingIntegration = typeof accountingIntegrations.$inferInsert;
+
+// ── H.1 Multi-Entity Architecture ───────────────────────────────────────
+
+export const legalEntities = pgTable("legal_entities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }), // llc | lp | corp | trust | series_llc
+  taxId: varchar("tax_id", { length: 50 }),
+  jurisdiction: varchar("jurisdiction", { length: 100 }),
+  parentEntityId: varchar("parent_entity_id"),
+  status: varchar("status", { length: 30 }).default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type LegalEntity = typeof legalEntities.$inferSelect;
+export type InsertLegalEntity = typeof legalEntities.$inferInsert;
+
+// ── H.2 API Keys ────────────────────────────────────────────────────────
+
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  keyHash: varchar("key_hash", { length: 255 }).notNull(),
+  keyPrefix: varchar("key_prefix", { length: 10 }).notNull(), // first 8 chars for identification
+  scopes: jsonb("scopes"), // ['deals:read', 'contacts:read', 'portfolio:read']
+  ipAllowlist: jsonb("ip_allowlist"),
+  rateLimitPerHour: integer("rate_limit_per_hour").default(1000),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = typeof apiKeys.$inferInsert;
+
+// ── H.4 Virtual Data Room ───────────────────────────────────────────────
+
+export const dataRooms = pgTable("data_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 100 }),
+  status: varchar("status", { length: 30 }).default("draft"),
+  requireNDA: boolean("require_nda").default(true),
+  ndaDocUrl: varchar("nda_doc_url", { length: 500 }),
+  watermarkEnabled: boolean("watermark_enabled").default(true),
+  folders: jsonb("folders"),
+  branding: jsonb("branding"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DataRoom = typeof dataRooms.$inferSelect;
+export type InsertDataRoom = typeof dataRooms.$inferInsert;
+
+export const dataRoomAccess = pgTable("data_room_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dataRoomId: varchar("data_room_id").notNull().references(() => dataRooms.id, { onDelete: "cascade" }),
+  email: varchar("email", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  company: varchar("company", { length: 255 }),
+  accessLevel: varchar("access_level", { length: 20 }).default("view"), // view | download
+  ndaSignedAt: timestamp("nda_signed_at"),
+  lastAccessAt: timestamp("last_access_at"),
+  totalViews: integer("total_views").default(0),
+  totalTimeSeconds: integer("total_time_seconds").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DataRoomAccessEntry = typeof dataRoomAccess.$inferSelect;
+export type InsertDataRoomAccess = typeof dataRoomAccess.$inferInsert;
+
+// ── I.1 Climate Risk ────────────────────────────────────────────────────
+
+export const climateRiskAssessments = pgTable("climate_risk_assessments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  compositeScore: numeric("composite_score", { precision: 5, scale: 2 }),
+  floodRisk: jsonb("flood_risk"),
+  seaLevelRise: jsonb("sea_level_rise"),
+  windRisk: jsonb("wind_risk"),
+  wildfireRisk: jsonb("wildfire_risk"),
+  insuranceImpact: jsonb("insurance_impact"),
+  aiDisclosure: text("ai_disclosure"),
+  assessedAt: timestamp("assessed_at", { withTimezone: true }).defaultNow(),
+});
+export type ClimateRiskAssessment = typeof climateRiskAssessments.$inferSelect;
+export type InsertClimateRiskAssessment = typeof climateRiskAssessments.$inferInsert;
+
+// ── I.2 Environmental Tracking ──────────────────────────────────────────
+
+export const environmentalStudies = pgTable("environmental_studies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  studyType: varchar("study_type", { length: 50 }), // phase_1 | phase_2 | asbestos | lead | mold
+  status: varchar("status", { length: 30 }).default("ordered"),
+  vendorName: varchar("vendor_name", { length: 255 }),
+  orderedDate: date("ordered_date"),
+  completedDate: date("completed_date"),
+  findings: jsonb("findings"),
+  recIdentified: boolean("rec_identified").default(false),
+  nfaLetterUrl: varchar("nfa_letter_url", { length: 500 }),
+  documentUrl: varchar("document_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type EnvironmentalStudy = typeof environmentalStudies.$inferSelect;
+export type InsertEnvironmentalStudy = typeof environmentalStudies.$inferInsert;
+
+// ── I.3 Insurance Management ────────────────────────────────────────────
+
+export const insurancePolicies = pgTable("insurance_policies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  policyType: varchar("policy_type", { length: 50 }), // property | liability | flood | wind | umbrella
+  carrier: varchar("carrier", { length: 255 }),
+  policyNumber: varchar("policy_number", { length: 100 }),
+  coverageAmount: numeric("coverage_amount", { precision: 15, scale: 2 }),
+  deductible: numeric("deductible", { precision: 12, scale: 2 }),
+  annualPremium: numeric("annual_premium", { precision: 12, scale: 2 }),
+  effectiveDate: date("effective_date"),
+  expirationDate: date("expiration_date"),
+  status: varchar("status", { length: 30 }).default("active"),
+  documentUrl: varchar("document_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
+export type InsertInsurancePolicy = typeof insurancePolicies.$inferInsert;
+
+export const insuranceClaims = pgTable("insurance_claims", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  policyId: varchar("policy_id").notNull().references(() => insurancePolicies.id),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  claimNumber: varchar("claim_number", { length: 100 }),
+  description: text("description"),
+  incidentDate: date("incident_date"),
+  filedDate: date("filed_date"),
+  claimAmount: numeric("claim_amount", { precision: 12, scale: 2 }),
+  settledAmount: numeric("settled_amount", { precision: 12, scale: 2 }),
+  status: varchar("status", { length: 30 }).default("filed"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type InsuranceClaim = typeof insuranceClaims.$inferSelect;
+export type InsertInsuranceClaim = typeof insuranceClaims.$inferInsert;
+
+// ── I.4 Regulatory Calendar ─────────────────────────────────────────────
+
+export const regulatoryObligations = pgTable("regulatory_obligations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  obligationType: varchar("obligation_type", { length: 100 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  authority: varchar("authority", { length: 255 }),
+  dueDate: date("due_date"),
+  frequency: varchar("frequency", { length: 20 }), // one_time | monthly | quarterly | annual
+  noticePeriodDays: integer("notice_period_days").default(30),
+  status: varchar("status", { length: 30 }).default("upcoming"),
+  completedAt: timestamp("completed_at"),
+  documentUrl: varchar("document_url", { length: 500 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type RegulatoryObligation = typeof regulatoryObligations.$inferSelect;
+export type InsertRegulatoryObligation = typeof regulatoryObligations.$inferInsert;
+
+// ── J.2 Onboarding / In-App Training ───────────────────────────────────
+
+export const userOnboarding = pgTable("user_onboarding", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  completedSteps: jsonb("completed_steps"), // ['welcome', 'first_deal', 'first_contact']
+  toursCompleted: jsonb("tours_completed"), // ['deal_workspace', 'financial_model']
+  tooltipsDismissed: jsonb("tooltips_dismissed"),
+  isOnboardingComplete: boolean("is_onboarding_complete").default(false),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type UserOnboardingRecord = typeof userOnboarding.$inferSelect;
+export type InsertUserOnboarding = typeof userOnboarding.$inferInsert;

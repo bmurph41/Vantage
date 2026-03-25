@@ -1,6 +1,110 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-19)
+## Current State (2026-03-25)
+
+### ✅ COMPLETE — Master Spec Volume 1 Full Build-Out (2026-03-25)
+All 50 sections from MARINAMATCH_MASTER_SPEC.md implemented:
+- **42 new database tables** created in PostgreSQL
+- **~200 API endpoints** across 9 new route modules + 1 service
+- **0 TypeScript errors**
+
+**New Schema Tables (shared/schema.ts):**
+Sections 1.1-1.5: dealChatSessions, dealChatMessages, dealChatFeedback, aiNarratives, leaseAbstractions, dealRiskScores
+Sections 2.1-2.5: investors, investments, distributions, distributionAllocations, capitalCalls, capitalCallLineItems, taxDocuments
+Sections 3.2-3.3: marketBenchmarks, portfolioAlerts
+Sections 4.1-4.4: capRateFeed, rentComps, propertyZoning, entitlements
+Sections 5.1-5.4: workOrders, workOrderUpdates, vendors, vendorRatings, capexProjects, inspectionTemplates, inspections
+Sections 6.1-6.4: lenders, lenderDeals, termSheets, dealDebt, mezzPositions
+Section 7.1, 7.4: contactRelationships, contactNewsMentions
+Section 8.4: orgBranding
+Section 9.1: notificationPreferences, userNotifications
+Section 9.2: signatureRequests
+Section 9.3: webhookEndpoints, webhookDeliveries
+Section 9.5: dealStageConfigs
+Section 10.1: workflowAutomations, workflowExecutionLog
+Section 10.6: emailMessages, emailSendTemplates
+
+**New Route Files (server/routes/):**
+- workflow-automation-routes.ts — 10.1 workflow engine (11 endpoints)
+- ai-deal-intelligence-routes.ts — 1.1-1.5 AI chat, narratives, lease abstractor, risk scoring, comps (20 endpoints)
+- investor-portal-routes.ts — 2.1-2.5 LP dashboard, capital calls, distributions, tax docs (24 endpoints)
+- portfolio-market-routes.ts — 3.1-4.5 portfolio, benchmarks, alerts, cap rates, rent comps, zoning (25 endpoints)
+- operations-management-routes.ts — 5.1-5.4 work orders, vendors, capex, inspections (27 endpoints)
+- capital-markets-routes.ts — 6.1-6.4 lender matching, term sheets, debt maturity, mezz (20 endpoints)
+- crm-relationship-intelligence-routes.ts — 7.1-7.5 relationship graph, sourcing, follow-up AI, news, meeting prep (15 endpoints)
+- reporting-quickwins-routes.ts — 8.1-9.5+10.6 reports, branding, notifications, e-sign, webhooks, stages, email (30 endpoints)
+- crm-pipeline-enhancements-routes.ts — 10.2-10.5 timeline, comparison, kanban dates, activity log (12 endpoints)
+
+**New Services:**
+- server/services/workflow-engine.ts — condition evaluator, action executor, templates, dry-run
+
+**Route Registration (server/routes.ts):**
+All 9 routers mounted under auth+tenant middleware:
+/api/ai-deal/*, /api/investors/*, /api/market/*, /api/operations/*, /api/capital-markets/*, /api/crm/intelligence/*, /api/platform/*, /api/crm/pipeline/*, /api/workflow-automations/*
+
+**Trigger Hooks Wired:**
+- deal.created → POST /api/crm/deals
+- deal.stage_changed → PUT /api/crm/deals/:id (includes newStageName)
+- deal.field_updated → PUT /api/crm/deals/:id
+- contact.created → POST /api/contacts
+
+### ✅ COMPLETE — Gap Spec Volume 2 Full Build-Out (2026-03-25)
+All 38 sections from MARINAMATCH_GAP_SPEC.md implemented:
+- **38 new database tables** created in PostgreSQL (on top of 42 from Vol 1)
+- **~300 additional API endpoints** across 6 new route modules + 1 service + 1 middleware
+- **0 TypeScript errors**
+- **Stripe SDK** installed
+
+**New Schema Tables (shared/schema.ts):**
+A.1: billingSubscriptions, billingInvoices, billingUsageMetrics, billingFeatureFlags
+A.2: rbacRoles, rbacUserRoles, rbacFieldPermissions
+A.3: auditTrail
+A.4: ssoConfigs
+A.5: userTwoFactor
+B.1-B.2: fundsV2, fundDealsV2, managementFeeInvoices, fundDocuments, sideLetters
+B.3: investorVerification
+B.4: capitalAccounts, capitalAccountEntries
+C.1: tenantUsers, tenantMessages
+C.2: rentPayments
+C.3: leaseRenewalOpportunities
+C.5: vacancyListings, leasingProspects, showings
+D.1: constructionProjects, constructionBudgetLines, constructionDraws
+D.2: unitRenovations
+E.1: customReports
+E.3: stressTestScenarios
+F.1: accountingIntegrations
+H.1: legalEntities
+H.2: apiKeys
+H.4: dataRooms, dataRoomAccess
+I.1: climateRiskAssessments
+I.2: environmentalStudies
+I.3: insurancePolicies, insuranceClaims
+I.4: regulatoryObligations
+J.2: userOnboarding
+
+**New Route Files (server/routes/):**
+- billing-routes.ts — A.1 Stripe billing engine (12 endpoints)
+- infrastructure-routes.ts — A.2 RBAC + A.3 Audit + A.4 SSO + A.5 2FA (~35 endpoints)
+- fund-management-routes.ts — B.1-B.5 Fund model, docs, KYC, capital accounts, fees (~30 endpoints)
+- tenant-construction-routes.ts — C.1-C.5 + D.1-D.2 Tenant, rent, leasing, construction (~45 endpoints)
+- analytics-enterprise-routes.ts — E.1-E.5 + F.1 + H.1-H.5 Reports, stress tests, data rooms (~35 endpoints)
+- compliance-onboarding-routes.ts — I.1-I.4 + J.2 Climate risk, insurance, regulatory, onboarding (~40 endpoints)
+
+**New Services:**
+- server/services/billing-service.ts — BillingService class with Stripe integration, 14 methods
+- server/middleware/feature-gate.ts — requireFeature() + checkUsageLimit() middleware
+
+**Route Registration (server/routes.ts):**
+/api/billing/* — Billing (unauthenticated webhooks + authenticated management)
+/api/infrastructure/* — RBAC, Audit, SSO, 2FA
+/api/fund-management/* — Fund accounting & compliance
+/api/tenant-ops/* — Tenant portal & construction
+/api/enterprise/* — Analytics, integrations, data rooms
+/api/compliance/* — Climate risk, insurance, regulatory calendar, onboarding
+
+---
+
+## Prior State (2026-03-19)
 
 ### ✅ COMPLETE — CRM Record Pages (10x upgrade)
 All 4 record pages rebuilt with institutional 3-column CrmRecordPage layout.

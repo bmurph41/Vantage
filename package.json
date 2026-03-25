@@ -146,6 +146,7 @@
     "resend": "^4.0.0",
     "rss-parser": "^3.13.0",
     "speakeasy": "^2.0.0",
+    "stripe": "^20.4.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tesseract.js": "^7.0.0",

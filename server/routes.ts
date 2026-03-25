@@ -23,6 +23,20 @@ import { setTenantContext, clearTenantContext } from "./middleware/tenant-contex
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
 import vdrRouter from "./vdr-routes";
 import { workflowAutomationRouter } from "./routes/workflow-automation-routes";
+import { aiDealIntelligenceRouter } from "./routes/ai-deal-intelligence-routes";
+import { investorPortalRouter } from "./routes/investor-portal-routes";
+import { portfolioMarketRouter } from "./routes/portfolio-market-routes";
+import { operationsManagementRouter } from "./routes/operations-management-routes";
+import { capitalMarketsRouter } from "./routes/capital-markets-routes";
+import { crmRelationshipIntelligenceRouter } from "./routes/crm-relationship-intelligence-routes";
+import { reportingQuickWinsRouter } from "./routes/reporting-quickwins-routes";
+import { crmPipelineEnhancementsRouter } from "./routes/crm-pipeline-enhancements-routes";
+import { billingRouter } from "./routes/billing-routes";
+import { infrastructureRouter } from "./routes/infrastructure-routes";
+import { fundManagementRouter } from "./routes/fund-management-routes";
+import { tenantConstructionRouter } from "./routes/tenant-construction-routes";
+import { analyticsEnterpriseRouter } from "./routes/analytics-enterprise-routes";
+import { complianceOnboardingRouter } from "./routes/compliance-onboarding-routes";
 import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
 import { dealWorkspaceRouter } from "./routes/deal-workspace-routes";
@@ -457,6 +471,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
   app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
+
+  // ── Billing (no auth on webhook endpoint, auth on everything else) ──
+  app.use("/api/billing", billingRouter);
+
+  // ── Gap Spec (Volume 2) Feature Modules ────────────────────────────
+  // A.2-A.5: RBAC, Audit Trail, SSO, 2FA
+  app.use("/api/infrastructure", authenticateUser, enforceTenant, infrastructureRouter);
+  // B.1-B.5: Fund Management, Formation Docs, KYC, Capital Accounts, Fees
+  app.use("/api/fund-management", authenticateUser, enforceTenant, fundManagementRouter);
+  // C.1-C.5 + D.1-D.2: Tenant Portal, Rent, Leasing, Construction, Renovations
+  app.use("/api/tenant-ops", authenticateUser, enforceTenant, tenantConstructionRouter);
+  // E.1-E.5 + F.1 + H.1-H.5: Reports, Stress Tests, Accounting, Entities, API Keys, Data Rooms
+  app.use("/api/enterprise", authenticateUser, enforceTenant, analyticsEnterpriseRouter);
+  // I.1-I.4 + J.2: Climate Risk, Environmental, Insurance, Regulatory, Onboarding
+  app.use("/api/compliance", authenticateUser, enforceTenant, complianceOnboardingRouter);
+
+  // ── Master Spec Feature Modules ──────────────────────────────────────
+  // Section 1: AI-Native Deal Intelligence (1.1-1.5)
+  app.use("/api/ai-deal", authenticateUser, enforceTenant, aiDealIntelligenceRouter);
+  // Section 2: LP / Investor Portal (2.1-2.5)
+  app.use("/api/investors", authenticateUser, enforceTenant, investorPortalRouter);
+  // Sections 3-4: Portfolio Intelligence + Market Intelligence (3.1-4.5)
+  app.use("/api/market", authenticateUser, enforceTenant, portfolioMarketRouter);
+  // Section 5: Operations & Asset Management (5.1-5.4)
+  app.use("/api/operations", authenticateUser, enforceTenant, operationsManagementRouter);
+  // Section 6: Capital Markets Tools (6.1-6.4)
+  app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
+  // Section 7: CRM Relationship Intelligence (7.1-7.5)
+  app.use("/api/crm/intelligence", authenticateUser, enforceTenant, crmRelationshipIntelligenceRouter);
+  // Sections 8-9: Reporting, Notifications, E-Sign, Webhooks, Stage Config, Email (8.1-9.5, 10.6)
+  app.use("/api/platform", authenticateUser, enforceTenant, reportingQuickWinsRouter);
+  // Section 10: CRM Pipeline Enhancements (10.2-10.5)
+  app.use("/api/crm/pipeline", authenticateUser, enforceTenant, crmPipelineEnhancementsRouter);
   app.use("/api/pipeline/scoring", authenticateUser, enforceTenant, dealScoringRoutes);
   app.use("/api/pipeline/competitive", authenticateUser, enforceTenant, competitiveTrackingRoutes);
   app.use("/api/pipeline/templates", authenticateUser, enforceTenant, pipelineTemplateRoutes);
@@ -7096,6 +7143,8 @@ Current context: Project ${req.params.projectId}`;
   app.post("/api/crm/deals", async (req: any, res) => {
     try {
       const deal = await storage.createCrmDeal({ ...req.body, ownerId: req.user.id });
+      // Workflow automation trigger — fire and forget
+      evaluateAutomations('deal.created', 'deal', deal.id, req.user.orgId, deal).catch(() => {});
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to create deal:", error);
@@ -7212,8 +7261,20 @@ Current context: Project ${req.params.projectId}`;
           // Don't fail the deal update if automation fails
           console.error("[Pipeline Automation] Error creating automated tasks:", automationError);
         }
+
+        // Workflow engine trigger for stage changes — fire and forget
+        evaluateAutomations('deal.stage_changed', 'deal', req.params.id, req.user.orgId, {
+          prevStage: oldStageId,
+          newStage: newStageId,
+          newStageName: (await storage.getCrmStage(newStageId))?.name || '',
+        }).catch(() => {});
       }
-      
+
+      // Workflow engine trigger for any field update — fire and forget
+      evaluateAutomations('deal.field_updated', 'deal', req.params.id, req.user.orgId, {
+        updatedFields: Object.keys(req.body),
+      }).catch(() => {});
+
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to update deal:", error);
@@ -11648,6 +11709,9 @@ Current context: Project ${req.params.projectId}`;
         } as any);
       }
       
+      // Workflow automation trigger — fire and forget
+      evaluateAutomations('contact.created', 'contact', contact.id, req.user.orgId, contact).catch(() => {});
+
       res.json({ ...contact, linkedCompanyId, pendingCompanyId, exactMatchFound: !companyId && linkedCompanyId !== null });
     } catch (error: any) {
       console.error("Failed to create contact:", error);
