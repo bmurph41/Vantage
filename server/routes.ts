@@ -22,6 +22,8 @@ import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
 import vdrRouter from "./vdr-routes";
+import { workflowAutomationRouter } from "./routes/workflow-automation-routes";
+import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
 import { dealWorkspaceRouter } from "./routes/deal-workspace-routes";
 import shipStoreRouter from "./ship-store-router";
@@ -454,6 +456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
+  app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
   app.use("/api/pipeline/scoring", authenticateUser, enforceTenant, dealScoringRoutes);
   app.use("/api/pipeline/competitive", authenticateUser, enforceTenant, competitiveTrackingRoutes);
   app.use("/api/pipeline/templates", authenticateUser, enforceTenant, pipelineTemplateRoutes);
