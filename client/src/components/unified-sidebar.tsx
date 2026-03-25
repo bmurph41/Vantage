@@ -23,6 +23,7 @@ const crmNav = [
   { name: "Properties", href: "/crm/properties" },
   { name: "Prospecting", href: "/prospecting" },
   { name: "Marketing", href: "/marketing" },
+  { name: "Meetings", href: "/crm/meetings" },
   { name: "Settings", href: "/crm/settings" },
 ];
 
@@ -120,6 +121,9 @@ const marketIntelligenceNav = [
   { name: "Demographics", href: "/analysis/demographics" },
   { name: "Capital Markets", href: "/analysis/benchmarks" },
   { name: "Portfolio Analytics", href: "/analysis/marinalytics" },
+  { name: "Predictive Analytics", href: "/analysis/predictive" },
+  { name: "Cash Flow Forecast", href: "/analysis/cash-flow" },
+  { name: "Deal Sourcing", href: "/analysis/deal-sourcing" },
 ];
 
 // Integrations - direct link (no sub-navigation)

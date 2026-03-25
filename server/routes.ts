@@ -49,6 +49,7 @@ import { meetingTranscriptionRouter } from "./routes/meeting-transcription-route
 import { multiCurrencyRouter } from "./routes/multi-currency-routes";
 import { masterCompsRouter } from "./routes/master-comps-routes";
 import { ddFindingsRouter } from "./routes/dd-findings-routes";
+import { modelingEnhancementsRouter } from "./routes/modeling-enhancements-routes";
 import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
 import { dealWorkspaceRouter } from "./routes/deal-workspace-routes";
@@ -521,6 +522,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/master-comps", authenticateUser, enforceTenant, masterCompsRouter);
   // DD Findings, KPI Dashboard & Unified Deal Team
   app.use("/api/dd-enhanced", authenticateUser, enforceTenant, ddFindingsRouter);
+  // Financial Model Enhancements (rent roll sync, stress tests, approvals, loan cache, cap stack, scoring)
+  app.use("/api/modeling-enhanced", authenticateUser, enforceTenant, modelingEnhancementsRouter);
 
   // ── Master Spec Feature Modules ──────────────────────────────────────
   // Section 1: AI-Native Deal Intelligence (1.1-1.5)

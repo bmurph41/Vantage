@@ -2,6 +2,51 @@
 
 ## Current State (2026-03-25)
 
+### ✅ COMPLETE — Financial Model 6 Fixes (2026-03-25)
+All 6 financial modeling gaps resolved in one route file:
+- **~25 new API endpoints** in server/routes/modeling-enhancements-routes.ts
+
+**Fix 1: Rent Roll → Pro Forma Auto-Sync** (POST /rent-roll-sync/:projectId)
+- Aggregates modelingRentRollUnits by type/status → computes GPR, EGR, occupancy, slip revenue, other revenue
+- Upserts into underwritingAssumptions for target year
+- Returns full breakdown by storage type
+
+**Fix 2: Stress Test Engine (Enhanced)** (POST /stress-tests/:id/run-enhanced)
+- Pulls actual underwriting assumptions + debt tranches per deal (not flat assumptions)
+- Applies: vacancy increase, rent decline, cap rate expansion, rate increase, expense increase
+- Computes stressed NOI, value, DSCR per deal; flags DSCR breaches
+- Portfolio summary: total value change %, worst-impacted deal, breach count
+- Preset factory: mild_recession, gfc, rate_shock, stagflation (POST /stress-tests/presets)
+
+**Fix 3: IC Approval Workflow** (5 endpoints: /approvals/*)
+- Create request with required approvers + quorum count + deadline
+- Auto-creates pending decisions for each approver
+- Approve/reject with comments; auto-resolves when quorum met or impossible
+- GET /approvals/pending/me — pending items for current user
+
+**Fix 4: Loan Schedule Caching** (POST /loan-schedule/cache/:debtTrancheId)
+- Computes full monthly amortization schedule from debtTranches
+- Stores in monthlyLoanSchedule table (was empty before)
+- Handles IO periods, amortizing periods, tracks beginning/ending balance
+- GET /loan-schedule/:debtTrancheId returns cached schedule
+
+**Fix 5: Capital Stack Projections** (POST /capital-stack-projections/:capitalStackId)
+- Computes year-by-year from acquisition through exit
+- Tracks: revenue, NOI, debt service, principal paydown, DSCR, debt yield
+- Exit year: exit value, loan payoff, net proceeds
+- Returns: cumulative cash flow, equity multiple, cash-on-cash per year
+- Stored in capitalStackProjections table (32 fields, was empty before)
+
+**Fix 6: Deal Scoring Models** (6 endpoints: /scoring-models/*)
+- CRUD for scoring models with configurable criteria (numeric_range, boolean, select)
+- Score deals: weighted multi-criterion scoring → total score + grade (A+ through F)
+- Stores in dealScores with per-criterion breakdown
+- GET /scores/:dealId for history
+
+**Route Registration:** /api/modeling-enhanced/*
+
+---
+
 ### ✅ COMPLETE — DD Findings, KPI Dashboard & Unified Deal Team (2026-03-25)
 Three enhancements to the Deal Workspace ecosystem:
 - **1 new database table** (ddFindings) + **~15 new API endpoints**

@@ -144,6 +144,13 @@ const AdminOrganizationsPage = lazy(() => import("@/pages/admin/AdminOrganizatio
 const AdminAuditTrailPage = lazy(() => import("@/pages/admin/AdminAuditTrailPage"));
 const DataSourcesAdmin = lazy(() => import("@/pages/admin/DataSourcesAdmin"));
 const AssetClassManager = lazy(() => import("@/pages/admin/AssetClassManager"));
+const MasterCompsAdmin = lazy(() => import("@/pages/admin/MasterCompsAdmin"));
+const PlatformDashboard = lazy(() => import("@/pages/admin/PlatformDashboard"));
+const PredictiveAnalyticsPage = lazy(() => import("@/pages/analysis/predictive/index"));
+const CashFlowForecastingPage = lazy(() => import("@/pages/analysis/cash-flow/index"));
+const DealSourcingPage = lazy(() => import("@/pages/analysis/deal-sourcing/index"));
+const MeetingTranscriptionPage = lazy(() => import("@/pages/crm/meetings/index"));
+const CurrencySettingsPage = lazy(() => import("@/pages/settings/currency/index"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -645,6 +652,55 @@ function Router() {
         <Suspense fallback={<PageLoader />}>
           <AssetClassManager />
         </Suspense>
+      </Route>
+      <Route path="/admin/master-comps">
+        {() => (
+          <UnifiedLayout>
+            <MasterCompsAdmin />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/admin/platform-dashboard">
+        {() => (
+          <UnifiedLayout>
+            <PlatformDashboard />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/predictive">
+        {() => (
+          <GatedLayout pack="analysis">
+            <PredictiveAnalyticsPage />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/cash-flow">
+        {() => (
+          <GatedLayout pack="analysis">
+            <CashFlowForecastingPage />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/analysis/deal-sourcing">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <DealSourcingPage />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/crm/meetings">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <MeetingTranscriptionPage />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/settings/currency">
+        {() => (
+          <UnifiedLayout>
+            <CurrencySettingsPage />
+          </UnifiedLayout>
+        )}
       </Route>
       <Route path="/projects/:id">
         {(params) => (
