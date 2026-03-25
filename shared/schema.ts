@@ -2418,7 +2418,7 @@ export const crmContacts = pgTable("crm_contacts", {
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").notNull(),
+  email: text("email"),
   phone: text("phone"), // Legacy field - kept for backward compatibility
   phones: jsonb("phones").default(sql`'[]'`), // Array of {type: 'office'|'mobile'|'home', number: string}
   position: text("position"),
