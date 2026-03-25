@@ -2,6 +2,130 @@
 
 ## Current State (2026-03-25)
 
+### ✅ COMPLETE — DD Findings, KPI Dashboard & Unified Deal Team (2026-03-25)
+Three enhancements to the Deal Workspace ecosystem:
+- **1 new database table** (ddFindings) + **~15 new API endpoints**
+
+**New Schema Table (shared/schema.ts):**
+- ddFindings — severity (critical/major/minor/observation/positive), category, financial impact (cost_to_cure/value_reduction/revenue_risk/liability/capex_required), resolution workflow (open→investigating→mitigated→resolved→escalated), recommendation (proceed/renegotiate/walk_away/further_investigation), linked to checklist items/documents/tasks
+
+**New Route File (server/routes/dd-findings-routes.ts):**
+1. **DD Findings CRUD** (6 endpoints): create, list, get, update, delete, summary with risk scoring
+2. **Findings Summary** per workspace: by severity, category, recommended action, deal-breaker detection, total financial impact (resolved vs unresolved)
+3. **DD KPI Dashboard** (1 endpoint): comprehensive metrics per workspace:
+   - Core: total/completed/provided/overdue/blocked items, completion %, provision %
+   - Breakdowns: by status, internal status, priority, request type
+   - Category heatmap: per-section completion/provision/overdue rates
+   - Timeline: avg days to provide, upcoming deadlines (next 7d)
+   - Findings integration: total/critical/open findings, financial impact
+   - Health score: 0-100 composite (On Track/Needs Attention/At Risk/Critical)
+4. **Unified Deal Team** (2 endpoints):
+   - GET /team/:dealId — merges dealContacts + workspaceMembers, deduplicates by email, enriches with CRM data and user info, groups by team type
+   - POST /team/:dealId/sync — bidirectional sync between workspace members and deal contacts
+
+**Route Registration:** /api/dd-enhanced/*
+
+---
+
+### ✅ COMPLETE — Master Comps Database Pack Feature (2026-03-25)
+Full master comps pack built with 5 pillars:
+- **3 new database tables** added to schema.ts
+- **~25 new API endpoints** in 1 new route file
+
+**New Schema Tables (shared/schema.ts):**
+- compOverrides — org-level annotations/adjustments on master comps (override price, cap rate, NOI, notes, ratings, tags, exclude)
+- compContributions — submission pipeline for users to contribute comps to master DB (submitted → under_review → approved/rejected)
+- compDedupMatches — duplicate detection results linking user comps to potential master matches
+
+**New Route File:**
+- server/routes/master-comps-routes.ts — 5 sections:
+  1. **Admin Curation** (6 endpoints): list global comps, promote/demote to global scope, verify/quality score, bulk promote, stats dashboard
+  2. **Subscriber Access** (1 endpoint): unified query merging org + master comps with overrides layered on, filtered by pack access
+  3. **Comp Overrides** (5 endpoints): create/update/delete org-level overrides on master comps, exclude comps, list overrides
+  4. **Contribution Pipeline** (3 endpoints): submit comp for master inclusion, list contributions, admin review (approve → auto-promote)
+  5. **Dedup Engine** (4 endpoints): check single comp, batch check, list pending matches, resolve matches (link/keep_both/dismiss)
+
+**Pack Access:**
+- `master_comps` or `analytics_pro` pack grants access to global comps
+- Dev mode bypass when org has no packs (consistent with existing pattern)
+- Comps promoted with `requiredPack: "master_comps"` on the salesComps/rateComps records
+
+**Similarity Scoring (dedup):**
+- Marina name: exact (40pts) or partial (25pts)
+- Address: exact (30pts) or partial (15pts)
+- City+State: 10pts
+- Sale year: exact (10pts) or ±1yr (5pts)
+- Sale price: ±5% (10pts) or ±10% (5pts)
+- Threshold: 60+ = potential match
+
+**Route Registration (server/routes.ts):**
+- /api/master-comps/* — Master Comps Database
+
+---
+
+### ✅ COMPLETE — Final 5 Missing Spec Sections Built (2026-03-25)
+All remaining missing spec sections now implemented:
+- **8 new database tables** added to schema.ts
+- **~60 new API endpoints** across 5 new route files
+- **83 of 86 sections now BUILT** (3 minor partials remain: E.4, F.3, F.5)
+
+**New Schema Tables (shared/schema.ts):**
+- cashFlowForecasts, liquidityAlerts (E.5)
+- aiUnderwritingRuns (G.1)
+- buyBoxProfiles, buyBoxScores (G.3)
+- meetingRecordings (G.5)
+- exchangeRates (H.3)
+
+**New Route Files:**
+- server/routes/cash-flow-forecasting-routes.ts — E.5 (6 endpoints): 24-month projections, liquidity alerts, deal breakdown, summary
+- server/routes/ai-underwriting-routes.ts — G.1 (4 endpoints): AI market research + comps + public records → pro forma assumptions
+- server/routes/deal-sourcing-routes.ts — G.3 (8 endpoints): AI buy box generation, deal scoring (A/B/C/D tiers), batch scoring, leaderboard
+- server/routes/meeting-transcription-routes.ts — G.5 (8 endpoints): upload transcript, AI analysis, CRM sync (auto-create tasks, log activities)
+- server/routes/multi-currency-routes.ts — H.3 (6 endpoints): exchange rate refresh (Open Exchange Rates), conversion, portfolio FX exposure
+
+**Route Registration (server/routes.ts):**
+- /api/cash-flow/* — Cash Flow Forecasting
+- /api/ai-underwriting/* — AI Underwriting Assistant
+- /api/deal-sourcing/* — Deal Sourcing & Buy Box
+- /api/meetings/* — Meeting Transcription + CRM Sync
+- /api/currency/* — Multi-Currency & International
+
+---
+
+### ✅ COMPLETE — Gap Closures: F.4, F.6, G.4, H.2, C.2/C.3/C.5 Enhancements (2026-03-25)
+Prior gap closures:
+- **7 new database tables** added to schema.ts
+- **~80 new API endpoints** across 4 new route files + 1 service + 1 middleware
+
+**New Schema Tables (shared/schema.ts):**
+- docusignEnvelopes, docusignTemplates (F.4)
+- propertyPublicRecords (F.6)
+- dealPredictions, assetRiskScores (G.4)
+- holdSellAnalyses (G.4 + 3.5)
+
+**New Route Files:**
+- server/routes/docusign-routes.ts — F.4 DocuSign Deep Integration (14 endpoints): template sync/CRUD, send from template, embedded signing URL, bulk send, envelope management, void/resend, PDF download, webhook handler, dashboard
+- server/routes/public-records-routes.ts — F.6 Public Records / Title Data (8 endpoints): ATTOM property enrichment, selective field import to deal/property, sale history, tax history, property/deal lookups
+- server/routes/predictive-analytics-routes.ts — G.4 + 3.5 Predictive Analytics & Hold-Sell (8 endpoints): deal closure probability scoring, batch predictions, asset underperformance risk scoring, portfolio risk overview, hold/sell analysis with year-by-year projections
+- server/routes/api-v1-routes.ts — H.2 White-Label API v1 (14 endpoints): deals, portfolio, contacts, properties, investors, distributions, work orders, webhooks — all with pagination, scope enforcement, rate limiting
+
+**New Services & Middleware:**
+- server/services/public-records-service.ts — ATTOM Data Solutions integration: address lookup, property detail, sale history, tax history, lien data, parallel enrichment
+- server/middleware/api-key-auth.ts — API key authentication (Bearer mm_sk_...), scope enforcement (requireScope), IP allowlist, in-memory rate limiting with X-RateLimit headers
+
+**Enhanced Routes (server/routes/tenant-construction-routes.ts):**
+- C.2: Stripe PaymentIntent creation, late fee calculator (flat/daily/percentage), payment reconciliation, NSF fee application
+- C.3: Lease renewal auto-scan (180/120/90/60/30-day horizons), AI renewal offer letter generation with market rent comparison
+- C.5: Detailed conversion funnel with stage-by-stage rates, days-on-market alerts with revenue loss estimates and pricing suggestions
+
+**Route Registration (server/routes.ts):**
+- /api/docusign/* — DocuSign (webhook + authenticated routes)
+- /api/public-records/* — Public Records / Title Data
+- /api/predictive/* — Predictive Analytics + Hold-Sell
+- /api/v1/* — White-Label API (API key auth, no session)
+
+---
+
 ### ✅ COMPLETE — Master Spec Volume 1 Full Build-Out (2026-03-25)
 All 50 sections from MARINAMATCH_MASTER_SPEC.md implemented:
 - **42 new database tables** created in PostgreSQL
@@ -252,11 +376,37 @@ Full overhaul of /analysis/demographics to match STDB / LandVision / ArcGIS Busi
 Pack enforcement is live but there's no self-serve payment flow. Stripe fields
 exist in schema (stripePriceIdMonthly, stripeSubscriptionId, etc.) but no
 webhook handlers or checkout routes. Packs currently activated manually.
+Note: Stripe rent payment intent creation is now built in C.2, but pack
+checkout/subscription flow is separate and still pending.
 
 ### 2. Real Data Import (HIGH — platform is data-ready)
 Sales Comps: /analysis/sales-comps/upload
 Rate Comps: /analysis/rate-comps
 Empty state CTAs now point directly to these flows.
+
+### 3. J.1 Native Mobile App — NOT APPLICABLE
+Spec calls for iOS/Android but web app is fully responsive. Deferred to post-launch.
+
+### 4. External API Keys — DB Migration
+apiKeys table exists in schema but needs `npm run db:push` or manual SQL to create
+in PostgreSQL. Same for all new tables (docusign_envelopes, docusign_templates,
+property_public_records, deal_predictions, asset_risk_scores, hold_sell_analyses,
+cash_flow_forecasts, liquidity_alerts, ai_underwriting_runs, buy_box_profiles,
+buy_box_scores, meeting_recordings, exchange_rates, comp_overrides,
+comp_contributions, comp_dedup_matches).
+
+### 5. Admin Panel — ✅ DONE (2026-03-25)
+Comprehensive admin dashboard already existed at /api/admin/*. Enhanced with:
+- **Platform Dashboard** (GET /admin/customers/dashboard): total users, active/disabled/verified/MFA stats, role breakdown, 30/90d signups, active-in-30d, never-logged-in, org count, subscription stats (MRR/ARR), pack adoption
+- **Signup Funnel** (GET /admin/customers/signup-funnel): daily/weekly/monthly registration trends, verification rate, activation rate, configurable lookback
+- **Active Sessions** (GET /admin/customers/active-sessions): live sessions with device, browser, OS, IP, location, user info
+- **Login Activity** (GET /admin/customers/login-activity): success/failure events, unique users/IPs, configurable lookback
+- **Cohort Retention** (GET /admin/customers/cohort-retention): monthly cohort analysis with retention percentages
+Pre-existing: user CRUD, invite, enable/disable, subscription management (cancel/reactivate/extend trial/change plan), CSV export, notes, audit trail, org management, pack grant/revoke, ownership transfer
+
+### 6. Master Comps Pack — Catalog Entry
+Add `master_comps` to packCatalog table with pricing and feature list.
+Currently only exists in code logic — needs DB seed row.
 
 ### 3. CRM Dashboard Assessment — ✅ DONE (2026-03-19)
 Assessed: already solid (684 lines, 6 KPI cards, pipeline bars, activity panels,

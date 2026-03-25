@@ -28306,3 +28306,443 @@ export const userOnboarding = pgTable("user_onboarding", {
 });
 export type UserOnboardingRecord = typeof userOnboarding.$inferSelect;
 export type InsertUserOnboarding = typeof userOnboarding.$inferInsert;
+
+// ── F.4 DocuSign Deep Integration ─────────────────────────────────────
+
+export const docusignEnvelopes = pgTable("docusign_envelopes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  externalEnvelopeId: varchar("external_envelope_id", { length: 255 }).notNull(),
+  templateId: varchar("template_id", { length: 255 }),
+  subject: varchar("subject", { length: 500 }),
+  status: varchar("status", { length: 30 }).default("created"), // created | sent | delivered | signed | completed | declined | voided
+  signers: jsonb("signers"), // [{ name, email, role, status, signedAt }]
+  prefillFields: jsonb("prefill_fields"),
+  documentUrl: varchar("document_url", { length: 500 }),
+  executedDocUrl: varchar("executed_doc_url", { length: 500 }),
+  sentAt: timestamp("sent_at"),
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DocusignEnvelope = typeof docusignEnvelopes.$inferSelect;
+export type InsertDocusignEnvelope = typeof docusignEnvelopes.$inferInsert;
+
+export const docusignTemplates = pgTable("docusign_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  externalTemplateId: varchar("external_template_id", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }), // loi | subscription | operating_agreement | lease | capital_call | nda | custom
+  signerRoles: jsonb("signer_roles"), // [{ roleName, order }]
+  prefillFieldNames: jsonb("prefill_field_names"), // ['buyerName', 'sellerName', 'purchasePrice']
+  isActive: boolean("is_active").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DocusignTemplate = typeof docusignTemplates.$inferSelect;
+export type InsertDocusignTemplate = typeof docusignTemplates.$inferInsert;
+
+// ── F.6 Public Records / Title Data ──────────────────────────────────
+
+export const propertyPublicRecords = pgTable("property_public_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  propertyId: varchar("property_id").references(() => crmProperties.id),
+  address: varchar("address", { length: 500 }),
+  externalId: varchar("external_id", { length: 255 }), // ATTOM ID or similar
+  provider: varchar("provider", { length: 50 }).default("attom"), // attom | first_american | custom
+  // Property facts
+  yearBuilt: integer("year_built"),
+  buildingSqFt: integer("building_sq_ft"),
+  lotSqFt: integer("lot_sq_ft"),
+  totalUnits: integer("total_units"),
+  stories: integer("stories"),
+  constructionType: varchar("construction_type", { length: 100 }),
+  propertyType: varchar("property_type", { length: 100 }),
+  // Ownership
+  currentOwner: varchar("current_owner", { length: 255 }),
+  ownerMailingAddress: varchar("owner_mailing_address", { length: 500 }),
+  ownershipType: varchar("ownership_type", { length: 50 }), // individual | corporate | trust | government
+  // Tax info
+  assessedValue: numeric("assessed_value", { precision: 14, scale: 2 }),
+  taxYear: integer("tax_year"),
+  annualTaxes: numeric("annual_taxes", { precision: 12, scale: 2 }),
+  taxExemptions: jsonb("tax_exemptions"),
+  // Sale history
+  saleHistory: jsonb("sale_history"), // [{ date, price, buyer, seller, docNumber }]
+  lastSaleDate: date("last_sale_date"),
+  lastSalePrice: numeric("last_sale_price", { precision: 14, scale: 2 }),
+  // Liens
+  liens: jsonb("liens"), // [{ amount, type, lender, recordDate, status }]
+  totalLienAmount: numeric("total_lien_amount", { precision: 14, scale: 2 }),
+  // Zoning
+  zoningCode: varchar("zoning_code", { length: 50 }),
+  zoningDescription: varchar("zoning_description", { length: 255 }),
+  // Meta
+  dataAsOf: date("data_as_of"),
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type PropertyPublicRecord = typeof propertyPublicRecords.$inferSelect;
+export type InsertPropertyPublicRecord = typeof propertyPublicRecords.$inferInsert;
+
+// ── G.4 Predictive Analytics ─────────────────────────────────────────
+
+export const dealPredictions = pgTable("deal_predictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  predictionType: varchar("prediction_type", { length: 50 }).notNull(), // closure_probability | time_to_close | optimal_price
+  score: numeric("score", { precision: 5, scale: 2 }), // 0-100 probability or score
+  confidence: numeric("confidence", { precision: 5, scale: 2 }), // model confidence 0-100
+  factors: jsonb("factors"), // [{ name, impact, value, direction }]
+  recommendation: text("recommendation"),
+  modelVersion: varchar("model_version", { length: 20 }).default("v1"),
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type DealPrediction = typeof dealPredictions.$inferSelect;
+export type InsertDealPrediction = typeof dealPredictions.$inferInsert;
+
+export const assetRiskScores = pgTable("asset_risk_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  compositeScore: numeric("composite_score", { precision: 5, scale: 2 }), // 0-100 risk
+  occupancyRisk: numeric("occupancy_risk", { precision: 5, scale: 2 }),
+  noiVarianceRisk: numeric("noi_variance_risk", { precision: 5, scale: 2 }),
+  maintenanceRisk: numeric("maintenance_risk", { precision: 5, scale: 2 }),
+  leaseRolloverRisk: numeric("lease_rollover_risk", { precision: 5, scale: 2 }),
+  marketRisk: numeric("market_risk", { precision: 5, scale: 2 }),
+  dscrRisk: numeric("dscr_risk", { precision: 5, scale: 2 }),
+  factors: jsonb("factors"), // detailed breakdown
+  recommendation: text("recommendation"),
+  alertLevel: varchar("alert_level", { length: 20 }).default("normal"), // normal | watch | warning | critical
+  assessedAt: timestamp("assessed_at", { withTimezone: true }).defaultNow(),
+  validUntil: timestamp("valid_until"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type AssetRiskScore = typeof assetRiskScores.$inferSelect;
+export type InsertAssetRiskScore = typeof assetRiskScores.$inferInsert;
+
+export const holdSellAnalyses = pgTable("hold_sell_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  recommendation: varchar("recommendation", { length: 20 }), // hold | sell | refinance
+  confidenceScore: numeric("confidence_score", { precision: 5, scale: 2 }),
+  currentValue: numeric("current_value", { precision: 14, scale: 2 }),
+  projectedExitValue: numeric("projected_exit_value", { precision: 14, scale: 2 }),
+  optimalExitYear: integer("optimal_exit_year"),
+  holdIrr: numeric("hold_irr", { precision: 7, scale: 4 }),
+  sellNowIrr: numeric("sell_now_irr", { precision: 7, scale: 4 }),
+  yearByYearProjections: jsonb("year_by_year_projections"), // [{ year, projectedValue, irr, noi, capRate }]
+  factors: jsonb("factors"), // [{ name, impact, direction }]
+  marketConditions: jsonb("market_conditions"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type HoldSellAnalysis = typeof holdSellAnalyses.$inferSelect;
+export type InsertHoldSellAnalysis = typeof holdSellAnalyses.$inferInsert;
+
+// ── E.5 Cash Flow Forecasting Engine ──────────────────────────────────
+
+export const cashFlowForecasts = pgTable("cash_flow_forecasts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  period: varchar("period", { length: 20 }).notNull(), // 2026-01, 2026-02, etc.
+  asOf: date("as_of").notNull(),
+  // Inflows
+  projectedNOI: numeric("projected_noi", { precision: 15, scale: 2 }).default("0"),
+  projectedRefinanceProceeds: numeric("projected_refinance_proceeds", { precision: 15, scale: 2 }).default("0"),
+  projectedSaleProceeds: numeric("projected_sale_proceeds", { precision: 15, scale: 2 }).default("0"),
+  projectedCapitalCallsIn: numeric("projected_capital_calls_in", { precision: 15, scale: 2 }).default("0"),
+  // Outflows
+  projectedDebtService: numeric("projected_debt_service", { precision: 15, scale: 2 }).default("0"),
+  projectedCapex: numeric("projected_capex", { precision: 15, scale: 2 }).default("0"),
+  projectedDistributions: numeric("projected_distributions", { precision: 15, scale: 2 }).default("0"),
+  projectedManagementFees: numeric("projected_management_fees", { precision: 15, scale: 2 }).default("0"),
+  projectedOperatingExpenses: numeric("projected_operating_expenses", { precision: 15, scale: 2 }).default("0"),
+  // Net
+  netCashFlow: numeric("net_cash_flow", { precision: 15, scale: 2 }).default("0"),
+  cumulativeCashFlow: numeric("cumulative_cash_flow", { precision: 15, scale: 2 }).default("0"),
+  // Breakdown
+  dealBreakdown: jsonb("deal_breakdown"), // [{ dealId, dealTitle, noi, debtService, capex, net }]
+  confidenceLevel: varchar("confidence_level", { length: 20 }).default("medium"), // high | medium | low
+  generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow(),
+});
+export type CashFlowForecast = typeof cashFlowForecasts.$inferSelect;
+export type InsertCashFlowForecast = typeof cashFlowForecasts.$inferInsert;
+
+export const liquidityAlerts = pgTable("liquidity_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  period: varchar("period", { length: 20 }).notNull(),
+  alertType: varchar("alert_type", { length: 30 }).notNull(), // cash_shortfall | low_reserve | concentration_risk
+  severity: varchar("severity", { length: 20 }).default("warning"), // info | warning | critical
+  message: text("message"),
+  shortfallAmount: numeric("shortfall_amount", { precision: 15, scale: 2 }),
+  suggestedActions: jsonb("suggested_actions"), // ['Accelerate capital call', 'Defer distribution']
+  acknowledged: boolean("acknowledged").default(false),
+  acknowledgedBy: varchar("acknowledged_by").references(() => users.id),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type LiquidityAlert = typeof liquidityAlerts.$inferSelect;
+
+// ── G.1 AI Underwriting Assistant ─────────────────────────────────────
+
+export const aiUnderwritingRuns = pgTable("ai_underwriting_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  status: varchar("status", { length: 20 }).default("pending"), // pending | researching | analyzing | complete | failed
+  // Inputs
+  address: varchar("address", { length: 500 }),
+  assetClass: varchar("asset_class", { length: 100 }),
+  askPrice: numeric("ask_price", { precision: 14, scale: 2 }),
+  unitCount: integer("unit_count"),
+  // AI Results
+  marketResearch: text("market_research"),
+  compsFound: integer("comps_found").default(0),
+  publicRecordsEnriched: boolean("public_records_enriched").default(false),
+  suggestedAssumptions: jsonb("suggested_assumptions"), // { going_in_occupancy, stabilized_occupancy, avg_rent, rent_growth, expense_ratio, cap_rate, exit_cap, hold_period, debt_assumption }
+  marketCommentary: text("market_commentary"),
+  riskFlags: jsonb("risk_flags"), // ['Flag 1', 'Flag 2']
+  confidence: varchar("confidence", { length: 20 }), // high | medium | low
+  appliedToProForma: boolean("applied_to_pro_forma").default(false),
+  appliedAt: timestamp("applied_at"),
+  // Meta
+  modelUsed: varchar("model_used", { length: 100 }),
+  tokensUsed: integer("tokens_used"),
+  durationMs: integer("duration_ms"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type AiUnderwritingRun = typeof aiUnderwritingRuns.$inferSelect;
+export type InsertAiUnderwritingRun = typeof aiUnderwritingRuns.$inferInsert;
+
+// ── G.3 AI Deal Sourcing ──────────────────────────────────────────────
+
+export const buyBoxProfiles = pgTable("buy_box_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).default("Default Buy Box"),
+  isDefault: boolean("is_default").default(true),
+  // Criteria
+  preferredAssetClasses: jsonb("preferred_asset_classes"), // ['marina', 'multifamily']
+  preferredMarkets: jsonb("preferred_markets"), // ['Tampa, FL', 'Charleston, SC']
+  priceMin: numeric("price_min", { precision: 14, scale: 2 }),
+  priceMax: numeric("price_max", { precision: 14, scale: 2 }),
+  capRateMin: numeric("cap_rate_min", { precision: 5, scale: 3 }),
+  capRateMax: numeric("cap_rate_max", { precision: 5, scale: 3 }),
+  unitsMin: integer("units_min"),
+  unitsMax: integer("units_max"),
+  yearBuiltMin: integer("year_built_min"),
+  yearBuiltMax: integer("year_built_max"),
+  preferredStrategies: jsonb("preferred_strategies"), // ['value_add', 'core_plus']
+  avoidCharacteristics: jsonb("avoid_characteristics"), // ['flood_zone', 'ground_lease']
+  // AI-generated insights
+  aiGeneratedProfile: jsonb("ai_generated_profile"), // full AI analysis of historical patterns
+  confidence: numeric("confidence", { precision: 5, scale: 2 }),
+  dataPointCount: integer("data_point_count"), // how many closed deals informed this
+  lastGeneratedAt: timestamp("last_generated_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type BuyBoxProfile = typeof buyBoxProfiles.$inferSelect;
+export type InsertBuyBoxProfile = typeof buyBoxProfiles.$inferInsert;
+
+export const buyBoxScores = pgTable("buy_box_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  dealId: varchar("deal_id").notNull().references(() => crmDeals.id),
+  buyBoxId: varchar("buy_box_id").notNull().references(() => buyBoxProfiles.id),
+  score: integer("score").notNull(), // 0-100
+  tier: varchar("tier", { length: 1 }).notNull(), // A | B | C | D
+  matches: jsonb("matches"), // ['Asset class in target set', ...]
+  misses: jsonb("misses"), // ['Price outside range', ...]
+  scoredAt: timestamp("scored_at", { withTimezone: true }).defaultNow(),
+});
+export type BuyBoxScore = typeof buyBoxScores.$inferSelect;
+
+// ── G.5 Meeting Transcription + CRM Sync ──────────────────────────────
+
+export const meetingRecordings = pgTable("meeting_recordings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  externalMeetingId: varchar("external_meeting_id", { length: 255 }),
+  platform: varchar("platform", { length: 20 }), // zoom | teams | google_meet | upload
+  title: varchar("title", { length: 255 }),
+  startTime: timestamp("start_time"),
+  duration: integer("duration"), // seconds
+  participants: jsonb("participants"), // [{ name, email, joinTime, leaveTime }]
+  // Transcription
+  transcriptText: text("transcript_text"),
+  transcriptUrl: varchar("transcript_url", { length: 500 }),
+  // AI Analysis
+  summary: text("summary"),
+  keyDecisions: jsonb("key_decisions"),
+  actionItems: jsonb("action_items"), // [{ task, assignee, dueDate, dealMention }]
+  dealsMentioned: jsonb("deals_mentioned"), // dealId[]
+  contactsMentioned: jsonb("contacts_mentioned"), // contactId[]
+  nextSteps: text("next_steps"),
+  // CRM sync
+  syncedToContactIds: jsonb("synced_to_contact_ids"),
+  syncedToDealIds: jsonb("synced_to_deal_ids"),
+  activityLoggedAt: timestamp("activity_logged_at"),
+  tasksCreatedAt: timestamp("tasks_created_at"),
+  tasksCreatedCount: integer("tasks_created_count").default(0),
+  // Status
+  transcriptionStatus: varchar("transcription_status", { length: 20 }).default("pending"), // pending | processing | complete | failed
+  analysisStatus: varchar("analysis_status", { length: 20 }).default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type MeetingRecording = typeof meetingRecordings.$inferSelect;
+export type InsertMeetingRecording = typeof meetingRecordings.$inferInsert;
+
+// ── H.3 Multi-Currency & International ────────────────────────────────
+
+export const exchangeRates = pgTable("exchange_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  baseCurrency: varchar("base_currency", { length: 3 }).default("USD"),
+  targetCurrency: varchar("target_currency", { length: 3 }).notNull(),
+  rate: numeric("rate", { precision: 15, scale: 8 }).notNull(), // 1 base = X target
+  source: varchar("source", { length: 50 }).default("openexchangerates"), // openexchangerates | ecb | manual
+  rateDate: date("rate_date").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type InsertExchangeRate = typeof exchangeRates.$inferInsert;
+
+// ── Master Comps Database ─────────────────────────────────────────────
+
+/**
+ * Org-level overrides/annotations on master (global) comps.
+ * Subscribers can adjust values, add notes, flag issues — without
+ * modifying the master record. Their override is layered on top at query time.
+ */
+export const compOverrides = pgTable("comp_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  compId: varchar("comp_id").notNull(), // FK to salesComps or rateComps
+  compType: varchar("comp_type", { length: 10 }).notNull(), // sales | rate
+  // Override values (null = use master value)
+  overrideSalePrice: integer("override_sale_price"),
+  overrideCapRate: numeric("override_cap_rate", { precision: 6, scale: 3 }),
+  overrideNoi: integer("override_noi"),
+  overrideNotes: text("override_notes"),
+  // Org-specific metadata
+  internalRating: integer("internal_rating"), // 1-5 stars
+  internalTags: jsonb("internal_tags"), // ['comparable', 'outlier', 'verified', 'stale']
+  isExcluded: boolean("is_excluded").default(false), // hide from org's view
+  excludeReason: varchar("exclude_reason", { length: 255 }),
+  // Custom field overrides (flexible)
+  customOverrides: jsonb("custom_overrides"), // { fieldName: overrideValue, ... }
+  // Audit
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type CompOverride = typeof compOverrides.$inferSelect;
+export type InsertCompOverride = typeof compOverrides.$inferInsert;
+
+/**
+ * User-submitted comps for potential inclusion in the master database.
+ * Platform admin reviews, verifies, and promotes to global scope.
+ */
+export const compContributions = pgTable("comp_contributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  compId: varchar("comp_id").notNull(), // FK to the org's salesComps or rateComps record
+  compType: varchar("comp_type", { length: 10 }).notNull(), // sales | rate
+  status: varchar("status", { length: 20 }).default("submitted"), // submitted | under_review | approved | rejected | merged
+  // Review
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  // If merged into existing master comp
+  mergedIntoCompId: varchar("merged_into_comp_id"),
+  // If promoted as new global comp
+  promotedCompId: varchar("promoted_comp_id"),
+  // Submitter context
+  submittedBy: varchar("submitted_by").references(() => users.id),
+  submitterNotes: text("submitter_notes"),
+  dataSource: varchar("data_source", { length: 100 }), // 'broker_provided', 'public_filing', 'direct_knowledge', 'industry_report'
+  confidenceLevel: varchar("confidence_level", { length: 20 }), // high | medium | low
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type CompContribution = typeof compContributions.$inferSelect;
+export type InsertCompContribution = typeof compContributions.$inferInsert;
+
+/**
+ * Potential duplicate detection results when comps are uploaded.
+ * Links user's comp to a possible master database match.
+ */
+export const compDedupMatches = pgTable("comp_dedup_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  sourceCompId: varchar("source_comp_id").notNull(), // user's comp
+  matchedCompId: varchar("matched_comp_id").notNull(), // master comp
+  compType: varchar("comp_type", { length: 10 }).notNull(),
+  similarityScore: numeric("similarity_score", { precision: 5, scale: 2 }), // 0-100
+  matchFields: jsonb("match_fields"), // ['marina', 'address', 'saleYear', 'salePrice']
+  resolution: varchar("resolution", { length: 20 }), // pending | link | keep_both | dismiss
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+export type CompDedupMatch = typeof compDedupMatches.$inferSelect;
+
+// ── DD Findings ───────────────────────────────────────────────────────
+
+export const ddFindings = pgTable("dd_findings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  workspaceId: varchar("workspace_id").references(() => dealWorkspaces.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  dealId: varchar("deal_id").references(() => crmDeals.id),
+  // Finding classification
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }).notNull(), // title | survey | esa | appraisal | inspection | permits | zoning | financial | legal | insurance | operational | other
+  severity: varchar("severity", { length: 20 }).notNull(), // critical | major | minor | observation | positive
+  // Financial impact
+  estimatedFinancialImpact: numeric("estimated_financial_impact", { precision: 14, scale: 2 }),
+  impactType: varchar("impact_type", { length: 30 }), // cost_to_cure | value_reduction | revenue_risk | liability | capex_required | none
+  impactTimeframe: varchar("impact_timeframe", { length: 20 }), // immediate | short_term | medium_term | long_term
+  // Resolution
+  status: varchar("status", { length: 20 }).default("open"), // open | investigating | mitigated | accepted | resolved | escalated
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  // Recommendation
+  recommendation: text("recommendation"),
+  recommendedAction: varchar("recommended_action", { length: 30 }), // proceed | renegotiate | walk_away | further_investigation | accept_risk | remediate
+  // Linked items
+  checklistItemId: varchar("checklist_item_id"), // FK to ddChecklistItems
+  documentId: varchar("document_id"), // FK to vdrDocuments
+  taskId: varchar("task_id"), // FK to tasks
+  // Source
+  discoveredBy: varchar("discovered_by").references(() => users.id),
+  discoveredAt: timestamp("discovered_at", { withTimezone: true }).defaultNow(),
+  source: varchar("source", { length: 50 }), // inspection | document_review | third_party_report | site_visit | financial_analysis | legal_review | ai_detected
+  sourceDetail: varchar("source_detail", { length: 255 }),
+  // Attachments
+  attachments: jsonb("attachments"), // [{ name, url, type }]
+  // Audit
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+export type DdFinding = typeof ddFindings.$inferSelect;
+export type InsertDdFinding = typeof ddFindings.$inferInsert;

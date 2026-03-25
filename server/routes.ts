@@ -37,6 +37,18 @@ import { fundManagementRouter } from "./routes/fund-management-routes";
 import { tenantConstructionRouter } from "./routes/tenant-construction-routes";
 import { analyticsEnterpriseRouter } from "./routes/analytics-enterprise-routes";
 import { complianceOnboardingRouter } from "./routes/compliance-onboarding-routes";
+import { docusignRouter } from "./routes/docusign-routes";
+import { publicRecordsRouter } from "./routes/public-records-routes";
+import { predictiveAnalyticsRouter } from "./routes/predictive-analytics-routes";
+import { apiV1Router } from "./routes/api-v1-routes";
+import { authenticateApiKey } from "./middleware/api-key-auth";
+import { cashFlowForecastingRouter } from "./routes/cash-flow-forecasting-routes";
+import { aiUnderwritingRouter } from "./routes/ai-underwriting-routes";
+import { dealSourcingRouter } from "./routes/deal-sourcing-routes";
+import { meetingTranscriptionRouter } from "./routes/meeting-transcription-routes";
+import { multiCurrencyRouter } from "./routes/multi-currency-routes";
+import { masterCompsRouter } from "./routes/master-comps-routes";
+import { ddFindingsRouter } from "./routes/dd-findings-routes";
 import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
 import { dealWorkspaceRouter } from "./routes/deal-workspace-routes";
@@ -486,6 +498,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/enterprise", authenticateUser, enforceTenant, analyticsEnterpriseRouter);
   // I.1-I.4 + J.2: Climate Risk, Environmental, Insurance, Regulatory, Onboarding
   app.use("/api/compliance", authenticateUser, enforceTenant, complianceOnboardingRouter);
+  // F.4: DocuSign Deep Integration (webhook endpoint is unauthenticated)
+  app.post("/api/docusign/webhook", docusignRouter);
+  app.use("/api/docusign", authenticateUser, enforceTenant, docusignRouter);
+  // F.6: Public Records / Title Data
+  app.use("/api/public-records", authenticateUser, enforceTenant, publicRecordsRouter);
+  // G.4 + 3.5: Predictive Analytics & Hold-Sell Optimizer
+  app.use("/api/predictive", authenticateUser, enforceTenant, predictiveAnalyticsRouter);
+  // H.2: White-Label API v1 (API key auth, no session)
+  app.use("/api/v1", authenticateApiKey, apiV1Router);
+  // E.5: Cash Flow Forecasting Engine
+  app.use("/api/cash-flow", authenticateUser, enforceTenant, cashFlowForecastingRouter);
+  // G.1: AI Underwriting Assistant
+  app.use("/api/ai-underwriting", authenticateUser, enforceTenant, aiUnderwritingRouter);
+  // G.3: AI Deal Sourcing & Buy Box
+  app.use("/api/deal-sourcing", authenticateUser, enforceTenant, dealSourcingRouter);
+  // G.5: Meeting Transcription + CRM Sync
+  app.use("/api/meetings", authenticateUser, enforceTenant, meetingTranscriptionRouter);
+  // H.3: Multi-Currency & International
+  app.use("/api/currency", authenticateUser, enforceTenant, multiCurrencyRouter);
+  // Master Comps Database (admin curation, subscriber access, overrides, contributions, dedup)
+  app.use("/api/master-comps", authenticateUser, enforceTenant, masterCompsRouter);
+  // DD Findings, KPI Dashboard & Unified Deal Team
+  app.use("/api/dd-enhanced", authenticateUser, enforceTenant, ddFindingsRouter);
 
   // ── Master Spec Feature Modules ──────────────────────────────────────
   // Section 1: AI-Native Deal Intelligence (1.1-1.5)

@@ -2,8 +2,8 @@ import { Router } from "express";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import { db } from "../../db";
-import { users, organizations, subscriptions, adminAuditLog, customerNotes } from "@shared/schema";
-import { eq, and, or, ilike, sql, desc, asc, count, sum } from "drizzle-orm";
+import { users, organizations, subscriptions, adminAuditLog, customerNotes, organizationPacks, userSessions, securityAuditLog } from "@shared/schema";
+import { eq, and, or, ilike, sql, desc, asc, count, sum, gte } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 
 const router = Router();
@@ -746,6 +746,285 @@ router.get("/audit-trail", async (req, res) => {
   } catch (error) {
     logger.error({ error }, "Error fetching audit trail");
     res.status(500).json({ error: "Failed to fetch audit trail" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLATFORM DASHBOARD — signup funnel, cohort analysis, session activity
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET /dashboard — platform-wide KPIs and signup funnel
+router.get("/dashboard", async (req, res) => {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const ninetyDaysAgo = new Date(now);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    // Overall platform stats
+    const [platformStats] = await db.select({
+      totalUsers: count(),
+      activeUsers: sql<number>`count(*) filter (where ${users.isActive} = true)`,
+      disabledUsers: sql<number>`count(*) filter (where ${users.isActive} = false)`,
+      verifiedUsers: sql<number>`count(*) filter (where ${users.emailVerified} = true)`,
+      unverifiedUsers: sql<number>`count(*) filter (where ${users.emailVerified} = false)`,
+      mfaEnabled: sql<number>`count(*) filter (where ${users.mfaEnabled} = true)`,
+      ownersCount: sql<number>`count(*) filter (where ${users.role} = 'owner')`,
+      editorsCount: sql<number>`count(*) filter (where ${users.role} = 'editor')`,
+      viewersCount: sql<number>`count(*) filter (where ${users.role} = 'viewer')`,
+      newLast30d: sql<number>`count(*) filter (where ${users.createdAt} >= ${thirtyDaysAgo})`,
+      newLast90d: sql<number>`count(*) filter (where ${users.createdAt} >= ${ninetyDaysAgo})`,
+      activeInLast30d: sql<number>`count(*) filter (where ${users.lastLoginAt} >= ${thirtyDaysAgo})`,
+      neverLoggedIn: sql<number>`count(*) filter (where ${users.lastLoginAt} is null)`,
+    }).from(users);
+
+    // Organization stats
+    const [orgStats] = await db.select({
+      totalOrgs: count(),
+      newOrgsLast30d: sql<number>`count(*) filter (where ${organizations.createdAt} >= ${thirtyDaysAgo})`,
+    }).from(organizations);
+
+    // Subscription stats
+    const [subStats] = await db.select({
+      totalSubs: count(),
+      activeSubs: sql<number>`count(*) filter (where ${subscriptions.status} = 'active')`,
+      trialingSubs: sql<number>`count(*) filter (where ${subscriptions.status} = 'trialing')`,
+      pastDueSubs: sql<number>`count(*) filter (where ${subscriptions.status} = 'past_due')`,
+      canceledSubs: sql<number>`count(*) filter (where ${subscriptions.status} = 'canceled')`,
+      totalMrr: sql<number>`coalesce(sum(case when ${subscriptions.status} = 'active' then ${subscriptions.mrrCents} else 0 end), 0)`,
+    }).from(subscriptions);
+
+    // Pack adoption
+    const packAdoption = await db.select({
+      packType: organizationPacks.packType,
+      activeCount: count(),
+    })
+      .from(organizationPacks)
+      .where(eq(organizationPacks.status, "active"))
+      .groupBy(organizationPacks.packType);
+
+    res.json({
+      users: platformStats,
+      organizations: orgStats,
+      subscriptions: {
+        ...subStats,
+        mrrDollars: ((subStats?.totalMrr || 0) / 100).toFixed(2),
+        arrDollars: (((subStats?.totalMrr || 0) * 12) / 100).toFixed(2),
+      },
+      packAdoption,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching platform dashboard");
+    res.status(500).json({ error: "Failed to fetch dashboard" });
+  }
+});
+
+// GET /signup-funnel — registration trends by day/week/month
+router.get("/signup-funnel", async (req, res) => {
+  try {
+    const { period = "daily", days = "90" } = req.query as Record<string, string>;
+    const lookback = Math.min(365, parseInt(days || "90", 10));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - lookback);
+
+    let truncExpr: any;
+    if (period === "weekly") {
+      truncExpr = sql`date_trunc('week', ${users.createdAt})`;
+    } else if (period === "monthly") {
+      truncExpr = sql`date_trunc('month', ${users.createdAt})`;
+    } else {
+      truncExpr = sql`date_trunc('day', ${users.createdAt})`;
+    }
+
+    const signups = await db.select({
+      period: truncExpr.as("period"),
+      signups: count(),
+      verified: sql<number>`count(*) filter (where ${users.emailVerified} = true)`,
+      activated: sql<number>`count(*) filter (where ${users.lastLoginAt} is not null)`,
+    })
+      .from(users)
+      .where(gte(users.createdAt, cutoff))
+      .groupBy(sql`period`)
+      .orderBy(sql`period`);
+
+    // Compute conversion rates
+    const funnelData = signups.map((row: any) => ({
+      period: row.period,
+      signups: row.signups,
+      verified: row.verified,
+      activated: row.activated,
+      verificationRate: row.signups > 0 ? Math.round((row.verified / row.signups) * 100) : 0,
+      activationRate: row.signups > 0 ? Math.round((row.activated / row.signups) * 100) : 0,
+    }));
+
+    // Totals
+    const totals = funnelData.reduce(
+      (acc: any, row: any) => ({
+        signups: acc.signups + row.signups,
+        verified: acc.verified + row.verified,
+        activated: acc.activated + row.activated,
+      }),
+      { signups: 0, verified: 0, activated: 0 },
+    );
+
+    res.json({
+      period,
+      lookbackDays: lookback,
+      data: funnelData,
+      totals: {
+        ...totals,
+        verificationRate: totals.signups > 0 ? Math.round((totals.verified / totals.signups) * 100) : 0,
+        activationRate: totals.signups > 0 ? Math.round((totals.activated / totals.signups) * 100) : 0,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching signup funnel");
+    res.status(500).json({ error: "Failed to fetch signup funnel" });
+  }
+});
+
+// GET /active-sessions — currently active sessions across all users
+router.get("/active-sessions", async (req, res) => {
+  try {
+    const { page = "1", pageSize = "50" } = req.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const size = Math.min(100, parseInt(pageSize, 10));
+    const offset = (pageNum - 1) * size;
+
+    const sessions = await db.execute(sql`
+      SELECT
+        s.id, s.user_id, s.status, s.device_type, s.browser, s.os,
+        s.ip_address, s.location, s.created_at, s.last_activity_at, s.expires_at,
+        u.name as user_name, u.email as user_email, o.name as org_name
+      FROM user_sessions s
+      LEFT JOIN users u ON u.id = s.user_id
+      LEFT JOIN organizations o ON o.id = s.org_id
+      WHERE s.status = 'active' AND s.expires_at > now()
+      ORDER BY s.last_activity_at DESC
+      LIMIT ${size} OFFSET ${offset}
+    `);
+
+    const [totalResult] = await db.select({
+      total: sql<number>`count(*) filter (where ${userSessions.status} = 'active')`,
+    }).from(userSessions);
+
+    res.json({
+      sessions: sessions.rows,
+      total: totalResult?.total || 0,
+      page: pageNum,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching active sessions");
+    res.status(500).json({ error: "Failed to fetch sessions" });
+  }
+});
+
+// GET /login-activity — recent login events
+router.get("/login-activity", async (req, res) => {
+  try {
+    const { days = "7", eventType } = req.query as Record<string, string>;
+    const lookback = Math.min(90, parseInt(days || "7", 10));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - lookback);
+
+    const conditions = [gte(securityAuditLog.createdAt, cutoff)];
+    if (eventType) {
+      conditions.push(eq(securityAuditLog.eventType, eventType));
+    } else {
+      conditions.push(
+        or(
+          eq(securityAuditLog.eventType, "login_success"),
+          eq(securityAuditLog.eventType, "login_failure"),
+        )!,
+      );
+    }
+
+    const events = await db.execute(sql`
+      SELECT
+        a.id, a.event_type, a.ip_address, a.user_agent, a.success, a.created_at,
+        u.name as user_name, u.email as user_email, o.name as org_name
+      FROM security_audit_log a
+      LEFT JOIN users u ON u.id = a.user_id
+      LEFT JOIN organizations o ON o.id = a.org_id
+      WHERE a.created_at >= ${cutoff}
+        AND a.event_type IN ('login_success', 'login_failure')
+      ORDER BY a.created_at DESC
+      LIMIT 200
+    `);
+
+    // Aggregate stats
+    const [loginStats] = await db.select({
+      successCount: sql<number>`count(*) filter (where ${securityAuditLog.eventType} = 'login_success' and ${securityAuditLog.createdAt} >= ${cutoff})`,
+      failureCount: sql<number>`count(*) filter (where ${securityAuditLog.eventType} = 'login_failure' and ${securityAuditLog.createdAt} >= ${cutoff})`,
+      uniqueUsers: sql<number>`count(distinct ${securityAuditLog.userId}) filter (where ${securityAuditLog.eventType} = 'login_success' and ${securityAuditLog.createdAt} >= ${cutoff})`,
+      uniqueIPs: sql<number>`count(distinct ${securityAuditLog.ipAddress}) filter (where ${securityAuditLog.createdAt} >= ${cutoff})`,
+    }).from(securityAuditLog);
+
+    res.json({
+      lookbackDays: lookback,
+      stats: loginStats,
+      events: events.rows,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching login activity");
+    res.status(500).json({ error: "Failed to fetch login activity" });
+  }
+});
+
+// GET /cohort-retention — monthly cohort retention analysis
+router.get("/cohort-retention", async (req, res) => {
+  try {
+    const { months = "6" } = req.query as Record<string, string>;
+    const numMonths = Math.min(12, parseInt(months || "6", 10));
+
+    // Get signup cohorts and their login activity
+    const cohorts = await db.execute(sql`
+      WITH cohorts AS (
+        SELECT
+          date_trunc('month', created_at) as cohort_month,
+          id as user_id
+        FROM users
+        WHERE created_at >= now() - interval '${sql.raw(String(numMonths))} months'
+      ),
+      activity AS (
+        SELECT
+          c.cohort_month,
+          date_trunc('month', s.created_at) as activity_month,
+          count(distinct c.user_id) as active_users
+        FROM cohorts c
+        LEFT JOIN security_audit_log s
+          ON s.user_id = c.user_id
+          AND s.event_type = 'login_success'
+        GROUP BY c.cohort_month, activity_month
+      ),
+      cohort_sizes AS (
+        SELECT cohort_month, count(*) as cohort_size
+        FROM cohorts
+        GROUP BY cohort_month
+      )
+      SELECT
+        cs.cohort_month,
+        cs.cohort_size,
+        a.activity_month,
+        a.active_users,
+        CASE WHEN cs.cohort_size > 0
+          THEN round((a.active_users::numeric / cs.cohort_size) * 100, 1)
+          ELSE 0
+        END as retention_pct
+      FROM cohort_sizes cs
+      LEFT JOIN activity a ON a.cohort_month = cs.cohort_month
+      WHERE a.activity_month IS NOT NULL
+      ORDER BY cs.cohort_month, a.activity_month
+    `);
+
+    res.json({
+      months: numMonths,
+      cohorts: cohorts.rows,
+    });
+  } catch (error) {
+    logger.error({ error }, "Error fetching cohort retention");
+    res.status(500).json({ error: "Failed to fetch cohort retention" });
   }
 });
 

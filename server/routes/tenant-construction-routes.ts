@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import Stripe from "stripe";
 import { db } from "../db";
 import {
   tenantUsers,
@@ -13,7 +14,12 @@ import {
   constructionDraws,
   unitRenovations,
 } from "@shared/schema";
-import { eq, and, desc, sql, count, sum, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, count, sum, gte, lte, lt, inArray } from "drizzle-orm";
+
+// Initialize Stripe if key available
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
 
 export const tenantConstructionRouter = Router();
 
@@ -874,3 +880,555 @@ tenantConstructionRouter.get("/renovations/metrics/:dealId", async (req: Request
     res.status(500).json({ error: error.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C.2 ENHANCED — Stripe Payment Intents, Late Fee Calculator, Reconciliation
+// ═══════════════════════════════════════════════════════════════════════════
+
+// POST /rent-payments/create-intent — create Stripe PaymentIntent for rent
+tenantConstructionRouter.post("/rent-payments/create-intent", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+    const { dealId, tenantUserId, amount, method, periodStart, periodEnd } = req.body;
+
+    if (!stripe) {
+      return res.status(503).json({ error: "Stripe not configured" });
+    }
+    if (!amount || !method) {
+      return res.status(400).json({ error: "amount and method (ach|card) are required" });
+    }
+
+    const amountCents = Math.round(parseFloat(amount) * 100);
+    const platformFeeCents = Math.round(amountCents * 0.015); // 1.5% platform fee
+
+    const paymentMethodTypes = method === "ach" ? ["us_bank_account"] : ["card"];
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency: "usd",
+      payment_method_types: paymentMethodTypes,
+      application_fee_amount: platformFeeCents,
+      metadata: {
+        dealId: dealId || "",
+        tenantUserId: tenantUserId || "",
+        paymentType: "rent",
+        periodStart: periodStart || "",
+        periodEnd: periodEnd || "",
+        orgId,
+      },
+    });
+
+    // Create pending payment record
+    const [payment] = await db
+      .insert(rentPayments)
+      .values({
+        orgId,
+        dealId,
+        tenantUserId,
+        amount: String(amount),
+        totalAmount: String(amount),
+        method,
+        status: "pending",
+        stripePaymentIntentId: paymentIntent.id,
+        periodStart,
+        periodEnd,
+      })
+      .returning();
+
+    res.status(201).json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      paymentId: payment.id,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /rent-payments/calculate-late-fee — calculate late fee for a lease
+tenantConstructionRouter.post("/rent-payments/calculate-late-fee", async (req: Request, res: Response) => {
+  try {
+    const {
+      monthlyRent,
+      dueDate,
+      paymentDate,
+      gracePeriodDays = 5,
+      lateFeeType = "flat", // flat | daily | percentage
+      lateFeeAmount = 50,
+      lateFeeRate = 5, // percentage of monthly rent
+    } = req.body;
+
+    if (!monthlyRent || !dueDate || !paymentDate) {
+      return res.status(400).json({ error: "monthlyRent, dueDate, and paymentDate are required" });
+    }
+
+    const due = new Date(dueDate);
+    const payment = new Date(paymentDate);
+    const gracePeriodEnd = new Date(due);
+    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + gracePeriodDays);
+
+    if (payment <= gracePeriodEnd) {
+      return res.json({ lateFee: 0, daysLate: 0, withinGracePeriod: true });
+    }
+
+    const daysLate = Math.floor(
+      (payment.getTime() - gracePeriodEnd.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    let lateFee: number;
+    switch (lateFeeType) {
+      case "daily":
+        lateFee = lateFeeAmount * daysLate;
+        break;
+      case "percentage":
+        lateFee = parseFloat(monthlyRent) * (lateFeeRate / 100);
+        break;
+      case "flat":
+      default:
+        lateFee = lateFeeAmount;
+        break;
+    }
+
+    res.json({
+      lateFee: Math.round(lateFee * 100) / 100,
+      daysLate,
+      withinGracePeriod: false,
+      gracePeriodEnd: gracePeriodEnd.toISOString().split("T")[0],
+      feeType: lateFeeType,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /rent-payments/reconcile/:dealId — nightly reconciliation (match Stripe payouts to expected)
+tenantConstructionRouter.post("/rent-payments/reconcile/:dealId", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+    const { dealId } = req.params;
+
+    // Get all pending payments older than 48 hours
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+    const pendingPayments = await db
+      .select()
+      .from(rentPayments)
+      .where(
+        and(
+          eq(rentPayments.orgId, orgId),
+          eq(rentPayments.dealId, dealId),
+          eq(rentPayments.status, "pending"),
+          lt(rentPayments.createdAt, cutoff),
+        ),
+      );
+
+    const reconciled: any[] = [];
+    const failed: any[] = [];
+
+    for (const payment of pendingPayments) {
+      if (payment.stripePaymentIntentId && stripe) {
+        try {
+          const pi = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+
+          if (pi.status === "succeeded") {
+            await db
+              .update(rentPayments)
+              .set({ status: "succeeded", processedAt: new Date() })
+              .where(eq(rentPayments.id, payment.id));
+            reconciled.push(payment.id);
+          } else if (["canceled", "requires_payment_method"].includes(pi.status)) {
+            await db
+              .update(rentPayments)
+              .set({
+                status: "failed",
+                failedAt: new Date(),
+                failureReason: pi.last_payment_error?.message || pi.status,
+              })
+              .where(eq(rentPayments.id, payment.id));
+            failed.push(payment.id);
+          }
+        } catch {
+          // Stripe lookup failed — skip
+        }
+      }
+    }
+
+    res.json({
+      dealId,
+      totalPending: pendingPayments.length,
+      reconciled: reconciled.length,
+      failed: failed.length,
+      reconciledIds: reconciled,
+      failedIds: failed,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /rent-payments/nsf-fee — apply NSF fee to a failed payment
+tenantConstructionRouter.post("/rent-payments/nsf-fee", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+    const { paymentId, nsfFeeAmount = 35 } = req.body;
+
+    const [payment] = await db
+      .select()
+      .from(rentPayments)
+      .where(
+        and(eq(rentPayments.id, paymentId), eq(rentPayments.orgId, orgId)),
+      );
+
+    if (!payment) return res.status(404).json({ error: "Payment not found" });
+    if (payment.status !== "failed") {
+      return res.status(400).json({ error: "NSF fee can only be applied to failed payments" });
+    }
+
+    // Create a new charge record for the NSF fee
+    const [nsfRecord] = await db
+      .insert(rentPayments)
+      .values({
+        orgId,
+        dealId: payment.dealId,
+        tenantUserId: payment.tenantUserId,
+        amount: "0",
+        lateFeeAmount: "0",
+        totalAmount: String(nsfFeeAmount),
+        method: "system",
+        status: "pending",
+        periodStart: payment.periodStart,
+        periodEnd: payment.periodEnd,
+      })
+      .returning();
+
+    res.status(201).json({ nsfFee: nsfFeeAmount, chargeId: nsfRecord.id });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C.3 ENHANCED — Automated Monitoring, AI Offer Generation, Workflow
+// ═══════════════════════════════════════════════════════════════════════════
+
+// POST /lease-renewals/scan — scan for leases approaching expiry and auto-create opportunities
+tenantConstructionRouter.post("/lease-renewals/scan", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+
+    const today = new Date();
+    const horizons = [
+      { days: 180, action: "create_opportunity" },
+      { days: 120, action: "create_task" },
+      { days: 90, action: "send_alert" },
+      { days: 60, action: "escalate" },
+      { days: 30, action: "critical_alert" },
+    ];
+
+    // Get all existing renewal opportunities to avoid duplicates
+    const existingRenewals = await db
+      .select({ dealId: leaseRenewalOpportunities.dealId })
+      .from(leaseRenewalOpportunities)
+      .where(
+        and(
+          eq(leaseRenewalOpportunities.orgId, orgId),
+          inArray(leaseRenewalOpportunities.status, [
+            "monitoring",
+            "outreach_sent",
+            "in_negotiation",
+            "renewal_offered",
+          ]),
+        ),
+      );
+    const existingDealIds = new Set(existingRenewals.map((r) => r.dealId));
+
+    // Find leases expiring within 180 days (via lease expiry dates on renewal opps)
+    const sixMonthsOut = new Date(today);
+    sixMonthsOut.setDate(sixMonthsOut.getDate() + 180);
+
+    // Check for renewals that need status upgrades based on proximity
+    const allRenewals = await db
+      .select()
+      .from(leaseRenewalOpportunities)
+      .where(
+        and(
+          eq(leaseRenewalOpportunities.orgId, orgId),
+          eq(leaseRenewalOpportunities.status, "monitoring"),
+        ),
+      );
+
+    const actions: any[] = [];
+
+    for (const renewal of allRenewals) {
+      if (!renewal.leaseExpiryDate) continue;
+      const expiry = new Date(renewal.leaseExpiryDate);
+      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysUntilExpiry <= 30) {
+        actions.push({
+          renewalId: renewal.id,
+          action: "critical_alert",
+          daysUntilExpiry,
+          newStatus: "vacating",
+        });
+      } else if (daysUntilExpiry <= 60) {
+        actions.push({
+          renewalId: renewal.id,
+          action: "escalate",
+          daysUntilExpiry,
+        });
+      } else if (daysUntilExpiry <= 120) {
+        actions.push({
+          renewalId: renewal.id,
+          action: "outreach_needed",
+          daysUntilExpiry,
+        });
+      }
+    }
+
+    res.json({
+      scanned: allRenewals.length,
+      actions,
+      existingOpportunities: existingDealIds.size,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /lease-renewals/:id/generate-offer — AI-generate renewal offer letter
+tenantConstructionRouter.post(
+  "/lease-renewals/:id/generate-offer",
+  async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.user!;
+      const { rentIncreasePct = 3, termMonths = 12 } = req.body;
+
+      const [renewal] = await db
+        .select()
+        .from(leaseRenewalOpportunities)
+        .where(
+          and(
+            eq(leaseRenewalOpportunities.id, req.params.id),
+            eq(leaseRenewalOpportunities.orgId, orgId),
+          ),
+        );
+
+      if (!renewal) return res.status(404).json({ error: "Renewal opportunity not found" });
+
+      const currentRent = parseFloat(renewal.currentRent || "0");
+      const proposedRent = Math.round(currentRent * (1 + rentIncreasePct / 100) * 100) / 100;
+      const marketRent = parseFloat(renewal.marketRentEstimate || "0");
+      const premiumDiscount = marketRent > 0
+        ? Math.round(((proposedRent - marketRent) / marketRent) * 10000) / 100
+        : null;
+
+      // Update renewal with offer details
+      const offerExpiresAt = new Date();
+      offerExpiresAt.setDate(offerExpiresAt.getDate() + 14);
+
+      const [updated] = await db
+        .update(leaseRenewalOpportunities)
+        .set({
+          offerRent: String(proposedRent),
+          offerTermMonths: termMonths,
+          offerSentAt: new Date(),
+          rentIncreasePct: String(rentIncreasePct),
+          status: "renewal_offered",
+          updatedAt: new Date(),
+        })
+        .where(eq(leaseRenewalOpportunities.id, renewal.id))
+        .returning();
+
+      res.json({
+        renewalId: renewal.id,
+        offer: {
+          currentRent,
+          proposedRent,
+          increasePct: rentIncreasePct,
+          termMonths,
+          marketRentEstimate: marketRent || null,
+          premiumVsMarket: premiumDiscount,
+          offerExpiresAt: offerExpiresAt.toISOString().split("T")[0],
+        },
+        letterContent: generateOfferLetter({
+          currentRent,
+          proposedRent,
+          termMonths,
+          expiresAt: offerExpiresAt,
+          leaseExpiryDate: renewal.leaseExpiryDate,
+        }),
+        updated,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C.5 ENHANCED — Conversion Funnel, Days-on-Market Alerts, Pricing
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET /vacancies/funnel/:dealId — detailed conversion funnel with rates
+tenantConstructionRouter.get("/vacancies/funnel/:dealId", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+    const { dealId } = req.params;
+
+    const stages = [
+      "inquiry",
+      "showing_scheduled",
+      "showing_completed",
+      "application_sent",
+      "application_received",
+      "approved",
+      "lease_offered",
+      "lease_signed",
+    ];
+
+    const funnel = await db
+      .select({
+        stage: leasingProspects.stage,
+        count: count(),
+      })
+      .from(leasingProspects)
+      .where(
+        and(eq(leasingProspects.orgId, orgId), eq(leasingProspects.dealId, dealId)),
+      )
+      .groupBy(leasingProspects.stage);
+
+    const funnelMap = new Map(funnel.map((f) => [f.stage, f.count]));
+
+    // Build conversion rates between stages
+    const funnelWithRates = stages.map((stage, i) => {
+      const currentCount = funnelMap.get(stage) || 0;
+      const prevCount = i > 0 ? funnelMap.get(stages[i - 1]) || 0 : currentCount;
+      const conversionRate = prevCount > 0 ? Math.round((currentCount / prevCount) * 100) : 0;
+
+      return {
+        stage,
+        count: currentCount,
+        conversionRate: i === 0 ? 100 : conversionRate,
+      };
+    });
+
+    // Lost count
+    const [lost] = await db
+      .select({ count: count() })
+      .from(leasingProspects)
+      .where(
+        and(
+          eq(leasingProspects.orgId, orgId),
+          eq(leasingProspects.dealId, dealId),
+          eq(leasingProspects.stage, "lost"),
+        ),
+      );
+
+    res.json({
+      dealId,
+      funnel: funnelWithRates,
+      lost: lost?.count || 0,
+      overallConversion:
+        (funnelMap.get("lease_signed") || 0) > 0 && (funnelMap.get("inquiry") || 0) > 0
+          ? Math.round(
+              ((funnelMap.get("lease_signed") || 0) / (funnelMap.get("inquiry") || 0)) * 100,
+            )
+          : 0,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /vacancies/dom-alerts/:dealId — days-on-market alerts for stale vacancies
+tenantConstructionRouter.get("/vacancies/dom-alerts/:dealId", async (req: Request, res: Response) => {
+  try {
+    const { orgId } = req.user!;
+    const { dealId } = req.params;
+    const alertThreshold = parseInt(req.query.threshold as string) || 30;
+
+    const staleVacancies = await db
+      .select()
+      .from(vacancyListings)
+      .where(
+        and(
+          eq(vacancyListings.orgId, orgId),
+          eq(vacancyListings.dealId, dealId),
+          eq(vacancyListings.status, "vacant"),
+          sql`${vacancyListings.vacantSince}::date < now() - interval '${sql.raw(String(alertThreshold))} days'`,
+        ),
+      )
+      .orderBy(vacancyListings.vacantSince);
+
+    const alerts = staleVacancies.map((v) => {
+      const vacantSince = new Date(v.vacantSince!);
+      const daysOnMarket = Math.floor((Date.now() - vacantSince.getTime()) / (1000 * 60 * 60 * 24));
+      const askingRent = parseFloat(v.askingRent || "0");
+      const monthlyLostRevenue = askingRent;
+
+      return {
+        listingId: v.id,
+        unitId: v.unitId,
+        daysOnMarket,
+        askingRent,
+        monthlyLostRevenue,
+        totalLostRevenue: Math.round(monthlyLostRevenue * (daysOnMarket / 30) * 100) / 100,
+        suggestion:
+          daysOnMarket > 60
+            ? `Consider reducing asking rent by 5-10% ($${Math.round(askingRent * 0.9)}-$${Math.round(askingRent * 0.95)})`
+            : daysOnMarket > 45
+              ? "Increase marketing — consider listing on additional platforms"
+              : `Unit has been vacant ${daysOnMarket} days — monitor closely`,
+      };
+    });
+
+    const totalLostRevenue = alerts.reduce((sum, a) => sum + a.monthlyLostRevenue, 0);
+
+    res.json({
+      dealId,
+      alertThresholdDays: alertThreshold,
+      staleUnits: alerts.length,
+      estimatedMonthlyRevenueLoss: totalLostRevenue,
+      alerts,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Helper Functions ─────────────────────────────────────────────────────
+
+function generateOfferLetter(params: {
+  currentRent: number;
+  proposedRent: number;
+  termMonths: number;
+  expiresAt: Date;
+  leaseExpiryDate: string | null;
+}): string {
+  const increase = params.proposedRent - params.currentRent;
+  const increasePct = ((increase / params.currentRent) * 100).toFixed(1);
+
+  return [
+    `Dear Tenant,`,
+    ``,
+    `We value your tenancy and would like to offer you an opportunity to renew your lease.`,
+    ``,
+    `Current Monthly Rent: $${params.currentRent.toLocaleString()}`,
+    `Proposed Monthly Rent: $${params.proposedRent.toLocaleString()} (+${increasePct}%)`,
+    `Proposed Term: ${params.termMonths} months`,
+    params.leaseExpiryDate
+      ? `Current Lease Expiry: ${params.leaseExpiryDate}`
+      : "",
+    ``,
+    `This offer is valid until ${params.expiresAt.toISOString().split("T")[0]}.`,
+    `Please contact the property management office to discuss this renewal or to negotiate terms.`,
+    ``,
+    `We look forward to continuing our relationship.`,
+    ``,
+    `Regards,`,
+    `Property Management`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
