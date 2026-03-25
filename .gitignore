@@ -37,3 +37,6 @@ tmp/
 .idea/
 *.swp
 *.swo
+
+# Claude Code config (contains API keys / session tokens)
+/.claude-user
