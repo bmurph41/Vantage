@@ -51,7 +51,8 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit)",
       "Bash(find /home/runner/workspace/client/src -name *Onboarding* -o -name *onboarding*)",
       "Bash(find /home/runner/workspace/db/migrations -name \"*.sql\" -exec basename {})",
-      "Bash(find /home/runner/workspace/modules/dockit -name *email* -o -name *mail*)"
+      "Bash(find /home/runner/workspace/modules/dockit -name *email* -o -name *mail*)",
+      "Bash(find /home/runner/workspace/server/routes -type f -name \"*.ts\" -exec wc -l {} +)"
     ]
   }
 }

@@ -34,6 +34,9 @@ import {
   type DiligenceRequest, type RequestDocument, type RequestComment, type RequestTemplate,
   type ExternalUser, type ExternalUserProjectAccess,
   type DocketDeal, type InsertDocketDeal, type UpdateDocketDeal,
+  workflowAutomations, workflowExecutionLog,
+  type WorkflowAutomation, type InsertWorkflowAutomation,
+  type WorkflowExecutionLog, type InsertWorkflowExecutionLog,
   type InsertOrganization, type InsertUser, type InsertProject, 
   type InsertProjectSettings, type InsertDDTask,
   type InsertProjectTemplate, type InsertAuditLog, type InsertTimelineNote, type InsertProjectShare, type InsertRisk,
@@ -8573,6 +8576,80 @@ export class DatabaseStorage implements IStorage {
 
   async createExitActivity(data: InsertExitActivity & { orgId: string }): Promise<ExitActivity> {
     const [created] = await db.insert(exitActivities)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  // ── Workflow Automations ─────────────────────────────────────────────
+
+  async getWorkflowAutomations(orgId: string): Promise<WorkflowAutomation[]> {
+    return await db.select()
+      .from(workflowAutomations)
+      .where(eq(workflowAutomations.orgId, orgId))
+      .orderBy(desc(workflowAutomations.createdAt));
+  }
+
+  async getWorkflowAutomation(id: string, orgId: string): Promise<WorkflowAutomation | undefined> {
+    const [automation] = await db.select()
+      .from(workflowAutomations)
+      .where(and(eq(workflowAutomations.id, id), eq(workflowAutomations.orgId, orgId)));
+    return automation;
+  }
+
+  async getActiveAutomationsByTrigger(orgId: string, triggerType: string): Promise<WorkflowAutomation[]> {
+    return await db.select()
+      .from(workflowAutomations)
+      .where(and(
+        eq(workflowAutomations.orgId, orgId),
+        eq(workflowAutomations.triggerType, triggerType),
+        eq(workflowAutomations.isActive, true),
+      ));
+  }
+
+  async createWorkflowAutomation(data: InsertWorkflowAutomation): Promise<WorkflowAutomation> {
+    const [created] = await db.insert(workflowAutomations)
+      .values(data as any)
+      .returning();
+    return created;
+  }
+
+  async updateWorkflowAutomation(id: string, orgId: string, data: Partial<InsertWorkflowAutomation>): Promise<WorkflowAutomation> {
+    const [updated] = await db.update(workflowAutomations)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(and(eq(workflowAutomations.id, id), eq(workflowAutomations.orgId, orgId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteWorkflowAutomation(id: string, orgId: string): Promise<boolean> {
+    const result = await db.delete(workflowAutomations)
+      .where(and(eq(workflowAutomations.id, id), eq(workflowAutomations.orgId, orgId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async incrementWorkflowExecutionCount(id: string): Promise<void> {
+    await db.update(workflowAutomations)
+      .set({
+        executionCount: sql`${workflowAutomations.executionCount} + 1`,
+        lastExecutedAt: new Date(),
+      } as any)
+      .where(eq(workflowAutomations.id, id));
+  }
+
+  // ── Workflow Execution Logs ──────────────────────────────────────────
+
+  async getWorkflowExecutionLogs(automationId: string, limit = 50): Promise<WorkflowExecutionLog[]> {
+    return await db.select()
+      .from(workflowExecutionLog)
+      .where(eq(workflowExecutionLog.automationId, automationId))
+      .orderBy(desc(workflowExecutionLog.executedAt))
+      .limit(limit);
+  }
+
+  async createWorkflowExecutionLog(data: InsertWorkflowExecutionLog): Promise<WorkflowExecutionLog> {
+    const [created] = await db.insert(workflowExecutionLog)
       .values(data as any)
       .returning();
     return created;

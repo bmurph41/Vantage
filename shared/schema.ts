@@ -26642,3 +26642,53 @@ export const dealPropertyAddress = pgTable("deal_property_address", {
 }));
 export type DealPropertyAddress = typeof dealPropertyAddress.$inferSelect;
 export type NewDealPropertyAddress = typeof dealPropertyAddress.$inferInsert;
+
+// ── Workflow Automation Engine (Section 10.1) ──────────────────────────
+
+export const workflowAutomations = pgTable("workflow_automations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  triggerType: varchar("trigger_type", { length: 100 }).notNull(),
+  triggerConfig: jsonb("trigger_config").default({}),
+  conditions: jsonb("conditions"),   // { logic: 'AND'|'OR', rules: ConditionRule[] }
+  actions: jsonb("actions").notNull(), // ordered array of action objects
+  executionCount: integer("execution_count").notNull().default(0),
+  lastExecutedAt: timestamp("last_executed_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  orgIdx: index("idx_wa_org_id").on(table.orgId),
+  triggerIdx: index("idx_wa_trigger_type").on(table.triggerType),
+}));
+
+export const insertWorkflowAutomationSchema = createInsertSchema(workflowAutomations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  executionCount: true,
+  lastExecutedAt: true,
+});
+
+export type WorkflowAutomation = typeof workflowAutomations.$inferSelect;
+export type InsertWorkflowAutomation = typeof workflowAutomations.$inferInsert;
+
+export const workflowExecutionLog = pgTable("workflow_execution_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  automationId: varchar("automation_id").notNull().references(() => workflowAutomations.id, { onDelete: "cascade" }),
+  triggerEntityType: varchar("trigger_entity_type", { length: 50 }).notNull(),
+  triggerEntityId: varchar("trigger_entity_id").notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // success | failed | skipped
+  actionsExecuted: jsonb("actions_executed"),
+  errorMessage: text("error_message"),
+  executedAt: timestamp("executed_at", { withTimezone: true }).defaultNow(),
+}, (table) => ({
+  automationIdx: index("idx_wel_automation_id").on(table.automationId),
+  entityIdx: index("idx_wel_entity").on(table.triggerEntityType, table.triggerEntityId),
+}));
+
+export type WorkflowExecutionLog = typeof workflowExecutionLog.$inferSelect;
+export type InsertWorkflowExecutionLog = typeof workflowExecutionLog.$inferInsert;
