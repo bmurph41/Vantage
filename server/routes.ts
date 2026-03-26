@@ -50,6 +50,10 @@ import { multiCurrencyRouter } from "./routes/multi-currency-routes";
 import { masterCompsRouter } from "./routes/master-comps-routes";
 import { ddFindingsRouter } from "./routes/dd-findings-routes";
 import { modelingEnhancementsRouter } from "./routes/modeling-enhancements-routes";
+import { onboardingRouter } from "./routes/onboarding-routes";
+import { orgSettingsRouter } from "./routes/org-settings-routes";
+import { integrationsMarketplaceRouter } from "./routes/integrations-marketplace-routes";
+import { startPlatformCronJobs } from "./jobs/platform-cron";
 import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
 import { dealWorkspaceRouter } from "./routes/deal-workspace-routes";
@@ -524,6 +528,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/dd-enhanced", authenticateUser, enforceTenant, ddFindingsRouter);
   // Financial Model Enhancements (rent roll sync, stress tests, approvals, loan cache, cap stack, scoring)
   app.use("/api/modeling-enhanced", authenticateUser, enforceTenant, modelingEnhancementsRouter);
+  // Onboarding Wizard + Notification Center
+  app.use("/api/onboarding", authenticateUser, enforceTenant, onboardingRouter);
+  // Organization Settings (user-facing)
+  app.use("/api/org-settings", authenticateUser, enforceTenant, orgSettingsRouter);
+  // Integrations Marketplace
+  app.use("/api/integrations-marketplace", authenticateUser, enforceTenant, integrationsMarketplaceRouter);
+
+  // Start background jobs (non-blocking)
+  try { startPlatformCronJobs(); } catch (e) { console.error("Failed to start cron jobs:", e); }
 
   // ── Master Spec Feature Modules ──────────────────────────────────────
   // Section 1: AI-Native Deal Intelligence (1.1-1.5)
@@ -39204,13 +39217,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // Payment routes (Stripe coming soon - currently disabled)
+  // Payment routes (Stripe)
   app.get("/api/stripe/status", async (_req, res) => {
-    res.json({ configured: false, message: "Payment processing coming soon - free trials available during beta" });
+    const configured = !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY);
+    res.json({ configured, message: configured ? "Stripe is configured" : "Stripe keys not set — free trials available during beta" });
   });
 
   app.get("/api/stripe/publishable-key", async (_req, res) => {
-    res.json({ publishableKey: null, configured: false });
+    const key = process.env.STRIPE_PUBLISHABLE_KEY || null;
+    res.json({ publishableKey: key, configured: !!key });
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -39484,12 +39499,176 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
 
+  // POST /api/stripe/checkout — create Stripe Checkout Session for pack purchase
   app.post("/api/stripe/checkout", authenticateUser, async (req: any, res) => {
-    res.status(503).json({ error: "Payment processing coming soon. Free trials are available during beta - activate packs from the settings page." });
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+      if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+
+      const orgId = req.user?.orgId || req.tenantId;
+      const userId = req.user?.id;
+      const email = req.user?.email;
+      const { packType, billingCycle = "monthly", successUrl, cancelUrl } = req.body;
+
+      if (!packType) return res.status(400).json({ error: "packType is required" });
+
+      // Look up pack in catalog
+      const [pack] = await db.select().from(packCatalog).where(eq(packCatalog.packType, packType));
+      if (!pack) return res.status(404).json({ error: `Pack '${packType}' not found in catalog` });
+
+      const priceId = billingCycle === "yearly" ? pack.stripePriceIdYearly : pack.stripePriceIdMonthly;
+
+      // Get or create Stripe customer
+      let customerId: string | undefined;
+      const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, orgId)).limit(1);
+      if (existingSub?.providerCustomerId) {
+        customerId = existingSub.providerCustomerId;
+      } else {
+        const customer = await stripe.customers.create({
+          email,
+          metadata: { orgId, userId },
+        });
+        customerId = customer.id;
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "subscription",
+        line_items: priceId
+          ? [{ price: priceId, quantity: 1 }]
+          : [{
+              price_data: {
+                currency: "usd",
+                product_data: { name: pack.name || packType, description: pack.description || undefined },
+                unit_amount: billingCycle === "yearly" ? (pack.yearlyPriceCents || 0) : (pack.monthlyPriceCents || 0),
+                recurring: { interval: billingCycle === "yearly" ? "year" : "month" },
+              },
+              quantity: 1,
+            }],
+        success_url: successUrl || `${baseUrl}/settings/billing?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: cancelUrl || `${baseUrl}/settings/billing?canceled=true`,
+        metadata: { orgId, userId, packType, billingCycle },
+        subscription_data: {
+          metadata: { orgId, packType },
+        },
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error: any) {
+      console.error("Stripe checkout error:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
+  // POST /api/stripe/portal — open Stripe Customer Portal for subscription management
   app.post("/api/stripe/portal", authenticateUser, async (req: any, res) => {
-    res.status(503).json({ error: "Subscription management coming soon. Contact support for billing questions." });
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+      if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+
+      const orgId = req.user?.orgId || req.tenantId;
+      const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, orgId)).limit(1);
+
+      if (!existingSub?.providerCustomerId) {
+        return res.status(400).json({ error: "No Stripe customer found. Subscribe to a plan first." });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const session = await stripe.billingPortal.sessions.create({
+        customer: existingSub.providerCustomerId,
+        return_url: req.body.returnUrl || `${baseUrl}/settings/billing`,
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Stripe portal error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/stripe/webhook — handle Stripe webhooks for subscription lifecycle
+  app.post("/api/stripe/webhook", async (req: any, res) => {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+      if (!stripe) return res.status(200).json({ received: true });
+
+      const sig = req.headers["stripe-signature"] as string;
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!webhookSecret || !sig) return res.status(200).json({ received: true });
+
+      let event: any;
+      try {
+        const rawBody = req.rawBody || req.body;
+        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+      } catch {
+        return res.status(400).json({ error: "Invalid signature" });
+      }
+
+      const data = event.data.object;
+      const orgId = data.metadata?.orgId || data.subscription_details?.metadata?.orgId;
+
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const packType = data.metadata?.packType;
+          if (orgId && packType) {
+            // Activate the pack
+            await db.insert(organizationPacks).values({
+              orgId,
+              packType,
+              status: "active",
+              purchasedAt: new Date(),
+              stripeSubscriptionId: data.subscription,
+              stripeCustomerId: data.customer,
+              billingCycle: data.metadata?.billingCycle || "monthly",
+              purchasedBy: data.metadata?.userId,
+            }).onConflictDoUpdate({
+              target: [organizationPacks.orgId, organizationPacks.packType],
+              set: {
+                status: "active",
+                stripeSubscriptionId: data.subscription,
+                stripeCustomerId: data.customer,
+                purchasedAt: new Date(),
+              },
+            });
+          }
+          break;
+        }
+        case "customer.subscription.updated": {
+          if (orgId) {
+            const status = data.cancel_at_period_end ? "cancelled" : data.status === "active" ? "active" : data.status;
+            await db.update(organizationPacks)
+              .set({ status, currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end * 1000) : undefined })
+              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.id)));
+          }
+          break;
+        }
+        case "customer.subscription.deleted": {
+          if (data.id) {
+            await db.update(organizationPacks)
+              .set({ status: "cancelled" })
+              .where(eq(organizationPacks.stripeSubscriptionId, data.id));
+          }
+          break;
+        }
+        case "invoice.payment_failed": {
+          if (orgId) {
+            await db.update(organizationPacks)
+              .set({ status: "past_due" })
+              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.subscription)));
+          }
+          break;
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error("Stripe webhook error:", error);
+      res.status(200).json({ received: true, error: error.message });
+    }
   });
 
   const httpServer = createServer(app);

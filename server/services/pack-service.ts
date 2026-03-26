@@ -12,7 +12,9 @@ export type AddonPackType = "fund_management" | "lp_portal" | "prospecting" | "a
 // Role-based packs for Rent Roll access
 export type RolePackType = "owner" | "investor" | "broker";
 
-export type PackType = CorePackType | AddonPackType | RolePackType;
+export type MasterPackType = "master_comps";
+
+export type PackType = CorePackType | AddonPackType | RolePackType | MasterPackType;
 
 // Pack dependencies - which packs are required before activation
 const PACK_DEPENDENCIES: Record<PackType, PackType[]> = {
@@ -30,6 +32,8 @@ const PACK_DEPENDENCIES: Record<PackType, PackType[]> = {
   owner: [],
   investor: [],
   broker: [],
+  // Master data packs
+  master_comps: ["analysis"],
 };
 
 // Static pack information (fallback if catalog not in DB)
@@ -180,6 +184,20 @@ const PACK_INFO: Record<PackType, { name: string; description: string; features:
       "Client presentation views",
       "Market comparisons",
       "Export and reporting",
+    ],
+    isCore: false,
+    monthlyPriceCents: 9900, // $99/month
+  },
+  master_comps: {
+    name: "Master Comps Database",
+    description: "Access curated, verified comparable sales and rate data from across the industry with dedup and contribution tools.",
+    features: [
+      "Curated master sales comps database",
+      "Verified rate comp library",
+      "Org-level overrides and annotations",
+      "Contribution pipeline to submit comps",
+      "Dedup engine for duplicate detection",
+      "Batch import and quality scoring",
     ],
     isCore: false,
     monthlyPriceCents: 9900, // $99/month
@@ -409,7 +427,7 @@ class PackService {
     const allPacks: PackType[] = [
       // Core packs first
       "crm_pipeline",
-      "modeling_tools", 
+      "modeling_tools",
       "analysis",
       "operations",
       // Then add-on packs
@@ -417,6 +435,12 @@ class PackService {
       "lp_portal",
       "prospecting",
       "analytics_pro",
+      // Master data packs
+      "master_comps",
+      // Role-based packs
+      "owner",
+      "investor",
+      "broker",
     ];
 
     return Promise.all(

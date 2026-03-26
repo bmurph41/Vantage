@@ -17,14 +17,17 @@ import {
   Loader2, Anchor, Eye, EyeOff, Check, Building, Calculator, ChartLine, Briefcase,
   Users, Target, BarChart3, Waves, Info, Shield, Crown, TrendingUp, Search, ClipboardCheck,
   LineChart, Home, Warehouse, Hotel, Truck, Building2, Store, ShoppingBag, Factory,
-  ChevronRight, Sparkles, Lock, Globe, Zap, ArrowRight, ArrowLeft,
+  ChevronRight, Sparkles, Lock, Globe, Zap, ArrowRight, ArrowLeft, ChevronDown, ChevronUp,
+  Fuel, Car, ShowerHead, Utensils, GraduationCap, Landmark, HeartPulse, ParkingCircle,
+  TreePine, Tent, Bed, Coffee, Scissors, Shirt, Dog, Dumbbell, Database,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // --- Existing types (unchanged) ---
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
-type AddonPackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
-type PackType = CorePackType | AddonPackType;
+type AddonPackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro' | 'master_comps';
+type RolePackType = 'owner' | 'investor' | 'broker';
+type PackType = CorePackType | AddonPackType | RolePackType;
 
 interface PackInfo {
   name: string;
@@ -51,6 +54,19 @@ const PACK_ICONS: Record<PackType, typeof Briefcase> = {
   lp_portal: Users,
   prospecting: Target,
   analytics_pro: BarChart3,
+  master_comps: Database,
+  owner: Crown,
+  investor: TrendingUp,
+  broker: Search,
+};
+
+// Role-based pack recommendations based on selected role
+const ROLE_RECOMMENDED_PACKS: Record<string, PackType[]> = {
+  owner_operator: ['crm_pipeline', 'operations', 'modeling_tools', 'owner'],
+  investor: ['modeling_tools', 'analysis', 'fund_management', 'investor'],
+  broker: ['crm_pipeline', 'analysis', 'prospecting', 'broker'],
+  appraiser: ['analysis', 'modeling_tools', 'master_comps'],
+  analyst: ['modeling_tools', 'analysis', 'analytics_pro', 'fund_management'],
 };
 
 const signupSchema = z.object({
@@ -89,26 +105,105 @@ const ROLES: RoleOption[] = [
   { id: 'analyst', label: 'Analyst', description: 'I build models, run scenarios, and produce investment memos', icon: LineChart },
 ];
 
-// --- New: Asset class definitions ---
+// --- New: Asset class definitions with categories ---
 interface AssetClassOption {
   id: string;
   label: string;
   icon: typeof Building;
 }
 
-const ASSET_CLASSES: AssetClassOption[] = [
-  { id: 'marina', label: 'Marina', icon: Anchor },
-  { id: 'multifamily', label: 'Multifamily', icon: Building },
-  { id: 'self_storage', label: 'Self Storage', icon: Warehouse },
-  { id: 'hotel_hospitality', label: 'Hotel/Hospitality', icon: Hotel },
-  { id: 'rv_park', label: 'RV Park', icon: Truck },
-  { id: 'mobile_home', label: 'Mobile Home', icon: Home },
-  { id: 'mixed_use', label: 'Mixed Use', icon: Building2 },
-  { id: 'industrial', label: 'Industrial', icon: Factory },
-  { id: 'office', label: 'Office', icon: Briefcase },
-  { id: 'retail', label: 'Retail', icon: Store },
-  { id: 'sfr', label: 'SFR', icon: ShoppingBag },
+interface AssetCategory {
+  id: string;
+  label: string;
+  icon: typeof Building;
+  description: string;
+  assets: AssetClassOption[];
+}
+
+const ASSET_CATEGORIES: AssetCategory[] = [
+  {
+    id: 'marine_outdoor',
+    label: 'Marine & Outdoor Recreation',
+    icon: Anchor,
+    description: 'Marinas, RV parks, campgrounds, and outdoor facilities',
+    assets: [
+      { id: 'marina', label: 'Marina', icon: Anchor },
+      { id: 'rv_park', label: 'RV Park', icon: Truck },
+      { id: 'campground', label: 'Campground', icon: Tent },
+      { id: 'boat_storage', label: 'Boat/RV Storage', icon: Warehouse },
+      { id: 'mobile_home', label: 'Mobile Home Park', icon: Home },
+    ],
+  },
+  {
+    id: 'hospitality',
+    label: 'Hospitality & Short-Term Rentals',
+    icon: Hotel,
+    description: 'Hotels, STRs, resorts, and vacation properties',
+    assets: [
+      { id: 'hotel', label: 'Hotel / Motel', icon: Hotel },
+      { id: 'str', label: 'Short-Term Rental (STR)', icon: Bed },
+      { id: 'resort', label: 'Resort / Spa', icon: TreePine },
+      { id: 'bnb', label: 'B&B / Inn', icon: Coffee },
+    ],
+  },
+  {
+    id: 'residential',
+    label: 'Residential',
+    icon: Building,
+    description: 'Multifamily, single-family, and student housing',
+    assets: [
+      { id: 'multifamily', label: 'Multifamily', icon: Building },
+      { id: 'sfr', label: 'Single Family Rental', icon: Home },
+      { id: 'student_housing', label: 'Student Housing', icon: GraduationCap },
+      { id: 'senior_living', label: 'Senior Living', icon: HeartPulse },
+      { id: 'affordable_housing', label: 'Affordable Housing', icon: Building2 },
+    ],
+  },
+  {
+    id: 'commercial',
+    label: 'Commercial',
+    icon: Briefcase,
+    description: 'Office, retail, industrial, and mixed-use',
+    assets: [
+      { id: 'office', label: 'Office', icon: Briefcase },
+      { id: 'retail', label: 'Retail / Shopping Center', icon: Store },
+      { id: 'industrial', label: 'Industrial / Warehouse', icon: Factory },
+      { id: 'mixed_use', label: 'Mixed Use', icon: Building2 },
+      { id: 'medical_office', label: 'Medical Office', icon: HeartPulse },
+      { id: 'self_storage', label: 'Self Storage', icon: Warehouse },
+    ],
+  },
+  {
+    id: 'specialty_business',
+    label: 'Specialty & Business Acquisitions',
+    icon: Store,
+    description: 'Car washes, laundromats, restaurants, and other businesses',
+    assets: [
+      { id: 'car_wash', label: 'Car Wash', icon: Car },
+      { id: 'laundromat', label: 'Laundromat', icon: Shirt },
+      { id: 'gas_station', label: 'Gas Station / C-Store', icon: Fuel },
+      { id: 'restaurant', label: 'Restaurant / Bar', icon: Utensils },
+      { id: 'salon_spa', label: 'Salon / Spa', icon: Scissors },
+      { id: 'fitness', label: 'Gym / Fitness', icon: Dumbbell },
+      { id: 'pet_care', label: 'Pet Care / Kennel', icon: Dog },
+      { id: 'parking', label: 'Parking Garage / Lot', icon: ParkingCircle },
+    ],
+  },
+  {
+    id: 'institutional',
+    label: 'Institutional & Land',
+    icon: Landmark,
+    description: 'Net lease, government, and land deals',
+    assets: [
+      { id: 'net_lease', label: 'Net Lease (NNN)', icon: Landmark },
+      { id: 'land', label: 'Development Land', icon: TreePine },
+      { id: 'data_center', label: 'Data Center', icon: Database },
+    ],
+  },
 ];
+
+// Flattened list for backward compat
+const ALL_ASSET_CLASSES: AssetClassOption[] = ASSET_CATEGORIES.flatMap(c => c.assets);
 
 // --- Step type ---
 type StepId = 'account' | 'role' | 'assets' | 'packs';
@@ -224,10 +319,10 @@ function RightPanelContent({ step }: { step: StepId }) {
       </div>
       <h2 className="text-2xl font-bold text-slate-800 mb-3">Build your toolkit</h2>
       <p className="text-slate-500 mb-8 leading-relaxed">
-        Mix and match packs to create the perfect workspace. Start lean and add more as you grow -- you can change packs anytime.
+        Mix and match packs to create the perfect workspace. Every pack includes a 7-day free trial -- your card won't be charged until the trial ends.
       </p>
       <div className="space-y-3">
-        {['No lock-in, cancel anytime', 'Add or remove packs instantly', '14-day free trial on all packs', 'Volume discounts available'].map((item, i) => (
+        {['7-day free trial, cancel anytime', 'Add or remove packs instantly', 'Role-based recommendations', 'Volume discounts available'].map((item, i) => (
           <div key={i} className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-cyan-50 flex items-center justify-center">
               <Check className="h-3.5 w-3.5 text-cyan-600" />
@@ -284,6 +379,7 @@ export default function SignupPage() {
   const [accountData, setAccountData] = useState<SignupFormValues | null>(null);
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['marine_outdoor']);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -383,6 +479,14 @@ export default function SignupPage() {
         : [...prev, assetId]
     );
   };
+
+  const toggleCategory = (catId: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(catId) ? prev.filter(c => c !== catId) : [...prev, catId]
+    );
+  };
+
+  const recommendedPacks = selectedRole ? ROLE_RECOMMENDED_PACKS[selectedRole] || [] : [];
 
   const corePacks = availablePacks.filter(p => p.info.isCore);
   const addonPacks = availablePacks.filter(p => !p.info.isCore);
@@ -714,41 +818,82 @@ export default function SignupPage() {
       );
     }
 
-    // --- STEP 3: Asset class selection ---
+    // --- STEP 3: Asset class selection (categorized) ---
     if (step === 'assets') {
       return (
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800 mb-1" data-testid="text-assets-title">Which asset classes interest you?</h2>
-            <p className="text-slate-500">Select all that apply -- you can update these later</p>
+            <p className="text-slate-500">Browse categories and select all that apply</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {ASSET_CLASSES.map((asset) => {
-              const isSelected = selectedAssets.includes(asset.id);
-              const Icon = asset.icon;
+          <div className="space-y-3">
+            {ASSET_CATEGORIES.map((category) => {
+              const CatIcon = category.icon;
+              const isExpanded = expandedCategories.includes(category.id);
+              const selectedInCategory = category.assets.filter(a => selectedAssets.includes(a.id)).length;
+
               return (
-                <div
-                  key={asset.id}
-                  onClick={() => toggleAsset(asset.id)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                    isSelected
-                      ? 'border-cyan-500 bg-cyan-50/50 shadow-sm shadow-cyan-500/10'
-                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-                  }`}
-                  data-testid={`asset-${asset.id}`}
-                >
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                    isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    <Icon className="h-5 w-5" />
+                <div key={category.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div
+                    onClick={() => toggleCategory(category.id)}
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <CatIcon className="h-5 w-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700 text-sm">{category.label}</p>
+                        <p className="text-xs text-slate-400">{category.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedInCategory > 0 && (
+                        <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100 text-xs">
+                          {selectedInCategory}
+                        </Badge>
+                      )}
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
                   </div>
-                  <span className={`text-sm font-medium ${isSelected ? 'text-cyan-700' : 'text-slate-600'}`}>
-                    {asset.label}
-                  </span>
-                  {isSelected && (
-                    <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center absolute -top-1 -right-1">
-                      <Check className="h-3 w-3 text-white" />
+
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-1 border-t border-slate-100">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {category.assets.map((asset) => {
+                          const isSelected = selectedAssets.includes(asset.id);
+                          const Icon = asset.icon;
+                          return (
+                            <div
+                              key={asset.id}
+                              onClick={() => toggleAsset(asset.id)}
+                              className={`relative flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-cyan-500 bg-cyan-50/60 shadow-sm'
+                                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                              }`}
+                              data-testid={`asset-${asset.id}`}
+                            >
+                              <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                                isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'
+                              }`}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <span className={`text-xs font-medium leading-tight ${isSelected ? 'text-cyan-700' : 'text-slate-600'}`}>
+                                {asset.label}
+                              </span>
+                              {isSelected && (
+                                <Check className="h-3 w-3 text-cyan-500 absolute top-1.5 right-1.5" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -796,17 +941,58 @@ export default function SignupPage() {
       );
     }
 
-    // --- STEP 4: Pack selection ---
+    // --- STEP 4: Pack selection (all packs with recommendations) ---
     return (
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 mb-1" data-testid="text-packs-title">Choose Your Tools</h2>
           <p className="text-slate-500" data-testid="text-packs-description">
-            Select the packs you need to build your marina management platform
+            Start with a 7-day free trial on all packs. Your card won't be charged until the trial ends.
           </p>
         </div>
 
+        {recommendedPacks.length > 0 && (
+          <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-cyan-600" />
+              <span className="text-sm font-semibold text-cyan-700">Recommended for {ROLES.find(r => r.id === selectedRole)?.label || 'you'}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recommendedPacks.map(pt => {
+                const packData = availablePacks.find(p => p.packType === pt);
+                return packData ? (
+                  <Badge
+                    key={pt}
+                    variant={selectedPacks.includes(pt) ? "default" : "outline"}
+                    className={`cursor-pointer transition-all ${
+                      selectedPacks.includes(pt) ? 'bg-cyan-600' : 'hover:bg-cyan-50 border-cyan-300 text-cyan-700'
+                    }`}
+                    onClick={() => togglePack(pt)}
+                  >
+                    {selectedPacks.includes(pt) && <Check className="h-3 w-3 mr-1" />}
+                    {packData.info.name}
+                  </Badge>
+                ) : null;
+              })}
+              {!recommendedPacks.every(pt => selectedPacks.includes(pt)) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs text-cyan-600 hover:text-cyan-700"
+                  onClick={() => {
+                    const toAdd = recommendedPacks.filter(pt => !selectedPacks.includes(pt));
+                    setSelectedPacks(prev => [...prev, ...toAdd]);
+                  }}
+                >
+                  Select all recommended
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-8">
+          {/* Core Packs */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               Core Packs
@@ -814,47 +1000,45 @@ export default function SignupPage() {
             </h3>
             <div className="grid gap-3 md:grid-cols-2">
               {corePacks.map((pack) => {
-                const Icon = PACK_ICONS[pack.packType];
+                const Icon = PACK_ICONS[pack.packType] || Briefcase;
                 const isSelected = selectedPacks.includes(pack.packType);
+                const isRecommended = recommendedPacks.includes(pack.packType);
                 const price = pack.info.monthlyPriceCents ? formatPrice(pack.info.monthlyPriceCents) : null;
 
                 return (
                   <Card
                     key={pack.packType}
-                    className={`cursor-pointer transition-all ${isSelected ? 'border-primary ring-2 ring-primary/20' : 'hover:border-primary/50'}`}
+                    className={`cursor-pointer transition-all relative ${
+                      isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/20' : 'hover:border-cyan-300'
+                    }`}
                     onClick={() => togglePack(pack.packType)}
                     data-testid={`card-pack-${pack.packType}`}
                   >
+                    {isRecommended && !isSelected && (
+                      <div className="absolute -top-2 left-4">
+                        <Badge className="bg-cyan-600 text-white text-[10px] px-2 py-0">Recommended</Badge>
+                      </div>
+                    )}
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                          <div className={`p-2 rounded-lg ${isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-100'}`}>
                             <Icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <CardTitle className="text-lg" data-testid={`text-pack-name-${pack.packType}`}>
-                              {pack.info.name}
-                            </CardTitle>
-                            {price && (
-                              <span className="text-sm text-muted-foreground">{price}/mo</span>
-                            )}
+                            <CardTitle className="text-base">{pack.info.name}</CardTitle>
+                            {price && <span className="text-sm text-muted-foreground">{price}/mo</span>}
                           </div>
                         </div>
-                        <Checkbox
-                          checked={isSelected}
-                          className="mt-1"
-                          data-testid={`checkbox-pack-${pack.packType}`}
-                        />
+                        <Checkbox checked={isSelected} className="mt-1" />
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-3" data-testid={`text-pack-description-${pack.packType}`}>
-                        {pack.info.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground mb-2">{pack.info.description}</p>
                       <ul className="space-y-1">
                         {pack.info.features.slice(0, 3).map((feature, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Check className="h-3 w-3 text-primary" />
+                          <li key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Check className="h-3 w-3 text-cyan-500 shrink-0" />
                             {feature}
                           </li>
                         ))}
@@ -866,61 +1050,57 @@ export default function SignupPage() {
             </div>
           </div>
 
+          {/* Add-On & Specialty Packs */}
           {addonPacks.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                Add-On Packs
-                <Badge variant="outline">Optional</Badge>
+                Add-On & Specialty Packs
+                <Badge variant="outline">Extend your platform</Badge>
               </h3>
               <div className="grid gap-3 md:grid-cols-2">
                 {addonPacks.map((pack) => {
-                  const Icon = PACK_ICONS[pack.packType];
+                  const Icon = PACK_ICONS[pack.packType] || Briefcase;
                   const isSelected = selectedPacks.includes(pack.packType);
+                  const isRecommended = recommendedPacks.includes(pack.packType);
                   const price = pack.info.monthlyPriceCents ? formatPrice(pack.info.monthlyPriceCents) : null;
                   const hasDependencies = pack.dependencies.every(dep => selectedPacks.includes(dep));
 
                   return (
                     <Card
                       key={pack.packType}
-                      className={`cursor-pointer transition-all ${
+                      className={`cursor-pointer transition-all relative ${
                         isSelected
-                          ? 'border-primary ring-2 ring-primary/20'
+                          ? 'border-cyan-500 ring-2 ring-cyan-500/20'
                           : hasDependencies
-                            ? 'hover:border-primary/50'
+                            ? 'hover:border-cyan-300'
                             : 'opacity-50'
                       }`}
                       onClick={() => hasDependencies && togglePack(pack.packType)}
                       data-testid={`card-pack-${pack.packType}`}
                     >
+                      {isRecommended && !isSelected && hasDependencies && (
+                        <div className="absolute -top-2 left-4">
+                          <Badge className="bg-cyan-600 text-white text-[10px] px-2 py-0">Recommended</Badge>
+                        </div>
+                      )}
                       <CardHeader className="pb-2">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                            <div className={`p-2 rounded-lg ${isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-100'}`}>
                               <Icon className="h-5 w-5" />
                             </div>
                             <div>
-                              <CardTitle className="text-lg" data-testid={`text-pack-name-${pack.packType}`}>
-                                {pack.info.name}
-                              </CardTitle>
-                              {price && (
-                                <span className="text-sm text-muted-foreground">{price}/mo</span>
-                              )}
+                              <CardTitle className="text-base">{pack.info.name}</CardTitle>
+                              {price && <span className="text-sm text-muted-foreground">{price}/mo</span>}
                             </div>
                           </div>
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={!hasDependencies}
-                            className="mt-1"
-                            data-testid={`checkbox-pack-${pack.packType}`}
-                          />
+                          <Checkbox checked={isSelected} disabled={!hasDependencies} className="mt-1" />
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm text-muted-foreground mb-3" data-testid={`text-pack-description-${pack.packType}`}>
-                          {pack.info.description}
-                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">{pack.info.description}</p>
                         {!hasDependencies && (
-                          <p className="text-xs text-orange-600 dark:text-orange-400">
+                          <p className="text-xs text-orange-600">
                             Requires: {pack.dependencies.map(d => d.replace(/_/g, ' ')).join(', ')}
                           </p>
                         )}
@@ -947,10 +1127,14 @@ export default function SignupPage() {
           </Button>
           <div className="text-right">
             {selectedPacks.length > 0 && (
-              <p className="text-sm text-muted-foreground mb-2">
-                {selectedPacks.length} pack{selectedPacks.length !== 1 ? 's' : ''} selected •
-                <span className="font-semibold text-foreground ml-1">{formatPrice(totalMonthly)}/mo</span>
-              </p>
+              <div className="mb-2">
+                <p className="text-sm text-muted-foreground">
+                  {selectedPacks.length} pack{selectedPacks.length !== 1 ? 's' : ''} selected •
+                  <span className="font-semibold text-foreground ml-1">{formatPrice(totalMonthly)}/mo</span>
+                  <span className="text-xs text-muted-foreground ml-1">after trial</span>
+                </p>
+                <p className="text-xs text-green-600 font-medium">7-day free trial included</p>
+              </div>
             )}
             <Button
               onClick={onPacksSubmit}
@@ -960,13 +1144,13 @@ export default function SignupPage() {
               data-testid="button-complete-signup"
             >
               {registerMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {selectedPacks.length > 0 ? 'Create Account & Subscribe' : 'Create Account'}
+              {selectedPacks.length > 0 ? 'Start Free Trial' : 'Create Account'}
             </Button>
           </div>
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          You can always add or change packs later in your settings.
+          7-day free trial on all packs. Cancel anytime before the trial ends. You can also change packs later in settings.
         </p>
       </div>
     );

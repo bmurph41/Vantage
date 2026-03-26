@@ -66,7 +66,11 @@
       "Bash(NODE_OPTIONS=\"--max-old-space-size=4096\" npx tsc --noEmit --skipLibCheck)",
       "Bash(/tmp/gap_analysis.txt:*)",
       "Bash(/tmp/audit_sections.txt:*)",
-      "Bash(find /home/runner/workspace -name *modeling*.test.ts -o -name *modeling*.spec.ts -o -name *dcf*.test.ts -o -name *debt*.test.ts -o -name *exit*.test.ts)"
+      "Bash(find /home/runner/workspace -name *modeling*.test.ts -o -name *modeling*.spec.ts -o -name *dcf*.test.ts -o -name *debt*.test.ts -o -name *exit*.test.ts)",
+      "Bash(find /home/runner/workspace -maxdepth 3 -name .env* -o -name *.env)",
+      "Bash(kill %1)",
+      "Bash(pkill -f 'drizzle-kit push')",
+      "Bash(psql:*)"
     ]
   }
 }

@@ -151,6 +151,10 @@ const CashFlowForecastingPage = lazy(() => import("@/pages/analysis/cash-flow/in
 const DealSourcingPage = lazy(() => import("@/pages/analysis/deal-sourcing/index"));
 const MeetingTranscriptionPage = lazy(() => import("@/pages/crm/meetings/index"));
 const CurrencySettingsPage = lazy(() => import("@/pages/settings/currency/index"));
+const BillingSettingsPage = lazy(() => import("@/pages/settings/billing/index"));
+const OnboardingWizardPage = lazy(() => import("@/pages/onboarding/index"));
+const OrgSettingsPage = lazy(() => import("@/pages/settings/organization/index"));
+const IntegrationsMarketplacePage = lazy(() => import("@/pages/settings/integrations/index"));
 const OpsInboxPage = lazy(() => import("@/pages/ops/InboxPage"));
 const OpsAutomationsPage = lazy(() => import("@/pages/ops/AutomationsPage"));
 const OpsTasksPage = lazy(() => import("@/pages/ops/TasksPage"));
@@ -699,6 +703,30 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <CurrencySettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/billing">
+        {() => (
+          <UnifiedLayout>
+            <BillingSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/onboarding">
+        {() => <OnboardingWizardPage />}
+      </Route>
+      <Route path="/settings/organization">
+        {() => (
+          <UnifiedLayout>
+            <OrgSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/integrations">
+        {() => (
+          <UnifiedLayout>
+            <IntegrationsMarketplacePage />
           </UnifiedLayout>
         )}
       </Route>

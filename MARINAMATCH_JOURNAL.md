@@ -2,6 +2,103 @@
 
 ## Current State (2026-03-25)
 
+### ✅ COMPLETE — Background Jobs + Org Settings + Integrations Marketplace (2026-03-26)
+Three operational systems built:
+
+**1. Background Jobs / Cron System** (server/jobs/platform-cron.ts)
+8 scheduled jobs using node-cron:
+- Lease expiry alerts (daily 7 AM) — 180/120/90/60/30-day horizons, notifies org owners
+- DD deadline monitoring (every 4h) — flags deals with DD expiring in 7 days
+- Compliance/insurance expiry (daily 8 AM) — insurance within 60 days, regulatory within 30 days
+- Integration auto-sync (every 30 min) — triggers connectors due for sync based on frequency setting
+- Subscription renewal warnings (daily 9 AM) — 7-day warnings for pack renewals and trial expirations
+- Rent payment reconciliation (nightly 1 AM) — flags stale pending payments and overdue rent
+- Stale deal detection (Monday 6 AM) — open deals with no activity in 30+ days
+- Exchange rate refresh (daily 6 AM) — pulls latest rates from Open Exchange Rates
+Started in routes.ts boot sequence. Uses existing notification system for all alerts.
+
+**2. Organization Settings** (server/routes/org-settings-routes.ts — 10 endpoints)
+- GET/PUT / — org profile (name, session timeout, MFA required, email domains)
+- GET/PUT /branding — firm name, colors, logo, support email, custom domain
+- GET /team — list all members with role, status, MFA, last login
+- POST /team/invite — invite new member (creates placeholder user)
+- PATCH /team/:id — change role or status
+- DELETE /team/:id — soft-disable member
+- POST /team/transfer-ownership — ownership transfer flow
+- GET /team/audit — recent team change audit trail
+Frontend: /settings/organization — 4 tabs (Profile, Team, Branding, Security)
+
+**3. Integrations Marketplace** (server/routes/integrations-marketplace-routes.ts — 8 endpoints)
+- GET /catalog — all 40+ integrations with connection status per org, grouped by category
+- GET /catalog/:key — single integration detail with sync history
+- POST /connect — create connection with credentials
+- POST /test/:connectionId — test connection via BaseConnector.testConnection()
+- POST /sync/:connectionId — manual sync via connector.syncAll()
+- PATCH /connections/:connectionId — update sync frequency, auto-sync, settings
+- DELETE /connections/:connectionId — disconnect (soft disable)
+- GET /sync-history/:connectionId — detailed sync logs
+Frontend: /settings/integrations — discovery grid, category filter, search, connect wizard, sync/test/disconnect buttons
+
+**Route Registration:**
+- /api/org-settings/* — Organization Settings
+- /api/integrations-marketplace/* — Integrations Marketplace
+- startPlatformCronJobs() called in boot sequence
+
+---
+
+### ✅ COMPLETE — Stripe Checkout + Onboarding Wizard + Notification Center (2026-03-26)
+Three production-critical systems built:
+
+**1. Stripe Checkout Flow (was 503 stub, now functional)**
+- Replaced hardcoded 503 "coming soon" stubs with real Stripe Checkout Session creation
+- POST /api/stripe/checkout → creates Stripe Checkout Session with pack pricing
+- POST /api/stripe/portal → opens Stripe Customer Portal for self-serve management
+- POST /api/stripe/webhook → handles checkout.session.completed, subscription.updated/deleted, invoice.payment_failed
+- Auto-activates organizationPacks on successful payment
+- Subscription lifecycle: checkout → active → past_due → cancelled
+- GET /api/stripe/status and /api/stripe/publishable-key now return real configuration state
+- Frontend: settings/billing page with plan cards, subscribe buttons, Stripe redirect, success/cancel handling, portal link
+
+**2. Onboarding Wizard**
+- Backend (server/routes/onboarding-routes.ts): 6 endpoints
+  - GET /status — onboarding checklist with auto-detection (checks real data: deals, packs, team members, org name)
+  - POST /complete-step — mark individual steps done
+  - POST /dismiss — skip remaining
+  - POST /setup-org — org name + industry setup
+  - POST /invite-team — batch invite with placeholder user creation
+- Frontend (client/src/pages/onboarding/index.tsx): 3-step wizard
+  - Step 0: Organization setup (name)
+  - Step 1: Team invites (dynamic email list)
+  - Step 2: Getting Started checklist (7 items with links to relevant pages)
+  - Progress bar, skip button, auto-redirect when complete
+- Checklist auto-completes from real data (created deal? invited team? activated pack?)
+
+**3. In-App Notification Center + Email Dispatch**
+- Backend (server/routes/onboarding-routes.ts): 4 endpoints
+  - GET /notifications — paginated with unread count, 30s polling
+  - POST /notifications/mark-read — individual or mark-all
+  - POST /notifications/send — create notification (internal API)
+  - POST /notifications/dispatch — event-driven notifications with templates:
+    - deal_stage_changed, deal_assigned, approval_requested, approval_decided
+    - dd_milestone_approaching, dd_item_overdue, finding_critical
+    - meeting_analyzed, comment_mention
+  - Auto-sends email via SendGrid alongside in-app notification (fire-and-forget)
+- Frontend (client/src/components/NotificationCenter.tsx): Sheet-based notification panel
+  - Bell icon with unread badge count
+  - Notification feed with type icons, time-ago, read/unread states
+  - Mark all read, individual mark read on click
+  - 30-second auto-refresh polling
+
+**Route Registration:**
+- /api/onboarding/* — Onboarding + Notifications
+- /api/stripe/* — Checkout, Portal, Webhook (replaced stubs)
+
+**Frontend Routes:**
+- /onboarding — Wizard page (no sidebar layout)
+- /settings/billing — Plan selection + Stripe Checkout
+
+---
+
 ### ✅ COMPLETE — Financial Model 6 Fixes (2026-03-25)
 All 6 financial modeling gaps resolved in one route file:
 - **~25 new API endpoints** in server/routes/modeling-enhancements-routes.ts

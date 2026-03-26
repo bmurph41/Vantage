@@ -302,6 +302,7 @@ export const packTypeEnum = pgEnum("pack_type", [
   "owner",            // Owner pack ($149/mo) - RRA with full portfolio management
   "investor",         // Investor pack ($99/mo) - RRA with analysis focus
   "broker",           // Broker pack ($99/mo) - RRA with transaction focus
+  "master_comps",     // Master Comps Database ($99/mo) - curated comps, dedup, contributions
 ]);
 
 export const packStatusEnum = pgEnum("pack_status", ["active", "trial", "expired", "cancelled"]);
