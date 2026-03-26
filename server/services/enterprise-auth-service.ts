@@ -54,13 +54,8 @@ export class EnterpriseAuthService {
         return { success: false, error: 'Invalid credentials', errorCode: 'INVALID_CREDENTIALS' };
       }
 
-      // Check if account is locked
-      if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
-        await this.logSecurityEvent(user.id, user.orgId, 'login_failure', { 
-          reason: 'account_locked' 
-        }, deviceInfo, false);
-        return { success: false, error: 'Account is temporarily locked', errorCode: 'ACCOUNT_LOCKED' };
-      }
+      // Note: accounts are never locked. After too many failed attempts, we send
+      // a warning email with a password reset link instead of blocking access.
 
       // Check if SSO is enforced
       const org = await this.getOrganization(user.orgId);
@@ -539,22 +534,53 @@ export class EnterpriseAuthService {
     if (!user) return;
 
     const attempts = (user.failedLoginAttempts || 0) + 1;
-    const updates: Partial<User> = { failedLoginAttempts: attempts };
-
-    if (attempts >= MAX_LOGIN_ATTEMPTS) {
-      updates.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-    }
-
     await db.update(users)
-      .set(updates as any)
+      .set({ failedLoginAttempts: attempts } as any)
       .where(eq(users.id, userId));
+
+    // After too many failed attempts, send a warning email with reset link
+    if (attempts >= MAX_LOGIN_ATTEMPTS && user.email) {
+      try {
+        const appUrl = process.env.APP_URL || 'https://marinamatch.com';
+        const resetUrl = `${appUrl}/forgot-password`;
+        await sendEmail({
+          to: user.email,
+          subject: 'Unusual login activity on your MarinaMatch account',
+          text: `Hi${user.name ? ' ' + user.name : ''},\n\nWe noticed ${attempts} failed login attempts on your MarinaMatch account. If this was you, you can reset your password here: ${resetUrl}\n\nIf you didn't attempt to log in, we recommend resetting your password immediately to secure your account.\n\n— The MarinaMatch Security Team`,
+          html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #343E5C; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #EFEFF4;">
+  <div style="background: white; border-radius: 8px; padding: 40px; margin: 20px 0;">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <h1 style="color: #0891b2; margin: 0; font-size: 22px;">MarinaMatch</h1>
+    </div>
+    <h2 style="margin-top: 0; color: #1e293b;">Unusual Login Activity</h2>
+    <p>Hi${user.name ? ' ' + user.name : ''},</p>
+    <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; border-radius: 4px; margin: 16px 0;">
+      <p style="margin: 0; font-size: 14px;"><strong>We detected ${attempts} failed login attempts</strong> on your account.</p>
+    </div>
+    <p>If this was you, you can reset your password to regain access:</p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${resetUrl}" style="background: linear-gradient(135deg, #0891b2, #2563eb); color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">Reset Your Password</a>
+    </div>
+    <p style="color: #64748b; font-size: 14px;">If you didn't attempt to log in, we recommend resetting your password immediately to secure your account.</p>
+  </div>
+  <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 20px;">
+    <p>&copy; ${new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+  </div>
+</body></html>`,
+        });
+        logger.info({ userId, attempts }, 'Sent failed login warning email');
+      } catch (emailErr) {
+        logger.error({ error: emailErr, userId }, 'Failed to send login warning email');
+      }
+    }
   }
 
   private async resetFailedAttempts(userId: string): Promise<void> {
     await db.update(users)
-      .set({ 
+      .set({
         failedLoginAttempts: 0,
-        lockedUntil: null
       })
       .where(eq(users.id, userId));
   }
