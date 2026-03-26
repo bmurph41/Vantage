@@ -3114,11 +3114,14 @@ export const rraMarinaLocations = pgTable("rra_marina_locations", {
   budgetYear: integer("budget_year"),
   seasonalStorageTypes: text("seasonal_storage_types").array(),
   storageMix: jsonb("storage_mix"),
+  // Multi-asset-class support
+  assetClass: text("asset_class").default("marina"), // marina, self_storage, multifamily, retail, office, industrial, hotel, str, rv_park, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   nameOrgIdx: index("rra_marina_locations_name_org_idx").on(table.name, table.orgId),
   orgIdx: index("rra_marina_locations_org_idx").on(table.orgId),
+  assetClassIdx: index("rra_marina_locations_asset_class_idx").on(table.assetClass),
 }));
 
 // 2. RRA Storage Locations (Physical docks/slips within projects)
@@ -3158,6 +3161,8 @@ export const rraTenants = pgTable("rra_tenants", {
   zip: text("zip"),
   crmContactId: varchar("crm_contact_id").references(() => crmContacts.id),
   crmCompanyId: varchar("crm_company_id").references(() => crmCompanies.id),
+  // Multi-asset-class: stores asset-specific tenant data (e.g., vehicle info for RV, company info for CRE)
+  assetSpecificData: jsonb("asset_specific_data"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -3207,6 +3212,10 @@ export const rraLeases = pgTable("rra_leases", {
   sewerCharge: numeric("sewer_charge", { precision: 14, scale: 2 }).default("0"),
   pumpoutCharge: numeric("pumpout_charge", { precision: 14, scale: 2 }).default("0"),
   taxesCharge: numeric("taxes_charge", { precision: 14, scale: 2 }).default("0"),
+  // Multi-asset-class generic fields (marina uses boatDimensions/slipLength; other asset classes use these)
+  unitTypeCustom: text("unit_type_custom"), // Generic unit type string (e.g., "5x10 Climate", "1BR/1BA", "Standard King")
+  unitDimension1: numeric("unit_dimension_1", { precision: 10, scale: 2 }), // Primary dimension (SF, width, etc.)
+  unitDimension2: numeric("unit_dimension_2", { precision: 10, scale: 2 }), // Secondary dimension (depth, etc.)
   isActive: boolean("is_active").default(true).notNull(),
   isIncomplete: boolean("is_incomplete").default(false).notNull(),
   usesDefaultDates: boolean("uses_default_dates").default(false).notNull(),
@@ -21502,6 +21511,43 @@ export const DEFAULT_RENT_ROLL_COLUMNS: RentRollColumnConfig[] = [
   { id: 'actions', label: 'Actions', visible: true, order: 45, sortable: false, align: 'right' },
 ];
 
+/**
+ * Get default rent roll columns configured for a specific asset class.
+ * Marina returns the full DEFAULT_RENT_ROLL_COLUMNS with marina columns visible.
+ * Non-marina hides boat/slip columns and shows generic unit columns instead.
+ */
+export function getDefaultColumnsForAssetClass(assetClass: string): RentRollColumnConfig[] {
+  if (assetClass === 'marina' || !assetClass) {
+    return [...DEFAULT_RENT_ROLL_COLUMNS];
+  }
+
+  // For non-marina: hide boat/slip columns, relabel generic ones
+  const marinaOnlyColumns = new Set([
+    'boatType', 'boatLength', 'boatWidth', 'boat',
+    'slipLength', 'slipWidth', 'slipUtilization',
+    'ratePerFtMo', 'ratePerFtYr', 'ratePerFtSeason',
+    'isLiveaboard', 'liveaboardRate', 'pumpoutCharge',
+    'seasonSummary',
+  ]);
+
+  const labelOverrides: Record<string, string> = {
+    'unitNumber': 'Unit #',
+    'storageType': 'Unit Type',
+    'slipStatus': 'Status',
+    'totalStorageRevenue': 'Total Revenue',
+  };
+
+  return DEFAULT_RENT_ROLL_COLUMNS.map(col => {
+    if (marinaOnlyColumns.has(col.id)) {
+      return { ...col, visible: false };
+    }
+    if (labelOverrides[col.id]) {
+      return { ...col, label: labelOverrides[col.id], visible: col.visible || col.id === 'storageType' || col.id === 'unitNumber' };
+    }
+    return { ...col };
+  });
+}
+
 // Note: Scenario type already defined at line 11933 as ShipStoreScenario
 
 // Report types for Rent Roll module
@@ -21789,12 +21835,18 @@ export type InsertRraPnlRackRevenue = typeof rraPnlRackRevenue.$inferInsert;
 
 // Table aliases - map short names to RRA-prefixed tables
 export const tenants = rraTenants;
+export const leases = rraLeases;
+export const marinaLocations = rraMarinaLocations;
+export const contractCharges = rraContractCharges;
 export const periods = rraPeriods;
 export const projectDetailsConfig = rraProjectDetailsConfig;
 export const pnlRackRevenue = rraPnlRackRevenue;
 
 // Type aliases - map short type names to RRA types
 export type Tenant = RraTenant;
+export type Lease = RraLease;
+export type InsertLease = InsertRraLease;
+export type InsertLeaseLineItem = InsertRraLeaseLineItem;
 export type Period = RraPeriod;
 export type InsertTenant = InsertRraTenant;
 

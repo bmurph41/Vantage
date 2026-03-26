@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { getRentRollConfig, type RentRollAssetConfig } from "@shared/rent-roll-config";
 
 interface ProjectDetails {
   id: string;
@@ -9,6 +10,7 @@ interface ProjectDetails {
   description?: string;
   capacity?: number;
   status?: string;
+  assetClass?: string;
 }
 
 interface ProjectContextValue {
@@ -16,13 +18,17 @@ interface ProjectContextValue {
   project: ProjectDetails | null;
   isLoading: boolean;
   isPortfolioScope: boolean;
+  rentRollConfig: RentRollAssetConfig;
 }
+
+const defaultConfig = getRentRollConfig('marina');
 
 const ProjectContext = createContext<ProjectContextValue>({
   projectId: null,
   project: null,
   isLoading: false,
   isPortfolioScope: false,
+  rentRollConfig: defaultConfig,
 });
 
 export function useProjectContext() {
@@ -44,12 +50,18 @@ export function ProjectProvider({ children, projectId }: ProjectProviderProps) {
     enabled: !!projectId,
   });
 
+  const rentRollConfig = useMemo(
+    () => getRentRollConfig(project?.assetClass),
+    [project?.assetClass]
+  );
+
   const value = useMemo(() => ({
     projectId: projectId || null,
     project: project || null,
     isLoading,
     isPortfolioScope: false,
-  }), [projectId, project, isLoading]);
+    rentRollConfig,
+  }), [projectId, project, isLoading, rentRollConfig]);
 
   return (
     <ProjectContext.Provider value={value}>
@@ -68,6 +80,7 @@ export function PortfolioProvider({ children }: PortfolioProviderProps) {
     project: null,
     isLoading: false,
     isPortfolioScope: true,
+    rentRollConfig: defaultConfig,
   }), []);
 
   return (

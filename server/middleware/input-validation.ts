@@ -285,6 +285,47 @@ export const validators = {
   )
 };
 
+// ============================================================================
+// Input Sanitization
+// ============================================================================
+
+/**
+ * Strip HTML tags and script content from a string
+ */
+function sanitizeString(input: string): string {
+  return input
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
+}
+
+/**
+ * Recursively sanitize all string values in an object
+ */
+function deepSanitize(obj: any): any {
+  if (typeof obj === 'string') return sanitizeString(obj);
+  if (Array.isArray(obj)) return obj.map(deepSanitize);
+  if (obj && typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = deepSanitize(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/**
+ * Middleware that sanitizes all string values in req.body
+ * to prevent XSS and HTML injection attacks.
+ */
+export function sanitizeBody(req: any, _res: any, next: any) {
+  if (req.body && typeof req.body === 'object') {
+    req.body = deepSanitize(req.body);
+  }
+  next();
+}
+
 /**
  * Example usage in routes:
  * 

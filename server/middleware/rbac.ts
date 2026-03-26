@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { organizationUserRoles } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { logger } from '../lib/logger';
 
 export type UserRole = 'owner' | 'admin' | 'editor' | 'viewer' | 'auditor';
 
@@ -128,6 +129,7 @@ export function requirePermission(...permissions: Permission[]) {
       );
 
       if (!hasAllPermissions) {
+        logger.warn({ userId, orgId, permission: permissions, role: userRole, path: req.path }, 'Permission denied');
         return res.status(403).json({
           message: 'Insufficient permissions',
           code: 'INSUFFICIENT_PERMISSIONS',
@@ -166,6 +168,7 @@ export function requireRole(...roles: UserRole[]) {
       const userRole = await getUserRole(userId, orgId, fallbackRole);
 
       if (!userRole || !roles.includes(userRole)) {
+        logger.warn({ userId, orgId, requiredRoles: roles, role: userRole, path: req.path }, 'Permission denied');
         return res.status(403).json({
           message: 'Insufficient role level',
           code: 'INSUFFICIENT_ROLE',
@@ -184,6 +187,23 @@ export function requireRole(...roles: UserRole[]) {
         code: 'RBAC_ERROR' 
       });
     }
+  };
+}
+
+export function requireWriteAccess() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const writeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+    if (!writeMethods.includes(req.method)) return next();
+
+    const role = (req as any).user?.role;
+    if (role === 'viewer' || role === 'auditor') {
+      logger.warn({ userId: (req as any).user?.id, orgId: (req as any).user?.orgId, role, path: req.path, method: req.method }, 'Permission denied');
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        message: 'Your role does not allow write operations',
+      });
+    }
+    next();
   };
 }
 

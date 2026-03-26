@@ -15,6 +15,9 @@ import path from "path";
 import os from "os";
 import { createRequire } from "module";
 import * as rentRollService from "../services/rent-roll-v2/rentRollService";
+import { getAssetStrategy } from "../services/rent-roll-v2/assetStrategies";
+import * as creAdapter from "../services/rent-roll-v2/adapters/commercialLeaseAdapter";
+import { usesCREDataSource } from "@shared/rent-roll-config";
 
 const require = createRequire(import.meta.url);
 import { ilike, eq, and, or, desc } from "drizzle-orm";
@@ -63,6 +66,87 @@ router.get("/dashboard", async (req: Request, res: Response, next: NextFunction)
     const metrics = await rraService.getDashboardMetrics(orgId);
     res.json(metrics);
   } catch (error) {
+    next(error);
+  }
+});
+
+// Monthly summary aggregation
+router.get("/monthly-summary", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { from, to, startDate, endDate, asOfDate, mode, locationId } = req.query;
+
+    // Support both old params (from/to strings) and new options (mode, asOfDate as Dates)
+    if (mode || asOfDate) {
+      const result = await rentRollService.getMonthlySummary({
+        startDate: (startDate || from) ? new Date((startDate || from) as string) : undefined,
+        endDate: (endDate || to) ? new Date((endDate || to) as string) : undefined,
+        asOfDate: asOfDate ? new Date(asOfDate as string) : undefined,
+        mode: mode as "FULL_PERIOD" | "YTD" | undefined,
+        locationId: locationId as string | undefined,
+      });
+      res.json(result);
+    } else {
+      const result = await rentRollService.getMonthlySummary({
+        from: (from || startDate) as string | undefined,
+        to: (to || endDate) as string | undefined,
+        locationId: locationId as string | undefined,
+      });
+      res.json(result);
+    }
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+// Move events
+router.get("/move-events", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { direction, year, locationId, page, pageSize } = req.query;
+    const result = await rentRollService.getAllMoveEvents({
+      direction: direction as "IN" | "OUT" | undefined,
+      year: year ? parseInt(year as string) : undefined,
+      locationId: locationId as string | undefined,
+      page: page ? parseInt(page as string) : undefined,
+      pageSize: pageSize ? parseInt(pageSize as string) : undefined,
+    });
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.post("/move-events", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const event = await rentRollService.createMoveEvent(req.body);
+    res.status(201).json(event);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.post("/move-events/import", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { events } = req.body;
+    if (!Array.isArray(events) || events.length === 0) {
+      return res.status(400).json({ error: "events array is required" });
+    }
+    const results = [];
+    for (const eventData of events) {
+      const event = await rentRollService.createMoveEvent(eventData);
+      results.push(event);
+    }
+    res.json({ imported: results.length, events: results });
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+// P&L rack revenue
+router.post("/pnl-rack-revenue", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await rentRollService.upsertPnlRackRevenue(req.body);
+    res.json({ success: true });
+  } catch (error: any) {
     next(error);
   }
 });
@@ -1742,6 +1826,126 @@ router.post("/leases/bulk-delete", async (req: Request, res: Response, next: Nex
     next(error);
   }
 });
+
+// ============================================================================
+// BULK UPDATE, DATA QUALITY, ANALYTICS, REGENERATION ENDPOINTS
+// ============================================================================
+
+router.post("/leases/bulk-update", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { leaseIds, updates } = req.body;
+
+    if (!Array.isArray(leaseIds) || leaseIds.length === 0) {
+      return res.status(400).json({ error: "Invalid or empty leaseIds array" });
+    }
+
+    const updatedCount = await rentRollService.bulkUpdateLeases(leaseIds, updates, orgId);
+
+    await PlatformAuditService.logBulkOperation(req, 'update', 'lease', updatedCount, {
+      leaseIds,
+      updateFields: Object.keys(updates),
+    });
+
+    res.json({ updatedCount });
+  } catch (error: any) {
+    console.error("[Rent Roll] Bulk update error:", error);
+    next(error);
+  }
+});
+
+router.get("/address-heatmap", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { group, locationId } = req.query;
+    const groupBy = group === "city" ? "city" : "state";
+    const result = await rentRollService.getAddressHeatMap(groupBy, locationId as string | undefined);
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.get("/data-quality", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId, asOfDate } = req.query;
+    const result = await rentRollService.getDataQualitySummary({
+      locationId: locationId as string | undefined,
+      asOfDate: asOfDate ? new Date(asOfDate as string) : undefined,
+    });
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.get("/lease-matrix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate, locationId } = req.query;
+    const result = await rentRollService.getLeaseCashFlowMatrix({
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      locationId: locationId as string | undefined,
+    });
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.get("/revenue-by-storage-type", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate, locationId } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    const result = await rentRollService.getRevenueByStorageType(
+      startDate as string,
+      endDate as string,
+      locationId as string | undefined
+    );
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.get("/location-occupancy", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    const result = await rentRollService.getLocationOccupancy(
+      startDate as string,
+      endDate as string
+    );
+    res.json(result);
+  } catch (error: any) {
+    next(error);
+  }
+});
+
+router.post("/locations/:locationId/regenerate-cashflows", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.params;
+    const result = await rentRollService.regenerateAllCashFlowsForProject(locationId);
+
+    await PlatformAuditService.logBulkOperation(req, 'regenerate', 'cash_flow', result.generatedCount, {
+      locationId,
+      processedCount: result.processedCount,
+      errors: result.errors,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("[Rent Roll] Regenerate cash flows error:", error);
+    next(error);
+  }
+});
+
+// ============================================================================
+// LEASE LINE ITEMS
+// ============================================================================
 
 router.post("/leases/:leaseId/line-items", async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -3450,6 +3654,93 @@ router.patch("/locations/:locationId/auto-sync", async (req: Request, res: Respo
       .returning();
 
     res.json({ success: true, updated: updated.length, autoSyncEnabled });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================================================
+// CRE (COMMERCIAL REAL ESTATE) LEASE ADAPTER ENDPOINTS
+// These endpoints serve the rent roll dashboard for CRE asset classes
+// (retail, office, industrial, medical_office) by reading from commercialTenants.
+// ============================================================================
+
+router.get("/cre/leases", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId, locationId, isActive, page, pageSize } = req.query;
+    const result = await creAdapter.getCRELeases({
+      orgId,
+      locationId: locationId as string | undefined,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      page: page ? parseInt(page as string) : undefined,
+      pageSize: pageSize ? parseInt(pageSize as string) : undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/cre/dashboard-metrics", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId, startDate, endDate } = req.query;
+    const metrics = await creAdapter.getCREDashboardMetrics({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+    });
+    res.json(metrics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/cre/rent-schedule", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId } = req.query;
+    const schedule = await creAdapter.getCRERentSchedule({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+    });
+    res.json(schedule);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/cre/revenue-by-tenant", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId } = req.query;
+    const result = await creAdapter.getCRERevenueByTenant({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/cre/lease-rollover", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId } = req.query;
+    const result = await creAdapter.getCRELeaseRollover({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+    });
+    res.json(result);
   } catch (error) {
     next(error);
   }

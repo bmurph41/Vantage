@@ -1,9 +1,20 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import Stripe from 'stripe';
 import billingService, { SUBSCRIPTION_TIERS } from '../services/billing-service';
 import { AuthenticatedRequest } from '../middleware/auth-resolver';
 
 const router = Router();
+
+// Capture raw body for Stripe webhook signature verification
+// This must run before express.json() parses the body
+router.use('/webhooks', express.raw({ type: 'application/json' }), (req: Request, _res: Response, next: NextFunction) => {
+  if (Buffer.isBuffer(req.body)) {
+    (req as any).rawBody = req.body;
+    req.body = JSON.parse(req.body.toString('utf8'));
+  }
+  next();
+});
 
 function getOrgId(req: Request): string {
   const authReq = req as AuthenticatedRequest;
@@ -201,7 +212,8 @@ router.post('/webhooks', async (req: Request, res: Response, next: NextFunction)
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      return res.status(500).json({ error: 'Stripe webhook secret not configured' });
+      console.error('STRIPE_WEBHOOK_SECRET environment variable is not set');
+      return res.status(500).json({ error: 'Webhook processing unavailable' });
     }
 
     let event: Stripe.Event;

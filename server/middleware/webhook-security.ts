@@ -15,12 +15,16 @@ export function verifyWebhookSignature(provider: string) {
     const secret = WEBHOOK_SECRETS[provider];
     
     if (!secret) {
-      logger.warn({
+      logger.error({
         type: 'webhook_secret_missing',
         provider,
         path: req.path,
+        message: `Webhook secret not configured for provider: ${provider}. Rejecting request.`,
       });
-      return next();
+      return res.status(500).json({
+        error: 'Webhook processing unavailable',
+        code: 'WEBHOOK_NOT_CONFIGURED',
+      });
     }
 
     try {

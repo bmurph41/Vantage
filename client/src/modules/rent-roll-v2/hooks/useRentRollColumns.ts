@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import type { RentRollTableConfig, RentRollColumnConfig } from "@shared/schema";
-import { DEFAULT_RENT_ROLL_COLUMNS, RENT_ROLL_CONFIG_VERSION } from "@shared/schema";
+import { RENT_ROLL_CONFIG_VERSION, getDefaultColumnsForAssetClass } from "@shared/schema";
+import { useRentRollConfig } from "./useRentRollConfig";
 
 const STORAGE_KEY = "rentRollTableConfig";
 
 /**
  * Custom hook to manage rent roll table column configuration with localStorage persistence
  * Includes automatic migration when new columns are added to the default configuration
+ * Now asset-class-aware: non-marina projects hide boat/slip columns by default
  */
 export function useRentRollColumns(locationId?: string | null) {
+  const { assetClass } = useRentRollConfig();
+  const effectiveDefaults = getDefaultColumnsForAssetClass(assetClass);
   // Generate storage key based on location (project-specific settings)
   const storageKey = locationId ? `${STORAGE_KEY}_${locationId}` : STORAGE_KEY;
 
@@ -24,7 +28,7 @@ export function useRentRollColumns(locationId?: string | null) {
         
         // Validate that stored config has all required columns
         const storedColumnIds = new Set(parsed.columns.map((c) => c.id));
-        const defaultColumnIds = new Set(DEFAULT_RENT_ROLL_COLUMNS.map((c) => c.id));
+        const defaultColumnIds = new Set(effectiveDefaults.map((c) => c.id));
         
         // If outdated or columns don't match, merge defaults with stored overrides
         if (isOutdated ||
@@ -32,7 +36,7 @@ export function useRentRollColumns(locationId?: string | null) {
             !Array.from(defaultColumnIds).every((id) => storedColumnIds.has(id))) {
           
           // Merge: keep stored settings for existing columns, add missing ones
-          const mergedColumns = DEFAULT_RENT_ROLL_COLUMNS.map((defaultCol, index) => {
+          const mergedColumns = effectiveDefaults.map((defaultCol, index) => {
             const storedCol = parsed.columns.find((c) => c.id === defaultCol.id);
             
             if (storedCol) {
@@ -90,7 +94,7 @@ export function useRentRollColumns(locationId?: string | null) {
 
     // Return default configuration
     return {
-      columns: [...DEFAULT_RENT_ROLL_COLUMNS],
+      columns: [...effectiveDefaults],
       sort: { columnId: null, direction: null },
       version: RENT_ROLL_CONFIG_VERSION,
     };
@@ -146,7 +150,7 @@ export function useRentRollColumns(locationId?: string | null) {
 
   const resetToDefaults = useCallback(() => {
     // Ensure deterministic order indexes when resetting
-    const resetColumns = DEFAULT_RENT_ROLL_COLUMNS.map((col, index) => ({
+    const resetColumns = effectiveDefaults.map((col, index) => ({
       ...col,
       order: index,
     }));

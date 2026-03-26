@@ -2,14 +2,23 @@ import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  ChevronLeft, 
+import {
+  ChevronLeft,
   Ship,
+  Box,
+  Building,
+  Building2,
+  Store,
+  Factory,
+  Hotel,
+  Home,
+  Tent,
   Table2,
   FileText,
   Calculator,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  type LucideIcon,
 } from "lucide-react";
 import { ProjectProvider } from "../contexts/ProjectContext";
 import UserMenu from "../components/navigation/UserMenu";
@@ -19,7 +28,21 @@ interface ProjectDetails {
   name: string;
   projectType: "OWNED" | "DEAL";
   description?: string;
+  assetClass?: string;
 }
+
+const assetClassIcons: Record<string, LucideIcon> = {
+  marina: Ship,
+  self_storage: Box,
+  multifamily: Building2,
+  retail: Store,
+  office: Building,
+  industrial: Factory,
+  hotel: Hotel,
+  str: Home,
+  rv_park: Tent,
+  mobile_home: Home,
+};
 
 interface ProjectLayoutProps {
   children: React.ReactNode;
@@ -68,7 +91,7 @@ export default function ProjectLayout({ children }: ProjectLayoutProps) {
                   <Skeleton className="h-6 w-48" />
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Ship className="h-5 w-5 text-muted-foreground" />
+                    {(() => { const Icon = assetClassIcons[project?.assetClass || 'marina'] || Building2; return <Icon className="h-5 w-5 text-muted-foreground" />; })()}
                     <h1 className="text-lg font-semibold" data-testid="text-project-name">
                       {project?.name || "Project"}
                     </h1>

@@ -10,7 +10,7 @@
  */
 
 import { db } from "./db";
-import { contractCharges, leases, tenants, marinaLocations } from "@shared/schema";
+import { rraContractCharges as contractCharges, rraLeases as leases, rraTenants as tenants, rraMarinaLocations as marinaLocations } from "@shared/schema";
 import { eq, and, gte, lte, isNull, or } from "drizzle-orm";
 import { 
   startOfMonth, 
@@ -31,7 +31,7 @@ import {
 // TYPES
 // ============================================================================
 
-export type BasisType = 'per_ft_per_month' | 'per_ft_per_year' | 'per_month' | 'per_year' | 'per_day' | 'per_season';
+export type BasisType = 'per_ft_per_month' | 'per_ft_per_year' | 'per_month' | 'per_year' | 'per_day' | 'per_season' | 'per_sf_per_month' | 'per_sf_per_year';
 export type ChargeFrequency = 'monthly' | 'annual' | 'seasonal' | 'daily' | 'one_time';
 export type EscalationType = 'none' | 'fixed_step' | 'index_linked';
 
@@ -189,28 +189,35 @@ function convertToMonthlyAmount(
   amount: number,
   basisType: BasisType,
   boatLength?: number,
-  daysInMonth?: number
+  daysInMonth?: number,
+  unitSF?: number
 ): number {
   switch (basisType) {
     case 'per_ft_per_month':
       return amount * (boatLength || 1);
-    
+
     case 'per_ft_per_year':
       return (amount * (boatLength || 1)) / 12;
-    
+
+    case 'per_sf_per_month':
+      return amount * (unitSF || 1);
+
+    case 'per_sf_per_year':
+      return (amount * (unitSF || 1)) / 12;
+
     case 'per_month':
       return amount;
-    
+
     case 'per_year':
       return amount / 12;
-    
+
     case 'per_day':
       return amount * (daysInMonth || 30);
-    
+
     case 'per_season':
       // Assume 6-month season, convert to monthly
       return amount / 6;
-    
+
     default:
       return amount;
   }

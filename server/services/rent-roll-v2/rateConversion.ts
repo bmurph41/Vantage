@@ -16,6 +16,16 @@ export const RATE_TYPE_TO_BASIS: Record<string, string> = {
   '$/season': 'per_season',
   '$/yr.': 'per_year',
   '$/SF': 'per_sf',
+  '$/sf/mo.': 'per_sf_month',
+  '$/SF/Month': 'per_sf_month',
+  '$/sf/yr.': 'per_sf_year',
+  '$/SF/Year': 'per_sf_year',
+  '$/SF/Year (NNN)': 'per_sf_year',
+  '$/Month (Gross)': 'per_month',
+  '$/night': 'per_night',
+  '$/Night': 'per_night',
+  '$/week': 'per_week',
+  '$/Week': 'per_week',
   'Flat Fee': 'flat_fee',
 };
 
@@ -38,6 +48,9 @@ export interface RateConversionConfig {
   slipLength?: number | null;
   slipWidth?: number | null;
   contractTerm?: string | null;
+  // Multi-asset: generic dimension fields (SF for CRE/storage, etc.)
+  unitDimension1?: number | null;
+  unitDimension2?: number | null;
 }
 
 /**
@@ -80,29 +93,31 @@ export function getMonthsFromContractTerm(contractTerm: string | null | undefine
  * @returns Monthly rent equivalent
  */
 export function convertToMonthlyRent(config: RateConversionConfig): number {
-  const { rawAmount, rateType, numMonths, boatLength, slipLength, slipWidth, contractTerm } = config;
-  
+  const { rawAmount, rateType, numMonths, boatLength, slipLength, slipWidth, contractTerm, unitDimension1, unitDimension2 } = config;
+
   if (!rawAmount || isNaN(rawAmount) || rawAmount <= 0) {
     return 0;
   }
-  
+
   const rateBasis = getRateBasis(rateType);
-  
+
   // Determine the number of months for season-based calculations
-  const effectiveMonths = numMonths && numMonths > 0 
-    ? numMonths 
+  const effectiveMonths = numMonths && numMonths > 0
+    ? numMonths
     : getMonthsFromContractTerm(contractTerm);
-  
+
   // Ensure we don't divide by zero
   const safeMonths = Math.max(1, effectiveMonths);
-  
-  // Get boat length for per-foot calculations
+
+  // Get boat length for per-foot calculations (marina)
   const length = boatLength && boatLength > 0 ? boatLength : null;
-  
-  // Get square footage for per-SF calculations
-  const sqft = slipLength && slipWidth && slipLength > 0 && slipWidth > 0 
-    ? slipLength * slipWidth 
-    : null;
+
+  // Get square footage: prefer unitDimension1, fallback to slipLength × slipWidth
+  const sqft = (unitDimension1 && unitDimension1 > 0)
+    ? unitDimension1
+    : (slipLength && slipWidth && slipLength > 0 && slipWidth > 0
+      ? slipLength * slipWidth
+      : null);
   
   switch (rateBasis) {
     case 'per_month':
@@ -139,16 +154,38 @@ export function convertToMonthlyRent(config: RateConversionConfig): number {
       return rawAmount / 12;
       
     case 'per_sf':
-      // Rate per square foot - multiply by area
+      // Rate per square foot (ambiguous period) - multiply by area, treat as monthly
       if (sqft) {
         return rawAmount * sqft;
       }
       return rawAmount;
-      
+
+    case 'per_sf_month':
+      // Rate per SF per month - multiply by area
+      if (sqft) {
+        return rawAmount * sqft;
+      }
+      return rawAmount;
+
+    case 'per_sf_year':
+      // Rate per SF per year - multiply by area, divide by 12
+      if (sqft) {
+        return (rawAmount * sqft) / 12;
+      }
+      return rawAmount / 12;
+
+    case 'per_night':
+      // Nightly rate (hotel/STR) - multiply by ~30 days for monthly equivalent
+      return rawAmount * 30;
+
+    case 'per_week':
+      // Weekly rate - multiply by ~4.33 weeks for monthly equivalent
+      return rawAmount * (52 / 12);
+
     case 'flat_fee':
       // Flat fee - no conversion, treat as monthly
       return rawAmount;
-      
+
     default:
       // Unknown rate type - treat as monthly
       return rawAmount;

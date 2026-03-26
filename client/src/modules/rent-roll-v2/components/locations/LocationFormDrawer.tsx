@@ -37,31 +37,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { useRentRollConfig } from "../../hooks/useRentRollConfig";
 
-const STORAGE_TYPES = [
-  'Wet Slip',
-  'Lift Slip',
-  'Mooring',
-  'Jet Ski',
-  'Dry Rack - Indoor',
-  'Dry Rack - Outdoor',
-  'Houseboat',
-  'Land Storage',
-  'Boat on Trailer',
-  'Trailer Only',
-  'Carport',
-  'RV Site',
+// Fallback defaults (marina) — overridden by config when available
+const DEFAULT_STORAGE_TYPES = [
+  'Wet Slip', 'Lift Slip', 'Mooring', 'Jet Ski',
+  'Dry Rack - Indoor', 'Dry Rack - Outdoor', 'Houseboat',
+  'Land Storage', 'Boat on Trailer', 'Trailer Only', 'Carport', 'RV Site',
 ];
 
-const RATE_TYPES = [
-  '$/ft./mo.',
-  '$/ft./season',
-  '$/ft./yr.',
-  '$/mo.',
-  '$/season',
-  '$/yr.',
-  '$/SF',
-  'Flat Fee',
+const DEFAULT_RATE_TYPES = [
+  '$/ft./mo.', '$/ft./season', '$/ft./yr.',
+  '$/mo.', '$/season', '$/yr.', '$/SF', 'Flat Fee',
 ];
 
 interface LocationFormDrawerProps {
@@ -98,6 +85,13 @@ type StorageLocationFormValues = z.infer<typeof storageLocationFormSchema>;
 
 export default function LocationFormDrawer({ open, onClose, locationId, projectId }: LocationFormDrawerProps) {
   const { toast } = useToast();
+  const config = useRentRollConfig();
+  const STORAGE_TYPES = config.unitTypes.length > 0
+    ? config.unitTypes.map(t => t.name)
+    : DEFAULT_STORAGE_TYPES;
+  const RATE_TYPES = config.rateTypes.length > 0
+    ? config.rateTypes.map(t => t.value)
+    : DEFAULT_RATE_TYPES;
   const isEditing = !!locationId;
 
   const { data: existingLocation, isLoading: isLoadingLocation, isError: isErrorLocation } = useQuery({

@@ -2,6 +2,7 @@ import { db } from '../db';
 import { auditLogs, securityAuditLog, users } from '../../shared/schema';
 import { eq, desc, and, gte, lte, like, sql, inArray, or, count } from 'drizzle-orm';
 import { Request } from 'express';
+import { logger } from '../lib/logger';
 
 export type AuditEventType = 
   | 'create' | 'update' | 'delete' | 'export' | 'import' | 'sync'
@@ -944,5 +945,34 @@ export class AuditService {
         mimeType: 'application/json',
       };
     }
+  }
+}
+
+/**
+ * Standalone utility to write security events to the security_audit_log table.
+ * Use this for auth events, permission denials, and other security-sensitive actions
+ * that should be tracked separately from general audit logs.
+ */
+export async function logSecurityEvent(params: {
+  userId?: string | null;
+  orgId?: string | null;
+  eventType: string;
+  eventDetails?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  success?: boolean;
+}): Promise<void> {
+  try {
+    await db.insert(securityAuditLog).values({
+      userId: params.userId || null,
+      orgId: params.orgId || null,
+      eventType: params.eventType,
+      eventDetails: params.eventDetails || {},
+      ipAddress: params.ipAddress || null,
+      userAgent: params.userAgent || null,
+      success: params.success !== false,
+    });
+  } catch (err) {
+    logger.error({ error: err }, 'Failed to write audit log');
   }
 }

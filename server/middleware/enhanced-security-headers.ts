@@ -47,9 +47,18 @@ export function configureEnhancedSecurityHeaders(app: Express) {
     // Prevent MIME-type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
+    // Prevent search engine indexing of API and internal pages
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+
+    // Prevent framing (clickjacking protection)
+    res.setHeader('X-Frame-Options', 'DENY');
+
     // Remove server identity headers
     res.removeHeader('X-Powered-By');
     res.removeHeader('Server');
+
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
     // Cross-Origin policies
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
@@ -73,7 +82,7 @@ export function configureEnhancedSecurityHeaders(app: Express) {
     app.use((req: Request, res: Response, next: NextFunction) => {
       res.setHeader(
         'Strict-Transport-Security',
-        'max-age=31536000; includeSubDomains; preload'
+        'max-age=63072000; includeSubDomains; preload'
       );
       next();
     });
@@ -91,12 +100,12 @@ export function getRecommendedHelmetConfig() {
       ? {
           directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://maps.googleapis.com'],
-            styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
             fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-            imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+            imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
             connectSrc: ["'self'", 'https://maps.googleapis.com', 'wss:', 'ws:'],
-            frameSrc: ["'self'", 'https://maps.google.com'],
+            frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             formAction: ["'self'"],
@@ -106,7 +115,7 @@ export function getRecommendedHelmetConfig() {
         }
       : false,
     hsts: {
-      maxAge: 31536000,
+      maxAge: 63072000,
       includeSubDomains: true,
       preload: true,
     },

@@ -18,6 +18,7 @@ import { docIntelService } from "./services/doc-intel-service";
 import { configureSecurityMiddleware } from "./middleware/security";
 import { requestIdMiddleware, requestLoggingMiddleware } from "./middleware/logging";
 import { centralizedErrorHandler, notFoundHandler } from "./middleware/error-handler";
+import { globalRateLimit, loginRateLimit, failedLoginTracker } from "./middleware/rate-limiting";
 import { tenantContextMiddleware } from "./middleware/tenant-context";
 import { logger } from "./lib/logger";
 import settingsRoutes from './routes/settings-routes';
@@ -29,6 +30,8 @@ import healthRoutes from './routes/health';
 import { deprecationWarning } from './routes/api-versioning';
 import { exitStudioRouter } from './routes/exit-studio-routes';
 import legalBenchmarkingRoutes from './routes/legal-benchmarking-routes';
+import { authenticateUser } from './middleware/authenticate';
+import { configureEnhancedSecurityHeaders } from './middleware/enhanced-security-headers';
 
 import { EventEmitter } from 'events';
 EventEmitter.defaultMaxListeners = 50;
@@ -41,12 +44,34 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// Validate required environment variables before starting
+function validateRequiredEnvVars() {
+  const required = ['DATABASE_URL'];
+  const recommended = ['JWT_SECRET', 'SENDGRID_API_KEY', 'STRIPE_SECRET_KEY'];
+
+  const missing = required.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    console.error(`FATAL: Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  const missingRecommended = recommended.filter(v => !process.env[v]);
+  if (missingRecommended.length > 0) {
+    console.warn(`WARNING: Missing recommended environment variables: ${missingRecommended.join(', ')}`);
+  }
+}
+
+validateRequiredEnvVars();
+
 const app = express();
 
 app.use((req, res, next) => { res.setMaxListeners(50); next(); });
 app.use(requestIdMiddleware);
 
 configureSecurityMiddleware(app);
+
+// Enhanced security headers (CSP hardening, Permissions-Policy, etc.)
+configureEnhancedSecurityHeaders(app);
 
 // Stripe webhook route placeholder (payment integration coming soon)
 app.post(
@@ -57,10 +82,25 @@ app.post(
   }
 );
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Default body size limit — keep it small to prevent abuse.
+// File-upload routes should use their own higher-limit parser.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Higher limit for file upload routes
+app.use('/api/uploads', express.json({ limit: '10mb' }));
+app.use('/api/documents/upload', express.json({ limit: '10mb' }));
 
 app.use(requestLoggingMiddleware);
+
+// Global rate limit — 100 req/min per user (Redis-backed)
+app.use(globalRateLimit);
+
+// Strict rate limits for all auth endpoints (login, register, SAML, OIDC)
+app.use('/api/auth', loginRateLimit);
+
+// Block IPs after 5 consecutive failed login attempts for 30 minutes
+app.use('/api/auth/login', failedLoginTracker);
 
 // Enhanced health check routes (mounted BEFORE auth middleware)
 // Provides /health, /health/live, /health/ready endpoints
@@ -73,6 +113,10 @@ app.use('/api', deprecationWarning('2027-06-01'));
 (async () => {
   try {
     const server = await registerRoutes(app);
+
+    // Auth middleware for routes mounted outside registerRoutes()
+    app.use(authenticateUser);
+
     // Then add after auth routes:
     app.use('/api/settings', settingsRoutes);
     app.use('/api', legalBenchmarkingRoutes);

@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { createLease, updateLease, getLease } from "../../lib/rentRollApi";
 import { useToast } from "@/hooks/use-toast";
+import { useRentRollConfig } from "../../hooks/useRentRollConfig";
 import { addYears, addMonths, subDays, format } from "date-fns";
 import {
   Sheet,
@@ -114,6 +115,9 @@ type LeaseFormValues = z.infer<typeof leaseFormSchema>;
 
 export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, location }: LeaseFormDrawerProps) {
   const { toast } = useToast();
+  const config = useRentRollConfig();
+  const showBoatFields = config.showBoatFields;
+  const showLiveaboardFields = config.showLiveaboardFields;
   const isEditing = !!leaseId;
   const [showCustomStorageInput, setShowCustomStorageInput] = useState(false);
   const [customStorageType, setCustomStorageType] = useState("");
@@ -577,6 +581,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                     )}
                   />
 
+                  {showBoatFields && (
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -615,6 +620,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                       )}
                     />
                   </div>
+                  )}
 
 
                   <FormField
@@ -1244,6 +1250,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                     />
                   </div>
 
+                  {showBoatFields && (
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -1285,6 +1292,7 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                       )}
                     />
                   </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField

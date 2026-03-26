@@ -1,17 +1,38 @@
 import { db } from "./db";
-import { tenants, leases, leaseLineItems, marinaLocations, type InsertTenant, type InsertLease, type InsertLeaseLineItem } from "@shared/schema";
+import { tenants, leases, marinaLocations, type InsertTenant, type InsertLease } from "@shared/schema";
 import {
-  ALL_IMPORT_FIELDS,
-  TENANT_IMPORT_FIELDS,
-  LEASE_IMPORT_FIELDS,
-  LINE_ITEM_IMPORT_FIELDS,
-  type ImportFieldMetadata,
+  RENT_ROLL_TARGET_FIELDS as ALL_IMPORT_FIELDS,
+  TENANT_FIELDS as TENANT_IMPORT_FIELDS,
+  LEASE_FIELDS as LEASE_IMPORT_FIELDS,
+  SEASONAL_RATE_FIELDS,
+  ADDITIONAL_FEE_FIELDS,
+  type ImportFieldDefinition as ImportFieldMetadata,
   type ParsedImportRow,
-  type ParsedLineItemData,
-  type BulkLeaseImportResponse,
-} from "@shared/schema";
+  type ImportMode,
+  type RateConfig,
+  type ImportOptions,
+} from "@shared/rent-roll-import-schema";
 import { buildLeaseKey, diffInDays, diffInMonthsInclusive, generateLeaseCashFlows } from "./rentRollService";
 import { eq, and, sql } from "drizzle-orm";
+
+const LINE_ITEM_IMPORT_FIELDS = [...SEASONAL_RATE_FIELDS, ...ADDITIONAL_FEE_FIELDS];
+
+/** Line-item data parsed from an import row */
+export type ParsedLineItemData = Record<string, any>;
+
+/** Result shape returned by the bulk import function */
+export interface BulkLeaseImportResponse {
+  imported: number;
+  skipped: number;
+  errors: number;
+  updated: number;
+  details: {
+    created: Array<{ tenantName: string; leaseId: string }>;
+    duplicates: Array<{ tenantName: string; reason: string }>;
+    failed: Array<{ tenantName: string; error: string }>;
+    updated: Array<{ tenantName: string; leaseId: string }>;
+  };
+}
 
 /**
  * Fetches project season dates for auto-applying to leases without dates

@@ -489,8 +489,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
   app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
 
-  // ── Billing (no auth on webhook endpoint, auth on everything else) ──
-  app.use("/api/billing", billingRouter);
+  // ── Billing (auth required except for public plan catalog and webhooks) ──
+  app.use("/api/billing", (req: any, res: any, next: any) => {
+    // Allow public access to plan catalog and webhook endpoints
+    if (req.path === '/plans' || req.path.startsWith('/webhooks')) {
+      return next();
+    }
+    authenticateUser(req, res, next);
+  }, billingRouter);
 
   // ── Gap Spec (Volume 2) Feature Modules ────────────────────────────
   // A.2-A.5: RBAC, Audit Trail, SSO, 2FA

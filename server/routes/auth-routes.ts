@@ -137,7 +137,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res.cookie('sessionToken', result.session?.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000,
       path: '/',
     });
@@ -173,7 +173,7 @@ router.post('/mfa/verify', async (req: Request, res: Response) => {
     res.cookie('sessionToken', result.session?.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000,
       path: '/',
     });
@@ -371,7 +371,7 @@ router.post('/register', async (req: Request, res: Response) => {
       res.cookie('sessionToken', result.session.sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
         maxAge: 8 * 60 * 60 * 1000,
         path: '/',
       });
@@ -487,7 +487,7 @@ router.get('/magic-link/verify/:token', async (req: Request, res: Response) => {
     res.cookie('sessionToken', session.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000,
       path: '/',
     });
@@ -766,7 +766,7 @@ router.post('/saml/callback/:orgId',
     res.cookie('sessionToken', user.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000,
       path: '/',
     });

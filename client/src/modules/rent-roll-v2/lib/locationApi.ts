@@ -22,7 +22,7 @@ export async function createLocation(data: InsertMarinaLocation): Promise<Marina
 }
 
 export async function updateLocation(id: string, data: Partial<InsertMarinaLocation>): Promise<MarinaLocation> {
-  const res = await apiRequest("PUT", `/api/rent-roll/locations/${id}`, data);
+  const res = await apiRequest("PATCH", `/api/rent-roll/locations/${id}`, data);
   return await res.json();
 }
 

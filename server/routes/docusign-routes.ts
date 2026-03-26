@@ -573,8 +573,45 @@ docusignRouter.post("/envelopes/bulk-send", async (req: Request, res: Response) 
 // ── Webhook Handler ──────────────────────────────────────────────────────
 
 // POST /webhook — DocuSign Connect webhook (no auth — called by DocuSign)
+// DocuSign Connect supports HMAC signature verification via X-DocuSign-Signature headers
 docusignRouter.post("/webhook", async (req: Request, res: Response) => {
   try {
+    // Verify DocuSign HMAC signature if secret is configured
+    const docusignHmacKey = process.env.DOCUSIGN_WEBHOOK_HMAC_KEY;
+    if (docusignHmacKey) {
+      const crypto = await import('crypto');
+      const signatureHeaders = [
+        req.headers['x-docusign-signature-1'] as string,
+        req.headers['x-docusign-signature-2'] as string,
+        req.headers['x-docusign-signature-3'] as string,
+      ].filter(Boolean);
+
+      if (signatureHeaders.length === 0) {
+        return res.status(401).json({ error: 'Missing DocuSign signature header' });
+      }
+
+      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+      const computedHmac = crypto.default
+        .createHmac('sha256', docusignHmacKey)
+        .update(rawBody, 'utf8')
+        .digest('base64');
+
+      const isValid = signatureHeaders.some((sig) => {
+        try {
+          return crypto.default.timingSafeEqual(
+            Buffer.from(sig),
+            Buffer.from(computedHmac)
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid DocuSign webhook signature' });
+      }
+    }
+
     const event = req.body;
     const envelopeId = event?.data?.envelopeId || event?.envelopeId;
     const eventType = event?.event || event?.status;
@@ -643,8 +680,9 @@ docusignRouter.post("/webhook", async (req: Request, res: Response) => {
     res.status(200).json({ received: true, matched: true, status: updateData.status });
   } catch (error: any) {
     // Always return 200 to DocuSign to prevent retries
+    // Do not leak internal error details in the response
     console.error("DocuSign webhook error:", error);
-    res.status(200).json({ received: true, error: error.message });
+    res.status(200).json({ received: true, error: 'Processing error' });
   }
 });
 

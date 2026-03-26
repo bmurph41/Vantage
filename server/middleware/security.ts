@@ -16,17 +16,37 @@ export function configureSecurityMiddleware(app: Express) {
         ? {
             directives: {
               defaultSrc: ["'self'"],
-              scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://maps.googleapis.com'],
-              styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+              scriptSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
               fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-              imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-              connectSrc: ["'self'", 'https://maps.googleapis.com', 'wss:', 'ws:'],
-              frameSrc: ["'self'", 'https://maps.google.com'],
+              imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+              connectSrc: [
+                "'self'",
+                'https://maps.googleapis.com',
+                'https://api.openai.com',
+                'https://api.anthropic.com',
+                'https://api.stripe.com',
+                'https://api.sendgrid.com',
+                'wss:',
+                'ws:',
+              ],
+              frameSrc: ["'none'"],
+              objectSrc: ["'none'"],
+              baseUri: ["'self'"],
+              formAction: ["'self'"],
+              frameAncestors: ["'none'"],
+              upgradeInsecureRequests: [],
             },
           }
         : false,
       crossOriginEmbedderPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      hsts: {
+        maxAge: 63072000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     })
   );
   

@@ -16,6 +16,7 @@ const EXEMPT_PATHS = [
   '/api/webhooks',
   '/api/modeling/projects/',
   '/api/ai-assistant/',
+  '/api/v1/', // API key-authenticated routes are exempt from CSRF
 ];
 
 function generateCsrfToken(): string {
@@ -61,6 +62,17 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
       error: 'CSRF token missing', 
       code: 'CSRF_MISSING' 
     });
+  }
+
+  if (cookieToken.length !== headerToken.length) {
+    logger.warn({
+      type: 'csrf_length_mismatch',
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      userId: (req as any).user?.id,
+    });
+    return res.status(403).json({ error: 'CSRF token mismatch', code: 'CSRF_MISMATCH' });
   }
 
   if (!crypto.timingSafeEqual(Buffer.from(cookieToken), Buffer.from(headerToken))) {

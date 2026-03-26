@@ -54,7 +54,7 @@ export async function updateLease(
   id: string,
   data: { tenant?: Partial<CreateLeaseWithTenant["tenant"]>; lease?: Partial<CreateLeaseWithTenant["lease"]> }
 ): Promise<LeaseWithTenant> {
-  const res = await apiRequest("PUT", `/api/rent-roll/leases/${id}`, data);
+  const res = await apiRequest("PATCH", `/api/rent-roll/leases/${id}`, data);
   return res.json();
 }
 

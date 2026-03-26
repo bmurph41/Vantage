@@ -42,13 +42,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useLocation } from "wouter";
 import { calculateDateRange, type TimePeriodFilter } from "@shared/timePeriodUtils";
+import { getRentRollConfig, getSupportedRentRollAssetClasses } from "@shared/rent-roll-config";
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { createLocation } from "../lib/locationApi";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
-const STORAGE_TYPES = [
+// Default storage types for marina (backward compatible).
+// For per-project views, use getRentRollConfig(project.assetClass).unitTypes instead.
+const DEFAULT_MARINA_UNIT_TYPES = [
   "Wet Slip",
   "Lift Slip",
   "Mooring",
@@ -62,6 +65,9 @@ const STORAGE_TYPES = [
   "Trailer Only",
 ] as const;
 
+// For backward compatibility, STORAGE_TYPES alias
+const STORAGE_TYPES = DEFAULT_MARINA_UNIT_TYPES;
+
 const storageTypeConfigSchema = z.object({
   storageType: z.string(),
   unitCount: z.number().min(0).nullable(),
@@ -71,6 +77,7 @@ const storageTypeConfigSchema = z.object({
 const addProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   projectType: z.enum(["OWNED", "DEAL"]),
+  assetClass: z.string().default("marina"),
   description: z.string().optional(),
   status: z.string().optional(),
   operationType: z.enum(["ANNUAL", "SEASONAL"]).default("ANNUAL"),
@@ -1304,13 +1311,13 @@ export default function ExecutiveDashboard() {
                 </CardContent>
               </Card>
 
-              <Card 
+              <Card
                 data-testid="card-avg-boat-size"
                 className="hover-elevate cursor-pointer"
                 onClick={() => setAvgBoatSizeModalOpen(true)}
               >
                 <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Boat Size</CardTitle>
+                  <CardTitle className="text-sm font-medium">Avg Unit Size</CardTitle>
                   <Ship className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -1849,7 +1856,7 @@ export default function ExecutiveDashboard() {
                 />
               )}
 
-              {addDialogStep === 2 && (
+              {addDialogStep === 2 && (<>
                 <FormField
                   control={form.control}
                   name="projectType"
@@ -1892,7 +1899,41 @@ export default function ExecutiveDashboard() {
                     </FormItem>
                   )}
                 />
-              )}
+
+                <FormField
+                  control={form.control}
+                  name="assetClass"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>Asset Class</FormLabel>
+                      <Select value={field.value || "marina"} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-asset-class">
+                            <SelectValue placeholder="Select asset class..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="marina">Marina</SelectItem>
+                          <SelectItem value="self_storage">Self-Storage</SelectItem>
+                          <SelectItem value="rv_park">RV Park / Campground</SelectItem>
+                          <SelectItem value="mobile_home">Mobile Home Park</SelectItem>
+                          <SelectItem value="multifamily">Multifamily</SelectItem>
+                          <SelectItem value="retail">Retail</SelectItem>
+                          <SelectItem value="office">Office</SelectItem>
+                          <SelectItem value="industrial">Industrial</SelectItem>
+                          <SelectItem value="medical_office">Medical Office</SelectItem>
+                          <SelectItem value="hotel">Hotel / Hospitality</SelectItem>
+                          <SelectItem value="str">Short-Term Rental</SelectItem>
+                          <SelectItem value="mixed_use">Mixed-Use</SelectItem>
+                          <SelectItem value="laundromat">Laundromat</SelectItem>
+                          <SelectItem value="business">Business / Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>)}
 
               {addDialogStep === 3 && (
                 <div className="space-y-4">
@@ -1904,7 +1945,7 @@ export default function ExecutiveDashboard() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Brief description of the marina"
+                            placeholder="Brief description of the property"
                             data-testid="input-project-description"
                             {...field}
                           />

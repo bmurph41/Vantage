@@ -36,7 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import DashboardNav from "../components/navigation/DashboardNav";
 import { createLocation } from "../lib/locationApi";
+import { getRentRollConfig, getSupportedRentRollAssetClasses } from "@shared/rent-roll-config";
 
+// Default marina unit types (backward compatible). Projects use config-driven unit types.
 const STORAGE_TYPES = [
   "Wet Slip",
   "Lift Slip",
@@ -60,6 +62,7 @@ const storageTypeConfigSchema = z.object({
 const addProjectSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   projectType: z.enum(["OWNED", "DEAL"]),
+  assetClass: z.string().default("marina"),
   description: z.string().optional(),
   status: z.string().optional(),
   operationType: z.enum(["ANNUAL", "SEASONAL"]).default("ANNUAL"),

@@ -53,7 +53,8 @@ export class ConflictError extends AppError {
 
 export class TenantIsolationError extends AppError {
   constructor() {
-    super(403, 'Access denied', 'TENANT_ISOLATION_ERROR');
+    // Return 404 instead of 403 to avoid revealing that the resource exists
+    super(404, 'Not found', 'NOT_FOUND');
     this.name = 'TenantIsolationError';
   }
 }
@@ -101,7 +102,16 @@ export function centralizedErrorHandler(
       details: err.details,
       stack: err.statusCode >= 500 ? err.stack : undefined,
     });
-    
+
+    // In production, never leak internal details for 500 errors
+    if (isProduction() && err.statusCode >= 500) {
+      return res.status(err.statusCode).json({
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
+        requestId,
+      });
+    }
+
     return res.status(err.statusCode).json({
       error: err.message,
       code: err.code,
@@ -122,9 +132,10 @@ export function centralizedErrorHandler(
   });
   
   return res.status(500).json({
-    error: isProduction() ? 'An unexpected error occurred' : err.message,
+    error: 'Internal server error',
     code: 'INTERNAL_ERROR',
     requestId,
+    ...(!isProduction() && { debug: err.message }),
   });
 }
 
@@ -138,7 +149,7 @@ export function asyncHandler<T>(
 
 export function notFoundHandler(req: Request, res: Response) {
   const requestId = req.requestId || 'unknown';
-  
+
   if (req.log) {
     req.log.warn({
       type: 'not_found',
@@ -146,11 +157,20 @@ export function notFoundHandler(req: Request, res: Response) {
       path: req.path,
     });
   }
-  
+
   res.status(404).json({
     error: 'Endpoint not found',
     code: 'NOT_FOUND',
     requestId,
-    path: req.path,
+    // Do not leak file paths or internal routing info in production
+    ...(!isProduction() && { path: req.path }),
   });
+}
+
+/**
+ * Returns a 404 instead of 403 to avoid revealing that a resource exists.
+ * Use this for cross-tenant access attempts and sensitive resource checks.
+ */
+export function notFoundOrForbidden(res: Response) {
+  return res.status(404).json({ error: 'Not found' });
 }

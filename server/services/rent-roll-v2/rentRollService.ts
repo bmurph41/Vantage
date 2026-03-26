@@ -33,6 +33,51 @@ import {
 import { convertToMonthlyRent, getMonthsFromContractTerm } from "./rateConversion";
 import { eq, and, gte, lte, sql, desc, asc, isNull, isNotNull, or, inArray } from "drizzle-orm";
 import { format, parse, endOfMonth, startOfMonth, addMonths, subMonths, differenceInDays, startOfYear, isBefore, isAfter } from "date-fns";
+import { getAssetStrategy, type AssetClassStrategy, type LeaseRecord, type TenantRecord } from "./assetStrategies";
+
+// ============================================================================
+// MULTI-ASSET HELPERS
+// ============================================================================
+
+/**
+ * Resolve the display unit type for a lease, respecting the asset class strategy.
+ * For marina: returns storageType (Wet Slip, Dry Rack, etc.)
+ * For other classes: returns unitTypeCustom or storageType fallback
+ */
+export function resolveUnitType(lease: any, assetClass?: string | null): string {
+  const strategy = getAssetStrategy(assetClass);
+  return strategy.resolveUnitType(lease as LeaseRecord);
+}
+
+/**
+ * Resolve the primary dimension for rate calculations.
+ * For marina: boatLength → slipLength → unitDimension1
+ * For self-storage: unitDimension1 (square footage)
+ * For CRE: unitDimension1 (square footage)
+ */
+export function resolveUnitDimension(lease: any, tenant?: any, assetClass?: string | null): number | null {
+  const strategy = getAssetStrategy(assetClass);
+  return strategy.resolveUnitDimension(lease as LeaseRecord, tenant as TenantRecord);
+}
+
+/**
+ * Get the asset class for a location by ID. Cached per request.
+ */
+const locationAssetClassCache = new Map<string, string>();
+
+export async function getLocationAssetClass(locationId: string): Promise<string> {
+  if (locationAssetClassCache.has(locationId)) {
+    return locationAssetClassCache.get(locationId)!;
+  }
+  const [loc] = await db
+    .select({ assetClass: marinaLocations.assetClass })
+    .from(marinaLocations)
+    .where(eq(marinaLocations.id, locationId))
+    .limit(1);
+  const ac = loc?.assetClass || 'marina';
+  locationAssetClassCache.set(locationId, ac);
+  return ac;
+}
 
 // ============================================================================
 // PHASE 1 - NEW TYPES FOR AS-OF DATE & YTD SUPPORT
@@ -349,6 +394,9 @@ export async function createLeaseWithTenant(data: CreateLeaseWithTenant): Promis
     rateType: data.lease.rateType || null,
     contractTerm: data.lease.contractTerm || null,
     storageType: data.lease.storageType || "Wet Slip",
+    unitTypeCustom: (data.lease as any).unitTypeCustom || null,
+    unitDimension1: (data.lease as any).unitDimension1 ? String((data.lease as any).unitDimension1) : null,
+    unitDimension2: (data.lease as any).unitDimension2 ? String((data.lease as any).unitDimension2) : null,
     boatType: data.lease.boatType || null,
     unitLocation: data.lease.unitLocation || null,
     unitNumber: data.lease.unitNumber || null,
@@ -1756,26 +1804,30 @@ export async function upsertPnlRackRevenue(data: Array<{ periodDate: string; amo
  */
 export async function createMoveEvent(data: {
   direction: "IN" | "OUT";
-  customerName: string;
-  checkedAt: string;
+  customerName?: string;
+  checkedAt?: string;
+  eventDate?: string;
+  leaseId?: string;
+  locationId?: string;
+  orgId?: string;
+  reason?: string;
+  notes?: string;
   vesselLoa?: number;
   subtotal?: number;
   sourceSheet?: string;
 }): Promise<MoveEvent> {
-  const checkedDate = new Date(data.checkedAt);
-  const period = await getOrCreatePeriod(checkedDate);
-  
+  const dateStr = data.eventDate || data.checkedAt || new Date().toISOString().split('T')[0];
+
   const [event] = await db.insert(moveEvents).values({
     direction: data.direction,
-    customerName: data.customerName,
-    checkedAt: data.checkedAt,
-    vesselLoa: data.vesselLoa?.toString() || null,
-    subtotal: data.subtotal?.toString() || null,
-    sourceYear: checkedDate.getFullYear(),
-    sourceSheet: data.sourceSheet || null,
-    periodId: period.id,
+    eventDate: dateStr,
+    leaseId: data.leaseId || "unknown",
+    locationId: data.locationId || null,
+    orgId: data.orgId || "org-1",
+    reason: data.reason || (data.customerName ? `Move ${data.direction.toLowerCase()} - ${data.customerName}` : undefined),
+    notes: data.notes || (data.sourceSheet ? `Source: ${data.sourceSheet}` : undefined),
   }).returning();
-  
+
   return event;
 }
 
@@ -1798,42 +1850,37 @@ export async function getAllMoveEvents(filters?: {
   pageSize?: number;
 }): Promise<{ events: MoveEvent[]; total: number; summary: MoveEventsSummary }> {
   const conditions = [];
-  
+
   if (filters?.direction) {
     conditions.push(eq(moveEvents.direction, filters.direction));
   }
-  
+
   if (filters?.year) {
-    conditions.push(eq(moveEvents.sourceYear, filters.year));
+    conditions.push(sql`EXTRACT(YEAR FROM ${moveEvents.eventDate}::date) = ${filters.year}`);
   }
-  
+
   if (filters?.locationId) {
     conditions.push(eq(moveEvents.locationId, filters.locationId));
   }
-  
-  const allEvents = await db.query.moveEvents.findMany({
-    where: conditions.length > 0 ? and(...conditions) : undefined,
-    orderBy: [desc(moveEvents.checkedAt)],
-  });
-  
+
+  const allEvents = await db
+    .select()
+    .from(moveEvents)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(moveEvents.eventDate));
+
   const page = filters?.page || 1;
   const pageSize = filters?.pageSize || 50;
   const start = (page - 1) * pageSize;
   const end = start + pageSize;
-  
+
   // Calculate summary stats from all events (not just paginated)
   const totalMoveIns = allEvents.filter(e => e.direction === "IN").length;
   const totalMoveOuts = allEvents.filter(e => e.direction === "OUT").length;
   const netChange = totalMoveIns - totalMoveOuts;
-  
-  // Calculate average vessel size from events with vesselLoa data
-  const eventsWithLoa = allEvents.filter(e => e.vesselLoa !== null && e.vesselLoa !== undefined);
-  const avgVesselSize = eventsWithLoa.length > 0 
-    ? eventsWithLoa.reduce((sum, e) => sum + (parseFloat(e.vesselLoa?.toString() || "0") || 0), 0) / eventsWithLoa.length
-    : null;
-  
-  // Calculate total revenue from subtotals
-  const totalRevenue = allEvents.reduce((sum, e) => sum + (parseFloat(e.subtotal?.toString() || "0") || 0), 0);
+
+  const avgVesselSize = null;
+  const totalRevenue = 0;
   
   return {
     events: allEvents.slice(start, end),
@@ -1934,9 +1981,12 @@ export async function getRevenueByStorageType(
     whereConditions.push(projectFilter);
   }
 
+  // Use COALESCE(unitTypeCustom, storageType) so non-marina asset classes group by their custom unit type
+  const unitTypeExpr = sql<string>`COALESCE(${leases.unitTypeCustom}, ${leases.storageType}::text)`;
+
   const results = await db
     .select({
-      storageType: leases.storageType,
+      storageType: unitTypeExpr,
       totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.rentAmount}), 0)`,
       leaseCount: sql<number>`COUNT(DISTINCT ${leases.id})`,
     })
@@ -1945,7 +1995,7 @@ export async function getRevenueByStorageType(
     .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
     .innerJoin(periods, eq(leaseCashFlows.periodId, periods.id))
     .where(and(...whereConditions))
-    .groupBy(leases.storageType)
+    .groupBy(unitTypeExpr)
     .orderBy(desc(sql`SUM(${leaseCashFlows.rentAmount})`));
 
   // Calculate total revenue for percentage calculation

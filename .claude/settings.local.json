@@ -72,7 +72,27 @@
       "Bash(pkill -f 'drizzle-kit push')",
       "Bash(psql:*)",
       "Bash(find /home/runner/workspace/client/src/components -type d -name *workspace* -o -type d -name *deal*)",
-      "Bash(curl -s -X POST http://localhost:5000/api/dd-checklist-templates/seed -H \"Content-Type: application/json\")"
+      "Bash(curl -s -X POST http://localhost:5000/api/dd-checklist-templates/seed -H \"Content-Type: application/json\")",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//tmp/claude-1000/-home-runner-workspace/570a7f51-7562-46ce-8496-153e87d7baa2/tasks/**)",
+      "Bash(npm ls:*)",
+      "Bash(unzip -l marinamatch-full.zip)",
+      "Bash(find /home/runner/workspace/client/src/components/rent-roll -type f -name *.tsx)",
+      "Bash(xargs basename:*)",
+      "Bash(unzip -o marinamatch-full.zip -d /tmp/marinamatch)",
+      "Bash(find /home/runner/workspace/client -type d -name *rent* -o -type d -name *rra*)",
+      "Bash(find /home/runner/workspace -name rra-routes.ts -o -name *rra*routes*)",
+      "Bash(for endpoint:*)",
+      "Bash(do)",
+      "Bash(echo \"=== Searching for: $endpoint ===\")",
+      "Bash(for table:*)",
+      "Bash(if grep:*)",
+      "Bash(then)",
+      "Bash(echo \"✓ $table EXISTS\")",
+      "Bash(else)",
+      "Bash(find /home/runner/workspace/modules -type f -name *commercial*)",
+      "Bash(find /home/runner/workspace -type f -path */rent-roll* -name *.ts -o -path */rent-roll* -name *.tsx)"
     ]
   }
 }

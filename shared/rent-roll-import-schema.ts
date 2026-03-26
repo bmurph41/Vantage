@@ -133,6 +133,9 @@ export interface ImportSession {
   valueMappings: ValueMappingItem[];
   rateConfiguration?: RateConfig[];
   defaultStorageType?: string;
+  // Multi-asset: asset class of the target project (drives field selection)
+  assetClass?: string;
+  locationId?: string;
   autoApplyContractTermDates?: boolean;
   importMode: ImportMode;
   skipDuplicates: boolean;
@@ -375,4 +378,145 @@ export function transformBoolean(value: any): boolean | null {
   if (['true', 'yes', 'y', '1', 'x', 'checked'].includes(strValue)) return true;
   if (['false', 'no', 'n', '0', '', 'unchecked'].includes(strValue)) return false;
   return null;
+}
+
+// ============================================================================
+// MULTI-ASSET-CLASS IMPORT FIELD CONFIGURATIONS
+// ============================================================================
+
+/** Common tenant fields shared across all asset classes */
+const COMMON_TENANT_FIELDS: ImportFieldDefinition[] = [
+  { id: "tenantName", label: "Tenant Name", type: "text", required: false, recommended: true, aliases: ["tenant", "lessee", "name", "customer", "owner", "renter", "client"] },
+  { id: "tenantEmail", label: "Tenant Email", type: "text", required: false, aliases: ["email", "email_address", "e-mail", "contact email"] },
+  { id: "tenantPhone", label: "Tenant Phone", type: "text", required: false, aliases: ["phone", "phone_number", "telephone", "mobile", "cell"] },
+  { id: "address1", label: "Address Line 1", type: "text", required: false, aliases: ["address1", "street", "street_address"] },
+  { id: "address2", label: "Address Line 2", type: "text", required: false, aliases: ["address2", "apt", "suite", "unit"] },
+  { id: "city", label: "City", type: "text", required: false, aliases: ["city", "town"] },
+  { id: "state", label: "State", type: "text", required: false, aliases: ["state", "province", "region"] },
+  { id: "zip", label: "ZIP Code", type: "text", required: false, aliases: ["zip", "zipcode", "postal", "postal_code"] },
+  { id: "fullAddress", label: "Full Address (AI will split)", type: "text", required: false, aliases: ["address", "full_address", "complete_address", "mailing_address"] },
+];
+
+/** Common lease fields shared across all asset classes */
+const COMMON_LEASE_FIELDS: ImportFieldDefinition[] = [
+  { id: "unitLocation", label: "Unit Location", type: "text", required: false, aliases: ["unit", "space", "location", "unit #", "unit number"] },
+  { id: "leaseAmount", label: "Monthly Rent", type: "currency", required: false, recommended: true, aliases: ["rent", "rate", "amount", "fee", "charge", "monthly", "price", "cost", "base rent"] },
+  { id: "leaseCommencement", label: "Lease Start Date", type: "date", required: false, recommended: true, aliases: ["start", "begin", "commence", "from", "effective", "start_date"] },
+  { id: "leaseExpiration", label: "Lease End Date", type: "date", required: false, aliases: ["end", "expire", "expiration", "through", "to_date", "end_date"] },
+  { id: "contractTerm", label: "Contract Term", type: "text", required: false, aliases: ["term", "contract", "period", "lease type"] },
+  { id: "notes", label: "Notes", type: "text", required: false, aliases: ["notes", "comments", "memo", "remarks"] },
+];
+
+/** Self-Storage specific import fields */
+const SELF_STORAGE_TENANT_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_TENANT_FIELDS,
+];
+
+const SELF_STORAGE_LEASE_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_LEASE_FIELDS,
+  { id: "unitTypeCustom", label: "Unit Type", type: "text", required: false, recommended: true, aliases: ["type", "unit type", "size", "unit size"], validValues: ["5x5", "5x10", "10x10", "10x15", "10x20", "10x25", "10x30", "10x40", "15x20", "20x20"] },
+  { id: "unitDimension1", label: "Unit SF", type: "number", required: false, aliases: ["sf", "sqft", "square feet", "square footage", "area"] },
+  { id: "slipStatus", label: "Unit Status", type: "text", required: false, aliases: ["status", "occupancy"], validValues: ["Occupied", "Vacant", "Reserved", "Delinquent", "Maintenance"] },
+  { id: "rateType", label: "Rate Type", type: "text", required: false, aliases: ["rate type", "billing", "rate basis"] },
+];
+
+/** Multifamily specific import fields */
+const MULTIFAMILY_LEASE_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_LEASE_FIELDS,
+  { id: "unitTypeCustom", label: "Unit Type", type: "text", required: false, recommended: true, aliases: ["type", "unit type", "bed/bath", "floorplan"], validValues: ["Studio", "1BR/1BA", "2BR/1BA", "2BR/2BA", "3BR/2BA", "3BR/3BA", "4BR+"] },
+  { id: "unitDimension1", label: "Unit SF", type: "number", required: false, aliases: ["sf", "sqft", "square feet", "square footage"] },
+  { id: "slipStatus", label: "Unit Status", type: "text", required: false, aliases: ["status"], validValues: ["Occupied", "Vacant", "Down for Renovation", "Model", "Notice to Vacate"] },
+  { id: "baseRent2", label: "Market Rent", type: "currency", required: false, aliases: ["market rent", "market rate", "asking rent"] },
+];
+
+/** CRE (Retail/Office/Industrial) specific import fields */
+const CRE_TENANT_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_TENANT_FIELDS,
+  { id: "tradeName", label: "Trade Name / DBA", type: "text", required: false, aliases: ["trade name", "dba", "doing business as"] },
+  { id: "contactName", label: "Contact Name", type: "text", required: false, aliases: ["contact", "contact name", "primary contact"] },
+  { id: "industry", label: "Industry / Use", type: "text", required: false, aliases: ["industry", "use", "permitted use", "business type"] },
+];
+
+const CRE_LEASE_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_LEASE_FIELDS,
+  { id: "unitTypeCustom", label: "Space Type", type: "text", required: false, aliases: ["type", "space type", "suite type"] },
+  { id: "unitDimension1", label: "Square Footage", type: "number", required: false, recommended: true, aliases: ["sf", "sqft", "square feet", "rsf", "rentable sf", "nra"] },
+  { id: "rateType", label: "Lease Type", type: "text", required: false, aliases: ["lease type", "rent type"], validValues: ["NNN", "Modified Gross", "Full Service", "Absolute Net", "Double Net"] },
+  { id: "slipStatus", label: "Occupancy Status", type: "text", required: false, aliases: ["status", "occupancy"], validValues: ["Occupied", "Vacant", "Under Renovation", "Leased - Not Occupied"] },
+  { id: "baseRent2", label: "Escalated Rent", type: "currency", required: false, aliases: ["escalated rent", "new rent", "adjusted rent"] },
+];
+
+/** RV Park / Campground specific import fields */
+const RV_PARK_LEASE_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_LEASE_FIELDS,
+  { id: "unitTypeCustom", label: "Site Type", type: "text", required: false, recommended: true, aliases: ["type", "site type", "hookup type"], validValues: ["Full Hookup", "Water/Electric", "Electric Only", "Dry Camping", "Cabin", "Glamping", "Tent Site"] },
+  { id: "rateType", label: "Rate Type", type: "text", required: false, aliases: ["rate type", "billing"], validValues: ["$/Night", "$/Week", "$/Month", "$/Season", "$/Year"] },
+  { id: "slipStatus", label: "Site Status", type: "text", required: false, aliases: ["status"], validValues: ["Occupied", "Vacant", "Reserved", "Seasonal Hold", "Maintenance"] },
+];
+
+const RV_PARK_TENANT_FIELDS: ImportFieldDefinition[] = [
+  ...COMMON_TENANT_FIELDS,
+  { id: "vehicleType", label: "Vehicle Type", type: "text", required: false, aliases: ["vehicle", "rig type", "rv type"] },
+  { id: "vehicleLength", label: "Vehicle Length (ft)", type: "number", required: false, aliases: ["length", "rv length", "rig length"] },
+];
+
+/**
+ * Get the appropriate import field definitions for a given asset class.
+ * Returns { tenantFields, leaseFields, allFields } with asset-appropriate
+ * field labels, aliases, and valid values.
+ */
+export function getImportFieldsForAssetClass(assetClass: string | null | undefined): {
+  tenantFields: ImportFieldDefinition[];
+  leaseFields: ImportFieldDefinition[];
+  allFields: ImportFieldDefinition[];
+} {
+  const ac = assetClass || 'marina';
+
+  switch (ac) {
+    case 'self_storage':
+      return {
+        tenantFields: SELF_STORAGE_TENANT_FIELDS,
+        leaseFields: SELF_STORAGE_LEASE_FIELDS,
+        allFields: [...SELF_STORAGE_TENANT_FIELDS, ...SELF_STORAGE_LEASE_FIELDS],
+      };
+
+    case 'multifamily':
+    case 'duplex':
+    case 'triplex':
+    case 'quad':
+      return {
+        tenantFields: COMMON_TENANT_FIELDS,
+        leaseFields: MULTIFAMILY_LEASE_FIELDS,
+        allFields: [...COMMON_TENANT_FIELDS, ...MULTIFAMILY_LEASE_FIELDS],
+      };
+
+    case 'retail':
+    case 'office':
+    case 'industrial':
+    case 'medical_office':
+    case 'shopping_center':
+      return {
+        tenantFields: CRE_TENANT_FIELDS,
+        leaseFields: CRE_LEASE_FIELDS,
+        allFields: [...CRE_TENANT_FIELDS, ...CRE_LEASE_FIELDS],
+      };
+
+    case 'rv_park':
+    case 'mobile_home':
+    case 'mobile_home_park':
+      return {
+        tenantFields: RV_PARK_TENANT_FIELDS,
+        leaseFields: RV_PARK_LEASE_FIELDS,
+        allFields: [...RV_PARK_TENANT_FIELDS, ...RV_PARK_LEASE_FIELDS],
+      };
+
+    case 'marina':
+    default:
+      // Marina uses the original field definitions (backward compatible)
+      return {
+        tenantFields: TENANT_FIELDS,
+        leaseFields: [...LEASE_FIELDS, ...SEASONAL_RATE_FIELDS, ...ADDITIONAL_FEE_FIELDS],
+        allFields: RENT_ROLL_TARGET_FIELDS,
+      };
+  }
 }
