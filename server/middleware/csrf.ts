@@ -11,7 +11,13 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 const EXEMPT_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/auth/magic-link',
+  '/api/auth/verify-email',
   '/api/auth/saml',
+  '/api/auth/oidc',
+  '/api/auth/mfa',
   '/api/stripe/webhook',
   '/api/webhooks',
   '/api/modeling/projects/',

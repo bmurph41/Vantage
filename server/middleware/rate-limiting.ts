@@ -123,9 +123,9 @@ export function failedLoginTracker(req: Request, res: Response, next: NextFuncti
     if (res.statusCode === 401 || res.statusCode === 403) {
       const current = failedLoginAttempts.get(ip) || { count: 0, blockedUntil: null };
       current.count += 1;
-      if (current.count >= 5) {
-        current.blockedUntil = Date.now() + 30 * 60 * 1000;
-        logger.warn({ type: 'failed_login_ip_block_triggered', ip }, 'IP blocked after 5 failed login attempts');
+      if (current.count >= 10) {
+        current.blockedUntil = Date.now() + 15 * 60 * 1000; // 15 min block after 10 failures
+        logger.warn({ type: 'failed_login_ip_block_triggered', ip }, 'IP blocked after 10 failed login attempts');
       }
       failedLoginAttempts.set(ip, current);
     } else if (res.statusCode >= 200 && res.statusCode < 300) {

@@ -94,12 +94,15 @@ app.use('/api/documents/upload', express.json({ limit: '10mb' }));
 app.use(requestLoggingMiddleware);
 
 // Global rate limit — 100 req/min per user (Redis-backed)
+// NOTE: security.ts already applies /api/ rate limit (300/15min) and /api/auth/login limit (10/15min).
+// This global limiter adds a per-minute cap on top.
 app.use(globalRateLimit);
 
-// Strict rate limits for all auth endpoints (login, register, SAML, OIDC)
-app.use('/api/auth', loginRateLimit);
+// NOTE: Removed duplicate loginRateLimit here — security.ts already applies one at line 86.
+// Having two separate rate limiters on the same path caused double-counting.
 
-// Block IPs after 5 consecutive failed login attempts for 30 minutes
+// Track failed logins per IP — block after 10 consecutive failures for 15 minutes.
+// (Reduced from 5 failures / 30 min which was too aggressive)
 app.use('/api/auth/login', failedLoginTracker);
 
 // Enhanced health check routes (mounted BEFORE auth middleware)

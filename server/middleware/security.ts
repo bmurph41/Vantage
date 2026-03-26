@@ -85,9 +85,9 @@ export function configureSecurityMiddleware(app: Express) {
   
   app.use('/api/auth/login', createRateLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: { 
-      error: 'Too many login attempts', 
+    max: 20,
+    message: {
+      error: 'Too many login attempts',
       code: 'LOGIN_RATE_LIMITED',
       retryAfter: 15 * 60,
     },
