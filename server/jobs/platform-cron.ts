@@ -531,6 +531,82 @@ export function startPlatformCronJobs() {
     }
   });
 
+  // ─── 9. Trial Reminder Emails — daily at 8:30 AM ─────────────────────
+  cron.schedule("30 8 * * *", async () => {
+    logger.info("[CRON] Running trial reminder email check");
+    try {
+      // Find orgs on trial by checking organizationPacks with status='trial'
+      const trialPacks = await db
+        .select({
+          orgId: organizationPacks.orgId,
+          trialEndsAt: organizationPacks.trialEndsAt,
+          packType: organizationPacks.packType,
+        })
+        .from(organizationPacks)
+        .where(
+          and(
+            eq(organizationPacks.status, "trial"),
+            sql`${organizationPacks.trialEndsAt} IS NOT NULL`,
+          ),
+        );
+
+      // Group by org — use the earliest trial end date
+      const orgTrials = new Map<string, Date>();
+      for (const pack of trialPacks) {
+        if (!pack.orgId || !pack.trialEndsAt) continue;
+        const endDate = new Date(pack.trialEndsAt);
+        const existing = orgTrials.get(pack.orgId);
+        if (!existing || endDate < existing) {
+          orgTrials.set(pack.orgId, endDate);
+        }
+      }
+
+      let day3Sent = 0, day5Sent = 0, day7Sent = 0;
+
+      for (const [orgId, trialEnd] of orgTrials) {
+        const now = new Date();
+        const daysUntilEnd = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Determine which reminder to send
+        let sendFn: ((to: string, name?: string) => Promise<boolean>) | null = null;
+        if (daysUntilEnd === 4) sendFn = sendTrialDay3Email;  // Day 3 of trial (4 days left)
+        else if (daysUntilEnd === 2) sendFn = sendTrialDay5Email;  // Day 5 of trial (2 days left)
+        else if (daysUntilEnd === 0 || daysUntilEnd === 1) sendFn = sendTrialLastDayEmail;  // Day 7 — last day
+        else continue;
+
+        // Get org owners to email
+        const orgOwners = await db
+          .select({ email: users.email, name: users.name })
+          .from(users)
+          .where(
+            and(
+              eq(users.orgId, orgId),
+              eq(users.role, "owner"),
+              eq(users.isDisabled, false),
+            ),
+          );
+
+        for (const owner of orgOwners) {
+          if (!owner.email) continue;
+          try {
+            await sendFn(owner.email, owner.name || undefined);
+            if (daysUntilEnd === 4) day3Sent++;
+            else if (daysUntilEnd === 2) day5Sent++;
+            else day7Sent++;
+          } catch (emailError: any) {
+            logger.error({ error: emailError.message, to: owner.email }, "[CRON] Trial reminder email failed");
+          }
+        }
+      }
+
+      if (day3Sent + day5Sent + day7Sent > 0) {
+        logger.info(`[CRON] Trial reminders sent: ${day3Sent} day-3, ${day5Sent} day-5, ${day7Sent} last-day`);
+      }
+    } catch (error) {
+      logger.error({ error }, "[CRON] Trial reminder check failed");
+    }
+  });
+
   logger.info("All platform background jobs scheduled successfully");
 }
 
@@ -549,6 +625,7 @@ export function getPlatformJobStatus(): {
       { name: "rent_reconciliation", schedule: "0 1 * * *", description: "Rent payment reconciliation (nightly 1 AM)" },
       { name: "stale_deal_detection", schedule: "0 6 * * 1", description: "Stale deal detection (Monday 6 AM)" },
       { name: "exchange_rate_refresh", schedule: "0 6 * * *", description: "Exchange rate refresh (daily 6 AM)" },
+      { name: "trial_reminders", schedule: "30 8 * * *", description: "Trial reminder emails (daily 8:30 AM)" },
     ],
   };
 }

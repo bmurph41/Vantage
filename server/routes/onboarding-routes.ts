@@ -420,15 +420,13 @@ onboardingRouter.post("/notifications/dispatch", async (req: Request, res: Respo
 
     // Attempt email delivery (fire-and-forget)
     try {
-      const { getSendGridClient } = await import("../services/email-service");
-      const { client, fromEmail } = await getSendGridClient();
+      const { sendEmail } = await import("../services/email-service");
 
       for (const userId of targetUserIds) {
         const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, userId));
         if (user?.email) {
-          await client.send({
+          await sendEmail({
             to: user.email,
-            from: { email: fromEmail, name: "MarinaMatch" },
             subject: content.title,
             text: `${content.message}\n\nView in MarinaMatch: ${process.env.APP_URL || "https://app.marinamatch.com"}`,
             html: `<p>${content.message}</p><p><a href="${process.env.APP_URL || "https://app.marinamatch.com"}">View in MarinaMatch</a></p>`,
