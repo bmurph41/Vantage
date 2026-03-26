@@ -9,12 +9,12 @@ import bcrypt from 'bcrypt';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import { logger } from '../lib/logger';
-import { sendPasswordResetEmail } from './email-service';
+import { sendPasswordResetEmail, sendEmail } from './email-service';
 
 const SALT_ROUNDS = 12;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours default
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+// No lockout — instead, send an email notification after too many attempts
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
 const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 

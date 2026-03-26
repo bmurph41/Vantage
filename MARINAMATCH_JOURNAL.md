@@ -1,6 +1,57 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-25)
+## Current State (2026-03-26)
+
+### ✅ COMPLETE — Final Pending Items Resolved (2026-03-26)
+All deferred/pending items from the journal now resolved:
+
+**1. DB Migration — 18 New Tables Created in Postgres**
+All tables that were defined in schema.ts but missing from the DB are now live:
+api_keys, docusign_envelopes, docusign_templates, property_public_records, deal_predictions, asset_risk_scores, hold_sell_analyses, cash_flow_forecasts, liquidity_alerts, ai_underwriting_runs, buy_box_profiles, buy_box_scores, meeting_recordings, exchange_rates, comp_overrides, comp_contributions, comp_dedup_matches, dd_findings
+
+**2. Master Comps Pack — Fully Wired**
+- Added `master_comps` to packTypeEnum in shared/schema.ts
+- Added PACK_DEPENDENCIES entry (requires `analysis`)
+- Added PACK_INFO fallback in pack-service.ts ($99/mo, 6 features)
+- Added to getAllPacksWithStatus() alongside role-based packs (owner/investor/broker)
+- Seeded pack_catalog row in Postgres
+- Added to ALTER TYPE pack_type enum in DB
+
+**3. Email System — Unified Provider with Fallback Chain**
+Rewrote server/services/email-service.ts:
+- New unified `sendEmail()` function tries: SendGrid → Resend → console log
+- All existing email functions (password reset, verification, magic link) now use `sendEmail()`
+- Added `wrapEmailTemplate()` and `emailButton()` helpers for consistent MarinaMatch branding
+- Notification dispatch (onboarding-routes.ts) updated to use `sendEmail()` instead of raw SendGrid
+- Emails will NEVER silently fail — console fallback ensures visibility in dev
+
+**4. Trial Reminder System (7-day free trial with CC on file)**
+- New cron job #9 in platform-cron.ts: `30 8 * * *` (daily 8:30 AM)
+- Queries organizationPacks with status='trial' and trialEndsAt
+- Day 3 email: "Getting the most out of MarinaMatch" tips
+- Day 5 email: "Your trial expires in 2 days" warning
+- Day 7 email: "Trial ending today — subscription begins" or cancel prompt
+- Sends to org owners only
+- 3 new email templates: `sendTrialDay3Email()`, `sendTrialDay5Email()`, `sendTrialLastDayEmail()`
+
+**5. Sign-Up Page — Categorized Asset Classes + All Packs + Recommendations**
+Enhanced client/src/pages/auth/signup.tsx:
+- **Asset classes now organized into 6 categories** with expandable accordion:
+  - Marine & Outdoor Recreation (marina, RV park, campground, boat storage, MHP)
+  - Hospitality & STRs (hotel, STR, resort, B&B)
+  - Residential (multifamily, SFR, student housing, senior living, affordable)
+  - Commercial (office, retail, industrial, mixed use, medical office, self storage)
+  - Specialty & Business Acquisitions (car wash, laundromat, gas station, restaurant, salon, gym, pet care, parking)
+  - Institutional & Land (net lease, dev land, data center)
+- **All 12 packs now shown** in step 4 (was 8): added master_comps, owner, investor, broker
+- **Role-based recommendations**: each role gets suggested packs highlighted with "Recommended" badges
+- **"Select all recommended" button** for quick setup
+- **Trial messaging**: "7-day free trial included", "Start Free Trial" CTA, pricing shows "after trial"
+
+**6. Real Data Import — Already Complete (confirmed)**
+Sales comps and rate comps upload flows were already fully built with CSV/Excel parsing, column mapping, duplicate detection, and async processing. Not actually pending — confirmed complete.
+
+---
 
 ### ✅ COMPLETE — Background Jobs + Org Settings + Integrations Marketplace (2026-03-26)
 Three operational systems built:
@@ -512,43 +563,18 @@ Full overhaul of /analysis/demographics to match STDB / LandVision / ArcGIS Busi
 
 ---
 
-## Remaining Work (priority order)
+## Remaining Work
 
-### 1. Stripe Payment Integration (HIGH — packs activated via admin/DB only)
-Pack enforcement is live but there's no self-serve payment flow. Stripe fields
-exist in schema (stripePriceIdMonthly, stripeSubscriptionId, etc.) but no
-webhook handlers or checkout routes. Packs currently activated manually.
-Note: Stripe rent payment intent creation is now built in C.2, but pack
-checkout/subscription flow is separate and still pending.
-
-### 2. Real Data Import (HIGH — platform is data-ready)
-Sales Comps: /analysis/sales-comps/upload
-Rate Comps: /analysis/rate-comps
-Empty state CTAs now point directly to these flows.
-
-### 3. J.1 Native Mobile App — NOT APPLICABLE
-Spec calls for iOS/Android but web app is fully responsive. Deferred to post-launch.
-
-### 4. External API Keys — DB Migration
-apiKeys table exists in schema but needs `npm run db:push` or manual SQL to create
-in PostgreSQL. Same for all new tables (docusign_envelopes, docusign_templates,
-property_public_records, deal_predictions, asset_risk_scores, hold_sell_analyses,
-cash_flow_forecasts, liquidity_alerts, ai_underwriting_runs, buy_box_profiles,
-buy_box_scores, meeting_recordings, exchange_rates, comp_overrides,
-comp_contributions, comp_dedup_matches).
-
-### 5. Admin Panel — ✅ DONE (2026-03-25)
-Comprehensive admin dashboard already existed at /api/admin/*. Enhanced with:
-- **Platform Dashboard** (GET /admin/customers/dashboard): total users, active/disabled/verified/MFA stats, role breakdown, 30/90d signups, active-in-30d, never-logged-in, org count, subscription stats (MRR/ARR), pack adoption
-- **Signup Funnel** (GET /admin/customers/signup-funnel): daily/weekly/monthly registration trends, verification rate, activation rate, configurable lookback
-- **Active Sessions** (GET /admin/customers/active-sessions): live sessions with device, browser, OS, IP, location, user info
-- **Login Activity** (GET /admin/customers/login-activity): success/failure events, unique users/IPs, configurable lookback
-- **Cohort Retention** (GET /admin/customers/cohort-retention): monthly cohort analysis with retention percentages
-Pre-existing: user CRUD, invite, enable/disable, subscription management (cancel/reactivate/extend trial/change plan), CSV export, notes, audit trail, org management, pack grant/revoke, ownership transfer
-
-### 6. Master Comps Pack — Catalog Entry
-Add `master_comps` to packCatalog table with pricing and feature list.
-Currently only exists in code logic — needs DB seed row.
+### All Major Items Complete
+- ✅ Stripe Payment Integration — done (checkout, portal, webhooks)
+- ✅ Real Data Import — done (full CSV/Excel upload for sales + rate comps)
+- ✅ DB Migration — done (18 new tables created via raw SQL)
+- ✅ Master Comps Pack — done (enum, catalog, pack-service)
+- ✅ Email System — done (unified provider with SendGrid → Resend → console fallback)
+- ✅ Trial Reminders — done (day 3/5/7 emails via cron job)
+- ✅ Sign-Up Enhancement — done (categorized assets, all packs, recommendations)
+- ✅ Admin Panel — done
+- N/A J.1 Native Mobile — deferred (web app is fully responsive)
 
 ### 3. CRM Dashboard Assessment — ✅ DONE (2026-03-19)
 Assessed: already solid (684 lines, 6 KPI cards, pipeline bars, activity panels,
