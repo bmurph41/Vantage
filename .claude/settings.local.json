@@ -70,7 +70,8 @@
       "Bash(find /home/runner/workspace -maxdepth 3 -name .env* -o -name *.env)",
       "Bash(kill %1)",
       "Bash(pkill -f 'drizzle-kit push')",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(find /home/runner/workspace/client/src/components -type d -name *workspace* -o -type d -name *deal*)"
     ]
   }
 }
