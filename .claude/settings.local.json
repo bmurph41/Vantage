@@ -71,7 +71,8 @@
       "Bash(kill %1)",
       "Bash(pkill -f 'drizzle-kit push')",
       "Bash(psql:*)",
-      "Bash(find /home/runner/workspace/client/src/components -type d -name *workspace* -o -type d -name *deal*)"
+      "Bash(find /home/runner/workspace/client/src/components -type d -name *workspace* -o -type d -name *deal*)",
+      "Bash(curl -s -X POST http://localhost:5000/api/dd-checklist-templates/seed -H \"Content-Type: application/json\")"
     ]
   }
 }

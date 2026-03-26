@@ -87,6 +87,25 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
   const seedTemplates = useSeedTemplates();
   const updateSettings = useUpdateChecklistSettings();
   const togglePeriod = useTogglePeriodReceived();
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const saveAsTemplate = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
+      const res = await apiRequest('POST', '/api/dd-checklist-templates/save-from-checklist', {
+        workspaceId, name, description,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Template saved', description: 'Your checklist has been saved as a reusable template.' });
+      setShowSaveDialog(false);
+      setSaveTemplateName('');
+      queryClient.invalidateQueries({ queryKey: ['/api/dd-checklist-templates'] });
+    },
+    onError: () => {
+      toast({ title: 'Failed to save template', variant: 'destructive' });
+    },
+  });
 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -268,6 +287,9 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
             </Button>
             <Button variant="outline" size="sm" onClick={() => exportChecklist.mutate({ workspaceId, format: 'excel' })}>
               <Download className="h-4 w-4 mr-1" />Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
+              <Save className="h-4 w-4 mr-1" />Save as Template
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowSettingsDialog(true)}>
               <Settings className="h-4 w-4" />
@@ -649,64 +671,247 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
           onUpdate={updateSettings}
         />
       )}
+
+      {/* Save as Template dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>Save this checklist as a reusable template for future deals.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Template Name</Label>
+              <Input
+                placeholder="e.g. Marina Acquisition Standard"
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => saveAsTemplate.mutate({ name: saveTemplateName })}
+              disabled={!saveTemplateName.trim() || saveAsTemplate.isPending}
+            >
+              {saveAsTemplate.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
+const TEMPLATE_CATEGORY_META: Record<string, { label: string; icon: string; color: string }> = {
+  'Financial Due Diligence': { label: 'Financial', icon: '💰', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  'Legal Due Diligence': { label: 'Legal', icon: '⚖️', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  'Operations Due Diligence': { label: 'Operations', icon: '⚙️', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  'Environmental Due Diligence': { label: 'Environmental', icon: '🌿', color: 'bg-green-50 text-green-700 border-green-200' },
+  'Insurance & Compliance': { label: 'Insurance', icon: '🛡️', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  'Technology & IT Due Diligence': { label: 'Technology', icon: '💻', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+};
+
+function getTemplateItemCount(tmpl: any): number {
+  return tmpl.data?.sections?.reduce((n: number, s: any) => n + (s.items?.length || 0), 0) || 0;
+}
+
+function getTemplateSectionCount(tmpl: any): number {
+  return tmpl.data?.sections?.length || 0;
+}
+
 function TemplatePickerDialog({ open, onClose, templates, selectedIds, onToggle, mergeStrategy, onMergeChange, onConfirm, isPending, onSeed, isSeedPending }: any) {
+  const [previewTemplate, setPreviewTemplate] = useState<any>(null);
+
+  // Separate quick-start vs comprehensive vs custom
+  const quickStartNames = new Set(Object.keys(TEMPLATE_CATEGORY_META));
+  const quickStart = templates.filter((t: any) => quickStartNames.has(t.name));
+  const comprehensive = templates.filter((t: any) => t.isBuiltin && !quickStartNames.has(t.name));
+  const custom = templates.filter((t: any) => !t.isBuiltin);
+
+  const totalSelectedItems = templates
+    .filter((t: any) => selectedIds.includes(t.id))
+    .reduce((sum: number, t: any) => sum + getTemplateItemCount(t), 0);
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create from Template</DialogTitle>
-          <DialogDescription>Select one or more templates to populate your DD checklist.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-2 max-h-[300px] overflow-y-auto">
-          {templates.length === 0 ? (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground text-sm mb-2">No templates available.</p>
-              <Button variant="outline" size="sm" onClick={onSeed} disabled={isSeedPending}>
-                {isSeedPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Load Built-in Templates
-              </Button>
-            </div>
-          ) : (
-            templates.map((tmpl: any) => (
-              <div key={tmpl.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted cursor-pointer" onClick={() => onToggle(tmpl.id)}>
-                <Checkbox checked={selectedIds.includes(tmpl.id)} />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{tmpl.name}</div>
-                  <div className="text-xs text-muted-foreground">{tmpl.description} · {tmpl.data?.sections?.reduce((n: number, s: any) => n + (s.items?.length || 0), 0) || '?'} items</div>
-                </div>
-                {tmpl.isBuiltin && <Badge variant="secondary" className="text-xs">Built-in</Badge>}
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create from Template</DialogTitle>
+            <DialogDescription>Select templates to populate your DD request list. Mix and match categories.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2 max-h-[420px] overflow-y-auto">
+            {templates.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground text-sm mb-3">No templates loaded yet.</p>
+                <Button variant="outline" size="sm" onClick={onSeed} disabled={isSeedPending}>
+                  {isSeedPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load Built-in Templates
+                </Button>
               </div>
-            ))
-          )}
-        </div>
-        {templates.length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-xs">Merge Strategy</Label>
-            <Select value={mergeStrategy} onValueChange={onMergeChange}>
-              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="replace">Replace existing</SelectItem>
-                <SelectItem value="append">Append to existing</SelectItem>
-                <SelectItem value="dedupe_by_key">Append (skip duplicates)</SelectItem>
-              </SelectContent>
-            </Select>
+            ) : (
+              <>
+                {/* Quick-Start Templates */}
+                {quickStart.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Start</h4>
+                      <Badge variant="secondary" className="text-[10px]">Pick by category</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {quickStart.map((tmpl: any) => {
+                        const meta = TEMPLATE_CATEGORY_META[tmpl.name] || { label: tmpl.name, icon: '📋', color: 'bg-slate-50 text-slate-700 border-slate-200' };
+                        const isSelected = selectedIds.includes(tmpl.id);
+                        const itemCount = getTemplateItemCount(tmpl);
+                        return (
+                          <div
+                            key={tmpl.id}
+                            className={`relative flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer transition-all text-center ${
+                              isSelected ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : `${meta.color} hover:shadow-sm`
+                            }`}
+                            onClick={() => onToggle(tmpl.id)}
+                          >
+                            <span className="text-xl">{meta.icon}</span>
+                            <span className="text-xs font-semibold">{meta.label}</span>
+                            <span className="text-[10px] text-muted-foreground">{itemCount} items</span>
+                            {isSelected && <Check className="h-3.5 w-3.5 text-primary absolute top-1.5 right-1.5" />}
+                            <button
+                              className="absolute bottom-1 right-1 text-[10px] text-muted-foreground hover:text-foreground"
+                              onClick={(e) => { e.stopPropagation(); setPreviewTemplate(tmpl); }}
+                            >
+                              preview
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Comprehensive Templates */}
+                {comprehensive.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Comprehensive Templates</h4>
+                    {comprehensive.map((tmpl: any) => {
+                      const isSelected = selectedIds.includes(tmpl.id);
+                      return (
+                        <div key={tmpl.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border" onClick={() => onToggle(tmpl.id)}>
+                          <Checkbox checked={isSelected} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{tmpl.name}</span>
+                              <Badge variant="outline" className="text-[10px]">{tmpl.assetClass?.replace(/_/g, ' ')}</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {getTemplateSectionCount(tmpl)} sections · {getTemplateItemCount(tmpl)} items
+                            </div>
+                          </div>
+                          <button
+                            className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={(e) => { e.stopPropagation(); setPreviewTemplate(tmpl); }}
+                          >
+                            Preview
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Custom Templates */}
+                {custom.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Your Templates</h4>
+                    {custom.map((tmpl: any) => {
+                      const isSelected = selectedIds.includes(tmpl.id);
+                      return (
+                        <div key={tmpl.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted cursor-pointer border border-transparent hover:border-border" onClick={() => onToggle(tmpl.id)}>
+                          <Checkbox checked={isSelected} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium">{tmpl.name}</span>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {getTemplateSectionCount(tmpl)} sections · {getTemplateItemCount(tmpl)} items
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[10px]">Custom</Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={selectedIds.length === 0 || isPending}>
-            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create ({selectedIds.length} selected)
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {templates.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="space-y-1">
+                <Label className="text-xs">Merge Strategy</Label>
+                <Select value={mergeStrategy} onValueChange={onMergeChange}>
+                  <SelectTrigger className="h-8 w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="replace">Replace existing</SelectItem>
+                    <SelectItem value="append">Append to existing</SelectItem>
+                    <SelectItem value="dedupe_by_key">Append (skip duplicates)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedIds.length > 0 && (
+                <p className="text-xs text-muted-foreground">{selectedIds.length} template(s) · {totalSelectedItems} items total</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={onConfirm} disabled={selectedIds.length === 0 || isPending}>
+              {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create ({selectedIds.length} selected)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{previewTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              {getTemplateSectionCount(previewTemplate)} sections · {getTemplateItemCount(previewTemplate)} items
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {previewTemplate?.data?.sections?.map((section: any, i: number) => (
+              <div key={i}>
+                <h4 className="text-sm font-semibold mb-1">{section.title}</h4>
+                {section.description && <p className="text-xs text-muted-foreground mb-2">{section.description}</p>}
+                <ul className="space-y-1">
+                  {section.items?.map((item: any, j: number) => (
+                    <li key={j} className="flex items-start gap-2 text-xs">
+                      <span className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                        item.priority === 1 ? 'bg-red-500' : item.priority === 2 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`} />
+                      <span className="text-muted-foreground">{item.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewTemplate(null)}>Close</Button>
+            <Button onClick={() => { onToggle(previewTemplate.id); setPreviewTemplate(null); }}>
+              {selectedIds.includes(previewTemplate?.id) ? 'Deselect' : 'Select This Template'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

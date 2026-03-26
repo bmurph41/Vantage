@@ -996,10 +996,10 @@ router.post('/api/dd-checklist-templates/seed', async (req: any, res: Response) 
   try {
     const db = await getDb();
     const schema = await getSchema();
-    const { DD_CHECKLIST_TEMPLATES } = await import('../templates/ddTemplates/index');
+    const { ALL_TEMPLATES } = await import('../templates/ddTemplates/index');
 
     let seeded = 0;
-    for (const tmpl of DD_CHECKLIST_TEMPLATES) {
+    for (const tmpl of ALL_TEMPLATES) {
       // Check if already seeded
       const [existing] = await db.select().from(schema.ddChecklistTemplates)
         .where(and(
@@ -1019,10 +1019,179 @@ router.post('/api/dd-checklist-templates/seed', async (req: any, res: Response) 
       }
     }
 
-    res.json({ seeded, total: DD_CHECKLIST_TEMPLATES.length });
+    res.json({ seeded, total: ALL_TEMPLATES.length });
   } catch (err: any) {
     console.error('[Seed] Error:', err.message);
     res.status(500).json({ error: 'Failed to seed templates' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPLATE CRUD — Create, Update, Delete custom templates
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/dd-checklist-templates — create a custom template
+router.post('/api/dd-checklist-templates', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+    const { name, description, category, assetClass, sections } = req.body;
+
+    if (!name || !sections) return res.status(400).json({ error: 'Name and sections are required' });
+
+    const templateData = { name, version: '1.0.0', assetClass: assetClass || 'general_cre', sections };
+
+    const [template] = await db.insert(schema.ddChecklistTemplates).values({
+      orgId,
+      name,
+      description: description || null,
+      templateType: category || 'custom',
+      category: category || null,
+      assetClass: assetClass || 'general_cre',
+      data: templateData,
+      isBuiltin: false,
+      isSystem: false,
+      createdBy: userId,
+    }).returning();
+
+    res.status(201).json(template);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to create template' });
+  }
+});
+
+// PUT /api/dd-checklist-templates/:id — update a custom template
+router.put('/api/dd-checklist-templates/:id', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const orgId = req.user?.orgId;
+    const { name, description, category, sections } = req.body;
+
+    // Only allow editing own org's templates (not built-in)
+    const [existing] = await db.select().from(schema.ddChecklistTemplates)
+      .where(and(eq(schema.ddChecklistTemplates.id, req.params.id), eq(schema.ddChecklistTemplates.orgId, orgId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: 'Template not found' });
+    if (existing.isBuiltin) return res.status(403).json({ error: 'Cannot edit built-in templates' });
+
+    const updates: any = { updatedAt: new Date() };
+    if (name) { updates.name = name; }
+    if (description !== undefined) { updates.description = description; }
+    if (category) { updates.templateType = category; updates.category = category; }
+    if (sections) {
+      updates.data = { name: name || existing.name, version: '1.0.0', assetClass: existing.assetClass, sections };
+    }
+
+    const [updated] = await db.update(schema.ddChecklistTemplates)
+      .set(updates)
+      .where(eq(schema.ddChecklistTemplates.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update template' });
+  }
+});
+
+// DELETE /api/dd-checklist-templates/:id — delete a custom template
+router.delete('/api/dd-checklist-templates/:id', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const orgId = req.user?.orgId;
+
+    const [existing] = await db.select().from(schema.ddChecklistTemplates)
+      .where(and(eq(schema.ddChecklistTemplates.id, req.params.id), eq(schema.ddChecklistTemplates.orgId, orgId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: 'Template not found' });
+    if (existing.isBuiltin) return res.status(403).json({ error: 'Cannot delete built-in templates' });
+
+    await db.delete(schema.ddChecklistTemplates)
+      .where(eq(schema.ddChecklistTemplates.id, req.params.id));
+
+    res.json({ deleted: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to delete template' });
+  }
+});
+
+// POST /api/dd-checklist-templates/save-from-checklist — save an existing checklist as a reusable template
+router.post('/api/dd-checklist-templates/save-from-checklist', async (req: any, res: Response) => {
+  try {
+    const db = await getDb();
+    const schema = await getSchema();
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+    const { workspaceId, name, description } = req.body;
+
+    if (!workspaceId || !name) return res.status(400).json({ error: 'workspaceId and name are required' });
+
+    // Get the active checklist for this workspace
+    const [checklist] = await db.select().from(schema.ddChecklists)
+      .where(and(eq(schema.ddChecklists.workspaceId, workspaceId), eq(schema.ddChecklists.status, 'active')))
+      .limit(1);
+
+    if (!checklist) return res.status(404).json({ error: 'No active checklist found' });
+
+    // Load sections and items
+    const sections = await db.select().from(schema.ddChecklistSections)
+      .where(eq(schema.ddChecklistSections.checklistId, checklist.id))
+      .orderBy(asc(schema.ddChecklistSections.sortOrder));
+
+    const templateSections: any[] = [];
+
+    for (const section of sections) {
+      const items = await db.select().from(schema.ddChecklistItems)
+        .where(eq(schema.ddChecklistItems.sectionId, section.id))
+        .orderBy(asc(schema.ddChecklistItems.sortOrder));
+
+      templateSections.push({
+        key: section.title.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        title: section.title,
+        description: section.description || undefined,
+        items: items.map((item: any) => ({
+          key: item.templateKey || item.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 60),
+          title: item.title,
+          requestText: item.requestText || '',
+          priority: item.priority || 2,
+          requestType: item.requestType || 'document',
+          milestoneAnchor: item.milestoneAnchor || undefined,
+          dueOffsetDays: item.dueOffsetDays ?? undefined,
+          subCategory: item.subCategory || undefined,
+          tags: item.tags || undefined,
+        })),
+      });
+    }
+
+    const templateData = {
+      name,
+      version: '1.0.0',
+      assetClass: 'general_cre',
+      sections: templateSections,
+    };
+
+    const [template] = await db.insert(schema.ddChecklistTemplates).values({
+      orgId,
+      name,
+      description: description || `Saved from workspace checklist`,
+      templateType: 'custom',
+      assetClass: 'general_cre',
+      data: templateData,
+      isBuiltin: false,
+      isSystem: false,
+      createdBy: userId,
+    }).returning();
+
+    const totalItems = templateSections.reduce((sum: number, s: any) => sum + s.items.length, 0);
+    res.status(201).json({ template, sections: templateSections.length, items: totalItems });
+  } catch (err: any) {
+    console.error('[DD Template] save-from-checklist error:', err.message);
+    res.status(500).json({ error: 'Failed to save template' });
   }
 });
 
