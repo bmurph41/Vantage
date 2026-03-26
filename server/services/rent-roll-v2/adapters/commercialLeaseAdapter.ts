@@ -9,7 +9,7 @@
  * CRUD operations for CRE leases still go through commercial-tenants-routes.ts.
  */
 
-import { db } from "../../db";
+import { db } from "../db";
 import { eq, and, gte, lte, sql, desc, asc, inArray } from "drizzle-orm";
 import {
   commercialTenants,

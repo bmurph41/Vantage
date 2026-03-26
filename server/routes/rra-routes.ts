@@ -18,6 +18,10 @@ import * as rentRollService from "../services/rent-roll-v2/rentRollService";
 import { getAssetStrategy } from "../services/rent-roll-v2/assetStrategies";
 import * as creAdapter from "../services/rent-roll-v2/adapters/commercialLeaseAdapter";
 import { usesCREDataSource } from "@shared/rent-roll-config";
+import * as selfStorageAnalytics from "../services/rent-roll-v2/assetStrategies/selfStorageAnalytics";
+import * as hotelAnalytics from "../services/rent-roll-v2/assetStrategies/hotelAnalytics";
+import * as multifamilyAnalytics from "../services/rent-roll-v2/assetStrategies/multifamilyAnalytics";
+import * as retailAnalytics from "../services/rent-roll-v2/assetStrategies/retailAnalytics";
 
 const require = createRequire(import.meta.url);
 import { ilike, eq, and, or, desc } from "drizzle-orm";
@@ -3744,6 +3748,126 @@ router.get("/cre/lease-rollover", async (req: Request, res: Response, next: Next
   } catch (error) {
     next(error);
   }
+});
+
+// ============================================================================
+// VERTICAL-SPECIFIC ANALYTICS ENDPOINTS (Phase 6)
+// ============================================================================
+
+// --- Self-Storage ---
+router.get("/analytics/self-storage/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await selfStorageAnalytics.getSelfStorageKPIs(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/self-storage/unit-mix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await selfStorageAnalytics.analyzeUnitMix(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.post("/analytics/self-storage/ecri", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId, streetRates, maxIncreasePercent, minMonthsSinceIncrease } = req.body;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const rateMap = new Map<string, number>(Object.entries(streetRates || {}));
+    const result = await selfStorageAnalytics.analyzeECRIOpportunities(
+      locationId, rateMap, maxIncreasePercent || 10, minMonthsSinceIncrease || 6
+    );
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Hotel / STR ---
+router.get("/analytics/hotel/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await hotelAnalytics.getHotelKPIs(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/hotel/room-performance", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await hotelAnalytics.getRoomTypePerformance(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Multifamily ---
+router.get("/analytics/multifamily/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await multifamilyAnalytics.getMultifamilyKPIs(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/multifamily/unit-mix", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await multifamilyAnalytics.getUnitMixPerformance(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/multifamily/loss-to-lease", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { locationId } = req.query;
+    if (!locationId) return res.status(400).json({ error: "locationId required" });
+    const result = await multifamilyAnalytics.getLossToLeaseDetail(locationId as string);
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+// --- Retail ---
+router.get("/analytics/retail/kpis", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId, marinaId } = req.query;
+    const result = await retailAnalytics.getRetailKPIs({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+      marinaId: marinaId as string | undefined,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/retail/percentage-rent", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId } = req.query;
+    const result = await retailAnalytics.getPercentageRentAnalysis({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
+});
+
+router.get("/analytics/retail/cam-reconciliation", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { modelingProjectId } = req.query;
+    const result = await retailAnalytics.getCAMReconciliation({
+      orgId,
+      modelingProjectId: modelingProjectId as string | undefined,
+    });
+    res.json(result);
+  } catch (error) { next(error); }
 });
 
 export default router;
