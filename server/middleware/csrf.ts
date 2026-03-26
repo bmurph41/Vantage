@@ -39,8 +39,8 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
       const token = generateCsrfToken();
       res.cookie(CSRF_COOKIE_NAME, token, {
         httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.REPLIT_DEV_DOMAIN,
+        sameSite: 'lax',
         path: '/',
         maxAge: 8 * 60 * 60 * 1000,
       });
@@ -98,8 +98,8 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   const newToken = generateCsrfToken();
   res.cookie(CSRF_COOKIE_NAME, newToken, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production' || !!process.env.REPLIT_DEV_DOMAIN,
+    sameSite: 'lax',
     path: '/',
     maxAge: 8 * 60 * 60 * 1000,
   });
