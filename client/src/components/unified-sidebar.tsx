@@ -431,8 +431,8 @@ export default function UnifiedSidebar() {
         className={cn(
           "flex items-center transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           depth === 0 && "text-[13px] text-sidebar-foreground",
-          depth === 1 && "text-[11px] text-sidebar-foreground/60",
-          depth >= 2 && "text-[10px] text-sidebar-foreground/50 italic",
+          depth === 1 && "text-[12px] text-sidebar-foreground/60",
+          depth >= 2 && "text-[11px] text-sidebar-foreground/50 italic",
           sidebarCollapsed ? "px-2 py-2.5 justify-center" : depth > 0 ? "px-4 py-[7px] md:py-[6px]" : "px-4 py-3 md:py-2.5",
           isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium !text-sidebar-primary"
         )}

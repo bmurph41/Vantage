@@ -1333,12 +1333,12 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
               {explainResult && (
                 <div className="text-xs space-y-2 border-t pt-2">
                   <div className="flex justify-between font-medium">
-                    <span>Budget: ${explainResult.budgetTotal?.toLocaleString()}</span>
-                    <span>Actual: ${explainResult.actualTotal?.toLocaleString()}</span>
+                    <span>Budget: {formatAmount(explainResult.budgetTotal || 0)}</span>
+                    <span>Actual: {formatAmount(explainResult.actualTotal || 0)}</span>
                   </div>
                   <div className={cn("font-semibold", explainResult.favorable ? "text-emerald-600" : "text-red-600")}>
-                    Variance: {explainResult.variance >= 0 ? '+' : ''}${explainResult.variance?.toLocaleString()}
-                    {' '}({explainResult.variancePct >= 0 ? '+' : ''}{explainResult.variancePct}%)
+                    Variance: {formatVarDollar(explainResult.variance || 0)}
+                    {' '}{formatVarPct(explainResult.variancePct || 0)}
                     {' '}— {explainResult.favorable ? 'Favorable' : 'Unfavorable'}
                   </div>
                   <div className="whitespace-pre-wrap text-muted-foreground leading-relaxed">
@@ -1438,8 +1438,7 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
                   <div className={cn("text-center font-semibold py-1 rounded",
                     whatIfResult.favorable ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" : "text-red-600 bg-red-50 dark:bg-red-900/20"
                   )}>
-                    NOI Impact: {whatIfResult.noiImpact >= 0 ? '+' : ''}{formatCurrency(whatIfResult.noiImpact)}
-                    {' '}({whatIfResult.noiImpactPct >= 0 ? '+' : ''}{whatIfResult.noiImpactPct}%)
+                    NOI Impact: {formatVarDollar(whatIfResult.noiImpact)} {formatVarPct(whatIfResult.noiImpactPct)}
                   </div>
                   {whatIfResult.adjustments?.map((a: any) => (
                     <div key={a.accountKey} className="flex justify-between text-muted-foreground">
@@ -1701,10 +1700,10 @@ function VersionManager({ budgetId, currentVersion, onVersionChange }: {
                           <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(row.totalA)}</td>
                           <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(row.totalB)}</td>
                           <td className={cn("text-right px-3 py-1.5 tabular-nums", favorable ? "text-emerald-600" : "text-red-600")}>
-                            {row.totalDiff >= 0 ? "+" : ""}{formatAmount(row.totalDiff)}
+                            {formatVarDollar(row.totalDiff)}
                           </td>
                           <td className={cn("text-right px-3 py-1.5 tabular-nums", favorable ? "text-emerald-600" : "text-red-600")}>
-                            {row.totalPctDiff >= 0 ? "+" : ""}{row.totalPctDiff.toFixed(1)}%
+                            {formatVarPct(row.totalPctDiff)}
                           </td>
                         </tr>
                       );
@@ -2029,17 +2028,17 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
                         <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(secBudget)}</td>
                         <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(secActual)}</td>
                         <td className={cn("text-right px-3 py-1.5 tabular-nums", secFav ? "text-emerald-600" : "text-red-600")}>
-                          {secVar >= 0 ? "+" : ""}{formatAmount(secVar)}
+                          {formatVarDollar(secVar)}
                         </td>
                         <td className={cn("text-right px-3 py-1.5 tabular-nums", secFav ? "text-emerald-600" : "text-red-600")}>
-                          {secBudget !== 0 ? `${((secVar / Math.abs(secBudget)) * 100).toFixed(1)}%` : "—"}
+                          {secBudget !== 0 ? formatVarPct((secVar / Math.abs(secBudget)) * 100) : "—"}
                         </td>
                         <td className="text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20">{formatAmount(secYtdBudget)}</td>
                         <td className="text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20">{formatAmount(secYtdActual)}</td>
                         <td className={cn("text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20",
                           (isExp ? secYtdVar <= 0 : secYtdVar >= 0) ? "text-emerald-600" : "text-red-600"
                         )}>
-                          {secYtdVar >= 0 ? "+" : ""}{formatAmount(secYtdVar)}
+                          {formatVarDollar(secYtdVar)}
                         </td>
                       </tr>
                     </React.Fragment>
@@ -2052,15 +2051,15 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
                   <td className="text-right px-3 py-2 tabular-nums">{formatAmount(summary.noiBudget)}</td>
                   <td className="text-right px-3 py-2 tabular-nums">{formatAmount(summary.noiActual)}</td>
                   <td className={cn("text-right px-3 py-2 tabular-nums", noiVarAnnual >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {noiVarAnnual >= 0 ? "+" : ""}{formatAmount(noiVarAnnual)}
+                    {formatVarDollar(noiVarAnnual)}
                   </td>
                   <td className={cn("text-right px-3 py-2 tabular-nums", noiVarAnnual >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {summary.noiBudget !== 0 ? `${((noiVarAnnual / Math.abs(summary.noiBudget)) * 100).toFixed(1)}%` : "—"}
+                    {summary.noiBudget !== 0 ? formatVarPct((noiVarAnnual / Math.abs(summary.noiBudget)) * 100) : "—"}
                   </td>
                   <td className="text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700">{formatAmount(summary.ytdNoiBudget)}</td>
                   <td className="text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700">{formatAmount(summary.ytdNoiActual)}</td>
                   <td className={cn("text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700", noiVarYtd >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {noiVarYtd >= 0 ? "+" : ""}{formatAmount(noiVarYtd)}
+                    {formatVarDollar(noiVarYtd)}
                   </td>
                 </tr>
               </tbody>
@@ -2139,7 +2138,7 @@ function BudgetVsActual({ budgetId }: { budgetId: string }) {
               }
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              NOI variance: {summary.noiBudget !== 0 ? `${((noiVar / Math.abs(summary.noiBudget)) * 100).toFixed(1)}%` : "N/A"}
+              NOI variance: {summary.noiBudget !== 0 ? formatVarPct((noiVar / Math.abs(summary.noiBudget)) * 100) : "N/A"}
             </p>
           </CardContent>
         </Card>
@@ -2172,10 +2171,10 @@ function BudgetVsActual({ budgetId }: { budgetId: string }) {
                   <td className="text-right px-3 py-2">{formatAmount(summary.noiBudget)}</td>
                   <td className="text-right px-3 py-2">{formatAmount(summary.noiActual)}</td>
                   <td className={cn("text-right px-3 py-2", noiVar >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {noiVar >= 0 ? "+" : ""}{formatAmount(noiVar)}
+                    {formatVarDollar(noiVar)}
                   </td>
                   <td className={cn("text-right px-3 py-2", noiVar >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {summary.noiBudget !== 0 ? `${((noiVar / Math.abs(summary.noiBudget)) * 100).toFixed(1)}%` : "—"}
+                    {summary.noiBudget !== 0 ? formatVarPct((noiVar / Math.abs(summary.noiBudget)) * 100) : "—"}
                   </td>
                   <td className="text-center px-3 py-2">
                     {noiVar >= 0
@@ -2217,7 +2216,7 @@ function SummaryCard({ title, budget, actual, variance, favorable }: {
             : <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
           }
           <span className={cn("text-xs font-medium", favorable ? "text-emerald-600" : "text-red-600")}>
-            {variance >= 0 ? "+" : ""}{formatCurrency(variance)}
+            {formatVarDollar(variance)}
           </span>
           <span className="text-xs text-muted-foreground">vs budget {formatCurrency(budget)}</span>
         </div>
@@ -2268,7 +2267,7 @@ function BvaSection({ section, lines }: { section: string; lines: BvaLine[] }) {
             {formatVarDollar(line.totals.varDollar)}
           </td>
           <td className={cn("text-right px-3 py-1.5 tabular-nums", line.totals.favorable ? "text-emerald-600" : "text-red-600")}>
-            {line.totals.varPct >= 0 ? "+" : ""}{line.totals.varPct.toFixed(1)}%
+            {formatVarPct(line.totals.varPct)}
           </td>
           <td className="text-center px-3 py-1.5">
             {line.totals.favorable
@@ -2283,10 +2282,10 @@ function BvaSection({ section, lines }: { section: string; lines: BvaLine[] }) {
         <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(totBudget)}</td>
         <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(totActual)}</td>
         <td className={cn("text-right px-3 py-1.5 tabular-nums", totFavorable ? "text-emerald-600" : "text-red-600")}>
-          {totVar >= 0 ? "+" : ""}{formatAmount(totVar)}
+          {formatVarDollar(totVar)}
         </td>
         <td className={cn("text-right px-3 py-1.5 tabular-nums", totFavorable ? "text-emerald-600" : "text-red-600")}>
-          {totBudget !== 0 ? `${((totVar / Math.abs(totBudget)) * 100).toFixed(1)}%` : "—"}
+          {totBudget !== 0 ? formatVarPct((totVar / Math.abs(totBudget)) * 100) : "—"}
         </td>
         <td />
       </tr>
