@@ -11902,6 +11902,58 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to create company" });
     }
   });
+
+  // Contact-Company junction CRUD
+  app.post("/api/contact-companies", async (req: any, res) => {
+    try {
+      const { contactId, companyId, role, isPrimary } = req.body;
+      const [link] = await db.insert(crmContactCompanies).values({
+        contactId, companyId, role: role || null, isPrimary: isPrimary || false,
+      }).returning();
+      res.json(link);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to link contact to company" });
+    }
+  });
+  app.put("/api/contact-companies/:id", async (req: any, res) => {
+    try {
+      const [updated] = await db.update(crmContactCompanies).set(req.body)
+        .where(eq(crmContactCompanies.id, req.params.id)).returning();
+      res.json(updated || { error: 'Not found' });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update link" });
+    }
+  });
+  app.delete("/api/contact-companies/:id", async (req: any, res) => {
+    try {
+      await db.delete(crmContactCompanies).where(eq(crmContactCompanies.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove link" });
+    }
+  });
+
+  // Company-Property junction CRUD
+  app.post("/api/company-properties", async (req: any, res) => {
+    try {
+      const { companyId, propertyId, role } = req.body;
+      const [link] = await db.insert(crmCompanyProperties).values({
+        companyId, propertyId, role: role || null,
+      }).returning();
+      res.json(link);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to link company to property" });
+    }
+  });
+  app.delete("/api/company-properties/:id", async (req: any, res) => {
+    try {
+      await db.delete(crmCompanyProperties).where(eq(crmCompanyProperties.id, req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove link" });
+    }
+  });
+
   // Get companies KPI stats (for computed metrics) - Must be before :id routes
   app.get('/api/companies/kpi-stats', authenticateUser, async (req: any, res) => {
     try {
