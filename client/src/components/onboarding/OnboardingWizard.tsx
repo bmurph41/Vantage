@@ -365,9 +365,6 @@ const wizardAssetClasses = [
   { id: "duplex", name: "Duplex", description: "Two-unit residential properties", icon: Home, metric: "grm" },
   { id: "triplex", name: "Triplex", description: "Three-unit residential properties", icon: Home, metric: "grm" },
   { id: "quad", name: "Quad / Fourplex", description: "Four-unit residential properties", icon: Home, metric: "grm" },
-  { id: "duplex", name: "Duplex", description: "Two-unit residential properties", icon: Home, metric: "grm" },
-  { id: "triplex", name: "Triplex", description: "Three-unit residential properties", icon: Home, metric: "grm" },
-  { id: "quad", name: "Quad / Fourplex", description: "Four-unit residential properties", icon: Home, metric: "grm" },
   { id: "business", name: "Business / Other", description: "Operating businesses, other asset types", icon: Briefcase, metric: "ebitda_multiple" },
 ];
 
