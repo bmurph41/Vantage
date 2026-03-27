@@ -7,7 +7,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { eq, desc } from 'drizzle-orm';
 import { db } from '../db';
-import { omBuilderDocuments, omDocumentSections, omExemplars } from '@shared/document-builder/schema';
+import { and } from 'drizzle-orm';
+import { omBuilderDocuments, omDocumentSections, omExemplars, omDocumentVersions } from '@shared/document-builder/schema';
+import { omTemplates } from '@shared/schema';
 import { documentBuilderService } from '../services/document-builder/document-builder-service';
 import { dataBindingService } from '../services/document-builder/data-binding-service';
 import { aiContentGenerationService } from '../services/document-builder/ai-content-service';
@@ -1048,5 +1050,257 @@ router.get(
     });
   })
 );
+
+// =============================================================================
+// Version History
+// =============================================================================
+
+// Save a new version snapshot
+router.post('/documents/:id/versions', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { changeDescription } = req.body;
+    const userId = req.user?.id;
+
+    // Load document + all sections for snapshot
+    const [doc] = await db.select().from(omBuilderDocuments).where(eq(omBuilderDocuments.id, id)).limit(1);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    const sections = await db.select().from(omDocumentSections)
+      .where(eq(omDocumentSections.documentId, id))
+      .orderBy(omDocumentSections.order);
+
+    // Determine next version number
+    const [latestVersion] = await db.select()
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.documentId, id))
+      .orderBy(desc(omDocumentVersions.versionNumber))
+      .limit(1);
+
+    const nextVersion = (latestVersion?.versionNumber || 0) + 1;
+
+    // Create version snapshot
+    const [version] = await db.insert(omDocumentVersions).values({
+      documentId: id,
+      versionNumber: nextVersion,
+      title: doc.title,
+      snapshot: { document: doc, sections },
+      changeDescription: changeDescription || `Version ${nextVersion}`,
+      status: doc.status,
+      createdBy: userId,
+    }).returning();
+
+    // Update document metadata version
+    const currentMeta = (doc.metadata || {}) as any;
+    await db.update(omBuilderDocuments)
+      .set({
+        metadata: { ...currentMeta, version: nextVersion },
+        updatedAt: new Date(),
+      })
+      .where(eq(omBuilderDocuments.id, id));
+
+    res.json({ success: true, version });
+  } catch (error: any) {
+    console.error('[Document Builder] Version save error:', error);
+    res.status(500).json({ error: 'Failed to save version' });
+  }
+});
+
+// List all versions for a document
+router.get('/documents/:id/versions', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const versions = await db.select({
+      id: omDocumentVersions.id,
+      versionNumber: omDocumentVersions.versionNumber,
+      title: omDocumentVersions.title,
+      changeDescription: omDocumentVersions.changeDescription,
+      status: omDocumentVersions.status,
+      createdBy: omDocumentVersions.createdBy,
+      createdAt: omDocumentVersions.createdAt,
+    })
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.documentId, id))
+      .orderBy(desc(omDocumentVersions.versionNumber));
+
+    res.json(versions);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to list versions' });
+  }
+});
+
+// Get a specific version snapshot
+router.get('/documents/:id/versions/:versionId', async (req: any, res) => {
+  try {
+    const { versionId } = req.params;
+    const [version] = await db.select()
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.id, versionId))
+      .limit(1);
+
+    if (!version) return res.status(404).json({ error: 'Version not found' });
+    res.json(version);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to get version' });
+  }
+});
+
+// Restore a document to a previous version
+router.post('/documents/:id/versions/:versionId/restore', async (req: any, res) => {
+  try {
+    const { id, versionId } = req.params;
+
+    const [version] = await db.select()
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.id, versionId))
+      .limit(1);
+
+    if (!version) return res.status(404).json({ error: 'Version not found' });
+
+    const snapshot = version.snapshot as any;
+    if (!snapshot?.document || !snapshot?.sections) {
+      return res.status(400).json({ error: 'Invalid version snapshot' });
+    }
+
+    // Save current state as a new version before restoring
+    const [doc] = await db.select().from(omBuilderDocuments).where(eq(omBuilderDocuments.id, id)).limit(1);
+    const currentSections = await db.select().from(omDocumentSections)
+      .where(eq(omDocumentSections.documentId, id));
+
+    const [latestVer] = await db.select()
+      .from(omDocumentVersions)
+      .where(eq(omDocumentVersions.documentId, id))
+      .orderBy(desc(omDocumentVersions.versionNumber))
+      .limit(1);
+
+    const nextNum = (latestVer?.versionNumber || 0) + 1;
+
+    await db.insert(omDocumentVersions).values({
+      documentId: id,
+      versionNumber: nextNum,
+      title: doc?.title || 'Pre-restore backup',
+      snapshot: { document: doc, sections: currentSections },
+      changeDescription: `Auto-saved before restoring to v${version.versionNumber}`,
+      status: doc?.status || 'draft',
+      createdBy: req.user?.id,
+    });
+
+    // Restore document fields
+    await db.update(omBuilderDocuments)
+      .set({
+        title: snapshot.document.title,
+        config: snapshot.document.config,
+        metadata: { ...(snapshot.document.metadata || {}), version: nextNum + 1 },
+        workingSnapshot: snapshot.document.workingSnapshot,
+        completionStatus: snapshot.document.completionStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(omBuilderDocuments.id, id));
+
+    // Delete current sections and restore old ones
+    await db.delete(omDocumentSections).where(eq(omDocumentSections.documentId, id));
+
+    for (const section of snapshot.sections) {
+      await db.insert(omDocumentSections).values({
+        documentId: id,
+        sectionKey: section.sectionKey,
+        order: section.order,
+        enabled: section.enabled,
+        customTitle: section.customTitle,
+        dataBindings: section.dataBindings,
+        media: section.media,
+        content: section.content,
+        completionStatus: section.completionStatus,
+      });
+    }
+
+    res.json({ success: true, restoredToVersion: version.versionNumber });
+  } catch (error: any) {
+    console.error('[Document Builder] Version restore error:', error);
+    res.status(500).json({ error: 'Failed to restore version' });
+  }
+});
+
+// =============================================================================
+// Save Document as Template
+// =============================================================================
+
+router.post('/documents/:id/save-as-template', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+
+    // Load document + sections
+    const [doc] = await db.select().from(omBuilderDocuments).where(eq(omBuilderDocuments.id, id)).limit(1);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    const sections = await db.select().from(omDocumentSections)
+      .where(eq(omDocumentSections.documentId, id))
+      .orderBy(omDocumentSections.order);
+
+    // Save as org-level template
+    const [template] = await db.insert(omTemplates).values({
+      name: name || `${doc.title} Template`,
+      description: description || `Template based on "${doc.title}"`,
+      documentType: doc.documentType,
+      scope: 'organization',
+      ownerType: 'organization',
+      ownerId: orgId,
+      templateData: {
+        documentType: doc.documentType,
+        audience: doc.audience,
+        assetClass: doc.assetClass,
+        config: doc.config,
+        sections: sections.map(s => ({
+          sectionKey: s.sectionKey,
+          order: s.order,
+          enabled: s.enabled,
+          customTitle: s.customTitle,
+          content: s.content,
+          dataBindings: s.dataBindings,
+        })),
+      },
+      createdBy: userId,
+    } as any).returning();
+
+    res.json({ success: true, template });
+  } catch (error: any) {
+    console.error('[Document Builder] Save as template error:', error);
+    res.status(500).json({ error: 'Failed to save as template' });
+  }
+});
+
+// List saved templates (DB + defaults)
+router.get('/saved-templates', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId;
+
+    const templates = await db.select()
+      .from(omTemplates)
+      .where(eq(omTemplates.ownerId, orgId))
+      .orderBy(desc(omTemplates.createdAt));
+
+    res.json(templates);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to list templates' });
+  }
+});
+
+// Delete a saved template
+router.delete('/saved-templates/:templateId', async (req: any, res) => {
+  try {
+    const { templateId } = req.params;
+    const orgId = req.user?.orgId;
+
+    await db.delete(omTemplates)
+      .where(and(eq(omTemplates.id, templateId), eq(omTemplates.ownerId, orgId)));
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to delete template' });
+  }
+});
 
 export default router;

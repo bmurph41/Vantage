@@ -11262,14 +11262,72 @@ Current context: Project ${req.params.projectId}`;
   app.post("/api/deals", async (req: any, res) => {
     try {
       const orgId = req.body.orgId || req.user?.orgId || req.orgId;
+      const userId = req.user.id;
+      const { dealContacts, depositSchedule, ...rest } = req.body;
+
       const dealData = {
-        ...req.body,
-        title: req.body.title || req.body.name || '',
-        stage: req.body.stage || req.body.status || 'prospect',
-        ownerId: req.user.id,
+        ...rest,
+        title: rest.title || rest.name || '',
+        stage: rest.stage || rest.status || 'prospect',
+        ownerId: userId,
         orgId,
+        // Store deposit schedule in customDeadlines if provided
+        ...(depositSchedule && depositSchedule.length > 0 ? { customDeadlines: depositSchedule } : {}),
       };
       const deal = await storage.createCrmDeal(dealData);
+
+      // Process deal contacts — link existing CRM contacts or create pending contacts/companies
+      if (dealContacts && Array.isArray(dealContacts) && dealContacts.length > 0) {
+        for (const entry of dealContacts) {
+          if (entry.linkedContactId) {
+            // Link existing CRM contact to deal
+            await db.insert(crmDealContacts).values({
+              dealId: deal.id,
+              contactId: entry.linkedContactId,
+              role: entry.contactType || 'other',
+              isPrimary: false,
+              notes: entry.titleRole || '',
+            });
+          } else if (entry.firstName || entry.lastName || entry.email) {
+            // Create pending contact for unlinked entries
+            const [pending] = await db.insert(pendingContacts).values({
+              orgId,
+              fullName: [entry.firstName, entry.lastName].filter(Boolean).join(' '),
+              email: entry.email || null,
+              phone: entry.phone || null,
+              sourceType: 'deal_contact',
+              sourceId: deal.id,
+              sourceMetadata: {
+                dealId: deal.id,
+                dealTitle: deal.title,
+                contactType: entry.contactType,
+                teamType: entry.teamType,
+                titleRole: entry.titleRole,
+              },
+              status: 'pending',
+              createdBy: userId,
+            }).returning();
+
+            // Create pending company if company name was provided
+            if (entry.company) {
+              await db.insert(pendingCompanies).values({
+                orgId,
+                name: entry.company,
+                sourceType: 'deal_contact',
+                sourceId: deal.id,
+                sourceMetadata: {
+                  dealId: deal.id,
+                  contactType: entry.contactType,
+                  pendingContactId: pending?.id,
+                },
+                status: 'pending',
+                createdBy: userId,
+              });
+            }
+          }
+        }
+      }
+
       res.json(deal);
     } catch (error: any) {
       console.error("Failed to create deal:", error);

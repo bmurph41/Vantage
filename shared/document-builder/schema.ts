@@ -366,6 +366,26 @@ export const omBindingCache = pgTable('om_binding_cache', {
 }));
 
 // =============================================================================
+// Document Version History Table
+// =============================================================================
+
+export const omDocumentVersions = pgTable('om_document_versions', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  documentId: varchar('document_id').notNull().references(() => omBuilderDocuments.id, { onDelete: 'cascade' }),
+  versionNumber: integer('version_number').notNull(),
+  title: text('title').notNull(),
+  snapshot: jsonb('snapshot').notNull(), // full document + sections snapshot
+  changeDescription: text('change_description'),
+  status: documentStatusEnum('status').notNull().default('draft'),
+  createdBy: varchar('created_by'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index('om_doc_versions_document_idx').on(table.documentId),
+  versionIdx: index('om_doc_versions_version_idx').on(table.documentId, table.versionNumber),
+}));
+export type OmDocumentVersion = typeof omDocumentVersions.$inferSelect;
+
+// =============================================================================
 // Zod Schemas for Validation
 // =============================================================================
 
