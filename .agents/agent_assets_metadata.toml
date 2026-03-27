@@ -18,3 +18,9 @@ id = "BK1pWsyIGrPNpKX4ZoFej"
 uri = "file://pipeline-export.zip"
 type = "unspecified"
 title = "Pipeline Section — Full Source Code (51 files, 256KB)"
+
+[[outputs]]
+id = "RAV23V_AkJSYWsq_dRDGJ"
+uri = "file://ai-chatbot-export.zip"
+type = "unspecified"
+title = "AI Chatbot — Full Source Code (8 files, 28KB)"
