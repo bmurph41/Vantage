@@ -234,7 +234,7 @@ function SummarySection({ summary, isLoading }: { summary: PortfolioSummary | un
         <MetricCard
           title="Total Units"
           value={formatNumber(summary.totalUnits)}
-          subtitle={`${summary.totalAcres.toFixed(1)} acres`}
+          subtitle={`${(summary.totalAcres ?? 0).toFixed(1)} acres`}
           icon={Building2}
         />
       </div>
