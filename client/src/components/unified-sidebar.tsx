@@ -429,15 +429,24 @@ export default function UnifiedSidebar() {
         onClick={handleNavClick}
         style={!sidebarCollapsed && depth > 0 ? { paddingLeft: `${16 + depth * 24}px` } : undefined}
         className={cn(
-          depth > 0 ? "flex items-center text-[11px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors" : "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-          sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-3 md:py-2.5",
-          isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
+          "flex items-center transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          depth === 0 && "text-[13px] text-sidebar-foreground",
+          depth === 1 && "text-[11px] text-sidebar-foreground/60",
+          depth >= 2 && "text-[10px] text-sidebar-foreground/50 italic",
+          sidebarCollapsed ? "px-2 py-2.5 justify-center" : depth > 0 ? "px-4 py-[7px] md:py-[6px]" : "px-4 py-3 md:py-2.5",
+          isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium !text-sidebar-primary"
         )}
         data-testid={`nav-${item.name.toLowerCase().replace(/ /g, '-')}`}
       >
-        {item.icon && <item.icon className={cn("w-4 h-4 flex-shrink-0", !sidebarCollapsed && "mr-3", isActive && "text-sidebar-primary")} />}
+        {item.icon && <item.icon className={cn("flex-shrink-0", !sidebarCollapsed && "mr-3", depth > 0 ? "w-3.5 h-3.5" : "w-4 h-4", isActive && "text-sidebar-primary")} />}
         {!sidebarCollapsed && (
           <>
+            {!item.icon && depth === 1 && (
+              <span className="mr-2 text-sidebar-foreground/30 select-none flex-shrink-0">–</span>
+            )}
+            {!item.icon && depth >= 2 && (
+              <span className="mr-1.5 text-sidebar-foreground/25 select-none flex-shrink-0">·</span>
+            )}
             <span className="truncate">{item.name}</span>
             {item.badge && (
               <span className="ml-auto text-xs bg-blue-500 text-white rounded-full px-2 py-0.5" data-testid={`badge-${item.name.toLowerCase().replace(/ /g, '-')}`}>
@@ -699,12 +708,12 @@ export default function UnifiedSidebar() {
                 {/* Subcategory-grouped modules */}
                 {opsSubcategoryGroups.map((subcat) => (
                   <div key={subcat.id}>
-                    <div className="mt-3 mb-1 pl-8 flex items-center gap-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                    <div className="mt-3 mb-0.5 ml-4 pl-3 border-l border-sidebar-foreground/15 flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
                         {subcat.label}
                       </span>
                       {!subcat.isUniversal && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 flex-shrink-0" />
+                        <span className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0" />
                       )}
                     </div>
                     {subcat.items.map((item) => (
@@ -714,8 +723,8 @@ export default function UnifiedSidebar() {
                 ))}
 
                 {/* Integrations link */}
-                <div className="mt-3 mb-1 pl-8">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">System</span>
+                <div className="mt-3 mb-0.5 ml-4 pl-3 border-l border-sidebar-foreground/15 flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-sidebar-foreground/40">System</span>
                 </div>
                 <NavLink item={{ name: "Integrations", href: "/operations/integrations" }} depth={1} />
               </>

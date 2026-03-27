@@ -75,14 +75,38 @@ const LINE_TYPE_COLORS: Record<string, string> = {
   OTHER_EXPENSE: "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
+/** Compact format for KPI cards: $45.2K, $1.3M — uses accounting parens for negatives */
 function formatCurrency(val: number): string {
-  if (Math.abs(val) >= 1000000) return `$${(val / 1000000).toFixed(1)}M`;
-  if (Math.abs(val) >= 1000) return `$${(val / 1000).toFixed(1)}K`;
-  return `$${val.toFixed(0)}`;
+  if (val === 0) return "—";
+  const abs = Math.abs(val);
+  let str: string;
+  if (abs >= 1000000) str = `$${(abs / 1000000).toFixed(1)}M`;
+  else if (abs >= 1000) str = `$${(abs / 1000).toFixed(1)}K`;
+  else str = `$${abs.toFixed(0)}`;
+  return val < 0 ? `(${str})` : str;
 }
 
+/** Full format for grid cells: $12,345 — accounting parens for negatives, "—" for zero */
 function formatAmount(val: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+  if (val === 0) return "—";
+  const abs = Math.abs(val);
+  const formatted = '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return val < 0 ? `(${formatted})` : formatted;
+}
+
+/** Variance % — capped at ±999%, "—" for zero, always includes sign */
+function formatVarPct(val: number): string {
+  if (val === 0) return "—";
+  const capped = Math.max(-999, Math.min(999, val));
+  const prefix = capped > 0 ? "+" : "";
+  return `${prefix}${capped.toFixed(1)}%`;
+}
+
+/** Variance $ — always includes sign, accounting parens for negatives */
+function formatVarDollar(val: number): string {
+  if (val === 0) return "—";
+  if (val < 0) return `(${formatAmount(Math.abs(val))})`;
+  return `+${formatAmount(val)}`;
 }
 
 export default function BudgetingTabbed() {
@@ -1955,15 +1979,15 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
                               <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.annual.budget)}</td>
                               <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.annual.actual)}</td>
                               <td className={cn("text-right px-3 py-1.5 tabular-nums font-medium", line.annual.favorable ? "text-emerald-600" : "text-red-600")}>
-                                {line.annual.varDollar >= 0 ? "+" : ""}{formatAmount(line.annual.varDollar)}
+                                {formatVarDollar(line.annual.varDollar)}
                               </td>
                               <td className={cn("text-right px-3 py-1.5 tabular-nums", line.annual.favorable ? "text-emerald-600" : "text-red-600")}>
-                                {line.annual.varPct >= 0 ? "+" : ""}{line.annual.varPct.toFixed(1)}%
+                                {formatVarPct(line.annual.varPct)}
                               </td>
                               <td className="text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10">{formatAmount(line.ytd.budget)}</td>
                               <td className="text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10">{formatAmount(line.ytd.actual)}</td>
                               <td className={cn("text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10", line.ytd.favorable ? "text-emerald-600" : "text-red-600")}>
-                                {line.ytd.varDollar >= 0 ? "+" : ""}{formatAmount(line.ytd.varDollar)}
+                                {formatVarDollar(line.ytd.varDollar)}
                               </td>
                             </tr>
                             {/* Monthly drill-down */}
@@ -1986,10 +2010,10 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
                                     <td className="text-right px-3 py-1 text-xs tabular-nums">{formatAmount(m.budget)}</td>
                                     <td className="text-right px-3 py-1 text-xs tabular-nums">{formatAmount(m.actual)}</td>
                                     <td className={cn("text-right px-3 py-1 text-xs tabular-nums", m.favorable ? "text-emerald-600" : "text-red-600")}>
-                                      {m.varDollar >= 0 ? "+" : ""}{formatAmount(m.varDollar)}
+                                      {formatVarDollar(m.varDollar)}
                                     </td>
                                     <td className={cn("text-right px-3 py-1 text-xs tabular-nums", m.favorable ? "text-emerald-600" : "text-red-600")}>
-                                      {m.varPct >= 0 ? "+" : ""}{m.varPct.toFixed(1)}%
+                                      {formatVarPct(m.varPct)}
                                     </td>
                                     <td colSpan={3} />
                                   </tr>
@@ -2241,7 +2265,7 @@ function BvaSection({ section, lines }: { section: string; lines: BvaLine[] }) {
           <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.totals.budget)}</td>
           <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.totals.actual)}</td>
           <td className={cn("text-right px-3 py-1.5 tabular-nums", line.totals.favorable ? "text-emerald-600" : "text-red-600")}>
-            {line.totals.varDollar >= 0 ? "+" : ""}{formatAmount(line.totals.varDollar)}
+            {formatVarDollar(line.totals.varDollar)}
           </td>
           <td className={cn("text-right px-3 py-1.5 tabular-nums", line.totals.favorable ? "text-emerald-600" : "text-red-600")}>
             {line.totals.varPct >= 0 ? "+" : ""}{line.totals.varPct.toFixed(1)}%
