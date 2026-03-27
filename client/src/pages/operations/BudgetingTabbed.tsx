@@ -126,6 +126,7 @@ export default function BudgetingTabbed() {
               setSelectedBudget(b);
               setTab("bva");
             }}
+            onCreate={() => setCreateOpen(true)}
           />
         </TabsContent>
 
@@ -179,7 +180,7 @@ function SeedActualsButton() {
   );
 }
 
-function BudgetList({ onSelect, onBva }: { onSelect: (b: Budget) => void; onBva: (b: Budget) => void }) {
+function BudgetList({ onSelect, onBva, onCreate }: { onSelect: (b: Budget) => void; onBva: (b: Budget) => void; onCreate: () => void }) {
   const { data: budgetList, isLoading } = useQuery<Budget[]>({ queryKey: ["/api/budgets"] });
   const { toast } = useToast();
 
@@ -222,13 +223,27 @@ function BudgetList({ onSelect, onBva }: { onSelect: (b: Budget) => void; onBva:
 
   if (!budgetList?.length) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Budgets Yet</h3>
-          <p className="text-muted-foreground text-center max-w-md mb-4">
-            Create your first budget to start tracking financial performance against plan. Seed demo actuals first for a realistic comparison.
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-20">
+          <div className="rounded-full bg-muted p-4 mb-6">
+            <DollarSign className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Create your first budget</h3>
+          <p className="text-muted-foreground text-center max-w-lg mb-6 leading-relaxed">
+            Budgets let you plan revenue and expenses by account, track actuals from your GL, and analyze
+            variance month-over-month. Start with a blank template or seed from prior-year actuals.
           </p>
+          <div className="flex flex-col items-center gap-3">
+            <Button size="lg" onClick={onCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Budget
+            </Button>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><BarChart3 className="h-3.5 w-3.5" /> Track by account</span>
+              <span className="flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Compare to actuals</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Monthly granularity</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -573,7 +588,66 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   }, [childRows, months, lockedMonths, collapsed]);
 
   if (isLoading || !treeGrid) {
-    return <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-6 w-48 mb-1" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left px-3 py-2.5 min-w-[240px]"><Skeleton className="h-4 w-20" /></th>
+                {MONTHS_SHORT.map(m => (
+                  <th key={m} className="px-3 py-2.5 min-w-[105px]"><Skeleton className="h-4 w-10 ml-auto" /></th>
+                ))}
+                <th className="px-3 py-2.5 min-w-[115px]"><Skeleton className="h-4 w-12 ml-auto" /></th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Revenue parent + 4 children */}
+              <tr className="bg-emerald-50/70 dark:bg-emerald-900/20">
+                <td className="px-3 py-2" colSpan={14}><Skeleton className="h-5 w-24" /></td>
+              </tr>
+              {[1,2,3,4].map(i => (
+                <tr key={`r${i}`} className="border-b">
+                  <td className="pl-10 pr-3 py-1.5"><Skeleton className="h-4 w-32" /></td>
+                  {MONTHS_SHORT.map(m => (
+                    <td key={m} className="px-1 py-1.5"><Skeleton className="h-6 w-full" /></td>
+                  ))}
+                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                </tr>
+              ))}
+              {/* OpEx parent + 5 children */}
+              <tr className="bg-red-50/70 dark:bg-red-900/20">
+                <td className="px-3 py-2" colSpan={14}><Skeleton className="h-5 w-36" /></td>
+              </tr>
+              {[1,2,3,4,5].map(i => (
+                <tr key={`e${i}`} className="border-b">
+                  <td className="pl-10 pr-3 py-1.5"><Skeleton className="h-4 w-36" /></td>
+                  {MONTHS_SHORT.map(m => (
+                    <td key={m} className="px-1 py-1.5"><Skeleton className="h-6 w-full" /></td>
+                  ))}
+                  <td className="px-3 py-1.5"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                </tr>
+              ))}
+              {/* NOI row */}
+              <tr className="bg-slate-100 dark:bg-slate-800 border-t-2">
+                <td className="px-3 py-2.5"><Skeleton className="h-5 w-40" /></td>
+                {MONTHS_SHORT.map(m => (
+                  <td key={m} className="px-3 py-2.5"><Skeleton className="h-5 w-16 ml-auto" /></td>
+                ))}
+                <td className="px-3 py-2.5"><Skeleton className="h-5 w-20 ml-auto" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   }
 
   const tree = treeGrid.tree;
@@ -1154,8 +1228,10 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
                 {seedMutation.isPending ? "Analyzing..." : "Seed Budget"}
               </Button>
               {seedMutation.data && (
-                <div className="text-xs space-y-1 max-h-40 overflow-auto">
-                  <div className="font-medium text-emerald-600">{seedMutation.data.accountsUpdated} accounts updated</div>
+                <div className="text-xs space-y-2 max-h-52 overflow-auto">
+                  <div className="font-medium text-emerald-600">
+                    {seedMutation.data.accountsUpdated} accounts updated
+                  </div>
                   {seedMutation.data.assumptions?.slice(0, 8).map((a: any) => (
                     <div key={a.accountKey} className="flex justify-between">
                       <span className="truncate">{a.accountKey.replace(/_/g, ' ')}</span>
@@ -1164,6 +1240,29 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
                       </span>
                     </div>
                   ))}
+
+                  {/* Skipped accounts callout */}
+                  {seedMutation.data.accountsSkipped > 0 && (
+                    <div className="rounded border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10 p-2 mt-1">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <AlertCircle className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                          {seedMutation.data.accountsSkipped} accounts skipped
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed mb-1.5">
+                        No prior-year actuals found for these accounts. Import GL data or enter values manually.
+                      </p>
+                      {seedMutation.data.skippedAccounts?.map((s: any) => (
+                        <div key={s.accountKey} className="flex justify-between text-muted-foreground">
+                          <span className="truncate">{s.displayName}</span>
+                          <span className="ml-1 flex-shrink-0 text-amber-600 dark:text-amber-400">
+                            {s.reason === 'no_prior_data' ? 'no data' : 'zero total'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1647,22 +1746,74 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
   }, []);
 
   if (isLoading || !data) {
-    return <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>;
+    return (
+      <div className="space-y-4">
+        {/* KPI card skeletons */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-8 w-28 mb-2" />
+                <Skeleton className="h-3 w-36" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {/* Table skeleton */}
+        <Card>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-5 w-48 mb-1" />
+            <Skeleton className="h-4 w-72" />
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="px-3 py-2 min-w-[200px]"><Skeleton className="h-4 w-20" /></th>
+                    {['Budget','Actual','$ Var','% Var','YTD Bud','YTD Act','YTD Var'].map(h => (
+                      <th key={h} className="px-3 py-2"><Skeleton className="h-4 w-14 ml-auto" /></th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[1,2,3,4,5,6,7,8].map(i => (
+                    <tr key={i} className="border-b">
+                      <td className="px-3 py-2"><Skeleton className="h-4 w-32" /></td>
+                      {[1,2,3,4,5,6,7].map(j => (
+                        <td key={j} className="px-3 py-2"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!data.lines?.length) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
-          <p className="text-muted-foreground text-center max-w-md">
-            Seed demo actuals and add budget amounts first.
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-20">
+          <div className="rounded-full bg-muted p-4 mb-6">
+            <BarChart3 className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">No budget lines to compare</h3>
+          <p className="text-muted-foreground text-center max-w-lg mb-4 leading-relaxed">
+            This budget has no line items yet. Go to the Editor tab to add accounts or seed from a template,
+            then return here to compare budget vs actual performance.
           </p>
         </CardContent>
       </Card>
     );
   }
+
+  // Check if we have zero actuals across all lines
+  const hasAnyActuals = data.lines.some(l => l.monthly.some(m => m.actual !== 0));
 
   const { summary, lines, months, currentMonthIdx } = data;
   const noiVarYtd = summary.ytdNoiActual - summary.ytdNoiBudget;
@@ -1682,6 +1833,28 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
 
   return (
     <div className="space-y-6">
+      {/* No-actuals callout */}
+      {!hasAnyActuals && (
+        <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10">
+          <CardContent className="flex items-start gap-4 p-4">
+            <div className="rounded-full bg-amber-100 dark:bg-amber-900/30 p-2 mt-0.5 flex-shrink-0">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm mb-1">No actuals data found</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Budget amounts are loaded, but there are no actuals to compare against yet. To populate actuals:
+              </p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                <li>Import GL data from Bookkeeping &gt; GL Import (CSV or accounting sync)</li>
+                <li>Connect an integration (QuickBooks, Xero, Sage) in Settings &gt; Integrations</li>
+                <li>Use the "Seed Demo Actuals" button on the Budgets tab for sample data</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SummaryCard

@@ -59,3 +59,7 @@ LISTING_INGESTION_V2 = "true"
 
 [userenv.production]
 NODE_OPTIONS = "--max-old-space-size=4096"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
