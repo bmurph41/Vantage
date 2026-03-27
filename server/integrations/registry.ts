@@ -3826,6 +3826,112 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       estimatedMigrationDays: 3
     }
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Communication & Marketing Integrations
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    key: "slack",
+    name: "Slack",
+    description: "Send deal alerts, DD notifications, and team updates to Slack channels. Get real-time notifications for stage changes, approvals, and deadlines.",
+    icon: "slack",
+    category: "Communication",
+    contexts: ["notifications", "deal_alerts", "team"],
+    assetClasses: ["marina", "rv_park", "mobile_home_park", "self_storage", "multifamily", "mixed_use", "other"],
+    authType: "oauth" as const,
+    status: "active" as const,
+    uiPlacements: ["settings", "notifications"],
+    settingsSchema: [
+      { key: "botToken", label: "Bot Token", type: "secret", required: true, helpText: "OAuth bot token from Slack App settings (xoxb-...)" },
+      { key: "defaultChannelId", label: "Default Channel", type: "string", required: false, helpText: "Channel ID for default notifications" },
+      { key: "dealAlerts", label: "Deal Stage Alerts", type: "boolean", helpText: "Send notifications when deals change stages" },
+      { key: "ddAlerts", label: "DD Deadline Alerts", type: "boolean", helpText: "Send alerts for approaching DD deadlines" },
+    ],
+    capabilities: { dataRead: false, dataWrite: false, actions: true, uiHooks: false, webhooks: true, notifications: true },
+    dataMappings: [],
+    migrationSupport: { canExportAll: false, supportsHistoricalImport: false, migrationComplexity: "low", estimatedMigrationDays: 1 },
+  },
+
+  {
+    key: "microsoft_teams",
+    name: "Microsoft Teams",
+    description: "Push deal updates, approval requests, and milestone notifications to Microsoft Teams channels via incoming webhooks or Graph API.",
+    icon: "microsoft-teams",
+    category: "Communication",
+    contexts: ["notifications", "deal_alerts", "team"],
+    assetClasses: ["marina", "rv_park", "mobile_home_park", "self_storage", "multifamily", "mixed_use", "other"],
+    authType: "oauth" as const,
+    status: "active" as const,
+    uiPlacements: ["settings", "notifications"],
+    settingsSchema: [
+      { key: "webhookUrl", label: "Incoming Webhook URL", type: "secret", required: false, helpText: "Teams channel webhook URL. Create in Teams > Connectors > Incoming Webhook." },
+      { key: "accessToken", label: "Graph API Token", type: "secret", required: false, helpText: "Microsoft Graph API access token (optional, for full API access)" },
+      { key: "dealAlerts", label: "Deal Stage Alerts", type: "boolean", helpText: "Send card notifications when deals change stages" },
+      { key: "approvalAlerts", label: "Approval Requests", type: "boolean", helpText: "Post approval request cards to channel" },
+    ],
+    capabilities: { dataRead: false, dataWrite: false, actions: true, uiHooks: false, webhooks: true, notifications: true },
+    dataMappings: [],
+    migrationSupport: { canExportAll: false, supportsHistoricalImport: false, migrationComplexity: "low", estimatedMigrationDays: 1 },
+  },
+
+  {
+    key: "mailchimp",
+    name: "Mailchimp",
+    description: "Sync CRM contacts to Mailchimp audiences for email marketing campaigns. Automatically segment contacts by deal stage, asset class, and investor type.",
+    icon: "mailchimp",
+    category: "Marketing",
+    contexts: ["marketing", "crm_sync", "email"],
+    assetClasses: ["marina", "rv_park", "mobile_home_park", "self_storage", "multifamily", "mixed_use", "other"],
+    authType: "apiKey" as const,
+    status: "active" as const,
+    uiPlacements: ["settings", "marketing", "contacts"],
+    settingsSchema: [
+      { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Found in Mailchimp > Account > Extras > API Keys. Format: xxxxxxxx-usXX" },
+      { key: "defaultAudienceId", label: "Default Audience", type: "string", required: false, helpText: "Audience (list) ID to sync contacts to" },
+      { key: "autoSync", label: "Auto-sync CRM Contacts", type: "boolean", helpText: "Automatically sync new CRM contacts to Mailchimp" },
+      { key: "tagByStage", label: "Tag by Deal Stage", type: "boolean", helpText: "Automatically tag contacts with their current deal stage" },
+    ],
+    capabilities: { dataRead: true, dataWrite: true, actions: true, uiHooks: false, webhooks: false, notifications: false },
+    dataMappings: [
+      { sourceEntity: "CrmContact", targetModule: "audience", targetEntity: "subscriber", fields: [
+        { source: "email", target: "email_address" },
+        { source: "firstName", target: "FNAME" },
+        { source: "lastName", target: "LNAME" },
+        { source: "company", target: "COMPANY" },
+      ], syncDirection: "write" as const, frequency: "realtime" },
+    ],
+    migrationSupport: { canExportAll: false, supportsHistoricalImport: false, migrationComplexity: "low", estimatedMigrationDays: 1 },
+  },
+
+  {
+    key: "constant_contact",
+    name: "Constant Contact",
+    description: "Sync CRM contacts to Constant Contact lists for newsletters and marketing campaigns. Bulk import with automatic deduplication.",
+    icon: "constant-contact",
+    category: "Marketing",
+    contexts: ["marketing", "crm_sync", "email"],
+    assetClasses: ["marina", "rv_park", "mobile_home_park", "self_storage", "multifamily", "mixed_use", "other"],
+    authType: "oauth" as const,
+    status: "active" as const,
+    uiPlacements: ["settings", "marketing", "contacts"],
+    settingsSchema: [
+      { key: "accessToken", label: "Access Token", type: "secret", required: true, helpText: "OAuth access token from Constant Contact developer portal" },
+      { key: "defaultListId", label: "Default Contact List", type: "string", required: false, helpText: "Contact list ID for default sync" },
+      { key: "autoSync", label: "Auto-sync CRM Contacts", type: "boolean", helpText: "Automatically sync new CRM contacts" },
+    ],
+    capabilities: { dataRead: true, dataWrite: true, actions: true, uiHooks: false, webhooks: false, notifications: false },
+    dataMappings: [
+      { sourceEntity: "CrmContact", targetModule: "contactList", targetEntity: "contact", fields: [
+        { source: "email", target: "email.address" },
+        { source: "firstName", target: "first_name" },
+        { source: "lastName", target: "last_name" },
+        { source: "company", target: "company_name" },
+        { source: "phone", target: "phone_numbers[0].phone_number" },
+      ], syncDirection: "write" as const, frequency: "realtime" },
+    ],
+    migrationSupport: { canExportAll: false, supportsHistoricalImport: false, migrationComplexity: "low", estimatedMigrationDays: 1 },
+  },
 ];
 
 export function getIntegrationByKey(key: string): IntegrationRegistryItem | undefined {

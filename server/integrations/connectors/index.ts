@@ -89,6 +89,17 @@ ConnectorFactory.register('adp', AdpConnector);
 ConnectorFactory.register('cleancloud', CleanCloudConnector);
 ConnectorFactory.register('xero', XeroConnector);
 
+// Register communication & marketing connectors
+import { SlackConnector } from './slack';
+import { MicrosoftTeamsConnector } from './microsoft-teams';
+import { MailchimpConnector } from './mailchimp';
+import { ConstantContactConnector } from './constant-contact';
+
+ConnectorFactory.register('slack', SlackConnector);
+ConnectorFactory.register('microsoft_teams', MicrosoftTeamsConnector);
+ConnectorFactory.register('mailchimp', MailchimpConnector);
+ConnectorFactory.register('constant_contact', ConstantContactConnector);
+
 export { ConnectorFactory, BaseConnector };
 export type { ConnectorConfig };
 
@@ -128,6 +139,12 @@ export { GustoConnector } from './gusto';
 export { AdpConnector } from './adp';
 export { CleanCloudConnector } from './cleancloud';
 export { XeroConnector } from './xero';
+
+// Communication & marketing connector exports
+export { SlackConnector } from './slack';
+export { MicrosoftTeamsConnector } from './microsoft-teams';
+export { MailchimpConnector } from './mailchimp';
+export { ConstantContactConnector } from './constant-contact';
 
 export type {
   SyncDirection,
