@@ -429,7 +429,7 @@ export default function UnifiedSidebar() {
         onClick={handleNavClick}
         style={!sidebarCollapsed && depth > 0 ? { paddingLeft: `${16 + depth * 24}px` } : undefined}
         className={cn(
-          "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
+          depth > 0 ? "flex items-center text-[11px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors" : "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
           sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-3 md:py-2.5",
           isActive && "bg-sidebar-accent border-r-3 border-sidebar-primary text-sidebar-primary font-medium"
         )}
