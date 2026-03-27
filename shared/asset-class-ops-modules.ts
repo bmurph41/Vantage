@@ -140,3 +140,65 @@ export function getOpsModulesForAssetClasses(assetClasses: string[]): OpsModuleK
 export function getAllAssetClassKeys(): string[] {
   return Object.keys(ASSET_CLASS_OPS_MODULES);
 }
+
+// ─── Operations Subcategory System ──────────────────────────────────────────
+
+export type OpsSubcategory =
+  | 'financials'
+  | 'people'
+  | 'leasing'
+  | 'marketing_ops'
+  | 'marina_ops'
+  | 'hotel_ops'
+  | 'multifamily_ops'
+  | 'retail_office_ops'
+  | 'self_storage_ops';
+
+/** Maps each module to its subcategory for sidebar grouping */
+export const OPS_MODULE_SUBCATEGORY: Record<OpsModuleKey, OpsSubcategory> = {
+  bookkeeping: 'financials',
+  budgeting: 'financials',
+  payroll: 'people',
+  rent_roll: 'leasing',
+  commercial_tenants: 'leasing',
+  marketing: 'marketing_ops',
+  dockage: 'marina_ops',
+  fuel: 'marina_ops',
+  ship_store: 'marina_ops',
+  service: 'marina_ops',
+  boat_rentals: 'marina_ops',
+  boat_club: 'marina_ops',
+  boat_sales: 'marina_ops',
+  hotel_ops: 'hotel_ops',
+  multifamily_ops: 'multifamily_ops',
+  retail_office_ops: 'retail_office_ops',
+  self_storage_ops: 'self_storage_ops',
+};
+
+/** Subcategories that appear for all users regardless of asset class */
+export const UNIVERSAL_SUBCATEGORIES: OpsSubcategory[] = [
+  'financials', 'people', 'leasing', 'marketing_ops',
+];
+
+/** Metadata for each subcategory — used by sidebar rendering */
+export const OPS_SUBCATEGORY_META: {
+  id: OpsSubcategory;
+  label: string;
+  isUniversal: boolean;
+  assetClasses?: string[];
+}[] = [
+  { id: 'financials', label: 'Financials', isUniversal: true },
+  { id: 'people', label: 'People', isUniversal: true },
+  { id: 'leasing', label: 'Leasing', isUniversal: true },
+  { id: 'marketing_ops', label: 'Marketing', isUniversal: true },
+  { id: 'marina_ops', label: 'Marina', isUniversal: false, assetClasses: ['marina'] },
+  { id: 'hotel_ops', label: 'Hotel', isUniversal: false, assetClasses: ['hotel'] },
+  { id: 'multifamily_ops', label: 'Multifamily', isUniversal: false, assetClasses: ['multifamily'] },
+  { id: 'retail_office_ops', label: 'Retail / Office', isUniversal: false, assetClasses: ['retail', 'office', 'medical_office'] },
+  { id: 'self_storage_ops', label: 'Self-Storage', isUniversal: false, assetClasses: ['self_storage'] },
+];
+
+/** Get subcategory for a module key */
+export function getSubcategoryForModule(moduleKey: OpsModuleKey): OpsSubcategory {
+  return OPS_MODULE_SUBCATEGORY[moduleKey];
+}

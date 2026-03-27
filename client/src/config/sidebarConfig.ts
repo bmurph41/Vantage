@@ -46,6 +46,8 @@ import {
   Sailboat,
   Users as UsersIcon,
   BookOpen,
+  ClipboardList,
+  Package,
   Store,
   ListTree,
   GitMerge,
@@ -71,6 +73,14 @@ export interface SidebarItem {
   opsModuleKey?: string;              // Maps to asset-class-ops-modules key for dynamic filtering
 }
 
+export interface SidebarSubcategory {
+  id: string;
+  label: string;
+  isUniversal: boolean;
+  assetClasses?: string[];   // Show when user owns these asset classes (if not universal)
+  items: SidebarItem[];
+}
+
 export interface SidebarGroup {
   id: string;
   label: string;
@@ -78,6 +88,7 @@ export interface SidebarGroup {
   href?: string;
   matchRoutes?: string[];
   children?: SidebarItem[];
+  subcategories?: SidebarSubcategory[];  // Two-tier grouping (used by Operations)
   requiredModules?: FeatureModule[];  // Modules needed to see this group
   featureFlag?: boolean;
   defaultExpanded?: boolean;
@@ -427,115 +438,110 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'operations',
     label: 'Operations',
     icon: Wrench,
-    matchRoutes: ['/operations', '/portfolio', '/dockit', '/commercial-tenants', '/fuel-sales', '/ship-store', '/service-dept', '/boat-rentals', '/boat-club', '/boat-sales', '/bookkeeping','/payroll'],
+    matchRoutes: ['/operations', '/portfolio', '/dockit', '/commercial-tenants', '/fuel-sales', '/ship-store', '/service-dept', '/boat-rentals', '/boat-club', '/boat-sales', '/bookkeeping', '/payroll', '/rent-roll'],
     requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO],
     defaultExpanded: false,
+    subcategories: [
+      // ── Always visible ──
+      {
+        id: 'ops-overview',
+        label: 'Overview',
+        isUniversal: true,
+        items: [
+          { id: 'ops-portfolio', label: 'Portfolio', href: '/operations/portfolio', icon: Anchor, matchRoutes: ['/operations/portfolio', '/portfolio'], requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO] },
+        ],
+      },
+      // ── Universal subcategories ──
+      {
+        id: 'ops-financials',
+        label: 'Financials',
+        isUniversal: true,
+        items: [
+          { id: 'bookkeeping', label: 'Bookkeeping', href: '/operations/bookkeeping', icon: BookOpen, matchRoutes: ['/operations/bookkeeping', '/bookkeeping'], opsModuleKey: 'bookkeeping', requiredModules: [FEATURE_MODULES.OPS_BOOKKEEPING] },
+          { id: 'budgeting', label: 'Budgeting', href: '/operations/budgeting', icon: BarChart2, matchRoutes: ['/operations/budgeting'], opsModuleKey: 'budgeting' },
+        ],
+      },
+      {
+        id: 'ops-people',
+        label: 'People',
+        isUniversal: true,
+        items: [
+          { id: 'payroll', label: 'Payroll', href: '/operations/payroll', icon: DollarSign, matchRoutes: ['/operations/payroll', '/payroll'], opsModuleKey: 'payroll' },
+        ],
+      },
+      {
+        id: 'ops-leasing',
+        label: 'Leasing',
+        isUniversal: true,
+        items: [
+          { id: 'rent-roll', label: 'Rent Roll', href: '/rent-roll/executive', icon: ClipboardList, matchRoutes: ['/rent-roll'], opsModuleKey: 'rent_roll' },
+          { id: 'commercial-tenants', label: 'Commercial Tenants', href: '/operations/commercial-tenants', icon: Building2, matchRoutes: ['/operations/commercial-tenants', '/commercial-tenants'], opsModuleKey: 'commercial_tenants', requiredModules: [FEATURE_MODULES.OPS_TENANTS] },
+        ],
+      },
+      {
+        id: 'ops-marketing',
+        label: 'Marketing',
+        isUniversal: true,
+        items: [
+          { id: 'ops-marketing-hub', label: 'Marketing', href: '/operations/marketing', icon: Megaphone, matchRoutes: ['/operations/marketing'], opsModuleKey: 'marketing' },
+        ],
+      },
+      // ── Asset-class-specific subcategories ──
+      {
+        id: 'ops-marina',
+        label: 'Marina',
+        isUniversal: false,
+        assetClasses: ['marina'],
+        items: [
+          { id: 'dockit', label: 'Dockit', href: '/operations/dockit', icon: Ship, matchRoutes: ['/operations/dockit', '/dockit'], opsModuleKey: 'dockage', requiredModules: [FEATURE_MODULES.OPS_DOCKAGE] },
+          { id: 'fuel-sales', label: 'Fuel Sales', href: '/operations/fuel-sales', icon: Fuel, matchRoutes: ['/operations/fuel-sales', '/fuel-sales'], opsModuleKey: 'fuel', requiredModules: [FEATURE_MODULES.OPS_FUEL] },
+          { id: 'ship-store', label: 'Ship Store', href: '/operations/ship-store', icon: ShoppingBag, matchRoutes: ['/operations/ship-store', '/ship-store'], opsModuleKey: 'ship_store', requiredModules: [FEATURE_MODULES.OPS_SHIP_STORE] },
+          { id: 'service-dept', label: 'Service & Parts', href: '/operations/service-dept', icon: WrenchIcon, matchRoutes: ['/operations/service-dept', '/service-dept'], opsModuleKey: 'service', requiredModules: [FEATURE_MODULES.OPS_SERVICE] },
+          { id: 'boat-rentals', label: 'Boat Rentals', href: '/operations/boat-rentals', icon: Key, matchRoutes: ['/operations/boat-rentals', '/boat-rentals'], opsModuleKey: 'boat_rentals', requiredModules: [FEATURE_MODULES.OPS_RENTALS] },
+          { id: 'boat-club', label: 'Boat Club', href: '/operations/boat-club', icon: UsersIcon, matchRoutes: ['/operations/boat-club', '/boat-club'], opsModuleKey: 'boat_club', requiredModules: [FEATURE_MODULES.OPS_CLUB] },
+          { id: 'boat-sales', label: 'Boat Sales', href: '/operations/boat-sales', icon: Sailboat, matchRoutes: ['/operations/boat-sales', '/boat-sales'], opsModuleKey: 'boat_sales', requiredModules: [FEATURE_MODULES.OPS_SALES] },
+        ],
+      },
+      {
+        id: 'ops-hotel',
+        label: 'Hotel',
+        isUniversal: false,
+        assetClasses: ['hotel'],
+        items: [
+          { id: 'hotel-ops', label: 'Hotel Ops', href: '/operations/hotel', icon: Building2, matchRoutes: ['/operations/hotel'], opsModuleKey: 'hotel_ops' },
+        ],
+      },
+      {
+        id: 'ops-multifamily',
+        label: 'Multifamily',
+        isUniversal: false,
+        assetClasses: ['multifamily'],
+        items: [
+          { id: 'multifamily-ops', label: 'Multifamily Ops', href: '/operations/multifamily', icon: Building2, matchRoutes: ['/operations/multifamily'], opsModuleKey: 'multifamily_ops' },
+        ],
+      },
+      {
+        id: 'ops-retail-office',
+        label: 'Retail / Office',
+        isUniversal: false,
+        assetClasses: ['retail', 'office', 'medical_office'],
+        items: [
+          { id: 'retail-office-ops', label: 'Retail/Office Ops', href: '/operations/retail-office', icon: Building2, matchRoutes: ['/operations/retail-office'], opsModuleKey: 'retail_office_ops' },
+        ],
+      },
+      {
+        id: 'ops-self-storage',
+        label: 'Self-Storage',
+        isUniversal: false,
+        assetClasses: ['self_storage'],
+        items: [
+          { id: 'self-storage-ops', label: 'Self-Storage Ops', href: '/operations/self-storage', icon: Package, matchRoutes: ['/operations/self-storage'], opsModuleKey: 'self_storage_ops' },
+        ],
+      },
+    ],
+    // Keep flat children for backward compat (integrations link)
     children: [
-      {
-        id: 'ops-portfolio',
-        label: 'Portfolio',
-        href: '/operations/portfolio',
-        icon: Anchor,
-        matchRoutes: ['/operations/portfolio', '/portfolio'],
-        requiredModules: [FEATURE_MODULES.OPS_PORTFOLIO],
-      },
-      {
-        id: 'dockit',
-        label: 'Dockit',
-        href: '/operations/dockit',
-        icon: Ship,
-        matchRoutes: ['/operations/dockit', '/dockit'],
-        requiredModules: [FEATURE_MODULES.OPS_DOCKAGE],
-        opsModuleKey: 'dockage',
-      },
-      {
-        id: 'commercial-tenants',
-        label: 'Commercial Tenants',
-        href: '/operations/commercial-tenants',
-        icon: Building2,
-        matchRoutes: ['/operations/commercial-tenants', '/commercial-tenants'],
-        requiredModules: [FEATURE_MODULES.OPS_TENANTS],
-        opsModuleKey: 'commercial_tenants',
-      },
-      {
-        id: 'fuel-sales',
-        label: 'Fuel Sales',
-        href: '/operations/fuel-sales',
-        icon: Fuel,
-        matchRoutes: ['/operations/fuel-sales', '/fuel-sales'],
-        requiredModules: [FEATURE_MODULES.OPS_FUEL],
-        opsModuleKey: 'fuel',
-      },
-      {
-        id: 'ship-store',
-        label: 'Ship Store',
-        href: '/operations/ship-store',
-        icon: ShoppingBag,
-        matchRoutes: ['/operations/ship-store', '/ship-store'],
-        requiredModules: [FEATURE_MODULES.OPS_SHIP_STORE],
-        opsModuleKey: 'ship_store',
-      },
-      {
-        id: 'marina-integrations',
-        label: 'Integrations',
-        href: '/operations/integrations',
-        icon: Plug,
-        matchRoutes: ['/operations/integrations'],
-        requiredModules: [FEATURE_MODULES.OPS_RETAIL],
-      },
-      {
-        id: 'service-dept',
-        label: 'Service Dept',
-        href: '/operations/service-dept',
-        icon: WrenchIcon,
-        matchRoutes: ['/operations/service-dept', '/service-dept'],
-        requiredModules: [FEATURE_MODULES.OPS_SERVICE],
-        opsModuleKey: 'service',
-      },
-      {
-        id: 'payroll',
-        label: 'Payroll',
-        href: '/operations/payroll',
-        icon: DollarSign,
-        matchRoutes: ['/operations/payroll', '/payroll'],
-        opsModuleKey: 'payroll',
-      },
-      {
-        id: 'boat-rentals',
-        label: 'Boat Rentals',
-        href: '/operations/boat-rentals',
-        icon: Key,
-        matchRoutes: ['/operations/boat-rentals', '/boat-rentals'],
-        requiredModules: [FEATURE_MODULES.OPS_RENTALS],
-        opsModuleKey: 'boat_rentals',
-      },
-      {
-        id: 'boat-club',
-        label: 'Boat Club',
-        href: '/operations/boat-club',
-        icon: UsersIcon,
-        matchRoutes: ['/operations/boat-club', '/boat-club'],
-        requiredModules: [FEATURE_MODULES.OPS_CLUB],
-        opsModuleKey: 'boat_club',
-      },
-      {
-        id: 'boat-sales',
-        label: 'Boat Sales',
-        href: '/operations/boat-sales',
-        icon: Sailboat,
-        matchRoutes: ['/operations/boat-sales', '/boat-sales'],
-        requiredModules: [FEATURE_MODULES.OPS_SALES],
-        opsModuleKey: 'boat_sales',
-      },
-      {
-        id: 'bookkeeping',
-        label: 'Bookkeeping',
-        href: '/operations/bookkeeping',
-        icon: BookOpen,
-        matchRoutes: ['/operations/bookkeeping', '/bookkeeping'],
-        requiredModules: [FEATURE_MODULES.OPS_BOOKKEEPING],
-        opsModuleKey: 'bookkeeping',
-      },
+      { id: 'marina-integrations', label: 'Integrations', href: '/operations/integrations', icon: Plug, matchRoutes: ['/operations/integrations'], requiredModules: [FEATURE_MODULES.OPS_RETAIL] },
     ],
   },
 

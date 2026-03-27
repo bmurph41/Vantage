@@ -8,6 +8,8 @@ import {
   Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OPS_MODULE_SUBCATEGORY, OPS_SUBCATEGORY_META, type OpsSubcategory } from '@shared/asset-class-ops-modules';
+import { useOpsAssetStore } from '@/stores/operations-asset-store';
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
@@ -169,6 +171,7 @@ export default function UnifiedSidebar() {
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { simplifiedMode } = useDisplayMode();
+  const { selectedAssetId: selectedOpsAssetId, setSelectedAsset: setSelectedOpsAsset } = useOpsAssetStore();
   
   // Sidebar collapse state with localStorage persistence
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -233,18 +236,41 @@ export default function UnifiedSidebar() {
 
   // Filter operations nav based on enabled modules (from owned asset classes) and access
   const enabledModules = opsModulesData?.modules || [];
+  const ownedAssetClasses = opsModulesData?.assetClasses || [];
   const filteredOperationsModulesNav = operationsModulesNav.filter(item => {
-    // Always show Portfolio
     if (item.opsModuleKey === null) return true;
-    // Rent Roll requires special pack access
     if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
-    // If we have module resolution data, filter by enabled modules
     if (enabledModules.length > 0) {
       return enabledModules.includes(item.opsModuleKey);
     }
-    // Default: show all modules (fallback when no owned assets exist)
     return true;
   });
+
+  // Build subcategory-grouped operations nav
+  const opsSubcategoryGroups = OPS_SUBCATEGORY_META
+    .map(subcat => {
+      // For asset-class-specific subcategories, check if user owns any matching asset
+      if (!subcat.isUniversal) {
+        const hasMatchingAsset = enabledModules.length === 0 || // fallback: show all
+          (subcat.assetClasses || []).some(ac => ownedAssetClasses.includes(ac));
+        if (!hasMatchingAsset) return null;
+      }
+
+      // Get items for this subcategory
+      const items = operationsModulesNav.filter(item => {
+        if (!item.opsModuleKey) return false;
+        const itemSubcat = OPS_MODULE_SUBCATEGORY[item.opsModuleKey as keyof typeof OPS_MODULE_SUBCATEGORY];
+        if (itemSubcat !== subcat.id) return false;
+        // Apply same module filtering as before
+        if (item.href === '/rent-roll/executive' && !hasRentRollAccess()) return false;
+        if (enabledModules.length > 0) return enabledModules.includes(item.opsModuleKey);
+        return true;
+      });
+
+      if (items.length === 0) return null;
+      return { ...subcat, items };
+    })
+    .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: typeof operationsModulesNav })[];
 
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
@@ -646,12 +672,51 @@ export default function UnifiedSidebar() {
             />
             {operationsExpanded && (
               <>
-                {simplifiedMode && (
-                  <NavLink item={{ name: "Overview", href: "/operations" }} />
+                {/* Asset Switcher — only when multiple assets owned */}
+                {(opsModulesData?.assets?.length || 0) > 1 && (
+                  <div className="px-3 py-1.5">
+                    <select
+                      className="w-full h-7 text-[11px] rounded-md border border-sidebar-border bg-sidebar px-2 text-sidebar-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={selectedOpsAssetId || ''}
+                      onChange={(e) => {
+                        const id = e.target.value || null;
+                        const asset = opsModulesData?.assets?.find((a: any) => a.id === id);
+                        setSelectedOpsAsset(id, asset?.name || null);
+                      }}
+                    >
+                      <option value="">All Assets (Portfolio)</option>
+                      {(opsModulesData?.assets || []).map((asset: any) => (
+                        <option key={asset.id} value={asset.id}>{asset.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
-                {filteredOperationsModulesNav.map((item) => (
-                  <NavLink key={item.name} item={item} />
+
+                {/* Portfolio — always visible */}
+                <NavLink item={{ name: "Portfolio", href: "/portfolio" }} />
+
+                {/* Subcategory-grouped modules */}
+                {opsSubcategoryGroups.map((subcat) => (
+                  <div key={subcat.id}>
+                    <div className="mt-3 mb-1 pl-8 flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                        {subcat.label}
+                      </span>
+                      {!subcat.isUniversal && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 flex-shrink-0" />
+                      )}
+                    </div>
+                    {subcat.items.map((item) => (
+                      <NavLink key={item.name} item={item} />
+                    ))}
+                  </div>
                 ))}
+
+                {/* Integrations link */}
+                <div className="mt-3 mb-1 pl-8">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">System</span>
+                </div>
+                <NavLink item={{ name: "Integrations", href: "/operations/integrations" }} />
               </>
             )}
           </div>
