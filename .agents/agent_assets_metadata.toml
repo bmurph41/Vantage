@@ -12,3 +12,9 @@ id = "DtBmOicQZAeGL44m5nxqZ"
 uri = "file://marinamatch-export.zip"
 type = "unspecified"
 title = "MarinaMatch — Full Source Code (53 files, 232KB)"
+
+[[outputs]]
+id = "BK1pWsyIGrPNpKX4ZoFej"
+uri = "file://pipeline-export.zip"
+type = "unspecified"
+title = "Pipeline Section — Full Source Code (51 files, 256KB)"

@@ -99,7 +99,8 @@
       "Bash(xargs sed:*)",
       "Bash(echo \"STATUS:$?\")",
       "Bash(jobs -l)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(find /home/runner/workspace/client -name *enabled*ops* -o -name *ops*modules*)"
     ]
   }
 }
