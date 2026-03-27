@@ -19,6 +19,14 @@ import type {
   AudiencePersona,
   AssetClass,
 } from '@shared/document-builder/types';
+import {
+  DOCUMENT_STUDIO_TEMPLATES,
+  TEMPLATE_REGISTRY,
+  getTemplateById,
+  MASTER_TOKEN_MAP,
+  TOKEN_SUMMARY,
+  getTokensForTemplate,
+} from '@shared/document-builder/templates';
 
 const router = Router();
 
@@ -1285,6 +1293,101 @@ router.get('/saved-templates', async (req: any, res) => {
     res.json(templates);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to list templates' });
+  }
+});
+
+// =============================================================================
+// Professional Template Registry (IC Deck + OM)
+// =============================================================================
+
+// Get all registered professional templates
+router.get('/professional-templates', async (_req: any, res) => {
+  res.json({
+    templates: TEMPLATE_REGISTRY,
+    tokenSummary: TOKEN_SUMMARY,
+  });
+});
+
+// Get full template definition by ID (with all sections + blocks)
+router.get('/professional-templates/:templateId', async (req: any, res) => {
+  const template = getTemplateById(req.params.templateId);
+  if (!template) return res.status(404).json({ error: 'Template not found' });
+  res.json(template);
+});
+
+// Get token map for a template type
+router.get('/professional-templates/:templateId/tokens', async (req: any, res) => {
+  const template = getTemplateById(req.params.templateId);
+  if (!template) return res.status(404).json({ error: 'Template not found' });
+
+  const templateType = template.id.includes('ic_deal') ? 'ic_deck' : 'om';
+  const tokens = getTokensForTemplate(templateType as 'ic_deck' | 'om');
+
+  const liveTokens = tokens.filter(t => t.source !== 'manual' && t.bindingPath);
+  const manualTokens = tokens.filter(t => t.source === 'manual');
+
+  res.json({
+    templateId: template.id,
+    totalTokens: tokens.length,
+    liveTokens: liveTokens.length,
+    manualTokens: manualTokens.length,
+    tokens,
+    required: template.requiredTokens,
+    optional: template.optionalTokens,
+  });
+});
+
+// Get full master token map
+router.get('/token-map', async (_req: any, res) => {
+  res.json({
+    summary: TOKEN_SUMMARY,
+    tokens: MASTER_TOKEN_MAP,
+  });
+});
+
+// Seed professional templates into om_templates DB table
+router.post('/professional-templates/seed', async (req: any, res) => {
+  try {
+    const userId = req.user?.id;
+    const orgId = req.user?.orgId;
+    const seeded: string[] = [];
+
+    for (const template of DOCUMENT_STUDIO_TEMPLATES) {
+      // Check if already seeded
+      const existing = await db.select()
+        .from(omTemplates)
+        .where(and(
+          eq(omTemplates.name, template.name),
+          eq(omTemplates.ownerId, orgId),
+        ))
+        .limit(1);
+
+      if (existing.length > 0) continue;
+
+      await db.insert(omTemplates).values({
+        name: template.name,
+        description: template.description,
+        documentType: template.documentType,
+        scope: 'organization',
+        ownerType: 'organization',
+        ownerId: orgId,
+        templateData: template as any,
+        createdBy: userId,
+      } as any);
+
+      seeded.push(template.name);
+    }
+
+    res.json({
+      success: true,
+      seeded,
+      message: seeded.length > 0
+        ? `Seeded ${seeded.length} templates`
+        : 'All templates already exist',
+    });
+  } catch (error: any) {
+    console.error('[Document Builder] Template seed error:', error);
+    res.status(500).json({ error: 'Failed to seed templates' });
   }
 });
 
