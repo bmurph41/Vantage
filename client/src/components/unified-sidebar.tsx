@@ -366,7 +366,7 @@ export default function UnifiedSidebar() {
     setMobileMenuOpen(false);
   };
 
-  const NavLink = ({ item }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean } }) => {
+  const NavLink = ({ item, depth = 0 }: { item: { name: string; href: string; icon?: any; badge?: string; disabled?: boolean }; depth?: number }) => {
     // Check if current location is a child of this nav item's href
     // Parse both location and href to handle query parameters using wouter's location string
     const [itemPath, itemQuery] = item.href.split('?');
@@ -427,6 +427,7 @@ export default function UnifiedSidebar() {
         key={item.name} 
         href={item.href}
         onClick={handleNavClick}
+        style={!sidebarCollapsed && depth > 0 ? { paddingLeft: `${16 + depth * 24}px` } : undefined}
         className={cn(
           "flex items-center text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
           sidebarCollapsed ? "px-2 py-2.5 justify-center" : "px-4 py-3 md:py-2.5",
@@ -707,7 +708,7 @@ export default function UnifiedSidebar() {
                       )}
                     </div>
                     {subcat.items.map((item) => (
-                      <NavLink key={item.name} item={item} />
+                      <NavLink key={item.name} item={item} depth={1} />
                     ))}
                   </div>
                 ))}
@@ -716,7 +717,7 @@ export default function UnifiedSidebar() {
                 <div className="mt-3 mb-1 pl-8">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">System</span>
                 </div>
-                <NavLink item={{ name: "Integrations", href: "/operations/integrations" }} />
+                <NavLink item={{ name: "Integrations", href: "/operations/integrations" }} depth={1} />
               </>
             )}
           </div>
@@ -733,7 +734,7 @@ export default function UnifiedSidebar() {
               isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
             />
             {crmExpanded && (
-              <>
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {crmNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
@@ -764,7 +765,7 @@ export default function UnifiedSidebar() {
                     ))}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -820,11 +821,11 @@ export default function UnifiedSidebar() {
               isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/')}
             />
             {pipelineExpanded && (
-              <>
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {pipelineDealNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -840,7 +841,7 @@ export default function UnifiedSidebar() {
               isActive={location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr')}
             />
             {dealWorkspaceExpanded && (
-              <>
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {dealWorkspaceNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
@@ -852,7 +853,7 @@ export default function UnifiedSidebar() {
                     ))}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -867,25 +868,24 @@ export default function UnifiedSidebar() {
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
             />
-            {analysisExpanded && analysisNav
-              // In simplified mode, hide advanced analysis items:
-              // - Debt Scenarios (Monte Carlo / Stress Testing)
-              // - Pipeline Returns (IRR Decomposition)
-              // - Portfolio Returns (Benchmark Overlay)
-              // - Exit Strategies (Sensitivity Analysis)
-              .filter((item) => {
-                if (!simplifiedMode) return true;
-                const hiddenInSimplifiedMode = [
-                  "/modeling/scenarios",       // Debt Scenarios (Monte Carlo / Stress Testing)
-                  "/modeling/returns-valuation", // Pipeline Returns (IRR Decomposition)
-                  "/modeling/portfolio/returns", // Portfolio Returns (Benchmark Overlay)
-                  "/modeling/exit-strategies",   // Exit Strategies (Sensitivity Analysis)
-                ];
-                return !hiddenInSimplifiedMode.includes(item.href);
-              })
-              .map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
+            {analysisExpanded && (
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
+                {analysisNav
+                  .filter((item) => {
+                    if (!simplifiedMode) return true;
+                    const hiddenInSimplifiedMode = [
+                      "/modeling/scenarios",
+                      "/modeling/returns-valuation",
+                      "/modeling/portfolio/returns",
+                      "/modeling/exit-strategies",
+                    ];
+                    return !hiddenInSimplifiedMode.includes(item.href);
+                  })
+                  .map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+              </div>
+            )}
           </div>
         )}
         
@@ -899,11 +899,11 @@ export default function UnifiedSidebar() {
             isActive={location.startsWith('/document-studio') || location.startsWith('/om') || location.startsWith('/document-builder') || location.startsWith('/simple-report')}
           />
           {documentStudioExpanded && (
-            <>
+            <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
               <NavLink item={{ name: "All Documents", href: "/document-studio" }} />
               <NavLink item={{ name: "Template Gallery", href: "/document-studio/templates" }} />
               <NavLink item={{ name: "Quick Reports", href: "/simple-report" }} />
-            </>
+            </div>
           )}
         </div>
         
@@ -917,15 +917,19 @@ export default function UnifiedSidebar() {
               onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
               isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
             />
-            {investorServicesExpanded && investorServicesNav
-              .filter((item) => {
-                if (item.href === '/modeling/funds') return hasPack('fund_management');
-                if (item.href === '/modeling/lp-portal') return hasPack('lp_portal');
-                return true;
-              })
-              .map((item) => (
-                <NavLink key={item.name} item={item} />
-              ))}
+            {investorServicesExpanded && (
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
+                {investorServicesNav
+                  .filter((item) => {
+                    if (item.href === '/modeling/funds') return hasPack('fund_management');
+                    if (item.href === '/modeling/lp-portal') return hasPack('lp_portal');
+                    return true;
+                  })
+                  .map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))}
+              </div>
+            )}
           </div>
         )}
         
@@ -1012,9 +1016,13 @@ export default function UnifiedSidebar() {
               onToggle={() => setMarketIntelExpanded(!marketIntelExpanded)}
               isActive={location.startsWith('/analysis/')}
             />
-            {marketIntelExpanded && marketIntelligenceNav.map((item) => (
-              <NavLink key={item.name} item={item} />
-            ))}
+            {marketIntelExpanded && (
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
+                {marketIntelligenceNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

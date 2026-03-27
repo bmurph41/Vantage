@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,11 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, FileText, Calendar, DollarSign, TrendingUp, TrendingDown, ArrowUpRight,
   ArrowDownRight, BarChart3, Trash2, Lock, Unlock, CheckCircle2, AlertCircle,
-  Save, RefreshCw, ChevronRight, Minus
+  Save, RefreshCw, ChevronRight, Minus, MoreHorizontal, SplitSquareVertical,
+  Percent, BarChart2, Copy, Upload
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,11 +46,6 @@ type BudgetLine = {
   lineType: string;
   accountKey: string;
   displayName: string;
-};
-
-type GridData = {
-  lines: BudgetLine[];
-  amounts: Record<string, Record<string, string>>;
 };
 
 type BvaLine = BudgetLine & {
@@ -133,13 +130,17 @@ export default function BudgetingTabbed() {
 
         <TabsContent value="editor" className="mt-4">
           {selectedBudget && selectedVersion && (
-            <BudgetEditor budget={selectedBudget} version={selectedVersion} />
+            <BudgetEditor
+              budget={selectedBudget}
+              version={selectedVersion}
+              onVersionChange={(v) => setSelectedVersion(v)}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="bva" className="mt-4">
           {selectedBudget && (
-            <BudgetVsActual budgetId={selectedBudget.id} />
+            <EnhancedBudgetVsActual budgetId={selectedBudget.id} />
           )}
         </TabsContent>
       </Tabs>
@@ -375,150 +376,359 @@ function CreateBudgetDialog({ open, onOpenChange, onCreated }: {
   );
 }
 
-function BudgetEditor({ budget, version }: { budget: Budget; version: BudgetVersion }) {
-  const { toast } = useToast();
-  const [editedCells, setEditedCells] = useState<Record<string, string>>({});
-  const [hasChanges, setHasChanges] = useState(false);
+type TreeRow = {
+  id: string;
+  accountKey: string;
+  displayName: string;
+  parentKey: string | null;
+  lineType: string;
+  sortOrder: number;
+  isParent: boolean;
+  assetClass: string;
+};
 
-  const { data: gridData, isLoading } = useQuery<GridData>({
-    queryKey: ["/api/budgets/version", version.id, "grid"],
+type TreeGridData = {
+  tree: TreeRow[];
+  amounts: Record<string, Record<string, string>>;
+  lineIdMap: Record<string, string>;
+  fiscalYear: number;
+  budgetStatus: string;
+};
+
+function BudgetEditor({ budget, version, onVersionChange }: {
+  budget: Budget;
+  version: BudgetVersion;
+  onVersionChange: (v: BudgetVersion) => void;
+}) {
+  const { toast } = useToast();
+  const [localAmounts, setLocalAmounts] = useState<Record<string, Record<string, string>>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const savingRef = useRef<Set<string>>(new Set());
+
+  const { data: treeGrid, isLoading } = useQuery<TreeGridData>({
+    queryKey: ["/api/budgets/version", version.id, "tree-grid"],
     queryFn: async () => {
-      const res = await fetch(`/api/budgets/version/${version.id}/grid`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load grid data");
+      const res = await fetch(`/api/budgets/version/${version.id}/tree-grid`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load tree grid");
       return res.json();
     },
   });
 
+  // Sync server amounts into local state when data loads
+  useEffect(() => {
+    if (treeGrid?.amounts) {
+      setLocalAmounts(prev => {
+        const merged = { ...treeGrid.amounts };
+        // Overlay any in-flight local edits
+        for (const [key, months] of Object.entries(prev)) {
+          if (!merged[key]) merged[key] = {};
+          for (const [m, v] of Object.entries(months)) {
+            if (savingRef.current.has(`${key}|${m}`)) {
+              merged[key][m] = v; // Keep local value while saving
+            }
+          }
+        }
+        return merged;
+      });
+    }
+  }, [treeGrid?.amounts]);
+
   const months = useMemo(() => {
+    const fy = treeGrid?.fiscalYear || budget.fiscalYear;
     return Array.from({ length: 12 }, (_, i) => {
       const m = (i + 1).toString().padStart(2, '0');
-      return `${budget.fiscalYear}-${m}-01`;
+      return `${fy}-${m}-01`;
     });
-  }, [budget.fiscalYear]);
+  }, [treeGrid?.fiscalYear, budget.fiscalYear]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const updates = Object.entries(editedCells).map(([key, amount]) => {
-        const [budgetLineId, periodStart] = key.split("|");
-        return { budgetLineId, periodStart, amount };
+  // Determine which months are locked (prior to current month)
+  const lockedMonths = useMemo(() => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
+    const locked = new Set<string>();
+    for (const m of months) {
+      if (m < currentMonth) locked.add(m);
+    }
+    return locked;
+  }, [months]);
+
+  const autoSave = useCallback(async (accountKey: string, periodStart: string, amount: string) => {
+    const cellKey = `${accountKey}|${periodStart}`;
+    if (savingRef.current.has(cellKey)) return;
+    savingRef.current.add(cellKey);
+    try {
+      await apiRequest("PATCH", `/api/budgets/version/${version.id}/cell`, {
+        accountKey,
+        periodStart,
+        amount,
       });
-      if (updates.length === 0) return;
-      await apiRequest("PUT", `/api/budgets/version/${version.id}/amounts`, { updates });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "grid"] });
-      setEditedCells({});
-      setHasChanges(false);
-      toast({ title: "Budget saved", description: "All changes have been saved" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to save budget", description: error.message, variant: "destructive" });
-    },
-  });
+    } catch {
+      toast({ title: "Auto-save failed", description: `Could not save ${accountKey}`, variant: "destructive" });
+    } finally {
+      savingRef.current.delete(cellKey);
+    }
+  }, [version.id, toast]);
 
-  const handleCellChange = useCallback((lineId: string, month: string, value: string) => {
+  const getCellValue = useCallback((accountKey: string, month: string): string => {
+    return localAmounts[accountKey]?.[month] || '0';
+  }, [localAmounts]);
+
+  const handleCellChange = useCallback((accountKey: string, month: string, value: string) => {
     const numVal = value.replace(/[^0-9.\-]/g, '');
-    const key = `${lineId}|${month}`;
-    setEditedCells(prev => ({ ...prev, [key]: numVal }));
-    setHasChanges(true);
+    setLocalAmounts(prev => ({
+      ...prev,
+      [accountKey]: { ...(prev[accountKey] || {}), [month]: numVal },
+    }));
   }, []);
 
-  const getCellValue = useCallback((lineId: string, month: string): string => {
-    const key = `${lineId}|${month}`;
-    if (editedCells[key] !== undefined) return editedCells[key];
-    return gridData?.amounts[lineId]?.[month] || '0';
-  }, [editedCells, gridData]);
+  const handleCellBlur = useCallback((accountKey: string, month: string) => {
+    const val = localAmounts[accountKey]?.[month] || '0';
+    autoSave(accountKey, month, val);
+  }, [localAmounts, autoSave]);
 
-  const getLineTotal = useCallback((lineId: string): number => {
-    return months.reduce((sum, m) => sum + parseFloat(getCellValue(lineId, m) || '0'), 0);
+  const getChildTotal = useCallback((accountKey: string): number => {
+    return months.reduce((sum, m) => sum + parseFloat(getCellValue(accountKey, m) || '0'), 0);
   }, [months, getCellValue]);
 
-  if (isLoading) {
+  const getParentMonthTotal = useCallback((parentKey: string, month: string, children: TreeRow[]): number => {
+    return children
+      .filter(c => c.parentKey === parentKey && !c.isParent)
+      .reduce((sum, c) => sum + parseFloat(getCellValue(c.accountKey, month) || '0'), 0);
+  }, [getCellValue]);
+
+  const getParentAnnualTotal = useCallback((parentKey: string, children: TreeRow[]): number => {
+    return months.reduce((sum, m) => sum + getParentMonthTotal(parentKey, m, children), 0);
+  }, [months, getParentMonthTotal]);
+
+  const toggleCollapse = useCallback((key: string) => {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  // Build ordered child list for keyboard nav
+  const childRows = useMemo(() => {
+    if (!treeGrid?.tree) return [];
+    return treeGrid.tree.filter(r => !r.isParent).sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [treeGrid?.tree]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>, accountKey: string, monthIdx: number) => {
+    const rowIdx = childRows.findIndex(r => r.accountKey === accountKey);
+    if (rowIdx === -1) return;
+
+    let targetRow = rowIdx;
+    let targetMonth = monthIdx;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        targetMonth = monthIdx - 1;
+        if (targetMonth < 0) { targetMonth = 11; targetRow = rowIdx - 1; }
+      } else {
+        targetMonth = monthIdx + 1;
+        if (targetMonth > 11) { targetMonth = 0; targetRow = rowIdx + 1; }
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      targetRow = e.shiftKey ? rowIdx - 1 : rowIdx + 1;
+    } else {
+      return;
+    }
+
+    if (targetRow < 0 || targetRow >= childRows.length) return;
+    // Skip locked months
+    const targetMonthStr = months[targetMonth];
+    if (lockedMonths.has(targetMonthStr)) return;
+
+    // Ensure parent is expanded
+    const targetChild = childRows[targetRow];
+    if (targetChild.parentKey && collapsed[targetChild.parentKey]) {
+      setCollapsed(prev => ({ ...prev, [targetChild.parentKey!]: false }));
+    }
+
+    const refKey = `${targetChild.accountKey}|${targetMonth}`;
+    // Use setTimeout to let any collapse re-render happen first
+    setTimeout(() => {
+      const input = cellRefs.current.get(refKey);
+      if (input) { input.focus(); input.select(); }
+    }, 0);
+  }, [childRows, months, lockedMonths, collapsed]);
+
+  if (isLoading || !treeGrid) {
     return <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>;
   }
 
-  const lines = gridData?.lines || [];
-  const grouped: Record<string, BudgetLine[]> = {};
-  for (const line of lines) {
-    if (!grouped[line.lineType]) grouped[line.lineType] = [];
-    grouped[line.lineType].push(line);
-  }
+  const tree = treeGrid.tree;
+  const parents = tree.filter(r => r.isParent).sort((a, b) => a.sortOrder - b.sortOrder);
+  const isLocked = budget.status === "LOCKED" || (version as any).isLocked === true;
 
-  const sectionOrder = ["REVENUE", "OTHER_INCOME", "COGS", "OPEX", "OTHER_EXPENSE"];
+  // NOI computation
+  const getNoiMonth = (month: string) => {
+    const rev = getParentMonthTotal("REVENUE", month, tree);
+    const exp = getParentMonthTotal("OPEX", month, tree);
+    return rev - exp;
+  };
+  const noiTotal = months.reduce((sum, m) => sum + getNoiMonth(m), 0);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">{budget.name}</h2>
-          <p className="text-sm text-muted-foreground">Version: {version.name} | FY {budget.fiscalYear}</p>
+          <p className="text-sm text-muted-foreground">FY {budget.fiscalYear}</p>
         </div>
-        <div className="flex gap-2">
-          {hasChanges && (
-            <Badge variant="outline" className="text-amber-600">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              Unsaved changes
-            </Badge>
-          )}
-          <Button onClick={() => saveMutation.mutate()} disabled={!hasChanges || saveMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {saveMutation.isPending ? "Saving..." : "Save"}
-          </Button>
-        </div>
+        <Badge variant="outline" className="text-xs text-muted-foreground">
+          <Save className="h-3 w-3 mr-1" />
+          Auto-saves on blur
+        </Badge>
       </div>
 
-      <div className="border rounded-lg overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="text-left px-3 py-2 font-medium sticky left-0 bg-muted/50 min-w-[200px] z-10">Account</th>
-              {MONTHS_SHORT.map(m => (
-                <th key={m} className="text-right px-3 py-2 font-medium min-w-[100px]">{m}</th>
-              ))}
-              <th className="text-right px-3 py-2 font-semibold min-w-[110px] bg-muted/80">Total</th>
+      <VersionManager
+        budgetId={budget.id}
+        currentVersion={version}
+        onVersionChange={onVersionChange}
+      />
+
+      <CsvDropZone
+        versionId={version.id}
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
+        }}
+      />
+
+      <div className="border rounded-lg overflow-auto max-h-[75vh]">
+        <table className="w-full text-sm border-collapse">
+          <thead className="sticky top-0 z-20">
+            <tr className="bg-muted/80 backdrop-blur-sm">
+              <th className="text-left px-3 py-2.5 font-medium sticky left-0 bg-muted/80 backdrop-blur-sm min-w-[240px] z-30 border-b">Account</th>
+              {MONTHS_SHORT.map((m, i) => {
+                const monthStr = months[i];
+                const locked = lockedMonths.has(monthStr);
+                return (
+                  <th key={m} className={cn(
+                    "text-right px-3 py-2.5 font-medium min-w-[105px] border-b",
+                    locked && "text-muted-foreground/60"
+                  )}>
+                    {m}
+                    {locked && <Lock className="h-3 w-3 inline ml-1 opacity-40" />}
+                  </th>
+                );
+              })}
+              <th className="text-right px-3 py-2.5 font-semibold min-w-[115px] bg-muted border-b sticky right-0 z-30">Total</th>
             </tr>
           </thead>
           <tbody>
-            {sectionOrder.map(section => {
-              const sectionLines = grouped[section];
-              if (!sectionLines?.length) return null;
-
-              const sectionTotal = sectionLines.reduce((s, l) => s + getLineTotal(l.id), 0);
+            {parents.map(parent => {
+              const children = tree.filter(r => r.parentKey === parent.accountKey && !r.isParent)
+                .sort((a, b) => a.sortOrder - b.sortOrder);
+              const isCollapsed = collapsed[parent.accountKey] ?? false;
+              const parentColor = parent.lineType === "REVENUE"
+                ? "bg-emerald-50/70 dark:bg-emerald-900/20"
+                : "bg-red-50/70 dark:bg-red-900/20";
+              const parentBadgeColor = LINE_TYPE_COLORS[parent.lineType] || "";
 
               return (
-                <SectionBlock
-                  key={section}
-                  section={section}
-                  lines={sectionLines}
-                  months={months}
-                  getCellValue={getCellValue}
-                  getLineTotal={getLineTotal}
-                  onCellChange={handleCellChange}
-                  sectionTotal={sectionTotal}
-                  isLocked={budget.status === "LOCKED"}
-                />
+                <React.Fragment key={parent.accountKey}>
+                  {/* Parent row — click to collapse/expand */}
+                  <tr
+                    className={cn("cursor-pointer select-none hover:bg-muted/30 transition-colors border-b", parentColor)}
+                    onClick={() => toggleCollapse(parent.accountKey)}
+                  >
+                    <td className={cn("px-3 py-2 sticky left-0 z-10 font-semibold text-sm", parentColor)}>
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className={cn(
+                          "h-4 w-4 transition-transform flex-shrink-0",
+                          !isCollapsed && "rotate-90"
+                        )} />
+                        <Badge className={cn("text-xs", parentBadgeColor)} variant="outline">
+                          {parent.displayName}
+                        </Badge>
+                      </div>
+                    </td>
+                    {months.map((m, i) => (
+                      <td key={i} className="text-right px-3 py-2 font-semibold tabular-nums text-sm">
+                        {formatAmount(getParentMonthTotal(parent.accountKey, m, tree))}
+                      </td>
+                    ))}
+                    <td className={cn("text-right px-3 py-2 font-bold tabular-nums sticky right-0 z-10", parentColor)}>
+                      {formatAmount(getParentAnnualTotal(parent.accountKey, tree))}
+                    </td>
+                  </tr>
+
+                  {/* Child rows — editable */}
+                  {!isCollapsed && children.map(child => (
+                    <tr key={child.accountKey} className="border-b hover:bg-muted/10 transition-colors group/row">
+                      <td className="pl-10 pr-1 py-0.5 sticky left-0 bg-background z-10 text-sm">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="truncate">{child.displayName}</span>
+                          {!isLocked && (
+                            <BulkFillMenu
+                              versionId={version.id}
+                              accountKey={child.accountKey}
+                              displayName={child.displayName}
+                              onFilled={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
+                              }}
+                            />
+                          )}
+                        </div>
+                      </td>
+                      {months.map((m, mi) => {
+                        const locked = lockedMonths.has(m);
+                        const cellDisabled = isLocked || locked;
+                        const refKey = `${child.accountKey}|${mi}`;
+                        return (
+                          <td key={m} className="px-0.5 py-0.5">
+                            <input
+                              ref={(el) => {
+                                if (el) cellRefs.current.set(refKey, el);
+                                else cellRefs.current.delete(refKey);
+                              }}
+                              type="text"
+                              className={cn(
+                                "w-full text-right px-2 py-1 text-sm rounded transition-colors tabular-nums",
+                                cellDisabled
+                                  ? "bg-muted/40 text-muted-foreground/50 cursor-not-allowed"
+                                  : "bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                              )}
+                              value={getCellValue(child.accountKey, m)}
+                              onChange={(e) => handleCellChange(child.accountKey, m, e.target.value)}
+                              onBlur={() => handleCellBlur(child.accountKey, m)}
+                              onKeyDown={(e) => handleKeyDown(e, child.accountKey, mi)}
+                              disabled={cellDisabled}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="text-right px-3 py-0.5 font-medium tabular-nums bg-muted/10 sticky right-0 z-10">
+                        {formatAmount(getChildTotal(child.accountKey))}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               );
             })}
+
+            {/* NOI row */}
             <tr className="bg-slate-100 dark:bg-slate-800 font-bold border-t-2">
-              <td className="px-3 py-2 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Net Operating Income</td>
+              <td className="px-3 py-2.5 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10 text-sm">
+                <div className="flex items-center gap-2">
+                  <Minus className="h-4 w-4 flex-shrink-0 opacity-40" />
+                  Net Operating Income
+                </div>
+              </td>
               {months.map((m, i) => {
-                const rev = (grouped["REVENUE"] || []).reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0)
-                  + (grouped["OTHER_INCOME"] || []).reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0);
-                const exp = (grouped["COGS"] || []).reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0)
-                  + (grouped["OPEX"] || []).reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0)
-                  + (grouped["OTHER_EXPENSE"] || []).reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0);
-                const noi = rev - exp;
+                const noi = getNoiMonth(m);
                 return (
-                  <td key={i} className={cn("text-right px-3 py-2", noi >= 0 ? "text-emerald-600" : "text-red-600")}>
+                  <td key={i} className={cn("text-right px-3 py-2.5 tabular-nums", noi >= 0 ? "text-emerald-600" : "text-red-600")}>
                     {formatAmount(noi)}
                   </td>
                 );
               })}
-              <td className="text-right px-3 py-2 bg-slate-200 dark:bg-slate-700">
-                {formatAmount(
-                  ["REVENUE", "OTHER_INCOME"].reduce((s, t) => s + (grouped[t] || []).reduce((s2, l) => s2 + getLineTotal(l.id), 0), 0)
-                  - ["COGS", "OPEX", "OTHER_EXPENSE"].reduce((s, t) => s + (grouped[t] || []).reduce((s2, l) => s2 + getLineTotal(l.id), 0), 0)
-                )}
+              <td className={cn(
+                "text-right px-3 py-2.5 font-bold tabular-nums sticky right-0 z-10 bg-slate-200 dark:bg-slate-700",
+                noiTotal >= 0 ? "text-emerald-600" : "text-red-600"
+              )}>
+                {formatAmount(noiTotal)}
               </td>
             </tr>
           </tbody>
@@ -528,69 +738,757 @@ function BudgetEditor({ budget, version }: { budget: Budget; version: BudgetVers
   );
 }
 
-function SectionBlock({
-  section, lines, months, getCellValue, getLineTotal, onCellChange, sectionTotal, isLocked,
-}: {
-  section: string;
-  lines: BudgetLine[];
-  months: string[];
-  getCellValue: (lineId: string, month: string) => string;
-  getLineTotal: (lineId: string) => number;
-  onCellChange: (lineId: string, month: string, value: string) => void;
-  sectionTotal: number;
-  isLocked: boolean;
+// ---------------------------------------------------------------------------
+// BulkFillMenu — "..." popover on each child row
+// ---------------------------------------------------------------------------
+function BulkFillMenu({ versionId, accountKey, displayName, onFilled }: {
+  versionId: string;
+  accountKey: string;
+  displayName: string;
+  onFilled: () => void;
 }) {
-  const sectionLabels: Record<string, string> = {
-    REVENUE: "Revenue",
-    COGS: "Cost of Goods Sold",
-    OPEX: "Operating Expenses",
-    OTHER_INCOME: "Other Income",
-    OTHER_EXPENSE: "Other Expense",
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<string | null>(null);
+  const [annualTotal, setAnnualTotal] = useState("");
+  const [janValue, setJanValue] = useState("");
+  const [growthRate, setGrowthRate] = useState("");
+  const [upliftPct, setUpliftPct] = useState("5");
+
+  const fillMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const res = await apiRequest("POST", `/api/budgets/version/${versionId}/bulk-fill`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Row filled", description: `${displayName} updated` });
+      setOpen(false);
+      setMode(null);
+      onFilled();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Fill failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const submit = () => {
+    const base = { accountKey, mode };
+    switch (mode) {
+      case "spread_evenly":
+        fillMutation.mutate({ ...base, annualTotal: parseFloat(annualTotal) || 0 });
+        break;
+      case "grow_pct":
+        fillMutation.mutate({ ...base, januaryValue: parseFloat(janValue) || 0, growthRate: (parseFloat(growthRate) || 0) / 100 });
+        break;
+      case "seasonality":
+        fillMutation.mutate({ ...base, annualTotal: parseFloat(annualTotal) || 0 });
+        break;
+      case "copy_prior_year":
+        fillMutation.mutate({ ...base, upliftPct: (parseFloat(upliftPct) || 0) / 100 });
+        break;
+    }
+  };
+
+  const modes = [
+    { key: "spread_evenly", label: "Spread Evenly", icon: SplitSquareVertical, desc: "Divide annual total by 12" },
+    { key: "grow_pct", label: "Grow by %", icon: Percent, desc: "January value + MoM growth" },
+    { key: "seasonality", label: "Apply Seasonality", icon: BarChart2, desc: "Weight by prior year actuals" },
+    { key: "copy_prior_year", label: "Copy Prior Year", icon: Copy, desc: "Prior actuals × uplift %" },
+  ];
+
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setMode(null); }}>
+      <PopoverTrigger asChild>
+        <button
+          className="opacity-0 group-hover/row:opacity-100 focus:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start" side="right">
+        {!mode ? (
+          <div className="py-1">
+            <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Bulk Fill — {displayName}
+            </div>
+            {modes.map(m => (
+              <button
+                key={m.key}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left"
+                onClick={() => setMode(m.key)}
+              >
+                <m.icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="font-medium">{m.label}</div>
+                  <div className="text-xs text-muted-foreground">{m.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="p-3 space-y-3">
+            <div className="text-sm font-medium">{modes.find(m => m.key === mode)?.label}</div>
+
+            {(mode === "spread_evenly" || mode === "seasonality") && (
+              <div>
+                <Label className="text-xs">Annual Total ($)</Label>
+                <Input
+                  type="number"
+                  value={annualTotal}
+                  onChange={e => setAnnualTotal(e.target.value)}
+                  placeholder="e.g. 120000"
+                  autoFocus
+                />
+                {mode === "seasonality" && (
+                  <p className="text-xs text-muted-foreground mt-1">Weighted by prior year actual distribution</p>
+                )}
+              </div>
+            )}
+
+            {mode === "grow_pct" && (
+              <>
+                <div>
+                  <Label className="text-xs">January Value ($)</Label>
+                  <Input type="number" value={janValue} onChange={e => setJanValue(e.target.value)} placeholder="e.g. 10000" autoFocus />
+                </div>
+                <div>
+                  <Label className="text-xs">Month-over-Month Growth (%)</Label>
+                  <Input type="number" value={growthRate} onChange={e => setGrowthRate(e.target.value)} placeholder="e.g. 3" />
+                </div>
+              </>
+            )}
+
+            {mode === "copy_prior_year" && (
+              <div>
+                <Label className="text-xs">Uplift (%)</Label>
+                <Input type="number" value={upliftPct} onChange={e => setUpliftPct(e.target.value)} placeholder="e.g. 5" autoFocus />
+                <p className="text-xs text-muted-foreground mt-1">Prior year actuals × (1 + uplift)</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" variant="outline" className="flex-1" onClick={() => setMode(null)}>Back</Button>
+              <Button size="sm" className="flex-1" onClick={submit} disabled={fillMutation.isPending}>
+                {fillMutation.isPending ? "Applying..." : "Apply"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CsvDropZone — Drag-and-drop CSV/Excel import
+// ---------------------------------------------------------------------------
+function CsvDropZone({ versionId, onImported }: { versionId: string; onImported: () => void }) {
+  const { toast } = useToast();
+  const [dragging, setDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ imported: number; skipped: number; details?: any } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processFile = async (file: File) => {
+    setImporting(true);
+    setResult(null);
+    try {
+      let csvText: string;
+
+      if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+        csvText = await file.text();
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        // For Excel files, try to read as CSV (basic tab/comma delimited)
+        // Full xlsx parsing would need a library — treat as CSV for now
+        csvText = await file.text();
+      } else {
+        toast({ title: "Unsupported file", description: "Please upload a .csv file", variant: "destructive" });
+        setImporting(false);
+        return;
+      }
+
+      const res = await apiRequest("POST", `/api/budgets/version/${versionId}/import-csv`, { csvText });
+      const data = await res.json();
+      setResult(data);
+      toast({
+        title: `Imported ${data.imported} rows`,
+        description: data.skipped > 0 ? `${data.skipped} rows skipped (no match)` : "All rows matched",
+      });
+      onImported();
+    } catch (error: any) {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    e.target.value = '';
   };
 
   return (
-    <>
-      <tr className="bg-muted/30">
-        <td colSpan={14} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide sticky left-0 bg-muted/30 z-10">
-          <Badge className={cn("mr-2", LINE_TYPE_COLORS[section])} variant="outline">
-            {sectionLabels[section] || section}
-          </Badge>
-        </td>
-      </tr>
-      {lines.map(line => (
-        <tr key={line.id} className="border-b hover:bg-muted/20 transition-colors">
-          <td className="px-3 py-1 sticky left-0 bg-background z-10 text-sm font-medium">
-            {line.displayName}
-          </td>
-          {months.map(m => (
-            <td key={m} className="px-1 py-0.5">
-              <input
-                type="text"
-                className="w-full text-right px-2 py-1 text-sm bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary rounded transition-colors"
-                value={getCellValue(line.id, m)}
-                onChange={(e) => onCellChange(line.id, m, e.target.value)}
-                disabled={isLocked}
-              />
-            </td>
-          ))}
-          <td className="text-right px-3 py-1 font-medium bg-muted/20">
-            {formatAmount(getLineTotal(line.id))}
-          </td>
-        </tr>
-      ))}
-      <tr className="border-b-2 bg-muted/10">
-        <td className="px-3 py-1 sticky left-0 bg-muted/10 z-10 font-semibold text-sm">
-          Total {sectionLabels[section]}
-        </td>
-        {months.map((m, i) => {
-          const monthTotal = lines.reduce((s, l) => s + parseFloat(getCellValue(l.id, m) || '0'), 0);
-          return <td key={i} className="text-right px-3 py-1 font-semibold text-sm">{formatAmount(monthTotal)}</td>;
-        })}
-        <td className="text-right px-3 py-1 font-bold bg-muted/30">
-          {formatAmount(sectionTotal)}
-        </td>
-      </tr>
-    </>
+    <div className="space-y-2">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={cn(
+          "border-2 border-dashed rounded-lg px-4 py-3 text-center cursor-pointer transition-colors",
+          dragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/20 hover:border-muted-foreground/40"
+        )}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={onFileSelect}
+          className="hidden"
+        />
+        {importing ? (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Importing...
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Upload className="h-4 w-4" />
+            <span>Drop a CSV here or <span className="text-primary underline">browse</span></span>
+            <span className="text-xs">(Account, Jan–Dec columns)</span>
+          </div>
+        )}
+      </div>
+
+      {result && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
+          <span className="text-emerald-600 font-medium">{result.imported} imported</span>
+          {result.skipped > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="text-amber-600 underline cursor-pointer">{result.skipped} skipped</button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 max-h-48 overflow-auto text-xs" align="start">
+                <div className="space-y-1">
+                  <div className="font-medium text-sm mb-2">Skipped Rows</div>
+                  {result.details?.skipped?.map((s: any, i: number) => (
+                    <div key={i} className="flex justify-between">
+                      <span className="truncate">{s.account || `Row ${s.row}`}</span>
+                      <span className="text-muted-foreground ml-2 flex-shrink-0">{s.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          <button className="ml-auto text-muted-foreground hover:text-foreground" onClick={() => setResult(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VersionManager — Version selector, clone, lock, compare
+// ---------------------------------------------------------------------------
+function VersionManager({ budgetId, currentVersion, onVersionChange }: {
+  budgetId: string;
+  currentVersion: BudgetVersion;
+  onVersionChange: (v: BudgetVersion) => void;
+}) {
+  const { toast } = useToast();
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareVersionId, setCompareVersionId] = useState<string | null>(null);
+
+  const { data: versions = [], refetch: refetchVersions } = useQuery<(BudgetVersion & { isLocked?: boolean })[]>({
+    queryKey: ["/api/budgets", budgetId, "versions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/budgets/${budgetId}/versions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load versions");
+      return res.json();
+    },
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/budgets/version/${currentVersion.id}/clone`, {
+        name: `${currentVersion.name} (Revised)`,
+      });
+      return res.json();
+    },
+    onSuccess: (newVer) => {
+      refetchVersions();
+      onVersionChange(newVer);
+      toast({ title: "Version cloned", description: `"${newVer.name}" created` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Clone failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: async ({ versionId, locked }: { versionId: string; locked: boolean }) => {
+      await apiRequest("PATCH", `/api/budgets/version/${versionId}/lock`, { locked });
+      return { versionId, locked };
+    },
+    onSuccess: ({ locked }) => {
+      refetchVersions();
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", currentVersion.id, "tree-grid"] });
+      toast({ title: locked ? "Version locked" : "Version unlocked" });
+    },
+  });
+
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (versionId: string) => {
+      const res = await apiRequest("PATCH", `/api/budgets/version/${versionId}/set-primary`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchVersions();
+      toast({ title: "Primary version updated" });
+    },
+  });
+
+  const { data: comparison } = useQuery({
+    queryKey: ["/api/budgets/version/compare", currentVersion.id, compareVersionId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/budgets/version/compare?versionA=${currentVersion.id}&versionB=${compareVersionId}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to compare");
+      return res.json();
+    },
+    enabled: compareOpen && !!compareVersionId,
+  });
+
+  const isCurrentLocked = (versions.find(v => v.id === currentVersion.id) as any)?.isLocked === true
+    || (versions.find(v => v.id === currentVersion.id) as any)?.is_locked === true;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Version selector */}
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">Version:</Label>
+          <Select
+            value={currentVersion.id}
+            onValueChange={(id) => {
+              const v = versions.find(ver => ver.id === id);
+              if (v) onVersionChange(v);
+            }}
+          >
+            <SelectTrigger className="h-8 w-[200px] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {versions.map(v => (
+                <SelectItem key={v.id} value={v.id}>
+                  <div className="flex items-center gap-2">
+                    {v.name}
+                    {v.isPrimary && <Badge variant="outline" className="text-[10px] px-1 py-0">Primary</Badge>}
+                    {((v as any).isLocked || (v as any).is_locked) && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={() => cloneMutation.mutate()}
+            disabled={cloneMutation.isPending}
+          >
+            <Copy className="h-3 w-3 mr-1" />
+            Clone
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={() => lockMutation.mutate({ versionId: currentVersion.id, locked: !isCurrentLocked })}
+          >
+            {isCurrentLocked ? <Unlock className="h-3 w-3 mr-1" /> : <Lock className="h-3 w-3 mr-1" />}
+            {isCurrentLocked ? "Unlock" : "Lock"}
+          </Button>
+
+          {!currentVersion.isPrimary && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => setPrimaryMutation.mutate(currentVersion.id)}
+            >
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Set Primary
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            variant={compareOpen ? "default" : "outline"}
+            className="h-8 text-xs"
+            onClick={() => setCompareOpen(!compareOpen)}
+          >
+            <SplitSquareVertical className="h-3 w-3 mr-1" />
+            Compare
+          </Button>
+        </div>
+      </div>
+
+      {/* Compare panel */}
+      {compareOpen && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Label className="text-xs whitespace-nowrap">Compare with:</Label>
+              <Select value={compareVersionId || ""} onValueChange={setCompareVersionId}>
+                <SelectTrigger className="h-8 w-[200px] text-sm">
+                  <SelectValue placeholder="Select version..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {versions.filter(v => v.id !== currentVersion.id).map(v => (
+                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {comparison && (
+              <div className="border rounded-lg overflow-auto max-h-[400px]">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-muted/80">
+                      <th className="text-left px-3 py-2 font-medium min-w-[180px]">Account</th>
+                      <th className="text-right px-3 py-2 font-medium">{comparison.versionA.name}</th>
+                      <th className="text-right px-3 py-2 font-medium">{comparison.versionB.name}</th>
+                      <th className="text-right px-3 py-2 font-medium">$ Var</th>
+                      <th className="text-right px-3 py-2 font-medium">% Var</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparison.comparison.map((row: any) => {
+                      const isExpense = ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(row.lineType);
+                      const favorable = isExpense ? row.totalDiff <= 0 : row.totalDiff >= 0;
+                      return (
+                        <tr key={row.accountKey} className="border-b hover:bg-muted/10">
+                          <td className="px-3 py-1.5 text-sm">{row.displayName}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(row.totalA)}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(row.totalB)}</td>
+                          <td className={cn("text-right px-3 py-1.5 tabular-nums", favorable ? "text-emerald-600" : "text-red-600")}>
+                            {row.totalDiff >= 0 ? "+" : ""}{formatAmount(row.totalDiff)}
+                          </td>
+                          <td className={cn("text-right px-3 py-1.5 tabular-nums", favorable ? "text-emerald-600" : "text-red-600")}>
+                            {row.totalPctDiff >= 0 ? "+" : ""}{row.totalPctDiff.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EnhancedBudgetVsActual — Monthly drill-down with YTD, GL actuals
+// ---------------------------------------------------------------------------
+type EnhancedBvaLine = {
+  accountKey: string;
+  displayName: string;
+  lineType: string;
+  monthly: { month: string; budget: number; actual: number; varDollar: number; varPct: number; favorable: boolean; isYtd: boolean }[];
+  ytd: { budget: number; actual: number; varDollar: number; varPct: number; favorable: boolean };
+  annual: { budget: number; actual: number; varDollar: number; varPct: number; favorable: boolean };
+};
+
+type EnhancedBvaData = {
+  budget: Budget;
+  version: BudgetVersion;
+  versions: BudgetVersion[];
+  lines: EnhancedBvaLine[];
+  summary: {
+    totalRevenueBudget: number; totalRevenueActual: number;
+    totalExpenseBudget: number; totalExpenseActual: number;
+    noiBudget: number; noiActual: number;
+    ytdRevenueBudget: number; ytdRevenueActual: number;
+    ytdExpenseBudget: number; ytdExpenseActual: number;
+    ytdNoiBudget: number; ytdNoiActual: number;
+  };
+  months: string[];
+  currentMonthIdx: number;
+};
+
+function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const { data, isLoading } = useQuery<EnhancedBvaData>({
+    queryKey: ["/api/budgets/bva-enhanced", budgetId],
+    queryFn: async () => {
+      const res = await fetch(`/api/budgets/bva-enhanced/${budgetId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load BVA data");
+      return res.json();
+    },
+  });
+
+  const toggleRow = useCallback((key: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  if (isLoading || !data) {
+    return <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>;
+  }
+
+  if (!data.lines?.length) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
+          <p className="text-muted-foreground text-center max-w-md">
+            Seed demo actuals and add budget amounts first.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { summary, lines, months, currentMonthIdx } = data;
+  const noiVarYtd = summary.ytdNoiActual - summary.ytdNoiBudget;
+  const noiVarAnnual = summary.noiActual - summary.noiBudget;
+
+  // Group lines by type
+  const groupOrder = ["REVENUE", "OTHER_INCOME", "COGS", "OPEX", "OTHER_EXPENSE"];
+  const groupLabels: Record<string, string> = {
+    REVENUE: "Revenue", COGS: "Cost of Goods Sold", OPEX: "Operating Expenses",
+    OTHER_INCOME: "Other Income", OTHER_EXPENSE: "Other Expense",
+  };
+  const grouped: Record<string, EnhancedBvaLine[]> = {};
+  for (const l of lines) {
+    if (!grouped[l.lineType]) grouped[l.lineType] = [];
+    grouped[l.lineType].push(l);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <SummaryCard
+          title="YTD Revenue"
+          budget={summary.ytdRevenueBudget}
+          actual={summary.ytdRevenueActual}
+          variance={summary.ytdRevenueActual - summary.ytdRevenueBudget}
+          favorable={summary.ytdRevenueActual >= summary.ytdRevenueBudget}
+        />
+        <SummaryCard
+          title="YTD Expenses"
+          budget={summary.ytdExpenseBudget}
+          actual={summary.ytdExpenseActual}
+          variance={summary.ytdExpenseActual - summary.ytdExpenseBudget}
+          favorable={summary.ytdExpenseActual <= summary.ytdExpenseBudget}
+        />
+        <SummaryCard
+          title="YTD NOI"
+          budget={summary.ytdNoiBudget}
+          actual={summary.ytdNoiActual}
+          variance={noiVarYtd}
+          favorable={noiVarYtd >= 0}
+        />
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground font-medium uppercase">Budget Accuracy</p>
+            <p className="text-2xl font-bold mt-1">
+              {summary.ytdNoiBudget !== 0
+                ? `${Math.max(0, 100 - Math.abs((noiVarYtd / summary.ytdNoiBudget) * 100)).toFixed(1)}%`
+                : "N/A"
+              }
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Through {MONTHS_SHORT[currentMonthIdx] || "Dec"} {data.budget.fiscalYear}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Variance table */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Detailed Variance Analysis</CardTitle>
+          <CardDescription>Click any row to expand monthly detail — Budget | Actual | $ Var | % Var</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 border-b">
+                  <th className="text-left px-3 py-2 font-medium sticky left-0 bg-muted/50 min-w-[200px] z-10">Account</th>
+                  <th className="text-right px-3 py-2 font-medium">Budget</th>
+                  <th className="text-right px-3 py-2 font-medium">Actual</th>
+                  <th className="text-right px-3 py-2 font-medium">$ Var</th>
+                  <th className="text-right px-3 py-2 font-medium">% Var</th>
+                  <th className="text-right px-3 py-2 font-semibold bg-muted/30">YTD Budget</th>
+                  <th className="text-right px-3 py-2 font-semibold bg-muted/30">YTD Actual</th>
+                  <th className="text-right px-3 py-2 font-semibold bg-muted/30">YTD $ Var</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupOrder.map(section => {
+                  const sectionLines = grouped[section];
+                  if (!sectionLines?.length) return null;
+
+                  const secBudget = sectionLines.reduce((s, l) => s + l.annual.budget, 0);
+                  const secActual = sectionLines.reduce((s, l) => s + l.annual.actual, 0);
+                  const secVar = secActual - secBudget;
+                  const isExp = ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(section);
+                  const secFav = isExp ? secVar <= 0 : secVar >= 0;
+                  const secYtdBudget = sectionLines.reduce((s, l) => s + l.ytd.budget, 0);
+                  const secYtdActual = sectionLines.reduce((s, l) => s + l.ytd.actual, 0);
+                  const secYtdVar = secYtdActual - secYtdBudget;
+
+                  return (
+                    <React.Fragment key={section}>
+                      <tr className="bg-muted/20">
+                        <td colSpan={8} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide sticky left-0 bg-muted/20 z-10">
+                          <Badge className={cn("mr-2", LINE_TYPE_COLORS[section])} variant="outline">
+                            {groupLabels[section]}
+                          </Badge>
+                        </td>
+                      </tr>
+                      {sectionLines.map(line => {
+                        const isExpanded = expandedRows.has(line.accountKey);
+                        return (
+                          <React.Fragment key={line.accountKey}>
+                            <tr
+                              className="border-b hover:bg-muted/10 cursor-pointer transition-colors"
+                              onClick={() => toggleRow(line.accountKey)}
+                            >
+                              <td className="px-3 py-1.5 sticky left-0 bg-background z-10">
+                                <div className="flex items-center gap-1.5">
+                                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform text-muted-foreground", isExpanded && "rotate-90")} />
+                                  {line.displayName}
+                                </div>
+                              </td>
+                              <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.annual.budget)}</td>
+                              <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.annual.actual)}</td>
+                              <td className={cn("text-right px-3 py-1.5 tabular-nums font-medium", line.annual.favorable ? "text-emerald-600" : "text-red-600")}>
+                                {line.annual.varDollar >= 0 ? "+" : ""}{formatAmount(line.annual.varDollar)}
+                              </td>
+                              <td className={cn("text-right px-3 py-1.5 tabular-nums", line.annual.favorable ? "text-emerald-600" : "text-red-600")}>
+                                {line.annual.varPct >= 0 ? "+" : ""}{line.annual.varPct.toFixed(1)}%
+                              </td>
+                              <td className="text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10">{formatAmount(line.ytd.budget)}</td>
+                              <td className="text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10">{formatAmount(line.ytd.actual)}</td>
+                              <td className={cn("text-right px-3 py-1.5 tabular-nums font-semibold bg-muted/10", line.ytd.favorable ? "text-emerald-600" : "text-red-600")}>
+                                {line.ytd.varDollar >= 0 ? "+" : ""}{formatAmount(line.ytd.varDollar)}
+                              </td>
+                            </tr>
+                            {/* Monthly drill-down */}
+                            {isExpanded && (
+                              <>
+                                <tr className="bg-muted/5">
+                                  <td className="pl-10 pr-3 py-1 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/5 z-10">Month</td>
+                                  <td className="text-right px-3 py-1 text-xs font-medium text-muted-foreground">Budget</td>
+                                  <td className="text-right px-3 py-1 text-xs font-medium text-muted-foreground">Actual</td>
+                                  <td className="text-right px-3 py-1 text-xs font-medium text-muted-foreground">$ Var</td>
+                                  <td className="text-right px-3 py-1 text-xs font-medium text-muted-foreground">% Var</td>
+                                  <td colSpan={3} />
+                                </tr>
+                                {line.monthly.map((m, mi) => (
+                                  <tr key={m.month} className={cn("border-b", m.isYtd ? "bg-background" : "bg-muted/5 opacity-60")}>
+                                    <td className="pl-10 pr-3 py-1 text-xs sticky left-0 z-10" style={{ background: 'inherit' }}>
+                                      {MONTHS_SHORT[mi]}
+                                      {m.isYtd && <span className="ml-1 text-[10px] text-muted-foreground">(YTD)</span>}
+                                    </td>
+                                    <td className="text-right px-3 py-1 text-xs tabular-nums">{formatAmount(m.budget)}</td>
+                                    <td className="text-right px-3 py-1 text-xs tabular-nums">{formatAmount(m.actual)}</td>
+                                    <td className={cn("text-right px-3 py-1 text-xs tabular-nums", m.favorable ? "text-emerald-600" : "text-red-600")}>
+                                      {m.varDollar >= 0 ? "+" : ""}{formatAmount(m.varDollar)}
+                                    </td>
+                                    <td className={cn("text-right px-3 py-1 text-xs tabular-nums", m.favorable ? "text-emerald-600" : "text-red-600")}>
+                                      {m.varPct >= 0 ? "+" : ""}{m.varPct.toFixed(1)}%
+                                    </td>
+                                    <td colSpan={3} />
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                      {/* Section total */}
+                      <tr className="border-b-2 bg-muted/10 font-semibold">
+                        <td className="px-3 py-1.5 sticky left-0 bg-muted/10 z-10">Total {groupLabels[section]}</td>
+                        <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(secBudget)}</td>
+                        <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(secActual)}</td>
+                        <td className={cn("text-right px-3 py-1.5 tabular-nums", secFav ? "text-emerald-600" : "text-red-600")}>
+                          {secVar >= 0 ? "+" : ""}{formatAmount(secVar)}
+                        </td>
+                        <td className={cn("text-right px-3 py-1.5 tabular-nums", secFav ? "text-emerald-600" : "text-red-600")}>
+                          {secBudget !== 0 ? `${((secVar / Math.abs(secBudget)) * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20">{formatAmount(secYtdBudget)}</td>
+                        <td className="text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20">{formatAmount(secYtdActual)}</td>
+                        <td className={cn("text-right px-3 py-1.5 tabular-nums font-bold bg-muted/20",
+                          (isExp ? secYtdVar <= 0 : secYtdVar >= 0) ? "text-emerald-600" : "text-red-600"
+                        )}>
+                          {secYtdVar >= 0 ? "+" : ""}{formatAmount(secYtdVar)}
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+
+                {/* NOI row */}
+                <tr className="bg-slate-100 dark:bg-slate-800 font-bold border-t-2">
+                  <td className="px-3 py-2 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Net Operating Income</td>
+                  <td className="text-right px-3 py-2 tabular-nums">{formatAmount(summary.noiBudget)}</td>
+                  <td className="text-right px-3 py-2 tabular-nums">{formatAmount(summary.noiActual)}</td>
+                  <td className={cn("text-right px-3 py-2 tabular-nums", noiVarAnnual >= 0 ? "text-emerald-600" : "text-red-600")}>
+                    {noiVarAnnual >= 0 ? "+" : ""}{formatAmount(noiVarAnnual)}
+                  </td>
+                  <td className={cn("text-right px-3 py-2 tabular-nums", noiVarAnnual >= 0 ? "text-emerald-600" : "text-red-600")}>
+                    {summary.noiBudget !== 0 ? `${((noiVarAnnual / Math.abs(summary.noiBudget)) * 100).toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700">{formatAmount(summary.ytdNoiBudget)}</td>
+                  <td className="text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700">{formatAmount(summary.ytdNoiActual)}</td>
+                  <td className={cn("text-right px-3 py-2 tabular-nums font-bold bg-slate-200 dark:bg-slate-700", noiVarYtd >= 0 ? "text-emerald-600" : "text-red-600")}>
+                    {noiVarYtd >= 0 ? "+" : ""}{formatAmount(noiVarYtd)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

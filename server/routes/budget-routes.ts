@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
+import { pool } from "../db";
 import { z } from "zod";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import {
   budgets, budgetVersions, budgetDimensions, budgetLines, budgetAmounts,
-  actualsFacts, budgetTargets,
+  actualsFacts, budgetTargets, opsBookkeepingGl,
   insertBudgetSchema, insertBudgetVersionSchema, insertBudgetLineSchema,
   insertBudgetAmountSchema, insertActualsFactSchema,
   type Budget, type BudgetVersion, type BudgetLine, type BudgetAmount, type ActualsFact,
@@ -12,6 +13,182 @@ import {
 import { AuthenticatedRequest } from "../middleware/auth-resolver";
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Ensure budget_tree_accounts table exists (raw SQL, no Drizzle)
+// ---------------------------------------------------------------------------
+async function ensureBudgetTreeTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budget_tree_accounts (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      budget_version_id UUID NOT NULL,
+      account_key TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      parent_key TEXT,
+      line_type TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_parent BOOLEAN NOT NULL DEFAULT false,
+      asset_class TEXT NOT NULL DEFAULT 'marina',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_bta_version ON budget_tree_accounts(budget_version_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_bta_version_key ON budget_tree_accounts(budget_version_id, account_key);
+  `);
+}
+// Add is_locked column to budget_versions if missing
+async function ensureVersionLockColumn() {
+  await pool.query(`
+    ALTER TABLE budget_versions ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT false;
+  `);
+}
+
+// Run on import — idempotent
+ensureBudgetTreeTable().catch(err => console.error("Failed to create budget_tree_accounts:", err));
+ensureVersionLockColumn().catch(err => console.error("Failed to add is_locked column:", err));
+
+// ---------------------------------------------------------------------------
+// COA templates by asset class — revenue & expense accounts for budget trees
+// ---------------------------------------------------------------------------
+const COA_TEMPLATES: Record<string, { key: string; name: string; parentKey: string; lineType: string }[]> = {
+  marina: [
+    // Revenue children
+    { key: "wet_slip_revenue", name: "Wet Slip Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "dry_storage_revenue", name: "Dry Storage Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "fuel_sales", name: "Fuel Sales", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "ship_store_revenue", name: "Ship Store Sales", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "service_repair_revenue", name: "Service & Repair Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "transient_dockage", name: "Transient Dockage", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "boat_rental_revenue", name: "Boat Rental Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "launch_haul_revenue", name: "Launch & Haul Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "other_marina_revenue", name: "Other Marina Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    // OpEx children
+    { key: "payroll_expense", name: "Payroll & Benefits", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "utilities_expense", name: "Utilities", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "insurance_expense", name: "Insurance", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "maintenance_expense", name: "Maintenance & Repairs", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "property_tax", name: "Property Tax", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "marketing_expense", name: "Marketing & Advertising", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "professional_fees", name: "Professional Fees", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "fuel_cogs", name: "Fuel Cost of Goods", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "ship_store_cogs", name: "Ship Store COGS", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "management_fees", name: "Management Fees", parentKey: "OPEX", lineType: "OPEX" },
+  ],
+  hotel: [
+    { key: "room_revenue", name: "Room Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "fb_revenue", name: "F&B Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "meeting_revenue", name: "Meeting Room Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "spa_revenue", name: "Spa Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "other_hotel_revenue", name: "Other Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "rooms_dept_expense", name: "Rooms Department Expense", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "fb_expense", name: "F&B Expense", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "ag_expense", name: "A&G Expense", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "sales_marketing", name: "Sales & Marketing", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "property_ops", name: "Property Operations", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "utilities_expense", name: "Utilities", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "insurance_expense", name: "Insurance", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "property_tax", name: "Property Tax", parentKey: "OPEX", lineType: "OPEX" },
+  ],
+  multifamily: [
+    { key: "rental_revenue", name: "Rental Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "parking_revenue", name: "Parking Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "laundry_revenue", name: "Laundry Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "late_fee_revenue", name: "Late Fee Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "other_mf_revenue", name: "Other Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "property_mgmt", name: "Property Management", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "maintenance_expense", name: "Maintenance & Repairs", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "utilities_expense", name: "Utilities", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "insurance_expense", name: "Insurance", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "property_tax", name: "Property Tax", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "turnover_costs", name: "Turnover Costs", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "marketing_expense", name: "Marketing", parentKey: "OPEX", lineType: "OPEX" },
+  ],
+  restaurant: [
+    { key: "food_sales", name: "Food Sales", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "beverage_sales", name: "Beverage Sales", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "catering_revenue", name: "Catering Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "other_fb_revenue", name: "Other Revenue", parentKey: "REVENUE", lineType: "REVENUE" },
+    { key: "food_cost", name: "Food Cost", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "beverage_cost", name: "Beverage Cost", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "labor_expense", name: "Labor", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "occupancy_costs", name: "Occupancy Costs", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "marketing_expense", name: "Marketing", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "utilities_expense", name: "Utilities", parentKey: "OPEX", lineType: "OPEX" },
+    { key: "insurance_expense", name: "Insurance", parentKey: "OPEX", lineType: "OPEX" },
+  ],
+};
+
+// Parent rows (always the same structure)
+const PARENT_ROWS = [
+  { key: "REVENUE", name: "Revenue", lineType: "REVENUE", sortOrder: 0 },
+  { key: "OPEX", name: "Operating Expenses", lineType: "OPEX", sortOrder: 1000 },
+  // NOI is computed, not stored
+];
+
+/**
+ * Seed the budget_tree_accounts for a given version with COA-based hierarchy.
+ */
+async function seedBudgetTree(versionId: string, assetClass: string, fiscalYear: number) {
+  const template = COA_TEMPLATES[assetClass] || COA_TEMPLATES.marina;
+
+  // Insert parent rows
+  for (const p of PARENT_ROWS) {
+    await pool.query(
+      `INSERT INTO budget_tree_accounts (budget_version_id, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class)
+       VALUES ($1, $2, $3, NULL, $4, $5, true, $6)
+       ON CONFLICT (budget_version_id, account_key) DO NOTHING`,
+      [versionId, p.key, p.name, p.lineType, p.sortOrder, assetClass]
+    );
+  }
+
+  // Insert child rows
+  let sortOrder = 1;
+  for (const child of template) {
+    const baseSortOrder = child.parentKey === "REVENUE" ? sortOrder : 1000 + sortOrder;
+    await pool.query(
+      `INSERT INTO budget_tree_accounts (budget_version_id, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class)
+       VALUES ($1, $2, $3, $4, $5, $6, false, $7)
+       ON CONFLICT (budget_version_id, account_key) DO NOTHING`,
+      [versionId, child.key, child.name, child.parentKey, child.lineType, baseSortOrder, assetClass]
+    );
+    sortOrder++;
+  }
+
+  // Also seed budget_amounts rows for each child (12 months, $0)
+  const childKeys = template.map(c => c.key);
+  // First, ensure budget_lines exist for each child (for amounts compatibility)
+  for (let i = 0; i < template.length; i++) {
+    const child = template[i];
+    const baseSortOrder = child.parentKey === "REVENUE" ? (i + 1) : (1000 + i + 1);
+
+    // Check if budget line already exists
+    const existing = await db.select().from(budgetLines)
+      .where(and(eq(budgetLines.budgetVersionId, versionId), eq(budgetLines.accountKey, child.key)));
+
+    let lineId: string;
+    if (existing.length === 0) {
+      const [line] = await db.insert(budgetLines).values({
+        budgetVersionId: versionId,
+        sortOrder: baseSortOrder,
+        lineType: child.lineType,
+        accountKey: child.key,
+        displayName: child.name,
+      }).returning();
+      lineId = line.id;
+    } else {
+      lineId = existing[0].id;
+    }
+
+    // Seed 12 months of $0 amounts if not already there
+    for (let m = 0; m < 12; m++) {
+      const periodStart = `${fiscalYear}-${(m + 1).toString().padStart(2, '0')}-01`;
+      const existingAmt = await db.select().from(budgetAmounts)
+        .where(and(eq(budgetAmounts.budgetLineId, lineId), eq(budgetAmounts.periodStart, periodStart)));
+      if (existingAmt.length === 0) {
+        await db.insert(budgetAmounts).values({ budgetLineId: lineId, periodStart, amount: '0' });
+      }
+    }
+  }
+}
 
 function getOrgId(req: Request): string {
   const authReq = req as AuthenticatedRequest;
@@ -401,5 +578,844 @@ async function seedBlankVersion(versionId: string, fiscalYear: number) {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// GET /version/:versionId/tree-grid — Hierarchical budget grid
+// Returns parent rows with children, amounts, and computed totals
+// ---------------------------------------------------------------------------
+router.get("/version/:versionId/tree-grid", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+
+    // Get the budget to know fiscal year and asset class
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    // Check if tree is seeded; if not, seed it
+    const treeCheck = await pool.query(
+      `SELECT count(*)::int AS cnt FROM budget_tree_accounts WHERE budget_version_id = $1`,
+      [versionId]
+    );
+    if (treeCheck.rows[0].cnt === 0) {
+      const assetClass = (req.query.assetClass as string) || 'marina';
+      await seedBudgetTree(versionId, assetClass, budget.fiscalYear);
+    }
+
+    // Fetch tree rows
+    const treeResult = await pool.query(
+      `SELECT id, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class
+       FROM budget_tree_accounts
+       WHERE budget_version_id = $1
+       ORDER BY sort_order ASC`,
+      [versionId]
+    );
+
+    // Fetch all budget lines + amounts for this version
+    const lines = await db.select().from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, versionId))
+      .orderBy(asc(budgetLines.sortOrder));
+
+    const lineIds = lines.map(l => l.id);
+    let amounts: BudgetAmount[] = [];
+    if (lineIds.length > 0) {
+      amounts = await db.select().from(budgetAmounts)
+        .where(inArray(budgetAmounts.budgetLineId, lineIds));
+    }
+
+    // Build amount map: accountKey → { periodStart → amount }
+    const lineByKey = new Map<string, string>();
+    for (const l of lines) lineByKey.set(l.accountKey, l.id);
+
+    const amountMap: Record<string, Record<string, string>> = {};
+    const lineIdToKey = new Map<string, string>();
+    for (const l of lines) lineIdToKey.set(l.id, l.accountKey);
+
+    for (const a of amounts) {
+      const key = lineIdToKey.get(a.budgetLineId);
+      if (!key) continue;
+      if (!amountMap[key]) amountMap[key] = {};
+      amountMap[key][a.periodStart as string] = a.amount;
+    }
+
+    // Build line ID map for the frontend to use when saving
+    const lineIdMap: Record<string, string> = {};
+    for (const l of lines) lineIdMap[l.accountKey] = l.id;
+
+    // Structure tree
+    const treeRows = treeResult.rows.map((r: any) => ({
+      id: r.id,
+      accountKey: r.account_key,
+      displayName: r.display_name,
+      parentKey: r.parent_key,
+      lineType: r.line_type,
+      sortOrder: r.sort_order,
+      isParent: r.is_parent,
+      assetClass: r.asset_class,
+    }));
+
+    res.json({
+      tree: treeRows,
+      amounts: amountMap,
+      lineIdMap,
+      fiscalYear: budget.fiscalYear,
+      budgetStatus: budget.status,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /version/:versionId/cell — Single-cell auto-save
+// ---------------------------------------------------------------------------
+const cellPatchSchema = z.object({
+  accountKey: z.string(),
+  periodStart: z.string(),
+  amount: z.string(),
+});
+
+router.patch("/version/:versionId/cell", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const { accountKey, periodStart, amount } = cellPatchSchema.parse(req.body);
+
+    // Find the budget line by version + account key
+    const [line] = await db.select().from(budgetLines)
+      .where(and(eq(budgetLines.budgetVersionId, versionId), eq(budgetLines.accountKey, accountKey)));
+
+    if (!line) return res.status(404).json({ error: `Budget line not found for key: ${accountKey}` });
+
+    // Upsert the amount
+    const existing = await db.select().from(budgetAmounts)
+      .where(and(eq(budgetAmounts.budgetLineId, line.id), eq(budgetAmounts.periodStart, periodStart)));
+
+    let result;
+    if (existing.length > 0) {
+      [result] = await db.update(budgetAmounts)
+        .set({ amount, updatedAt: new Date() })
+        .where(eq(budgetAmounts.id, existing[0].id))
+        .returning();
+    } else {
+      [result] = await db.insert(budgetAmounts)
+        .values({ budgetLineId: line.id, periodStart, amount })
+        .returning();
+    }
+
+    res.json({ ok: true, amount: result.amount, periodStart: result.periodStart });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// POST /version/:versionId/bulk-fill — Bulk fill a single account row
+// Modes: spread_evenly, grow_pct, seasonality, copy_prior_year
+// ---------------------------------------------------------------------------
+const bulkFillSchema = z.object({
+  accountKey: z.string(),
+  mode: z.enum(["spread_evenly", "grow_pct", "seasonality", "copy_prior_year"]),
+  annualTotal: z.number().optional(),     // spread_evenly, seasonality
+  januaryValue: z.number().optional(),    // grow_pct
+  growthRate: z.number().optional(),       // grow_pct (e.g. 0.03 = 3% MoM)
+  upliftPct: z.number().optional(),        // copy_prior_year (e.g. 0.05 = 5%)
+});
+
+router.post("/version/:versionId/bulk-fill", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    const body = bulkFillSchema.parse(req.body);
+
+    // Resolve budget + fiscal year
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const fiscalYear = budget.fiscalYear;
+    const months = Array.from({ length: 12 }, (_, i) =>
+      `${fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
+    );
+
+    let monthlyAmounts: number[] = [];
+
+    switch (body.mode) {
+      case "spread_evenly": {
+        const total = body.annualTotal ?? 0;
+        const perMonth = Math.round((total / 12) * 100) / 100;
+        // Last month absorbs rounding
+        monthlyAmounts = Array(11).fill(perMonth);
+        monthlyAmounts.push(Math.round((total - perMonth * 11) * 100) / 100);
+        break;
+      }
+
+      case "grow_pct": {
+        const jan = body.januaryValue ?? 0;
+        const rate = body.growthRate ?? 0;
+        let val = jan;
+        for (let i = 0; i < 12; i++) {
+          monthlyAmounts.push(Math.round(val * 100) / 100);
+          val = val * (1 + rate);
+        }
+        break;
+      }
+
+      case "seasonality": {
+        const total = body.annualTotal ?? 0;
+        // Pull prior year actuals for this account to get seasonal distribution
+        const priorYear = fiscalYear - 1;
+        const priorActuals = await db.select().from(actualsFacts).where(
+          and(
+            eq(actualsFacts.userId, userId),
+            eq(actualsFacts.accountKey, body.accountKey),
+            sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${priorYear}`,
+          )
+        );
+
+        if (priorActuals.length === 0) {
+          // No prior data — fall back to even spread
+          const perMonth = Math.round((total / 12) * 100) / 100;
+          monthlyAmounts = Array(11).fill(perMonth);
+          monthlyAmounts.push(Math.round((total - perMonth * 11) * 100) / 100);
+        } else {
+          // Build month → amount map from prior actuals
+          const priorByMonth: number[] = new Array(12).fill(0);
+          for (const a of priorActuals) {
+            const mStr = (a.periodStart as string).slice(5, 7);
+            const mIdx = parseInt(mStr, 10) - 1;
+            if (mIdx >= 0 && mIdx < 12) priorByMonth[mIdx] += parseFloat(a.amount);
+          }
+          const priorTotal = priorByMonth.reduce((s, v) => s + v, 0);
+          if (priorTotal === 0) {
+            const perMonth = Math.round((total / 12) * 100) / 100;
+            monthlyAmounts = Array(11).fill(perMonth);
+            monthlyAmounts.push(Math.round((total - perMonth * 11) * 100) / 100);
+          } else {
+            const weights = priorByMonth.map(v => v / priorTotal);
+            let allocated = 0;
+            for (let i = 0; i < 11; i++) {
+              const val = Math.round(total * weights[i] * 100) / 100;
+              monthlyAmounts.push(val);
+              allocated += val;
+            }
+            monthlyAmounts.push(Math.round((total - allocated) * 100) / 100);
+          }
+        }
+        break;
+      }
+
+      case "copy_prior_year": {
+        const uplift = body.upliftPct ?? 0;
+        const priorYear = fiscalYear - 1;
+        const priorActuals = await db.select().from(actualsFacts).where(
+          and(
+            eq(actualsFacts.userId, userId),
+            eq(actualsFacts.accountKey, body.accountKey),
+            sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${priorYear}`,
+          )
+        );
+
+        const priorByMonth: number[] = new Array(12).fill(0);
+        for (const a of priorActuals) {
+          const mStr = (a.periodStart as string).slice(5, 7);
+          const mIdx = parseInt(mStr, 10) - 1;
+          if (mIdx >= 0 && mIdx < 12) priorByMonth[mIdx] += parseFloat(a.amount);
+        }
+        monthlyAmounts = priorByMonth.map(v => Math.round(v * (1 + uplift) * 100) / 100);
+        break;
+      }
+    }
+
+    // Find (or create) the budget line for this account
+    let [line] = await db.select().from(budgetLines)
+      .where(and(eq(budgetLines.budgetVersionId, versionId), eq(budgetLines.accountKey, body.accountKey)));
+
+    if (!line) {
+      const displayName = body.accountKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      [line] = await db.insert(budgetLines).values({
+        budgetVersionId: versionId,
+        sortOrder: 999,
+        lineType: 'OPEX',
+        accountKey: body.accountKey,
+        displayName,
+      }).returning();
+    }
+
+    // Upsert all 12 months
+    for (let i = 0; i < 12; i++) {
+      const periodStart = months[i];
+      const amount = monthlyAmounts[i].toString();
+      const existing = await db.select().from(budgetAmounts)
+        .where(and(eq(budgetAmounts.budgetLineId, line.id), eq(budgetAmounts.periodStart, periodStart)));
+      if (existing.length > 0) {
+        await db.update(budgetAmounts)
+          .set({ amount, updatedAt: new Date() })
+          .where(eq(budgetAmounts.id, existing[0].id));
+      } else {
+        await db.insert(budgetAmounts).values({ budgetLineId: line.id, periodStart, amount });
+      }
+    }
+
+    res.json({
+      ok: true,
+      accountKey: body.accountKey,
+      mode: body.mode,
+      amounts: Object.fromEntries(months.map((m, i) => [m, monthlyAmounts[i].toString()])),
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// POST /version/:versionId/import-csv — Import budget from CSV text
+// Fuzzy-matches account names and month headers
+// ---------------------------------------------------------------------------
+const MONTH_ALIASES: Record<string, number> = {
+  jan: 0, january: 0, "1": 0, "01": 0,
+  feb: 1, february: 1, "2": 1, "02": 1,
+  mar: 2, march: 2, "3": 2, "03": 2,
+  apr: 3, april: 3, "4": 3, "04": 3,
+  may: 4, "5": 4, "05": 4,
+  jun: 5, june: 5, "6": 5, "06": 5,
+  jul: 6, july: 6, "7": 6, "07": 6,
+  aug: 7, august: 7, "8": 7, "08": 7,
+  sep: 8, sept: 8, september: 8, "9": 8, "09": 8,
+  oct: 9, october: 9, "10": 9,
+  nov: 10, november: 10, "11": 10,
+  dec: 11, december: 11, "12": 11,
+};
+
+function fuzzyMatchAccount(input: string, candidates: { key: string; name: string }[]): string | null {
+  const norm = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!norm) return null;
+
+  // Exact key match
+  for (const c of candidates) {
+    if (c.key === norm || c.key.replace(/_/g, '') === norm) return c.key;
+  }
+  // Exact name match
+  for (const c of candidates) {
+    if (c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === norm) return c.key;
+  }
+  // Substring match — input contains candidate name or vice-versa
+  for (const c of candidates) {
+    const cNorm = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (norm.includes(cNorm) || cNorm.includes(norm)) return c.key;
+  }
+  // Word overlap scoring
+  const inputWords = new Set(input.toLowerCase().split(/\s+/));
+  let bestScore = 0;
+  let bestKey: string | null = null;
+  for (const c of candidates) {
+    const nameWords = c.name.toLowerCase().split(/\s+/);
+    const overlap = nameWords.filter(w => inputWords.has(w)).length;
+    const score = overlap / Math.max(nameWords.length, inputWords.size);
+    if (score > bestScore && score >= 0.4) {
+      bestScore = score;
+      bestKey = c.key;
+    }
+  }
+  return bestKey;
+}
+
+function parseMonthHeader(header: string): number | null {
+  const clean = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (MONTH_ALIASES[clean] !== undefined) return MONTH_ALIASES[clean];
+  // Try prefix match (e.g. "jan-26", "feb 2026")
+  for (const [alias, idx] of Object.entries(MONTH_ALIASES)) {
+    if (clean.startsWith(alias) && alias.length >= 3) return idx;
+  }
+  return null;
+}
+
+const csvImportSchema = z.object({
+  csvText: z.string(),
+});
+
+router.post("/version/:versionId/import-csv", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const { csvText } = csvImportSchema.parse(req.body);
+
+    // Resolve budget
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const fiscalYear = budget.fiscalYear;
+
+    // Parse CSV
+    const rawLines = csvText.split(/\r?\n/).filter(l => l.trim());
+    if (rawLines.length < 2) return res.status(400).json({ error: "CSV must have header + at least 1 data row" });
+
+    const parseCsvRow = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+          else if (ch === '"') { inQuotes = false; }
+          else { current += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ',') { fields.push(current.trim()); current = ''; }
+          else { current += ch; }
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    const headers = parseCsvRow(rawLines[0]);
+
+    // Identify account column (first non-month column, typically column 0)
+    let accountColIdx = 0;
+    const monthColMap: { colIdx: number; monthIdx: number }[] = [];
+
+    for (let i = 0; i < headers.length; i++) {
+      const mIdx = parseMonthHeader(headers[i]);
+      if (mIdx !== null) {
+        monthColMap.push({ colIdx: i, monthIdx: mIdx });
+      } else if (monthColMap.length === 0) {
+        accountColIdx = i; // First non-month column before any months
+      }
+    }
+
+    if (monthColMap.length === 0) {
+      return res.status(400).json({ error: "Could not identify any month columns in CSV headers" });
+    }
+
+    // Get tree accounts for fuzzy matching
+    const treeResult = await pool.query(
+      `SELECT account_key, display_name FROM budget_tree_accounts
+       WHERE budget_version_id = $1 AND is_parent = false`,
+      [versionId]
+    );
+    const candidates = treeResult.rows.map((r: any) => ({ key: r.account_key, name: r.display_name }));
+
+    const imported: { row: number; account: string; matched: string }[] = [];
+    const skipped: { row: number; account: string; reason: string }[] = [];
+
+    for (let r = 1; r < rawLines.length; r++) {
+      const cols = parseCsvRow(rawLines[r]);
+      const accountName = cols[accountColIdx]?.trim();
+      if (!accountName) { skipped.push({ row: r, account: '', reason: 'empty account' }); continue; }
+
+      const matchedKey = fuzzyMatchAccount(accountName, candidates);
+      if (!matchedKey) { skipped.push({ row: r, account: accountName, reason: 'no match' }); continue; }
+
+      // Find or create budget line
+      let [line] = await db.select().from(budgetLines)
+        .where(and(eq(budgetLines.budgetVersionId, versionId), eq(budgetLines.accountKey, matchedKey)));
+
+      if (!line) {
+        const candidate = candidates.find(c => c.key === matchedKey);
+        [line] = await db.insert(budgetLines).values({
+          budgetVersionId: versionId,
+          sortOrder: 999,
+          lineType: 'OPEX',
+          accountKey: matchedKey,
+          displayName: candidate?.name || matchedKey,
+        }).returning();
+      }
+
+      // Write each month
+      for (const { colIdx, monthIdx } of monthColMap) {
+        const raw = (cols[colIdx] || '').replace(/[$,\s]/g, '');
+        const val = parseFloat(raw);
+        if (isNaN(val)) continue;
+
+        const periodStart = `${fiscalYear}-${(monthIdx + 1).toString().padStart(2, '0')}-01`;
+        const amount = val.toString();
+
+        const existing = await db.select().from(budgetAmounts)
+          .where(and(eq(budgetAmounts.budgetLineId, line.id), eq(budgetAmounts.periodStart, periodStart)));
+        if (existing.length > 0) {
+          await db.update(budgetAmounts).set({ amount, updatedAt: new Date() }).where(eq(budgetAmounts.id, existing[0].id));
+        } else {
+          await db.insert(budgetAmounts).values({ budgetLineId: line.id, periodStart, amount });
+        }
+      }
+
+      imported.push({ row: r, account: accountName, matched: matchedKey });
+    }
+
+    res.json({ imported: imported.length, skipped: skipped.length, details: { imported, skipped } });
+  } catch (err) { next(err); }
+});
+
+// ===========================================================================
+// VERSION MANAGEMENT
+// ===========================================================================
+
+// POST /version/:versionId/clone — Deep-clone a version (lines + amounts)
+router.post("/version/:versionId/clone", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const { name } = z.object({ name: z.string().optional() }).parse(req.body);
+
+    const [srcVer] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!srcVer) return res.status(404).json({ error: "Source version not found" });
+
+    // Create new version
+    const [newVer] = await db.insert(budgetVersions).values({
+      budgetId: srcVer.budgetId,
+      name: name || `${srcVer.name} (Copy)`,
+      isPrimary: false,
+    }).returning();
+
+    // Clone budget lines
+    const srcLines = await db.select().from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, versionId));
+
+    for (const srcLine of srcLines) {
+      const [newLine] = await db.insert(budgetLines).values({
+        budgetVersionId: newVer.id,
+        sortOrder: srcLine.sortOrder,
+        lineType: srcLine.lineType,
+        accountKey: srcLine.accountKey,
+        displayName: srcLine.displayName,
+      }).returning();
+
+      // Clone amounts
+      const srcAmounts = await db.select().from(budgetAmounts)
+        .where(eq(budgetAmounts.budgetLineId, srcLine.id));
+      for (const srcAmt of srcAmounts) {
+        await db.insert(budgetAmounts).values({
+          budgetLineId: newLine.id,
+          periodStart: srcAmt.periodStart,
+          amount: srcAmt.amount,
+        });
+      }
+    }
+
+    // Clone tree accounts
+    await pool.query(
+      `INSERT INTO budget_tree_accounts (budget_version_id, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class)
+       SELECT $1, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class
+       FROM budget_tree_accounts WHERE budget_version_id = $2
+       ON CONFLICT (budget_version_id, account_key) DO NOTHING`,
+      [newVer.id, versionId]
+    );
+
+    res.status(201).json(newVer);
+  } catch (err) { next(err); }
+});
+
+// PATCH /version/:versionId/lock — Lock or unlock a version
+router.patch("/version/:versionId/lock", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const { locked } = z.object({ locked: z.boolean() }).parse(req.body);
+
+    await pool.query(
+      `UPDATE budget_versions SET is_locked = $1, updated_at = now() WHERE id = $2`,
+      [locked, versionId]
+    );
+
+    res.json({ ok: true, versionId, locked });
+  } catch (err) { next(err); }
+});
+
+// PATCH /version/:versionId/rename — Rename a version
+router.patch("/version/:versionId/rename", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+
+    const [row] = await db.update(budgetVersions)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(budgetVersions.id, versionId))
+      .returning();
+    if (!row) return res.status(404).json({ error: "Version not found" });
+    res.json(row);
+  } catch (err) { next(err); }
+});
+
+// PATCH /version/:versionId/set-primary — Make this the primary version
+router.patch("/version/:versionId/set-primary", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+
+    // Unset all siblings
+    await db.update(budgetVersions)
+      .set({ isPrimary: false })
+      .where(eq(budgetVersions.budgetId, ver.budgetId));
+
+    // Set this one
+    const [row] = await db.update(budgetVersions)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(eq(budgetVersions.id, versionId))
+      .returning();
+
+    res.json(row);
+  } catch (err) { next(err); }
+});
+
+// GET /version/compare — Compare two versions side-by-side
+router.get("/version/compare", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionA, versionB } = z.object({
+      versionA: z.string(),
+      versionB: z.string(),
+    }).parse(req.query);
+
+    const fetchVersionGrid = async (versionId: string) => {
+      const lines = await db.select().from(budgetLines)
+        .where(eq(budgetLines.budgetVersionId, versionId))
+        .orderBy(asc(budgetLines.sortOrder));
+      const lineIds = lines.map(l => l.id);
+      let amounts: BudgetAmount[] = [];
+      if (lineIds.length > 0) {
+        amounts = await db.select().from(budgetAmounts)
+          .where(inArray(budgetAmounts.budgetLineId, lineIds));
+      }
+      const amountMap: Record<string, Record<string, number>> = {};
+      for (const l of lines) amountMap[l.accountKey] = {};
+      for (const a of amounts) {
+        const line = lines.find(l => l.id === a.budgetLineId);
+        if (line) amountMap[line.accountKey][a.periodStart as string] = parseFloat(a.amount);
+      }
+      return { lines, amountMap };
+    };
+
+    const [verA, verB] = await Promise.all([
+      db.select().from(budgetVersions).where(eq(budgetVersions.id, versionA)),
+      db.select().from(budgetVersions).where(eq(budgetVersions.id, versionB)),
+    ]);
+    if (!verA[0] || !verB[0]) return res.status(404).json({ error: "One or both versions not found" });
+
+    const [gridA, gridB] = await Promise.all([fetchVersionGrid(versionA), fetchVersionGrid(versionB)]);
+
+    // Build comparison: for each account, compute A, B, variance
+    const allKeys = new Set<string>();
+    gridA.lines.forEach(l => allKeys.add(l.accountKey));
+    gridB.lines.forEach(l => allKeys.add(l.accountKey));
+
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, verA[0].budgetId));
+    const months = Array.from({ length: 12 }, (_, i) =>
+      `${budget.fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
+    );
+
+    const comparison = Array.from(allKeys).map(accountKey => {
+      const lineA = gridA.lines.find(l => l.accountKey === accountKey);
+      const lineB = gridB.lines.find(l => l.accountKey === accountKey);
+      const monthly = months.map(m => {
+        const a = gridA.amountMap[accountKey]?.[m] || 0;
+        const b = gridB.amountMap[accountKey]?.[m] || 0;
+        return { month: m, a, b, diff: b - a, pctDiff: a !== 0 ? ((b - a) / Math.abs(a)) * 100 : 0 };
+      });
+      const totalA = monthly.reduce((s, m) => s + m.a, 0);
+      const totalB = monthly.reduce((s, m) => s + m.b, 0);
+      return {
+        accountKey,
+        displayName: lineA?.displayName || lineB?.displayName || accountKey,
+        lineType: lineA?.lineType || lineB?.lineType || 'OPEX',
+        monthly,
+        totalA,
+        totalB,
+        totalDiff: totalB - totalA,
+        totalPctDiff: totalA !== 0 ? ((totalB - totalA) / Math.abs(totalA)) * 100 : 0,
+      };
+    });
+
+    res.json({
+      versionA: verA[0],
+      versionB: verB[0],
+      months,
+      comparison,
+    });
+  } catch (err) { next(err); }
+});
+
+// ===========================================================================
+// ENHANCED BVA — Budget vs Actual with GL actuals + monthly detail + YTD
+// ===========================================================================
+router.get("/bva-enhanced/:budgetId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    const { budgetId } = req.params;
+    const versionId = req.query.versionId as string | undefined;
+
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    // Resolve version
+    const versions = await db.select().from(budgetVersions).where(eq(budgetVersions.budgetId, budgetId));
+    let targetVersion: BudgetVersion | undefined;
+    if (versionId) {
+      targetVersion = versions.find(v => v.id === versionId);
+    }
+    if (!targetVersion) {
+      targetVersion = versions.find(v => v.isPrimary) || versions[0];
+    }
+    if (!targetVersion) return res.json({ lines: [], summary: {}, months: [] });
+
+    const fiscalYear = budget.fiscalYear;
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const m = (i + 1).toString().padStart(2, '0');
+      return `${fiscalYear}-${m}-01`;
+    });
+
+    // YTD cutoff: current month (inclusive)
+    const now = new Date();
+    const currentMonthIdx = now.getFullYear() === fiscalYear
+      ? now.getMonth() // 0-based
+      : now.getFullYear() > fiscalYear ? 11 : -1;
+
+    // Budget lines + amounts
+    const lines = await db.select().from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, targetVersion.id))
+      .orderBy(asc(budgetLines.sortOrder));
+    const lineIds = lines.map(l => l.id);
+    let budgetAmountsRows: BudgetAmount[] = [];
+    if (lineIds.length > 0) {
+      budgetAmountsRows = await db.select().from(budgetAmounts)
+        .where(inArray(budgetAmounts.budgetLineId, lineIds));
+    }
+
+    // Actuals from actualsFacts
+    const seedActuals = await db.select().from(actualsFacts).where(
+      and(
+        eq(actualsFacts.userId, userId),
+        sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${fiscalYear}`,
+      )
+    );
+
+    // Actuals from GL (opsBookkeepingGl)
+    const glActuals = await db.select().from(opsBookkeepingGl).where(
+      and(
+        eq(opsBookkeepingGl.orgId, orgId),
+        sql`EXTRACT(YEAR FROM ${opsBookkeepingGl.periodStart}::date) = ${fiscalYear}`,
+      )
+    );
+
+    // Build GL account name → budget accountKey mapping via fuzzy match
+    // GL uses accountName (e.g. "Wet Slip Revenue"), budget uses accountKey (e.g. "wet_slip_revenue")
+    const glByMonth: Record<string, Record<string, number>> = {};
+    for (const gl of glActuals) {
+      const normKey = gl.accountName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      // Try to match to a budget line
+      const matchedLine = lines.find(l => {
+        const lKey = l.accountKey;
+        const lName = l.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        return lKey === normKey || lName === normKey
+          || normKey.includes(lKey) || lKey.includes(normKey);
+      });
+      if (!matchedLine) continue;
+      const key = matchedLine.accountKey;
+      const period = gl.periodStart as string;
+      if (!glByMonth[key]) glByMonth[key] = {};
+      glByMonth[key][period] = (glByMonth[key][period] || 0) + parseFloat(gl.amount);
+    }
+
+    // Build per-line BVA
+    const bvaLines = lines.map(line => {
+      const lineAmounts: Record<string, number> = {};
+      for (const a of budgetAmountsRows) {
+        if (a.budgetLineId === line.id) lineAmounts[a.periodStart as string] = parseFloat(a.amount);
+      }
+
+      const isExpense = ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(line.lineType);
+
+      const monthly = months.map((month, mIdx) => {
+        const budgetAmt = lineAmounts[month] || 0;
+
+        // Actual = seedActuals + GL actuals combined
+        let actualAmt = 0;
+        actualAmt += seedActuals
+          .filter(a => (a.periodStart as string) === month && a.accountKey === line.accountKey)
+          .reduce((s, a) => s + parseFloat(a.amount), 0);
+        actualAmt += glByMonth[line.accountKey]?.[month] || 0;
+
+        const varDollar = actualAmt - budgetAmt;
+        const varPct = budgetAmt !== 0 ? (varDollar / Math.abs(budgetAmt)) * 100 : 0;
+        const favorable = isExpense ? varDollar <= 0 : varDollar >= 0;
+        const isYtd = mIdx <= currentMonthIdx;
+
+        return {
+          month,
+          budget: Math.round(budgetAmt * 100) / 100,
+          actual: Math.round(actualAmt * 100) / 100,
+          varDollar: Math.round(varDollar * 100) / 100,
+          varPct: Math.round(varPct * 100) / 100,
+          favorable,
+          isYtd,
+        };
+      });
+
+      const ytdMonths = monthly.filter(m => m.isYtd);
+      const ytd = {
+        budget: ytdMonths.reduce((s, m) => s + m.budget, 0),
+        actual: ytdMonths.reduce((s, m) => s + m.actual, 0),
+        varDollar: 0 as number,
+        varPct: 0 as number,
+        favorable: false,
+      };
+      ytd.varDollar = ytd.actual - ytd.budget;
+      ytd.varPct = ytd.budget !== 0 ? (ytd.varDollar / Math.abs(ytd.budget)) * 100 : 0;
+      ytd.favorable = isExpense ? ytd.varDollar <= 0 : ytd.varDollar >= 0;
+
+      const annual = {
+        budget: monthly.reduce((s, m) => s + m.budget, 0),
+        actual: monthly.reduce((s, m) => s + m.actual, 0),
+        varDollar: 0 as number,
+        varPct: 0 as number,
+        favorable: false,
+      };
+      annual.varDollar = annual.actual - annual.budget;
+      annual.varPct = annual.budget !== 0 ? (annual.varDollar / Math.abs(annual.budget)) * 100 : 0;
+      annual.favorable = isExpense ? annual.varDollar <= 0 : annual.varDollar >= 0;
+
+      return {
+        accountKey: line.accountKey,
+        displayName: line.displayName,
+        lineType: line.lineType,
+        monthly,
+        ytd,
+        annual,
+      };
+    });
+
+    // Summary
+    const revLines = bvaLines.filter(l => ['REVENUE', 'OTHER_INCOME'].includes(l.lineType));
+    const expLines = bvaLines.filter(l => ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(l.lineType));
+    const sumField = (arr: typeof bvaLines, field: 'budget' | 'actual') =>
+      arr.reduce((s, l) => s + l.annual[field], 0);
+    const ytdSumField = (arr: typeof bvaLines, field: 'budget' | 'actual') =>
+      arr.reduce((s, l) => s + l.ytd[field], 0);
+
+    const summary = {
+      totalRevenueBudget: sumField(revLines, 'budget'),
+      totalRevenueActual: sumField(revLines, 'actual'),
+      totalExpenseBudget: sumField(expLines, 'budget'),
+      totalExpenseActual: sumField(expLines, 'actual'),
+      noiBudget: sumField(revLines, 'budget') - sumField(expLines, 'budget'),
+      noiActual: sumField(revLines, 'actual') - sumField(expLines, 'actual'),
+      ytdRevenueBudget: ytdSumField(revLines, 'budget'),
+      ytdRevenueActual: ytdSumField(revLines, 'actual'),
+      ytdExpenseBudget: ytdSumField(expLines, 'budget'),
+      ytdExpenseActual: ytdSumField(expLines, 'actual'),
+      ytdNoiBudget: ytdSumField(revLines, 'budget') - ytdSumField(expLines, 'budget'),
+      ytdNoiActual: ytdSumField(revLines, 'actual') - ytdSumField(expLines, 'actual'),
+    };
+
+    res.json({
+      budget,
+      version: targetVersion,
+      versions,
+      lines: bvaLines,
+      summary,
+      months,
+      currentMonthIdx,
+    });
+  } catch (err) { next(err); }
+});
 
 export default router;
