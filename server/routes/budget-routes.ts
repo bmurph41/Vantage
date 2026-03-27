@@ -118,6 +118,65 @@ const COA_TEMPLATES: Record<string, { key: string; name: string; parentKey: stri
 };
 
 // Parent rows (always the same structure)
+/**
+ * Safe GL-to-budget account matching. Returns the BEST single match, not all substring matches.
+ * Prevents double-counting by requiring exact or high-confidence match.
+ */
+function matchGlToBudgetLine(glAccountName: string | null | undefined, budgetLines: { accountKey: string; displayName: string }[]): string | null {
+  if (!glAccountName) return null;
+  const normGl = glAccountName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  if (!normGl) return null;
+
+  // Priority 1: Exact key match
+  for (const l of budgetLines) {
+    if (l.accountKey === normGl) return l.accountKey;
+  }
+
+  // Priority 2: Exact display name match (normalized)
+  for (const l of budgetLines) {
+    const normName = l.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (normName === normGl) return l.accountKey;
+  }
+
+  // Priority 3: Score-based — prefer longest common prefix, avoid substring ambiguity
+  let bestKey: string | null = null;
+  let bestScore = 0;
+  for (const l of budgetLines) {
+    const normName = l.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    // Word overlap scoring
+    const glWords = new Set(normGl.split('_').filter(Boolean));
+    const nameWords = normName.split('_').filter(Boolean);
+    const keyWords = l.accountKey.split('_').filter(Boolean);
+    const allCandidateWords = new Set([...nameWords, ...keyWords]);
+    const overlap = [...glWords].filter(w => allCandidateWords.has(w)).length;
+    const score = overlap / Math.max(glWords.size, allCandidateWords.size);
+    if (score > bestScore && score >= 0.6) {
+      bestScore = score;
+      bestKey = l.accountKey;
+    }
+  }
+  return bestKey;
+}
+
+/**
+ * Aggregate GL entries into a map of accountKey → month → total amount.
+ * Each GL entry matches at most one budget line (prevents double-counting).
+ */
+function aggregateGlActuals(
+  glEntries: { accountName: string; periodStart: string | Date; amount: string }[],
+  budgetLinesList: { accountKey: string; displayName: string }[],
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {};
+  for (const gl of glEntries) {
+    const matchedKey = matchGlToBudgetLine(gl.accountName, budgetLinesList);
+    if (!matchedKey) continue;
+    const period = gl.periodStart as string;
+    if (!result[matchedKey]) result[matchedKey] = {};
+    result[matchedKey][period] = (result[matchedKey][period] || 0) + parseFloat(gl.amount);
+  }
+  return result;
+}
+
 const PARENT_ROWS = [
   { key: "REVENUE", name: "Revenue", lineType: "REVENUE", sortOrder: 0 },
   { key: "OPEX", name: "Operating Expenses", lineType: "OPEX", sortOrder: 1000 },
@@ -1012,10 +1071,16 @@ router.post("/version/:versionId/import-csv", async (req: Request, res: Response
 
       if (!line) {
         const candidate = candidates.find(c => c.key === matchedKey);
+        // Resolve lineType from tree accounts (not hardcoded)
+        const treeRow = await pool.query(
+          `SELECT line_type FROM budget_tree_accounts WHERE budget_version_id = $1 AND account_key = $2 LIMIT 1`,
+          [versionId, matchedKey]
+        );
+        const resolvedLineType = treeRow.rows[0]?.line_type || 'OPEX';
         [line] = await db.insert(budgetLines).values({
           budgetVersionId: versionId,
           sortOrder: 999,
-          lineType: 'OPEX',
+          lineType: resolvedLineType,
           accountKey: matchedKey,
           displayName: candidate?.name || matchedKey,
         }).returning();
@@ -1296,24 +1361,8 @@ router.get("/bva-enhanced/:budgetId", async (req: Request, res: Response, next: 
       )
     );
 
-    // Build GL account name → budget accountKey mapping via fuzzy match
-    // GL uses accountName (e.g. "Wet Slip Revenue"), budget uses accountKey (e.g. "wet_slip_revenue")
-    const glByMonth: Record<string, Record<string, number>> = {};
-    for (const gl of glActuals) {
-      const normKey = gl.accountName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-      // Try to match to a budget line
-      const matchedLine = lines.find(l => {
-        const lKey = l.accountKey;
-        const lName = l.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-        return lKey === normKey || lName === normKey
-          || normKey.includes(lKey) || lKey.includes(normKey);
-      });
-      if (!matchedLine) continue;
-      const key = matchedLine.accountKey;
-      const period = gl.periodStart as string;
-      if (!glByMonth[key]) glByMonth[key] = {};
-      glByMonth[key][period] = (glByMonth[key][period] || 0) + parseFloat(gl.amount);
-    }
+    // Build GL actuals map using safe matching (prevents double-counting)
+    const glByMonth = aggregateGlActuals(glActuals as any, lines);
 
     // Build per-line BVA
     const bvaLines = lines.map(line => {
@@ -1414,6 +1463,543 @@ router.get("/bva-enhanced/:budgetId", async (req: Request, res: Response, next: 
       summary,
       months,
       currentMonthIdx,
+    });
+  } catch (err) { next(err); }
+});
+
+// ===========================================================================
+// ROLLING FORECAST — Latest Estimate version
+// Closed months = GL actuals, future months = budget values
+// ===========================================================================
+router.post("/version/:versionId/rolling-forecast", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId } = req.params;
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+
+    // Resolve source version + budget
+    const [srcVer] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!srcVer) return res.status(404).json({ error: "Source version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, srcVer.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const fiscalYear = budget.fiscalYear;
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
+    const months = Array.from({ length: 12 }, (_, i) =>
+      `${fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
+    );
+
+    // Check if a "Latest Estimate" version already exists for this budget
+    const existingVersions = await db.select().from(budgetVersions)
+      .where(eq(budgetVersions.budgetId, budget.id));
+    let leVersion = existingVersions.find(v => v.name === "Latest Estimate");
+
+    if (!leVersion) {
+      // Clone the source version as "Latest Estimate"
+      const [newVer] = await db.insert(budgetVersions).values({
+        budgetId: budget.id,
+        name: "Latest Estimate",
+        isPrimary: false,
+      }).returning();
+
+      // Clone lines + amounts
+      const srcLines = await db.select().from(budgetLines)
+        .where(eq(budgetLines.budgetVersionId, versionId));
+      for (const srcLine of srcLines) {
+        const [newLine] = await db.insert(budgetLines).values({
+          budgetVersionId: newVer.id,
+          sortOrder: srcLine.sortOrder,
+          lineType: srcLine.lineType,
+          accountKey: srcLine.accountKey,
+          displayName: srcLine.displayName,
+        }).returning();
+        const srcAmounts = await db.select().from(budgetAmounts)
+          .where(eq(budgetAmounts.budgetLineId, srcLine.id));
+        for (const a of srcAmounts) {
+          await db.insert(budgetAmounts).values({
+            budgetLineId: newLine.id,
+            periodStart: a.periodStart,
+            amount: a.amount,
+          });
+        }
+      }
+
+      // Clone tree
+      await pool.query(
+        `INSERT INTO budget_tree_accounts (budget_version_id, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class)
+         SELECT $1, account_key, display_name, parent_key, line_type, sort_order, is_parent, asset_class
+         FROM budget_tree_accounts WHERE budget_version_id = $2
+         ON CONFLICT (budget_version_id, account_key) DO NOTHING`,
+        [newVer.id, versionId]
+      );
+
+      leVersion = newVer;
+    }
+
+    // Now overwrite closed months with actuals
+    const leLines = await db.select().from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, leVersion.id));
+
+    // Gather actuals from both sources
+    const seedActuals = await db.select().from(actualsFacts).where(
+      and(eq(actualsFacts.userId, userId), sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${fiscalYear}`)
+    );
+    const glActuals = await db.select().from(opsBookkeepingGl).where(
+      and(eq(opsBookkeepingGl.orgId, orgId), sql`EXTRACT(YEAR FROM ${opsBookkeepingGl.periodStart}::date) = ${fiscalYear}`)
+    );
+
+    // Build actuals by accountKey → month → total
+    const actualsMap: Record<string, Record<string, number>> = {};
+    for (const a of seedActuals) {
+      if (!actualsMap[a.accountKey]) actualsMap[a.accountKey] = {};
+      const p = a.periodStart as string;
+      actualsMap[a.accountKey][p] = (actualsMap[a.accountKey][p] || 0) + parseFloat(a.amount);
+    }
+
+    // GL matching — use safe matcher to prevent double-counting
+    const glMapped = aggregateGlActuals(glActuals as any, leLines);
+    for (const [key, months] of Object.entries(glMapped)) {
+      if (!actualsMap[key]) actualsMap[key] = {};
+      for (const [p, val] of Object.entries(months)) {
+        actualsMap[key][p] = (actualsMap[key][p] || 0) + val;
+      }
+    }
+
+    // Overwrite closed months
+    let updatedCells = 0;
+    for (const line of leLines) {
+      for (const month of months) {
+        if (month >= currentMonthStr) continue; // Future — keep budget
+        const actualVal = actualsMap[line.accountKey]?.[month];
+        if (actualVal === undefined) continue;
+
+        const existing = await db.select().from(budgetAmounts)
+          .where(and(eq(budgetAmounts.budgetLineId, line.id), eq(budgetAmounts.periodStart, month)));
+        const amount = actualVal.toString();
+        if (existing.length > 0) {
+          await db.update(budgetAmounts).set({ amount, updatedAt: new Date() }).where(eq(budgetAmounts.id, existing[0].id));
+        } else {
+          await db.insert(budgetAmounts).values({ budgetLineId: line.id, periodStart: month, amount });
+        }
+        updatedCells++;
+      }
+    }
+
+    res.json({
+      ok: true,
+      versionId: leVersion.id,
+      versionName: leVersion.name,
+      updatedCells,
+      currentMonth: currentMonthStr,
+    });
+  } catch (err) { next(err); }
+});
+
+// ===========================================================================
+// AI BUDGET ASSISTANT
+// ===========================================================================
+
+// (1) Seed assumptions from actuals — analyze prior year, compute growth, auto-fill
+router.post("/ai/seed-assumptions", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    const { versionId, growthOverride } = z.object({
+      versionId: z.string(),
+      growthOverride: z.number().optional(), // manual override for all accounts
+    }).parse(req.body);
+
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const fiscalYear = budget.fiscalYear;
+    const priorYear = fiscalYear - 1;
+    const twoYearsAgo = fiscalYear - 2;
+
+    // Pull prior year actuals
+    const priorActuals = await db.select().from(actualsFacts).where(
+      and(eq(actualsFacts.userId, userId), sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${priorYear}`)
+    );
+    // Pull two-years-ago for growth calculation
+    const olderActuals = await db.select().from(actualsFacts).where(
+      and(eq(actualsFacts.userId, userId), sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${twoYearsAgo}`)
+    );
+
+    // Also try GL
+    const priorGl = await db.select().from(opsBookkeepingGl).where(
+      and(eq(opsBookkeepingGl.orgId, orgId), sql`EXTRACT(YEAR FROM ${opsBookkeepingGl.periodStart}::date) = ${priorYear}`)
+    );
+
+    // Aggregate by account → month
+    const priorByAccount: Record<string, number[]> = {};
+    const olderByAccount: Record<string, number> = {};
+
+    for (const a of priorActuals) {
+      if (!priorByAccount[a.accountKey]) priorByAccount[a.accountKey] = new Array(12).fill(0);
+      const mIdx = parseInt((a.periodStart as string).slice(5, 7), 10) - 1;
+      priorByAccount[a.accountKey][mIdx] += parseFloat(a.amount);
+    }
+
+    for (const a of olderActuals) {
+      olderByAccount[a.accountKey] = (olderByAccount[a.accountKey] || 0) + parseFloat(a.amount);
+    }
+
+    // Add GL entries — use safe matcher
+    const budLines = await db.select().from(budgetLines).where(eq(budgetLines.budgetVersionId, versionId));
+    const glMapped = aggregateGlActuals(priorGl as any, budLines);
+    for (const [key, monthAmts] of Object.entries(glMapped)) {
+      if (!priorByAccount[key]) priorByAccount[key] = new Array(12).fill(0);
+      for (const [period, val] of Object.entries(monthAmts)) {
+        const mIdx = parseInt(period.slice(5, 7), 10) - 1;
+        if (mIdx >= 0 && mIdx < 12) priorByAccount[key][mIdx] += val;
+      }
+    }
+
+    // For each account, compute YoY growth and apply
+    const assumptions: { accountKey: string; priorTotal: number; growthRate: number; budgetTotal: number }[] = [];
+    const skippedAccounts: { accountKey: string; displayName: string; reason: string }[] = [];
+    const months = Array.from({ length: 12 }, (_, i) =>
+      `${fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
+    );
+
+    for (const line of budLines) {
+      const priorMonthly = priorByAccount[line.accountKey];
+      if (!priorMonthly) {
+        skippedAccounts.push({ accountKey: line.accountKey, displayName: line.displayName, reason: 'no_prior_data' });
+        continue;
+      }
+
+      const priorTotal = priorMonthly.reduce((s, v) => s + v, 0);
+      if (priorTotal === 0) {
+        skippedAccounts.push({ accountKey: line.accountKey, displayName: line.displayName, reason: 'zero_prior_total' });
+        continue;
+      }
+
+      // Compute growth rate
+      let growth: number;
+      if (growthOverride !== undefined) {
+        growth = growthOverride;
+      } else {
+        const olderTotal = olderByAccount[line.accountKey] || 0;
+        if (olderTotal > 0) {
+          growth = (priorTotal - olderTotal) / Math.abs(olderTotal);
+          growth = Math.max(-0.20, Math.min(0.30, growth)); // Clamp to ±20-30%
+        } else {
+          growth = 0.03; // Default 3% growth
+        }
+      }
+
+      // Apply growth to each month (preserving seasonality)
+      const budgetTotal = priorTotal * (1 + growth);
+      for (let m = 0; m < 12; m++) {
+        const weight = priorTotal !== 0 ? priorMonthly[m] / priorTotal : 1 / 12;
+        const amount = Math.round(budgetTotal * weight * 100) / 100;
+
+        const existing = await db.select().from(budgetAmounts)
+          .where(and(eq(budgetAmounts.budgetLineId, line.id), eq(budgetAmounts.periodStart, months[m])));
+        if (existing.length > 0) {
+          await db.update(budgetAmounts).set({ amount: amount.toString(), updatedAt: new Date() })
+            .where(eq(budgetAmounts.id, existing[0].id));
+        } else {
+          await db.insert(budgetAmounts).values({ budgetLineId: line.id, periodStart: months[m], amount: amount.toString() });
+        }
+      }
+
+      assumptions.push({
+        accountKey: line.accountKey,
+        priorTotal: Math.round(priorTotal),
+        growthRate: Math.round(growth * 10000) / 100,
+        budgetTotal: Math.round(budgetTotal),
+      });
+    }
+
+    res.json({
+      ok: true,
+      accountsUpdated: assumptions.length,
+      accountsSkipped: skippedAccounts.length,
+      assumptions,
+      skippedAccounts,
+      method: growthOverride !== undefined ? "manual_override" : "yoy_growth",
+    });
+  } catch (err) { next(err); }
+});
+
+// (2) Explain variance — fetch GL transactions, build plain-English explanation
+router.post("/ai/explain-variance", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = getUserId(req);
+    const orgId = getOrgId(req);
+    const { versionId, accountKey, month } = z.object({
+      versionId: z.string(),
+      accountKey: z.string(),
+      month: z.string().optional(), // If omitted, YTD
+    }).parse(req.body);
+
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const fiscalYear = budget.fiscalYear;
+
+    // Get budget amount
+    const [line] = await db.select().from(budgetLines)
+      .where(and(eq(budgetLines.budgetVersionId, versionId), eq(budgetLines.accountKey, accountKey)));
+    if (!line) return res.status(404).json({ error: "Budget line not found" });
+
+    const isExpense = ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(line.lineType);
+
+    // Determine months to analyze
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-01`;
+    let targetMonths: string[];
+    if (month) {
+      targetMonths = [month];
+    } else {
+      // YTD
+      targetMonths = [];
+      for (let m = 1; m <= 12; m++) {
+        const ms = `${fiscalYear}-${m.toString().padStart(2, '0')}-01`;
+        if (ms < currentMonthStr) targetMonths.push(ms);
+      }
+    }
+
+    // Budget total for the period
+    const budgetAmts = await db.select().from(budgetAmounts)
+      .where(eq(budgetAmounts.budgetLineId, line.id));
+    let budgetTotal = 0;
+    for (const ba of budgetAmts) {
+      if (targetMonths.includes(ba.periodStart as string)) {
+        budgetTotal += parseFloat(ba.amount);
+      }
+    }
+
+    // Actual from seed actuals
+    let actualTotal = 0;
+    const seedActuals = await db.select().from(actualsFacts).where(
+      and(eq(actualsFacts.userId, userId), eq(actualsFacts.accountKey, accountKey),
+        sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${fiscalYear}`)
+    );
+    for (const a of seedActuals) {
+      if (targetMonths.includes(a.periodStart as string)) {
+        actualTotal += parseFloat(a.amount);
+      }
+    }
+
+    // GL transactions for this account
+    const glConditions = [
+      eq(opsBookkeepingGl.orgId, orgId),
+      sql`EXTRACT(YEAR FROM ${opsBookkeepingGl.periodStart}::date) = ${fiscalYear}`,
+    ];
+    const glEntries = await db.select().from(opsBookkeepingGl).where(and(...glConditions));
+
+    // Match GL to this account using safe matcher
+    const matchedGl = glEntries.filter(gl => {
+      const matched = matchGlToBudgetLine(gl.accountName, [{ accountKey: line.accountKey, displayName: line.displayName }]);
+      return matched === line.accountKey;
+    }).filter(gl => targetMonths.includes(gl.periodStart as string));
+
+    for (const gl of matchedGl) {
+      actualTotal += parseFloat(gl.amount);
+    }
+
+    const variance = actualTotal - budgetTotal;
+    const variancePct = budgetTotal !== 0 ? (variance / Math.abs(budgetTotal)) * 100 : 0;
+    const favorable = isExpense ? variance <= 0 : variance >= 0;
+
+    // Get prior year for context
+    const priorYear = fiscalYear - 1;
+    const priorActuals = await db.select().from(actualsFacts).where(
+      and(eq(actualsFacts.userId, userId), eq(actualsFacts.accountKey, accountKey),
+        sql`EXTRACT(YEAR FROM ${actualsFacts.periodStart}::date) = ${priorYear}`)
+    );
+    let priorTotal = 0;
+    for (const a of priorActuals) {
+      const aMonth = (a.periodStart as string).replace(`${priorYear}`, `${fiscalYear}`);
+      if (targetMonths.includes(aMonth)) priorTotal += parseFloat(a.amount);
+    }
+    const yoyChange = priorTotal !== 0 ? ((actualTotal - priorTotal) / Math.abs(priorTotal)) * 100 : 0;
+
+    // Build GL transaction details
+    const transactions = matchedGl.map(gl => ({
+      date: gl.periodStart,
+      amount: parseFloat(gl.amount),
+      notes: gl.notes,
+      source: gl.source,
+    })).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+
+    // Build explanation
+    const periodLabel = month
+      ? new Date(month + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : `YTD (${targetMonths.length} months)`;
+
+    const direction = variance >= 0 ? "higher" : "lower";
+    const favorability = favorable ? "favorable" : "unfavorable";
+
+    let explanation = `**${line.displayName}** — ${periodLabel}\n\n`;
+    explanation += `Budget: $${budgetTotal.toLocaleString()} | Actual: $${actualTotal.toLocaleString()} | `;
+    explanation += `Variance: ${variance >= 0 ? '+' : ''}$${variance.toLocaleString()} (${variancePct >= 0 ? '+' : ''}${variancePct.toFixed(1)}%) — **${favorability}**\n\n`;
+
+    if (priorTotal > 0) {
+      explanation += `Compared to prior year same period ($${priorTotal.toLocaleString()}), actuals are ${yoyChange >= 0 ? 'up' : 'down'} ${Math.abs(yoyChange).toFixed(1)}% YoY.\n\n`;
+    }
+
+    if (Math.abs(variancePct) < 5) {
+      explanation += `The variance is within normal range (< 5%). ${line.displayName} is tracking close to budget.`;
+    } else if (favorable) {
+      if (isExpense) {
+        explanation += `${line.displayName} is running $${Math.abs(variance).toLocaleString()} ${direction} than budget. This is ${favorability} — spending is under control.`;
+      } else {
+        explanation += `${line.displayName} is outperforming budget by $${Math.abs(variance).toLocaleString()}. Revenue is trending ${direction} than planned.`;
+      }
+    } else {
+      if (isExpense) {
+        explanation += `⚠️ ${line.displayName} is $${Math.abs(variance).toLocaleString()} over budget. Review the largest transactions below for cost drivers.`;
+      } else {
+        explanation += `⚠️ ${line.displayName} is $${Math.abs(variance).toLocaleString()} under budget. Revenue shortfall may require corrective action.`;
+      }
+    }
+
+    if (transactions.length > 0) {
+      explanation += `\n\n**Top GL entries:**\n`;
+      for (const t of transactions.slice(0, 5)) {
+        explanation += `- ${t.date}: $${t.amount.toLocaleString()}${t.notes ? ` — ${t.notes}` : ''}\n`;
+      }
+    }
+
+    res.json({
+      accountKey,
+      displayName: line.displayName,
+      lineType: line.lineType,
+      period: periodLabel,
+      budgetTotal: Math.round(budgetTotal * 100) / 100,
+      actualTotal: Math.round(actualTotal * 100) / 100,
+      variance: Math.round(variance * 100) / 100,
+      variancePct: Math.round(variancePct * 100) / 100,
+      favorable,
+      priorYearTotal: Math.round(priorTotal * 100) / 100,
+      yoyChangePct: Math.round(yoyChange * 100) / 100,
+      explanation,
+      transactions: transactions.slice(0, 10),
+    });
+  } catch (err) { next(err); }
+});
+
+// (3) What-if analysis — adjust driver assumptions, see NOI impact
+router.post("/ai/what-if", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { versionId, adjustments } = z.object({
+      versionId: z.string(),
+      adjustments: z.array(z.object({
+        accountKey: z.string(),
+        changePct: z.number(), // e.g. +5 = 5% increase, -10 = 10% decrease
+      })),
+    }).parse(req.body);
+
+    const [ver] = await db.select().from(budgetVersions).where(eq(budgetVersions.id, versionId));
+    if (!ver) return res.status(404).json({ error: "Version not found" });
+    const [budget] = await db.select().from(budgets).where(eq(budgets.id, ver.budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found" });
+
+    const months = Array.from({ length: 12 }, (_, i) =>
+      `${budget.fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
+    );
+
+    // Fetch all lines + amounts
+    const lines = await db.select().from(budgetLines)
+      .where(eq(budgetLines.budgetVersionId, versionId));
+    const lineIds = lines.map(l => l.id);
+    let allAmounts: BudgetAmount[] = [];
+    if (lineIds.length > 0) {
+      allAmounts = await db.select().from(budgetAmounts)
+        .where(inArray(budgetAmounts.budgetLineId, lineIds));
+    }
+
+    // Build current amounts map
+    const currentByAccount: Record<string, number[]> = {};
+    for (const line of lines) {
+      currentByAccount[line.accountKey] = new Array(12).fill(0);
+    }
+    for (const a of allAmounts) {
+      const line = lines.find(l => l.id === a.budgetLineId);
+      if (!line) continue;
+      const mIdx = parseInt((a.periodStart as string).slice(5, 7), 10) - 1;
+      currentByAccount[line.accountKey][mIdx] = parseFloat(a.amount);
+    }
+
+    // Compute baseline NOI
+    const computeNoi = (amounts: Record<string, number[]>) => {
+      let totalRev = 0, totalExp = 0;
+      const monthlyNoi: number[] = new Array(12).fill(0);
+      for (const line of lines) {
+        const vals = amounts[line.accountKey] || new Array(12).fill(0);
+        for (let m = 0; m < 12; m++) {
+          if (['REVENUE', 'OTHER_INCOME'].includes(line.lineType)) {
+            totalRev += vals[m];
+            monthlyNoi[m] += vals[m];
+          } else {
+            totalExp += vals[m];
+            monthlyNoi[m] -= vals[m];
+          }
+        }
+      }
+      return { totalRev, totalExp, noi: totalRev - totalExp, monthlyNoi };
+    };
+
+    const baseline = computeNoi(currentByAccount);
+
+    // Apply adjustments
+    const adjustedByAccount = { ...currentByAccount };
+    const adjustmentDetails: { accountKey: string; displayName: string; baseTotal: number; adjustedTotal: number; changePct: number }[] = [];
+
+    for (const adj of adjustments) {
+      const line = lines.find(l => l.accountKey === adj.accountKey);
+      if (!line) continue;
+      const base = currentByAccount[adj.accountKey] || new Array(12).fill(0);
+      const factor = 1 + (adj.changePct / 100);
+      adjustedByAccount[adj.accountKey] = base.map(v => Math.round(v * factor * 100) / 100);
+
+      adjustmentDetails.push({
+        accountKey: adj.accountKey,
+        displayName: line.displayName,
+        baseTotal: base.reduce((s, v) => s + v, 0),
+        adjustedTotal: adjustedByAccount[adj.accountKey].reduce((s, v) => s + v, 0),
+        changePct: adj.changePct,
+      });
+    }
+
+    const scenario = computeNoi(adjustedByAccount);
+
+    const noiImpact = scenario.noi - baseline.noi;
+    const noiImpactPct = baseline.noi !== 0 ? (noiImpact / Math.abs(baseline.noi)) * 100 : 0;
+
+    // Build monthly comparison
+    const monthlyComparison = months.map((m, i) => ({
+      month: m,
+      baselineNoi: Math.round(baseline.monthlyNoi[i] * 100) / 100,
+      scenarioNoi: Math.round(scenario.monthlyNoi[i] * 100) / 100,
+      impact: Math.round((scenario.monthlyNoi[i] - baseline.monthlyNoi[i]) * 100) / 100,
+    }));
+
+    res.json({
+      baseline: {
+        revenue: Math.round(baseline.totalRev),
+        expenses: Math.round(baseline.totalExp),
+        noi: Math.round(baseline.noi),
+      },
+      scenario: {
+        revenue: Math.round(scenario.totalRev),
+        expenses: Math.round(scenario.totalExp),
+        noi: Math.round(scenario.noi),
+      },
+      noiImpact: Math.round(noiImpact),
+      noiImpactPct: Math.round(noiImpactPct * 100) / 100,
+      favorable: noiImpact >= 0,
+      adjustments: adjustmentDetails,
+      monthlyComparison,
     });
   } catch (err) { next(err); }
 });

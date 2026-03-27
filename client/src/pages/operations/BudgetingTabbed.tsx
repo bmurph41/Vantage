@@ -16,7 +16,8 @@ import {
   Plus, FileText, Calendar, DollarSign, TrendingUp, TrendingDown, ArrowUpRight,
   ArrowDownRight, BarChart3, Trash2, Lock, Unlock, CheckCircle2, AlertCircle,
   Save, RefreshCw, ChevronRight, Minus, MoreHorizontal, SplitSquareVertical,
-  Percent, BarChart2, Copy, Upload
+  Percent, BarChart2, Copy, Upload, Zap, BrainCircuit, PanelRightOpen,
+  PanelRightClose, Lightbulb, HelpCircle, Sliders, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -403,6 +404,7 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   const { toast } = useToast();
   const [localAmounts, setLocalAmounts] = useState<Record<string, Record<string, string>>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [aiOpen, setAiOpen] = useState(false);
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const savingRef = useRef<Set<string>>(new Set());
 
@@ -453,6 +455,13 @@ function BudgetEditor({ budget, version, onVersionChange }: {
     return locked;
   }, [months]);
 
+  // Keep a ref to latest localAmounts so blur reads fresh data without re-creating callbacks
+  const localAmountsRef = useRef(localAmounts);
+  localAmountsRef.current = localAmounts;
+
+  // Debounce timers per cell
+  const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   const autoSave = useCallback(async (accountKey: string, periodStart: string, amount: string) => {
     const cellKey = `${accountKey}|${periodStart}`;
     if (savingRef.current.has(cellKey)) return;
@@ -483,9 +492,19 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   }, []);
 
   const handleCellBlur = useCallback((accountKey: string, month: string) => {
-    const val = localAmounts[accountKey]?.[month] || '0';
-    autoSave(accountKey, month, val);
-  }, [localAmounts, autoSave]);
+    // Read from ref to avoid stale closure on localAmounts
+    const cellKey = `${accountKey}|${month}`;
+    // Clear any existing debounce for this cell
+    const existing = debounceTimers.current.get(cellKey);
+    if (existing) clearTimeout(existing);
+    // Debounce 300ms — coalesces rapid Tab-through
+    const timer = setTimeout(() => {
+      debounceTimers.current.delete(cellKey);
+      const val = localAmountsRef.current[accountKey]?.[month] || '0';
+      autoSave(accountKey, month, val);
+    }, 300);
+    debounceTimers.current.set(cellKey, timer);
+  }, [autoSave]);
 
   const getChildTotal = useCallback((accountKey: string): number => {
     return months.reduce((sum, m) => sum + parseFloat(getCellValue(accountKey, m) || '0'), 0);
@@ -576,10 +595,21 @@ function BudgetEditor({ budget, version, onVersionChange }: {
           <h2 className="text-lg font-semibold">{budget.name}</h2>
           <p className="text-sm text-muted-foreground">FY {budget.fiscalYear}</p>
         </div>
-        <Badge variant="outline" className="text-xs text-muted-foreground">
-          <Save className="h-3 w-3 mr-1" />
-          Auto-saves on blur
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs text-muted-foreground">
+            <Save className="h-3 w-3 mr-1" />
+            Auto-saves on blur
+          </Badge>
+          <Button
+            size="sm"
+            variant={aiOpen ? "default" : "outline"}
+            className="h-8 text-xs"
+            onClick={() => setAiOpen(!aiOpen)}
+          >
+            {aiOpen ? <PanelRightClose className="h-3 w-3 mr-1" /> : <BrainCircuit className="h-3 w-3 mr-1" />}
+            AI Assistant
+          </Button>
+        </div>
       </div>
 
       <VersionManager
@@ -595,7 +625,8 @@ function BudgetEditor({ budget, version, onVersionChange }: {
         }}
       />
 
-      <div className="border rounded-lg overflow-auto max-h-[75vh]">
+      <div className={cn("flex gap-4", aiOpen && "")}>
+      <div className={cn("border rounded-lg overflow-auto max-h-[75vh]", aiOpen ? "flex-1 min-w-0" : "w-full")}>
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-20">
             <tr className="bg-muted/80 backdrop-blur-sm">
@@ -733,6 +764,18 @@ function BudgetEditor({ budget, version, onVersionChange }: {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* AI Assistant Sidebar */}
+      {aiOpen && (
+        <AiBudgetAssistant
+          versionId={version.id}
+          childRows={childRows}
+          onRefresh={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
+          }}
+        />
+      )}
       </div>
     </div>
   );
@@ -1002,6 +1045,336 @@ function CsvDropZone({ versionId, onImported }: { versionId: string; onImported:
 }
 
 // ---------------------------------------------------------------------------
+// AiBudgetAssistant — Collapsible sidebar with 3 AI actions
+// ---------------------------------------------------------------------------
+function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
+  versionId: string;
+  childRows: TreeRow[];
+  onRefresh: () => void;
+}) {
+  const { toast } = useToast();
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+
+  // Seed assumptions state
+  const [seedGrowth, setSeedGrowth] = useState("");
+
+  // Explain variance state
+  const [explainAccount, setExplainAccount] = useState("");
+  const [explainResult, setExplainResult] = useState<any>(null);
+
+  // What-if state
+  const [whatIfAdjustments, setWhatIfAdjustments] = useState<{ accountKey: string; changePct: number }[]>([]);
+  const [whatIfResult, setWhatIfResult] = useState<any>(null);
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = { versionId };
+      if (seedGrowth) body.growthOverride = parseFloat(seedGrowth) / 100;
+      const res = await apiRequest("POST", "/api/budgets/ai/seed-assumptions", body);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Budget seeded", description: `${data.accountsUpdated} accounts updated using ${data.method}` });
+      onRefresh();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Seed failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const explainMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/budgets/ai/explain-variance", {
+        versionId,
+        accountKey: explainAccount,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => setExplainResult(data),
+    onError: (error: Error) => {
+      toast({ title: "Explain failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const whatIfMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/budgets/ai/what-if", {
+        versionId,
+        adjustments: whatIfAdjustments,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => setWhatIfResult(data),
+    onError: (error: Error) => {
+      toast({ title: "What-if failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addWhatIfRow = () => {
+    setWhatIfAdjustments(prev => [...prev, { accountKey: childRows[0]?.accountKey || '', changePct: 0 }]);
+  };
+
+  return (
+    <div className="w-[340px] flex-shrink-0 border rounded-lg overflow-auto max-h-[75vh]">
+      <div className="p-3 border-b bg-muted/30">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-sm">AI Budget Assistant</span>
+        </div>
+      </div>
+
+      <div className="p-2 space-y-2">
+        {/* Action 1: Seed Assumptions */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            className={cn("w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-muted/50 transition-colors",
+              activeAction === "seed" && "bg-muted/50")}
+            onClick={() => setActiveAction(activeAction === "seed" ? null : "seed")}
+          >
+            <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">Seed from Actuals</div>
+              <div className="text-xs text-muted-foreground">Auto-populate from prior year</div>
+            </div>
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", activeAction === "seed" && "rotate-180")} />
+          </button>
+          {activeAction === "seed" && (
+            <div className="px-3 pb-3 space-y-2 border-t">
+              <div className="pt-2">
+                <Label className="text-xs">Growth Override (%) — leave blank for auto YoY</Label>
+                <Input
+                  type="number"
+                  value={seedGrowth}
+                  onChange={e => setSeedGrowth(e.target.value)}
+                  placeholder="e.g. 5 for 5% growth"
+                  className="h-8 text-sm mt-1"
+                />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+                {seedMutation.isPending ? "Analyzing..." : "Seed Budget"}
+              </Button>
+              {seedMutation.data && (
+                <div className="text-xs space-y-1 max-h-40 overflow-auto">
+                  <div className="font-medium text-emerald-600">{seedMutation.data.accountsUpdated} accounts updated</div>
+                  {seedMutation.data.assumptions?.slice(0, 8).map((a: any) => (
+                    <div key={a.accountKey} className="flex justify-between">
+                      <span className="truncate">{a.accountKey.replace(/_/g, ' ')}</span>
+                      <span className="text-muted-foreground ml-1 flex-shrink-0">
+                        {a.growthRate >= 0 ? '+' : ''}{a.growthRate}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action 2: Explain Variance */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            className={cn("w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-muted/50 transition-colors",
+              activeAction === "explain" && "bg-muted/50")}
+            onClick={() => { setActiveAction(activeAction === "explain" ? null : "explain"); setExplainResult(null); }}
+          >
+            <HelpCircle className="h-4 w-4 text-blue-500 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">Explain Variance</div>
+              <div className="text-xs text-muted-foreground">Why is this over/under budget?</div>
+            </div>
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", activeAction === "explain" && "rotate-180")} />
+          </button>
+          {activeAction === "explain" && (
+            <div className="px-3 pb-3 space-y-2 border-t">
+              <div className="pt-2">
+                <Label className="text-xs">Account</Label>
+                <Select value={explainAccount} onValueChange={setExplainAccount}>
+                  <SelectTrigger className="h-8 text-sm mt-1">
+                    <SelectValue placeholder="Select account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {childRows.map(r => (
+                      <SelectItem key={r.accountKey} value={r.accountKey}>{r.displayName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => explainMutation.mutate()}
+                disabled={!explainAccount || explainMutation.isPending}
+              >
+                {explainMutation.isPending ? "Analyzing..." : "Explain"}
+              </Button>
+              {explainResult && (
+                <div className="text-xs space-y-2 border-t pt-2">
+                  <div className="flex justify-between font-medium">
+                    <span>Budget: ${explainResult.budgetTotal?.toLocaleString()}</span>
+                    <span>Actual: ${explainResult.actualTotal?.toLocaleString()}</span>
+                  </div>
+                  <div className={cn("font-semibold", explainResult.favorable ? "text-emerald-600" : "text-red-600")}>
+                    Variance: {explainResult.variance >= 0 ? '+' : ''}${explainResult.variance?.toLocaleString()}
+                    {' '}({explainResult.variancePct >= 0 ? '+' : ''}{explainResult.variancePct}%)
+                    {' '}— {explainResult.favorable ? 'Favorable' : 'Unfavorable'}
+                  </div>
+                  <div className="whitespace-pre-wrap text-muted-foreground leading-relaxed">
+                    {explainResult.explanation?.replace(/\*\*/g, '')}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action 3: What-If Analysis */}
+        <div className="border rounded-lg overflow-hidden">
+          <button
+            className={cn("w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-muted/50 transition-colors",
+              activeAction === "whatif" && "bg-muted/50")}
+            onClick={() => { setActiveAction(activeAction === "whatif" ? null : "whatif"); setWhatIfResult(null); }}
+          >
+            <Sliders className="h-4 w-4 text-purple-500 flex-shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">What-If Analysis</div>
+              <div className="text-xs text-muted-foreground">Adjust drivers, see NOI impact</div>
+            </div>
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", activeAction === "whatif" && "rotate-180")} />
+          </button>
+          {activeAction === "whatif" && (
+            <div className="px-3 pb-3 space-y-2 border-t">
+              <div className="pt-2 space-y-2">
+                {whatIfAdjustments.map((adj, i) => (
+                  <div key={i} className="flex gap-1.5 items-end">
+                    <div className="flex-1">
+                      {i === 0 && <Label className="text-[10px]">Account</Label>}
+                      <Select
+                        value={adj.accountKey}
+                        onValueChange={(v) => {
+                          setWhatIfAdjustments(prev => prev.map((a, j) => j === i ? { ...a, accountKey: v } : a));
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {childRows.map(r => (
+                            <SelectItem key={r.accountKey} value={r.accountKey}>{r.displayName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-16">
+                      {i === 0 && <Label className="text-[10px]">% Change</Label>}
+                      <Input
+                        type="number"
+                        value={adj.changePct}
+                        onChange={(e) => {
+                          setWhatIfAdjustments(prev => prev.map((a, j) =>
+                            j === i ? { ...a, changePct: parseFloat(e.target.value) || 0 } : a
+                          ));
+                        }}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => setWhatIfAdjustments(prev => prev.filter((_, j) => j !== i))}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={addWhatIfRow} disabled={childRows.length === 0}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Driver
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => whatIfMutation.mutate()}
+                disabled={whatIfAdjustments.length === 0 || whatIfMutation.isPending}
+              >
+                {whatIfMutation.isPending ? "Computing..." : "Run Scenario"}
+              </Button>
+              {whatIfResult && (
+                <div className="text-xs space-y-2 border-t pt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="border rounded p-2">
+                      <div className="text-muted-foreground">Baseline NOI</div>
+                      <div className="font-bold text-base">{formatCurrency(whatIfResult.baseline.noi)}</div>
+                    </div>
+                    <div className={cn("border rounded p-2", whatIfResult.favorable ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-900/20" : "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-900/20")}>
+                      <div className="text-muted-foreground">Scenario NOI</div>
+                      <div className="font-bold text-base">{formatCurrency(whatIfResult.scenario.noi)}</div>
+                    </div>
+                  </div>
+                  <div className={cn("text-center font-semibold py-1 rounded",
+                    whatIfResult.favorable ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" : "text-red-600 bg-red-50 dark:bg-red-900/20"
+                  )}>
+                    NOI Impact: {whatIfResult.noiImpact >= 0 ? '+' : ''}{formatCurrency(whatIfResult.noiImpact)}
+                    {' '}({whatIfResult.noiImpactPct >= 0 ? '+' : ''}{whatIfResult.noiImpactPct}%)
+                  </div>
+                  {whatIfResult.adjustments?.map((a: any) => (
+                    <div key={a.accountKey} className="flex justify-between text-muted-foreground">
+                      <span className="truncate">{a.displayName}</span>
+                      <span className="ml-1 flex-shrink-0">{formatCurrency(a.baseTotal)} → {formatCurrency(a.adjustedTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RollingForecastButton — Generate Latest Estimate version
+// ---------------------------------------------------------------------------
+function RollingForecastButton({ versionId, onCreated }: {
+  versionId: string;
+  onCreated: (v: BudgetVersion) => void;
+}) {
+  const { toast } = useToast();
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/budgets/version/${versionId}/rolling-forecast`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Latest Estimate generated",
+        description: `${data.updatedCells} cells updated with actuals through ${data.currentMonth}`,
+      });
+      onCreated({ id: data.versionId, budgetId: '', name: data.versionName, isPrimary: false } as BudgetVersion);
+      queryClient.invalidateQueries({ queryKey: ["/api/budgets"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Forecast failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-8 text-xs"
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+    >
+      <Zap className={cn("h-3 w-3 mr-1", mutation.isPending && "animate-pulse")} />
+      {mutation.isPending ? "Generating..." : "Latest Estimate"}
+    </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // VersionManager — Version selector, clone, lock, compare
 // ---------------------------------------------------------------------------
 function VersionManager({ budgetId, currentVersion, onVersionChange }: {
@@ -1148,10 +1521,20 @@ function VersionManager({ budgetId, currentVersion, onVersionChange }: {
             variant={compareOpen ? "default" : "outline"}
             className="h-8 text-xs"
             onClick={() => setCompareOpen(!compareOpen)}
+            disabled={versions.length < 2}
+            title={versions.length < 2 ? "Need at least 2 versions to compare" : undefined}
           >
             <SplitSquareVertical className="h-3 w-3 mr-1" />
             Compare
           </Button>
+
+          <RollingForecastButton
+            versionId={currentVersion.id}
+            onCreated={(newVer) => {
+              refetchVersions();
+              onVersionChange(newVer);
+            }}
+          />
         </div>
       </div>
 
