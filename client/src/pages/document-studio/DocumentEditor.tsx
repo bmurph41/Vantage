@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import {
   useDocument as useDocumentQuery,
@@ -399,6 +400,118 @@ function AddBlockButton({ onAdd }: { onAdd: (type: ContentBlock['type']) => void
 }
 
 // =============================================================================
+// Version History Panel (right sidebar)
+// =============================================================================
+
+function VersionHistoryPanel({ documentId }: { documentId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: versions = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/document-builder/documents/${documentId}/versions`],
+    queryFn: async () => {
+      const res = await fetch(`/api/document-builder/documents/${documentId}/versions`, { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const saveVersion = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/document-builder/documents/${documentId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ changeDescription: description || undefined }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: [`/api/document-builder/documents/${documentId}/versions`] });
+        toast({ title: 'Version saved' });
+        setDescription('');
+      }
+    } catch {
+      toast({ title: 'Failed to save version', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const restoreVersion = async (versionId: string, versionNumber: number) => {
+    try {
+      const res = await fetch(`/api/document-builder/documents/${documentId}/versions/${versionId}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['document-builder'] });
+        toast({ title: `Restored to version ${versionNumber}` });
+      }
+    } catch {
+      toast({ title: 'Failed to restore', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="py-3 space-y-4">
+      <div>
+        <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Save Version</h4>
+        <Input
+          className="h-8 text-xs mb-2"
+          placeholder="Version description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+        <Button size="sm" className="w-full text-xs" onClick={saveVersion} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Current Version'}
+        </Button>
+      </div>
+
+      <Separator />
+
+      <div>
+        <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+          Version History ({versions.length})
+        </h4>
+        {isLoading ? (
+          <div className="space-y-2">{[1,2].map(i => <Skeleton key={i} className="h-14" />)}</div>
+        ) : versions.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">No versions saved yet</p>
+        ) : (
+          <div className="space-y-2">
+            {versions.map((v: any) => (
+              <Card key={v.id} className="p-2.5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-xs font-medium">v{v.versionNumber}</span>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {v.changeDescription || v.title}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(v.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => restoreVersion(v.id, v.versionNumber)}
+                  >
+                    Restore
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Main DocumentEditor Component
 // =============================================================================
 
@@ -425,7 +538,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<'sections' | 'blocks'>('sections');
-  const [rightTab, setRightTab] = useState<'properties' | 'data' | 'project'>('properties');
+  const [rightTab, setRightTab] = useState<'properties' | 'data' | 'project' | 'versions'>('properties');
   const [zoomLevel, setZoomLevel] = useState(100);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -1133,10 +1246,11 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
           {rightSidebarOpen && (
             <aside className="w-[320px] border-l bg-muted/20 flex flex-col shrink-0">
               <Tabs value={rightTab} onValueChange={(v) => setRightTab(v as typeof rightTab)} className="flex flex-col flex-1">
-                <TabsList className="mx-3 mt-3 grid grid-cols-3">
+                <TabsList className="mx-3 mt-3 grid grid-cols-4">
                   <TabsTrigger value="properties" className="text-xs">Properties</TabsTrigger>
                   <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
                   <TabsTrigger value="project" className="text-xs">Project</TabsTrigger>
+                  <TabsTrigger value="versions" className="text-xs">Versions</TabsTrigger>
                 </TabsList>
 
                 {/* Properties Tab */}
@@ -1464,6 +1578,13 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
                         </div>
                       </div>
                     </div>
+                  </ScrollArea>
+                </TabsContent>
+
+                {/* Versions Tab */}
+                <TabsContent value="versions" className="flex-1 mt-0 px-3 pb-3 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    <VersionHistoryPanel documentId={documentId} />
                   </ScrollArea>
                 </TabsContent>
               </Tabs>

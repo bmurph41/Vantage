@@ -66,6 +66,7 @@ const DDProgressReportPage = lazy(() => import("@/pages/dd-progress-report"));
 const UserSettingsPage = lazy(() => import("@/pages/user-settings"));
 const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
 const AuditLogsPage = lazy(() => import("@/pages/audit-logs"));
+const KnowledgeBasePage = lazy(() => import("@/pages/knowledge-base"));
 const Pipeline = lazy(() => import("@/pages/pipeline"));
 const Leads = lazy(() => import("@/pages/leads"));
 const Contacts = lazy(() => import("@/pages/contacts"));
@@ -682,6 +683,15 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <BillingSettingsPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/knowledge-base">
+        {() => (
+          <UnifiedLayout>
+            <Suspense fallback={<PageLoader />}>
+              <KnowledgeBasePage />
+            </Suspense>
           </UnifiedLayout>
         )}
       </Route>

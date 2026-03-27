@@ -27,6 +27,7 @@ import {
   TOKEN_SUMMARY,
   getTokensForTemplate,
 } from '@shared/document-builder/templates';
+import { resolveTokens, interpolateTokens, formatTokenValue } from '../services/document-builder/token-resolver-service';
 
 const router = Router();
 
@@ -1343,6 +1344,130 @@ router.get('/token-map', async (_req: any, res) => {
     summary: TOKEN_SUMMARY,
     tokens: MASTER_TOKEN_MAP,
   });
+});
+
+// Resolve live tokens for a deal/project workspace
+router.post('/tokens/resolve', async (req: any, res) => {
+  try {
+    const { dealId, projectId } = req.body;
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+
+    const orgId = req.user?.orgId;
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+
+    // Split into live (resolved) vs manual (null)
+    const live: Record<string, any> = {};
+    const manual: string[] = [];
+    for (const [key, value] of Object.entries(resolved)) {
+      if (value !== null && value !== undefined) {
+        live[key] = value;
+      } else {
+        manual.push(key);
+      }
+    }
+
+    res.json({
+      resolved: live,
+      unresolvedCount: manual.length,
+      unresolved: manual,
+      totalTokens: Object.keys(resolved).length,
+    });
+  } catch (error: any) {
+    console.error('[Document Builder] Token resolve error:', error);
+    res.status(500).json({ error: 'Failed to resolve tokens' });
+  }
+});
+
+// Create a document from a professional template with auto-resolved tokens
+router.post('/documents/from-template', async (req: any, res) => {
+  try {
+    const { templateId, dealId, projectId, title, manualTokens } = req.body;
+    if (!templateId || !dealId) {
+      return res.status(400).json({ error: 'templateId and dealId are required' });
+    }
+
+    const template = getTemplateById(templateId);
+    if (!template) return res.status(404).json({ error: 'Template not found' });
+
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+
+    // Resolve live tokens
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+
+    // Merge manual overrides
+    if (manualTokens && typeof manualTokens === 'object') {
+      Object.assign(resolved, manualTokens);
+    }
+
+    // Create the document
+    const [doc] = await db.insert(omBuilderDocuments).values({
+      dealId,
+      documentType: template.documentType,
+      title: title || template.name,
+      audience: template.audience?.[0] || null,
+      assetClass: template.assetClass,
+      templateId: template.id,
+      status: 'draft',
+      config: {
+        sections: template.sections.map((s: any) => s.key),
+        settings: { templateId: template.id, style: template.style },
+      },
+      metadata: {
+        propertyName: resolved.PROPERTY_NAME as string || '',
+        propertyAddress: resolved.PROPERTY_ADDRESS as string || '',
+        version: 1,
+      },
+      workingSnapshot: { resolvedTokens: resolved },
+      completionStatus: {
+        totalSections: template.sections.length,
+        completedSections: 0,
+        percentage: 0,
+        readyToExport: false,
+      },
+      createdBy: userId,
+    }).returning();
+
+    // Create sections from template
+    for (const section of template.sections) {
+      // Interpolate token values into any text content
+      const content: any = {};
+      for (const block of (section.blocks || [])) {
+        if (block.config?.text) {
+          content[block.key] = { text: interpolateTokens(block.config.text, resolved) };
+        }
+        if (block.config?.token) {
+          content[block.key] = { value: resolved[block.config.token] ?? null };
+        }
+      }
+
+      await db.insert(omDocumentSections).values({
+        documentId: doc.id,
+        sectionKey: section.key,
+        order: section.order,
+        enabled: section.enabled,
+        customTitle: section.title,
+        dataBindings: (section.tokens || []).map((t: string) => ({
+          bindingKey: t,
+          source: 'workspace',
+          field: t,
+          resolvedValue: resolved[t] ?? null,
+        })),
+        content,
+        completionStatus: { percentage: 0, requiredFieldsFilled: 0, totalRequiredFields: (section.tokens || []).length },
+      });
+    }
+
+    res.status(201).json({
+      document: doc,
+      templateUsed: template.id,
+      tokensResolved: Object.values(resolved).filter(v => v !== null).length,
+      tokensTotal: Object.keys(resolved).length,
+    });
+  } catch (error: any) {
+    console.error('[Document Builder] Template document creation error:', error);
+    res.status(500).json({ error: 'Failed to create document from template' });
+  }
 });
 
 // Seed professional templates into om_templates DB table

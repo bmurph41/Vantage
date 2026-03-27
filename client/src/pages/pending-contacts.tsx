@@ -289,10 +289,22 @@ export default function PendingContacts() {
                       <div className="flex items-center gap-2 mt-1.5">
                         <Badge variant="outline" className="text-[10px] h-5" data-testid={`text-contact-source-${pending.id}`}>
                           <FileText className="h-2.5 w-2.5 mr-1" />
-                          {pending.sourceType === 'dd_project' ? 'DD Project' : 
+                          {pending.sourceType === 'dd_project' ? 'DD Project' :
+                           pending.sourceType === 'deal_contact' ? 'Deal Contact' :
+                           pending.sourceType === 'deal_member' ? 'Deal Team' :
                            pending.sourceType === 'sales_comp' ? 'Sales Comp' :
                            pending.sourceType || 'Import'}
                         </Badge>
+                        {(pending.sourceMetadata as any)?.dealTitle && (
+                          <Badge variant="secondary" className="text-[10px] h-5">
+                            {(pending.sourceMetadata as any).dealTitle}
+                          </Badge>
+                        )}
+                        {(pending.sourceMetadata as any)?.contactType && (
+                          <Badge variant="outline" className="text-[10px] h-5 capitalize">
+                            {(pending.sourceMetadata as any).contactType.replace('_', ' ')}
+                          </Badge>
+                        )}
                         {hasDuplicates && (
                           <Badge variant="destructive" className="text-[10px] h-5 gap-0.5" data-testid={`badge-duplicates-${pending.id}`}>
                             <AlertTriangle className="h-2.5 w-2.5" />
