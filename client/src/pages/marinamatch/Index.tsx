@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2, Briefcase, MessageSquareWarning } from "lucide-react";
+import { Building2, Target, Users, TrendingUp, Rss, FileText, BarChart3, Radar, Goal, Settings2, Briefcase, MessageSquareWarning, Zap, Globe } from "lucide-react";
 import { DealSourcesTab } from "./DealSources";
 import { MandatesTab } from "./Mandates";
 import { DealTrackerTab } from "./DealTracker";
@@ -14,6 +14,8 @@ import { MarketIntelTab } from "./MarketIntel";
 import { InvestmentCriteriaTab } from "./InvestmentCriteria";
 import { GoalsDashboard } from "./GoalsDashboard";
 import { FeedbackAdminTab } from "./FeedbackAdmin";
+import MarketplaceListings from "./MarketplaceListings";
+import { WorkflowAutomation } from "./WorkflowAutomation";
 
 function ConsolidatedInvestmentCriteria() {
   const [subTab, setSubTab] = useState("mandates");
@@ -261,6 +263,10 @@ function DealManagement() {
             <Users className="h-4 w-4 mr-2" />
             Broker Network
           </TabsTrigger>
+          <TabsTrigger value="automation" className="data-[state=active]:bg-background" data-testid="subtab-automation">
+            <Zap className="h-4 w-4 mr-2" />
+            Automation
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="queue" className="mt-4">
@@ -273,6 +279,37 @@ function DealManagement() {
         
         <TabsContent value="brokers" className="mt-4">
           <BrokersTab />
+        </TabsContent>
+        <TabsContent value="automation" className="mt-4">
+          <WorkflowAutomation />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function ListingsSection({ onNavigateToBrokers }: { onNavigateToBrokers: () => void }) {
+  const [subTab, setSubTab] = useState("intel");
+  return (
+    <div className="space-y-4">
+      <Tabs value={subTab} onValueChange={setSubTab}>
+        <TabsList className="bg-muted/30 p-1">
+          <TabsTrigger value="intel" className="data-[state=active]:bg-background">
+            <Radar className="h-4 w-4 mr-2" />
+            Market Intel
+          </TabsTrigger>
+          <TabsTrigger value="marketplace" className="data-[state=active]:bg-background">
+            <Globe className="h-4 w-4 mr-2" />
+            Live Marketplace
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="intel" className="mt-4">
+          <MarketIntelTab onNavigateToBrokers={onNavigateToBrokers} />
+        </TabsContent>
+        <TabsContent value="marketplace" className="mt-0">
+          <div className="h-[calc(100vh-220px)]">
+            <MarketplaceListings />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -360,7 +397,7 @@ export default function MarinaMatchIndex() {
           </TabsList>
 
           <TabsContent value="listings">
-            <MarketIntelTab onNavigateToBrokers={() => handleTabChange("deals")} />
+            <ListingsSection onNavigateToBrokers={() => handleTabChange("deals")} />
           </TabsContent>
 
           <TabsContent value="criteria">

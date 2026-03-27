@@ -96,7 +96,10 @@
       "Bash(curl -s \"https://$REPLIT_CONNECTORS_HOSTNAME/api/v2/connection?include_secrets=true&connector_names=sendgrid\" -H 'Accept: application/json' -H 'X_REPLIT_TOKEN: repl $REPL_IDENTITY')",
       "Bash(curl:*)",
       "Bash(find /home/runner/workspace/client/src -type f -name *useMediaQuery* -o -name *useIsMobile* -o -name *responsive*)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(echo \"STATUS:$?\")",
+      "Bash(jobs -l)",
+      "Bash(npm list:*)"
     ]
   }
 }

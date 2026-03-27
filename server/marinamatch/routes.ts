@@ -3,6 +3,8 @@ import { db } from "../db";
 import { eq, and, desc, asc, sql, gte, lte, like, or, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import intelRouter from "./intel-routes";
+import { WorkflowEngine } from './workflow-engine';
+import workflowRouter from './workflow-routes';
 import {
   dealSources,
   investmentMandates,
@@ -1300,6 +1302,7 @@ router.post("/sourced-deals", requireProspecting, async (req: Request, res: Resp
       .where(eq(sourcedDeals.id, deal.id))
       .returning();
 
+    WorkflowEngine.fire('deal_added', orgId, { deal: updatedDeal }).catch(() => {});
     res.status(201).json(updatedDeal);
   } catch (error: any) {
     console.error("Error creating sourced deal:", error);
@@ -1320,6 +1323,9 @@ router.patch("/sourced-deals/:id", requireProspecting, async (req: Request, res:
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Sourced deal not found" });
+    if (req.body.status) {
+      WorkflowEngine.fire('deal_stage_changed', orgId, { deal: updated, toStage: updated.status }).catch(() => {});
+    }
     res.json(updated);
   } catch (error: any) {
     console.error("Error updating sourced deal:", error);
@@ -1392,6 +1398,7 @@ router.post("/sourced-deals/:id/convert", requireProspecting, async (req: Reques
       message: "Deal marked for conversion. Create CRM deal to complete.",
       sourcedDeal: updated 
     });
+    WorkflowEngine.fire('deal_converted', orgId, { deal: updated }).catch(() => {});
   } catch (error: any) {
     console.error("Error converting sourced deal:", error);
     res.status(400).json({ error: error.message || "Failed to convert sourced deal" });
@@ -1678,5 +1685,6 @@ async function updateBrokerStats(brokerId: string, orgId: string): Promise<void>
 }
 
 router.use("/intel", intelRouter);
+router.use("/workflow", workflowRouter);
 
 export default router;
