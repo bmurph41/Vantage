@@ -3870,4 +3870,109 @@ router.get("/analytics/retail/cam-reconciliation", async (req: Request, res: Res
   } catch (error) { next(error); }
 });
 
+// =============================================================================
+// Rent Roll Projects CRUD (/api/rent-roll/projects)
+// =============================================================================
+
+router.get("/projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { rows } = await db.execute(
+      `SELECT * FROM rent_roll_projects WHERE org_id = '${orgId}' ORDER BY created_at DESC`
+    );
+    // Map snake_case to camelCase
+    const projects = rows.map((r: any) => ({
+      id: r.id, orgId: r.org_id, name: r.name, code: r.code,
+      description: r.description, status: r.status, projectType: r.project_type,
+      seasonType: r.season_type, capacity: r.capacity, isActive: r.is_active,
+      targetNOI: r.target_noi, includeInExecutive: r.include_in_executive,
+      seasonStartDate: r.season_start_date, seasonEndDate: r.season_end_date,
+      winterStartDate: r.winter_start_date, winterEndDate: r.winter_end_date,
+      budgetedRevenue: r.budgeted_revenue, budgetedOccupancy: r.budgeted_occupancy,
+      budgetedExpenses: r.budgeted_expenses, budgetYear: r.budget_year,
+      storageMix: r.storage_mix, baseRent1Label: r.base_rent1_label,
+      baseRent2Label: r.base_rent2_label, baseRent3Label: r.base_rent3_label,
+      charge1Label: r.charge1_label, charge2Label: r.charge2_label,
+      charge3Label: r.charge3_label, createdAt: r.created_at, updatedAt: r.updated_at,
+    }));
+    res.json(projects);
+  } catch (error) { next(error); }
+});
+
+router.post("/projects", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const userId = getValidatedUserId(req as AuthenticatedRequest);
+    const d = req.body;
+    const { rows } = await db.execute(
+      `INSERT INTO rent_roll_projects (org_id, name, code, description, status, project_type, season_type,
+        capacity, is_active, target_noi, include_in_executive, season_start_date, season_end_date,
+        winter_start_date, winter_end_date, budgeted_revenue, budgeted_occupancy, budgeted_expenses,
+        budget_year, storage_mix, base_rent1_label, base_rent2_label, base_rent3_label,
+        charge1_label, charge2_label, charge3_label, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23,$24,$25,$26,$27)
+      RETURNING *`,
+      [orgId, d.name, d.code || null, d.description || null, d.status || 'active',
+       d.projectType || 'OWNED', d.seasonType || 'year_round', d.capacity || null,
+       d.isActive !== false, d.targetNOI || null, d.includeInExecutive || false,
+       d.seasonStartDate || null, d.seasonEndDate || null, d.winterStartDate || null,
+       d.winterEndDate || null, d.budgetedRevenue || null, d.budgetedOccupancy || null,
+       d.budgetedExpenses || null, d.budgetYear || null,
+       JSON.stringify(d.storageMix || []),
+       d.baseRent1Label || 'Base Rent', d.baseRent2Label || null, d.baseRent3Label || null,
+       d.charge1Label || null, d.charge2Label || null, d.charge3Label || null, userId]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) { next(error); }
+});
+
+router.patch("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const d = req.body;
+    const sets: string[] = [];
+    const vals: any[] = [];
+    let i = 1;
+
+    const fields: Record<string, string> = {
+      name: 'name', code: 'code', description: 'description', status: 'status',
+      projectType: 'project_type', seasonType: 'season_type', capacity: 'capacity',
+      isActive: 'is_active', targetNOI: 'target_noi', includeInExecutive: 'include_in_executive',
+      seasonStartDate: 'season_start_date', seasonEndDate: 'season_end_date',
+      winterStartDate: 'winter_start_date', winterEndDate: 'winter_end_date',
+      budgetedRevenue: 'budgeted_revenue', budgetedOccupancy: 'budgeted_occupancy',
+      budgetedExpenses: 'budgeted_expenses', budgetYear: 'budget_year',
+      baseRent1Label: 'base_rent1_label', baseRent2Label: 'base_rent2_label',
+      baseRent3Label: 'base_rent3_label', charge1Label: 'charge1_label',
+      charge2Label: 'charge2_label', charge3Label: 'charge3_label',
+    };
+
+    for (const [key, col] of Object.entries(fields)) {
+      if (d[key] !== undefined) { sets.push(`${col} = $${i}`); vals.push(d[key]); i++; }
+    }
+    if (d.storageMix !== undefined) { sets.push(`storage_mix = $${i}::jsonb`); vals.push(JSON.stringify(d.storageMix)); i++; }
+    sets.push(`updated_at = NOW()`);
+
+    vals.push(req.params.id, orgId);
+    const { rows } = await db.execute(
+      `UPDATE rent_roll_projects SET ${sets.join(', ')} WHERE id = $${i} AND org_id = $${i + 1} RETURNING *`,
+      vals
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+    res.json(rows[0]);
+  } catch (error) { next(error); }
+});
+
+router.delete("/projects/:id", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getValidatedOrgId(req as AuthenticatedRequest);
+    const { rowCount } = await db.execute(
+      `DELETE FROM rent_roll_projects WHERE id = $1 AND org_id = $2`,
+      [req.params.id, orgId]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Project not found' });
+    res.json({ success: true });
+  } catch (error) { next(error); }
+});
+
 export default router;
