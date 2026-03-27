@@ -422,7 +422,24 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
   const [sellersArray, setSellersArray] = useState<string[]>([]);
   const [attorneysArray, setAttorneysArray] = useState<string[]>([]);
   const [leases, setLeases] = useState<any[]>([]);
-  const [dealContactEntries, setDealContactEntries] = useState<DealContactEntry[]>([]);
+  const [dealContactEntries, setDealContactEntries] = useState<DealContactEntry[]>(() => {
+    // Auto-scaffold default contact roles for new deals
+    if (!deal) {
+      const makeEntry = (type: DealContactEntry['contactType'], team: DealContactEntry['teamType']): DealContactEntry => ({
+        id: `dc-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        firstName: '', lastName: '', company: '', titleRole: '', phone: '', email: '',
+        contactType: type, teamType: team,
+      });
+      return [
+        makeEntry('seller', 'seller_team'),
+        makeEntry('buyer', 'buyer_team'),
+        makeEntry('seller_counsel', 'seller_team'),
+        makeEntry('buyer_counsel', 'buyer_team'),
+        makeEntry('title_company', 'mutual'),
+      ];
+    }
+    return [];
+  });
   const [depositEntries, setDepositEntries] = useState<DepositEntry[]>([]);
   const [ddPeriodMode, setDdPeriodMode] = useState<"auto" | "custom">("auto");
   const [linkedToModel, setLinkedToModel] = useState(false);
