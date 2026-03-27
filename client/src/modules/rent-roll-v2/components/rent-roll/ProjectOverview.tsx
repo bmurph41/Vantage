@@ -1298,7 +1298,7 @@ export default function ProjectOverview({ locationId, periodFilter }: ProjectOve
                                     </TableCell>
                                     <TableCell className="tabular-nums text-sm">
                                       {lease.eventDate 
-                                        ? format(new Date(lease.eventDate + "T12:00:00"), "MMM d, yyyy")
+                                        ? format(new Date(lease.eventDate + "T12:00:00"), "MM/dd/yyyy")
                                         : "—"}
                                     </TableCell>
                                   </TableRow>

@@ -626,7 +626,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                       <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Created</div>
                       <div className="font-medium flex items-center gap-2 px-3 py-2">
                         <Calendar className="w-4 h-4" />
-                        {format(new Date(lead.createdAt), 'MMM d, yyyy')}
+                        {format(new Date(lead.createdAt), 'MM/dd/yyyy')}
                       </div>
                     </div>
                     {lead.lastActivityDate && (
@@ -634,7 +634,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                         <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Last Activity</div>
                         <div className="font-medium flex items-center gap-2 px-3 py-2">
                           <Clock className="w-4 h-4" />
-                          {format(new Date(lead.lastActivityDate), 'MMM d, yyyy')}
+                          {format(new Date(lead.lastActivityDate), 'MM/dd/yyyy')}
                         </div>
                       </div>
                     )}
@@ -735,7 +735,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                             <div className="font-medium capitalize">{activity.type.replace('_', ' ')}</div>
                             <div className="text-sm text-gray-600 dark:text-gray-400">{activity.description}</div>
                             <div className="text-xs text-gray-500 mt-1">
-                              {format(new Date(activity.createdAt), 'MMM d, yyyy h:mm a')}
+                              {format(new Date(activity.createdAt), 'MM/dd/yyyy h:mm a')}
                             </div>
                           </div>
                         </div>

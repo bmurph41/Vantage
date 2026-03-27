@@ -282,7 +282,7 @@ export default function BookkeepingSyncHistory() {
             </div>
             <p className="text-xs text-muted-foreground">
               {lastSyncTime
-                ? format(new Date(lastSyncTime), "MMM d, yyyy h:mm a")
+                ? format(new Date(lastSyncTime), "MM/dd/yyyy h:mm a")
                 : "No syncs recorded"}
             </p>
           </CardContent>
@@ -333,7 +333,7 @@ export default function BookkeepingSyncHistory() {
                 {syncEvents.map((event) => (
                   <TableRow key={event.id}>
                     <TableCell className="font-medium">
-                      {format(new Date(event.date), "MMM d, yyyy")}
+                      {format(new Date(event.date), "MM/dd/yyyy")}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

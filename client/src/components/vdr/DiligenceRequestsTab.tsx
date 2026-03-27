@@ -338,7 +338,7 @@ export function DiligenceRequestsTab({ projectId }: DiligenceRequestsTabProps) {
                     {request.dueDate && (
                       <div className="flex items-center gap-1.5">
                         <Calendar className="h-3 w-3" />
-                        <span>Due {format(new Date(request.dueDate), 'MMM d, yyyy')}</span>
+                        <span>Due {format(new Date(request.dueDate), 'MM/dd/yyyy')}</span>
                       </div>
                     )}
                   </div>

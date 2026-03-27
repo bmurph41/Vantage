@@ -422,7 +422,7 @@ export function TaskFiles({ taskId, taskTitle, compact = false, readOnly = false
                       <div className="flex items-center">
                         <Clock className="h-3 w-3 mr-1" />
                         <span data-testid={`text-uploaded-${file.id}`}>
-                          {format(new Date(file.createdAt), 'MMM d, yyyy')}
+                          {format(new Date(file.createdAt), 'MM/dd/yyyy')}
                         </span>
                       </div>
                     </div>

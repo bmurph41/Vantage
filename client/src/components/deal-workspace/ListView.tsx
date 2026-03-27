@@ -314,7 +314,7 @@ export default function ListView({ searchQuery, onEditDeal }: ListViewProps) {
                     {deal.expectedCloseDate && (
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
-                        <span>{format(new Date(deal.expectedCloseDate), 'MMM d, yyyy')}</span>
+                        <span>{format(new Date(deal.expectedCloseDate), 'MM/dd/yyyy')}</span>
                       </div>
                     )}
                   </td>

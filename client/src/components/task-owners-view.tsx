@@ -428,7 +428,7 @@ export function TaskOwnersView({ tasks, projectId }: TaskOwnersViewProps) {
                             )}
                             {task.deadline && (
                               <Badge variant="outline">
-                                Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
+                                Due: {format(parseISO(task.deadline), 'MM/dd/yyyy')}
                               </Badge>
                             )}
                             {task.ddCategory && (
@@ -506,7 +506,7 @@ export function TaskOwnersView({ tasks, projectId }: TaskOwnersViewProps) {
                             )}
                             {task.deadline && (
                               <Badge variant="outline">
-                                Due: {format(parseISO(task.deadline), 'MMM d, yyyy')}
+                                Due: {format(parseISO(task.deadline), 'MM/dd/yyyy')}
                               </Badge>
                             )}
                             {task.ddCategory && (

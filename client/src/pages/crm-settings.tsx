@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { PipelineStage } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,58 +113,188 @@ function CustomFieldsTab() {
   );
 }
 
-// Pipeline Stages Configuration
-function PipelineStagesTab() {
-  const defaultStages = [
-    { name: "Prospecting", probability: 10, color: "#94a3b8" },
-    { name: "Qualification", probability: 25, color: "#60a5fa" },
-    { name: "NDA/CA", probability: 40, color: "#a78bfa" },
-    { name: "Due Diligence", probability: 60, color: "#f59e0b" },
-    { name: "LOI", probability: 75, color: "#fb923c" },
-    { name: "Under Contract", probability: 90, color: "#34d399" },
-    { name: "Closing", probability: 95, color: "#10b981" },
-  ];
+// Pipeline Stages Configuration — live DB-connected
+const STAGE_COLORS = [
+  '#94a3b8', '#60a5fa', '#a78bfa', '#f59e0b', '#fb923c',
+  '#34d399', '#10b981', '#f87171', '#e879f9', '#6b7280',
+];
 
-  const [stages, setStages] = useState(defaultStages);
+function PipelineStagesTab() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: stages = [], isLoading } = useQuery<PipelineStage[]>({
+    queryKey: ['/api/pipeline-stages'],
+  });
+
+  // Local edit state mirrors DB stages so edits are instant
+  const [editStages, setEditStages] = useState<PipelineStage[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    if (stages.length > 0) {
+      setEditStages([...stages].sort((a, b) => (a.stageOrder ?? 0) - (b.stageOrder ?? 0)));
+      setHasChanges(false);
+    }
+  }, [stages]);
+
+  // Fetch default pipeline for new stages
+  const { data: pipelines = [] } = useQuery<any[]>({
+    queryKey: ['/api/crm/pipelines'],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (stage: { name: string; color: string; probability: number; stageOrder: number }) => {
+      let pipelineId = pipelines[0]?.id;
+      if (!pipelineId) {
+        // Auto-create default pipeline if none exists
+        const pRes = await apiRequest('POST', '/api/crm/pipelines', {
+          name: 'Default Pipeline',
+          description: 'Main deal pipeline',
+          pipelineType: 'sales',
+        });
+        const newPipeline = await pRes.json();
+        pipelineId = newPipeline.id;
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/pipelines'] });
+      }
+      const res = await apiRequest('POST', '/api/crm/pipeline-stages', { ...stage, pipelineId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
+      toast({ title: 'Stage created' });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (stage: { id: string; name: string; color: string; probability: number; stageOrder: number }) => {
+      const res = await apiRequest('PUT', `/api/crm/pipeline-stages/${stage.id}`, stage);
+      return res.json();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/crm/pipeline-stages/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
+      toast({ title: 'Stage deleted' });
+    },
+  });
+
+  const handleAddStage = () => {
+    const maxOrder = editStages.reduce((max, s) => Math.max(max, s.stageOrder ?? 0), 0);
+    createMutation.mutate({
+      name: 'New Stage',
+      color: STAGE_COLORS[editStages.length % STAGE_COLORS.length],
+      probability: 50,
+      stageOrder: maxOrder + 1,
+    });
+  };
+
+  const handleDelete = (stage: PipelineStage) => {
+    setEditStages(prev => prev.filter(s => s.id !== stage.id));
+    deleteMutation.mutate(stage.id);
+  };
+
+  const handleFieldChange = (index: number, field: string, value: any) => {
+    setEditStages(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value } as PipelineStage;
+      return updated;
+    });
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      await Promise.all(
+        editStages.map((s, i) =>
+          updateMutation.mutateAsync({
+            id: s.id,
+            name: s.name,
+            color: s.color || '#6b7280',
+            probability: s.probability ?? 50,
+            stageOrder: i + 1,
+          })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ['/api/pipeline-stages'] });
+      setHasChanges(false);
+      toast({ title: 'Pipeline stages saved' });
+    } catch {
+      toast({ title: 'Failed to save stages', variant: 'destructive' });
+    }
+  };
+
+  if (isLoading) {
+    return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}</div>;
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium">Pipeline Stages</h3>
-          <p className="text-sm text-muted-foreground">Configure deal stages and default win probabilities</p>
+          <p className="text-sm text-muted-foreground">Configure deal stages and default win probabilities. Changes here apply to all deals.</p>
         </div>
-        <Button size="sm" onClick={() => setStages([...stages, { name: "New Stage", probability: 50, color: "#6b7280" }])}>
+        <Button size="sm" onClick={handleAddStage} disabled={createMutation.isPending}>
           <Plus className="h-4 w-4 mr-1" /> Add Stage
         </Button>
       </div>
 
       <div className="border rounded-lg divide-y">
-        {stages.map((stage, i) => (
-          <div key={i} className="flex items-center gap-4 px-4 py-3">
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
-            <Input value={stage.name} className="flex-1 h-8" onChange={e => {
-              const updated = [...stages];
-              updated[i] = {...stage, name: e.target.value};
-              setStages(updated);
-            }} />
-            <div className="flex items-center gap-1 text-sm">
-              <Input type="number" value={stage.probability} className="w-16 h-8 text-center" min={0} max={100}
-                onChange={e => {
-                  const updated = [...stages];
-                  updated[i] = {...stage, probability: parseInt(e.target.value) || 0};
-                  setStages(updated);
-                }} />
+        {editStages.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground">
+            No stages configured yet. Click "Add Stage" to create your first pipeline stage.
+          </div>
+        )}
+        {editStages.map((stage, i) => (
+          <div key={stage.id} className="flex items-center gap-3 px-4 py-3">
+            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0" />
+            <input
+              type="color"
+              value={stage.color || '#6b7280'}
+              onChange={(e) => handleFieldChange(i, 'color', e.target.value)}
+              className="w-6 h-6 rounded border-0 cursor-pointer flex-shrink-0 p-0"
+              title="Stage color"
+            />
+            <Input
+              value={stage.name}
+              className="flex-1 h-8"
+              onChange={(e) => handleFieldChange(i, 'name', e.target.value)}
+              placeholder="Stage name"
+            />
+            <div className="flex items-center gap-1 text-sm flex-shrink-0">
+              <Input
+                type="number"
+                value={stage.probability ?? 0}
+                className="w-16 h-8 text-center"
+                min={0}
+                max={100}
+                onChange={(e) => handleFieldChange(i, 'probability', parseInt(e.target.value) || 0)}
+              />
               <span className="text-muted-foreground">%</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setStages(stages.filter((_, j) => j !== i))}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(stage)}
+              disabled={deleteMutation.isPending}
+              className="flex-shrink-0"
+            >
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
         ))}
       </div>
-      <Button className="w-full" variant="outline">Save Stage Configuration</Button>
+
+      {hasChanges && (
+        <Button className="w-full" onClick={handleSave} disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? 'Saving...' : 'Save Stage Configuration'}
+        </Button>
+      )}
     </div>
   );
 }

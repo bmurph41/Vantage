@@ -316,14 +316,14 @@ export function ExternalUsersTab({ projectId }: ExternalUsersTabProps) {
                       {user.invitedAt && (
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-3 w-3" />
-                          <span>Invited {format(new Date(user.invitedAt), 'MMM d, yyyy')}</span>
+                          <span>Invited {format(new Date(user.invitedAt), 'MM/dd/yyyy')}</span>
                         </div>
                       )}
                       {user.access.expiresAt && (
                         <div className={`flex items-center gap-1.5 ${isAccessExpiringSoon(user.access.expiresAt) ? 'text-orange-600 dark:text-orange-400 font-medium' : ''}`}>
                           <Clock className="h-3 w-3" />
                           <span>
-                            Expires {format(new Date(user.access.expiresAt), 'MMM d, yyyy')}
+                            Expires {format(new Date(user.access.expiresAt), 'MM/dd/yyyy')}
                             {isAccessExpiringSoon(user.access.expiresAt) && ' (Soon)'}
                           </span>
                         </div>

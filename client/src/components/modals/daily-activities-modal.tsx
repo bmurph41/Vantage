@@ -99,7 +99,7 @@ function ActivityCard({ activity }: { activity: CRMActivity }) {
               {activity.scheduledAt && (
                 <span className="flex items-center gap-1" data-testid={`text-scheduled-${activity.id}`}>
                   <Clock className="h-3 w-3" />
-                  {format(new Date(activity.scheduledAt), "MMM d, yyyy h:mm a")}
+                  {format(new Date(activity.scheduledAt), "MM/dd/yyyy h:mm a")}
                 </span>
               )}
               {activity.direction && (

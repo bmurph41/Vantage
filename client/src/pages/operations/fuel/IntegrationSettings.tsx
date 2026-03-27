@@ -567,7 +567,7 @@ export default function IntegrationSettings() {
                       {importLogs.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell>
-                            {format(new Date(log.startedAt), "MMM d, yyyy h:mm a")}
+                            {format(new Date(log.startedAt), "MM/dd/yyyy h:mm a")}
                           </TableCell>
                           <TableCell>{log.source}</TableCell>
                           <TableCell>

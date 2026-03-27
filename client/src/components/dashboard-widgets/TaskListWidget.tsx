@@ -120,7 +120,7 @@ export default function TaskListWidget() {
                     </p>
                     {task.dueDate && (
                       <p className="text-xs text-gray-500">
-                        Due: {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                        Due: {format(new Date(task.dueDate), 'MM/dd/yyyy')}
                       </p>
                     )}
                   </div>

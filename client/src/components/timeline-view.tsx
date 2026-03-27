@@ -1141,7 +1141,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                               <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
                               Project Start
                             </div>
-                            <div className="text-xs text-gray-600 font-medium">{format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MMM d, yyyy')}</div>
+                            <div className="text-xs text-gray-600 font-medium">{format(project.psaSignedDate ? parseISO(project.psaSignedDate) : new Date(project.createdAt), 'MM/dd/yyyy')}</div>
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-orange-50/95 border-t-2 border-l-2 border-orange-200/80 rotate-45"></div>
                           </div>
                         </div>
@@ -1170,7 +1170,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                               }`}></div>
                               {isCompleted ? 'Completed' : 'Closing Date'}
                             </div>
-                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                            <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MM/dd/yyyy')}</div>
                             <div className={`absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 border-t-2 border-l-2 rotate-45 ${
                               isCompleted 
                                 ? 'bg-gradient-to-br from-white to-green-50/95 border-green-200/80' 
@@ -1192,7 +1192,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                                 <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                                 PSA Signed
                               </div>
-                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.psaSignedDate), 'MMM d, yyyy')}</div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.psaSignedDate), 'MM/dd/yyyy')}</div>
                               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-blue-50/95 border-t-2 border-l-2 border-blue-200/80 rotate-45"></div>
                             </div>
                           </div>
@@ -1209,7 +1209,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                                 <div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
                                 DD Expiration
                               </div>
-                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.ddExpirationDate), 'MMM d, yyyy')}</div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.ddExpirationDate), 'MM/dd/yyyy')}</div>
                               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-amber-50/95 border-t-2 border-l-2 border-amber-200/80 rotate-45"></div>
                             </div>
                           </div>
@@ -1226,7 +1226,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                                 Closing
                               </div>
-                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MMM d, yyyy')}</div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(project.closingDate), 'MM/dd/yyyy')}</div>
                               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-green-50/95 border-t-2 border-l-2 border-green-200/80 rotate-45"></div>
                             </div>
                           </div>
@@ -1248,7 +1248,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                                 <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                                 {deadline.label}
                               </div>
-                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(deadline.date), 'MMM d, yyyy')}</div>
+                              <div className="text-xs text-gray-600 font-medium">{format(parseISO(deadline.date), 'MM/dd/yyyy')}</div>
                               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-gradient-to-br from-white to-purple-50/95 border-t-2 border-l-2 border-purple-200/80 rotate-45"></div>
                             </div>
                           </div>
@@ -1270,7 +1270,7 @@ export function TimelineView({ tasks, project, settings, onTaskClick }: Timeline
                             }`} />
                             <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-xl px-4 py-3 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[100] w-48">
                               <div className="font-semibold text-gray-900 mb-1">{task.title}</div>
-                              <div className="text-gray-600 mb-1">Due: {format(parseISO(task.deadline!), 'MMM d, yyyy')}</div>
+                              <div className="text-gray-600 mb-1">Due: {format(parseISO(task.deadline!), 'MM/dd/yyyy')}</div>
                               <div className={`text-gray-600 flex items-center ${
                                 task.status === 'completed' ? 'text-green-600' :
                                 task.status === 'in_progress' ? 'text-blue-600' :

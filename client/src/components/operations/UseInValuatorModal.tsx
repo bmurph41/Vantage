@@ -297,8 +297,8 @@ export function UseInValuatorModal({
                   </li>
                   <li>
                     <span className="text-muted-foreground">Date Range:</span>{" "}
-                    {dateRange?.from && format(dateRange.from, "MMM d, yyyy")} -{" "}
-                    {dateRange?.to && format(dateRange.to, "MMM d, yyyy")}
+                    {dateRange?.from && format(dateRange.from, "MM/dd/yyyy")} -{" "}
+                    {dateRange?.to && format(dateRange.to, "MM/dd/yyyy")}
                   </li>
                   <li>
                     <span className="text-muted-foreground">Mode:</span>{" "}

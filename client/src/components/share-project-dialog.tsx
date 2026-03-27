@@ -264,16 +264,16 @@ export function ShareProjectDialog({ open, onOpenChange, project }: ShareProject
                       </div>
                       
                       <div className="text-sm text-muted-foreground">
-                        Created {format(new Date(share.createdAt), 'MMM d, yyyy')}
+                        Created {format(new Date(share.createdAt), 'MM/dd/yyyy')}
                         {share.expiresAt && (
                           <span className="flex items-center gap-1 mt-1">
                             <Clock className="h-3 w-3" />
-                            Expires {format(new Date(share.expiresAt), 'MMM d, yyyy')}
+                            Expires {format(new Date(share.expiresAt), 'MM/dd/yyyy')}
                           </span>
                         )}
                         {share.lastAccessedAt && (
                           <span className="text-xs">
-                            Last accessed {format(new Date(share.lastAccessedAt), 'MMM d, yyyy')}
+                            Last accessed {format(new Date(share.lastAccessedAt), 'MM/dd/yyyy')}
                           </span>
                         )}
                       </div>

@@ -1079,7 +1079,7 @@ export default function Pipeline() {
                           </td>
                           <td className="px-4 py-3">
                             {deal.expectedCloseDate
-                              ? <span className="text-sm text-gray-700">{format(new Date(deal.expectedCloseDate), "MMM d, yyyy")}</span>
+                              ? <span className="text-sm text-gray-700">{format(new Date(deal.expectedCloseDate), "MM/dd/yyyy")}</span>
                               : <span className="text-sm text-gray-400">—</span>
                             }
                           </td>

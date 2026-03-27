@@ -247,7 +247,7 @@ export function PhaseGatesPanel({ dealId, showPendingApprovals = false }: PhaseG
                         </span>
                         <span className="flex items-center">
                           <Calendar className="h-3 w-3 mr-1" />
-                          {format(new Date(item.approval.requestedAt), 'MMM d, yyyy')}
+                          {format(new Date(item.approval.requestedAt), 'MM/dd/yyyy')}
                         </span>
                         {item.deal?.value && (
                           <Badge variant="outline">{formatCurrency(item.deal.value)}</Badge>
@@ -385,7 +385,7 @@ export function PhaseGatesPanel({ dealId, showPendingApprovals = false }: PhaseG
                         Stage transition requested
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {format(new Date(approval.requestedAt), 'MMM d, yyyy h:mm a')}
+                        {format(new Date(approval.requestedAt), 'MM/dd/yyyy h:mm a')}
                       </div>
                     </div>
                   </div>

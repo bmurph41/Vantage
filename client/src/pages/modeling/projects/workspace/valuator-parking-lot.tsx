@@ -900,7 +900,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                   <TableBody>
                     {records.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>{format(new Date(record.txnDate), "MMM d, yyyy")}</TableCell>
+                        <TableCell>{format(new Date(record.txnDate), "MM/dd/yyyy")}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{rateTypeLabels[record.rateType] || record.rateType}</Badge>
                         </TableCell>

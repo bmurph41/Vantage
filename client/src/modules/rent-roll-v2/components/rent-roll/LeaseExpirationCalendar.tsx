@@ -349,7 +349,7 @@ export function LeaseExpirationCalendar({
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{format(parseISO(lease.expirationDate), 'MMM d, yyyy')}</p>
+                          <p className="font-medium">{format(parseISO(lease.expirationDate), 'MM/dd/yyyy')}</p>
                           <p className="text-xs text-muted-foreground">{lease.daysUntilExpiration} days</p>
                         </div>
                       </TableCell>

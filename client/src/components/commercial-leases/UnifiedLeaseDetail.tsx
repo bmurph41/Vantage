@@ -56,7 +56,7 @@ const fmt = (value: number | string | null | undefined) => {
 const fmtDate = (value: string | null | undefined) => {
   if (!value) return "-";
   try {
-    return format(parseISO(value), "MMM d, yyyy");
+    return format(parseISO(value), "MM/dd/yyyy");
   } catch {
     return value;
   }

@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { insertDealSchema, type Deal, type Contact, type Company, type PipelineStage } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { toStateAbbr } from "@/lib/state-utils";
 import { DealContactsBlock, type DealContactEntry } from "@/components/deals/deal-contacts-block";
 import { DepositScheduleBlock, type DepositEntry } from "@/components/deals/deposit-schedule-block";
 import { DealTimelineVisualizer } from "@/components/deals/deal-timeline-visualizer";
@@ -711,17 +712,22 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         firstDepositDays: parseNumber(data.firstDepositDays, parseInt),
         secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
         secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
+        // Include deal contacts and deposit schedule
+        dealContacts: dealContactEntries.length > 0 ? dealContactEntries : undefined,
+        depositSchedule: depositEntries.length > 0 ? depositEntries : undefined,
+        // Normalize state to 2-letter abbreviation
+        ddState: data.ddState ? toStateAbbr(data.ddState) : undefined,
       };
-      
+
       // Remove the 'name' field since we've mapped it to 'title'
       delete cleanData.name;
-      
+
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined || cleanData[key] === "none" || cleanData[key] === null) {
           delete cleanData[key];
         }
       });
-      
+
       return await apiRequest('POST', '/api/deals', cleanData);
     },
     onSuccess: () => {
@@ -813,11 +819,16 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         firstDepositDays: parseNumber(data.firstDepositDays, parseInt),
         secondDepositAmount: parseNumber(data.secondDepositAmount, parseFloat),
         secondDepositDays: parseNumber(data.secondDepositDays, parseInt),
+        // Include deal contacts and deposit schedule
+        dealContacts: dealContactEntries.length > 0 ? dealContactEntries : undefined,
+        depositSchedule: depositEntries.length > 0 ? depositEntries : undefined,
+        // Normalize state to 2-letter abbreviation
+        ddState: data.ddState ? toStateAbbr(data.ddState) : undefined,
       };
-      
+
       // Remove the 'name' field since we've mapped it to 'title'
       delete cleanData.name;
-      
+
       Object.keys(cleanData).forEach(key => {
         if (cleanData[key] === "" || cleanData[key] === undefined || cleanData[key] === "none" || cleanData[key] === null) {
           delete cleanData[key];
@@ -1366,7 +1377,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       name="expectedCloseDate"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Expected Close Date</FormLabel>
+                          <FormLabel>Target Close Date</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -1380,7 +1391,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                 >
                                   <CalendarClock className="mr-2 h-4 w-4" />
                                   {field.value ? (
-                                    format(field.value, "PPP")
+                                    format(field.value, "MM/dd/yyyy")
                                   ) : (
                                     <span>Pick a date</span>
                                   )}
@@ -1401,6 +1412,44 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         </FormItem>
                       )}
                     />
+
+                    {/* Structured Deal Contacts */}
+                    <div className="pt-4 border-t">
+                      <DealContactsBlock
+                        contacts={dealContactEntries}
+                        onChange={setDealContactEntries}
+                      />
+                    </div>
+
+                    {/* Title Insurance & Lender */}
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                      <FormField
+                        control={form.control}
+                        name="titleInsuranceCompany"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Title Insurance Company</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., First American Title" {...field} data-testid="input-title-insurance" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lender"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lender</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Bank of America" {...field} data-testid="input-lender" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1438,7 +1487,16 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                             <FormItem>
                               <FormLabel>State</FormLabel>
                               <FormControl>
-                                <Input placeholder="e.g., MA" {...field} data-testid="input-dd-state" />
+                                <Input
+                                  placeholder="e.g., MA"
+                                  {...field}
+                                  onBlur={(e) => {
+                                    field.onBlur();
+                                    const abbr = toStateAbbr(e.target.value);
+                                    if (abbr !== field.value) field.onChange(abbr);
+                                  }}
+                                  data-testid="input-dd-state"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -1766,41 +1824,6 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       />
                     </div>
 
-                    {/* Deal Contacts (structured) */}
-                    <div className="pt-4 border-t">
-                      <DealContactsBlock
-                        contacts={dealContactEntries}
-                        onChange={setDealContactEntries}
-                      />
-                      <div className="grid grid-cols-2 gap-4 mt-4">
-                        <FormField
-                          control={form.control}
-                          name="titleInsuranceCompany"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Title Insurance Company</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g., First American Title" {...field} data-testid="input-title-insurance" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="lender"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Lender</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g., Bank of America" {...field} data-testid="input-lender" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
                     {/* Deposit Schedule (automated) */}
                     <div className="pt-4 border-t">
                       <DepositScheduleBlock

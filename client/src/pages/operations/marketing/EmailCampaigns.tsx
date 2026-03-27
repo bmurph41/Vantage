@@ -592,7 +592,7 @@ export default function EmailCampaigns() {
                           </Badge>
                           {campaign.sentAt && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(campaign.sentAt), "MMM d, yyyy")}
+                              {format(new Date(campaign.sentAt), "MM/dd/yyyy")}
                             </p>
                           )}
                         </div>

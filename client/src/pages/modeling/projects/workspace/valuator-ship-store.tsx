@@ -387,7 +387,7 @@ export default function ValuatorShipStoreTab({ projectId, projectName }: Valuato
                   const margin = revenue - cogs;
                   return (
                     <TableRow key={sale.id}>
-                      <TableCell>{format(new Date(sale.txnDate), "MMM d, yyyy")}</TableCell>
+                      <TableCell>{format(new Date(sale.txnDate), "MM/dd/yyyy")}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {categoryLabels[sale.category] || sale.category}

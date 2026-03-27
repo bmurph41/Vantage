@@ -661,7 +661,7 @@ export default function IntegrationsPage() {
                         </TableCell>
                         <TableCell>
                           {key.expiresAt
-                            ? format(new Date(key.expiresAt), "MMM d, yyyy")
+                            ? format(new Date(key.expiresAt), "MM/dd/yyyy")
                             : "Never"}
                         </TableCell>
                         <TableCell>

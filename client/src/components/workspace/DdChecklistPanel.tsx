@@ -463,7 +463,7 @@ export default function DdChecklistPanel({ workspaceId }: Props) {
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="text-xs">
                                       {period.isReceived
-                                        ? `Received${period.receivedAt ? ` on ${format(new Date(period.receivedAt), 'MMM d, yyyy')}` : ''}`
+                                        ? `Received${period.receivedAt ? ` on ${format(new Date(period.receivedAt), 'MM/dd/yyyy')}` : ''}`
                                         : 'Not received — click to mark received'
                                       }
                                     </TooltipContent>

@@ -415,7 +415,7 @@ export function RenewalRemindersPanel({ locationId }: RenewalRemindersPanelProps
                           </div>
                         </TableCell>
                         <TableCell>
-                          {format(parseISO(reminder.reminderDate), 'MMM d, yyyy')}
+                          {format(parseISO(reminder.reminderDate), 'MM/dd/yyyy')}
                         </TableCell>
                         <TableCell>{reminder.daysBeforeExpiration} days</TableCell>
                         <TableCell>{getStatusBadge(reminder.status)}</TableCell>
@@ -470,7 +470,7 @@ export function RenewalRemindersPanel({ locationId }: RenewalRemindersPanelProps
                           </div>
                         </TableCell>
                         <TableCell>
-                          {reminder.sentAt ? format(parseISO(reminder.sentAt), 'MMM d, yyyy h:mm a') : '-'}
+                          {reminder.sentAt ? format(parseISO(reminder.sentAt), 'MM/dd/yyyy h:mm a') : '-'}
                         </TableCell>
                         <TableCell>{getStatusBadge(reminder.status)}</TableCell>
                         <TableCell className="text-right">
@@ -512,7 +512,7 @@ export function RenewalRemindersPanel({ locationId }: RenewalRemindersPanelProps
                         </div>
                       </TableCell>
                       <TableCell>
-                        {format(parseISO(reminder.reminderDate), 'MMM d, yyyy')}
+                        {format(parseISO(reminder.reminderDate), 'MM/dd/yyyy')}
                       </TableCell>
                       <TableCell>{reminder.daysBeforeExpiration} days</TableCell>
                       <TableCell>{getStatusBadge(reminder.status)}</TableCell>

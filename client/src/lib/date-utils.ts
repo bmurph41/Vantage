@@ -20,6 +20,35 @@ import {
 import { toZonedTime, format as formatTz } from 'date-fns-tz';
 
 /**
+ * Standard date display format: MM/DD/YYYY
+ * Use this for all user-facing date rendering.
+ */
+export function formatDisplayDate(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return format(d, 'MM/dd/yyyy');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Standard date+time display format: MM/DD/YYYY h:mm a
+ */
+export function formatDisplayDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(d)) return '';
+    return format(d, 'MM/dd/yyyy h:mm a');
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Parse date string supporting both ISO format (YYYY-MM-DD) and M/DD/YYYY format
  */
 export function parseDate(dateString: string): Date {

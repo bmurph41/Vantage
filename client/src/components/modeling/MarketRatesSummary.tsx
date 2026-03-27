@@ -127,7 +127,7 @@ export function MarketRatesSummary({ compact = false, className }: MarketRatesSu
             <CardDescription>
               Live rates from FRED
               {latestDataDate && (
-                <span className="ml-1">({format(latestDataDate, "MMM d, yyyy")})</span>
+                <span className="ml-1">({format(latestDataDate, "MM/dd/yyyy")})</span>
               )}
             </CardDescription>
           </div>

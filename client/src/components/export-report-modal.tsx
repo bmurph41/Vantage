@@ -217,7 +217,7 @@ const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForE
         {/* Header */}
         <Text style={styles.header}>Due Diligence Report</Text>
         <Text style={styles.projectInfo}>
-          {project?.name || 'Project'} • Generated {format(tzNow('America/New_York'), 'MMM d, yyyy')}
+          {project?.name || 'Project'} • Generated {format(tzNow('America/New_York'), 'MM/dd/yyyy')}
         </Text>
         
         {/* Summary Section */}
@@ -261,7 +261,7 @@ const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForE
                   </Text>
                   {task.deadline && (
                     <Text style={styles.taskDetailItem}>
-                      Deadline: {format(typeof task.deadline === 'string' ? parseISO(task.deadline) : task.deadline, 'MMM d, yyyy')}
+                      Deadline: {format(typeof task.deadline === 'string' ? parseISO(task.deadline) : task.deadline, 'MM/dd/yyyy')}
                     </Text>
                   )}
                   {task.cost && (
@@ -298,7 +298,7 @@ const PDFReport = ({ filteredTasks, visibleColumns, project, formatCellValueForE
                   </Text>
                   {task.completedAt && (
                     <Text style={styles.taskDetailItem}>
-                      Completed: {format(typeof task.completedAt === 'string' ? parseISO(task.completedAt) : task.completedAt, 'MMM d, yyyy')}
+                      Completed: {format(typeof task.completedAt === 'string' ? parseISO(task.completedAt) : task.completedAt, 'MM/dd/yyyy')}
                     </Text>
                   )}
                   {task.cost && (
@@ -487,7 +487,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
       case 'deadline':
         try {
           const deadlineDate = calculateDeadlineDate(task);
-          return isValid(deadlineDate) ? format(deadlineDate, 'MMM d, yyyy') : '-';
+          return isValid(deadlineDate) ? format(deadlineDate, 'MM/dd/yyyy') : '-';
         } catch {
           return '-';
         }
@@ -495,7 +495,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.orderedAt ? (() => {
           try {
             const date = new Date(task.orderedAt!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }
@@ -504,7 +504,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.dateOnSite ? (() => {
           try {
             const date = new Date(task.dateOnSite!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }
@@ -513,7 +513,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.completedAt ? (() => {
           try {
             const date = new Date(task.completedAt!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }
@@ -560,7 +560,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
       case 'deadline':
         try {
           const deadlineDate = calculateDeadlineDate(task);
-          return isValid(deadlineDate) ? format(deadlineDate, 'MMM d, yyyy') : '-';
+          return isValid(deadlineDate) ? format(deadlineDate, 'MM/dd/yyyy') : '-';
         } catch {
           return '-';
         }
@@ -568,7 +568,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.orderedAt ? (() => {
           try {
             const date = new Date(task.orderedAt!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }
@@ -577,7 +577,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.dateOnSite ? (() => {
           try {
             const date = new Date(task.dateOnSite!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }
@@ -586,7 +586,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         return task.completedAt ? (() => {
           try {
             const date = new Date(task.completedAt!);
-            return isValid(date) ? format(date, 'MMM d, yyyy') : '-';
+            return isValid(date) ? format(date, 'MM/dd/yyyy') : '-';
           } catch {
             return '-';
           }

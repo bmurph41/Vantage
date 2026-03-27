@@ -680,7 +680,7 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         <span>
-                          {format(new Date(event.startDate), 'MMM d, yyyy h:mm a')}
+                          {format(new Date(event.startDate), 'MM/dd/yyyy h:mm a')}
                           {event.isAllDay && ' (All Day)'}
                         </span>
                       </div>

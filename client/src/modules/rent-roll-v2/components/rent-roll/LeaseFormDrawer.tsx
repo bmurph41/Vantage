@@ -1730,9 +1730,9 @@ export default function LeaseFormDrawer({ open, onClose, leaseId, locationId, lo
                                       )}
                                       {(item.startDate || item.endDate) && (
                                         <div className="text-xs text-muted-foreground">
-                                          {item.startDate && format(new Date(item.startDate), "MMM d, yyyy")}
+                                          {item.startDate && format(new Date(item.startDate), "MM/dd/yyyy")}
                                           {item.startDate && item.endDate && " - "}
-                                          {item.endDate && format(new Date(item.endDate), "MMM d, yyyy")}
+                                          {item.endDate && format(new Date(item.endDate), "MM/dd/yyyy")}
                                         </div>
                                       )}
                                     </div>

@@ -390,7 +390,7 @@ export function DealPlaybookPanel({
                             {item.progress.dueDate && (
                               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3" />
-                                Due: {format(new Date(item.progress.dueDate), "MMM d, yyyy")}
+                                Due: {format(new Date(item.progress.dueDate), "MM/dd/yyyy")}
                                 {isOverdue && (
                                   <Badge variant="destructive" className="text-xs ml-1">
                                     Overdue
@@ -400,7 +400,7 @@ export function DealPlaybookPanel({
                             )}
                             {item.progress.completedAt && (
                               <div className="text-xs text-green-600 mt-1">
-                                Completed {format(new Date(item.progress.completedAt), "MMM d, yyyy")}
+                                Completed {format(new Date(item.progress.completedAt), "MM/dd/yyyy")}
                               </div>
                             )}
                             {item.progress.skippedReason && (

@@ -148,7 +148,7 @@ function DDOverviewTab({ project, tasks, settings }: { project: any; tasks: any[
                       <Icon className={cn('h-3.5 w-3.5', isPast && urgent ? 'text-red-500' : isSoon && urgent ? 'text-amber-500' : `text-${color}-500`)} />
                       <p className="text-xs font-medium text-gray-600">{label}</p>
                     </div>
-                    <p className="text-sm font-bold text-gray-800">{format(d, 'MMM d, yyyy')}</p>
+                    <p className="text-sm font-bold text-gray-800">{format(d, 'MM/dd/yyyy')}</p>
                     <p className={cn('text-xs mt-0.5 font-medium',
                       isPast ? 'text-red-600' : isSoon ? 'text-amber-600' : 'text-gray-400'
                     )}>

@@ -784,7 +784,7 @@ export const ProgressBriefDocument = ({ project, tasks }: ProgressBriefProps) =>
             <View style={styles.footerRight}>
               <Text style={styles.footerNextUpdate}>Next Update</Text>
               <Text style={styles.footerNextDate}>
-                {format(addDays(currentDate, 7), 'MMM d, yyyy')}
+                {format(addDays(currentDate, 7), 'MM/dd/yyyy')}
               </Text>
             </View>
           </View>

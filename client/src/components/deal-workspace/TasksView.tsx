@@ -74,7 +74,7 @@ function TaskCard({ task, onComplete }: { task: TaskItem; onComplete: (id: strin
               {scheduledDate && (
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {format(scheduledDate, "MMM d, yyyy")}
+                  {format(scheduledDate, "MM/dd/yyyy")}
                 </span>
               )}
               {task.owner?.name && <span>Assigned to {task.owner.name}</span>}

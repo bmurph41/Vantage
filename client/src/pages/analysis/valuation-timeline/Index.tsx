@@ -286,7 +286,7 @@ export default function ValuationTimelinePage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm">
                     <CalendarIcon className="h-4 w-4 mr-2" />
-                    {format(selectedDate, "MMM d, yyyy")}
+                    {format(selectedDate, "MM/dd/yyyy")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -394,7 +394,7 @@ export default function ValuationTimelinePage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {format(new Date(currentValuation.dataAsOfDate), "MMM d, yyyy")}
+                  {format(new Date(currentValuation.dataAsOfDate), "MM/dd/yyyy")}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {currentValuation.isHistorical ? "From Snapshot" : "Live Calculation"}
@@ -487,7 +487,7 @@ export default function ValuationTimelinePage() {
                             </Badge>
                             <span className="text-sm text-muted-foreground">
                               {source.dataAsOf
-                                ? `As of ${format(new Date(source.dataAsOf), "MMM d, yyyy")}`
+                                ? `As of ${format(new Date(source.dataAsOf), "MM/dd/yyyy")}`
                                 : "Current data"}
                             </span>
                           </div>

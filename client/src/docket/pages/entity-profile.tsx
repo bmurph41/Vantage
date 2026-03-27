@@ -660,7 +660,7 @@ export default function EntityProfile() {
                                     <Calendar className="h-5 w-5 text-blue-600 mt-0.5" />
                                     <div>
                                       <p className="text-sm font-medium text-muted-foreground">Deal Date</p>
-                                      <p className="font-medium" data-testid={`date-deal-${deal.id}`}>{format(new Date(deal.dealDate), 'MMM d, yyyy')}</p>
+                                      <p className="font-medium" data-testid={`date-deal-${deal.id}`}>{format(new Date(deal.dealDate), 'MM/dd/yyyy')}</p>
                                     </div>
                                   </div>
                                 )}
@@ -670,7 +670,7 @@ export default function EntityProfile() {
                                     <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
                                     <div>
                                       <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
-                                      <p className="font-medium">{format(new Date(deal.closingDate), 'MMM d, yyyy')}</p>
+                                      <p className="font-medium">{format(new Date(deal.closingDate), 'MM/dd/yyyy')}</p>
                                     </div>
                                   </div>
                                 )}

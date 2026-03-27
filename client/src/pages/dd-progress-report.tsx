@@ -512,7 +512,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
                       </TooltipTrigger>
                       <TooltipContent className="z-[9999]">
                         <p className="font-medium">{task.title}</p>
-                        <p className="text-xs opacity-90">Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}</p>
+                        <p className="text-xs opacity-90">Due: {format(setDeadlineTo5PM(task.deadline), 'MM/dd/yyyy')}</p>
                         <p className="text-xs opacity-90 capitalize">Status: {task.status.replace('_', ' ')}</p>
                       </TooltipContent>
                     </Tooltip>
@@ -520,7 +520,7 @@ function TaskTimeline({ tasks, project }: TaskTimelineProps) {
                 </div>
                 {task.deadline && (
                   <div className="text-xs text-gray-500 mt-1">
-                    Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}
+                    Due: {format(setDeadlineTo5PM(task.deadline), 'MM/dd/yyyy')}
                   </div>
                 )}
               </div>
@@ -929,7 +929,7 @@ function DDProgressReport({
                       metrics.daysRemainingToDD && metrics.daysRemainingToDD <= 14 ? 'text-amber-600' :
                       'text-slate-600'
                     }`}>
-                      {format(metrics.ddEndDate, 'MMM d, yyyy')}
+                      {format(metrics.ddEndDate, 'MM/dd/yyyy')}
                     </div>
                   </>
                 ) : (
@@ -1418,15 +1418,15 @@ function DDProgressReport({
                   <div className="space-y-2 text-sm text-gray-700">
                     <div className="flex justify-between">
                       <span className="font-medium">Start Date:</span>
-                      <span>{project.psaSignedDate ? format(new Date(project.psaSignedDate), 'MMM d, yyyy') : 'Not Set'}</span>
+                      <span>{project.psaSignedDate ? format(new Date(project.psaSignedDate), 'MM/dd/yyyy') : 'Not Set'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-medium">DD Expiration:</span>
-                      <span>{project.ddExpirationDate ? format(new Date(project.ddExpirationDate), 'MMM d, yyyy') : 'Not Set'}</span>
+                      <span>{project.ddExpirationDate ? format(new Date(project.ddExpirationDate), 'MM/dd/yyyy') : 'Not Set'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-medium">Closing Date:</span>
-                      <span>{project.closingDate ? format(new Date(project.closingDate), 'MMM d, yyyy') : 'TBD'}</span>
+                      <span>{project.closingDate ? format(new Date(project.closingDate), 'MM/dd/yyyy') : 'TBD'}</span>
                     </div>
                   </div>
                 </div>
@@ -1640,7 +1640,7 @@ function DDProgressReport({
                 </h3>
                 <div className="space-y-2 text-sm text-blue-800">
                   <div><span className="font-medium">Generated:</span> {format(currentDate, 'PPP')}</div>
-                  <div><span className="font-medium">Next Update:</span> {format(addDays(currentDate, 7), 'MMM d, yyyy')}</div>
+                  <div><span className="font-medium">Next Update:</span> {format(addDays(currentDate, 7), 'MM/dd/yyyy')}</div>
                   <div><span className="font-medium">Sources:</span> DD Analytics, Project Management System</div>
                 </div>
               </div>
@@ -2016,7 +2016,7 @@ function DDProgressReport({
                                   <div className="font-semibold text-gray-900">{task.title}</div>
                                   {task.deadline && (
                                     <div className="text-sm text-red-600 mt-1">
-                                      Due: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')} 
+                                      Due: {format(setDeadlineTo5PM(task.deadline), 'MM/dd/yyyy')} 
                                       ({Math.abs(differenceInCalendarDays(setDeadlineTo5PM(task.deadline), currentDate))} day{Math.abs(differenceInCalendarDays(setDeadlineTo5PM(task.deadline), currentDate)) !== 1 ? 's' : ''} overdue)
                                     </div>
                                   )}
@@ -2078,7 +2078,7 @@ function DDProgressReport({
                                   <div className="font-semibold text-gray-900">{task.title}</div>
                                   {task.deadline && (
                                     <div className="text-sm text-amber-600 mt-1">
-                                      Target: {format(setDeadlineTo5PM(task.deadline), 'MMM d, yyyy')}
+                                      Target: {format(setDeadlineTo5PM(task.deadline), 'MM/dd/yyyy')}
                                     </div>
                                   )}
                                 </div>

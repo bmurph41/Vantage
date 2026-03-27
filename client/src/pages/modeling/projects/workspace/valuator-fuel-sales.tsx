@@ -390,7 +390,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
                   const margin = revenue - cogs;
                   return (
                     <TableRow key={txn.id}>
-                      <TableCell>{format(new Date(txn.txnDate), "MMM d, yyyy")}</TableCell>
+                      <TableCell>{format(new Date(txn.txnDate), "MM/dd/yyyy")}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {fuelTypeLabels[txn.fuelType] || txn.fuelType}

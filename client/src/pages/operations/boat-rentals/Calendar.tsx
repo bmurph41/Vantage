@@ -284,7 +284,7 @@ export default function BoatRentalsCalendar() {
                         )}
                         <div className="text-xs text-muted-foreground">
                           {format(new Date(r.startDate), "MMM d")} -{" "}
-                          {format(new Date(r.endDate), "MMM d, yyyy")}
+                          {format(new Date(r.endDate), "MM/dd/yyyy")}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

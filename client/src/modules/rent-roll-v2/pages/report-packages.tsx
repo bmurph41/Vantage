@@ -453,7 +453,7 @@ export default function ReportPackagesPage() {
                           {pkg.projectName || <span className="text-muted-foreground">All Projects</span>}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {format(new Date(pkg.periodStartDate), 'MMM d, yyyy')} - {format(new Date(pkg.periodEndDate), 'MMM d, yyyy')}
+                          {format(new Date(pkg.periodStartDate), 'MM/dd/yyyy')} - {format(new Date(pkg.periodEndDate), 'MM/dd/yyyy')}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusConfig.color}>
@@ -462,7 +462,7 @@ export default function ReportPackagesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(new Date(pkg.createdAt), 'MMM d, yyyy')}
+                          {format(new Date(pkg.createdAt), 'MM/dd/yyyy')}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -551,7 +551,7 @@ export default function ReportPackagesPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Period:</span>{' '}
-                  {format(new Date(selectedPackage.periodStartDate), 'MMM d, yyyy')} - {format(new Date(selectedPackage.periodEndDate), 'MMM d, yyyy')}
+                  {format(new Date(selectedPackage.periodStartDate), 'MM/dd/yyyy')} - {format(new Date(selectedPackage.periodEndDate), 'MM/dd/yyyy')}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Project:</span>{' '}

@@ -42,6 +42,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { ddClient } from "@/lib/ddClient";
 import { apiRequest } from "@/lib/queryClient";
+import { toStateAbbr } from "@/lib/state-utils";
 import type { CrmDeal, CrmProperty } from "@shared/schema";
 import DealFormModal from "@/components/modals/deal-form-modal";
 import PropertyFormModal from "@/components/modals/property-form-modal";
@@ -518,7 +519,15 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         <FormItem>
                           <FormLabel>State</FormLabel>
                           <FormControl>
-                            <Input placeholder="State" {...field} />
+                            <Input
+                              placeholder="e.g., VA"
+                              {...field}
+                              onBlur={(e) => {
+                                field.onBlur();
+                                const abbr = toStateAbbr(e.target.value);
+                                if (abbr !== field.value) field.onChange(abbr);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

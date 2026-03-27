@@ -150,7 +150,7 @@ function fmtCurrency(value: string | number | null): string {
 
 function fmtDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  try { return format(new Date(dateStr), 'MMM d, yyyy'); } catch { return '—'; }
+  try { return format(new Date(dateStr), 'MM/dd/yyyy'); } catch { return '—'; }
 }
 
 function fmtLabel(str: string): string {

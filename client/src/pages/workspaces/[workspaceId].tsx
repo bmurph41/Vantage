@@ -384,7 +384,7 @@ export default function WorkspaceDetailPage() {
                 <div className="text-2xl font-bold">{formatCurrency(workspace.targetPrice)}</div>
                 {workspace.expectedCloseDate && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                    <Calendar className="h-3.5 w-3.5" />Expected close: {format(new Date(workspace.expectedCloseDate), 'MMM d, yyyy')}
+                    <Calendar className="h-3.5 w-3.5" />Expected close: {format(new Date(workspace.expectedCloseDate), 'MM/dd/yyyy')}
                   </p>
                 )}
               </CardContent>
@@ -428,7 +428,7 @@ export default function WorkspaceDetailPage() {
                         <span className="font-medium text-sm">{m.title}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">{format(new Date(m.dueDate), 'MMM d, yyyy')}</span>
+                        <span className="text-sm text-muted-foreground">{format(new Date(m.dueDate), 'MM/dd/yyyy')}</span>
                         <Badge variant={m.status === 'completed' ? 'default' : m.status === 'overdue' ? 'destructive' : 'outline'} className="text-xs">
                           {m.status}
                         </Badge>

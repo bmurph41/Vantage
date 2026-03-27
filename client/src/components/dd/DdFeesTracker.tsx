@@ -353,7 +353,7 @@ export function DdFeesTracker({ projectId, compact = false }: DdFeesTrackerProps
                     {formatCurrency(parseFloat(fee.amount))}
                   </TableCell>
                   <TableCell>
-                    {fee.dateIncurred ? format(new Date(fee.dateIncurred), 'MMM d, yyyy') : '-'}
+                    {fee.dateIncurred ? format(new Date(fee.dateIncurred), 'MM/dd/yyyy') : '-'}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     {fee.invoiceNumber || '-'}

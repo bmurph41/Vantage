@@ -92,7 +92,7 @@ function fmtCurrency(v: string | number | null): string {
 
 function fmtDate(d: string | null): string {
   if (!d) return '—';
-  try { return format(new Date(d), 'MMM d, yyyy'); } catch { return '—'; }
+  try { return format(new Date(d), 'MM/dd/yyyy'); } catch { return '—'; }
 }
 
 function fmtRelative(d: string | null): string {

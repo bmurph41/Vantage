@@ -2339,7 +2339,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                       <div>
                         <p className="font-medium">{version.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(version.createdAt), 'MMM d, yyyy h:mm a')}
+                          {format(new Date(version.createdAt), 'MM/dd/yyyy h:mm a')}
                         </p>
                       </div>
                     </div>

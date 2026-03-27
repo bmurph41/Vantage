@@ -384,7 +384,7 @@ export default function WorkspacesListPage() {
                     {workspace.expectedCloseDate && (
                       <span className="flex items-center gap-1 text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5" />
-                        {format(new Date(workspace.expectedCloseDate), 'MMM d, yyyy')}
+                        {format(new Date(workspace.expectedCloseDate), 'MM/dd/yyyy')}
                       </span>
                     )}
                   </div>

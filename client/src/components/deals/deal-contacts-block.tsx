@@ -13,9 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   UserPlus, Trash2, Users, Scale, Briefcase, Landmark, MoreHorizontal,
-  Phone, Mail, ChevronDown, ChevronUp, GripVertical
+  Phone, Mail, ChevronDown, ChevronUp, GripVertical, ShieldCheck, Building2, Link2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useQuery } from "@tanstack/react-query";
+import type { Contact } from "@shared/schema";
 
 export interface DealContactEntry {
   id: string;
@@ -25,8 +28,9 @@ export interface DealContactEntry {
   titleRole: string;
   phone: string;
   email: string;
-  contactType: "seller" | "buyer" | "attorney" | "broker" | "lender" | "other";
+  contactType: "seller" | "buyer" | "seller_counsel" | "buyer_counsel" | "title_company" | "attorney" | "broker" | "lender" | "other";
   teamType: "seller_team" | "buyer_team" | "mutual";
+  linkedContactId?: string; // CRM contact ID if linked
 }
 
 interface DealContactsBlockProps {
@@ -39,6 +43,9 @@ interface DealContactsBlockProps {
 const CONTACT_TYPES = [
   { value: "seller", label: "Seller", icon: Users, defaultTeam: "seller_team" as const, color: "bg-red-50 text-red-700 border-red-200" },
   { value: "buyer", label: "Buyer", icon: Users, defaultTeam: "buyer_team" as const, color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "seller_counsel", label: "Seller Counsel", icon: Scale, defaultTeam: "seller_team" as const, color: "bg-rose-50 text-rose-700 border-rose-200" },
+  { value: "buyer_counsel", label: "Buyer Counsel", icon: Scale, defaultTeam: "buyer_team" as const, color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  { value: "title_company", label: "Title Company", icon: ShieldCheck, defaultTeam: "mutual" as const, color: "bg-teal-50 text-teal-700 border-teal-200" },
   { value: "attorney", label: "Attorney", icon: Scale, defaultTeam: "mutual" as const, color: "bg-purple-50 text-purple-700 border-purple-200" },
   { value: "broker", label: "Broker", icon: Briefcase, defaultTeam: "mutual" as const, color: "bg-amber-50 text-amber-700 border-amber-200" },
   { value: "lender", label: "Lender", icon: Landmark, defaultTeam: "mutual" as const, color: "bg-green-50 text-green-700 border-green-200" },
@@ -63,16 +70,37 @@ function formatPhoneInput(value: string): string {
 }
 
 function ContactCard({
-  contact, index, onUpdate, onRemove,
+  contact, index, onUpdate, onRemove, contacts: crmContacts,
 }: {
   contact: DealContactEntry;
   index: number;
   onUpdate: (field: keyof DealContactEntry, value: string) => void;
   onRemove: () => void;
+  contacts?: Contact[];
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showLinkCRM, setShowLinkCRM] = useState(false);
   const typeConfig = getContactTypeConfig(contact.contactType);
   const TypeIcon = typeConfig.icon;
+
+  const contactOptions = (crmContacts || []).map((c) => ({
+    value: c.id,
+    label: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email || 'Unnamed',
+  }));
+
+  const handleLinkContact = (contactId: string) => {
+    const linked = (crmContacts || []).find((c) => c.id === contactId);
+    if (linked) {
+      onUpdate("linkedContactId", contactId);
+      if (linked.firstName) onUpdate("firstName", linked.firstName);
+      if (linked.lastName) onUpdate("lastName", linked.lastName || '');
+      if (linked.email) onUpdate("email", linked.email);
+      if (linked.phone) onUpdate("phone", linked.phone);
+      if (linked.company) onUpdate("company", linked.company);
+      if (linked.title) onUpdate("titleRole", linked.title);
+      setShowLinkCRM(false);
+    }
+  };
 
   return (
     <div className={cn("rounded-lg border p-3 space-y-3 transition-all", typeConfig.color)}>
@@ -88,8 +116,17 @@ function ContactCard({
           ) : (
             <span className="text-xs text-muted-foreground italic">New Contact</span>
           )}
+          {contact.linkedContactId && (
+            <Badge variant="secondary" className="text-[9px] h-4 gap-0.5">
+              <Link2 className="w-2.5 h-2.5" /> CRM Linked
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
+            onClick={() => setShowLinkCRM(!showLinkCRM)} title="Link to CRM Contact">
+            <Link2 className="w-3.5 h-3.5" />
+          </Button>
           <Button type="button" variant="ghost" size="icon" className="h-6 w-6"
             onClick={() => setIsCollapsed(!isCollapsed)}>
             {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
@@ -101,6 +138,20 @@ function ContactCard({
           </Button>
         </div>
       </div>
+
+      {showLinkCRM && (
+        <div className="rounded-md border bg-white p-2">
+          <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">Link to CRM Contact</Label>
+          <SearchableSelect
+            options={contactOptions}
+            value={contact.linkedContactId || ''}
+            onValueChange={handleLinkContact}
+            placeholder="Search CRM contacts..."
+            searchPlaceholder="Type to search..."
+            emptyText="No contacts found"
+          />
+        </div>
+      )}
 
       {!isCollapsed && (
         <>
@@ -205,6 +256,11 @@ function KeyContactList({ contacts }: { contacts: DealContactEntry[] }) {
 }
 
 export function DealContactsBlock({ contacts, onChange, className, readOnly = false }: DealContactsBlockProps) {
+  const { data: crmContacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts'],
+    enabled: !readOnly,
+  });
+
   const addContact = (type: DealContactEntry["contactType"]) => {
     const typeConfig = CONTACT_TYPES.find((t) => t.value === type)!;
     const newContact: DealContactEntry = {
@@ -259,7 +315,8 @@ export function DealContactsBlock({ contacts, onChange, className, readOnly = fa
           {contacts.map((contact, index) => (
             <ContactCard key={contact.id} contact={contact} index={index}
               onUpdate={(field, value) => updateContact(index, field, value)}
-              onRemove={() => removeContact(index)} />
+              onRemove={() => removeContact(index)}
+              contacts={crmContacts} />
           ))}
         </div>
       ) : (

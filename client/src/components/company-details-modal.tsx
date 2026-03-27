@@ -397,13 +397,13 @@ export function CompanyDetailsModal({
                       {project.psaSignedDate && (
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">PSA Signed</p>
-                          <p className="text-gray-900">{format(new Date(project.psaSignedDate), 'MMM d, yyyy')}</p>
+                          <p className="text-gray-900">{format(new Date(project.psaSignedDate), 'MM/dd/yyyy')}</p>
                         </div>
                       )}
                       {project.ddExpirationDate && (
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">DD Expiration</p>
-                          <p className="text-gray-900">{format(new Date(project.ddExpirationDate), 'MMM d, yyyy')}</p>
+                          <p className="text-gray-900">{format(new Date(project.ddExpirationDate), 'MM/dd/yyyy')}</p>
                         </div>
                       )}
                       <div>

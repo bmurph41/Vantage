@@ -279,7 +279,7 @@ function formatPercent(value: number | null | undefined): string {
 }
 
 function CompsAnalysisPDFDocument({ comps, trends, filterCriteria }: CompsAnalysisPDFProps) {
-  const today = format(new Date(), 'MMMM d, yyyy');
+  const today = format(new Date(), 'MM/dd/yyyy');
   
   const summaryStats = {
     count: comps.length,

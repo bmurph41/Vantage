@@ -14,16 +14,16 @@ const DateInput = React.forwardRef<HTMLInputElement, DateInputProps>(
     const [displayValue, setDisplayValue] = React.useState("")
     const [isValid_, setIsValid_] = React.useState(true)
 
-    // Convert ISO date (YYYY-MM-DD) to display format (M/DD/YYYY)
+    // Convert ISO date (YYYY-MM-DD) to display format (MM/DD/YYYY)
     const formatDisplayValue = (isoDate: string): string => {
       if (!isoDate) return ""
       try {
         const date = parse(isoDate, "yyyy-MM-dd", new Date())
         if (isValid(date)) {
-          return format(date, "M/d/yyyy")
+          return format(date, "MM/dd/yyyy")
         }
       } catch (error) {
-        // If it's already in M/DD/YYYY format, return as is
+        // If it's already in MM/DD/YYYY format, return as is
         return isoDate
       }
       return ""

@@ -458,7 +458,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                   const perHour = hours > 0 ? revenue / hours : 0;
                   return (
                     <TableRow key={rental.id}>
-                      <TableCell>{format(new Date(rental.rentalDate), "MMM d, yyyy")}</TableCell>
+                      <TableCell>{format(new Date(rental.rentalDate), "MM/dd/yyyy")}</TableCell>
                       <TableCell>{rental.boatType || "-"}</TableCell>
                       <TableCell className="text-right">{hours.toFixed(1)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(revenue)}</TableCell>

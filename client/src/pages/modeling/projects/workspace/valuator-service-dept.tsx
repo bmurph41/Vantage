@@ -395,8 +395,8 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                   const margin = labor + parts - cogs;
                   return (
                     <TableRow key={order.id}>
-                      <TableCell>{format(new Date(order.openDate), "MMM d, yyyy")}</TableCell>
-                      <TableCell>{order.closeDate ? format(new Date(order.closeDate), "MMM d, yyyy") : "-"}</TableCell>
+                      <TableCell>{format(new Date(order.openDate), "MM/dd/yyyy")}</TableCell>
+                      <TableCell>{order.closeDate ? format(new Date(order.closeDate), "MM/dd/yyyy") : "-"}</TableCell>
                       <TableCell>
                         <Badge variant={order.status === "closed" ? "default" : "secondary"}>
                           {order.status}

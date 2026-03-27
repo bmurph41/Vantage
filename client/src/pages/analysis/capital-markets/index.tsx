@@ -252,7 +252,7 @@ export default function CapitalMarketsPage() {
                   <CardContent>
                     <div className="text-2xl font-bold">{point ? `${point.rate.toFixed(3)}%` : "N/A"}</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {yieldCurve.curveDate ? format(new Date(yieldCurve.curveDate), "MMM d, yyyy") : ""}
+                      {yieldCurve.curveDate ? format(new Date(yieldCurve.curveDate), "MM/dd/yyyy") : ""}
                     </p>
                   </CardContent>
                 </Card>
@@ -324,7 +324,7 @@ export default function CapitalMarketsPage() {
               <Skeleton className="h-8 w-32" />
             ) : (
               <div className="text-2xl font-bold">
-                {stats?.latestObservation ? format(new Date(stats.latestObservation), "MMM d, yyyy") : "No data"}
+                {stats?.latestObservation ? format(new Date(stats.latestObservation), "MM/dd/yyyy") : "No data"}
               </div>
             )}
           </CardContent>
@@ -347,7 +347,7 @@ export default function CapitalMarketsPage() {
                   <CardTitle>Yield Curve</CardTitle>
                   <CardDescription>
                     Current {RATE_TYPE_LABELS[selectedRateType]} yield curve as of{" "}
-                    {yieldCurve?.curveDate ? format(new Date(yieldCurve.curveDate), "MMM d, yyyy") : "today"}
+                    {yieldCurve?.curveDate ? format(new Date(yieldCurve.curveDate), "MM/dd/yyyy") : "today"}
                   </CardDescription>
                 </div>
                 <Select value={selectedRateType} onValueChange={(v) => setSelectedRateType(v as RateType)}>

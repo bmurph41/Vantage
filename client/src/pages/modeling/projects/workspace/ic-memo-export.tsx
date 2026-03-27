@@ -353,7 +353,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(event.createdAt), 'MMM d, yyyy')}
+                            {format(new Date(event.createdAt), 'MM/dd/yyyy')}
                           </span>
                         </div>
                       ))}
@@ -369,7 +369,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
         
         <div className="flex items-center justify-between pt-4">
           <p className="text-xs text-muted-foreground">
-            Generated: {memoData ? format(new Date(memoData.generatedAt), 'MMM d, yyyy h:mm a') : '-'}
+            Generated: {memoData ? format(new Date(memoData.generatedAt), 'MM/dd/yyyy h:mm a') : '-'}
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={handleDownloadJSON} disabled={!memoData} data-testid="button-download-json">

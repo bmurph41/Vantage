@@ -200,7 +200,7 @@ export function DealTimelineVisualizer({
           <div className="flex items-center gap-1 mb-1">
             <div className="w-2 h-2 rounded-full bg-slate-500" />
             <span className="text-[10px] font-medium text-slate-600">
-              PSA Signed — {format(parseISO(psaSignedDate), "MMM d, yyyy")}
+              PSA Signed — {format(parseISO(psaSignedDate), "MM/dd/yyyy")}
             </span>
           </div>
 
@@ -234,10 +234,10 @@ export function DealTimelineVisualizer({
                         {seg.days} {useBusinessDays ? "business" : "calendar"} days
                       </p>
                       {seg.startDate && (
-                        <p className="text-muted-foreground">Start: {format(seg.startDate, "MMM d, yyyy")}</p>
+                        <p className="text-muted-foreground">Start: {format(seg.startDate, "MM/dd/yyyy")}</p>
                       )}
                       {seg.endDate && (
-                        <p className="text-muted-foreground">End: {format(seg.endDate, "MMM d, yyyy")}</p>
+                        <p className="text-muted-foreground">End: {format(seg.endDate, "MM/dd/yyyy")}</p>
                       )}
                       {seg.type === "extension_potential" && (
                         <p className="text-amber-600 text-[10px]">Not yet executed</p>
@@ -257,7 +257,7 @@ export function DealTimelineVisualizer({
           {closingDate && (
             <div className="flex items-center gap-1 mt-1 justify-end">
               <span className="text-[10px] font-medium text-emerald-600">
-                Closing — {format(parseISO(closingDate), "MMM d, yyyy")}
+                Closing — {format(parseISO(closingDate), "MM/dd/yyyy")}
               </span>
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
             </div>
@@ -280,18 +280,18 @@ export function DealTimelineVisualizer({
       <div className="grid grid-cols-3 gap-3 pt-2 border-t">
         <div className="text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">PSA Signed</p>
-          <p className="text-sm font-semibold">{format(parseISO(psaSignedDate), "MMM d, yyyy")}</p>
+          <p className="text-sm font-semibold">{format(parseISO(psaSignedDate), "MM/dd/yyyy")}</p>
         </div>
         {ddExpirationDate && (
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">DD Expiration</p>
-            <p className="text-sm font-semibold">{format(parseISO(ddExpirationDate), "MMM d, yyyy")}</p>
+            <p className="text-sm font-semibold">{format(parseISO(ddExpirationDate), "MM/dd/yyyy")}</p>
           </div>
         )}
         {closingDate && (
           <div className="text-center">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Closing</p>
-            <p className="text-sm font-semibold">{format(parseISO(closingDate), "MMM d, yyyy")}</p>
+            <p className="text-sm font-semibold">{format(parseISO(closingDate), "MM/dd/yyyy")}</p>
           </div>
         )}
       </div>

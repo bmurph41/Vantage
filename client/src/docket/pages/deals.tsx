@@ -894,7 +894,7 @@ export default function DealsPage() {
                             <Calendar className="h-5 w-5 text-blue-600 mt-0.5" />
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Deal Date</p>
-                              <p className="font-medium">{format(new Date(deal.dealDate), 'MMM d, yyyy')}</p>
+                              <p className="font-medium">{format(new Date(deal.dealDate), 'MM/dd/yyyy')}</p>
                             </div>
                           </div>
                         )}
@@ -904,7 +904,7 @@ export default function DealsPage() {
                             <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Closing Date</p>
-                              <p className="font-medium">{format(new Date(deal.closingDate), 'MMM d, yyyy')}</p>
+                              <p className="font-medium">{format(new Date(deal.closingDate), 'MM/dd/yyyy')}</p>
                             </div>
                           </div>
                         )}
@@ -921,7 +921,7 @@ export default function DealsPage() {
                               {deal.article.source}
                               {deal.article.publishedAt && (
                                 <span className="text-muted-foreground ml-2">
-                                  • {format(new Date(deal.article.publishedAt), 'MMM d, yyyy')}
+                                  • {format(new Date(deal.article.publishedAt), 'MM/dd/yyyy')}
                                 </span>
                               )}
                             </p>
@@ -1012,7 +1012,7 @@ export default function DealsPage() {
                                 {article.source}
                                 {article.publishedAt && (
                                   <span className="text-muted-foreground ml-2">
-                                    • {format(new Date(article.publishedAt), 'MMM d, yyyy')}
+                                    • {format(new Date(article.publishedAt), 'MM/dd/yyyy')}
                                   </span>
                                 )}
                               </p>

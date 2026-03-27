@@ -233,7 +233,7 @@ const formatNumber = (value: number | null | undefined): string => {
 };
 
 function CompsComparisonPDFDocument({ comps, statistics }: CompsComparisonPDFProps) {
-  const generatedDate = format(new Date(), 'MMMM d, yyyy');
+  const generatedDate = format(new Date(), 'MM/dd/yyyy');
 
   return (
     <Document>

@@ -248,7 +248,7 @@ function getAmenities(comp: RateComp): string[] {
 }
 
 function RateCompsComparisonPDFDocument({ comps, statistics }: RateCompsComparisonPDFProps) {
-  const generatedDate = format(new Date(), 'MMMM d, yyyy');
+  const generatedDate = format(new Date(), 'MM/dd/yyyy');
 
   return (
     <Document>

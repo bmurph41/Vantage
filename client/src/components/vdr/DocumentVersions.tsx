@@ -156,7 +156,7 @@ export default function DocumentVersions({ documentId }: DocumentVersionsProps) 
                   </TableCell>
                   <TableCell className="text-sm text-gray-600">{v.uploadedByName}</TableCell>
                   <TableCell className="text-sm text-gray-600">
-                    {format(new Date(v.createdAt), "MMM d, yyyy h:mm a")}
+                    {format(new Date(v.createdAt), "MM/dd/yyyy h:mm a")}
                   </TableCell>
                   <TableCell className="text-sm text-gray-600">{formatFileSize(v.size)}</TableCell>
                   <TableCell className="text-sm text-gray-500 max-w-[200px] truncate">
@@ -194,12 +194,12 @@ export default function DocumentVersions({ documentId }: DocumentVersionsProps) 
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-blue-600 font-medium">Version {compareData.version1.version}</p>
                   <p className="text-sm font-medium">{compareData.version1.filename}</p>
-                  <p className="text-xs text-gray-500">{format(new Date(compareData.version1.createdAt), "MMM d, yyyy")}</p>
+                  <p className="text-xs text-gray-500">{format(new Date(compareData.version1.createdAt), "MM/dd/yyyy")}</p>
                 </div>
                 <div className="bg-purple-50 p-3 rounded-lg">
                   <p className="text-xs text-purple-600 font-medium">Version {compareData.version2.version}</p>
                   <p className="text-sm font-medium">{compareData.version2.filename}</p>
-                  <p className="text-xs text-gray-500">{format(new Date(compareData.version2.createdAt), "MMM d, yyyy")}</p>
+                  <p className="text-xs text-gray-500">{format(new Date(compareData.version2.createdAt), "MM/dd/yyyy")}</p>
                 </div>
               </div>
 

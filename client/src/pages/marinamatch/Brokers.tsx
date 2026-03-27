@@ -304,7 +304,7 @@ export function BrokersTab() {
                   )}
                   {broker.lastContactDate && (
                     <p className="text-xs text-muted-foreground">
-                      Last contact: {format(new Date(broker.lastContactDate), "MMM d, yyyy")}
+                      Last contact: {format(new Date(broker.lastContactDate), "MM/dd/yyyy")}
                     </p>
                   )}
                 </CardContent>
@@ -417,7 +417,7 @@ export function BrokersTab() {
                           <div>
                             <p className="font-medium">{activity.subject || activity.activityType}</p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(activity.activityDate), "MMM d, yyyy")}
+                              {format(new Date(activity.activityDate), "MM/dd/yyyy")}
                             </p>
                           </div>
                         </div>

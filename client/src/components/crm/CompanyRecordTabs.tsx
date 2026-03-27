@@ -29,7 +29,7 @@ function fmtCurrency(v: string | number | null): string {
 }
 function fmtDate(d: string | null | undefined): string {
   if (!d) return '—';
-  try { return format(new Date(d), 'MMM d, yyyy'); } catch { return '—'; }
+  try { return format(new Date(d), 'MM/dd/yyyy'); } catch { return '—'; }
 }
 function fmtLabel(str: string): string {
   return str.split(/[_-]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

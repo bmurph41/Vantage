@@ -283,7 +283,7 @@ export default function AuditTrailViewer({ projectId }: AuditTrailViewerProps) {
                               </span>
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {format(new Date(entry.createdAt), 'MMM d, yyyy h:mm a')}
+                                {format(new Date(entry.createdAt), 'MM/dd/yyyy h:mm a')}
                               </span>
                               <span className="text-muted-foreground/70">
                                 ({formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })})

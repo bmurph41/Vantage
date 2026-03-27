@@ -177,7 +177,7 @@ export function ProjectHeader({ project, tasks, settings }: ProjectHeaderProps) 
             {project.name}
           </h2>
           <p className="text-muted-foreground" data-testid="project-dates">
-            {project.closingDate && `Target Closing Date: ${format(parseISO(project.closingDate), 'MMMM d, yyyy')}`}
+            {project.closingDate && `Target Closing Date: ${format(parseISO(project.closingDate), 'MM/dd/yyyy')}`}
           </p>
         </div>
         <div className="flex items-center space-x-3">

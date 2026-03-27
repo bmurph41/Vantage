@@ -200,7 +200,7 @@ export default function LeaseEconomicsSection({ leaseId, isOpen = false, onToggl
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
     try {
-      return format(new Date(dateStr), "MMM d, yyyy");
+      return format(new Date(dateStr), "MM/dd/yyyy");
     } catch {
       return dateStr;
     }

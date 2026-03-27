@@ -297,15 +297,15 @@ export default function TimelineView({ searchQuery }: TimelineViewProps) {
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs max-w-xs">
                           <p className="font-semibold">{deal.title}</p>
-                          {psaDate && <p>PSA: {format(psaDate, "MMM d, yyyy")}</p>}
+                          {psaDate && <p>PSA: {format(psaDate, "MM/dd/yyyy")}</p>}
                           {ddDate && (
                             <p className={ddUrgent ? "text-red-600 font-medium" : ""}>
-                              DD Expiry: {format(ddDate, "MMM d, yyyy")}
+                              DD Expiry: {format(ddDate, "MM/dd/yyyy")}
                               {ddUrgent && ` (${differenceInDays(ddDate, now)}d left)`}
                             </p>
                           )}
-                          {closeDate && <p>Closing: {format(closeDate, "MMM d, yyyy")}</p>}
-                          {expClose && !closeDate && <p>Expected Close: {format(expClose, "MMM d, yyyy")}</p>}
+                          {closeDate && <p>Closing: {format(closeDate, "MM/dd/yyyy")}</p>}
+                          {expClose && !closeDate && <p>Expected Close: {format(expClose, "MM/dd/yyyy")}</p>}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

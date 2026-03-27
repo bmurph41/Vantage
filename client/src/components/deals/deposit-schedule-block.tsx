@@ -176,13 +176,13 @@ function DepositRow({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Switch checked={deposit.refundable} onCheckedChange={(val) => onUpdate("refundable", val)} className="h-4 w-7" />
-          <Label className="text-[10px]">Refundable</Label>
+        <div className="flex items-center gap-2 min-w-[110px]">
+          <Switch checked={deposit.refundable} onCheckedChange={(val) => onUpdate("refundable", val)} className="h-4 w-7 flex-shrink-0" />
+          <Label className="text-[10px] whitespace-nowrap">Refundable</Label>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Switch checked={deposit.appliedToPrice} onCheckedChange={(val) => onUpdate("appliedToPrice", val)} className="h-4 w-7" />
-          <Label className="text-[10px]">Applied to Price</Label>
+        <div className="flex items-center gap-2 min-w-[130px]">
+          <Switch checked={deposit.appliedToPrice} onCheckedChange={(val) => onUpdate("appliedToPrice", val)} className="h-4 w-7 flex-shrink-0" />
+          <Label className="text-[10px] whitespace-nowrap">Applied to Price</Label>
         </div>
       </div>
 
@@ -193,7 +193,7 @@ function DepositRow({
         )}>
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
-            <span className="font-medium">Due: {format(parseISO(dueDate), "MMM d, yyyy")}</span>
+            <span className="font-medium">Due: {format(parseISO(dueDate), "MM/dd/yyyy")}</span>
             <span className="text-muted-foreground">
               ({deposit.daysOffset} {deposit.dayType} days from {anchorLabel})
             </span>
@@ -240,7 +240,7 @@ function DepositScheduleTable({
                 <td className="text-right px-3 py-2 font-medium">${(parseFloat(dep.amount) || 0).toLocaleString()}</td>
                 <td className="px-3 py-2 text-muted-foreground">{anchorLabel}</td>
                 <td className="text-center px-3 py-2">{dep.daysOffset} {dep.dayType === "business" ? "BD" : "CD"}</td>
-                <td className="px-3 py-2">{dueDate ? format(parseISO(dueDate), "MMM d, yyyy") : "—"}</td>
+                <td className="px-3 py-2">{dueDate ? format(parseISO(dueDate), "MM/dd/yyyy") : "—"}</td>
                 <td className="text-center px-3 py-2">
                   {dep.refundable ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500 inline" /> : <span className="text-red-500">✕</span>}
                 </td>

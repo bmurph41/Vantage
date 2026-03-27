@@ -163,7 +163,7 @@ export function ArchiveView({ projectId }: ArchiveViewProps) {
                           {task.deadline && (
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-1" />
-                              {format(new Date(task.deadline), 'MMM d, yyyy')}
+                              {format(new Date(task.deadline), 'MM/dd/yyyy')}
                             </div>
                           )}
                           
@@ -177,7 +177,7 @@ export function ArchiveView({ projectId }: ArchiveViewProps) {
                           {task.archivedAt && (
                             <div className="flex items-center">
                               <Archive className="h-4 w-4 mr-1" />
-                              Archived {format(new Date(task.archivedAt), 'MMM d, yyyy')}
+                              Archived {format(new Date(task.archivedAt), 'MM/dd/yyyy')}
                             </div>
                           )}
                         </div>

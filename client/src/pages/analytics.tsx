@@ -170,8 +170,8 @@ export default function Analytics() {
                     aria-label={`Date range filter: ${
                       dateRange.from 
                         ? dateRange.to 
-                          ? `${format(dateRange.from, "LLL dd, y")} to ${format(dateRange.to, "LLL dd, y")}`
-                          : format(dateRange.from, "LLL dd, y")
+                          ? `${format(dateRange.from, "MM/dd/yyyy")} to ${format(dateRange.to, "MM/dd/yyyy")}`
+                          : format(dateRange.from, "MM/dd/yyyy")
                         : "No date range selected"
                     }`}
                     aria-haspopup="dialog"
@@ -181,11 +181,11 @@ export default function Analytics() {
                     {dateRange.from ? (
                       dateRange.to ? (
                         <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
+                          {format(dateRange.from, "MM/dd/yyyy")} -{" "}
+                          {format(dateRange.to, "MM/dd/yyyy")}
                         </>
                       ) : (
-                        format(dateRange.from, "LLL dd, y")
+                        format(dateRange.from, "MM/dd/yyyy")
                       )
                     ) : (
                       <span>Pick a date range</span>

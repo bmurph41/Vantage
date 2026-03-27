@@ -134,7 +134,7 @@ function DealCard({ deal, onClick }: DealCardProps) {
             {deal.expectedCloseDate && (
               <div className="flex items-center space-x-1 text-xs text-gray-500">
                 <Calendar className="h-3 w-3" />
-                <span>{format(new Date(deal.expectedCloseDate), "MMM d, yyyy")}</span>
+                <span>{format(new Date(deal.expectedCloseDate), "MM/dd/yyyy")}</span>
               </div>
             )}
 

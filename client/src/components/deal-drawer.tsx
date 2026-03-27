@@ -193,7 +193,7 @@ function NotesTab({ dealId }: { dealId: string }) {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  {format(new Date(note.createdAt), 'MMM d, yyyy h:mm a')}
+                  {format(new Date(note.createdAt), 'MM/dd/yyyy h:mm a')}
                 </p>
               </CardContent>
             </Card>
@@ -302,7 +302,7 @@ function FilesTab({ dealId }: { dealId: string }) {
                         {file.fileName}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {(file.size / 1024).toFixed(2)} KB • {format(new Date(file.createdAt), 'MMM d, yyyy')}
+                        {(file.size / 1024).toFixed(2)} KB • {format(new Date(file.createdAt), 'MM/dd/yyyy')}
                       </p>
                     </div>
                   </div>
@@ -545,7 +545,7 @@ function TimelineTab({ dealId }: { dealId: string }) {
                   </Badge>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {activity.scheduledAt && format(new Date(activity.scheduledAt), 'MMM d, yyyy h:mm a')}
+                  {activity.scheduledAt && format(new Date(activity.scheduledAt), 'MM/dd/yyyy h:mm a')}
                   {activity.completedAt && <span className="ml-2 text-green-600">✓ Completed</span>}
                 </p>
               </div>

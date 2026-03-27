@@ -342,7 +342,7 @@ export default function MarinaDatabase() {
                           {marina.lastRateUpdate ? (
                             <div className="flex items-center gap-1 text-sm">
                               <CalendarDays className="h-3 w-3 text-muted-foreground" />
-                              {format(new Date(marina.lastRateUpdate), "MMM d, yyyy")}
+                              {format(new Date(marina.lastRateUpdate), "MM/dd/yyyy")}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">No rates</span>

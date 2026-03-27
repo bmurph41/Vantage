@@ -121,15 +121,15 @@ export default function DDStatusReport({ projectId }: DDStatusReportProps) {
             </Button>
           </div>
           <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-            <span>Generated: {format(new Date(report.generatedAt), "MMM d, yyyy h:mm a")}</span>
+            <span>Generated: {format(new Date(report.generatedAt), "MM/dd/yyyy h:mm a")}</span>
             {report.project.ddExpiration && (
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                DD Expires: {format(new Date(report.project.ddExpiration), "MMM d, yyyy")}
+                DD Expires: {format(new Date(report.project.ddExpiration), "MM/dd/yyyy")}
               </span>
             )}
             {report.project.closingDate && (
-              <span>Closing: {format(new Date(report.project.closingDate), "MMM d, yyyy")}</span>
+              <span>Closing: {format(new Date(report.project.closingDate), "MM/dd/yyyy")}</span>
             )}
           </div>
         </CardHeader>
@@ -248,7 +248,7 @@ export default function DDStatusReport({ projectId }: DDStatusReportProps) {
                     </TableCell>
                     <TableCell className={`text-sm ${item.isOverdue ? "text-red-600 font-medium" : "text-gray-600"}`}>
                       {item.dueDate
-                        ? format(new Date(item.dueDate), "MMM d, yyyy")
+                        ? format(new Date(item.dueDate), "MM/dd/yyyy")
                         : <span className="text-gray-400">--</span>
                       }
                     </TableCell>

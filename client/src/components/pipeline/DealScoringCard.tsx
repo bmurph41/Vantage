@@ -168,7 +168,7 @@ export default function DealScoringCard({ dealId, dealTitle }: DealScoringCardPr
                       {grade}
                     </Badge>
                     <span className="text-sm text-gray-500">
-                      scored {format(new Date(currentScore.scoredAt), "MMM d, yyyy")}
+                      scored {format(new Date(currentScore.scoredAt), "MM/dd/yyyy")}
                     </span>
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export default function DealScoringCard({ dealId, dealTitle }: DealScoringCardPr
                   <span className="text-sm font-medium">{Number(entry.totalScore).toFixed(1)}</span>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {format(new Date(entry.scoredAt), "MMM d, yyyy h:mm a")}
+                  {format(new Date(entry.scoredAt), "MM/dd/yyyy h:mm a")}
                 </span>
               </div>
             ))}

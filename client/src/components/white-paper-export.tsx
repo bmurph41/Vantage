@@ -961,7 +961,7 @@ const formatDate = (dateString: string | null | undefined): string => {
     if (!isValid(date)) return "N/A";
     
     // Use EST timezone for consistent date formatting
-    return formatInTimeZone(date, 'America/New_York', 'MMMM d, yyyy');
+    return formatInTimeZone(date, 'America/New_York', 'MM/dd/yyyy');
   } catch {
     return "N/A";
   }
@@ -1908,7 +1908,7 @@ const analyzeRiskCategories = (risks: RiskFactor[]) => {
 export const WhitePaperDocument = ({ project, tasks, risks, riskAnalytics, settings }: WhitePaperProps) => {
   // Use real Risk data instead of legacy mock data, with defensive checks
   // Use EST timezone for consistent date formatting throughout PDF
-  const currentDate = formatInTimeZone(new Date(), 'America/New_York', 'MMMM d, yyyy');
+  const currentDate = formatInTimeZone(new Date(), 'America/New_York', 'MM/dd/yyyy');
   const currentTimestamp = formatInTimeZone(new Date(), 'America/New_York', 'MMMM d, yyyy \'at\' h:mm a zzz');
   
   // Ensure risks is an array, provide empty array as fallback

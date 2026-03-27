@@ -333,7 +333,7 @@ export default function SnapshotsPage() {
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
-                          {format(new Date(snapshot.snapshotDate), 'MMM d, yyyy')}
+                          {format(new Date(snapshot.snapshotDate), 'MM/dd/yyyy')}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusConfig.color}>

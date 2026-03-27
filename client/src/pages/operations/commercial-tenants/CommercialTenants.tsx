@@ -72,7 +72,7 @@ const formatPercent = (value: string | number | null | undefined) => {
 const formatDate = (value: string | null | undefined) => {
   if (!value) return "-";
   try {
-    return format(parseISO(value), "MMM d, yyyy");
+    return format(parseISO(value), "MM/dd/yyyy");
   } catch {
     return value;
   }

@@ -479,7 +479,7 @@ export default function ActivityLog() {
                         
                         <div className="flex items-center flex-wrap gap-2 text-xs">
                           <span className="text-gray-500">
-                            {format(new Date(activity.date), 'MMM d, yyyy h:mm a')}
+                            {format(new Date(activity.date), 'MM/dd/yyyy h:mm a')}
                           </span>
                           <span className="text-gray-300">&bull;</span>
                           <span className="text-gray-500">{activity.user}</span>

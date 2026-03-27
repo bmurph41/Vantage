@@ -243,7 +243,7 @@ export function ContactTimeline({ contactId, compact = false }: ContactTimelineP
                 {/* Date header */}
                 <div className="flex items-center gap-2 mb-3">
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    {format(new Date(dateKey), "MMM d, yyyy")}
+                    {format(new Date(dateKey), "MM/dd/yyyy")}
                   </div>
                   <div className="flex-1 h-px bg-gray-200" />
                   <Badge variant="outline" className="text-[10px]">

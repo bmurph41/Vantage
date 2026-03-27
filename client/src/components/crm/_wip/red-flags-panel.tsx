@@ -305,7 +305,7 @@ export function RedFlagsPanel({ dealId, showMyEscalations = false }: RedFlagsPan
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground mt-2">
-                            Raised {format(new Date(flag.raisedAt), 'MMM d, yyyy')}
+                            Raised {format(new Date(flag.raisedAt), 'MM/dd/yyyy')}
                             {raisedBy && ` by ${raisedBy.username}`}
                           </p>
                         </div>
