@@ -215,10 +215,10 @@ export default function UnifiedSidebar() {
   const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
 
   // Helper function to check if user has access to a pack
-  // In development mode, always grant access so the sidebar is usable without pack rows in the DB
+  // In development mode, always grant access so the sidebar is fully usable regardless of DB pack state
   const hasPack = (packType: PackType): boolean => {
     const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-    if (isDev && activePacks.length === 0) return true;
+    if (isDev) return true;
     return activePacks.includes(packType);
   };
 
@@ -248,6 +248,8 @@ export default function UnifiedSidebar() {
 
   // Helper function to check if user can see a section based on persona
   const canViewSection = (section: string): boolean => {
+    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+    if (isDev) return true; // Show all sections in dev regardless of persona
     if (!userPersona) return true; // Default to show all if no persona assigned
     
     const persona = userPersona.primaryPersona;
