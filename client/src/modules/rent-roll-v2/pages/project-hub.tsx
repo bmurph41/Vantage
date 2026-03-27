@@ -19,7 +19,15 @@ import {
   GitMerge,
   Trash2,
   FileEdit,
-  X
+  X,
+  Ship,
+  Box,
+  Home,
+  Car,
+  Hotel,
+  Store,
+  Factory,
+  Layers
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,20 +46,41 @@ import DashboardNav from "../components/navigation/DashboardNav";
 import { createLocation } from "../lib/locationApi";
 import { getRentRollConfig, getSupportedRentRollAssetClasses } from "@shared/rent-roll-config";
 
-// Default marina unit types (backward compatible). Projects use config-driven unit types.
-const STORAGE_TYPES = [
-  "Wet Slip",
-  "Lift Slip",
-  "Mooring",
-  "Jet Ski",
-  "Dry Rack - Indoor",
-  "Dry Rack - Outdoor",
-  "Houseboat",
-  "Liveaboard",
-  "Land Storage",
-  "Boat on Trailer",
-  "Trailer Only",
-] as const;
+// Per-asset-class unit type lists for the project creation wizard
+const ASSET_CLASS_UNIT_TYPES: Record<string, string[]> = {
+  marina: ["Wet Slip", "Lift Slip", "Mooring", "Jet Ski", "Dry Rack - Indoor", "Dry Rack - Outdoor", "Houseboat", "Liveaboard", "Land Storage", "Boat on Trailer", "Trailer Only"],
+  self_storage: ["5x5", "5x10", "5x15", "10x10", "10x15", "10x20", "10x25", "10x30", "Climate Control", "Drive-Up", "Vehicle / Boat", "Outdoor Parking"],
+  rv_park: ["Full Hookup Pull-Through", "Full Hookup Back-In", "Water/Electric", "Electric Only", "Tent Site", "Seasonal Site", "Cabin", "Glamping"],
+  mobile_home: ["Single-Wide", "Double-Wide", "Triple-Wide", "Land Only"],
+  multifamily: ["Studio", "1BR/1BA", "2BR/1BA", "2BR/2BA", "3BR/2BA", "3BR/3BA", "4BR+", "Penthouse"],
+  hotel: ["Standard Room", "King Room", "Double Queen", "Suite", "Junior Suite", "Penthouse Suite"],
+  str: ["Entire Unit", "Private Room", "Shared Room", "Studio", "1BR", "2BR", "3BR+"],
+  retail: ["Inline Suite", "End Cap", "Anchor Pad", "Outparcel", "Kiosk"],
+  office: ["Private Office", "Suite", "Floor", "Co-Work Desk", "Conference Room"],
+  industrial: ["Warehouse Bay", "Distribution Suite", "Cold Storage", "Manufacturing", "Flex Space"],
+  medical_office: ["Exam Suite", "Medical Suite", "Lab Space", "Physical Therapy", "Imaging"],
+};
+
+// Asset class display metadata for the picker
+const ASSET_CLASS_OPTIONS = [
+  { value: "marina", label: "Marina", icon: Ship, color: "text-blue-600" },
+  { value: "self_storage", label: "Self-Storage", icon: Box, color: "text-orange-600" },
+  { value: "rv_park", label: "RV Park / Campground", icon: Car, color: "text-green-600" },
+  { value: "multifamily", label: "Multifamily", icon: Home, color: "text-purple-600" },
+  { value: "hotel", label: "Hotel / STR", icon: Hotel, color: "text-pink-600" },
+  { value: "retail", label: "Retail", icon: Store, color: "text-yellow-600" },
+  { value: "office", label: "Office", icon: Building2, color: "text-sky-600" },
+  { value: "industrial", label: "Industrial", icon: Factory, color: "text-slate-600" },
+  { value: "mixed_use", label: "Mixed Use", icon: Layers, color: "text-teal-600" },
+];
+
+function getUnitTypesForAssetClass(assetClass: string): string[] {
+  return ASSET_CLASS_UNIT_TYPES[assetClass] || ASSET_CLASS_UNIT_TYPES["marina"];
+}
+
+function getAssetClassLabel(assetClass: string): string {
+  return ASSET_CLASS_OPTIONS.find(o => o.value === assetClass)?.label || "Property";
+}
 
 const storageTypeConfigSchema = z.object({
   storageType: z.string(),
@@ -166,6 +195,7 @@ export default function ProjectHub() {
     defaultValues: {
       name: "",
       projectType: "OWNED",
+      assetClass: "marina",
       description: "",
       status: "",
       operationType: "ANNUAL",
@@ -173,6 +203,15 @@ export default function ProjectHub() {
       includeInExecutive: true,
     },
   });
+
+  const watchedAssetClass = form.watch("assetClass") || "marina";
+  const watchedProjectType = form.watch("projectType") || "OWNED";
+  const activeUnitTypes = getUnitTypesForAssetClass(watchedAssetClass);
+
+  // Clear unit type selections when asset class changes
+  useEffect(() => {
+    form.setValue("storageTypeConfigs", []);
+  }, [watchedAssetClass]);
 
   const { data: projects, isLoading } = useQuery<ProjectHubMetrics[]>({
     queryKey: ['/api/rent-roll/project-hub-metrics'],
@@ -516,7 +555,7 @@ export default function ProjectHub() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
-            <h2 className="text-2xl font-semibold" data-testid="text-section-active">My Marinas</h2>
+            <h2 className="text-2xl font-semibold" data-testid="text-section-active">My Properties</h2>
             <Badge variant="secondary" data-testid="badge-active-count">{activeProjects.length}</Badge>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -1096,55 +1135,94 @@ export default function ProjectHub() {
               )}
 
               {addDialogStep === 2 && (
-                <FormField
-                  control={form.control}
-                  name="projectType"
-                  render={({ field }) => (
-                    <FormItem className="space-y-4 py-2">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div
-                          className={`cursor-pointer rounded-xl border-2 p-6 transition-all hover:shadow-md ${
-                            field.value === "OWNED"
-                              ? "border-primary bg-primary/5 shadow-sm"
-                              : "border-muted hover:border-primary/50"
-                          }`}
-                          onClick={() => field.onChange("OWNED")}
-                          data-testid="select-type-owned"
-                        >
-                          <div className="flex flex-col items-center gap-3 text-center">
-                            <div className={`rounded-full p-3 ${field.value === "OWNED" ? "bg-primary/10" : "bg-muted"}`}>
-                              <Building2 className={`h-8 w-8 ${field.value === "OWNED" ? "text-primary" : "text-muted-foreground"}`} />
+                <div className="space-y-5 py-2">
+                  {/* Asset Class Picker */}
+                  <FormField
+                    control={form.control}
+                    name="assetClass"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">Asset Class *</FormLabel>
+                        <div className="grid grid-cols-3 gap-2 mt-2">
+                          {ASSET_CLASS_OPTIONS.map((opt) => {
+                            const IconComp = opt.icon;
+                            const isSelected = field.value === opt.value;
+                            return (
+                              <div
+                                key={opt.value}
+                                className={`cursor-pointer rounded-lg border-2 p-3 transition-all hover:shadow-sm ${
+                                  isSelected
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-muted hover:border-primary/40"
+                                }`}
+                                onClick={() => field.onChange(opt.value)}
+                                data-testid={`select-asset-class-${opt.value}`}
+                              >
+                                <div className="flex flex-col items-center gap-1.5 text-center">
+                                  <IconComp className={`h-5 w-5 ${isSelected ? "text-primary" : opt.color}`} />
+                                  <div className="text-xs font-medium leading-tight">{opt.label}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Project Type (OWNED vs DEAL) */}
+                  <FormField
+                    control={form.control}
+                    name="projectType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">Project Type *</FormLabel>
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                          <div
+                            className={`cursor-pointer rounded-xl border-2 p-5 transition-all hover:shadow-md ${
+                              field.value === "OWNED"
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-muted hover:border-primary/50"
+                            }`}
+                            onClick={() => field.onChange("OWNED")}
+                            data-testid="select-type-owned"
+                          >
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              <div className={`rounded-full p-2.5 ${field.value === "OWNED" ? "bg-primary/10" : "bg-muted"}`}>
+                                <Building2 className={`h-6 w-6 ${field.value === "OWNED" ? "text-primary" : "text-muted-foreground"}`} />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm">My {getAssetClassLabel(watchedAssetClass)}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">Actively managed property</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-semibold text-base">My Marina</div>
-                              <div className="text-xs text-muted-foreground mt-1">Actively managed property in your portfolio</div>
+                          </div>
+                          <div
+                            className={`cursor-pointer rounded-xl border-2 p-5 transition-all hover:shadow-md ${
+                              field.value === "DEAL"
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-muted hover:border-primary/50"
+                            }`}
+                            onClick={() => field.onChange("DEAL")}
+                            data-testid="select-type-deal"
+                          >
+                            <div className="flex flex-col items-center gap-2 text-center">
+                              <div className={`rounded-full p-2.5 ${field.value === "DEAL" ? "bg-primary/10" : "bg-muted"}`}>
+                                <TrendingUp className={`h-6 w-6 ${field.value === "DEAL" ? "text-primary" : "text-muted-foreground"}`} />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm">Deal Pipeline</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">Under evaluation or acquisition</div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <div
-                          className={`cursor-pointer rounded-xl border-2 p-6 transition-all hover:shadow-md ${
-                            field.value === "DEAL"
-                              ? "border-primary bg-primary/5 shadow-sm"
-                              : "border-muted hover:border-primary/50"
-                          }`}
-                          onClick={() => field.onChange("DEAL")}
-                          data-testid="select-type-deal"
-                        >
-                          <div className="flex flex-col items-center gap-3 text-center">
-                            <div className={`rounded-full p-3 ${field.value === "DEAL" ? "bg-primary/10" : "bg-muted"}`}>
-                              <TrendingUp className={`h-8 w-8 ${field.value === "DEAL" ? "text-primary" : "text-muted-foreground"}`} />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-base">Deal Pipeline</div>
-                              <div className="text-xs text-muted-foreground mt-1">Property under evaluation or acquisition</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               )}
 
               {addDialogStep === 3 && (
@@ -1157,7 +1235,7 @@ export default function ProjectHub() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Brief description of the marina"
+                            placeholder={`Brief description of the ${getAssetClassLabel(watchedAssetClass).toLowerCase()}`}
                             data-testid="input-project-description"
                             {...field}
                           />
@@ -1219,11 +1297,11 @@ export default function ProjectHub() {
 
                   <div className="space-y-3">
                     <div>
-                      <FormLabel>Storage Types *</FormLabel>
-                      <p className="text-xs text-muted-foreground mt-1">Select storage types and set capacity details</p>
+                      <FormLabel>Unit / Space Types *</FormLabel>
+                      <p className="text-xs text-muted-foreground mt-1">Select types and set capacity for your {getAssetClassLabel(watchedAssetClass)}</p>
                     </div>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                      {STORAGE_TYPES.map((storageType) => {
+                      {activeUnitTypes.map((storageType) => {
                         const configs = form.watch("storageTypeConfigs") || [];
                         const existingConfig = configs.find((c) => c.storageType === storageType);
                         const isSelected = !!existingConfig;

@@ -101,13 +101,13 @@ export const sidebarConfig: SidebarGroup[] = [
   },
 
   // ─────────────────────────────────────────────────────────────
-  // CRM
+  // CRM (Core Entity Management only)
   // ─────────────────────────────────────────────────────────────
   {
     id: 'crm',
     label: 'CRM',
     icon: Users,
-    matchRoutes: ['/crm', '/contacts', '/companies', '/properties', '/pipeline', '/deals', '/follow-ups', '/activity', '/forecast'],
+    matchRoutes: ['/crm', '/contacts', '/companies', '/properties'],
     requiredModules: [FEATURE_MODULES.CRM_CORE],
     children: [
       {
@@ -134,6 +134,77 @@ export const sidebarConfig: SidebarGroup[] = [
         matchRoutes: ['/crm/properties', '/properties'],
         requiredModules: [FEATURE_MODULES.CRM_CORE],
       },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // PROSPECTING (its own top-level section)
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'prospecting',
+    label: 'Prospecting',
+    icon: Search,
+    matchRoutes: ['/prospecting'],
+    requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
+    children: [
+      {
+        id: 'prospecting-overview',
+        label: 'Overview',
+        href: '/prospecting/overview',
+        icon: Eye,
+        matchRoutes: ['/prospecting/overview'],
+        requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
+      },
+      {
+        id: 'workroom',
+        label: 'Workroom',
+        href: '/prospecting/workroom',
+        icon: Briefcase,
+        matchRoutes: ['/prospecting/workroom', '/workroom'],
+        requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // MARKETING (top-level section)
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    icon: Megaphone,
+    matchRoutes: ['/marketing', '/prospecting/marketing'],
+    requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
+    children: [
+      {
+        id: 'marketing-hub',
+        label: 'Marketing Hub',
+        href: '/marketing',
+        icon: Megaphone,
+        matchRoutes: ['/marketing'],
+        requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
+      },
+      {
+        id: 'campaigns',
+        label: 'Campaigns',
+        href: '/prospecting/campaigns',
+        icon: Activity,
+        matchRoutes: ['/prospecting/campaigns'],
+        requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // PIPELINE (Deal flow — split from CRM)
+  // ─────────────────────────────────────────────────────────────
+  {
+    id: 'pipeline',
+    label: 'Pipeline',
+    icon: Kanban,
+    matchRoutes: ['/pipeline', '/deals', '/follow-ups', '/activity', '/forecast'],
+    requiredModules: [FEATURE_MODULES.CRM_PIPELINE],
+    children: [
       {
         id: 'deals',
         label: 'Deals',
@@ -165,43 +236,6 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: TrendingUp,
         matchRoutes: ['/pipeline/forecast', '/forecast'],
         requiredModules: [FEATURE_MODULES.CRM_FORECAST],
-      },
-    ],
-  },
-
-  // ─────────────────────────────────────────────────────────────
-  // PROSPECTING
-  // ─────────────────────────────────────────────────────────────
-  {
-    id: 'prospecting',
-    label: 'Prospecting',
-    icon: Search,
-    matchRoutes: ['/prospecting', '/marketing'],
-    requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
-    children: [
-      {
-        id: 'prospecting-overview',
-        label: 'Overview',
-        href: '/prospecting/overview',
-        icon: Eye,
-        matchRoutes: ['/prospecting/overview'],
-        requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
-      },
-      {
-        id: 'workroom',
-        label: 'Workroom',
-        href: '/prospecting/workroom',
-        icon: Briefcase,
-        matchRoutes: ['/prospecting/workroom', '/workroom'],
-        requiredModules: [FEATURE_MODULES.PROSPECTING_CORE],
-      },
-      {
-        id: 'marketing',
-        label: 'Marketing',
-        href: '/prospecting/marketing',
-        icon: Megaphone,
-        matchRoutes: ['/prospecting/marketing', '/marketing'],
-        requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
       },
     ],
   },

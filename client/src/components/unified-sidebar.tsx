@@ -15,16 +15,21 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
 import { useDisplayMode } from "@/stores/display-mode-store";
 
-// CRM Navigation (Core CRM - Entity Management)
+// CRM Navigation (Core Entity Management only)
 const crmNav = [
   { name: "Dashboard", href: "/crm" },
   { name: "Contacts", href: "/crm/contacts" },
   { name: "Companies", href: "/crm/companies" },
   { name: "Properties", href: "/crm/properties" },
-  { name: "Prospecting", href: "/prospecting" },
-  { name: "Marketing", href: "/marketing" },
   { name: "Meetings", href: "/crm/meetings" },
   { name: "Settings", href: "/crm/settings" },
+];
+
+// Marketing Navigation (top-level section)
+const marketingNav = [
+  { name: "Marketing Hub", href: "/marketing" },
+  { name: "Campaigns", href: "/prospecting/campaigns" },
+  { name: "Templates", href: "/prospecting/templates" },
 ];
 
 // Pipeline Navigation (Deal flow, marketing, analytics)
@@ -152,7 +157,8 @@ export default function UnifiedSidebar() {
   const [operationsExpanded, setOperationsExpanded] = useState(false); // Default collapsed for Operations
   const [crmExpanded, setCrmExpanded] = useState(false);
   const [pipelineExpanded, setPipelineExpanded] = useState(false); // Pipeline deals section
-  const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting, Analytics
+  const [prospectingExpanded, setProspectingExpanded] = useState(false); // Prospecting section
+  const [marketingExpanded, setMarketingExpanded] = useState(false); // Marketing section
   const [dealWorkspaceExpanded, setDealWorkspaceExpanded] = useState(false); // Consolidated DD, VDR, Modeling
   const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
@@ -269,13 +275,15 @@ export default function UnifiedSidebar() {
   useEffect(() => {
     // Determine which section the current page belongs to
     const isOperationsPage = location.startsWith('/operations/');
-    // CRM: contacts, companies, properties, marketing (core entity management)
-    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing') || location === '/prospecting' || location.startsWith('/prospecting/');
+    // CRM: contacts, companies, properties only (entity management)
+    const isCrmPage = ['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location);
     const isPendingPage = location.includes('/pending-');
     // Pipeline section: Deal Board, Activity Log, Follow-Ups, Forecast
     const isPipelinePage = ['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/');
-    // Prospecting section: Overview and Workroom
-    const isProspectingPage = location === '/prospecting' || location.startsWith('/prospecting/');
+    // Prospecting section: Overview and Workroom only
+    const isProspectingPage = location === '/prospecting' || (location.startsWith('/prospecting/') && !location.startsWith('/prospecting/marketing') && !location.startsWith('/prospecting/campaigns') && !location.startsWith('/prospecting/templates'));
+    // Marketing section
+    const isMarketingPage = location.startsWith('/marketing') || location.startsWith('/prospecting/marketing') || location.startsWith('/prospecting/campaigns') || location.startsWith('/prospecting/templates');
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/dd/');
     // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
@@ -291,8 +299,9 @@ export default function UnifiedSidebar() {
       setOperationsExpanded(true);
     }
     setCrmExpanded(isCrmPage);
-    setPipelineExpanded(isPipelinePage);
     setProspectingExpanded(isProspectingPage);
+    setMarketingExpanded(isMarketingPage);
+    setPipelineExpanded(isPipelinePage);
     setPendingExpanded(isPendingPage);
     setDealWorkspaceExpanded(isDealWorkspacePage);
     setAnalysisExpanded(isUnderwritingToolsPage);
@@ -654,7 +663,7 @@ export default function UnifiedSidebar() {
               icon={Users}
               expanded={crmExpanded} 
               onToggle={() => setCrmExpanded(!crmExpanded)}
-              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location) || location.startsWith('/marketing') || location === '/prospecting' || location.startsWith('/prospecting/')}
+              isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
             />
             {crmExpanded && (
               <>
@@ -688,6 +697,46 @@ export default function UnifiedSidebar() {
                     ))}
                   </div>
                 )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Prospecting Section - Overview and Workroom */}
+        {canViewSection('prospecting') && hasPack('prospecting') && (
+          <div className="mb-2">
+            <SectionHeader
+              title="Prospecting"
+              icon={Search}
+              expanded={prospectingExpanded}
+              onToggle={() => setProspectingExpanded(!prospectingExpanded)}
+              isActive={location === '/prospecting' || (location.startsWith('/prospecting/') && !location.startsWith('/prospecting/marketing') && !location.startsWith('/prospecting/campaigns'))}
+            />
+            {prospectingExpanded && (
+              <>
+                {prospectingNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Marketing Section */}
+        {canViewSection('prospecting') && hasPack('prospecting') && (
+          <div className="mb-2">
+            <SectionHeader
+              title="Marketing"
+              icon={Megaphone}
+              expanded={marketingExpanded}
+              onToggle={() => setMarketingExpanded(!marketingExpanded)}
+              isActive={location.startsWith('/marketing') || location.startsWith('/prospecting/marketing') || location.startsWith('/prospecting/campaigns')}
+            />
+            {marketingExpanded && (
+              <>
+                {marketingNav.map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
               </>
             )}
           </div>

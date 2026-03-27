@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order prioritizes core functionalities. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions.
+The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order: Dashboard → Operations → CRM (Contacts, Companies, Properties) → Prospecting → Marketing → Pipeline (Deals, Tasks, Activity, Forecast) → Deal Workspace → Analysis → Document Studio → Investor Services → MarinaMatch → Docket → Market Intelligence. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions.
 
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.
@@ -43,7 +43,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 - **Dual-Sourced Data Architecture**: Separates "Universal/Global" curated data from user-specific data with Global, Organization, and User scopes.
 - **CRM**: Deals, leads, contacts, pipelines, activities, email sequences, marketing automation, property status tracking, entity relationship management, Comment Threads, Multi-Entity Activity Associations, Saved Views, Computed Rollups, and Source Entity Badges.
 - **Due Diligence**: Project management, task tracking, template management, DD Fees Tracker, and project-level contact management.
-- **Rent Roll V2**: Marina-centric lease management with normalized schema.
+- **Rent Roll V2**: Multi-asset-class lease management (marina, self-storage, multifamily, RV park, hotel/STR, CRE, etc.). `shared/rent-roll-config.ts` drives per-asset-class unit types, field definitions, KPI cards, rate types, and feature flags. `asset_class` column added to `rra_marina_locations`. Project creation wizard (project-hub.tsx) has an asset class picker (step 2) with dynamic unit type lists per asset class.
 - **SalesComps**: Marina sales comparables with import/export, Google Maps integration, validation, and a Pending Sales Comps workflow.
 - **Modeling Projects**: Marina valuation, dynamic year selection, operations data sync, Exit Strategy Suite, AI-powered Document Intelligence, Scenario Versioning, Capital Stack Builder, Pro Forma Engine, Portfolio Roll-ups, Multi-Case Modeling, Addbacks System, and Excel Model Export.
 - **Operations Modules**: Fuel Sales, Ship Store, Dockit (scheduling), and Marketing.
