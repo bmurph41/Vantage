@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor } from "lucide-react";
+import { Plus, Building2, Briefcase, Trash2, MapPin, Anchor, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,6 +43,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ddClient } from "@/lib/ddClient";
 import { apiRequest } from "@/lib/queryClient";
 import type { CrmDeal, CrmProperty } from "@shared/schema";
+import DealFormModal from "@/components/modals/deal-form-modal";
+import PropertyFormModal from "@/components/modals/property-form-modal";
 
 interface PortfolioProperty {
   id: string;
@@ -86,6 +88,8 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
   const queryClient = useQueryClient();
   const [addressInputValue, setAddressInputValue] = useState("");
   const [portfolioProperties, setPortfolioProperties] = useState<PortfolioProperty[]>([]);
+  const [showCreateDeal, setShowCreateDeal] = useState(false);
+  const [showCreateProperty, setShowCreateProperty] = useState(false);
 
   const generatePropertyId = () => `prop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -394,6 +398,10 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                       <FormLabel>Link to Deal</FormLabel>
                       <Select
                         onValueChange={(value) => {
+                          if (value === "_create_new") {
+                            setShowCreateDeal(true);
+                            return;
+                          }
                           field.onChange(value === "_none" ? "" : value);
                         }}
                         value={field.value || "_none"}
@@ -405,6 +413,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="_none">No deal</SelectItem>
+                          <SelectItem value="_create_new">
+                            <span className="flex items-center gap-1.5 text-primary font-medium">
+                              <PlusCircle className="h-3.5 w-3.5" />
+                              Create New Deal
+                            </span>
+                          </SelectItem>
+                          {deals.length > 0 && <Separator className="my-1" />}
                           {deals.map((deal) => (
                             <SelectItem key={deal.id} value={deal.id}>
                               {deal.title || deal.name}
@@ -426,8 +441,14 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Link to Property</FormLabel>
-                      <Select 
-                        onValueChange={(value) => field.onChange(value === "_none" ? "" : value)} 
+                      <Select
+                        onValueChange={(value) => {
+                          if (value === "_create_new") {
+                            setShowCreateProperty(true);
+                            return;
+                          }
+                          field.onChange(value === "_none" ? "" : value);
+                        }}
                         value={field.value || "_none"}
                       >
                         <FormControl>
@@ -437,6 +458,13 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="_none">No property</SelectItem>
+                          <SelectItem value="_create_new">
+                            <span className="flex items-center gap-1.5 text-primary font-medium">
+                              <PlusCircle className="h-3.5 w-3.5" />
+                              Create New Property
+                            </span>
+                          </SelectItem>
+                          {properties.length > 0 && <Separator className="my-1" />}
                           {properties.map((property) => (
                             <SelectItem key={property.id} value={property.id}>
                               {property.title} {property.city ? `- ${property.city}, ${property.state}` : ''}
@@ -618,6 +646,28 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
           </form>
         </Form>
       </DialogContent>
+
+      {/* Inline Deal Creation Modal */}
+      <DealFormModal
+        isOpen={showCreateDeal}
+        onClose={() => {
+          setShowCreateDeal(false);
+          // Refresh deals list so newly created deal appears
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+        }}
+        deal={null}
+      />
+
+      {/* Inline Property Creation Modal */}
+      <PropertyFormModal
+        isOpen={showCreateProperty}
+        onClose={() => {
+          setShowCreateProperty(false);
+          // Refresh properties list so newly created property appears
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/properties"] });
+        }}
+        property={null}
+      />
     </Dialog>
   );
 }

@@ -315,6 +315,7 @@ import { validateFileUpload } from "./middleware/file-upload-security";
 import path from "path";
 import fs from "fs-extra";
 import { exitStudioRouter } from './routes/exit-studio-routes';
+import { generateExitAIInsights } from './services/exit-ai-insights-service';
 import coaRoutes from './routes/coa-routes';
 import coaTaxonomyRoutes from './routes/coa-taxonomy-routes';
 import { propertyDataRouter } from "./routes/property-data-routes";
@@ -946,6 +947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/lead-scoring", authenticateUser, enforceTenant, leadScoringRouter);
   app.use("/api/crm-ext", authenticateUser, enforceTenant, crmExtendedRouter);
   app.use("/api/exit-planning", authenticateUser, enforceTenant, exitPlanningExtRouter);
+  app.use("/api/exit-studio", authenticateUser, enforceTenant, exitStudioRouter);
   app.use("/api/sc", authenticateUser, enforceTenant, salesCompsExtRouter);
   app.use("/api/docket", authenticateUser, enforceTenant, docketExtRouter);
 
@@ -27604,6 +27606,23 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     } catch (error: any) {
       console.error('Failed to delete tax calculation:', error);
       res.status(500).json({ error: 'Failed to delete tax calculation' });
+    }
+  });
+
+  // --- AI EXIT INSIGHTS ---
+
+  app.post('/api/modeling/projects/:projectId/exit/ai-analysis', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const { prompt } = req.body || {};
+      const result = await generateExitAIInsights(projectId, prompt, {
+        orgId: req.user.orgId,
+        userId: req.user.id,
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Exit AI analysis failed:', error);
+      res.status(500).json({ error: 'AI analysis failed' });
     }
   });
 

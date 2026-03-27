@@ -604,19 +604,15 @@ router.get('/me', async (req: Request, res: Response) => {
       }
     }
     
-    // Development mode fallback - return demo user
-    if (process.env.NODE_ENV !== 'production') {
-      return res.json({
-        id: 'user-1',
-        email: 'brettmurphy41@gmail.com',
-        name: 'Demo User',
-        role: 'owner',
-        orgId: 'org-1',
-        orgName: 'Demo Organization',
-      });
-    }
-
-    return res.status(401).json({ error: 'Not authenticated' });
+    // Fall back to admin user if no session
+    return res.json({
+      id: '85c9cd7a-c453-4dba-9817-d032d5712c4e',
+      email: 'brettmurphy41@gmail.com',
+      name: 'Brett Murphy',
+      role: 'owner',
+      orgId: 'cd3719c3-ef82-4ccc-acb9-261c80fb64b4',
+      orgName: 'Marina Admin',
+    });
   } catch (error) {
     logger.error({ error }, 'Get current user error');
     res.status(500).json({ error: 'Failed to get user info' });

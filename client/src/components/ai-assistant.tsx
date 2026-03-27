@@ -112,6 +112,7 @@ export function AIAssistant() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
   const [advisoryMode, setAdvisoryMode] = useState<AdvisoryMode>('general');
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
@@ -185,6 +186,7 @@ export function AIAssistant() {
             timestamp: m.timestamp,
           })),
           advisoryMode,
+          conversationId,
         }),
       });
 
@@ -216,6 +218,9 @@ export function AIAssistant() {
               const jsonStr = trimmedLine.slice(6);
               if (jsonStr) {
                 const data = JSON.parse(jsonStr);
+                if (data.conversationId && !conversationId) {
+                  setConversationId(data.conversationId);
+                }
                 if (data.content) {
                   accumulatedContent += data.content;
                   setStreamingContent(accumulatedContent);
@@ -297,6 +302,7 @@ export function AIAssistant() {
   const clearConversation = () => {
     setMessages([]);
     setStreamingContent('');
+    setConversationId(null);
   };
 
   const handleFeedback = async (messageId: string, feedback: 'helpful' | 'not_helpful') => {
@@ -305,6 +311,11 @@ export function AIAssistant() {
     ));
     
     try {
+      // Find the assistant message and the preceding user message for learning
+      const msgIndex = messages.findIndex(m => m.id === messageId);
+      const assistantMsg = messages[msgIndex];
+      const userMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+
       await fetch('/api/ai-assistant/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -312,7 +323,9 @@ export function AIAssistant() {
           messageId,
           rating: feedback === 'helpful' ? 'positive' : 'negative',
           advisoryMode,
-          page: currentPage,
+          page: location,
+          messageContent: assistantMsg?.content,
+          userQuery: userMsg?.role === 'user' ? userMsg.content : undefined,
         }),
       });
     } catch (error) {

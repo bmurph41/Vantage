@@ -35,8 +35,8 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       }
     }
 
-    // Fall back to demo user in development if no session
-    if (!(req as any).user && process.env.NODE_ENV !== 'production') {
+    // Fall back to admin user if no session
+    if (!(req as any).user) {
       (req as any).user = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",
         orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",

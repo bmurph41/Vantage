@@ -1,14 +1,15 @@
 import OpenAI from "openai";
 import { db } from "../db";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { 
-  crmDeals, 
-  modelingProjects, 
+import {
+  crmDeals,
+  modelingProjects,
   projects,
   crmProperties,
   salesComps,
   aiAssistantFeedback
 } from "@shared/schema";
+import { getRAGContext, learnFromFeedback } from "./knowledge-base-service";
 
 // Use Replit AI Integrations if available (billed to Replit credits), otherwise fall back to user's OpenAI key
 const openai = new OpenAI({ 
@@ -579,11 +580,15 @@ async function getTenantContext(orgId: string, context: AssistantContext): Promi
   }
 }
 
-function buildSystemPrompt(context: AssistantContext, tenantContext: string): string {
+function buildSystemPrompt(context: AssistantContext, tenantContext: string, ragContext: string = ''): string {
   const mode = context.advisoryMode || 'general';
   const advisoryPrompt = ADVISORY_SYSTEM_PROMPTS[mode];
-  
+
   let systemPrompt = advisoryPrompt + '\n\n' + PLATFORM_KNOWLEDGE + '\n\n' + MARINA_INDUSTRY_KNOWLEDGE;
+
+  if (ragContext) {
+    systemPrompt += ragContext;
+  }
   
   const pageContext = Object.entries(PAGE_CONTEXT_PROMPTS).find(([path]) => 
     context.currentPage.startsWith(path) && path !== '/'
@@ -614,10 +619,13 @@ export async function chat(
   userMessage: string,
   context: AssistantContext,
   conversationHistory: ConversationMessage[] = []
-): Promise<string> {
-  const tenantContext = await getTenantContext(context.orgId || '', context);
-  const systemPrompt = buildSystemPrompt(context, tenantContext);
-  
+): Promise<{ response: string; ragChunkIds: string[] }> {
+  const [tenantContext, ragResult] = await Promise.all([
+    getTenantContext(context.orgId || '', context),
+    context.orgId ? getRAGContext(context.orgId, userMessage) : { context: '', chunkIds: [] as string[] },
+  ]);
+  const systemPrompt = buildSystemPrompt(context, tenantContext, ragResult.context);
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
     ...conversationHistory.slice(-10).map(msg => ({
@@ -626,15 +634,16 @@ export async function chat(
     })),
     { role: 'user', content: userMessage }
   ];
-  
+
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o',
       messages,
       max_completion_tokens: 2048,
     });
-    
-    return response.choices[0].message.content || "I'm sorry, I couldn't generate a response. Please try again.";
+
+    const content = response.choices[0].message.content || "I'm sorry, I couldn't generate a response. Please try again.";
+    return { response: content, ragChunkIds: ragResult.chunkIds };
   } catch (error: any) {
     console.error('[AI Assistant] Error:', error);
     throw new Error('Failed to get AI response: ' + error.message);
@@ -646,9 +655,12 @@ export async function* chatStream(
   context: AssistantContext,
   conversationHistory: ConversationMessage[] = []
 ): AsyncGenerator<string> {
-  const tenantContext = await getTenantContext(context.orgId || '', context);
-  const systemPrompt = buildSystemPrompt(context, tenantContext);
-  
+  const [tenantContext, ragResult] = await Promise.all([
+    getTenantContext(context.orgId || '', context),
+    context.orgId ? getRAGContext(context.orgId, userMessage) : { context: '', chunkIds: [] as string[] },
+  ]);
+  const systemPrompt = buildSystemPrompt(context, tenantContext, ragResult.context);
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
     ...conversationHistory.slice(-10).map(msg => ({
@@ -657,15 +669,15 @@ export async function* chatStream(
     })),
     { role: 'user', content: userMessage }
   ];
-  
+
   try {
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o',
       messages,
       max_completion_tokens: 2048,
       stream: true,
     });
-    
+
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
       if (content) {

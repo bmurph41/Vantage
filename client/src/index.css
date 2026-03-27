@@ -2147,6 +2147,142 @@ input[type="range"]::-moz-range-track {
   kbd:not(.mobile-keep) {
     display: none !important;
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     Financial Model Workspace — Mobile Simplification
+     Makes the complex modeling workspace usable on phones
+     without altering any component code.
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* ── Workspace header: stack vertically, compact ── */
+  .ws-nav-strip {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    margin-left: -0.75rem !important;
+    margin-right: -0.75rem !important;
+  }
+
+  /* Group rail: icon-only on mobile, smaller touch targets */
+  [data-testid="tab-groups"] {
+    gap: 0.125rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  [data-testid="tab-groups"] .ws-nav-group {
+    font-size: 10px;
+    padding: 4px 8px 6px;
+    min-width: unset;
+  }
+
+  /* Sub-tab rail: smaller, scrollable */
+  [data-testid="tabs-workspace"] .ws-nav-tab {
+    font-size: 11px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  /* ── Workspace project header: compact, stacked ── */
+  [data-testid="button-save-project"],
+  [data-testid="button-create-om"] {
+    padding: 0 0.5rem !important;
+    font-size: 11px !important;
+  }
+
+  /* Hide less critical header actions on mobile */
+  [data-testid="button-create-om"],
+  .ws-nav-strip + div .desktop-only {
+    display: none !important;
+  }
+
+  /* ── Financial model tables: card-style stacking ── */
+  .fm-table th,
+  .fm-table td {
+    padding: 0.375rem 0.5rem !important;
+    font-size: 12px !important;
+  }
+
+  .fm-table {
+    font-size: 12px;
+  }
+
+  /* ── Stat/KPI grids: single column on mobile ── */
+  [data-tour="valuator-inputs"] .grid,
+  [data-tour="valuator-analysis"] .grid,
+  [data-tour="valuator-scenarios"] .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Cards inside workspace: tighter spacing ── */
+  .space-y-6 > [class*="Card"],
+  .space-y-4 > [class*="Card"] {
+    margin-bottom: 0.75rem;
+  }
+
+  [class*="CardHeader"] {
+    padding: 0.75rem 1rem !important;
+  }
+
+  [class*="CardContent"] {
+    padding: 0.75rem 1rem !important;
+  }
+
+  [class*="CardTitle"] {
+    font-size: 0.9rem !important;
+  }
+
+  /* ── Assumption panels: single column layout ── */
+  .grid.grid-cols-2,
+  .grid.md\\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Charts: constrain height on mobile ── */
+  [class*="recharts-wrapper"],
+  [class*="chart-container"] {
+    max-height: 250px !important;
+  }
+
+  /* ── Accordion sections: compact headers ── */
+  [data-radix-accordion-trigger] {
+    padding: 0.625rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+
+  /* ── Multi-column form layouts: stack ── */
+  .flex.gap-4 > .flex-1,
+  .flex.gap-6 > .flex-1 {
+    min-width: 100% !important;
+  }
+
+  /* ── Workspace content area: reduced padding ── */
+  [role="tabpanel"] {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* ── Side-by-side comparison panels: stack vertically ── */
+  .grid.grid-cols-2.gap-6,
+  .grid.grid-cols-2.gap-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* ── Sensitivity / Monte Carlo tables: scrollable ── */
+  [data-testid*="sensitivity"],
+  [data-testid*="monte-carlo"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Action button bars: wrap on mobile ── */
+  [role="tabpanel"] .flex.items-center.justify-between {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  [role="tabpanel"] .flex.items-center.gap-2 {
+    flex-wrap: wrap;
+  }
 }
 
 /* ── Small phones (< 375px) — extra compact ── */

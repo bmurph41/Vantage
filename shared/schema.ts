@@ -28799,3 +28799,76 @@ export const ddFindings = pgTable("dd_findings", {
 });
 export type DdFinding = typeof ddFindings.$inferSelect;
 export type InsertDdFinding = typeof ddFindings.$inferInsert;
+
+// ─── Knowledge Base ─────────────────────────────────────────────────────────
+// Stores uploaded documents and knowledge entries for RAG-augmented AI chat
+
+export const knowledgeDocuments = pgTable("knowledge_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  sourceType: text("source_type").notNull(), // 'upload' | 'text' | 'url'
+  fileName: text("file_name"),
+  mimeType: text("mime_type"),
+  contentText: text("content_text"), // raw extracted text
+  chunkCount: integer("chunk_count").default(0),
+  status: text("status").notNull().default('processing'), // 'processing' | 'ready' | 'error'
+  metadata: jsonb("metadata").default(sql`'{}'`),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("knowledge_docs_org_idx").on(table.orgId),
+  statusIdx: index("knowledge_docs_status_idx").on(table.status),
+}));
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
+export type InsertKnowledgeDocument = typeof knowledgeDocuments.$inferInsert;
+
+export const knowledgeChunks = pgTable("knowledge_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  contentText: text("content_text").notNull(),
+  embedding: vector("embedding"),
+  tokenCount: integer("token_count"),
+  metadata: jsonb("metadata").default(sql`'{}'`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  docIdx: index("knowledge_chunks_doc_idx").on(table.documentId),
+  orgIdx: index("knowledge_chunks_org_idx").on(table.orgId),
+}));
+export type KnowledgeChunk = typeof knowledgeChunks.$inferSelect;
+export type InsertKnowledgeChunk = typeof knowledgeChunks.$inferInsert;
+
+// Conversation history for learning from user interactions
+export const aiConversations = pgTable("ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  title: text("title"),
+  advisoryMode: text("advisory_mode").default('general'),
+  messageCount: integer("message_count").default(0),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("ai_conversations_org_idx").on(table.orgId),
+  userIdx: index("ai_conversations_user_idx").on(table.userId),
+}));
+export type AiConversation = typeof aiConversations.$inferSelect;
+
+export const aiMessages = pgTable("ai_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => aiConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  advisoryMode: text("advisory_mode"),
+  page: text("page"),
+  ragChunkIds: jsonb("rag_chunk_ids").default(sql`'[]'`), // which knowledge chunks were used
+  feedbackRating: text("feedback_rating"), // 'positive' | 'negative' | null
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  convIdx: index("ai_messages_conv_idx").on(table.conversationId),
+}));
+export type AiMessage = typeof aiMessages.$inferSelect;

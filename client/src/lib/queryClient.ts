@@ -65,27 +65,12 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes - balance between freshness and performance
       gcTime: 10 * 60 * 1000, // 10 minutes - keep unused data cached
-      retry: (failureCount, error) => {
-        // Never retry 401 Unauthorized errors - redirect to login instead
-        if (error instanceof Error && error.message.startsWith('401')) {
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-          return false;
-        }
+      retry: (failureCount) => {
         return failureCount < 1;
       },
     },
     mutations: {
       retry: false,
-      onError: (error) => {
-        // Redirect to login on 401 during mutations
-        if (error instanceof Error && error.message.startsWith('401')) {
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
-        }
-      },
     },
   },
 });

@@ -39,11 +39,10 @@ function PageLoader() {
   );
 }
 
-// Auth guard component - redirects to login if not authenticated
+// Auth guard component - shows loading while auth resolves
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [location] = useLocation();
-  
+  const { isLoading } = useAuth();
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -51,35 +50,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
-  if (!isAuthenticated) {
-    return <Redirect to="/login" />;
-  }
-  
+
   return <>{children}</>;
 }
 
-// Landing page or dashboard redirect based on auth status
+// Always redirect to dashboard
 function LandingOrDashboard() {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  if (isAuthenticated) {
-    return <Redirect to="/dashboard" />;
-  }
-  
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <DesignPreview />
-    </Suspense>
-  );
+  return <Redirect to="/dashboard" />;
 }
 
 // Code-split less frequently used pages
@@ -370,21 +347,16 @@ function useOnboardingCheck() {
 }
 
 // Unified Layout wrapper with sidebar for both DD Tracker and CRM
-// Includes auth guard to redirect unauthenticated users to login
 function UnifiedLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isLoading, user } = useAuth();
   const { showOnboarding, setShowOnboarding, completeOnboarding } = useOnboardingCheck();
-  
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-  
-  if (!isAuthenticated) {
-    return <Redirect to="/login" />;
   }
   
   return (
