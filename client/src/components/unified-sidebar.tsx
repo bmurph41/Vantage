@@ -715,11 +715,11 @@ export default function UnifiedSidebar() {
               isActive={location === '/prospecting' || (location.startsWith('/prospecting/') && !location.startsWith('/prospecting/marketing') && !location.startsWith('/prospecting/campaigns'))}
             />
             {prospectingExpanded && (
-              <>
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {prospectingNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -735,11 +735,11 @@ export default function UnifiedSidebar() {
               isActive={location.startsWith('/marketing') || location.startsWith('/prospecting/marketing') || location.startsWith('/prospecting/campaigns')}
             />
             {marketingExpanded && (
-              <>
+              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {marketingNav.map((item) => (
                   <NavLink key={item.name} item={item} />
                 ))}
-              </>
+              </div>
             )}
           </div>
         )}
