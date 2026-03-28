@@ -110,7 +110,12 @@
       "Bash(getCredential)",
       "Bash(/tmp/nav_analysis.txt:*)",
       "Bash(/tmp/DETAILED_MISMATCH_TABLE.txt:*)",
-      "Bash(/tmp/audit_summary.txt:*)"
+      "Bash(/tmp/audit_summary.txt:*)",
+      "WebFetch(domain:gp-fund-lp-model.replit.app)",
+      "Bash(find /home/runner/workspace/client/src -name *chart* -o -name *graph* -o -name *visual*)",
+      "Bash(find /home/runner/workspace/client/src/components -name *spreadsheet* -o -name *grid* -o -name *table*)",
+      "WebSearch",
+      "Bash(find /home/runner/workspace -maxdepth 3 -name *.png -o -name *.jpg -o -name *.jpeg -o -name *.webp -o -name *.gif -o -name *.bmp)"
     ]
   }
 }
