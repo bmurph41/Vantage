@@ -203,6 +203,14 @@ export const sidebarConfig: SidebarGroup[] = [
         matchRoutes: ['/prospecting/campaigns'],
         requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
       },
+      {
+        id: 'templates',
+        label: 'Templates',
+        href: '/prospecting/templates',
+        icon: FileText,
+        matchRoutes: ['/prospecting/templates'],
+        requiredModules: [FEATURE_MODULES.PROSPECTING_MARKETING],
+      },
     ],
   },
 

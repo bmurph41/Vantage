@@ -101,7 +101,16 @@
       "Bash(jobs -l)",
       "Bash(npm list:*)",
       "Bash(find /home/runner/workspace/client -name *enabled*ops* -o -name *ops*modules*)",
-      "Bash(node -e \"console.log\\(require\\(''recharts/package.json''\\).version\\)\")"
+      "Bash(node -e \"console.log\\(require\\(''recharts/package.json''\\).version\\)\")",
+      "Bash(bash PATCH_SCRIPT.sh 2>&1)",
+      "Bash(find /home/runner/workspace/client/src/pages -name \"*.tsx\" -exec grep -l \"return <>\\\\|return null\\\\|Coming soon\\\\|Under construction\" {})",
+      "Bash(xargs -I {} basename {})",
+      "Bash(process.env)",
+      "Bash(headers)",
+      "Bash(getCredential)",
+      "Bash(/tmp/nav_analysis.txt:*)",
+      "Bash(/tmp/DETAILED_MISMATCH_TABLE.txt:*)",
+      "Bash(/tmp/audit_summary.txt:*)"
     ]
   }
 }

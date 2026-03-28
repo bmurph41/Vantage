@@ -47,7 +47,6 @@ const pipelineDealNav = [
 const prospectingNav = [
   { name: "Prospecting", href: "/prospecting" },
   { name: "Market Targets", href: "/prospecting/markets" },
-  { name: "Campaigns & Templates", href: "/prospecting/campaigns" },
   { name: "Deal Sourcing Analytics", href: "/prospecting/analytics" },
 ];
 
@@ -115,7 +114,7 @@ const analysisNav = [
 
 // Investor Services Navigation (GP users only via pack check)
 const investorServicesNav = [
-  { name: "Fund Management", href: "/modeling/funds" },
+  { name: "Fund Dashboard", href: "/modeling/funds" },
   { name: "LP Portal", href: "/modeling/lp-portal" },
 ];
 
@@ -920,7 +919,7 @@ export default function UnifiedSidebar() {
         {(hasPack('fund_management') || hasPack('lp_portal')) && (
           <div className="mb-2">
             <SectionHeader 
-              title="Investor Services" 
+              title="Fund Management" 
               icon={DollarSign}
               expanded={investorServicesExpanded} 
               onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
