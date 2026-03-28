@@ -10,7 +10,7 @@ import {
   insertBudgetAmountSchema, insertActualsFactSchema,
   type Budget, type BudgetVersion, type BudgetLine, type BudgetAmount, type ActualsFact,
 } from "@shared/schema";
-import { AuthenticatedRequest } from "../middleware/auth-resolver";
+import type { AuthenticatedRequest } from "../middleware/auth-resolver";
 
 const router = Router();
 
@@ -1263,6 +1263,7 @@ router.get("/version/compare", async (req: Request, res: Response, next: NextFun
     gridB.lines.forEach(l => allKeys.add(l.accountKey));
 
     const [budget] = await db.select().from(budgets).where(eq(budgets.id, verA[0].budgetId));
+    if (!budget) return res.status(404).json({ error: "Budget not found for these versions" });
     const months = Array.from({ length: 12 }, (_, i) =>
       `${budget.fiscalYear}-${(i + 1).toString().padStart(2, '0')}-01`
     );

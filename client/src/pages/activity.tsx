@@ -20,7 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 
 type Activity = {
   id: string;
-  type: 'call' | 'email' | 'meeting' | 'note' | 'task' | 'task_created' | 'stage_change' | 'deal_created';
+  type: 'call' | 'email' | 'meeting' | 'note' | 'task' | 'task_created' | 'stage_change' | 'deal_created' | 'lead_activity';
+  lead?: { id: string; name: string; status?: string };
   direction: 'inbound' | 'outbound' | 'internal';
   subject: string;
   description?: string;
@@ -54,6 +55,7 @@ export default function ActivityLog() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [directionFilter, setDirectionFilter] = useState<string>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<string>('all');
+  const [entityFilter, setEntityFilter] = useState<string>('all'); // all | deal | lead | contact | company
   const [showLogForm, setShowLogForm] = useState(false);
   const [newActivity, setNewActivity] = useState({
     subject: '',
@@ -107,7 +109,14 @@ export default function ActivityLog() {
       }
     }
 
-    return matchesSearch && matchesType && matchesDirection && matchesDate;
+    // Entity filter: all | deal | lead | contact | company
+    let matchesEntity = true;
+    if (entityFilter === 'deal') matchesEntity = !!activity.deal;
+    else if (entityFilter === 'lead') matchesEntity = !!(activity as any).lead;
+    else if (entityFilter === 'contact') matchesEntity = !!activity.contact && !activity.deal;
+    else if (entityFilter === 'company') matchesEntity = !!activity.company && !activity.deal;
+
+    return matchesSearch && matchesType && matchesDirection && matchesDate && matchesEntity;
   });
 
   const kpiStats = useMemo(() => {
@@ -514,6 +523,14 @@ export default function ActivityLog() {
                             </Link>
                           )}
                           
+                          {(activity as any).lead && (
+                            <Link href={`/crm/leads/${(activity as any).lead.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 hover:bg-purple-50 cursor-pointer gap-1">
+                                <TrendingUp className="h-2.5 w-2.5 text-purple-600" />
+                                Lead: {(activity as any).lead.name}
+                              </Badge>
+                            </Link>
+                          )}
                           {activity.deal && (
                             <Link href={`/crm/deals/${activity.deal.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                               <Badge variant="outline" className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">

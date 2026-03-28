@@ -50,6 +50,23 @@ const ACTION_TYPES = [
   { value: "assign_owner", label: "Assign Owner" },
 ];
 
+const CONDITION_FIELDS = [
+  { value: "amount", label: "Deal Value" },
+  { value: "probability", label: "Probability %" },
+  { value: "priority", label: "Priority" },
+  { value: "assetClass", label: "Asset Class" },
+  { value: "forecastCategory", label: "Forecast Category" },
+  { value: "daysInCurrentStage", label: "Days in Stage" },
+];
+
+const CONDITION_OPERATORS = [
+  { value: "equals", label: "=" },
+  { value: "not_equals", label: "≠" },
+  { value: "greater_than", label: ">" },
+  { value: "less_than", label: "<" },
+  { value: "contains", label: "contains" },
+];
+
 function getTriggerDescription(rule: AutomationRule): string {
   const config = rule.triggerConfig || {};
   switch (rule.triggerType) {
@@ -98,6 +115,8 @@ export default function AutomationRulesPanel() {
     triggerConfig: {} as any,
     actionType: "send_notification",
     actionConfig: {} as any,
+    // Conditions: array of { field, operator, value } ANDed together
+    conditions: [] as Array<{ field: string; operator: string; value: string }>,
   });
 
   const { data: rules = [], isLoading } = useQuery<AutomationRule[]>({
@@ -468,6 +487,87 @@ export default function AutomationRulesPanel() {
               </div>
             )}
           </div>
+          {/* ── Conditions Section ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-gray-600 font-medium">Run conditions (optional)</Label>
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                onClick={() => setForm(f => ({
+                  ...f,
+                  conditions: [...f.conditions, { field: 'amount', operator: 'greater_than', value: '' }]
+                }))}
+              >
+                <Plus className="h-3 w-3" /> Add condition
+              </button>
+            </div>
+            {form.conditions.length === 0 && (
+              <p className="text-[11px] text-gray-400 italic">No conditions — rule fires on all matching deals</p>
+            )}
+            {form.conditions.map((cond, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Select
+                  value={cond.field}
+                  onValueChange={v => {
+                    const next = [...form.conditions];
+                    next[idx] = { ...next[idx], field: v };
+                    setForm(f => ({ ...f, conditions: next }));
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONDITION_FIELDS.map(f => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={cond.operator}
+                  onValueChange={v => {
+                    const next = [...form.conditions];
+                    next[idx] = { ...next[idx], operator: v };
+                    setForm(f => ({ ...f, conditions: next }));
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs w-16">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONDITION_OPERATORS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="h-7 text-xs flex-1"
+                  placeholder="value"
+                  value={cond.value}
+                  onChange={e => {
+                    const next = [...form.conditions];
+                    next[idx] = { ...next[idx], value: e.target.value };
+                    setForm(f => ({ ...f, conditions: next }));
+                  }}
+                />
+                <button
+                  type="button"
+                  className="text-gray-400 hover:text-red-500"
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    conditions: f.conditions.filter((_, i) => i !== idx)
+                  }))}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            {form.conditions.length > 1 && (
+              <p className="text-[10px] text-gray-400">All conditions must be true (AND logic)</p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowDialog(false); resetForm(); }}>
               Cancel

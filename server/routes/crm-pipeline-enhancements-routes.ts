@@ -6,8 +6,10 @@ import {
   crmActivities,
   crmPipelineStages,
   crmDealStageHistory,
+  crmContacts,
+  crmCompanies,
 } from '@shared/schema';
-import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, isNotNull, count, max } from 'drizzle-orm';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const crmPipelineEnhancementsRouter = Router();
@@ -660,3 +662,59 @@ Provide exactly 3 concise bullet points summarizing the key developments, action
     return res.status(500).json({ error: 'Failed to summarize deal activities' });
   }
 });
+
+// GET /deals/enriched — deals list with activity counts + last-activity-date
+// Used by the Pipeline Kanban to show activity badges on deal cards
+crmPipelineEnhancementsRouter.get('/deals/enriched', async (req, res) => {
+  try {
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Activity counts + last activity date per deal
+    const activityStats = await db
+      .select({
+        dealId: crmActivities.dealId,
+        activityCount: count(crmActivities.id).as('activityCount'),
+        lastActivityDate: max(crmActivities.createdAt).as('lastActivityDate'),
+      })
+      .from(crmActivities)
+      .where(and(
+        eq(crmActivities.orgId, orgId),
+        isNotNull(crmActivities.dealId)
+      ))
+      .groupBy(crmActivities.dealId);
+
+    // Build lookup map
+    const statsMap = new Map(
+      activityStats.map(s => [s.dealId, { activityCount: Number(s.activityCount), lastActivityDate: s.lastActivityDate }])
+    );
+
+    // Fetch deals with contact + company
+    const deals = await db
+      .select({
+        deal: crmDeals,
+        contact: crmContacts,
+        company: crmCompanies,
+      })
+      .from(crmDeals)
+      .leftJoin(crmContacts, eq(crmDeals.primaryContactId, crmContacts.id))
+      .leftJoin(crmCompanies, eq(crmDeals.companyId, crmCompanies.id))
+      .where(eq(crmDeals.orgId, orgId))
+      .orderBy(desc(crmDeals.updatedAt));
+
+    // Merge activity stats
+    const enriched = deals.map(({ deal, contact, company }) => ({
+      ...deal,
+      contact: contact || null,
+      company: company || null,
+      activityCount: statsMap.get(deal.id)?.activityCount || 0,
+      lastActivityDate: statsMap.get(deal.id)?.lastActivityDate || null,
+    }));
+
+    return res.json(enriched);
+  } catch (error) {
+    console.error('Error fetching enriched deals:', error);
+    return res.status(500).json({ error: 'Failed to fetch enriched deals' });
+  }
+});
+

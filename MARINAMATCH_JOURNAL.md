@@ -1,6 +1,94 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-26)
+## Current State (2026-03-28)
+
+### ✅ COMPLETE — Bookkeeping Budget Editor: 4 Sprints + Polish (2026-03-27 → 2026-03-28)
+Production-grade budget creation/editing tool built in 4 sprints, then hardened with audit, UX polish, and export features.
+
+**Sprint 1: Hierarchical Account Tree**
+- New `budget_tree_accounts` table (raw SQL, not Drizzle) with parent/child hierarchy
+- COA templates for 4 asset classes (marina, hotel, multifamily, restaurant) with revenue + OpEx children
+- `GET /api/budgets/version/:versionId/tree-grid` — returns tree + amounts, auto-seeds on first access
+- `PATCH /api/budgets/version/:versionId/cell` — single-cell auto-save on blur
+- Collapsible parent rows (Revenue, Operating Expenses) with chevron toggle
+- Inline editable inputs: Tab→right, Enter→down, Shift+Tab→left, Escape→cancel+restore
+- Sticky Total column (Jan–Dec sum), locked/grayed months prior to current month
+- Parent rows auto-sum children in real time, NOI row computed as Revenue − OpEx
+
+**Sprint 2: Bulk Fill + CSV Import**
+- `POST /api/budgets/version/:versionId/bulk-fill` — 4 modes: spread_evenly, grow_pct, seasonality, copy_prior_year
+- `POST /api/budgets/version/:versionId/import-csv` — fuzzy account/month header matching with word-overlap scoring
+- BulkFillMenu popover ("..." on hover) with mode-specific input forms
+- CSV drag-and-drop zone with import results panel (matched/skipped with reasons)
+
+**Sprint 3: Version Management + Enhanced BVA**
+- `POST /version/:versionId/clone` — deep-clone (lines, amounts, tree)
+- `PATCH /version/:versionId/lock`, `/rename`, `/set-primary`
+- `GET /version/compare?versionA=&versionB=` — side-by-side with per-account variance
+- `GET /bva-enhanced/:budgetId` — per-account per-month Budget|Actual|$Var|%Var with YTD, pulls from actualsFacts + opsBookkeepingGl
+- VersionManager UI: selector, clone, lock/unlock, set primary, compare panel
+- EnhancedBudgetVsActual: expandable rows with monthly drill-down, YTD bold columns, KPI cards
+
+**Sprint 4: Rolling Forecast + AI Assistant**
+- `POST /version/:versionId/rolling-forecast` — creates/updates "Latest Estimate" version (closed months = actuals, future = budget)
+- `POST /ai/seed-assumptions` — analyzes prior year GL, computes YoY growth (clamped ±20-30%), auto-fills with seasonal weights
+- `POST /ai/explain-variance` — fetches GL transactions, builds plain-English explanation with YoY context
+- `POST /ai/what-if` — adjusts driver assumptions, computes baseline vs scenario NOI with monthly comparison
+- AI Budget Assistant collapsible sidebar: Seed from Actuals, Explain Variance, What-If Analysis
+
+**Audit & Fixes**
+- GL fuzzy-match replaced with `matchGlToBudgetLine()` — word-overlap scoring (60% threshold), prevents double-counting
+- Null safety on GL accountName before `.toLowerCase()`
+- CSV import resolves lineType from tree accounts (not hardcoded OPEX)
+- Seed-assumptions returns `skippedAccounts` array with reason
+- Compare button disabled when <2 versions; What-if "Add Driver" disabled when no child rows
+- Auto-save debounced (300ms) with `localAmountsRef` to avoid stale closures
+
+**UX Polish: Async States**
+- No budgets: illustrated empty state with "Create your first budget" CTA + feature pills
+- Grid loading: structural skeleton matching account tree layout (parent + child row shapes)
+- BVA no actuals: amber callout with GL sync guidance (import CSV, connect integration, seed demo)
+- Seed skipped accounts: amber callout in AI sidebar listing each skipped account with reason
+
+**UX Polish: Number Formatting**
+- `formatAmount()`: `$X,XXX` with accounting parens `($X,XXX)` for negatives, "—" for zeros
+- `formatCurrency()`: compact `$45.2K` / `($1.3M)` with same conventions
+- `formatVarPct()`: capped ±999%, always signed, "—" for zeros
+- `formatVarDollar()`: always signed `+$5,000` / `($2,100)`, "—" for zeros
+- 38 call sites updated across editor, BVA, compare, and AI sidebar
+
+**UX Polish: Keyboard Navigation**
+- `findNextCell()` wraps grid boundaries (Dec→Jan next row, last row→first row)
+- Skips locked months during navigation (Tab, Shift+Tab, Enter, Shift+Enter)
+- Escape: cancels debounce timer, restores prior value from `priorCellValue` ref, suppresses blur auto-save via `escapedRef`
+
+**UX Polish: User Feedback**
+- Auto-save: per-cell "Saved" label + emerald ring flash (1.5s), no toast
+- Bulk fill: toast with 5-second Undo button (captures prior values, restores via PATCH)
+- CSV import: bordered result panel with collapsible matched/skipped details
+- Locked cells: fixed tooltip "This version is locked" on click (via `<td>` handler since disabled inputs swallow clicks)
+- AI errors: server error message surfaced in toast descriptions
+
+**Charts Panel**
+- Collapsible "Show charts" toggle above grid (collapsed by default)
+- Budget vs Actual NOI bar chart (recharts): gray budget bars, blue actual bars, transparent for months without actuals
+- Top 5 Expense Variance horizontal bar chart: red for over budget, green for under
+- YTD NOI Attainment gauge: semi-circular arc (PieChart), color thresholds (green/amber/red), percentage + status label
+- Data fetched from bva-enhanced only when panel is open (`enabled: open`)
+
+**Export**
+- Export dropdown (Popover) in editor header with 2 options
+- Download CSV: account tree with indented children, parent sums, NOI row, raw numbers for spreadsheet compatibility
+- Print/PDF: injected `@media print` stylesheet hides controls, shows print header (budget name, version, date), clean table borders, preserved variance colors, no sticky positioning
+- Print-only header: `<div data-print-header>` with budget name + version + fiscal year + export date
+
+**Files Modified:**
+- `server/routes/budget-routes.ts` — ~1960 lines (was 405), 20+ new endpoints
+- `client/src/pages/operations/BudgetingTabbed.tsx` — ~2400 lines (was 883), full rewrite of editor + 10 new components
+
+**Route Registration:** All new endpoints under existing `/api/budgets` mount (no routes.ts changes needed)
+
+---
 
 ### ✅ COMPLETE — Final Pending Items Resolved (2026-03-26)
 All deferred/pending items from the journal now resolved:

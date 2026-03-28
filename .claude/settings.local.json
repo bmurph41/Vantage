@@ -100,7 +100,8 @@
       "Bash(echo \"STATUS:$?\")",
       "Bash(jobs -l)",
       "Bash(npm list:*)",
-      "Bash(find /home/runner/workspace/client -name *enabled*ops* -o -name *ops*modules*)"
+      "Bash(find /home/runner/workspace/client -name *enabled*ops* -o -name *ops*modules*)",
+      "Bash(node -e \"console.log\\(require\\(''recharts/package.json''\\).version\\)\")"
     ]
   }
 }

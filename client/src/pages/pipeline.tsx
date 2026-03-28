@@ -47,6 +47,7 @@ import { useDisplayMode } from "@/stores/display-mode-store";
 import SimpleDealTracker from "@/components/pipeline/SimpleDealTracker";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
+import { PipelineNudges } from "@/components/pipeline/PipelineNudges";
 import { ForecastChart } from "@/components/pipeline/ForecastChart";
 import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSelector";
 import {
@@ -171,6 +172,15 @@ function DealCard({ deal, onClick, rotThreshold = 30 }: DealCardProps) {
                   {(deal as any).probability}% prob
                 </Badge>
               )}
+              {(deal as any).score != null && (
+                  <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 ${
+                    (deal as any).score >= 80 ? 'bg-green-100 text-green-700' :
+                    (deal as any).score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-600'
+                  }`} title="Deal Score">
+                    {(deal as any).score}
+                  </div>
+                )}
             </div>
 
             {/* Company / Contact */}
@@ -447,6 +457,15 @@ export default function Pipeline() {
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Stage entry requirements: { [stageId]: string[] } — loaded from stage config
+  const stageRequirements: Record<string, string[]> = useMemo(() => {
+    if (!stages) return {};
+    return Object.fromEntries(
+      stages
+        .filter(s => (s as any).requiredFields?.length > 0)
+        .map(s => [s.id, (s as any).requiredFields as string[]])
+    );
+  }, [stages]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeAssetClass, setActiveAssetClass] = useState<string>("all");
   const [activeSavedView, setActiveSavedView] = useState<string>("all_deals");
@@ -485,7 +504,7 @@ export default function Pipeline() {
 
   // ── Mutations ──
   const updateDealMutation = useMutation({
-    mutationFn: async ({ dealId, stageId, stage }: { dealId: string; stageId: string; stage: string }) => {
+    mutationFn: async ({ dealId, stageId, stage, fromStageId }: { dealId: string; stageId: string; stage: string; fromStageId?: string }) => {
       const response = await apiRequest("PUT", `/api/deals/${dealId}`, {
         stageId, stage, pipelineId: selectedPipelineId || null,
       });
@@ -505,9 +524,19 @@ export default function Pipeline() {
       if (context?.previousDeals) queryClient.setQueryData(["/api/deals"], context.previousDeals);
       toast({ title: "Failed to update deal", variant: "destructive" });
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/activities"] });
       toast({ title: "Deal moved successfully" });
+      // Fire-and-forget: trigger automation rules evaluation for this stage change
+      if (vars.fromStageId && vars.stageId) {
+        apiRequest("POST", "/api/pipeline/automation/evaluate", {
+          dealId: vars.dealId,
+          fromStageId: vars.fromStageId,
+          toStageId: vars.stageId,
+          triggerType: "stage_change",
+        }).catch(() => {});
+      }
     },
   });
 
@@ -654,7 +683,33 @@ export default function Pipeline() {
     if (currentStageId === targetStageId) { setActiveId(null); return; }
     const targetStage = stages.find(s => s.id === targetStageId);
     if (!targetStage) { setActiveId(null); return; }
-    updateDealMutation.mutate({ dealId, stageId: targetStageId, stage: targetStage.name });
+
+    // ── Stage entry requirement gate ──
+    const required = stageRequirements[targetStageId] || [];
+    if (required.length > 0) {
+      const missingFields = required.filter(f => {
+        const val = (deal as any)[f];
+        return val === null || val === undefined || val === '' || val === 0;
+      });
+      if (missingFields.length > 0) {
+        const labels: Record<string, string> = {
+          amount: 'Deal Value', probability: 'Probability', expectedCloseDate: 'Close Date',
+          primaryContactId: 'Primary Contact', companyId: 'Company',
+          ddExpirationDate: 'DD Expiration', psaSignedDate: 'PSA Date',
+        };
+        const readable = missingFields.map(f => labels[f] || f).join(', ');
+        toast({
+          title: "⛔ Stage requirements not met",
+          description: `To move to "${targetStage.name}", complete: ${readable}`,
+          variant: "destructive",
+          duration: 5000,
+        });
+        setActiveId(null);
+        return;
+      }
+    }
+
+    updateDealMutation.mutate({ dealId, stageId: targetStageId, stage: targetStage.name, fromStageId: currentStageId });
     setActiveId(null);
   };
 
@@ -885,6 +940,37 @@ export default function Pipeline() {
               <TrendingUp className="w-3.5 h-3.5 mr-1" /> Forecast
             </Button>
 
+            <Button
+              variant={showNudges ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setShowNudges(!showNudges)}
+            >
+              <Zap className="h-3.5 w-3.5 mr-1" />
+              Nudges
+              {deals.filter(d => {
+                const last = (d as any).lastActivityDate;
+                return !last || (Date.now() - new Date(last).getTime()) / 86400000 > 14;
+              }).length > 0 && (
+                <span className="ml-1 bg-red-500 text-white text-[9px] rounded-full px-1">
+                  {deals.filter(d => {
+                    const last = (d as any).lastActivityDate;
+                    return !last || (Date.now() - new Date(last).getTime()) / 86400000 > 14;
+                  }).length}
+                </span>
+              )}
+            </Button>
+            {selectedForComparison.size >= 2 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                onClick={() => setShowComparison(true)}
+              >
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                Compare {selectedForComparison.size}
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setIsSettingsOpen(true)}>
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Stages
             </Button>
@@ -1029,7 +1115,17 @@ export default function Pipeline() {
                       return (
                         <tr
                           key={deal.id}
-                          onClick={() => handleDealClick(deal)}
+                          onClick={(e) => {
+                              if (e.shiftKey) {
+                                setSelectedForComparison(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(deal.id)) { next.delete(deal.id); } else { next.add(deal.id); }
+                                  return next;
+                                });
+                              } else {
+                                handleDealClick(deal);
+                              }
+                            }}
                           className={`hover:bg-gray-50 cursor-pointer transition-colors ${rotting ? 'bg-red-50/30' : ''}`}
                         >
                           <td className="px-4 py-3">

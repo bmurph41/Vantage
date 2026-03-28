@@ -84,6 +84,7 @@ export default function LeadsPage() {
   const [detailLead, setDetailLead] = useState<Lead | null>(null);
   const [isConversionModalOpen, setIsConversionModalOpen] = useState(false);
   const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
+  const [selectedLeadForActivity, setSelectedLeadForActivity] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Fetch leads

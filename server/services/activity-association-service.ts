@@ -94,6 +94,20 @@ export async function associateActivity(
       for (const c of companies) {
         addTarget('company', c.companyId, false);
       }
+    } else if (originObjectType === 'lead') {
+      // When an activity is logged on a lead, auto-associate with its contact/company if converted
+      try {
+        const { crmLeads } = await import('@shared/schema');
+        const leadResults = await db
+          .select({ primaryContactId: crmLeads.primaryContactId, accountId: crmLeads.accountId })
+          .from(crmLeads)
+          .where(and(eq(crmLeads.id, originObjectId), eq(crmLeads.orgId, orgId)));
+        const lead = leadResults[0];
+        if (lead?.primaryContactId) addTarget('contact', lead.primaryContactId, false);
+        if (lead?.accountId) addTarget('company', lead.accountId, false);
+      } catch (leadErr) {
+        // Schema mismatch or table doesn't exist — non-fatal
+      }
     } else if (originObjectType === 'deal') {
       const [deal] = await db.select({
         contactId: crmDeals.contactId,

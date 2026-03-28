@@ -12,14 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
-  Plus, FileText, Calendar, DollarSign, TrendingUp, TrendingDown, ArrowUpRight,
+  Plus, FileText, Calendar, DollarSign, TrendingUp, ArrowUpRight,
   ArrowDownRight, BarChart3, Trash2, Lock, Unlock, CheckCircle2, AlertCircle,
   Save, RefreshCw, ChevronRight, Minus, MoreHorizontal, SplitSquareVertical,
-  Percent, BarChart2, Copy, Upload, Zap, BrainCircuit, PanelRightOpen,
-  PanelRightClose, Lightbulb, HelpCircle, Sliders, ChevronDown
+  Percent, BarChart2, Copy, Upload, Zap, BrainCircuit,
+  PanelRightClose, Lightbulb, HelpCircle, Sliders, ChevronDown, Download, Printer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell, PieChart, Pie,
+} from "recharts";
 
 type Budget = {
   id: string;
@@ -38,31 +43,6 @@ type BudgetVersion = {
   budgetId: string;
   name: string;
   isPrimary: boolean;
-};
-
-type BudgetLine = {
-  id: string;
-  budgetVersionId: string;
-  sortOrder: number;
-  lineType: string;
-  accountKey: string;
-  displayName: string;
-};
-
-type BvaLine = BudgetLine & {
-  monthly: { month: string; budget: number; actual: number; varDollar: number; varPct: number; favorable: boolean }[];
-  totals: { budget: number; actual: number; varDollar: number; varPct: number; favorable: boolean };
-};
-
-type BvaData = {
-  budget: Budget;
-  lines: BvaLine[];
-  summary: {
-    totalRevenueBudget: number; totalRevenueActual: number;
-    totalExpenseBudget: number; totalExpenseActual: number;
-    noiBudget: number; noiActual: number;
-  };
-  months: string[];
 };
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -444,8 +424,13 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   const [localAmounts, setLocalAmounts] = useState<Record<string, Record<string, string>>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [aiOpen, setAiOpen] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(false);
+  const [savedCells, setSavedCells] = useState<Set<string>>(new Set());
+  const [lockedMessage, setLockedMessage] = useState<{ x: number; y: number; reason: string } | null>(null);
   const cellRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const savingRef = useRef<Set<string>>(new Set());
+  const savedTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const bulkFillUndo = useRef<{ versionId: string; accountKey: string; prev: Record<string, string> } | null>(null);
 
   const { data: treeGrid, isLoading } = useQuery<TreeGridData>({
     queryKey: ["/api/budgets/version", version.id, "tree-grid"],
@@ -501,6 +486,16 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   // Debounce timers per cell
   const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const t of debounceTimers.current.values()) clearTimeout(t);
+      debounceTimers.current.clear();
+      for (const t of savedTimers.current.values()) clearTimeout(t);
+      savedTimers.current.clear();
+    };
+  }, []);
+
   const autoSave = useCallback(async (accountKey: string, periodStart: string, amount: string) => {
     const cellKey = `${accountKey}|${periodStart}`;
     if (savingRef.current.has(cellKey)) return;
@@ -511,8 +506,20 @@ function BudgetEditor({ budget, version, onVersionChange }: {
         periodStart,
         amount,
       });
-    } catch {
-      toast({ title: "Auto-save failed", description: `Could not save ${accountKey}`, variant: "destructive" });
+      // Flash "Saved" indicator for this cell
+      setSavedCells(prev => new Set(prev).add(cellKey));
+      const existingTimer = savedTimers.current.get(cellKey);
+      if (existingTimer) clearTimeout(existingTimer);
+      savedTimers.current.set(cellKey, setTimeout(() => {
+        setSavedCells(prev => {
+          const next = new Set(prev);
+          next.delete(cellKey);
+          return next;
+        });
+        savedTimers.current.delete(cellKey);
+      }, 1500));
+    } catch (err: any) {
+      toast({ title: "Auto-save failed", description: err?.message || `Could not save ${accountKey}`, variant: "destructive" });
     } finally {
       savingRef.current.delete(cellKey);
     }
@@ -531,8 +538,12 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   }, []);
 
   const handleCellBlur = useCallback((accountKey: string, month: string) => {
-    // Read from ref to avoid stale closure on localAmounts
     const cellKey = `${accountKey}|${month}`;
+    // If Escape was pressed, skip auto-save entirely
+    if (escapedRef.current.has(cellKey)) {
+      escapedRef.current.delete(cellKey);
+      return;
+    }
     // Clear any existing debounce for this cell
     const existing = debounceTimers.current.get(cellKey);
     if (existing) clearTimeout(existing);
@@ -569,47 +580,115 @@ function BudgetEditor({ budget, version, onVersionChange }: {
     return treeGrid.tree.filter(r => !r.isParent).sort((a, b) => a.sortOrder - b.sortOrder);
   }, [treeGrid?.tree]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>, accountKey: string, monthIdx: number) => {
-    const rowIdx = childRows.findIndex(r => r.accountKey === accountKey);
-    if (rowIdx === -1) return;
+  // Store the value a cell had when it was focused, so Escape can restore it
+  const priorCellValue = useRef<{ key: string; value: string } | null>(null);
+  // Flag to suppress the blur auto-save after Escape
+  const escapedRef = useRef<Set<string>>(new Set());
 
-    let targetRow = rowIdx;
-    let targetMonth = monthIdx;
+  const handleCellFocus = useCallback((accountKey: string, month: string) => {
+    const val = localAmountsRef.current[accountKey]?.[month] || '0';
+    priorCellValue.current = { key: `${accountKey}|${month}`, value: val };
+  }, []);
 
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      if (e.shiftKey) {
-        targetMonth = monthIdx - 1;
-        if (targetMonth < 0) { targetMonth = 11; targetRow = rowIdx - 1; }
-      } else {
-        targetMonth = monthIdx + 1;
-        if (targetMonth > 11) { targetMonth = 0; targetRow = rowIdx + 1; }
+  /**
+   * Find the next unlocked cell in a given direction.
+   * Returns { row, month } or null if no valid target exists (wraps around grid).
+   */
+  const findNextCell = useCallback((
+    startRow: number,
+    startMonth: number,
+    direction: 'right' | 'left' | 'down' | 'up',
+  ): { row: number; month: number } | null => {
+    const totalCells = childRows.length * 12;
+    let row = startRow;
+    let month = startMonth;
+
+    for (let i = 0; i < totalCells; i++) {
+      // Advance one step
+      if (direction === 'right') {
+        month++;
+        if (month > 11) { month = 0; row++; }
+        if (row >= childRows.length) row = 0; // wrap to top
+      } else if (direction === 'left') {
+        month--;
+        if (month < 0) { month = 11; row--; }
+        if (row < 0) row = childRows.length - 1; // wrap to bottom
+      } else if (direction === 'down') {
+        row++;
+        if (row >= childRows.length) row = 0;
+      } else { // up
+        row--;
+        if (row < 0) row = childRows.length - 1;
       }
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      targetRow = e.shiftKey ? rowIdx - 1 : rowIdx + 1;
-    } else {
-      return;
-    }
 
-    if (targetRow < 0 || targetRow >= childRows.length) return;
-    // Skip locked months
-    const targetMonthStr = months[targetMonth];
-    if (lockedMonths.has(targetMonthStr)) return;
+      // Check if this cell is unlocked
+      const monthStr = months[month];
+      if (!lockedMonths.has(monthStr)) {
+        return { row, month };
+      }
+    }
+    return null; // All cells locked (shouldn't happen)
+  }, [childRows, months, lockedMonths]);
+
+  const focusCell = useCallback((targetRow: number, targetMonth: number) => {
+    const targetChild = childRows[targetRow];
+    if (!targetChild) return;
 
     // Ensure parent is expanded
-    const targetChild = childRows[targetRow];
     if (targetChild.parentKey && collapsed[targetChild.parentKey]) {
       setCollapsed(prev => ({ ...prev, [targetChild.parentKey!]: false }));
     }
 
     const refKey = `${targetChild.accountKey}|${targetMonth}`;
-    // Use setTimeout to let any collapse re-render happen first
     setTimeout(() => {
       const input = cellRefs.current.get(refKey);
       if (input) { input.focus(); input.select(); }
     }, 0);
-  }, [childRows, months, lockedMonths, collapsed]);
+  }, [childRows, collapsed]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>, accountKey: string, monthIdx: number) => {
+    const rowIdx = childRows.findIndex(r => r.accountKey === accountKey);
+    if (rowIdx === -1) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // Cancel any pending debounce for this cell
+      const cellKey = `${accountKey}|${months[monthIdx]}`;
+      const pendingTimer = debounceTimers.current.get(cellKey);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        debounceTimers.current.delete(cellKey);
+      }
+      // Restore prior value
+      if (priorCellValue.current && priorCellValue.current.key === cellKey) {
+        setLocalAmounts(prev => ({
+          ...prev,
+          [accountKey]: { ...(prev[accountKey] || {}), [months[monthIdx]]: priorCellValue.current!.value },
+        }));
+      }
+      // Mark this cell as escaped so blur handler skips auto-save
+      escapedRef.current.add(cellKey);
+      // Blur the input
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+
+    let target: { row: number; month: number } | null = null;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      target = findNextCell(rowIdx, monthIdx, e.shiftKey ? 'left' : 'right');
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      target = findNextCell(rowIdx, monthIdx, e.shiftKey ? 'up' : 'down');
+    } else {
+      return;
+    }
+
+    if (target) {
+      focusCell(target.row, target.month);
+    }
+  }, [childRows, months, findNextCell, focusCell]);
 
   if (isLoading || !treeGrid) {
     return (
@@ -678,6 +757,105 @@ function BudgetEditor({ budget, version, onVersionChange }: {
   const parents = tree.filter(r => r.isParent).sort((a, b) => a.sortOrder - b.sortOrder);
   const isLocked = budget.status === "LOCKED" || (version as any).isLocked === true;
 
+  // ---------------------------------------------------------------------------
+  // Export: CSV download
+  // ---------------------------------------------------------------------------
+  const exportCsv = useCallback(() => {
+    if (!treeGrid) return;
+    const tree = treeGrid.tree;
+    const par = tree.filter(r => r.isParent).sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const csvRows: string[] = [];
+    const header = ['Account', ...MONTHS_SHORT, 'Total'];
+    csvRows.push(header.map(h => `"${h}"`).join(','));
+
+    for (const parent of par) {
+      const children = tree.filter(r => r.parentKey === parent.accountKey && !r.isParent)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      // Parent row — summed
+      const parentMonthVals = months.map(m => getParentMonthTotal(parent.accountKey, m, tree));
+      const parentTotal = parentMonthVals.reduce((s, v) => s + v, 0);
+      csvRows.push([
+        `"${parent.displayName}"`,
+        ...parentMonthVals.map(v => v.toString()),
+        parentTotal.toString(),
+      ].join(','));
+
+      // Child rows — indented with 2 spaces
+      for (const child of children) {
+        const childVals = months.map(m => getCellValue(child.accountKey, m));
+        const childTotal = childVals.reduce((s, v) => s + parseFloat(v || '0'), 0);
+        csvRows.push([
+          `"  ${child.displayName}"`,
+          ...childVals.map(v => parseFloat(v || '0').toString()),
+          childTotal.toString(),
+        ].join(','));
+      }
+    }
+
+    // NOI row
+    const noiVals = months.map(m => {
+      const rev = getParentMonthTotal("REVENUE", m, tree);
+      const exp = getParentMonthTotal("OPEX", m, tree);
+      return rev - exp;
+    });
+    const noiAnnual = noiVals.reduce((s, v) => s + v, 0);
+    csvRows.push([
+      '"Net Operating Income"',
+      ...noiVals.map(v => v.toString()),
+      noiAnnual.toString(),
+    ].join(','));
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${budget.name} - ${version.name} FY${budget.fiscalYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [treeGrid, months, getCellValue, getParentMonthTotal, budget, version]);
+
+  // ---------------------------------------------------------------------------
+  // Export: Print / PDF
+  // ---------------------------------------------------------------------------
+  const exportPrint = useCallback(() => {
+    // Inject a print stylesheet if not already present
+    if (!document.getElementById('budget-print-styles')) {
+      const style = document.createElement('style');
+      style.id = 'budget-print-styles';
+      style.textContent = `
+        @media print {
+          /* Hide everything except the budget grid */
+          nav, aside, header, footer,
+          [data-print-hide],
+          .no-print,
+          button, .fixed { display: none !important; }
+
+          /* Show the print header */
+          [data-print-header] { display: block !important; }
+
+          /* Make grid fill the page */
+          body { margin: 0; padding: 0; font-size: 11px; }
+          table { width: 100% !important; border-collapse: collapse; page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          th, td { border: 1px solid #d1d5db; padding: 4px 8px; }
+          th { background: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          /* Color preservation */
+          .text-emerald-600, .text-green-600 { color: #059669 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .text-red-600 { color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .bg-emerald-50\\/70, .bg-red-50\\/70 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          /* Sticky positioning breaks in print */
+          .sticky { position: static !important; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    window.print();
+  }, []);
+
   // NOI computation
   const getNoiMonth = (month: string) => {
     const rev = getParentMonthTotal("REVENUE", month, tree);
@@ -693,11 +871,41 @@ function BudgetEditor({ budget, version, onVersionChange }: {
           <h2 className="text-lg font-semibold">{budget.name}</h2>
           <p className="text-sm text-muted-foreground">FY {budget.fiscalYear}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-print-hide>
           <Badge variant="outline" className="text-xs text-muted-foreground">
             <Save className="h-3 w-3 mr-1" />
             Auto-saves on blur
           </Badge>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 text-xs">
+                <Download className="h-3 w-3 mr-1" />
+                Export
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="end">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left"
+                onClick={exportCsv}
+              >
+                <Download className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">Download CSV</div>
+                  <div className="text-xs text-muted-foreground">Spreadsheet format</div>
+                </div>
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left"
+                onClick={exportPrint}
+              >
+                <Printer className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">Print / PDF</div>
+                  <div className="text-xs text-muted-foreground">Print-ready layout</div>
+                </div>
+              </button>
+            </PopoverContent>
+          </Popover>
           <Button
             size="sm"
             variant={aiOpen ? "default" : "outline"}
@@ -710,18 +918,38 @@ function BudgetEditor({ budget, version, onVersionChange }: {
         </div>
       </div>
 
-      <VersionManager
-        budgetId={budget.id}
-        currentVersion={version}
-        onVersionChange={onVersionChange}
-      />
+      {/* Print-only header — hidden on screen, shown when printing */}
+      <div data-print-header className="hidden">
+        <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{budget.name}</h1>
+        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>
+          Version: {version.name} | Fiscal Year {budget.fiscalYear} | Exported {new Date().toLocaleDateString()}
+        </p>
+      </div>
 
-      <CsvDropZone
-        versionId={version.id}
-        onImported={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
-        }}
-      />
+      <div data-print-hide>
+        <VersionManager
+          budgetId={budget.id}
+          currentVersion={version}
+          onVersionChange={onVersionChange}
+        />
+      </div>
+
+      <div data-print-hide>
+        <CsvDropZone
+          versionId={version.id}
+          onImported={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
+          }}
+        />
+      </div>
+
+      <div data-print-hide>
+        <BudgetChartsPanel
+          budgetId={budget.id}
+          open={chartsOpen}
+          onToggle={() => setChartsOpen(prev => !prev)}
+        />
+      </div>
 
       <div className={cn("flex gap-4", aiOpen && "")}>
       <div className={cn("border rounded-lg overflow-auto max-h-[75vh]", aiOpen ? "flex-1 min-w-0" : "w-full")}>
@@ -794,6 +1022,7 @@ function BudgetEditor({ budget, version, onVersionChange }: {
                               versionId={version.id}
                               accountKey={child.accountKey}
                               displayName={child.displayName}
+                              currentAmounts={localAmountsRef.current[child.accountKey] || {}}
                               onFilled={() => {
                                 queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
                               }}
@@ -805,8 +1034,19 @@ function BudgetEditor({ budget, version, onVersionChange }: {
                         const locked = lockedMonths.has(m);
                         const cellDisabled = isLocked || locked;
                         const refKey = `${child.accountKey}|${mi}`;
+                        const saveCellKey = `${child.accountKey}|${m}`;
+                        const justSaved = savedCells.has(saveCellKey);
                         return (
-                          <td key={m} className="px-0.5 py-0.5">
+                          <td
+                            key={m}
+                            className="px-0.5 py-0.5 relative"
+                            onClick={cellDisabled ? (e) => {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              const reason = isLocked ? "This version is locked" : "Past months cannot be edited";
+                              setLockedMessage({ x: rect.left + rect.width / 2, y: rect.top, reason });
+                              setTimeout(() => setLockedMessage(null), 2000);
+                            } : undefined}
+                          >
                             <input
                               ref={(el) => {
                                 if (el) cellRefs.current.set(refKey, el);
@@ -817,14 +1057,21 @@ function BudgetEditor({ budget, version, onVersionChange }: {
                                 "w-full text-right px-2 py-1 text-sm rounded transition-colors tabular-nums",
                                 cellDisabled
                                   ? "bg-muted/40 text-muted-foreground/50 cursor-not-allowed"
-                                  : "bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                  : "bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                                justSaved && "ring-1 ring-emerald-400/50"
                               )}
                               value={getCellValue(child.accountKey, m)}
+                              onFocus={() => handleCellFocus(child.accountKey, m)}
                               onChange={(e) => handleCellChange(child.accountKey, m, e.target.value)}
                               onBlur={() => handleCellBlur(child.accountKey, m)}
                               onKeyDown={(e) => handleKeyDown(e, child.accountKey, mi)}
                               disabled={cellDisabled}
                             />
+                            {justSaved && (
+                              <span className="absolute -top-1 right-0 text-[9px] text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in zoom-in duration-200">
+                                Saved
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -866,6 +1113,7 @@ function BudgetEditor({ budget, version, onVersionChange }: {
 
       {/* AI Assistant Sidebar */}
       {aiOpen && (
+        <div data-print-hide>
         <AiBudgetAssistant
           versionId={version.id}
           childRows={childRows}
@@ -873,7 +1121,257 @@ function BudgetEditor({ budget, version, onVersionChange }: {
             queryClient.invalidateQueries({ queryKey: ["/api/budgets/version", version.id, "tree-grid"] });
           }}
         />
+        </div>
       )}
+      </div>
+
+      {/* Locked version tooltip */}
+      {lockedMessage && (
+        <div
+          className="fixed z-50 px-3 py-1.5 rounded-md bg-slate-900 text-white text-xs font-medium shadow-lg animate-in fade-in zoom-in duration-150 pointer-events-none"
+          style={{ left: lockedMessage.x, top: lockedMessage.y - 32, transform: 'translateX(-50%)' }}
+        >
+          {lockedMessage.reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BudgetChartsPanel — Collapsible charts above the grid
+// ---------------------------------------------------------------------------
+const CHART_COLORS = {
+  budget: '#94a3b8',    // slate-400
+  actual: '#3b82f6',    // blue-500
+  positive: '#10b981',  // emerald-500
+  negative: '#ef4444',  // red-500
+  gaugeTrack: '#e2e8f0', // slate-200
+  gaugeArc: '#3b82f6',  // blue-500
+};
+
+function BudgetChartsPanel({ budgetId, open, onToggle }: {
+  budgetId: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  // Only fetch BVA data when panel is open
+  const { data } = useQuery<EnhancedBvaData>({
+    queryKey: ["/api/budgets/bva-enhanced", budgetId, "charts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/budgets/bva-enhanced/${budgetId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load chart data");
+      return res.json();
+    },
+    enabled: open,
+    staleTime: 30000,
+  });
+
+  // (1) NOI bar chart data — only months with actuals
+  const noiBarData = useMemo(() => {
+    if (!data?.lines?.length) return [];
+    return data.months.map((m, i) => {
+      let budgetRev = 0, budgetExp = 0, actualRev = 0, actualExp = 0;
+      for (const line of data.lines) {
+        const md = line.monthly[i];
+        if (!md) continue;
+        if (['REVENUE', 'OTHER_INCOME'].includes(line.lineType)) {
+          budgetRev += md.budget;
+          actualRev += md.actual;
+        } else {
+          budgetExp += md.budget;
+          actualExp += md.actual;
+        }
+      }
+      const budgetNoi = budgetRev - budgetExp;
+      const actualNoi = actualRev - actualExp;
+      const hasActual = data.lines.some(l => l.monthly[i]?.actual !== 0);
+      return {
+        month: MONTHS_SHORT[i],
+        budget: Math.round(budgetNoi),
+        actual: hasActual ? Math.round(actualNoi) : null,
+      };
+    });
+  }, [data]);
+
+  // (2) Top 5 expense variance — sorted by absolute variance, expenses only
+  const expenseVarData = useMemo(() => {
+    if (!data?.lines?.length) return [];
+    return data.lines
+      .filter(l => ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(l.lineType))
+      .map(l => ({
+        name: l.displayName.length > 18 ? l.displayName.slice(0, 16) + '...' : l.displayName,
+        fullName: l.displayName,
+        variance: l.annual.varDollar,
+        overBudget: l.annual.varDollar > 0,
+      }))
+      .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
+      .slice(0, 5);
+  }, [data]);
+
+  // (3) YTD attainment gauge
+  const attainment = useMemo(() => {
+    if (!data?.summary) return null;
+    const { ytdNoiBudget, ytdNoiActual } = data.summary;
+    if (ytdNoiBudget <= 0) return null; // Gauge is meaningless when budgeted NOI is zero or negative
+    const pct = (ytdNoiActual / ytdNoiBudget) * 100;
+    return { pct: Math.round(pct * 10) / 10, actual: ytdNoiActual, budget: ytdNoiBudget };
+  }, [data]);
+
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
+      >
+        <BarChart3 className="h-3.5 w-3.5" />
+        <span>{open ? 'Hide charts' : 'Show charts'}</span>
+        <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          {/* Chart 1: Budget vs Actual NOI by month */}
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Budget vs Actual NOI</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-3">
+              {noiBarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={noiBarData} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [formatAmount(value), name === 'budget' ? 'Budget' : 'Actual']}
+                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="budget" fill={CHART_COLORS.budget} radius={[2, 2, 0, 0]} barSize={10} name="budget" />
+                    <Bar dataKey="actual" radius={[2, 2, 0, 0]} barSize={10} name="actual">
+                      {noiBarData.map((entry, idx) => (
+                        <Cell
+                          key={idx}
+                          fill={entry.actual === null ? 'transparent' : CHART_COLORS.actual}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[160px] flex items-center justify-center text-xs text-muted-foreground">No data</div>
+              )}
+              <div className="flex items-center justify-center gap-4 mt-1 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: CHART_COLORS.budget }} /> Budget</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: CHART_COLORS.actual }} /> Actual</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chart 2: Top 5 Expense Variance */}
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Top 5 Expense Variances</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-3">
+              {expenseVarData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={expenseVarData} layout="vertical" margin={{ top: 5, right: 10, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={70} />
+                    <Tooltip
+                      formatter={(value: number) => [formatVarDollar(value), 'Variance']}
+                      labelFormatter={(label) => {
+                        const item = expenseVarData.find(d => d.name === label);
+                        return item?.fullName || label;
+                      }}
+                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="variance" radius={[0, 3, 3, 0]} barSize={14}>
+                      {expenseVarData.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.overBudget ? CHART_COLORS.negative : CHART_COLORS.positive} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[160px] flex items-center justify-center text-xs text-muted-foreground">No expense data</div>
+              )}
+              <div className="flex items-center justify-center gap-4 mt-1 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: CHART_COLORS.negative }} /> Over budget</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ background: CHART_COLORS.positive }} /> Under budget</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chart 3: YTD Budget Attainment Gauge */}
+          <Card>
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">YTD NOI Attainment</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-3">
+              {attainment ? (
+                <AttainmentGauge pct={attainment.pct} actual={attainment.actual} budget={attainment.budget} />
+              ) : (
+                <div className="h-[160px] flex items-center justify-center text-xs text-muted-foreground">No YTD data</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Simple arc gauge for YTD attainment using recharts Pie */
+function AttainmentGauge({ pct, actual, budget }: { pct: number; actual: number; budget: number }) {
+  const clamped = Math.max(0, Math.min(200, pct));
+  const filled = (clamped / 200) * 180; // Map 0-200% to 0-180 degrees
+  const remaining = 180 - filled;
+  const gaugeColor = pct >= 90 ? CHART_COLORS.positive : pct >= 70 ? '#f59e0b' : CHART_COLORS.negative;
+
+  const data = [
+    { value: filled, fill: gaugeColor },
+    { value: remaining, fill: CHART_COLORS.gaugeTrack },
+  ];
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative" style={{ width: 160, height: 100 }}>
+        <ResponsiveContainer width={160} height={160}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx={80}
+              cy={95}
+              startAngle={180}
+              endAngle={0}
+              innerRadius={52}
+              outerRadius={72}
+              dataKey="value"
+              stroke="none"
+              isAnimationActive={true}
+            >
+              {data.map((entry, idx) => (
+                <Cell key={idx} fill={entry.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
+          <span className="text-2xl font-bold tabular-nums" style={{ color: gaugeColor }}>
+            {pct.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+      <div className="text-center mt-1 space-y-0.5">
+        <div className="text-xs text-muted-foreground">
+          {formatCurrency(actual)} actual / {formatCurrency(budget)} budget
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          {pct >= 100 ? 'On or above target' : pct >= 90 ? 'Nearly on target' : pct >= 70 ? 'Below target' : 'Significantly behind'}
+        </div>
       </div>
     </div>
   );
@@ -882,10 +1380,11 @@ function BudgetEditor({ budget, version, onVersionChange }: {
 // ---------------------------------------------------------------------------
 // BulkFillMenu — "..." popover on each child row
 // ---------------------------------------------------------------------------
-function BulkFillMenu({ versionId, accountKey, displayName, onFilled }: {
+function BulkFillMenu({ versionId, accountKey, displayName, currentAmounts, onFilled }: {
   versionId: string;
   accountKey: string;
   displayName: string;
+  currentAmounts: Record<string, string>;
   onFilled: () => void;
 }) {
   const { toast } = useToast();
@@ -895,16 +1394,50 @@ function BulkFillMenu({ versionId, accountKey, displayName, onFilled }: {
   const [janValue, setJanValue] = useState("");
   const [growthRate, setGrowthRate] = useState("");
   const [upliftPct, setUpliftPct] = useState("5");
+  const undoRef = useRef<Record<string, string> | null>(null);
 
   const fillMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
+      // Capture current values for undo before overwriting
+      undoRef.current = { ...currentAmounts };
       const res = await apiRequest("POST", `/api/budgets/version/${versionId}/bulk-fill`, payload);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Row filled", description: `${displayName} updated` });
+    onSuccess: (data) => {
       setOpen(false);
       setMode(null);
+
+      // Snapshot undo data now — ref could be overwritten by a second fill before undo fires
+      const undoSnapshot = undoRef.current ? { ...undoRef.current } : null;
+
+      // Show toast with undo action (5 second window)
+      toast({
+        title: `${displayName} filled`,
+        description: `12 months updated via ${data.mode?.replace(/_/g, ' ')}`,
+        duration: 5000,
+        action: undoSnapshot ? (
+          <ToastAction
+            altText="Undo bulk fill"
+            onClick={async () => {
+              try {
+                const prev = undoSnapshot;
+                for (const [periodStart, amount] of Object.entries(prev)) {
+                  await apiRequest("PATCH", `/api/budgets/version/${versionId}/cell`, {
+                    accountKey, periodStart, amount,
+                  });
+                }
+                onFilled();
+                toast({ title: "Undone", description: `${displayName} restored to previous values` });
+              } catch {
+                toast({ title: "Undo failed", variant: "destructive" });
+              }
+            }}
+          >
+            Undo
+          </ToastAction>
+        ) : undefined,
+      });
+
       onFilled();
     },
     onError: (error: Error) => {
@@ -1113,29 +1646,61 @@ function CsvDropZone({ versionId, onImported }: { versionId: string; onImported:
       </div>
 
       {result && (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
-          <span className="text-emerald-600 font-medium">{result.imported} imported</span>
-          {result.skipped > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="text-amber-600 underline cursor-pointer">{result.skipped} skipped</button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 max-h-48 overflow-auto text-xs" align="start">
-                <div className="space-y-1">
-                  <div className="font-medium text-sm mb-2">Skipped Rows</div>
-                  {result.details?.skipped?.map((s: any, i: number) => (
-                    <div key={i} className="flex justify-between">
-                      <span className="truncate">{s.account || `Row ${s.row}`}</span>
-                      <span className="text-muted-foreground ml-2 flex-shrink-0">{s.reason}</span>
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
+        <div className="border rounded-lg px-3 py-2 text-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {result.imported} rows imported
+              </span>
+              {result.skipped > 0 && (
+                <span className="flex items-center gap-1 text-amber-600 font-medium">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {result.skipped} skipped
+                </span>
+              )}
+            </div>
+            <button className="text-muted-foreground hover:text-foreground text-xs" onClick={() => setResult(null)}>
+              Dismiss
+            </button>
+          </div>
+
+          {/* Imported rows detail */}
+          {result.details?.imported?.length > 0 && (
+            <details className="group">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                Show matched accounts
+              </summary>
+              <div className="mt-1 max-h-32 overflow-auto space-y-0.5 pl-2 border-l-2 border-emerald-200">
+                {result.details.imported.map((r: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="truncate text-muted-foreground">{r.account}</span>
+                    <ChevronRight className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+                    <span className="truncate font-medium">{r.matched.replace(/_/g, ' ')}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
-          <button className="ml-auto text-muted-foreground hover:text-foreground" onClick={() => setResult(null)}>
-            Dismiss
-          </button>
+
+          {/* Skipped rows detail */}
+          {result.details?.skipped?.length > 0 && (
+            <details className="group" open>
+              <summary className="cursor-pointer text-amber-600 hover:text-amber-700 select-none font-medium">
+                Skipped rows — could not match to budget accounts
+              </summary>
+              <div className="mt-1 max-h-32 overflow-auto space-y-0.5 pl-2 border-l-2 border-amber-200">
+                {result.details.skipped.map((s: any, i: number) => (
+                  <div key={i} className="flex justify-between text-muted-foreground">
+                    <span className="truncate">{s.account || `Row ${s.row}`}</span>
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 ml-2 flex-shrink-0">
+                      {s.reason === 'no match' ? 'no matching account' : s.reason === 'empty account' ? 'blank row' : s.reason}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       )}
     </div>
@@ -1172,7 +1737,12 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Budget seeded", description: `${data.accountsUpdated} accounts updated using ${data.method}` });
+      toast({
+        title: "Budget seeded",
+        description: data.accountsSkipped > 0
+          ? `${data.accountsUpdated} accounts updated, ${data.accountsSkipped} skipped (no prior data) — see details below`
+          : `${data.accountsUpdated} accounts updated using ${data.method}`,
+      });
       onRefresh();
     },
     onError: (error: Error) => {
@@ -2071,137 +2641,6 @@ function EnhancedBudgetVsActual({ budgetId }: { budgetId: string }) {
   );
 }
 
-function BudgetVsActual({ budgetId }: { budgetId: string }) {
-  const { data, isLoading } = useQuery<BvaData>({
-    queryKey: ["/api/budgets/bva", budgetId],
-    queryFn: async () => {
-      const res = await fetch(`/api/budgets/bva/${budgetId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load budget vs actual data");
-      return res.json();
-    },
-  });
-
-  if (isLoading) {
-    return <Card><CardContent className="p-6"><Skeleton className="h-96 w-full" /></CardContent></Card>;
-  }
-
-  if (!data || !data.lines?.length) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Data Available</h3>
-          <p className="text-muted-foreground text-center max-w-md">
-            This budget has no line items or there are no actuals to compare. Seed demo actuals and add budget amounts first.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const { summary, lines, months } = data;
-  const revenueVar = summary.totalRevenueActual - summary.totalRevenueBudget;
-  const expenseVar = summary.totalExpenseActual - summary.totalExpenseBudget;
-  const noiVar = summary.noiActual - summary.noiBudget;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryCard
-          title="Total Revenue"
-          budget={summary.totalRevenueBudget}
-          actual={summary.totalRevenueActual}
-          variance={revenueVar}
-          favorable={revenueVar >= 0}
-        />
-        <SummaryCard
-          title="Total Expenses"
-          budget={summary.totalExpenseBudget}
-          actual={summary.totalExpenseActual}
-          variance={expenseVar}
-          favorable={expenseVar <= 0}
-        />
-        <SummaryCard
-          title="Net Operating Income"
-          budget={summary.noiBudget}
-          actual={summary.noiActual}
-          variance={noiVar}
-          favorable={noiVar >= 0}
-        />
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium uppercase">Budget Accuracy</p>
-            <p className="text-2xl font-bold mt-1">
-              {summary.noiBudget !== 0
-                ? `${Math.max(0, 100 - Math.abs((noiVar / summary.noiBudget) * 100)).toFixed(1)}%`
-                : "N/A"
-              }
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              NOI variance: {summary.noiBudget !== 0 ? formatVarPct((noiVar / Math.abs(summary.noiBudget)) * 100) : "N/A"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Detailed Variance Analysis</CardTitle>
-          <CardDescription>Full-year view — Budget vs Actual with dollar and percentage variance</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/50 border-b">
-                  <th className="text-left px-3 py-2 font-medium sticky left-0 bg-muted/50 min-w-[180px] z-10">Account</th>
-                  <th className="text-right px-3 py-2 font-medium">Budget (YTD)</th>
-                  <th className="text-right px-3 py-2 font-medium">Actual (YTD)</th>
-                  <th className="text-right px-3 py-2 font-medium">Var $</th>
-                  <th className="text-right px-3 py-2 font-medium">Var %</th>
-                  <th className="text-center px-3 py-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupBvaLines(lines).map(({ section, sectionLines }) => (
-                  <BvaSection key={section} section={section} lines={sectionLines} />
-                ))}
-                <tr className="bg-slate-100 dark:bg-slate-800 font-bold border-t-2">
-                  <td className="px-3 py-2 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Net Operating Income</td>
-                  <td className="text-right px-3 py-2">{formatAmount(summary.noiBudget)}</td>
-                  <td className="text-right px-3 py-2">{formatAmount(summary.noiActual)}</td>
-                  <td className={cn("text-right px-3 py-2", noiVar >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {formatVarDollar(noiVar)}
-                  </td>
-                  <td className={cn("text-right px-3 py-2", noiVar >= 0 ? "text-emerald-600" : "text-red-600")}>
-                    {summary.noiBudget !== 0 ? formatVarPct((noiVar / Math.abs(summary.noiBudget)) * 100) : "—"}
-                  </td>
-                  <td className="text-center px-3 py-2">
-                    {noiVar >= 0
-                      ? <CheckCircle2 className="h-4 w-4 text-emerald-500 inline" />
-                      : <AlertCircle className="h-4 w-4 text-red-500 inline" />
-                    }
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Monthly Trend</CardTitle>
-          <CardDescription>Revenue, expenses, and NOI by month — budget vs actual</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MonthlyTrendChart lines={lines} months={months} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 function SummaryCard({ title, budget, actual, variance, favorable }: {
   title: string; budget: number; actual: number; variance: number; favorable: boolean;
 }) {
@@ -2222,138 +2661,5 @@ function SummaryCard({ title, budget, actual, variance, favorable }: {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function groupBvaLines(lines: BvaLine[]) {
-  const grouped: Record<string, BvaLine[]> = {};
-  for (const l of lines) {
-    if (!grouped[l.lineType]) grouped[l.lineType] = [];
-    grouped[l.lineType].push(l);
-  }
-  const order = ["REVENUE", "OTHER_INCOME", "COGS", "OPEX", "OTHER_EXPENSE"];
-  return order
-    .filter(s => grouped[s]?.length)
-    .map(s => ({ section: s, sectionLines: grouped[s] }));
-}
-
-function BvaSection({ section, lines }: { section: string; lines: BvaLine[] }) {
-  const sectionLabels: Record<string, string> = {
-    REVENUE: "Revenue", COGS: "Cost of Goods Sold", OPEX: "Operating Expenses",
-    OTHER_INCOME: "Other Income", OTHER_EXPENSE: "Other Expense",
-  };
-
-  const totBudget = lines.reduce((s, l) => s + l.totals.budget, 0);
-  const totActual = lines.reduce((s, l) => s + l.totals.actual, 0);
-  const totVar = totActual - totBudget;
-  const isExpense = ['COGS', 'OPEX', 'OTHER_EXPENSE'].includes(section);
-  const totFavorable = isExpense ? totVar <= 0 : totVar >= 0;
-
-  return (
-    <>
-      <tr className="bg-muted/20">
-        <td colSpan={6} className="px-3 py-1.5 font-semibold text-xs uppercase tracking-wide sticky left-0 bg-muted/20 z-10">
-          <Badge className={cn("mr-2", LINE_TYPE_COLORS[section])} variant="outline">
-            {sectionLabels[section]}
-          </Badge>
-        </td>
-      </tr>
-      {lines.map(line => (
-        <tr key={line.id} className="border-b hover:bg-muted/10 transition-colors">
-          <td className="px-3 py-1.5 sticky left-0 bg-background z-10">{line.displayName}</td>
-          <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.totals.budget)}</td>
-          <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(line.totals.actual)}</td>
-          <td className={cn("text-right px-3 py-1.5 tabular-nums", line.totals.favorable ? "text-emerald-600" : "text-red-600")}>
-            {formatVarDollar(line.totals.varDollar)}
-          </td>
-          <td className={cn("text-right px-3 py-1.5 tabular-nums", line.totals.favorable ? "text-emerald-600" : "text-red-600")}>
-            {formatVarPct(line.totals.varPct)}
-          </td>
-          <td className="text-center px-3 py-1.5">
-            {line.totals.favorable
-              ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 inline" />
-              : <AlertCircle className="h-3.5 w-3.5 text-red-500 inline" />
-            }
-          </td>
-        </tr>
-      ))}
-      <tr className="border-b-2 bg-muted/10 font-semibold">
-        <td className="px-3 py-1.5 sticky left-0 bg-muted/10 z-10">Total {sectionLabels[section]}</td>
-        <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(totBudget)}</td>
-        <td className="text-right px-3 py-1.5 tabular-nums">{formatAmount(totActual)}</td>
-        <td className={cn("text-right px-3 py-1.5 tabular-nums", totFavorable ? "text-emerald-600" : "text-red-600")}>
-          {formatVarDollar(totVar)}
-        </td>
-        <td className={cn("text-right px-3 py-1.5 tabular-nums", totFavorable ? "text-emerald-600" : "text-red-600")}>
-          {totBudget !== 0 ? formatVarPct((totVar / Math.abs(totBudget)) * 100) : "—"}
-        </td>
-        <td />
-      </tr>
-    </>
-  );
-}
-
-function MonthlyTrendChart({ lines, months }: { lines: BvaLine[]; months: string[] }) {
-  const data = months.map((m, i) => {
-    let revBudget = 0, revActual = 0, expBudget = 0, expActual = 0;
-    for (const l of lines) {
-      const md = l.monthly[i];
-      if (!md) continue;
-      if (['REVENUE', 'OTHER_INCOME'].includes(l.lineType)) {
-        revBudget += md.budget;
-        revActual += md.actual;
-      } else {
-        expBudget += md.budget;
-        expActual += md.actual;
-      }
-    }
-    return {
-      month: MONTHS_SHORT[i],
-      revBudget, revActual, expBudget, expActual,
-      noiBudget: revBudget - expBudget,
-      noiActual: revActual - expActual,
-    };
-  });
-
-  const allValues = data.flatMap(d => [d.revBudget, d.revActual, d.noiBudget, d.noiActual]);
-  const maxVal = Math.max(...allValues, 1);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-12 gap-1">
-        {data.map((d, i) => {
-          const barH = 120;
-          const noiH = Math.abs(d.noiActual) / maxVal * barH;
-          const noiBH = Math.abs(d.noiBudget) / maxVal * barH;
-          return (
-            <div key={i} className="flex flex-col items-center">
-              <div className="relative w-full h-[120px] flex items-end justify-center gap-[2px]">
-                <div
-                  className="w-[40%] bg-blue-200 dark:bg-blue-800 rounded-t"
-                  style={{ height: `${noiBH}px` }}
-                  title={`Budget NOI: ${formatAmount(d.noiBudget)}`}
-                />
-                <div
-                  className={cn("w-[40%] rounded-t", d.noiActual >= 0 ? "bg-emerald-400 dark:bg-emerald-600" : "bg-red-400 dark:bg-red-600")}
-                  style={{ height: `${noiH}px` }}
-                  title={`Actual NOI: ${formatAmount(d.noiActual)}`}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground mt-1">{d.month}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-4 justify-center text-xs text-muted-foreground">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-blue-200 dark:bg-blue-800" />
-          Budget NOI
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-emerald-400 dark:bg-emerald-600" />
-          Actual NOI
-        </div>
-      </div>
-    </div>
   );
 }
