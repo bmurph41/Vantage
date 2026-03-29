@@ -1,12 +1,13 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
+import {
   MapPin, Plus, Search, Target, Building2,
-  ChevronRight, Globe, DollarSign, Trash2, Pencil
+  ChevronRight, Globe, DollarSign, Trash2, Pencil, TrendingUp, Loader2
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -66,6 +67,29 @@ export default function MarketTargets() {
       toast({ title: "Market target deleted" });
     },
     onError: () => toast({ title: "Failed to delete market target", variant: "destructive" }),
+  });
+
+  const [, navigate] = useLocation();
+  const promoteMutation = useMutation({
+    mutationFn: (market: MarketTarget) =>
+      apiRequest('POST', '/api/modeling/projects', {
+        marinaName: market.name,
+        city: market.region || '',
+        state: market.states?.[0] || '',
+        assetClass: 'marina',
+        uwStage: 'not_started',
+        customMetrics: {
+          sourceType: 'prospecting_target',
+          sourceId: market.id,
+          sourceName: market.name,
+        },
+      }),
+    onSuccess: (newProject: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects'] });
+      toast({ title: "Model created", description: `${newProject.marinaName} promoted to Financial Model` });
+      navigate(`/modeling/projects/${newProject.id}?tab=inputs`);
+    },
+    onError: () => toast({ title: "Failed to create model", variant: "destructive" }),
   });
 
   const closeDialog = () => {
@@ -291,6 +315,16 @@ export default function MarketTargets() {
                       {market.priority.charAt(0).toUpperCase() + market.priority.slice(1)}
                     </Badge>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50"
+                        onClick={(e) => { e.stopPropagation(); promoteMutation.mutate(market); }}
+                        disabled={promoteMutation.isPending}
+                      >
+                        {promoteMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <TrendingUp className="w-3 h-3 mr-1" />}
+                        Model
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEditDialog(market); }}>
                         <Pencil className="w-4 h-4" />
                       </Button>

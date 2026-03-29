@@ -1195,6 +1195,832 @@ export class FundService {
       .where(eq(fundInvestors.id, investorId));
   }
 
+  // ============================================================================
+  // PREFERRED RETURN ACCRUAL
+  // ============================================================================
+
+  /**
+   * Accrue preferred return for all active investors in a fund.
+   * Supports simple, annual compounding, quarterly compounding, and continuous compounding.
+   * Creates capital account entries and updates investor records.
+   */
+  async accruePreferredReturn(
+    orgId: string,
+    fundId: string,
+    options: {
+      asOfDate?: Date;
+      compoundingMethod?: 'simple' | 'annual' | 'quarterly' | 'continuous';
+      periodMonths?: number; // defaults to 3 (quarterly)
+    } = {}
+  ): Promise<{
+    investorsAccrued: number;
+    totalAccrued: number;
+    details: { investorId: string; investorName: string; accrualAmount: number; newAccruedBalance: number }[];
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    const investors = await this.getInvestorsByFund(orgId, fundId);
+    const prefRate = parseFloat(fund.preferredReturn?.toString() || '0.08');
+    const compounding = options.compoundingMethod || 'simple';
+    const periodMonths = options.periodMonths || 3;
+    const periodFraction = periodMonths / 12;
+    const asOfDate = options.asOfDate || new Date();
+
+    const details: { investorId: string; investorName: string; accrualAmount: number; newAccruedBalance: number }[] = [];
+    let totalAccrued = 0;
+
+    for (const investor of investors) {
+      if (!investor.isActive) continue;
+
+      const calledCapital = parseFloat(investor.calledCapital?.toString() || '0');
+      const distributedCapital = parseFloat(investor.distributedCapital?.toString() || '0');
+      const returnedCapital = parseFloat(investor.returnedCapital?.toString() || '0');
+      const currentAccrued = parseFloat(investor.preferredReturnAccrued?.toString() || '0');
+      const currentPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+
+      // Unreturned capital basis for preferred return calculation
+      const unreturnedCapital = calledCapital - returnedCapital;
+      if (unreturnedCapital <= 0) continue;
+
+      // Include unpaid accrued pref in compounding base
+      const unpaidPref = currentAccrued - currentPaid;
+
+      let accrualAmount: number;
+
+      switch (compounding) {
+        case 'annual':
+          // Compound annually: accrual on (unreturned capital + unpaid pref) for the period
+          accrualAmount = (unreturnedCapital + unpaidPref) * prefRate * periodFraction;
+          break;
+        case 'quarterly':
+          // Compound quarterly: (1 + r/4)^periods - 1 applied to base
+          accrualAmount = (unreturnedCapital + unpaidPref) * (Math.pow(1 + prefRate / 4, periodMonths / 3) - 1);
+          break;
+        case 'continuous':
+          // Continuous compounding: e^(rt) - 1 applied to base
+          accrualAmount = (unreturnedCapital + unpaidPref) * (Math.exp(prefRate * periodFraction) - 1);
+          break;
+        default: // simple
+          accrualAmount = unreturnedCapital * prefRate * periodFraction;
+          break;
+      }
+
+      accrualAmount = Math.round(accrualAmount * 100) / 100;
+      if (accrualAmount <= 0) continue;
+
+      const newAccruedBalance = currentAccrued + accrualAmount;
+
+      // Update investor record
+      await db.update(fundInvestors)
+        .set({
+          preferredReturnAccrued: String(newAccruedBalance),
+          updatedAt: new Date(),
+        })
+        .where(eq(fundInvestors.id, investor.id));
+
+      details.push({
+        investorId: investor.id,
+        investorName: investor.investorName,
+        accrualAmount,
+        newAccruedBalance,
+      });
+
+      totalAccrued += accrualAmount;
+    }
+
+    // Record as capital movement for the fund
+    if (totalAccrued > 0) {
+      await db.insert(fundCapitalMovements).values({
+        orgId,
+        fundId,
+        movementType: 'fee',
+        movementDate: asOfDate,
+        amount: String(totalAccrued),
+        preferredReturn: String(totalAccrued),
+        status: 'completed',
+        description: `Preferred return accrual (${compounding}) for ${periodMonths}-month period ending ${asOfDate.toISOString().split('T')[0]}`,
+        createdBy: null,
+      });
+    }
+
+    return {
+      investorsAccrued: details.length,
+      totalAccrued: Math.round(totalAccrued * 100) / 100,
+      details,
+    };
+  }
+
+  // ============================================================================
+  // NAV CALCULATION PIPELINE
+  // ============================================================================
+
+  /**
+   * Calculate fund NAV by aggregating deal-level valuations.
+   * NAV = Sum of active deal current values + cash reserves - outstanding liabilities.
+   * Updates fund record and returns per-investor NAV allocation.
+   */
+  async calculateFundNav(
+    orgId: string,
+    fundId: string,
+    options: {
+      asOfDate?: Date;
+      cashOnHand?: number;
+      outstandingLiabilities?: number;
+    } = {}
+  ): Promise<{
+    totalNav: number;
+    grossAssetValue: number;
+    cashOnHand: number;
+    outstandingLiabilities: number;
+    dealBreakdown: { allocationId: string; projectName?: string; currentValue: number; costBasis: number; unrealizedGain: number }[];
+    investorAllocations: { investorId: string; investorName: string; ownershipPct: number; navAllocation: number; navPerUnit: number }[];
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    const allocations = await this.getAllocationsByFund(orgId, fundId);
+    const investors = await this.getInvestorsByFund(orgId, fundId);
+
+    const cashOnHand = options.cashOnHand || 0;
+    const outstandingLiabilities = options.outstandingLiabilities || 0;
+
+    // Aggregate deal-level values
+    const dealBreakdown: { allocationId: string; projectName?: string; currentValue: number; costBasis: number; unrealizedGain: number }[] = [];
+    let grossAssetValue = 0;
+
+    for (const alloc of allocations) {
+      if (alloc.exitStatus === 'exited' || alloc.exitStatus === 'written_off') continue;
+
+      const currentValue = parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0');
+      const costBasis = parseFloat(alloc.costBasis?.toString() || alloc.fundedAmount?.toString() || '0');
+      const unrealizedGain = currentValue - costBasis;
+
+      grossAssetValue += currentValue;
+
+      // Fetch project name
+      let projectName: string | undefined;
+      if (alloc.modelingProjectId) {
+        const [project] = await db.select({ name: modelingProjects.marinaName })
+          .from(modelingProjects)
+          .where(eq(modelingProjects.id, alloc.modelingProjectId))
+          .limit(1);
+        projectName = project?.name || undefined;
+      }
+
+      dealBreakdown.push({
+        allocationId: alloc.id,
+        projectName,
+        currentValue: Math.round(currentValue * 100) / 100,
+        costBasis: Math.round(costBasis * 100) / 100,
+        unrealizedGain: Math.round(unrealizedGain * 100) / 100,
+      });
+    }
+
+    const totalNav = grossAssetValue + cashOnHand - outstandingLiabilities;
+
+    // Calculate per-investor allocation
+    const totalCommitment = investors.reduce(
+      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      0
+    );
+
+    const investorAllocations = investors.map(inv => {
+      const commitment = parseFloat(inv.commitmentAmount?.toString() || '0');
+      const ownershipPct = totalCommitment > 0 ? (commitment / totalCommitment) * 100 : 0;
+      const navAllocation = totalNav * (ownershipPct / 100);
+
+      return {
+        investorId: inv.id,
+        investorName: inv.investorName,
+        ownershipPct: Math.round(ownershipPct * 100) / 100,
+        navAllocation: Math.round(navAllocation * 100) / 100,
+        navPerUnit: commitment > 0 ? Math.round((navAllocation / commitment) * 10000) / 10000 : 0,
+      };
+    });
+
+    // Persist to fund record
+    await db.update(funds)
+      .set({ updatedAt: new Date() })
+      .where(eq(funds.id, fundId));
+
+    // Store as cash flow entry for the NAV snapshot
+    await db.insert(fundCashFlows).values({
+      orgId,
+      fundId,
+      flowDate: options.asOfDate || new Date(),
+      flowType: 'inflow',
+      grossAmount: '0',
+      netAmount: '0',
+      runningNav: String(Math.round(totalNav * 100) / 100),
+      description: `NAV snapshot: $${(totalNav / 1_000_000).toFixed(2)}M`,
+    });
+
+    return {
+      totalNav: Math.round(totalNav * 100) / 100,
+      grossAssetValue: Math.round(grossAssetValue * 100) / 100,
+      cashOnHand,
+      outstandingLiabilities,
+      dealBreakdown,
+      investorAllocations,
+    };
+  }
+
+  // ============================================================================
+  // FUND-LEVEL CAPITAL CALLS
+  // ============================================================================
+
+  /**
+   * Create a fund-level capital call and automatically generate per-investor line items
+   * based on each investor's commitment percentage.
+   */
+  async createFundCapitalCall(
+    orgId: string,
+    userId: string,
+    fundId: string,
+    data: {
+      totalAmount: number;
+      purpose: string;
+      dueDate: string;
+      callNumber?: number;
+      notes?: string;
+      dealAllocationId?: string;
+    }
+  ): Promise<{
+    capitalCall: FundCapitalMovement;
+    investorLineItems: {
+      investorId: string;
+      investorName: string;
+      commitmentPct: number;
+      amountCalled: number;
+      unfundedBefore: number;
+      unfundedAfter: number;
+    }[];
+    totalAllocated: number;
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    const investors = await this.getInvestorsByFund(orgId, fundId);
+    if (investors.length === 0) throw new Error('No active investors in fund');
+
+    const totalCommitment = investors.reduce(
+      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      0
+    );
+
+    // Validate call doesn't exceed unfunded commitments
+    const totalUnfunded = investors.reduce(
+      (sum, inv) => sum + parseFloat(inv.unfundedCommitment?.toString() || '0'),
+      0
+    );
+
+    if (data.totalAmount > totalUnfunded) {
+      throw new Error(`Capital call of $${data.totalAmount.toLocaleString()} exceeds total unfunded commitments of $${totalUnfunded.toLocaleString()}`);
+    }
+
+    // Determine call number
+    const existingMovements = await this.getCapitalMovementsByFund(orgId, fundId);
+    const callCount = existingMovements.filter(m => m.movementType === 'call').length;
+    const callNumber = data.callNumber || callCount + 1;
+
+    // Create the fund-level capital movement
+    const [capitalCall] = await db.insert(fundCapitalMovements).values({
+      orgId,
+      fundId,
+      movementType: 'call',
+      movementDate: new Date(),
+      dueDate: new Date(data.dueDate),
+      amount: String(data.totalAmount),
+      callNumber,
+      callPurpose: data.purpose as any,
+      dealAllocationId: data.dealAllocationId || null,
+      status: 'pending',
+      description: data.notes || `Capital call #${callNumber}: ${data.purpose}`,
+      createdBy: userId,
+    }).returning();
+
+    // Generate per-investor line items
+    const investorLineItems: {
+      investorId: string;
+      investorName: string;
+      commitmentPct: number;
+      amountCalled: number;
+      unfundedBefore: number;
+      unfundedAfter: number;
+    }[] = [];
+
+    let totalAllocated = 0;
+
+    for (const investor of investors) {
+      const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+      const commitmentPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
+      const unfundedBefore = parseFloat(investor.unfundedCommitment?.toString() || '0');
+
+      // Calculate pro-rata share, but cap at investor's unfunded commitment
+      let amountCalled = Math.round(data.totalAmount * commitmentPct * 100) / 100;
+      amountCalled = Math.min(amountCalled, unfundedBefore);
+
+      if (amountCalled <= 0) continue;
+
+      const unfundedAfter = unfundedBefore - amountCalled;
+
+      // Create per-investor capital movement
+      await db.insert(fundCapitalMovements).values({
+        orgId,
+        fundId,
+        fundInvestorId: investor.id,
+        movementType: 'call',
+        movementDate: new Date(),
+        dueDate: new Date(data.dueDate),
+        amount: String(amountCalled),
+        callNumber,
+        callPurpose: data.purpose as any,
+        status: 'pending',
+        description: `Capital call #${callNumber} - ${investor.investorName}`,
+        createdBy: userId,
+      });
+
+      investorLineItems.push({
+        investorId: investor.id,
+        investorName: investor.investorName,
+        commitmentPct: Math.round(commitmentPct * 10000) / 100,
+        amountCalled,
+        unfundedBefore,
+        unfundedAfter,
+      });
+
+      totalAllocated += amountCalled;
+    }
+
+    return {
+      capitalCall,
+      investorLineItems,
+      totalAllocated: Math.round(totalAllocated * 100) / 100,
+    };
+  }
+
+  /**
+   * Mark a fund capital call as completed (all payments received).
+   * Updates investor balances and fund totals.
+   */
+  async completeFundCapitalCall(
+    orgId: string,
+    fundId: string,
+    callNumber: number
+  ): Promise<{
+    investorsUpdated: number;
+    totalReceived: number;
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    // Find all movements for this call
+    const movements = await db.select()
+      .from(fundCapitalMovements)
+      .where(and(
+        eq(fundCapitalMovements.fundId, fundId),
+        eq(fundCapitalMovements.orgId, orgId),
+        eq(fundCapitalMovements.callNumber, callNumber),
+        eq(fundCapitalMovements.movementType, 'call'),
+      ));
+
+    let investorsUpdated = 0;
+    let totalReceived = 0;
+
+    for (const movement of movements) {
+      if (movement.status === 'completed') continue;
+
+      // Mark movement as completed
+      await db.update(fundCapitalMovements)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .where(eq(fundCapitalMovements.id, movement.id));
+
+      const amount = parseFloat(movement.amount?.toString() || '0');
+
+      // Update investor balances if investor-specific
+      if (movement.fundInvestorId) {
+        await this.updateInvestorCalledCapital(orgId, movement.fundInvestorId, amount);
+        investorsUpdated++;
+      }
+
+      totalReceived += amount;
+    }
+
+    // Update fund-level called capital
+    if (totalReceived > 0) {
+      await this.updateFundCalledCapital(orgId, fundId, totalReceived);
+
+      // Create cash flow entry
+      await db.insert(fundCashFlows).values({
+        orgId,
+        fundId,
+        flowDate: new Date(),
+        flowType: 'inflow',
+        grossAmount: String(totalReceived),
+        netAmount: String(totalReceived),
+        investmentAmount: String(totalReceived),
+        description: `Capital call #${callNumber} completed: $${totalReceived.toLocaleString()}`,
+      });
+    }
+
+    return { investorsUpdated, totalReceived: Math.round(totalReceived * 100) / 100 };
+  }
+
+  // ============================================================================
+  // DISTRIBUTION WORKFLOW (with Waterfall)
+  // ============================================================================
+
+  /**
+   * Create a fund distribution, run the waterfall, and allocate to investors.
+   * Full workflow: calculate waterfall → allocate to LPs/GP → create movements → update accounts.
+   */
+  async processFundDistribution(
+    orgId: string,
+    userId: string,
+    fundId: string,
+    data: {
+      totalProceeds: number;
+      distributionType: 'operating' | 'return_of_capital' | 'capital_gain' | 'refinance' | 'exit';
+      dealAllocationId?: string;
+      notes?: string;
+      yearsHeld?: number;
+    }
+  ): Promise<{
+    waterfallResult: WaterfallDistributionResult;
+    investorDistributions: {
+      investorId: string;
+      investorName: string;
+      ownershipPct: number;
+      returnOfCapital: number;
+      preferredReturn: number;
+      profitShare: number;
+      carriedInterest: number;
+      totalDistribution: number;
+    }[];
+    totalDistributed: number;
+    gpCarry: number;
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    const investors = await this.getInvestorsByFund(orgId, fundId);
+    const metrics = await this.calculateFundMetrics(orgId, fundId);
+
+    // Run waterfall
+    const yearsHeld = data.yearsHeld || (fund.investmentPeriodYears || 5);
+    const waterfallResult = this.calculateWaterfallDistribution(
+      data.totalProceeds,
+      metrics.calledCapital,
+      parseFloat(fund.preferredReturn?.toString() || '0.08'),
+      parseFloat(fund.gpCatchUpPct?.toString() || '1.00'),
+      fund.promoteTiers || [{ irrHurdle: 0.08, gpSplit: 20, lpSplit: 80 }],
+      yearsHeld
+    );
+
+    // Store waterfall calculation
+    await this.storeWaterfallCalculation(orgId, fundId, waterfallResult, metrics);
+
+    // Calculate ownership percentages
+    const totalCommitment = investors.reduce(
+      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      0
+    );
+
+    const investorDistributions: {
+      investorId: string;
+      investorName: string;
+      ownershipPct: number;
+      returnOfCapital: number;
+      preferredReturn: number;
+      profitShare: number;
+      carriedInterest: number;
+      totalDistribution: number;
+    }[] = [];
+
+    let totalDistributed = 0;
+
+    for (const investor of investors) {
+      const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+      const ownershipPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
+      const isGp = investor.investorType === 'gp';
+
+      // LP gets pro-rata share of LP distributions
+      // GP gets their carry plus pro-rata share of any GP commitment returns
+      let returnOfCapital: number;
+      let preferredReturn: number;
+      let profitShare: number;
+      let carriedInterest: number;
+
+      if (isGp) {
+        returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
+        preferredReturn = waterfallResult.preferredReturn * ownershipPct;
+        carriedInterest = waterfallResult.totalGpDistribution - (waterfallResult.returnOfCapital * ownershipPct);
+        profitShare = 0;
+      } else {
+        returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
+        preferredReturn = waterfallResult.preferredReturn * ownershipPct;
+
+        // LP profit share is their pro-rata of remaining LP distributions after ROC and pref
+        const lpRemainder = waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn;
+        profitShare = lpRemainder > 0 ? lpRemainder * ownershipPct : 0;
+        carriedInterest = 0;
+      }
+
+      const totalDistribution = Math.round((returnOfCapital + preferredReturn + profitShare + carriedInterest) * 100) / 100;
+
+      // Create distribution capital movement for this investor
+      await db.insert(fundCapitalMovements).values({
+        orgId,
+        fundId,
+        fundInvestorId: investor.id,
+        movementType: 'distribution',
+        movementDate: new Date(),
+        amount: String(totalDistribution),
+        returnOfCapital: String(Math.round(returnOfCapital * 100) / 100),
+        preferredReturn: String(Math.round(preferredReturn * 100) / 100),
+        carriedInterest: String(Math.round(carriedInterest * 100) / 100),
+        dealAllocationId: data.dealAllocationId || null,
+        status: 'completed',
+        description: `${data.distributionType} distribution - ${investor.investorName}`,
+        createdBy: userId,
+      });
+
+      // Update investor balances
+      await this.updateInvestorDistributedCapital(orgId, investor.id, totalDistribution);
+
+      // Update preferred return paid
+      if (preferredReturn > 0) {
+        const currentPrefPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+        await db.update(fundInvestors)
+          .set({
+            preferredReturnPaid: String(currentPrefPaid + preferredReturn),
+            updatedAt: new Date(),
+          })
+          .where(eq(fundInvestors.id, investor.id));
+      }
+
+      // Update carried interest paid (GP only)
+      if (carriedInterest > 0 && isGp) {
+        const currentCarryPaid = parseFloat(investor.carriedInterestPaid?.toString() || '0');
+        const currentCarryEarned = parseFloat(investor.carriedInterestEarned?.toString() || '0');
+        await db.update(fundInvestors)
+          .set({
+            carriedInterestEarned: String(Math.max(currentCarryEarned, currentCarryPaid + carriedInterest)),
+            carriedInterestPaid: String(currentCarryPaid + carriedInterest),
+            updatedAt: new Date(),
+          })
+          .where(eq(fundInvestors.id, investor.id));
+      }
+
+      investorDistributions.push({
+        investorId: investor.id,
+        investorName: investor.investorName,
+        ownershipPct: Math.round(ownershipPct * 10000) / 100,
+        returnOfCapital: Math.round(returnOfCapital * 100) / 100,
+        preferredReturn: Math.round(preferredReturn * 100) / 100,
+        profitShare: Math.round(profitShare * 100) / 100,
+        carriedInterest: Math.round(carriedInterest * 100) / 100,
+        totalDistribution,
+      });
+
+      totalDistributed += totalDistribution;
+    }
+
+    // Update fund-level distributed capital
+    await this.updateFundDistributedCapital(orgId, fundId, totalDistributed);
+
+    // Create cash flow entry
+    await db.insert(fundCashFlows).values({
+      orgId,
+      fundId,
+      flowDate: new Date(),
+      flowType: 'outflow',
+      grossAmount: String(-totalDistributed),
+      netAmount: String(-totalDistributed),
+      returnOfCapital: String(waterfallResult.returnOfCapital),
+      preferredReturn: String(waterfallResult.preferredReturn),
+      gainDistribution: String(waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn),
+      carriedInterest: String(waterfallResult.totalGpDistribution),
+      description: `${data.distributionType} distribution: $${totalDistributed.toLocaleString()}`,
+    });
+
+    // Recalculate fund metrics
+    await this.recalculateFundMetrics(orgId, fundId);
+
+    return {
+      waterfallResult,
+      investorDistributions,
+      totalDistributed: Math.round(totalDistributed * 100) / 100,
+      gpCarry: Math.round((waterfallResult.totalGpDistribution - waterfallResult.gpCatchUp) * 100) / 100,
+    };
+  }
+
+  // ============================================================================
+  // LP INVESTOR STATEMENT
+  // ============================================================================
+
+  /**
+   * Generate a comprehensive investor statement for a specific LP.
+   * Includes: capital account summary, commitment status, distributions breakdown,
+   * preferred return tracking, fund performance metrics, and deal-level detail.
+   */
+  async generateInvestorStatement(
+    orgId: string,
+    fundId: string,
+    investorId: string,
+    options: {
+      asOfDate?: Date;
+      periodStart?: Date;
+      periodEnd?: Date;
+    } = {}
+  ): Promise<{
+    fund: {
+      name: string;
+      vintage: number | null;
+      status: string;
+      targetSize: number;
+      committedCapital: number;
+    };
+    investor: {
+      name: string;
+      type: string;
+      commitmentAmount: number;
+      commitmentPct: number;
+      calledCapital: number;
+      unfundedCommitment: number;
+    };
+    capitalAccount: {
+      openingBalance: number;
+      contributions: number;
+      distributions: number;
+      preferredReturnAccrued: number;
+      unrealizedGainLoss: number;
+      endingBalance: number;
+    };
+    distributions: {
+      date: Date;
+      type: string;
+      returnOfCapital: number;
+      preferredReturn: number;
+      carriedInterest: number;
+      profitShare: number;
+      total: number;
+    }[];
+    preferredReturn: {
+      rate: number;
+      totalAccrued: number;
+      totalPaid: number;
+      unpaidBalance: number;
+    };
+    performance: {
+      grossIrr: number | null;
+      netIrr: number | null;
+      tvpi: number | null;
+      dpi: number | null;
+      rvpi: number | null;
+      nav: number;
+    };
+    dealExposure: {
+      allocationId: string;
+      projectName: string;
+      investedAmount: number;
+      currentValue: number;
+      unrealizedGain: number;
+      exitStatus: string;
+    }[];
+    movements: FundCapitalMovement[];
+  }> {
+    const fund = await this.getFund(orgId, fundId);
+    if (!fund) throw new Error('Fund not found');
+
+    const investor = await this.getInvestor(orgId, investorId);
+    if (!investor) throw new Error('Investor not found');
+
+    const metrics = await this.calculateFundMetrics(orgId, fundId);
+
+    // Get all capital movements for this investor
+    const allMovements = await db.select()
+      .from(fundCapitalMovements)
+      .where(and(
+        eq(fundCapitalMovements.fundId, fundId),
+        eq(fundCapitalMovements.orgId, orgId),
+        eq(fundCapitalMovements.fundInvestorId, investorId),
+      ))
+      .orderBy(desc(fundCapitalMovements.movementDate));
+
+    // Calculate capital account summary
+    const contributions = allMovements
+      .filter(m => m.movementType === 'call' || m.movementType === 'contribution')
+      .filter(m => m.status === 'completed')
+      .reduce((sum, m) => sum + parseFloat(m.amount?.toString() || '0'), 0);
+
+    const distributionMovements = allMovements
+      .filter(m => m.movementType === 'distribution' || m.movementType === 'return_of_capital')
+      .filter(m => m.status === 'completed');
+
+    const totalDistributed = distributionMovements
+      .reduce((sum, m) => sum + parseFloat(m.amount?.toString() || '0'), 0);
+
+    // Build distributions breakdown
+    const distributions = distributionMovements.map(m => ({
+      date: new Date(m.movementDate),
+      type: m.movementType,
+      returnOfCapital: parseFloat(m.returnOfCapital?.toString() || '0'),
+      preferredReturn: parseFloat(m.preferredReturn?.toString() || '0'),
+      carriedInterest: parseFloat(m.carriedInterest?.toString() || '0'),
+      profitShare: parseFloat(m.amount?.toString() || '0') -
+        parseFloat(m.returnOfCapital?.toString() || '0') -
+        parseFloat(m.preferredReturn?.toString() || '0') -
+        parseFloat(m.carriedInterest?.toString() || '0'),
+      total: parseFloat(m.amount?.toString() || '0'),
+    }));
+
+    // Preferred return tracking
+    const prefRate = parseFloat(fund.preferredReturn?.toString() || '0.08');
+    const totalAccrued = parseFloat(investor.preferredReturnAccrued?.toString() || '0');
+    const totalPrefPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+
+    // Deal exposure
+    const allocations = await this.getAllocationsByFund(orgId, fundId);
+    const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+    const totalFundCommitment = (await this.getInvestorsByFund(orgId, fundId))
+      .reduce((sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'), 0);
+    const ownershipPct = totalFundCommitment > 0 ? commitment / totalFundCommitment : 0;
+
+    const dealExposure = [];
+    for (const alloc of allocations) {
+      if (alloc.exitStatus === 'written_off') continue;
+      const investedAmount = parseFloat(alloc.fundedAmount?.toString() || '0') * ownershipPct;
+      const currentValue = parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0') * ownershipPct;
+
+      let projectName = 'Unknown Project';
+      if (alloc.modelingProjectId) {
+        const [project] = await db.select({ name: modelingProjects.marinaName })
+          .from(modelingProjects)
+          .where(eq(modelingProjects.id, alloc.modelingProjectId))
+          .limit(1);
+        projectName = project?.name || 'Unknown Project';
+      }
+
+      dealExposure.push({
+        allocationId: alloc.id,
+        projectName,
+        investedAmount: Math.round(investedAmount * 100) / 100,
+        currentValue: Math.round(currentValue * 100) / 100,
+        unrealizedGain: Math.round((currentValue - investedAmount) * 100) / 100,
+        exitStatus: alloc.exitStatus || 'active',
+      });
+    }
+
+    // Unrealized gain/loss for capital account
+    const investorNav = metrics.nav * ownershipPct;
+    const unrealizedGainLoss = investorNav - (contributions - totalDistributed);
+
+    return {
+      fund: {
+        name: fund.name,
+        vintage: fund.vintage,
+        status: fund.status,
+        targetSize: parseFloat(fund.targetSize?.toString() || '0'),
+        committedCapital: parseFloat(fund.committedCapital?.toString() || '0'),
+      },
+      investor: {
+        name: investor.investorName,
+        type: investor.investorType,
+        commitmentAmount: commitment,
+        commitmentPct: Math.round(ownershipPct * 10000) / 100,
+        calledCapital: parseFloat(investor.calledCapital?.toString() || '0'),
+        unfundedCommitment: parseFloat(investor.unfundedCommitment?.toString() || String(commitment)),
+      },
+      capitalAccount: {
+        openingBalance: 0,
+        contributions,
+        distributions: totalDistributed,
+        preferredReturnAccrued: totalAccrued,
+        unrealizedGainLoss: Math.round(unrealizedGainLoss * 100) / 100,
+        endingBalance: Math.round((contributions - totalDistributed + unrealizedGainLoss) * 100) / 100,
+      },
+      distributions,
+      preferredReturn: {
+        rate: prefRate,
+        totalAccrued,
+        totalPaid: totalPrefPaid,
+        unpaidBalance: Math.round((totalAccrued - totalPrefPaid) * 100) / 100,
+      },
+      performance: {
+        grossIrr: metrics.grossIrr,
+        netIrr: metrics.netIrr,
+        tvpi: metrics.tvpi,
+        dpi: metrics.dpi,
+        rvpi: metrics.rvpi,
+        nav: Math.round(investorNav * 100) / 100,
+      },
+      dealExposure,
+      movements: allMovements,
+    };
+  }
+
   /**
    * Sync deal-level IRR/MOIC from returnsLedger into fundDealAllocations.
    * For each allocation in the fund, compute deal returns and update dealIrr/dealMoic.
@@ -1231,7 +2057,7 @@ export class FundService {
         amount: parseFloat(e.amount),
       }));
 
-      const irr = this.computeXIRR(cashflows);
+      const irr = this.calculateXirr(cashflows);
 
       // Compute MOIC
       const totalIn = cashflows.filter(cf => cf.amount < 0).reduce((s, cf) => s + Math.abs(cf.amount), 0);

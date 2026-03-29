@@ -144,6 +144,8 @@ export function useUnifiedLeaseMutations() {
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["unified-leases"] });
     queryClient.invalidateQueries({ queryKey: ["unified-lease-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["unified-lease-detail"] });
+    queryClient.invalidateQueries({ queryKey: ["commercial-leases"] });
   };
 
   // Create
@@ -201,6 +203,15 @@ export function useUnifiedLeaseMutations() {
     mutationFn: async () => {
       return apiRequest(`${apiBase}/sync-to-proforma`, { method: "POST" });
     },
+    onSuccess: () => {
+      invalidateAll();
+      // Pro-forma and actuals must refresh after lease sync
+      queryClient.invalidateQueries({ queryKey: ["pro-forma"] });
+      queryClient.invalidateQueries({ predicate: (q) => {
+        const key = q.queryKey as string[];
+        return key.some(k => typeof k === 'string' && (k.includes('pro-forma') || k.includes('actuals') || k.includes('lp-reporting')));
+      }});
+    },
   });
 
   // Bulk Recompute (valuator only)
@@ -208,7 +219,14 @@ export function useUnifiedLeaseMutations() {
     mutationFn: async () => {
       return apiRequest(`${apiBase}/bulk-recompute`, { method: "POST" });
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      invalidateAll();
+      // Recompute affects cashflow projections and pro-forma
+      queryClient.invalidateQueries({ predicate: (q) => {
+        const key = q.queryKey as string[];
+        return key.some(k => typeof k === 'string' && (k.includes('pro-forma') || k.includes('actuals') || k.includes('cashflow')));
+      }});
+    },
   });
 
   return {

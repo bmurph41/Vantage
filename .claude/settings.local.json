@@ -115,7 +115,12 @@
       "Bash(find /home/runner/workspace/client/src -name *chart* -o -name *graph* -o -name *visual*)",
       "Bash(find /home/runner/workspace/client/src/components -name *spreadsheet* -o -name *grid* -o -name *table*)",
       "WebSearch",
-      "Bash(find /home/runner/workspace -maxdepth 3 -name *.png -o -name *.jpg -o -name *.jpeg -o -name *.webp -o -name *.gif -o -name *.bmp)"
+      "Bash(find /home/runner/workspace -maxdepth 3 -name *.png -o -name *.jpg -o -name *.jpeg -o -name *.webp -o -name *.gif -o -name *.bmp)",
+      "Bash(find /tmp -name *.png -o -name *.jpg -o -name *.jpeg -o -name *.webp)",
+      "Bash(find /home/runner/workspace/server/routes -name \"*.ts\" -type f -exec wc -l {})",
+      "Bash(grep -r \"res\\\\.status\\(500\\)\" /home/runner/workspace/server/routes/*.ts)",
+      "Bash(grep -r \"next\\(error\\)\" /home/runner/workspace/server/routes/*.ts)",
+      "Bash(sort -t: -k1 -n)"
     ]
   }
 }

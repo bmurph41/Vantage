@@ -133,6 +133,13 @@ import WaterfallSensitivity from './workspace/waterfall-sensitivity';
 import ModelVersioning from './workspace/model-versioning';
 import AssumptionAudit from './workspace/assumption-audit';
 
+// New competitive-parity features
+import FundGnAModel from './workspace/fund-gna-model';
+import GpPartnerEconomics from './workspace/gp-partner-economics';
+import FundCashFlowDetail from './workspace/fund-cashflow-detail';
+import GlobalAssumptionsSidebar from '@/components/modeling/GlobalAssumptionsSidebar';
+import ScenarioBar from '@/components/modeling/ScenarioBar';
+
 interface TabItem {
   value: string;
   label: string;
@@ -235,6 +242,9 @@ const TAB_GROUPS: TabGroup[] = [
     icon: PieChart,
     tabs: [
       { value: 'fund-metrics', label: 'Fund Metrics', icon: BarChart3 },
+      { value: 'fund-cf', label: 'Fund Cash Flow', icon: DollarSign },
+      { value: 'fund-gna', label: 'G&A Model', icon: Users },
+      { value: 'gp-partners', label: 'GP Partners', icon: Briefcase },
       { value: 'lp-reporting', label: 'LP Reporting', icon: Users },
       { value: 'portfolio-risk', label: 'Portfolio Risk', icon: Shield },
     ],
@@ -659,6 +669,8 @@ export default function ProjectWorkspace() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* ── Persistent Project Header ─────────────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-white border-b border-border/40 shadow-sm">
+        {/* Scenario Bar */}
+        <ScenarioBar projectId={projectId!} />
         {/* Breadcrumb row */}
         <div className="flex items-center gap-1.5 px-6 pt-2.5 pb-0 text-[11px] text-muted-foreground">
           <button
@@ -810,7 +822,14 @@ export default function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Global Assumptions Sidebar */}
+        <GlobalAssumptionsSidebar
+          projectId={projectId!}
+          project={project}
+        />
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-0 flex-1 min-w-0">
         <div className="ws-nav-strip sticky top-[56px] z-20 -mx-6 px-6 border-b-2 border-border shadow-[0_3px_12px_-2px_rgba(0,0,0,0.10)]" style={{background:'hsl(221,50%,98%)'}}>
           {/* ── Group Rail ── */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1.5 pb-0 px-0" data-testid="tab-groups">
@@ -1111,6 +1130,15 @@ export default function ProjectWorkspace() {
         <TabsContent value="fund-metrics" className="mt-4 space-y-4">
           <FundMetrics projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
+        <TabsContent value="fund-cf" className="mt-4 space-y-4">
+          <FundCashFlowDetail projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="fund-gna" className="mt-4 space-y-4">
+          <FundGnAModel projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="gp-partners" className="mt-4 space-y-4">
+          <GpPartnerEconomics projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
         <TabsContent value="lp-reporting" className="mt-4 space-y-4">
           <LPReporting projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
@@ -1126,6 +1154,7 @@ export default function ProjectWorkspace() {
           <AssumptionAudit projectId={projectId!} onTabChange={handleTabChange} />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

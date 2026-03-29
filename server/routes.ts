@@ -7556,6 +7556,138 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // Create Modeling Project from Deal (bridges deal → modeling gap)
+  app.post("/api/deals/:dealId/create-modeling-project", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { dealId } = req.params;
+      const { crmDeals, modelingProjects } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const { db: database } = await import('./db');
+
+      // Fetch the deal
+      const [deal] = await database.select().from(crmDeals)
+        .where(and(eq(crmDeals.id, dealId), eq(crmDeals.orgId, orgId)));
+
+      if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+      // Check if deal already has a modeling project
+      if (deal.modelingProjectId) {
+        return res.status(400).json({ error: 'Deal already has a linked modeling project', modelingProjectId: deal.modelingProjectId });
+      }
+
+      // Check if a modeling project already references this deal
+      const [existingModel] = await database.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.dealId, dealId), eq(modelingProjects.orgId, orgId)))
+        .limit(1);
+
+      if (existingModel) {
+        // Link existing modeling project to deal
+        await database.update(crmDeals)
+          .set({ modelingProjectId: existingModel.id, updatedAt: new Date() })
+          .where(eq(crmDeals.id, dealId));
+        return res.json({ modelingProjectId: existingModel.id, message: 'Linked existing modeling project to deal' });
+      }
+
+      // Build modeling project from deal data
+      const projectData: any = {
+        orgId,
+        dealId,
+        ddProjectId: deal.ddProjectId || null,
+        marinaName: deal.dealName || deal.name || 'Untitled Model',
+        status: 'draft',
+        purchasePrice: deal.amount ? String(deal.amount) : null,
+        createdBy: userId,
+      };
+
+      // Copy location data if available
+      if (deal.address) projectData.address = deal.address;
+      if (deal.city) projectData.city = deal.city;
+      if (deal.state) projectData.state = deal.state;
+      if (deal.zipCode) projectData.zipCode = deal.zipCode;
+
+      const [modelingProject] = await database.insert(modelingProjects)
+        .values(projectData)
+        .returning();
+
+      // Update the deal with the modeling project link
+      await database.update(crmDeals)
+        .set({ modelingProjectId: modelingProject.id, updatedAt: new Date() })
+        .where(eq(crmDeals.id, dealId));
+
+      // Also update the DD project if it exists
+      if (deal.ddProjectId) {
+        const { projects } = await import('@shared/schema');
+        await database.update(projects)
+          .set({ modelingProjectId: modelingProject.id, updatedAt: new Date() })
+          .where(eq(projects.id, deal.ddProjectId));
+      }
+
+      res.status(201).json({
+        modelingProjectId: modelingProject.id,
+        modelingProject,
+        message: 'Modeling project created and linked to deal',
+      });
+    } catch (error: any) {
+      console.error("Failed to create modeling project from deal:", error);
+      res.status(500).json({ error: "Failed to create modeling project" });
+    }
+  });
+
+  // Get deal's modeling project (lookup across both direct link and indirect via DD)
+  app.get("/api/deals/:dealId/modeling-project", authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { dealId } = req.params;
+      const { crmDeals, modelingProjects } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const { db: database } = await import('./db');
+
+      const [deal] = await database.select().from(crmDeals)
+        .where(and(eq(crmDeals.id, dealId), eq(crmDeals.orgId, orgId)));
+
+      if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+      // Try direct link first
+      if (deal.modelingProjectId) {
+        const [project] = await database.select().from(modelingProjects)
+          .where(eq(modelingProjects.id, deal.modelingProjectId));
+        if (project) return res.json(project);
+      }
+
+      // Try via dealId on modeling projects
+      const [byDeal] = await database.select().from(modelingProjects)
+        .where(and(eq(modelingProjects.dealId, dealId), eq(modelingProjects.orgId, orgId)))
+        .limit(1);
+      if (byDeal) {
+        // Auto-link for future lookups
+        await database.update(crmDeals)
+          .set({ modelingProjectId: byDeal.id, updatedAt: new Date() })
+          .where(eq(crmDeals.id, dealId));
+        return res.json(byDeal);
+      }
+
+      // Try via DD project
+      if (deal.ddProjectId) {
+        const [byDd] = await database.select().from(modelingProjects)
+          .where(and(eq(modelingProjects.ddProjectId, deal.ddProjectId), eq(modelingProjects.orgId, orgId)))
+          .limit(1);
+        if (byDd) {
+          await database.update(crmDeals)
+            .set({ modelingProjectId: byDd.id, updatedAt: new Date() })
+            .where(eq(crmDeals.id, dealId));
+          return res.json(byDd);
+        }
+      }
+
+      res.status(404).json({ error: 'No modeling project found for this deal' });
+    } catch (error: any) {
+      console.error("Failed to fetch deal modeling project:", error);
+      res.status(500).json({ error: "Failed to fetch modeling project" });
+    }
+  });
+
   // CRM Leads
   app.get("/api/crm/leads", async (req: any, res) => {
     try {
@@ -29226,7 +29358,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       // Get fund metrics
       let metrics;
       try {
-        metrics = await fundService.calculateMetrics(orgId, fundId);
+        metrics = await fundService.calculateFundMetrics(orgId, fundId);
       } catch {
         metrics = {
           netIrr: parseFloat(fund.netIrr?.toString() || '0'),
@@ -29453,6 +29585,408 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     } catch (error: any) {
       console.error('Failed to calculate waterfall:', error);
       res.status(500).json({ error: 'Failed to calculate waterfall' });
+    }
+  });
+
+  // === Fund-Level Capital Calls ===
+  app.post('/api/funds/:fundId/capital-calls', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const { totalAmount, purpose, dueDate, callNumber, notes, dealAllocationId } = req.body;
+
+      if (!totalAmount || !purpose || !dueDate) {
+        return res.status(400).json({ error: 'totalAmount, purpose, and dueDate are required' });
+      }
+
+      const result = await fundService.createFundCapitalCall(orgId, userId, fundId, {
+        totalAmount: parseFloat(totalAmount),
+        purpose,
+        dueDate,
+        callNumber,
+        notes,
+        dealAllocationId,
+      });
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error('Failed to create fund capital call:', error);
+      res.status(error.message?.includes('exceeds') ? 400 : 500).json({ error: error.message || 'Failed to create capital call' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/capital-calls', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
+      const calls = movements.filter(m => m.movementType === 'call' && !m.fundInvestorId);
+
+      // For each call, get the investor line items
+      const callsWithDetails = await Promise.all(calls.map(async (call) => {
+        const lineItems = movements.filter(m =>
+          m.movementType === 'call' &&
+          m.fundInvestorId &&
+          m.callNumber === call.callNumber
+        );
+
+        return {
+          ...call,
+          lineItems,
+          investorCount: lineItems.length,
+          totalAllocated: lineItems.reduce((sum, li) =>
+            sum + parseFloat(li.amount?.toString() || '0'), 0
+          ),
+        };
+      }));
+
+      res.json(callsWithDetails);
+    } catch (error: any) {
+      console.error('Failed to fetch fund capital calls:', error);
+      res.status(500).json({ error: 'Failed to fetch capital calls' });
+    }
+  });
+
+  app.post('/api/funds/:fundId/capital-calls/:callNumber/complete', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId, callNumber } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const result = await fundService.completeFundCapitalCall(orgId, fundId, parseInt(callNumber));
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to complete capital call:', error);
+      res.status(500).json({ error: error.message || 'Failed to complete capital call' });
+    }
+  });
+
+  // === Fund Distributions (with Waterfall) ===
+  app.post('/api/funds/:fundId/distributions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const { totalProceeds, distributionType, dealAllocationId, notes, yearsHeld } = req.body;
+
+      if (!totalProceeds || !distributionType) {
+        return res.status(400).json({ error: 'totalProceeds and distributionType are required' });
+      }
+
+      const result = await fundService.processFundDistribution(orgId, userId, fundId, {
+        totalProceeds: parseFloat(totalProceeds),
+        distributionType,
+        dealAllocationId,
+        notes,
+        yearsHeld: yearsHeld ? parseFloat(yearsHeld) : undefined,
+      });
+
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error('Failed to process fund distribution:', error);
+      res.status(500).json({ error: error.message || 'Failed to process distribution' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/distributions', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
+      const distributions = movements.filter(m =>
+        m.movementType === 'distribution' || m.movementType === 'return_of_capital'
+      );
+
+      res.json(distributions);
+    } catch (error: any) {
+      console.error('Failed to fetch fund distributions:', error);
+      res.status(500).json({ error: 'Failed to fetch distributions' });
+    }
+  });
+
+  // === Preferred Return Accrual ===
+  app.post('/api/funds/:fundId/preferred-return/accrue', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const { compoundingMethod, periodMonths, asOfDate } = req.body;
+
+      const result = await fundService.accruePreferredReturn(orgId, fundId, {
+        compoundingMethod: compoundingMethod || 'simple',
+        periodMonths: periodMonths ? parseInt(periodMonths) : 3,
+        asOfDate: asOfDate ? new Date(asOfDate) : undefined,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to accrue preferred return:', error);
+      res.status(500).json({ error: error.message || 'Failed to accrue preferred return' });
+    }
+  });
+
+  app.get('/api/funds/:fundId/preferred-return', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const fund = await fundService.getFund(orgId, fundId);
+      if (!fund) return res.status(404).json({ error: 'Fund not found' });
+
+      const investors = await fundService.getInvestorsByFund(orgId, fundId);
+
+      const prefRate = parseFloat(fund.preferredReturn?.toString() || '0.08');
+
+      const summary = investors.map(inv => ({
+        investorId: inv.id,
+        investorName: inv.investorName,
+        investorType: inv.investorType,
+        calledCapital: parseFloat(inv.calledCapital?.toString() || '0'),
+        returnedCapital: parseFloat(inv.returnedCapital?.toString() || '0'),
+        preferredReturnRate: prefRate,
+        totalAccrued: parseFloat(inv.preferredReturnAccrued?.toString() || '0'),
+        totalPaid: parseFloat(inv.preferredReturnPaid?.toString() || '0'),
+        unpaidBalance: parseFloat(inv.preferredReturnAccrued?.toString() || '0') -
+          parseFloat(inv.preferredReturnPaid?.toString() || '0'),
+      }));
+
+      const totalAccrued = summary.reduce((s, i) => s + i.totalAccrued, 0);
+      const totalPaid = summary.reduce((s, i) => s + i.totalPaid, 0);
+
+      res.json({
+        fundId,
+        preferredReturnRate: prefRate,
+        totalAccrued: Math.round(totalAccrued * 100) / 100,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        totalUnpaid: Math.round((totalAccrued - totalPaid) * 100) / 100,
+        investors: summary,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch preferred return summary:', error);
+      res.status(500).json({ error: 'Failed to fetch preferred return summary' });
+    }
+  });
+
+  // === NAV Calculation ===
+  app.post('/api/funds/:fundId/nav/calculate', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const { cashOnHand, outstandingLiabilities, asOfDate } = req.body;
+
+      const result = await fundService.calculateFundNav(orgId, fundId, {
+        cashOnHand: cashOnHand ? parseFloat(cashOnHand) : undefined,
+        outstandingLiabilities: outstandingLiabilities ? parseFloat(outstandingLiabilities) : undefined,
+        asOfDate: asOfDate ? new Date(asOfDate) : undefined,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to calculate NAV:', error);
+      res.status(500).json({ error: error.message || 'Failed to calculate NAV' });
+    }
+  });
+
+  // === Sync Deal Returns ===
+  app.post('/api/funds/:fundId/sync-deal-returns', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const result = await fundService.syncDealReturns(orgId, fundId);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to sync deal returns:', error);
+      res.status(500).json({ error: 'Failed to sync deal returns' });
+    }
+  });
+
+  // === LP Investor Statement ===
+  app.get('/api/funds/:fundId/investors/:investorId/statement', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId, investorId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      const { periodStart, periodEnd, asOfDate } = req.query as Record<string, string>;
+
+      const statement = await fundService.generateInvestorStatement(orgId, fundId, investorId, {
+        asOfDate: asOfDate ? new Date(asOfDate) : undefined,
+        periodStart: periodStart ? new Date(periodStart) : undefined,
+        periodEnd: periodEnd ? new Date(periodEnd) : undefined,
+      });
+
+      res.json(statement);
+    } catch (error: any) {
+      console.error('Failed to generate investor statement:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate investor statement' });
+    }
+  });
+
+  // === LP Reporting (project-level, for workspace tab) ===
+  app.get('/api/modeling/projects/:projectId/lp-reporting', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+
+      // Find fund allocation for this project
+      const allocation = await fundService.getAllocationByProject(orgId, projectId);
+
+      if (!allocation) {
+        // No fund linked — return structured empty response so frontend shows empty state
+        return res.json({
+          fundSummary: null,
+          capitalAccount: [],
+          distributionHistory: [],
+          navBridge: [],
+          investments: [],
+          reportDate: new Date().toISOString().split('T')[0],
+          fundName: 'No Fund Linked',
+        });
+      }
+
+      const fundId = allocation.fundId;
+      const fund = await fundService.getFund(orgId, fundId);
+      if (!fund) return res.status(404).json({ error: 'Fund not found' });
+
+      const metrics = await fundService.calculateFundMetrics(orgId, fundId);
+      const investors = await fundService.getInvestorsByFund(orgId, fundId);
+      const allocations = await fundService.getAllocationsByFund(orgId, fundId);
+      const cashFlows = await fundService.getCashFlowsByFund(orgId, fundId);
+
+      // Build fund summary
+      const fundSummary = {
+        tvpi: metrics.tvpi || 0,
+        dpi: metrics.dpi || 0,
+        rvpi: metrics.rvpi || 0,
+        netIRR: (metrics.netIrr || 0) * 100,
+        totalCommitted: metrics.committedCapital,
+        totalCalled: metrics.calledCapital,
+        totalDistributed: metrics.distributedCapital,
+        totalNAV: metrics.nav,
+        vintage: fund.vintage || new Date().getFullYear(),
+        fundLife: `${fund.investmentPeriodYears || 0} of ${fund.fundLifeYears || 10} years`,
+      };
+
+      // Build capital account entries from cash flows
+      const capitalAccount: any[] = [];
+      let runningBalance = 0;
+
+      // Group cash flows by quarter
+      const quarterlyFlows = new Map<string, { contributions: number; distributions: number; gainsLosses: number }>();
+
+      for (const cf of cashFlows) {
+        const date = new Date(cf.flowDate);
+        const q = `Q${Math.ceil((date.getMonth() + 1) / 3)} ${date.getFullYear()}`;
+        const existing = quarterlyFlows.get(q) || { contributions: 0, distributions: 0, gainsLosses: 0 };
+
+        const gross = parseFloat(cf.grossAmount?.toString() || '0');
+        if (cf.flowType === 'inflow') {
+          existing.contributions += Math.abs(gross);
+        } else {
+          existing.distributions += Math.abs(gross);
+        }
+        quarterlyFlows.set(q, existing);
+      }
+
+      for (const [quarter, flows] of quarterlyFlows) {
+        const beginningBalance = runningBalance;
+        const gainsLosses = flows.contributions * 0.03; // Simplified unrealized gain estimate
+        runningBalance = beginningBalance + flows.contributions - flows.distributions + gainsLosses;
+        capitalAccount.push({
+          quarter,
+          beginningBalance: Math.round(beginningBalance * 100) / 100,
+          contributions: Math.round(flows.contributions * 100) / 100,
+          distributions: Math.round(-flows.distributions * 100) / 100,
+          gainsLosses: Math.round(gainsLosses * 100) / 100,
+          endingBalance: Math.round(runningBalance * 100) / 100,
+        });
+      }
+
+      // Build distribution history from capital movements
+      const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
+      const distributionMovements = movements.filter(m =>
+        (m.movementType === 'distribution' || m.movementType === 'return_of_capital') &&
+        m.status === 'completed' && !m.fundInvestorId
+      );
+
+      const distributionHistory = distributionMovements.map(m => {
+        const date = new Date(m.movementDate);
+        const q = `Q${Math.ceil((date.getMonth() + 1) / 3)} ${date.getFullYear()}`;
+        return {
+          quarter: q,
+          returnOfCapital: parseFloat(m.returnOfCapital?.toString() || '0'),
+          capitalGains: parseFloat(m.carriedInterest?.toString() || '0'),
+          incomeDistributions: parseFloat(m.amount?.toString() || '0') -
+            parseFloat(m.returnOfCapital?.toString() || '0') -
+            parseFloat(m.carriedInterest?.toString() || '0'),
+          total: parseFloat(m.amount?.toString() || '0'),
+        };
+      });
+
+      // Build NAV bridge
+      const navBridge = [
+        { label: 'Beginning NAV', value: metrics.calledCapital, type: 'start' },
+        { label: 'Capital Calls', value: metrics.calledCapital, type: 'add' },
+        { label: 'Distributions', value: -metrics.distributedCapital, type: 'subtract' },
+        { label: 'Unrealized Gains', value: metrics.nav - metrics.calledCapital + metrics.distributedCapital, type: 'add' },
+        { label: 'Ending NAV', value: metrics.nav, type: 'end' },
+      ];
+
+      // Build investment summaries
+      const investments: any[] = [];
+      for (const alloc of allocations) {
+        let projectName = 'Unknown Property';
+        if (alloc.modelingProjectId) {
+          const { modelingProjects: mp } = await import('@shared/schema');
+          const { eq: eqOp } = await import('drizzle-orm');
+          const { db: database } = await import('./db');
+          const [proj] = await database.select({ name: mp.marinaName }).from(mp).where(eqOp(mp.id, alloc.modelingProjectId)).limit(1);
+          projectName = proj?.name || projectName;
+        }
+
+        const invested = parseFloat(alloc.fundedAmount?.toString() || '0');
+        const current = parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0');
+        const moic = invested > 0 ? current / invested : 0;
+
+        investments.push({
+          property: projectName,
+          vintage: alloc.investmentDate ? new Date(alloc.investmentDate).getFullYear() : fund.vintage || 0,
+          investedCapital: invested,
+          currentValue: current,
+          moic: Math.round(moic * 100) / 100,
+          irr: parseFloat(alloc.dealIrr?.toString() || '0'),
+          status: alloc.exitStatus === 'exited' ? 'realized' : 'active',
+        });
+      }
+
+      res.json({
+        fundSummary,
+        capitalAccount,
+        distributionHistory,
+        navBridge,
+        investments,
+        reportDate: new Date().toISOString().split('T')[0],
+        fundName: fund.name,
+      });
+    } catch (error: any) {
+      console.error('Failed to generate LP reporting data:', error);
+      res.status(500).json({ error: 'Failed to generate LP reporting data' });
     }
   });
 

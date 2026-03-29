@@ -159,6 +159,8 @@ function NOISummaryBar({
   isDirty,
   isSaving,
   source,
+  noiOverride,
+  onNoiOverrideChange,
 }: {
   totalRevenue: number;
   totalExpenses: number;
@@ -166,27 +168,79 @@ function NOISummaryBar({
   isDirty: boolean;
   isSaving: boolean;
   source?: string;
+  noiOverride?: number | null;
+  onNoiOverrideChange?: (value: number | null) => void;
 }) {
+  const [overrideActive, setOverrideActive] = React.useState(noiOverride != null && noiOverride > 0);
+  const [overrideValue, setOverrideValue] = React.useState(noiOverride?.toString() || '');
+  const effectiveNoi = overrideActive && noiOverride ? noiOverride : noi;
+
   return (
     <div className="sticky top-0 z-20 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg shadow-sm">
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
+            {!overrideActive && (
+              <>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Revenue</p>
+                  <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(totalRevenue)}</p>
+                </div>
+                <div className="text-muted-foreground text-lg">−</div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Expenses</p>
+                  <p className="text-lg font-bold text-red-500 tabular-nums">{formatCurrency(totalExpenses)}</p>
+                </div>
+                <div className="text-muted-foreground text-lg">=</div>
+              </>
+            )}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Revenue</p>
-              <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(totalRevenue)}</p>
-            </div>
-            <div className="text-muted-foreground text-lg">−</div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Expenses</p>
-              <p className="text-lg font-bold text-red-500 tabular-nums">{formatCurrency(totalExpenses)}</p>
-            </div>
-            <div className="text-muted-foreground text-lg">=</div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Year 1 NOI</p>
-              <p className={`text-xl font-bold tabular-nums ${noi >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {formatCurrency(noi)}
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {overrideActive ? 'NOI Override (Top-Down)' : 'Year 1 NOI (Bottom-Up)'}
               </p>
+              <p className={`text-xl font-bold tabular-nums ${effectiveNoi >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {formatCurrency(effectiveNoi)}
+              </p>
+            </div>
+            {/* NOI Override Toggle */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-blue-200">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={overrideActive}
+                    onCheckedChange={(checked) => {
+                      setOverrideActive(checked);
+                      if (!checked) {
+                        onNoiOverrideChange?.(null);
+                      }
+                    }}
+                    className="h-4 w-7 data-[state=checked]:bg-amber-500"
+                  />
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    NOI Override
+                  </span>
+                </div>
+                {overrideActive && (
+                  <Input
+                    type="number"
+                    value={overrideValue}
+                    onChange={(e) => setOverrideValue(e.target.value)}
+                    onBlur={() => {
+                      const val = parseFloat(overrideValue);
+                      if (!isNaN(val) && val > 0) {
+                        onNoiOverrideChange?.(val);
+                      }
+                    }}
+                    placeholder="Enter NOI..."
+                    className="h-7 w-32 text-xs bg-white border-amber-300"
+                  />
+                )}
+              </div>
+              {overrideActive && (
+                <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-300">
+                  Top-Down
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -203,6 +257,11 @@ function NOISummaryBar({
             )}
           </div>
         </div>
+        {overrideActive && noi > 0 && (
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Bottom-up NOI: {formatCurrency(noi)} — Override is active, overriding both top-down and bottom-up NOI
+          </p>
+        )}
       </div>
     </div>
   );
@@ -702,6 +761,19 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
   const [customExpenses, setCustomExpenses] = useState<COACustomLine[]>([]);
   const [showAllCOAFields, setShowAllCOAFields] = useState(false);
 
+  // ─── NOI Override State ─────────────────────────────────────────
+  const existingOverride = (project?.customMetrics as any)?.noiOverride;
+  const [noiOverrideValue, setNoiOverrideValue] = useState<number | null>(existingOverride ?? null);
+  const handleNoiOverrideChange = useCallback((value: number | null) => {
+    setNoiOverrideValue(value);
+    const cm = (project?.customMetrics as any) ?? {};
+    apiRequest('PATCH', `/api/modeling/projects/${projectId}`, {
+      customMetrics: { ...cm, noiOverride: value },
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId] });
+    });
+  }, [projectId, project?.customMetrics, queryClient]);
+
   // ─── Unit Mix State ────────────────────────────────────────────
   const [unitRows, setUnitRows] = useState<UnitRow[]>([]);
   const rateType: string = (config.unitMix as any).rateType || 'monthly';
@@ -977,6 +1049,9 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'deal-pricing'] });
       queryClient.invalidateQueries({ queryKey: [`/api/modeling/projects/${projectId}/pricing`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/returns/model', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'lp-reporting'] });
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to save. Please try again.', variant: 'destructive' });
@@ -1094,6 +1169,8 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
           isDirty={isDirty}
           isSaving={saveMutation.isPending}
           source={showDirectInput ? 'direct_input' : 'none'}
+          noiOverride={noiOverrideValue}
+          onNoiOverrideChange={handleNoiOverrideChange}
         />
       )}
 

@@ -862,14 +862,14 @@ export const projects = pgTable("projects", {
   dealId: varchar("deal_id").references(() => crmDeals.id, { onDelete: 'set null' }), // Link to CRM deal
   propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: 'set null' }), // Link to CRM property
   modelingProjectId: varchar("modeling_project_id"), // Link to modeling project (forward reference, no FK to avoid circular)
-  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // Project Settings
 export const projectSettings = pgTable("project_settings", {
-  projectId: varchar("project_id").primaryKey().references(() => projects.id),
+  projectId: varchar("project_id").primaryKey().references(() => projects.id, { onDelete: 'cascade' }),
   useBusinessDays: boolean("use_business_days").notNull().default(false),
   holidayCalendar: holidayCalendarEnum("holiday_calendar").notNull().default("us_federal"),
   notificationsJson: jsonb("notifications_json").notNull().default(sql`'{}'`),
@@ -884,6 +884,8 @@ export const projectSettings = pgTable("project_settings", {
   quietHoursStart: text("quiet_hours_start").default("22:00"), // 10 PM
   quietHoursEnd: text("quiet_hours_end").default("08:00"), // 8 AM
   weekendNotifications: boolean("weekend_notifications").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 // Project Templates
 export const projectTemplates = pgTable("project_templates", {
@@ -896,7 +898,7 @@ export const projectTemplates = pgTable("project_templates", {
 // Tasks
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   description: text("description"),
   startStrategy: startStrategyEnum("start_strategy").notNull().default("offset"),
@@ -1008,7 +1010,7 @@ export const timelineNotes = pgTable("timeline_notes", {
 // Project Shares
 export const projectShares = pgTable("project_shares", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   shareType: shareTypeEnum("share_type").notNull().default("public"),
   accessLevel: shareAccessEnum("access_level").notNull().default("view"),
   shareToken: varchar("share_token").notNull().unique(), // Unique token for the share link
@@ -1023,7 +1025,7 @@ export const projectShares = pgTable("project_shares", {
 // Audit Logs
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").references(() => projects.id), // Nullable for org-level audit logs
+  projectId: varchar("project_id").references(() => projects.id, { onDelete: 'set null' }), // Nullable for org-level audit logs
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   entityType: text("entity_type").notNull(),
@@ -1049,7 +1051,7 @@ export const auditLogs = pgTable("audit_logs", {
 // Risk Management
 export const risks = pgTable("risks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   description: text("description"),
   category: riskCategoryEnum("category").notNull().default("operational"),
@@ -1133,8 +1135,8 @@ export const contacts = pgTable("contacts", {
 // Project Contacts (Join table for associating contacts with projects)
 export const projectContacts = pgTable("project_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
-  contactId: varchar("contact_id").notNull().references(() => crmContacts.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => crmContacts.id, { onDelete: 'cascade' }),
   role: contactRoleEnum("role").notNull(), // Role for this specific project
   customRole: text("custom_role"), // Custom role/position when role is "other"
   projectNotes: text("project_notes"), // Project-specific notes about this contact
@@ -1152,7 +1154,7 @@ export const projectContacts = pgTable("project_contacts", {
 // Project Deal Members - Custom deal team members manually added to a project
 export const projectDealMembers = pgTable("project_deal_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   orgId: varchar("org_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   email: text("email"),
@@ -1171,7 +1173,7 @@ export const projectDealMembers = pgTable("project_deal_members", {
 // Project Pending Contacts (Join table for associating pending contacts with projects)
 export const projectPendingContacts = pgTable("project_pending_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id").notNull().references(() => projects.id),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
   pendingContactId: varchar("pending_contact_id").notNull().references(() => pendingContacts.id),
   role: contactRoleEnum("role").notNull(), // Pre-assigned role for when contact is accepted
   customRole: text("custom_role"), // Custom role when role is "other"
@@ -4363,6 +4365,7 @@ export const crmDeals = pgTable("crm_deals", {
   ownerId: varchar("owner_id").notNull(),
   // DD Project Integration
   ddProjectId: varchar("dd_project_id").references(() => projects.id), // Links to DD project if converted
+  modelingProjectId: varchar("modeling_project_id"), // Links to financial modeling project (populated on model creation)
   // Closed Deal Tracking
   isClosed: boolean("is_closed").default(false),
   closedAt: timestamp("closed_at"),

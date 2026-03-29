@@ -166,6 +166,7 @@ export default function UnifiedSidebar() {
   const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
   const [documentStudioExpanded, setDocumentStudioExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
+  const [expandedSubcats, setExpandedSubcats] = useState<Set<string>>(new Set()); // all start collapsed
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{type: 'contact' | 'company' | 'deal', id: string} | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -203,7 +204,7 @@ export default function UnifiedSidebar() {
   });
 
   // Fetch enabled ops modules based on owned asset classes
-  const { data: opsModulesData } = useQuery<{ modules: string[]; assetClasses: string[] }>({
+  const { data: opsModulesData, isLoading: opsModulesLoading } = useQuery<{ modules: string[]; assetClasses: string[] }>({
     queryKey: ['/api/operations-context/modules'],
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -248,9 +249,11 @@ export default function UnifiedSidebar() {
   // Build subcategory-grouped operations nav
   const opsSubcategoryGroups = OPS_SUBCATEGORY_META
     .map(subcat => {
-      // For asset-class-specific subcategories, check if user owns any matching asset
+      // For asset-class-specific subcategories, check if user owns any matching asset.
+      // Show all while still loading (opsModulesLoading) or in dev mode (enabledModules empty means no subscription data yet).
       if (!subcat.isUniversal) {
-        const hasMatchingAsset = enabledModules.length === 0 || // fallback: show all
+        const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
+        const hasMatchingAsset = isDev || opsModulesLoading || ownedAssetClasses.length === 0 ||
           (subcat.assetClasses || []).some(ac => ownedAssetClasses.includes(ac));
         if (!hasMatchingAsset) return null;
       }
@@ -704,22 +707,47 @@ export default function UnifiedSidebar() {
                 {/* Portfolio — always visible */}
                 <NavLink item={{ name: "Portfolio", href: "/portfolio" }} />
 
-                {/* Subcategory-grouped modules */}
-                {opsSubcategoryGroups.map((subcat) => (
-                  <div key={subcat.id}>
-                    <div className="mt-3 mb-0.5 ml-4 pl-3 border-l border-sidebar-foreground/15 flex items-center gap-1.5">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
-                        {subcat.label}
-                      </span>
-                      {!subcat.isUniversal && (
-                        <span className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0" />
-                      )}
+                {/* Subcategory-grouped modules — each section is independently collapsible */}
+                {opsSubcategoryGroups.map((subcat) => {
+                  const isExpanded = expandedSubcats.has(subcat.id);
+                  const isActive = subcat.items.some(item => location.startsWith(item.href));
+                  const toggleSubcat = () => setExpandedSubcats(prev => {
+                    const next = new Set(prev);
+                    if (next.has(subcat.id)) next.delete(subcat.id);
+                    else next.add(subcat.id);
+                    return next;
+                  });
+                  return (
+                    <div key={subcat.id}>
+                      <button
+                        onClick={toggleSubcat}
+                        className={cn(
+                          "mt-2 mb-0 ml-2 mr-1 flex items-center justify-between rounded px-2 py-1",
+                          "w-[calc(100%-12px)] text-[9px] font-bold uppercase tracking-widest",
+                          "border-l border-sidebar-foreground/15 pl-3",
+                          "hover:bg-white/[0.06] transition-colors group",
+                          isActive
+                            ? "text-sidebar-foreground/70"
+                            : "text-sidebar-foreground/40"
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{subcat.label}</span>
+                          {!subcat.isUniversal && (
+                            <span className="w-1 h-1 rounded-full bg-primary/50 flex-shrink-0" title="Asset-class specific" />
+                          )}
+                        </div>
+                        <ChevronDown className={cn(
+                          "w-2.5 h-2.5 flex-shrink-0 opacity-50 transition-transform duration-150",
+                          isExpanded ? "rotate-0" : "-rotate-90"
+                        )} />
+                      </button>
+                      {isExpanded && subcat.items.map((item) => (
+                        <NavLink key={item.name} item={item} depth={1} />
+                      ))}
                     </div>
-                    {subcat.items.map((item) => (
-                      <NavLink key={item.name} item={item} depth={1} />
-                    ))}
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Integrations link */}
                 <div className="mt-3 mb-0.5 ml-4 pl-3 border-l border-sidebar-foreground/15 flex items-center gap-1.5">
