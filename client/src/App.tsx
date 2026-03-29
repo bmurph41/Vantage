@@ -1228,9 +1228,11 @@ function Router() {
         )}
       </Route>
       <Route path="/operations/integrations">
-        <Suspense fallback={<PageLoader />}>
-          <OperationsIntegrations />
-        </Suspense>
+        {() => (
+          <GatedLayout pack="operations">
+            <OperationsIntegrations />
+          </GatedLayout>
+        )}
       </Route>
       <Route path="/operations/ship-store">
         {() => (

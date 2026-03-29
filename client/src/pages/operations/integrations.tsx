@@ -190,7 +190,7 @@ export default function OperationsIntegrations() {
         </Badge>
       </div>
 
-      <Tabs defaultValue="connected" className="space-y-4">
+      <Tabs defaultValue="available" className="space-y-4">
         <TabsList>
           <TabsTrigger value="connected" className="gap-2">
             <Activity className="h-4 w-4" />
