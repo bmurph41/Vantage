@@ -2,6 +2,16 @@
 
 ## Current State (2026-03-30)
 
+### ✅ COMPLETE — Email Send Integration Spec (2026-03-30)
+
+## Planner Agent — 2026-03-30
+- Spec written: Email Send Integration for CRM Workflow Automation
+- Output: agents/specs/email-send-integration-spec.md
+- Builder task added: yes
+- Notes: Existing `send_email` action in workflow-engine.ts is a console-log stub. email-service.ts already has production-ready SendGrid/Resend with fallback. Spec covers: wiring the stub to real email service, new `workflow_email_templates` + `workflow_email_log` tables, template CRUD API, token interpolation reusing existing `interpolateTemplate()`, CRM activity logging for every sent email, frontend template editor with token insertion + live preview, and rule builder UI enhancement for configuring send_email actions. Two parallel DB schemas exist for workflows (marinamatch/ and services/) — spec targets the marinamatch/ version which has the active stub. Medium-High complexity (~800-1200 lines across 6-8 files).
+
+---
+
 ### ✅ COMPLETE — Deal Timeline / Gantt View (2026-03-30)
 Full implementation of the Deal Timeline/Gantt view feature (CRM priority #2).
 

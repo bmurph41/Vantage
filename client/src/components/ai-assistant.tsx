@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'wouter';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import {
   MessageCircle,
   X,
@@ -110,191 +111,6 @@ const getModeIcon = (iconName: string) => {
   return map[iconName] ?? MessageCircle;
 };
 
-// ─── Simple Markdown renderer ─────────────────────────────────────────────────
-// Avoids external dependency while supporting the most common patterns AI outputs
-
-function renderMarkdown(text: string): React.ReactNode {
-  const lines = text.split('\n');
-  const elements: React.ReactNode[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Code block
-    if (line.startsWith('```')) {
-      const lang = line.slice(3).trim();
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      elements.push(
-        <pre key={i} className="bg-zinc-900 text-zinc-100 rounded-md p-3 my-2 overflow-x-auto text-xs font-mono leading-relaxed">
-          <code>{codeLines.join('\n')}</code>
-        </pre>
-      );
-      i++;
-      continue;
-    }
-
-    // H1
-    if (line.startsWith('# ')) {
-      elements.push(<h1 key={i} className="text-base font-bold mt-3 mb-1 text-foreground">{inlineMarkdown(line.slice(2))}</h1>);
-      i++; continue;
-    }
-
-    // H2
-    if (line.startsWith('## ')) {
-      elements.push(<h2 key={i} className="text-sm font-bold mt-2.5 mb-1 text-foreground border-b border-border pb-0.5">{inlineMarkdown(line.slice(3))}</h2>);
-      i++; continue;
-    }
-
-    // H3
-    if (line.startsWith('### ')) {
-      elements.push(<h3 key={i} className="text-sm font-semibold mt-2 mb-0.5 text-foreground">{inlineMarkdown(line.slice(4))}</h3>);
-      i++; continue;
-    }
-
-    // Horizontal rule
-    if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
-      elements.push(<hr key={i} className="border-border my-2" />);
-      i++; continue;
-    }
-
-    // Table (detect by | chars)
-    if (line.includes('|') && line.trim().startsWith('|')) {
-      const tableLines: string[] = [];
-      while (i < lines.length && lines[i].includes('|')) {
-        tableLines.push(lines[i]);
-        i++;
-      }
-      elements.push(<MarkdownTable key={i} lines={tableLines} />);
-      continue;
-    }
-
-    // Unordered list
-    if (line.match(/^(\s*)([-*+])\s/)) {
-      const listItems: { level: number; content: string }[] = [];
-      while (i < lines.length && lines[i].match(/^(\s*)([-*+])\s/)) {
-        const m = lines[i].match(/^(\s*)([-*+])\s(.*)$/);
-        if (m) listItems.push({ level: m[1].length, content: m[3] });
-        i++;
-      }
-      elements.push(
-        <ul key={i} className="my-1 space-y-0.5">
-          {listItems.map((item, idx) => (
-            <li key={idx} className="flex gap-2 text-sm" style={{ paddingLeft: `${item.level * 12}px` }}>
-              <span className="text-muted-foreground mt-1 shrink-0">•</span>
-              <span>{inlineMarkdown(item.content)}</span>
-            </li>
-          ))}
-        </ul>
-      );
-      continue;
-    }
-
-    // Ordered list
-    if (line.match(/^\d+\.\s/)) {
-      const listItems: { num: number; content: string }[] = [];
-      while (i < lines.length && lines[i].match(/^\d+\.\s/)) {
-        const m = lines[i].match(/^(\d+)\.\s(.*)$/);
-        if (m) listItems.push({ num: parseInt(m[1]), content: m[2] });
-        i++;
-      }
-      elements.push(
-        <ol key={i} className="my-1 space-y-0.5">
-          {listItems.map((item, idx) => (
-            <li key={idx} className="flex gap-2 text-sm">
-              <span className="text-muted-foreground font-mono w-5 shrink-0 text-right">{item.num}.</span>
-              <span>{inlineMarkdown(item.content)}</span>
-            </li>
-          ))}
-        </ol>
-      );
-      continue;
-    }
-
-    // Blockquote
-    if (line.startsWith('> ')) {
-      elements.push(
-        <blockquote key={i} className="border-l-2 border-blue-500 pl-3 my-1 text-sm text-muted-foreground italic">
-          {inlineMarkdown(line.slice(2))}
-        </blockquote>
-      );
-      i++; continue;
-    }
-
-    // Empty line
-    if (!line.trim()) {
-      if (elements.length > 0) {
-        elements.push(<div key={i} className="h-1" />);
-      }
-      i++; continue;
-    }
-
-    // Normal paragraph
-    elements.push(
-      <p key={i} className="text-sm leading-relaxed">{inlineMarkdown(line)}</p>
-    );
-    i++;
-  }
-
-  return <div className="space-y-0.5">{elements}</div>;
-}
-
-/** Render inline markdown: bold, italic, code, links */
-function inlineMarkdown(text: string): React.ReactNode {
-  // Parse inline patterns
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|__[^_]+__)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**'))
-      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-    if (part.startsWith('__') && part.endsWith('__'))
-      return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-    if (part.startsWith('*') && part.endsWith('*'))
-      return <em key={i} className="italic">{part.slice(1, -1)}</em>;
-    if (part.startsWith('`') && part.endsWith('`'))
-      return <code key={i} className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
-    return part;
-  });
-}
-
-/** Render a markdown table */
-function MarkdownTable({ lines }: { lines: string[] }) {
-  const rows = lines.map(l => l.split('|').map(c => c.trim()).filter(Boolean));
-  const headerRow = rows[0] ?? [];
-  const isSeparator = (row: string[]) => row.every(c => c.match(/^:?-+:?$/));
-  const dataRows = rows.slice(1).filter(r => !isSeparator(r));
-
-  return (
-    <div className="overflow-x-auto my-2">
-      <table className="min-w-full text-xs border-collapse">
-        <thead>
-          <tr className="bg-muted">
-            {headerRow.map((h, i) => (
-              <th key={i} className="border border-border px-2 py-1 text-left font-semibold">
-                {inlineMarkdown(h)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dataRows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? '' : 'bg-muted/40'}>
-              {row.map((cell, ci) => (
-                <td key={ci} className="border border-border px-2 py-1">
-                  {inlineMarkdown(cell)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -889,7 +705,7 @@ export function AIAssistant() {
                 >
                   {message.role === 'user'
                     ? <p className="text-sm">{message.content}</p>
-                    : renderMarkdown(message.content)
+                    : <MarkdownRenderer content={message.content} />
                   }
                 </div>
 
@@ -931,7 +747,7 @@ export function AIAssistant() {
                   </Badge>
                 )}
                 <div className="max-w-[92%] rounded-xl px-3 py-2 bg-muted border border-border/50">
-                  {renderMarkdown(streamingContent)}
+                  {<MarkdownRenderer content={streamingContent} />}
                   <span className="inline-block w-1 h-3.5 bg-blue-600 animate-pulse ml-0.5 rounded-sm" />
                 </div>
               </div>

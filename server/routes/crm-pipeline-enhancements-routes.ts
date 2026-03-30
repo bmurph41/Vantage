@@ -932,3 +932,50 @@ crmPipelineEnhancementsRouter.get('/deals/enriched', async (req, res) => {
   }
 });
 
+// ─── Next Follow-Up Tasks (batch) ──────────────────────────────────
+// Returns a map of dealId → next pending task (soonest due date) for all deals in org.
+// Used by Kanban cards to display next follow-up date.
+crmPipelineEnhancementsRouter.get('/deals/next-follow-ups', async (req: any, res) => {
+  try {
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Get the soonest pending/in_progress task per deal using a window function
+    const result = await db.execute(sql`
+      SELECT DISTINCT ON (t.deal_id)
+        t.deal_id,
+        t.id AS task_id,
+        t.title,
+        t.type,
+        t.due_date,
+        t.status
+      FROM crm_tasks t
+      INNER JOIN crm_deals d ON d.id = t.deal_id
+      WHERE t.org_id = ${orgId}
+        AND t.deal_id IS NOT NULL
+        AND t.completed = false
+        AND t.status IN ('pending', 'in_progress')
+        AND t.due_date IS NOT NULL
+      ORDER BY t.deal_id, t.due_date ASC
+    `);
+
+    // Build a map: dealId → { taskId, title, type, dueDate, status }
+    const followUps: Record<string, { taskId: string; title: string; type: string; dueDate: string; status: string }> = {};
+    for (const row of (result as any).rows || result) {
+      const dealId = (row as any).deal_id;
+      followUps[dealId] = {
+        taskId: (row as any).task_id,
+        title: (row as any).title,
+        type: (row as any).type,
+        dueDate: (row as any).due_date,
+        status: (row as any).status,
+      };
+    }
+
+    return res.json(followUps);
+  } catch (error) {
+    console.error('Error fetching next follow-ups:', error);
+    return res.status(500).json({ error: 'Failed to fetch next follow-ups' });
+  }
+});
+

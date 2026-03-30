@@ -1,25 +1,20 @@
 # MarinaMatch Build Status
-_Last updated: 2026-03-30 23:15:00_
+_Last updated: 2026-03-30 23:14:39_
 
 ## Last Agent Run
 - Type: feature
-- Task: Implement Deal Timeline/Gantt view (CRM priority #2)
+- Task: Implement Deal Timeline/Gantt view — see agents/specs/deal-timeline-gantt-spec.md
 - Result: ✅ SUCCESS
-- Duration: ~20min
+- Duration: 894s
 
-## Files Created
-- `client/src/components/crm/deal-gantt-view.tsx`
-- `client/src/components/crm/gantt-toolbar.tsx`
-- `client/src/components/crm/gantt-popover.tsx`
-- `client/src/components/deals/deal-timeline-tab.tsx`
-
-## Files Modified
-- `server/routes/crm-pipeline-enhancements-routes.ts`
-- `client/src/pages/pipeline.tsx`
-- `client/src/pages/deal-detail.tsx`
 
 ## TypeScript
-Vite build: ✅ PASS (0 errors)
+
 
 ## Tests
-Not run this cycle
+npm error Missing script: "test"
+npm error
+npm error To see a list of scripts, run:
+npm error   npm run
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-03-30T23_14_39_359Z-debug-0.log
+

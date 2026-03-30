@@ -71,6 +71,14 @@ type DealWithRelations = Deal & {
   company?: Company | null;
 };
 
+type FollowUpInfo = {
+  taskId: string;
+  title: string;
+  type: string;
+  dueDate: string;
+  status: string;
+};
+
 // ─── Utilities ───────────────────────────────────────────────────────
 
 const getInitials = (firstName?: string, lastName?: string) => {
@@ -103,9 +111,10 @@ interface DealCardProps {
   deal: DealWithRelations;
   onClick: () => void;
   rotThreshold?: number;
+  followUp?: FollowUpInfo | null;
 }
 
-function DealCard({ deal, onClick, rotThreshold = 30 }: DealCardProps) {
+function DealCard({ deal, onClick, rotThreshold = 30, followUp }: DealCardProps) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: deal.id });
@@ -116,6 +125,13 @@ function DealCard({ deal, onClick, rotThreshold = 30 }: DealCardProps) {
   const isOverdue = deal.expectedCloseDate && new Date(deal.expectedCloseDate) < new Date();
   const priorityCfg = getPriorityConfig(deal.priority || 'medium');
   const dealAge = calculateDaysInStage(deal.createdAt);
+
+  // Key dates: collect the upcoming ones that matter
+  const now = new Date();
+  const ddExpDate = deal.ddExpirationDate ? new Date(deal.ddExpirationDate) : null;
+  const isDdOverdue = ddExpDate && ddExpDate < now;
+  const followUpDate = followUp?.dueDate ? new Date(followUp.dueDate) : null;
+  const isFollowUpOverdue = followUpDate && followUpDate < now;
 
   return (
     <div
@@ -210,19 +226,65 @@ function DealCard({ deal, onClick, rotThreshold = 30 }: DealCardProps) {
               </div>
             )}
 
-            {/* Stage time + close date row */}
-            <div className="flex items-center justify-between text-[11px] text-gray-500">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span className={isRotting ? "text-red-600 font-medium" : ""}>
-                  {daysInStage}d in stage
-                </span>
-              </div>
-              {deal.expectedCloseDate && (
-                <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(deal.expectedCloseDate), "MMM d")}
+            {/* Key Dates Section */}
+            <div className="space-y-1 bg-gray-50 rounded-md px-2 py-1.5">
+              {/* Created + Days in stage row */}
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  <span className={isRotting ? "text-red-600 font-medium" : ""}>
+                    {daysInStage}d in stage
+                  </span>
                 </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 text-gray-400">
+                        <Timer className="h-3 w-3" />
+                        <span>{dealAge}d old</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">Created {format(new Date(deal.createdAt), "MMM d, yyyy")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
+              {/* Expected Close */}
+              {deal.expectedCloseDate && (
+                <div className={`flex items-center gap-1 text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-blue-600'}`}>
+                  <Calendar className="h-3 w-3" />
+                  <span>Close: {format(new Date(deal.expectedCloseDate), "MMM d")}</span>
+                  {isOverdue && <AlertTriangle className="h-3 w-3 ml-auto" />}
+                </div>
+              )}
+
+              {/* DD Expiration */}
+              {deal.ddExpirationDate && (
+                <div className={`flex items-center gap-1 text-[11px] ${isDdOverdue ? 'text-red-600 font-medium' : 'text-amber-600'}`}>
+                  <Target className="h-3 w-3" />
+                  <span>DD: {format(new Date(deal.ddExpirationDate), "MMM d")}</span>
+                  {isDdOverdue && <AlertTriangle className="h-3 w-3 ml-auto" />}
+                </div>
+              )}
+
+              {/* Next Follow-Up */}
+              {followUp && followUpDate && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={`flex items-center gap-1 text-[11px] ${isFollowUpOverdue ? 'text-red-600 font-medium' : 'text-teal-600'}`}>
+                        <Phone className="h-3 w-3" />
+                        <span className="truncate">Follow-up: {format(followUpDate, "MMM d")}</span>
+                        {isFollowUpOverdue && <AlertTriangle className="h-3 w-3 ml-auto flex-shrink-0" />}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">{followUp.title}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
 
@@ -283,9 +345,10 @@ interface PipelineColumnProps {
   stage: PipelineStage;
   deals: DealWithRelations[];
   onDealClick: (deal: DealWithRelations) => void;
+  followUps?: Record<string, FollowUpInfo>;
 }
 
-function PipelineColumn({ stage, deals, onDealClick }: PipelineColumnProps) {
+function PipelineColumn({ stage, deals, onDealClick, followUps }: PipelineColumnProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(stage.name);
   const { toast } = useToast();
@@ -437,6 +500,7 @@ function PipelineColumn({ stage, deals, onDealClick }: PipelineColumnProps) {
                 deal={deal}
                 onClick={() => onDealClick(deal)}
                 rotThreshold={stage.rotDays || 30}
+                followUp={followUps?.[deal.id] || null}
               />
             ))
           )}
@@ -502,6 +566,12 @@ export default function Pipeline() {
   }, [allStages, selectedPipelineId]);
 
   const { data: deals = [], isLoading } = useQuery<DealWithRelations[]>({ queryKey: ["/api/deals"] });
+
+  // Batch-fetch next follow-up task per deal
+  const { data: followUps = {} } = useQuery<Record<string, FollowUpInfo>>({
+    queryKey: ["/api/crm/pipeline-enhancements/deals/next-follow-ups"],
+    staleTime: 60_000,
+  });
 
   // ── Mutations ──
   const updateDealMutation = useMutation({
@@ -1051,13 +1121,14 @@ export default function Pipeline() {
                     stage={stage}
                     deals={dealsByStage[stage.id] || []}
                     onDealClick={handleDealClick}
+                    followUps={followUps}
                   />
                 ))}
               </div>
               <DragOverlay>
                 {activeId ? (
                   <div className="opacity-80 rotate-3">
-                    <DealCard deal={deals.find(d => d.id === activeId)!} onClick={() => {}} />
+                    <DealCard deal={deals.find(d => d.id === activeId)!} onClick={() => {}} followUp={followUps[activeId] || null} />
                   </div>
                 ) : null}
               </DragOverlay>

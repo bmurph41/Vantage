@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileText, Loader2, Send, Brain, CheckCircle2, XCircle, Clock, Sparkles } from "lucide-react";
@@ -297,7 +298,10 @@ export function CddAdvisor({ projectId }: CddAdvisorProps) {
                           : 'bg-muted rounded-lg px-4 py-2 max-w-[80%]'
                         }
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {message.role === 'user'
+                          ? <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          : <MarkdownRenderer content={message.content} />
+                        }
                         
                         {/* Show tool calls if available */}
                         {message.toolCalls && message.toolCalls.length > 0 && (

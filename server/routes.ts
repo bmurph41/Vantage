@@ -13566,81 +13566,204 @@ Current context: Project ${req.params.projectId}`;
     }
   });
   
-  // Activities aliases
+  // Activities — global activity log with server-side pagination, filtering, and entity enrichment
   app.get("/api/activities", async (req: any, res) => {
     try {
-      const activities = await storage.getCrmActivitiesForOrg(req.user.id);
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+      if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
-      const enrichedActivities = await Promise.all(
-        activities.map(async (activity) => {
-          const enriched: any = {
-            id: activity.id,
-            type: activity.type || 'note',
-            direction: activity.direction || 'internal',
-            subject: activity.subject || activity.description?.slice(0, 80) || 'Activity',
-            description: activity.description,
-            date: activity.createdAt,
-            user: 'You',
-          };
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 25));
+      const entityType = req.query.entityType as string; // deal | contact | company | lead | property
+      const actorId = req.query.actorId as string;
+      const type = req.query.type as string; // call | email | meeting | note | task_created | stage_change | deal_created
+      const dateRange = req.query.dateRange as string; // today | week | month
+      const q = req.query.q as string;
+      const offset = (page - 1) * pageSize;
 
-          if (activity.entityType === 'contact' && activity.entityId) {
-            try {
-              const contact = await db.query.crmContacts.findFirst({
-                where: eq(crmContacts.id, activity.entityId),
-              });
-              if (contact) {
-                enriched.contact = { id: contact.id, name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() };
-              }
-            } catch {}
-          }
+      // Build WHERE conditions
+      const conditions: any[] = [eq(crmActivities.orgId, orgId)];
 
-          if (activity.entityType === 'deal' && activity.entityId) {
-            try {
-              const deal = await db.query.crmDeals.findFirst({
-                where: eq(crmDeals.id, activity.entityId),
-              });
-              if (deal) {
-                enriched.deal = { id: deal.id, name: deal.title || deal.name || 'Deal' };
-                if (deal.contactId) {
-                  try {
-                    const contact = await db.query.crmContacts.findFirst({
-                      where: eq(crmContacts.id, deal.contactId),
-                    });
-                    if (contact) {
-                      enriched.contact = { id: contact.id, name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() };
-                    }
-                  } catch {}
-                }
-                if (deal.companyId) {
-                  try {
-                    const company = await db.query.crmCompanies.findFirst({
-                      where: eq(crmCompanies.id, deal.companyId),
-                    });
-                    if (company) {
-                      enriched.company = { id: company.id, name: company.name };
-                    }
-                  } catch {}
-                }
-              }
-            } catch {}
-          }
+      if (entityType && entityType !== 'all') {
+        conditions.push(eq(crmActivities.entityType, entityType));
+      }
+      if (actorId && actorId !== 'all') {
+        conditions.push(eq(crmActivities.userId, actorId));
+      }
+      if (type && type !== 'all') {
+        conditions.push(eq(crmActivities.type, type));
+      }
+      if (dateRange && dateRange !== 'all') {
+        const now = new Date();
+        if (dateRange === 'today') {
+          conditions.push(gte(crmActivities.createdAt, new Date(now.getFullYear(), now.getMonth(), now.getDate())));
+        } else if (dateRange === 'week') {
+          conditions.push(gte(crmActivities.createdAt, new Date(now.getTime() - 7 * 86400000)));
+        } else if (dateRange === 'month') {
+          conditions.push(gte(crmActivities.createdAt, new Date(now.getTime() - 30 * 86400000)));
+        }
+      }
+      if (q) {
+        conditions.push(or(
+          ilike(crmActivities.subject, `%${q}%`),
+          ilike(crmActivities.description, `%${q}%`)
+        ));
+      }
 
-          if (activity.entityType === 'company' && activity.entityId) {
-            try {
-              const company = await db.query.crmCompanies.findFirst({
-                where: eq(crmCompanies.id, activity.entityId),
-              });
-              if (company) {
-                enriched.company = { id: company.id, name: company.name };
-              }
-            } catch {}
-          }
+      const whereClause = and(...conditions);
 
-          return enriched;
+      // Count total for pagination
+      const [countResult] = await db.select({ count: sql<number>`count(*)::int` })
+        .from(crmActivities)
+        .where(whereClause);
+      const total = countResult?.count || 0;
+
+      // Fetch page with actor join
+      const rows = await db
+        .select({
+          activity: crmActivities,
+          actorName: users.displayName,
+          actorEmail: users.email,
         })
-      );
+        .from(crmActivities)
+        .leftJoin(users, eq(crmActivities.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(crmActivities.createdAt))
+        .limit(pageSize)
+        .offset(offset);
 
-      res.json(enrichedActivities);
+      // Collect entity IDs for batch enrichment
+      const contactIds = new Set<string>();
+      const dealIds = new Set<string>();
+      const companyIds = new Set<string>();
+      const leadIds = new Set<string>();
+      const propertyIds = new Set<string>();
+
+      for (const row of rows) {
+        const a = row.activity;
+        if (a.entityType === 'contact' && a.entityId) contactIds.add(a.entityId);
+        if (a.entityType === 'deal' && a.entityId) dealIds.add(a.entityId);
+        if (a.entityType === 'company' && a.entityId) companyIds.add(a.entityId);
+        if (a.entityType === 'lead' && a.entityId) leadIds.add(a.entityId);
+        if (a.entityType === 'property' && a.entityId) propertyIds.add(a.entityId);
+      }
+
+      // Batch-load entities
+      const [contactMap, dealMap, companyMap, leadMap, propertyMap] = await Promise.all([
+        contactIds.size > 0
+          ? db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
+              .from(crmContacts).where(inArray(crmContacts.id, [...contactIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+        dealIds.size > 0
+          ? db.select({ id: crmDeals.id, title: crmDeals.title, name: crmDeals.name, contactId: crmDeals.contactId, companyId: crmDeals.companyId })
+              .from(crmDeals).where(inArray(crmDeals.id, [...dealIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+        companyIds.size > 0
+          ? db.select({ id: crmCompanies.id, name: crmCompanies.name })
+              .from(crmCompanies).where(inArray(crmCompanies.id, [...companyIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+        leadIds.size > 0
+          ? (async () => {
+              const { crmLeads } = await import('@shared/schema');
+              return db.select({ id: crmLeads.id, firstName: crmLeads.firstName, lastName: crmLeads.lastName })
+                .from(crmLeads).where(inArray(crmLeads.id, [...leadIds]))
+                .then(rows => new Map(rows.map(r => [r.id, r])));
+            })()
+          : Promise.resolve(new Map()),
+        propertyIds.size > 0
+          ? db.select({ id: crmProperties.id, name: crmProperties.name })
+              .from(crmProperties).where(inArray(crmProperties.id, [...propertyIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+      ]);
+
+      // Also batch-load deal-linked contacts and companies
+      const dealContactIds = new Set<string>();
+      const dealCompanyIds = new Set<string>();
+      for (const deal of dealMap.values()) {
+        if (deal.contactId) dealContactIds.add(deal.contactId);
+        if (deal.companyId) dealCompanyIds.add(deal.companyId);
+      }
+      const [dealContactMap, dealCompanyMap] = await Promise.all([
+        dealContactIds.size > 0
+          ? db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
+              .from(crmContacts).where(inArray(crmContacts.id, [...dealContactIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+        dealCompanyIds.size > 0
+          ? db.select({ id: crmCompanies.id, name: crmCompanies.name })
+              .from(crmCompanies).where(inArray(crmCompanies.id, [...dealCompanyIds]))
+              .then(rows => new Map(rows.map(r => [r.id, r])))
+          : Promise.resolve(new Map()),
+      ]);
+
+      // Enrich activities
+      const items = rows.map(row => {
+        const a = row.activity;
+        const enriched: any = {
+          id: a.id,
+          type: a.type || 'note',
+          direction: a.direction || 'internal',
+          subject: a.subject || a.description?.slice(0, 80) || 'Activity',
+          description: a.description,
+          date: a.createdAt,
+          user: row.actorName || row.actorEmail || 'System',
+          userId: a.userId,
+          entityType: a.entityType,
+        };
+
+        if (a.entityType === 'contact' && a.entityId) {
+          const c = contactMap.get(a.entityId);
+          if (c) enriched.contact = { id: c.id, name: `${c.firstName || ''} ${c.lastName || ''}`.trim() };
+        }
+        if (a.entityType === 'deal' && a.entityId) {
+          const d = dealMap.get(a.entityId);
+          if (d) {
+            enriched.deal = { id: d.id, name: d.title || d.name || 'Deal' };
+            if (d.contactId) {
+              const c = dealContactMap.get(d.contactId);
+              if (c) enriched.contact = { id: c.id, name: `${c.firstName || ''} ${c.lastName || ''}`.trim() };
+            }
+            if (d.companyId) {
+              const co = dealCompanyMap.get(d.companyId);
+              if (co) enriched.company = { id: co.id, name: co.name };
+            }
+          }
+        }
+        if (a.entityType === 'company' && a.entityId) {
+          const co = companyMap.get(a.entityId);
+          if (co) enriched.company = { id: co.id, name: co.name };
+        }
+        if (a.entityType === 'lead' && a.entityId) {
+          const l = leadMap.get(a.entityId);
+          if (l) enriched.lead = { id: l.id, name: `${l.firstName || ''} ${l.lastName || ''}`.trim() };
+        }
+        if (a.entityType === 'property' && a.entityId) {
+          const p = propertyMap.get(a.entityId);
+          if (p) enriched.property = { id: p.id, name: p.name };
+        }
+
+        return enriched;
+      });
+
+      // Fetch distinct actors for the filter dropdown
+      const actors = await db
+        .selectDistinct({ id: users.id, name: users.displayName, email: users.email })
+        .from(crmActivities)
+        .innerJoin(users, eq(crmActivities.userId, users.id))
+        .where(eq(crmActivities.orgId, orgId));
+
+      res.json({
+        items,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        actors: actors.map(a => ({ id: a.id, name: a.name || a.email || 'Unknown' })),
+      });
     } catch (error: any) {
       console.error("Failed to get activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
