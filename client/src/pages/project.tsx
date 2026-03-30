@@ -37,15 +37,16 @@ import type { DDTask } from "@shared/schema";
 
 // ── DD Overview Tab ───────────────────────────────────────────────────
 function DDOverviewTab({ project, tasks, settings }: { project: any; tasks: any[]; settings: any }) {
-  // Fetch linked deal if any
+  // Fetch linked deal — only if the project has an explicit dealId FK set
+  const linkedDealId = project.dealId || null;
   const { data: linkedDeal } = useQuery({
-    queryKey: ['dd-linked-deal', project.id],
+    queryKey: ['dd-linked-deal', project.id, linkedDealId],
+    enabled: !!linkedDealId,
     queryFn: async () => {
       try {
-        // Try to find deal linked to this DD project
-        const res = await apiRequest('GET', `/api/deals?ddProjectId=${project.id}&limit=1`);
-        const data = await res.json();
-        return Array.isArray(data) ? data[0] : data?.deals?.[0] || null;
+        const res = await apiRequest('GET', `/api/deals/${linkedDealId}`);
+        if (!res.ok) return null;
+        return await res.json();
       } catch { return null; }
     },
     retry: false,
