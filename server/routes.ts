@@ -11442,24 +11442,56 @@ Current context: Project ${req.params.projectId}`;
     try {
       const orgId = req.body.orgId || req.user?.orgId || req.orgId;
       const userId = req.user.id;
-      const { dealContacts, depositSchedule, ...rest } = req.body;
+      const { dealContacts, depositSchedule, createDDProject, ddProjectName, ...rest } = req.body;
+
+      // --- Resolve stageId from stage name if not already provided ---
+      let resolvedStageId = rest.stageId || null;
+      let resolvedPipelineId = rest.pipelineId || null;
+      let resolvedProbability = rest.probability ?? null;
+      const stageName = rest.stage || rest.status || 'lead';
+
+      if (!resolvedStageId && stageName) {
+        const orgStages = await storage.getAllCrmPipelineStages(orgId);
+        const matched = orgStages.find(
+          (s: any) => s.name.toLowerCase() === stageName.toLowerCase()
+        );
+        if (matched) {
+          resolvedStageId = matched.id;
+          resolvedPipelineId = resolvedPipelineId || matched.pipelineId;
+          if (resolvedProbability === null) resolvedProbability = matched.probability ?? null;
+        }
+      }
 
       const dealData = {
         ...rest,
         title: rest.title || rest.name || '',
-        stage: rest.stage || rest.status || 'prospect',
+        stage: stageName,
+        stageId: resolvedStageId,
+        pipelineId: resolvedPipelineId,
+        probability: resolvedProbability,
         ownerId: userId,
         orgId,
+        // Normalize DD city/state fields
+        city: rest.ddCity || rest.city || null,
+        state: rest.ddState || rest.state || null,
         // Store deposit schedule in customDeadlines if provided
         ...(depositSchedule && depositSchedule.length > 0 ? { customDeadlines: depositSchedule } : {}),
       };
+
+      // Remove form-only fields not in DB schema
+      delete dealData.ddCity;
+      delete dealData.ddState;
+      delete dealData.name;
+
       const deal = await storage.createCrmDeal(dealData);
+
+      // Trigger workflow automations
+      evaluateAutomations('deal.created', 'deal', deal.id, orgId, deal).catch(() => {});
 
       // Process deal contacts — link existing CRM contacts or create pending contacts/companies
       if (dealContacts && Array.isArray(dealContacts) && dealContacts.length > 0) {
         for (const entry of dealContacts) {
           if (entry.linkedContactId) {
-            // Link existing CRM contact to deal
             await db.insert(crmDealContacts).values({
               dealId: deal.id,
               contactId: entry.linkedContactId,
@@ -11468,7 +11500,6 @@ Current context: Project ${req.params.projectId}`;
               notes: entry.titleRole || '',
             });
           } else if (entry.firstName || entry.lastName || entry.email) {
-            // Create pending contact for unlinked entries
             const [pending] = await db.insert(pendingContacts).values({
               orgId,
               fullName: [entry.firstName, entry.lastName].filter(Boolean).join(' '),
@@ -11487,7 +11518,6 @@ Current context: Project ${req.params.projectId}`;
               createdBy: userId,
             }).returning();
 
-            // Create pending company if company name was provided
             if (entry.company) {
               await db.insert(pendingCompanies).values({
                 orgId,
@@ -11507,7 +11537,59 @@ Current context: Project ${req.params.projectId}`;
         }
       }
 
-      res.json(deal);
+      // --- Auto-create DD project if requested ---
+      let ddProject: any = null;
+      if (createDDProject) {
+        try {
+          const projectData: any = {
+            name: ddProjectName || `${deal.title} — DD`,
+            orgId,
+            createdBy: userId,
+            // Map DD fields from deal
+            anchorType: deal.anchorType || 'psa',
+            ddPeriodDays: deal.ddPeriodDays || null,
+            hasExtensions: deal.hasExtensions || false,
+            extensionCount: deal.extensionCount || 0,
+            extensionDays: (deal as any).extensionDays || [],
+            daysToClosing: deal.daysToClosing || null,
+            tz: 'America/New_York',
+            psaSignedDate: deal.psaSignedDate || null,
+            ddExpirationDate: deal.ddExpirationDate || null,
+            closingDate: deal.closingDate || null,
+            description: deal.description || null,
+            city: deal.city || null,
+            state: deal.state || null,
+            firstDepositAmount: deal.firstDepositAmount || null,
+            firstDepositDays: deal.firstDepositDays || null,
+            firstDepositDueDate: deal.firstDepositDueDate || null,
+            secondDepositAmount: deal.secondDepositAmount || null,
+            secondDepositDays: deal.secondDepositDays || null,
+            secondDepositDueDate: deal.secondDepositDueDate || null,
+            customDeadlines: (deal as any).customDeadlines || [],
+            leases: (deal as any).leases || [],
+          };
+
+          ddProject = await storage.createProject(projectData);
+
+          // Link deal to DD project
+          await storage.updateCrmDeal(deal.id, { ddProjectId: ddProject.id });
+
+          // Link entity via entity-link table
+          await storage.linkEntityToDDProject({
+            entityType: 'deal',
+            entityId: deal.id,
+            ddProjectId: ddProject.id,
+            relationship: 'source',
+            createdBy: userId,
+            orgId,
+          });
+        } catch (ddErr: any) {
+          console.error('[CreateDeal] Failed to auto-create DD project:', ddErr?.message);
+          // Don't fail the whole deal creation if DD project fails
+        }
+      }
+
+      res.json({ ...deal, ddProject });
     } catch (error: any) {
       console.error("Failed to create deal:", error);
       res.status(500).json({ error: "Failed to create deal" });
