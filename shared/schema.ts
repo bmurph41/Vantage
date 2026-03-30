@@ -826,6 +826,10 @@ export const projects = pgTable("projects", {
   coordinates: jsonb("coordinates"), // { lat: number, lng: number }
   placeId: text("place_id"),
   anchorType: anchorTypeEnum("anchor_type").notNull().default("psa"),
+  // LOI / PSA timeline (upstream of DD)
+  loiSubmittedDate: date("loi_submitted_date"),
+  loiSignedDate: date("loi_signed_date"),
+  daysFromLoiToPsa: integer("days_from_loi_to_psa"),
   psaSignedDate: date("psa_signed_date"),
   ddExpirationDate: date("dd_expiration_date"),
   closingDate: date("closing_date"),

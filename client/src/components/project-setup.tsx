@@ -28,6 +28,9 @@ const projectFormSchema = z.object({
   useBusinessDays: z.boolean(),
   holidayCalendar: z.enum(["us_federal", "none"]),
   tz: z.string(),
+  loiSubmittedDate: z.string().optional(),
+  loiSignedDate: z.string().optional(),
+  daysFromLoiToPsa: z.number().min(1).optional(),
   psaSignedDate: z.string().optional(),
   ddExpirationDate: z.string().optional(),
   closingDate: z.string().optional(),
@@ -191,6 +194,9 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
       useBusinessDays: settings?.useBusinessDays || false,
       holidayCalendar: settings?.holidayCalendar || "us_federal",
       tz: project.tz,
+      loiSubmittedDate: (project as any).loiSubmittedDate || "",
+      loiSignedDate: (project as any).loiSignedDate || "",
+      daysFromLoiToPsa: (project as any).daysFromLoiToPsa ?? undefined,
       psaSignedDate: project.psaSignedDate || "",
       ddExpirationDate: project.ddExpirationDate || "",
       closingDate: project.closingDate || "",
@@ -269,12 +275,29 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
   }, [project.id, project.updatedAt, settings?.useBusinessDays, settings?.holidayCalendar]);
 
   // Watch form values for automatic calculation
+  const loiSignedDate = projectForm.watch("loiSignedDate");
+  const daysFromLoiToPsa = projectForm.watch("daysFromLoiToPsa");
   const psaSignedDate = projectForm.watch("psaSignedDate");
   const ddPeriodDays = projectForm.watch("ddPeriodDays");
   const hasExtensions = projectForm.watch("hasExtensions");
   const daysToClosing = projectForm.watch("daysToClosing");
   const useBusinessDays = projectForm.watch("useBusinessDays");
   const holidayCalendar = projectForm.watch("holidayCalendar");
+
+  // Auto-calculate PSA Signed Date from LOI Signed Date + daysFromLoiToPsa
+  useEffect(() => {
+    if (!loiSignedDate || !daysFromLoiToPsa) return;
+    try {
+      const loiDate = parseISO(loiSignedDate);
+      const psaDate = useBusinessDays
+        ? addBusinessDays(loiDate, daysFromLoiToPsa, holidayCalendar || "us_federal")
+        : addDays(loiDate, daysFromLoiToPsa);
+      const formatted = format(psaDate, 'yyyy-MM-dd');
+      if (formatted !== projectForm.getValues("psaSignedDate")) {
+        projectForm.setValue("psaSignedDate", formatted);
+      }
+    } catch { /* invalid date */ }
+  }, [loiSignedDate, daysFromLoiToPsa, useBusinessDays, holidayCalendar]);
 
   // Update deposit due date when reference date or days change
   useEffect(() => {
@@ -391,6 +414,9 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         city: data.city,
         state: data.state,
         anchorType: data.anchorType,
+        loiSubmittedDate: data.loiSubmittedDate || null,
+        loiSignedDate: data.loiSignedDate || null,
+        daysFromLoiToPsa: data.daysFromLoiToPsa || null,
         psaSignedDate: data.psaSignedDate || null,
         ddExpirationDate: data.ddExpirationDate || null,
         closingDate: data.closingDate || null,
@@ -572,16 +598,61 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+
+            {/* LOI Submitted Date — reference only */}
             <div>
-              <Label htmlFor="psaSignedDate">PSA Signed Date</Label>
+              <Label htmlFor="loiSubmittedDate">LOI Submitted Date <span className="text-xs text-muted-foreground">(reference only)</span></Label>
               <DateInput
-                id="psaSignedDate"
-                value={projectForm.watch("psaSignedDate")}
-                onChange={(value) => projectForm.setValue("psaSignedDate", value)}
-                data-testid="input-psa-date"
+                id="loiSubmittedDate"
+                value={projectForm.watch("loiSubmittedDate")}
+                onChange={(value) => projectForm.setValue("loiSubmittedDate", value)}
               />
             </div>
-            
+
+            {/* LOI Signed Date */}
+            <div>
+              <Label htmlFor="loiSignedDate">LOI Signed Date</Label>
+              <DateInput
+                id="loiSignedDate"
+                value={projectForm.watch("loiSignedDate")}
+                onChange={(value) => {
+                  projectForm.setValue("loiSignedDate", value);
+                  // Clear auto-computed PSA if LOI date is cleared
+                  if (!value) projectForm.setValue("daysFromLoiToPsa", undefined);
+                }}
+              />
+            </div>
+
+            {/* PSA Signed Date — manual entry or computed from LOI + N days */}
+            <div>
+              <Label htmlFor="psaSignedDate">PSA Signed Date</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <DateInput
+                  id="psaSignedDate"
+                  value={projectForm.watch("psaSignedDate")}
+                  onChange={(value) => {
+                    projectForm.setValue("psaSignedDate", value);
+                    // When user manually sets PSA, clear the LOI-based calculation
+                    if (value) projectForm.setValue("daysFromLoiToPsa", undefined);
+                  }}
+                  data-testid="input-psa-date"
+                  placeholder="Select date manually (MM/DD/YYYY)"
+                />
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">or</span>
+                  <Input
+                    id="daysFromLoiToPsa"
+                    type="number"
+                    min="1"
+                    placeholder="Days from LOI"
+                    {...projectForm.register("daysFromLoiToPsa", { valueAsNumber: true })}
+                    className="w-40"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
+              </div>
+            </div>
+
             {/* DD Expiration Date */}
             <div>
               <Label htmlFor="ddExpirationDate">DD Expiration Date</Label>
