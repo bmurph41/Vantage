@@ -24,3 +24,9 @@ id = "RAV23V_AkJSYWsq_dRDGJ"
 uri = "file://ai-chatbot-export.zip"
 type = "unspecified"
 title = "AI Chatbot — Full Source Code (8 files, 28KB)"
+
+[[outputs]]
+id = "-ayrRUvXEnElZfvCpPEN-"
+uri = "file://MARINAMATCH_FOR_CLAUDE.md"
+type = "text"
+title = "MarinaMatch — Complete Claude Agent Context Package"
