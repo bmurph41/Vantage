@@ -89,6 +89,7 @@ const operationsModulesNav = [
 
 // Deal Workspace Navigation - Consolidated DD, VDR, and Modeling
 const dealWorkspaceNav = [
+  { name: "Deals", href: "/crm/deals" },
   { name: "Due Diligence", href: "/dd/projects" },
   { name: "Data Room", href: "/vdr" },
 ];
