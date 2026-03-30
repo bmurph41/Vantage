@@ -2,6 +2,35 @@
 
 ## Current State (2026-03-30)
 
+### ✅ COMPLETE — Global Activity Log Polish (2026-03-30)
+Full polish of the global activity log (CRM priority #5): timestamps, filters, pagination.
+
+**Backend (`server/routes.ts` — `GET /api/activities`)**
+- Rewrote from N+1 query pattern to batch-loaded entity enrichment (contacts, deals, companies, leads, properties)
+- Server-side pagination: `page`, `pageSize` params; returns `{ items, total, page, pageSize, totalPages, actors }`
+- Server-side filters: `entityType` (deal/contact/company/lead/property), `actorId`, `type`, `dateRange` (today/week/month), `q` (search)
+- Proper orgId scoping (removed `storage.getCrmActivitiesForOrg` which queried by userId incorrectly)
+- Actor names resolved via LEFT JOIN on `users` table (was hardcoded "You")
+- Returns `actors[]` list for the actor filter dropdown
+- Batch entity lookups via `inArray()` instead of per-row queries
+
+**Frontend (`client/src/pages/activity.tsx`)**
+- Entity type filter dropdown: All Entities, Deals, Contacts, Companies, Leads, Properties
+- Actor filter dropdown: populated from server-returned `actors[]` list
+- Relative timestamps with tooltip: "2 hours ago", "Yesterday at 3:00 PM", "Mar 28, 2026" — hover shows full absolute time
+- Full pagination controls: first/prev/page numbers/next/last with page count display
+- Debounced search (300ms) resets to page 1
+- "Clear all filters" button when any filter is active
+- Entity type badge on each activity card
+- All filters are server-side (no client-side filtering)
+
+**Files Modified:**
+- `server/routes.ts` — rewrote GET /api/activities handler
+- `client/src/pages/activity.tsx` — full rewrite with pagination, filters, relative timestamps
+
+---
+
+
 ### ✅ COMPLETE — Key Dates on Kanban Cards (2026-03-30)
 Added key dates display to Kanban pipeline cards (CRM priority #4).
 

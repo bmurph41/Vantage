@@ -1,14 +1,15 @@
 # MarinaMatch Build Status
-_Last updated: 2026-03-30 23:59:00_
+_Last updated: 2026-03-30 23:58:00_
 
 ## Last Agent Run
 - Type: feature
-- Task: Add key dates display to Kanban pipeline cards (CRM priority #4)
+- Task: Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
 - Result: ✅ SUCCESS
-- Duration: ~180s
+- Duration: ~300s
+
 
 ## TypeScript
-No errors in changed files (pipeline.tsx, crm-pipeline-enhancements-routes.ts)
+0 errors
 
 ## Tests
-Not run this cycle
+npm error Missing script: "test"
