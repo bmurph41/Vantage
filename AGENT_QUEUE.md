@@ -3,7 +3,7 @@
 ## 🔴 TIER 1 — CRM / DEAL PIPELINE (Active Priority)
 
 - [spec] [in-progress] Write detailed build spec for Deal Comparison workspace — pull DCF + Pro Forma per deal (CRM priority #3)
-- [feature] [in-progress] Add key dates display to Kanban pipeline cards — created, expected close, next follow-up (CRM priority #4)
+- [feature] [done] Add key dates display to Kanban pipeline cards — created, expected close, next follow-up (CRM priority #4)
 - [feature] [in-progress] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
 - [feature] [todo] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
 

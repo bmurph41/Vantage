@@ -1,14 +1,14 @@
 # MarinaMatch Build Status
-_Last updated: 2026-03-30 23:55:00_
+_Last updated: 2026-03-30 23:59:00_
 
 ## Last Agent Run
 - Type: feature
-- Task: Fix AI advisor markdown rendering — add react-markdown renderer to chat UI
+- Task: Add key dates display to Kanban pipeline cards (CRM priority #4)
 - Result: ✅ SUCCESS
-- Duration: ~120s
+- Duration: ~180s
 
 ## TypeScript
-Vite build: ✅ SUCCESS (47.61s)
+No errors in changed files (pipeline.tsx, crm-pipeline-enhancements-routes.ts)
 
 ## Tests
 Not run this cycle

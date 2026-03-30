@@ -2,6 +2,28 @@
 
 ## Current State (2026-03-30)
 
+### ✅ COMPLETE — Key Dates on Kanban Cards (2026-03-30)
+Added key dates display to Kanban pipeline cards (CRM priority #4).
+
+**Backend**
+- New `GET /api/crm/pipeline-enhancements/deals/next-follow-ups` endpoint
+- Batch-fetches the soonest pending/in-progress task per deal using `DISTINCT ON` for efficiency
+- Returns a map of `dealId → { taskId, title, type, dueDate, status }`
+
+**Frontend — DealCard Enhancement**
+- Replaced inline "stage time + close date" row with a structured Key Dates section (gray-50 background)
+- **Created date**: Shows deal age in days with tooltip showing full creation date
+- **Expected close**: Blue text, turns red with warning icon when overdue
+- **DD expiration**: Amber text, turns red with warning icon when overdue
+- **Next follow-up**: Teal text with tooltip showing task title, turns red when overdue
+- Follow-up data fetched in a single batch query (`staleTime: 60s`), passed through `PipelineColumn` → `DealCard`
+
+**Files Modified:**
+- `server/routes/crm-pipeline-enhancements-routes.ts` — added next-follow-ups endpoint
+- `client/src/pages/pipeline.tsx` — enhanced DealCard, added FollowUpInfo type, added follow-ups query, wired through PipelineColumn
+
+---
+
 ### ✅ COMPLETE — AI Advisor Markdown Rendering Fix (2026-03-30)
 Replaced custom hand-rolled markdown parser with `react-markdown` + `remark-gfm` for proper GFM rendering.
 
