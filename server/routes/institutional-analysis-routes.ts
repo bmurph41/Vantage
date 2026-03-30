@@ -715,7 +715,8 @@ router.post('/export/pdf-package', async (req: Request, res: Response) => {
 router.post('/rent-roll-mtm/:projectId', async (req: Request, res: Response) => {
   try {
     const { projectId } = req.params;
-    const orgId = (req as any).user?.orgId || (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Import schema tables
     const { rentRolls, rentRollEntries, rateComps, modelingProjects } = await import('@shared/schema');

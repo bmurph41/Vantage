@@ -55,7 +55,8 @@ const calculateKpisSchema = z.object({
  */
 router.get('/marina/kpis', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     // Parse query params
     const params = calculateKpisSchema.parse({
@@ -92,7 +93,8 @@ router.get('/marina/kpis', async (req: Request, res: Response) => {
  */
 router.post('/marina/kpis', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const params = calculateKpisSchema.parse(req.body);
 
@@ -117,7 +119,8 @@ router.post('/marina/kpis', async (req: Request, res: Response) => {
  */
 router.get('/marina/trends', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const months = req.query.months ? parseInt(req.query.months as string) : 12;
 
     const trends = await marinaKpiCalculator.calculateTrends(orgId, months);
@@ -138,7 +141,8 @@ router.get('/marina/trends', async (req: Request, res: Response) => {
  */
 router.get('/marina/summary', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const kpis = await marinaKpiCalculator.calculateKpis({ orgId });
 
@@ -347,7 +351,8 @@ interface UnifiedAnalytics {
  */
 router.get('/unified', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const period = (req.query.period as string) || '30d';
     
     const periodDays: Record<string, number> = {
@@ -639,7 +644,8 @@ router.get('/unified', async (req: Request, res: Response) => {
  */
 router.get('/executive-summary', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const pipelineStats = await db.select({
       stage: crmDeals.stage,
@@ -759,7 +765,8 @@ router.get('/executive-summary', async (req: Request, res: Response) => {
  */
 router.get('/unified/trends', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const months = parseInt(req.query.months as string) || 6;
     
     // Generate monthly data points
@@ -831,7 +838,8 @@ router.get('/unified/trends', async (req: Request, res: Response) => {
  */
 router.get('/financial', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const timeframe = req.query.timeframe as string || '12m';
     const projectId = req.query.projectId as string;
 
@@ -1189,7 +1197,8 @@ router.get('/rent-roll/interactive-analytics', async (req, res) => {
 router.get('/modeling/projects/:projectId', async (req, res) => {
   try {
     const { projectId } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Fetch the modeling project
     const [project] = await db.select()
@@ -1716,7 +1725,8 @@ router.get('/modeling/projects/:projectId/export/excel', async (req: Request, re
  */
 router.get('/drill-down', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const metricType = req.query.metricType as string;
     const filter = req.query.filter as string;
     const stage = req.query.stage as string;
@@ -1932,7 +1942,8 @@ router.get('/drill-down', async (req: Request, res: Response) => {
  */
 router.get('/unified/drilldown/deals', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const stage = req.query.stage as string;
     
     const whereConditions = [eq(crmDeals.ownerId, orgId)];
@@ -1974,7 +1985,8 @@ router.get('/unified/drilldown/deals', async (req: Request, res: Response) => {
  */
 router.get('/unified/drilldown/dd-projects', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const status = req.query.status as string;
     
     const whereConditions = [eq(projects.orgId, orgId)];
@@ -2057,7 +2069,8 @@ function calculateNextRunAt(frequency: string, dayOfWeek?: number | null, dayOfM
  */
 router.get('/report-schedules', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const schedules = await db.select()
       .from(analyticsReportSchedules)
@@ -2080,7 +2093,8 @@ router.get('/report-schedules', async (req: Request, res: Response) => {
  */
 router.post('/report-schedules', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const userId = (req as any).userId || 'user-1';
     
     const data = reportScheduleSchema.parse(req.body);
@@ -2112,7 +2126,8 @@ router.post('/report-schedules', async (req: Request, res: Response) => {
 router.put('/report-schedules/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const data = reportScheduleSchema.partial().parse(req.body);
     const updateData: any = { ...data, updatedAt: new Date() };
@@ -2158,7 +2173,8 @@ router.put('/report-schedules/:id', async (req: Request, res: Response) => {
 router.delete('/report-schedules/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const [deleted] = await db.delete(analyticsReportSchedules)
       .where(and(eq(analyticsReportSchedules.id, id), eq(analyticsReportSchedules.orgId, orgId)))
@@ -2184,7 +2200,8 @@ router.delete('/report-schedules/:id', async (req: Request, res: Response) => {
  */
 router.get('/unified/drilldown/operations', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const status = req.query.status as string;
     const type = req.query.type as string;
     
@@ -2238,7 +2255,8 @@ router.get('/unified/drilldown/operations', async (req: Request, res: Response) 
  */
 router.post('/export-pdf', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { period = '30d', dashboardType = 'unified', filters = {}, analyticsData, returnUrl = false } = req.body;
     
     const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
@@ -2517,7 +2535,8 @@ router.get('/reports/:filename', async (req: Request, res: Response) => {
 router.post('/report-schedules/:id/preview', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const [schedule] = await db.select()
       .from(analyticsReportSchedules)
@@ -2683,7 +2702,8 @@ router.post('/report-schedules/:id/preview', async (req: Request, res: Response)
 router.post('/report-schedules/:id/execute', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const [schedule] = await db.select()
       .from(analyticsReportSchedules)

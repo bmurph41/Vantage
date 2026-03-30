@@ -262,7 +262,7 @@ function mapStatusToDb(startDate: string, endDate: string): string {
 }
 
 function getOrgId(req: Request): string {
-  return (req as any).tenantId || (req as any).validatedOrgId || (req as any).user?.orgId || 'org-1';
+  return (req as any).user?.orgId || (req as any).tenantId || (req as any).validatedOrgId || (req as any).orgId || null;
 }
 
 function getUserId(req: Request): string {

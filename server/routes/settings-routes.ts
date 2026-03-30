@@ -262,7 +262,7 @@ const DEFAULT_SETTINGS = {
     }
 
     // Get organization info
-    let organization = { id: effectiveOrgId || 'org-1', name: 'Organization' };
+    let organization = { id: effectiveOrgId || 'unknown', name: 'Organization' };
     if (profile.orgId || effectiveOrgId) {
       try {
         const orgResult = await db.execute(sql`

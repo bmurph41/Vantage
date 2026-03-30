@@ -13,7 +13,7 @@ const router = Router();
 function getSlaRouter() {
   router.get('/configs', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const configs = await db.query.slaConfigs.findMany({
         where: eq(slaConfigs.orgId, orgId),
         orderBy: [desc(slaConfigs.createdAt)],
@@ -31,7 +31,7 @@ function getSlaRouter() {
   router.get('/configs/:configId', async (req, res) => {
     try {
       const { configId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const config = await db.query.slaConfigs.findFirst({
         where: and(eq(slaConfigs.id, configId), eq(slaConfigs.orgId, orgId)),
         with: {
@@ -51,7 +51,7 @@ function getSlaRouter() {
   router.post('/configs', async (req, res) => {
     try {
       const userId = req.headers['x-user-id'] as string || 'system';
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const validatedData = insertSlaConfigSchema.parse({
         ...req.body,
         orgId,
@@ -71,7 +71,7 @@ function getSlaRouter() {
   router.patch('/configs/:configId', async (req, res) => {
     try {
       const { configId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const validatedData = updateSlaConfigSchema.parse(req.body);
       const [updated] = await db.update(slaConfigs)
         .set({ ...validatedData, updatedAt: new Date() })
@@ -93,7 +93,7 @@ function getSlaRouter() {
   router.delete('/configs/:configId', async (req, res) => {
     try {
       const { configId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const [deleted] = await db.delete(slaConfigs)
         .where(and(eq(slaConfigs.id, configId), eq(slaConfigs.orgId, orgId)))
         .returning();
@@ -110,7 +110,7 @@ function getSlaRouter() {
   router.get('/tracking', async (req, res) => {
     try {
       const { status, assigneeId, entityType } = req.query;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       
       const trackings = await db.query.slaTracking.findMany({
         orderBy: [desc(slaTracking.slaDueTime)],
@@ -142,7 +142,7 @@ function getSlaRouter() {
   router.get('/tracking/my-slas', async (req, res) => {
     try {
       const userId = req.headers['x-user-id'] as string;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       if (!userId) {
         return res.status(400).json({ error: 'User ID required' });
       }
@@ -169,7 +169,7 @@ function getSlaRouter() {
   router.get('/tracking/:trackingId', async (req, res) => {
     try {
       const { trackingId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const tracking = await db.query.slaTracking.findFirst({
         where: eq(slaTracking.id, trackingId),
         with: {
@@ -213,7 +213,7 @@ function getSlaRouter() {
 
   router.post('/tracking', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const { slaConfigId } = req.body;
       
       const config = await db.query.slaConfigs.findFirst({
@@ -240,7 +240,7 @@ function getSlaRouter() {
       const { trackingId } = req.params;
       const { toUserId, reason } = req.body;
       const userId = req.headers['x-user-id'] as string;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       
       const tracking = await getTrackingWithOrgCheck(trackingId, orgId);
       if (!tracking) {
@@ -277,7 +277,7 @@ function getSlaRouter() {
       const { trackingId } = req.params;
       const { resolutionNotes } = req.body;
       const userId = req.headers['x-user-id'] as string;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       
       const tracking = await getTrackingWithOrgCheck(trackingId, orgId);
       if (!tracking) {
@@ -312,7 +312,7 @@ function getSlaRouter() {
       const { trackingId } = req.params;
       const { escalateToId, reason } = req.body;
       const userId = req.headers['x-user-id'] as string;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       
       const tracking = await getTrackingWithOrgCheck(trackingId, orgId);
       if (!tracking) {
@@ -347,7 +347,7 @@ function getSlaRouter() {
 
   router.get('/summary', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       
       const allTracking = await db.query.slaTracking.findMany({
         with: { config: true },
@@ -384,7 +384,7 @@ function getSlaRouter() {
 
   router.get('/metrics', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const { startDate, endDate } = req.query;
       
       const allTracking = await db.query.slaTracking.findMany({

@@ -204,6 +204,12 @@ export default function FundCashFlowDetail({ projectId, onTabChange }: FundCashF
     },
   });
 
+  // Fetch canonical hold period from config table
+  const { data: projectConfig } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', projectId, 'config'],
+    enabled: !!projectId,
+  });
+
   const isLoading = proFormaLoading || pricingLoading || projectLoading;
 
   const computed = useMemo(() => {
@@ -213,8 +219,9 @@ export default function FundCashFlowDetail({ projectId, onTabChange }: FundCashF
     const monthly = proFormaData.monthly ?? [];
     const cm = project?.customMetrics ?? {};
 
-    // Hold period: pro-forma first, then project customMetrics fallback
-    const holdPeriod = proFormaData.holdPeriod
+    // Hold period: config table is canonical, then pro-forma, then customMetrics fallback
+    const holdPeriod = projectConfig?.holdPeriod
+      ?? proFormaData.holdPeriod
       ?? proFormaData.holdPeriodYears
       ?? cm?.fundAssumptions?.holdPeriod
       ?? (annual.length || 5);

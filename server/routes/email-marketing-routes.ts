@@ -98,8 +98,9 @@ function validateAndConsumeState(nonce: string): { userId: string; orgId: string
 router.get('/status', async (req: Request, res: Response) => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const orgId = authReq.validatedOrgId || (authReq as any).tenantId || 'org-1';
-    const userId = authReq.validatedUserId || (authReq as any).user?.id || 'user-1';
+    const orgId = authReq.validatedOrgId || (authReq as any).user?.orgId || (authReq as any).tenantId || (authReq as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = authReq.validatedUserId || (authReq as any).user?.id;
 
     const connections = await db.select()
       .from(emailMarketingConnections)
@@ -133,8 +134,9 @@ router.get('/status', async (req: Request, res: Response) => {
 
 router.get('/providers', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
 
     const connections = await db.select()
       .from(emailMarketingConnections)
@@ -171,9 +173,10 @@ router.get('/providers', async (req: AuthenticatedRequest, res: Response) => {
 
 router.get('/constant-contact/auth', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
-    
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
     if (!CONSTANT_CONTACT_CLIENT_ID) {
       return res.status(400).json({ 
         error: 'CONSTANT_CONTACT_NOT_CONFIGURED',
@@ -307,8 +310,9 @@ router.get('/constant-contact/callback', async (req: AuthenticatedRequest, res: 
 
 router.get('/constant-contact/status', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
 
     const connection = await db.select()
       .from(emailMarketingConnections)
@@ -340,8 +344,9 @@ router.get('/constant-contact/status', async (req: AuthenticatedRequest, res: Re
 
 router.post('/constant-contact/disconnect', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     await db.update(emailMarketingConnections)
       .set({ 
@@ -365,9 +370,10 @@ router.post('/constant-contact/disconnect', async (req: AuthenticatedRequest, re
 
 router.get('/mailchimp/auth', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
-    
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
     if (!MAILCHIMP_CLIENT_ID) {
       return res.status(400).json({ 
         error: 'MAILCHIMP_NOT_CONFIGURED',
@@ -507,8 +513,9 @@ router.get('/mailchimp/callback', async (req: AuthenticatedRequest, res: Respons
 
 router.get('/mailchimp/status', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
 
     const connection = await db.select()
       .from(emailMarketingConnections)
@@ -539,8 +546,9 @@ router.get('/mailchimp/status', async (req: AuthenticatedRequest, res: Response)
 
 router.post('/mailchimp/disconnect', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     await db.update(emailMarketingConnections)
       .set({ 
@@ -587,8 +595,9 @@ async function getMailchimpApiEndpoint(userId: string, orgId: string): Promise<{
 
 router.get('/mailchimp/lists', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const credentials = await getMailchimpApiEndpoint(userId, orgId);
     if (!credentials) {
@@ -630,8 +639,9 @@ router.get('/mailchimp/lists', async (req: AuthenticatedRequest, res: Response) 
 
 router.get('/mailchimp/campaigns', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id || 'user-1';
-    const orgId = req.tenantId || 'org-1';
+    const userId = req.user?.id;
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const credentials = await getMailchimpApiEndpoint(userId, orgId);
     if (!credentials) {
@@ -770,8 +780,9 @@ async function deactivateConnection(connectionId: string, reason: string): Promi
 
 router.get('/constant-contact/lists', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
 
     const accessToken = await getValidAccessToken(userId, orgId);
     if (!accessToken) {
@@ -813,8 +824,9 @@ const subscribeSchema = z.object({
 
 router.post('/constant-contact/subscribe', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
 
     const parsed = subscribeSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -888,8 +900,9 @@ router.post('/constant-contact/subscribe', async (req: AuthenticatedRequest, res
 
 router.get('/constant-contact/campaigns', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
-    const userId = req.user?.id || 'user-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 10;
 
     const accessToken = await getValidAccessToken(userId, orgId);
@@ -938,7 +951,8 @@ router.get('/constant-contact/campaigns', async (req: AuthenticatedRequest, res:
 
 router.get('/leads', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const orgId = req.tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || req.tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const leads = await db.select()
       .from(emailMarketingLeads)

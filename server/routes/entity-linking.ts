@@ -296,9 +296,10 @@ export function registerEntityLinkingRoutes(app: Express) {
   app.post("/api/entity-links/docket-articles", async (req: any, res: Response) => {
     try {
       const body = linkArticleToCrmSchema.parse(req.body);
-      const orgId = req.user?.organizationId || 'org-1';
+      const orgId = req.user?.organizationId || (req as any).user?.orgId || (req as any).tenantId || null;
+      if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
       const userId = req.user?.id;
-      
+
       const [link] = await db.insert(articleCrmLinks).values({
         orgId,
         articleId: body.articleId,
@@ -332,9 +333,10 @@ export function registerEntityLinkingRoutes(app: Express) {
   app.post("/api/entity-links/docket-articles/bulk", async (req: any, res: Response) => {
     try {
       const body = bulkLinkArticlesSchema.parse(req.body);
-      const orgId = req.user?.organizationId || 'org-1';
+      const orgId = req.user?.organizationId || (req as any).user?.orgId || (req as any).tenantId || null;
+      if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
       const userId = req.user?.id;
-      
+
       const links = await Promise.all(body.links.map(async (l) => {
         const [link] = await db.insert(articleCrmLinks).values({
           orgId,

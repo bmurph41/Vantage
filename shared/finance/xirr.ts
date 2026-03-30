@@ -51,7 +51,11 @@ export function calculateXIRR(flows: DatedCashFlow[], guess: number = 0.1): XIRR
     return { irr: 0, converged: false, iterations: 0 };
   }
 
-  const dates = flows.map(f => new Date(f.date).getTime());
+  // Parse dates in UTC to avoid timezone-dependent variations in IRR calculations
+  const dates = flows.map(f => {
+    const d = f.date.includes('T') ? new Date(f.date) : new Date(f.date + 'T00:00:00Z');
+    return d.getTime();
+  });
   const d0 = dates[0];
   const amounts = flows.map(f => f.amount);
 

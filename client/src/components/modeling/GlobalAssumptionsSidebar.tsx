@@ -286,6 +286,16 @@ export default function GlobalAssumptionsSidebar({ projectId, project: projectPr
           },
         },
       };
+      // Sync hold period to config table (canonical source for pro-forma engine)
+      if (updatedAssumptions.holdPeriod != null) {
+        try {
+          await apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
+            holdPeriod: updatedAssumptions.holdPeriod,
+          });
+        } catch (_) { /* config may not exist yet */ }
+        // Also sync to project root for backwards compat
+        (patch as any).holdPeriodYears = updatedAssumptions.holdPeriod;
+      }
       const res = await apiRequest('PATCH', `/api/modeling/projects/${projectId}`, patch);
       return res.json();
     },

@@ -133,8 +133,9 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
       for (const tier of input.customTiers) {
         if (remainingProceeds <= 0) break;
         
-        const lpShare = remainingProceeds * tier.lpSplit;
-        const gpShare = remainingProceeds * tier.gpSplit;
+        // Round LP share, then derive GP as remainder to prevent floating-point drift
+        const lpShare = Math.round(remainingProceeds * tier.lpSplit * 100) / 100;
+        const gpShare = Math.round((remainingProceeds - lpShare) * 100) / 100;
         
         cumulativeLp += lpShare;
         cumulativeGp += gpShare;
@@ -174,16 +175,30 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     ? cumulativeLp / input.totalCapitalContributed 
     : 0;
   
-  const gpContribution = input.totalCapitalContributed * 0.02;
-  const gpMoic = gpContribution > 0 
-    ? cumulativeGp / gpContribution 
+  // GP contribution: configurable percentage, defaults to 2% if not specified
+  const gpCommitmentPct = (input as any).gpCommitmentPercent ?? 0.02;
+  const gpContribution = input.totalCapitalContributed * gpCommitmentPct;
+  const gpMoic = gpContribution > 0
+    ? cumulativeGp / gpContribution
     : 0;
 
+  // European clawback: calculated on PROFIT basis (institutional standard)
+  // GP clawback = GP distributions received - target GP share of profit
   let gpClawback = 0;
   if (input.structureType === 'european' && carriedInterestPaid > 0) {
-    const actualCarryRate = cumulativeGp / input.totalProceeds;
-    if (actualCarryRate > input.carriedInterest) {
-      gpClawback = (actualCarryRate - input.carriedInterest) * input.totalProceeds;
+    const totalProfit = input.totalProceeds - input.totalCapitalContributed;
+    if (totalProfit > 0) {
+      // GP's target share = carry % of profit + return of GP's own capital
+      const targetGpShare = (totalProfit * input.carriedInterest) + (input.totalCapitalContributed * gpCommitmentPct);
+      if (cumulativeGp > targetGpShare) {
+        gpClawback = cumulativeGp - targetGpShare;
+      }
+    } else {
+      // No profit = GP should only receive return of their own capital
+      const gpCapitalReturn = Math.min(cumulativeGp, input.totalCapitalContributed * gpCommitmentPct);
+      if (cumulativeGp > gpCapitalReturn) {
+        gpClawback = cumulativeGp - gpCapitalReturn;
+      }
     }
   }
 

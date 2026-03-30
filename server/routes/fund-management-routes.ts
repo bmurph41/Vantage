@@ -2,11 +2,16 @@
  * Fund Management Routes
  *
  * Covers Gap Spec sections:
- *   B.1 Fund-Level Model
+ *   B.1 Fund-Level Model — DELEGATES to V1 FundService via /api/funds/* routes
  *   B.2 Fund Formation Documents
  *   B.3 Investor Verification / KYC
- *   B.4 Capital Account Ledger
+ *   B.4 Capital Account Ledger (V2 tables for immutable ledger)
  *   B.5 Management Fee Calculator
+ *
+ * NOTE: B.1 fund CRUD and investor management is handled by the V1 FundService
+ * exposed at /api/funds/* in routes.ts. The V2 fund routes below (fundsV2 table)
+ * are kept for B.2-B.5 features that aren't in the V1 service. Avoid duplicating
+ * fund CRUD — use /api/funds/* as the canonical entry point.
  */
 import { Router, Request, Response } from 'express';
 import { eq, and, desc, sql, sum } from 'drizzle-orm';
@@ -30,7 +35,7 @@ async function getDb() {
 }
 
 function getOrgId(req: Request): string | null {
-  return (req as any).orgId || (req as any).user?.orgId || null;
+  return (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId || null;
 }
 
 // ============================================================================

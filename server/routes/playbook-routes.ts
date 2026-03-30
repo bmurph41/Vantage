@@ -17,7 +17,8 @@ const router = Router();
 
 router.get('/playbooks', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { pipelineId, stageId, dealType } = req.query;
 
     let query = db.select()
@@ -48,7 +49,8 @@ router.get('/playbooks', async (req: Request, res: Response) => {
 router.get('/playbooks/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const [playbook] = await db.select()
       .from(crmPlaybooks)
@@ -72,7 +74,8 @@ router.get('/playbooks/:id', async (req: Request, res: Response) => {
 
 router.post('/playbooks', async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const userId = (req as any).userId || 'user-1';
 
     const parsed = insertCrmPlaybookSchema.safeParse({
@@ -96,7 +99,8 @@ router.post('/playbooks', async (req: Request, res: Response) => {
 router.patch('/playbooks/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const [existing] = await db.select()
       .from(crmPlaybooks)
@@ -121,7 +125,8 @@ router.patch('/playbooks/:id', async (req: Request, res: Response) => {
 router.delete('/playbooks/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const [existing] = await db.select()
       .from(crmPlaybooks)
@@ -407,7 +412,8 @@ router.get('/playbook-templates', async (req: Request, res: Response) => {
 router.post('/playbooks/from-template/:templateId', async (req: Request, res: Response) => {
   try {
     const { templateId } = req.params;
-    const orgId = (req as any).tenantId || 'org-1';
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const userId = (req as any).userId || 'user-1';
     const { pipelineId, stageId, name, description } = req.body;
 

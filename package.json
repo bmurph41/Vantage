@@ -86,6 +86,7 @@
     "cors": "^2.8.5",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",
+    "decimal.js": "^10.6.0",
     "dnd-kit-sortable-tree": "^0.1.73",
     "docx": "^9.5.1",
     "drizzle-orm": "^0.39.1",

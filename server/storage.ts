@@ -3832,7 +3832,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCrmPipelinesForOrg(orgId: string): Promise<CrmPipeline[]> {
-    return db.select().from(crmPipelines).where(eq(crmPipelines.ownerId, orgId)).orderBy(asc(crmPipelines.name));
+    return db.select().from(crmPipelines).where(eq(crmPipelines.orgId, orgId)).orderBy(asc(crmPipelines.name));
   }
 
   async createCrmPipeline(pipeline: InsertCrmPipeline): Promise<CrmPipeline> {
@@ -3860,13 +3860,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCrmPipelineStages(orgId: string): Promise<CrmPipelineStage[]> {
-    // Get all pipelines for the org first
-    const pipelines = await db.select().from(crmPipelines).where(eq(crmPipelines.ownerId, orgId));
+    // First try by orgId column directly on stages (fast path)
+    const directStages = await db.select().from(crmPipelineStages)
+      .where(eq(crmPipelineStages.orgId, orgId))
+      .orderBy(asc(crmPipelineStages.stageOrder));
+    if (directStages.length > 0) return directStages;
+
+    // Fallback: get pipelines for the org, then get their stages
+    const pipelines = await db.select().from(crmPipelines).where(eq(crmPipelines.orgId, orgId));
     const pipelineIds = pipelines.map(p => p.id);
-    
     if (pipelineIds.length === 0) return [];
-    
-    // Get all stages for those pipelines
+
     return db.select().from(crmPipelineStages)
       .where(sql`${crmPipelineStages.pipelineId} IN ${pipelineIds}`)
       .orderBy(asc(crmPipelineStages.stageOrder));

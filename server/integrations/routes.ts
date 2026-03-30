@@ -304,7 +304,8 @@ integrationsRouter.patch('/api/integrations/:key/settings', async (req: Request,
 integrationsRouter.get('/api/integrations/pipeline/status', async (req: Request, res: Response) => {
   const userId = requireUser(req, res);
   if (!userId) return;
-  const orgId = getOrgId(req) || 'org-1';
+  const orgId = getOrgId(req);
+  if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     const { IntegrationDataPipelineService } = await import('../services/integration-data-pipeline');
@@ -328,7 +329,8 @@ integrationsRouter.get('/api/integrations/pipeline/status', async (req: Request,
 integrationsRouter.get('/api/integrations/pipeline/project/:projectId', async (req: Request, res: Response) => {
   const userId = requireUser(req, res);
   if (!userId) return;
-  const orgId = getOrgId(req) || 'org-1';
+  const orgId = getOrgId(req);
+  if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
   const { projectId } = req.params;
 
   try {

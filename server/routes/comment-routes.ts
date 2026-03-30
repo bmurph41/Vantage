@@ -21,7 +21,7 @@ export function registerCommentRoutes(app: Router) {
   // Thread routes
   router.get('/threads', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
       const { entityType, entityId, status } = req.query;
 
@@ -70,7 +70,7 @@ export function registerCommentRoutes(app: Router) {
   router.get('/threads/:threadId', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -104,7 +104,7 @@ export function registerCommentRoutes(app: Router) {
 
   router.post('/threads', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
       
       if (!userId) {
@@ -131,7 +131,7 @@ export function registerCommentRoutes(app: Router) {
   router.patch('/threads/:threadId', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -162,7 +162,7 @@ export function registerCommentRoutes(app: Router) {
   router.post('/threads/:threadId/resolve', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -193,7 +193,7 @@ export function registerCommentRoutes(app: Router) {
   router.post('/threads/:threadId/reopen', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -224,7 +224,7 @@ export function registerCommentRoutes(app: Router) {
   router.post('/threads/:threadId/pin', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
       const { isPinned } = req.body;
 
@@ -252,7 +252,7 @@ export function registerCommentRoutes(app: Router) {
   router.get('/threads/:threadId/comments', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -285,7 +285,7 @@ export function registerCommentRoutes(app: Router) {
   router.post('/threads/:threadId/comments', async (req, res) => {
     try {
       const { threadId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -344,7 +344,7 @@ export function registerCommentRoutes(app: Router) {
   router.patch('/comments/:commentId', async (req, res) => {
     try {
       const { commentId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -384,7 +384,7 @@ export function registerCommentRoutes(app: Router) {
   router.delete('/comments/:commentId', async (req, res) => {
     try {
       const { commentId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -415,7 +415,7 @@ export function registerCommentRoutes(app: Router) {
   // Notification routes
   router.get('/notifications', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
       const { unreadOnly, type, limit: limitParam } = req.query;
 
@@ -446,7 +446,7 @@ export function registerCommentRoutes(app: Router) {
 
   router.get('/notifications/unread-count', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -471,7 +471,7 @@ export function registerCommentRoutes(app: Router) {
   router.post('/notifications/:notificationId/read', async (req, res) => {
     try {
       const { notificationId } = req.params;
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       const [updated] = await db.update(crmNotifications)
@@ -496,7 +496,7 @@ export function registerCommentRoutes(app: Router) {
 
   router.post('/notifications/mark-all-read', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       await db.update(crmNotifications)
@@ -517,7 +517,7 @@ export function registerCommentRoutes(app: Router) {
   // User search for @mentions
   router.get('/users/search', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const { q } = req.query;
 
       if (!q || (q as string).length < 2) {
@@ -545,7 +545,7 @@ export function registerCommentRoutes(app: Router) {
   // Notification preferences
   router.get('/notification-preferences', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
 
       if (!userId) {
@@ -568,7 +568,7 @@ export function registerCommentRoutes(app: Router) {
 
   router.put('/notification-preferences', async (req, res) => {
     try {
-      const orgId = req.headers['x-org-id'] as string || 'default-org';
+      const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
       const userId = req.headers['x-user-id'] as string;
       const { notificationType, inApp, email, emailDigest } = req.body;
 

@@ -25,7 +25,23 @@ export type Permission =
   | 'audit:read'
   | 'finance_kernel:read'
   | 'finance_kernel:manage'
-  | 'integrations:manage';
+  | 'integrations:manage'
+  // Fund management permissions
+  | 'fund:read'
+  | 'fund:create'
+  | 'fund:update'
+  | 'fund:investor:manage'
+  | 'fund:capital_call:create'
+  | 'fund:capital_call:approve'
+  | 'fund:distribution:create'
+  | 'fund:distribution:approve'
+  | 'fund:waterfall:run'
+  | 'fund:nav:calculate'
+  | 'fund:period:lock'
+  | 'fund:period:unlock'
+  | 'fund:statement:generate'
+  | 'fund:ledger:read'
+  | 'fund:ledger:write';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   owner: [
@@ -36,6 +52,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'analytics:read', 'reports:create', 'settings:manage',
     'users:manage', 'audit:read',
     'finance_kernel:read', 'finance_kernel:manage', 'integrations:manage',
+    // Fund: full access including approvals and period management
+    'fund:read', 'fund:create', 'fund:update', 'fund:investor:manage',
+    'fund:capital_call:create', 'fund:capital_call:approve',
+    'fund:distribution:create', 'fund:distribution:approve',
+    'fund:waterfall:run', 'fund:nav:calculate',
+    'fund:period:lock', 'fund:period:unlock',
+    'fund:statement:generate', 'fund:ledger:read', 'fund:ledger:write',
   ],
   admin: [
     'fuel:read', 'fuel:create', 'fuel:update', 'fuel:delete',
@@ -45,20 +68,35 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'analytics:read', 'reports:create', 'settings:manage',
     'audit:read',
     'finance_kernel:read', 'finance_kernel:manage', 'integrations:manage',
+    // Fund: can create calls/distributions but cannot approve own (dual control)
+    'fund:read', 'fund:create', 'fund:update', 'fund:investor:manage',
+    'fund:capital_call:create', 'fund:capital_call:approve',
+    'fund:distribution:create', 'fund:distribution:approve',
+    'fund:waterfall:run', 'fund:nav:calculate',
+    'fund:period:lock',
+    'fund:statement:generate', 'fund:ledger:read', 'fund:ledger:write',
   ],
   editor: [
     'fuel:read', 'fuel:create', 'fuel:update',
     'fuel:export', 'fuel:approval:request',
     'analytics:read', 'reports:create',
     'finance_kernel:read',
+    // Fund: can create but not approve
+    'fund:read', 'fund:capital_call:create', 'fund:distribution:create',
+    'fund:waterfall:run', 'fund:nav:calculate',
+    'fund:statement:generate', 'fund:ledger:read',
   ],
   viewer: [
     'fuel:read', 'analytics:read',
     'finance_kernel:read',
+    // Fund: read-only
+    'fund:read', 'fund:ledger:read',
   ],
   auditor: [
     'fuel:read', 'analytics:read', 'audit:read',
     'finance_kernel:read',
+    // Fund: read + ledger access for audit
+    'fund:read', 'fund:ledger:read', 'fund:statement:generate',
   ],
 };
 

@@ -35,13 +35,13 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       }
     }
 
-    // Fall back to admin user if no session
-    if (!(req as any).user) {
+    // In development mode, allow demo user fallback for local testing only
+    if (!(req as any).user && process.env.NODE_ENV === 'development' && process.env.ALLOW_DEMO_AUTH === 'true') {
       (req as any).user = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",
         orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
         role: "owner",
-        email: "brettmurphy41@gmail.com",
+        email: "demo@localhost",
         name: "Demo User",
       };
     }

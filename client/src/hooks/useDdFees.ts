@@ -74,6 +74,7 @@ export function useDdFees(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees/summary'] });
       toast({ title: 'Fee Added', description: 'Due diligence fee has been recorded.' });
     },
     onError: (error: Error) => {
@@ -88,6 +89,7 @@ export function useDdFees(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees/summary'] });
       toast({ title: 'Fee Updated', description: 'Fee record has been updated.' });
     },
     onError: (error: Error) => {
@@ -102,6 +104,7 @@ export function useDdFees(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees/summary'] });
       toast({ title: 'Fee Deleted', description: 'Fee record has been removed.' });
     },
     onError: (error: Error) => {
@@ -116,6 +119,7 @@ export function useDdFees(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dd/projects', projectId, 'fees/summary'] });
       toast({ title: 'Fee Marked Paid', description: 'Fee has been marked as paid.' });
     },
     onError: (error: Error) => {

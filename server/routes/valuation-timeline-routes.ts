@@ -22,7 +22,7 @@ const timelineQuerySchema = z.object({
 
 router.get('/projects/:projectId/as-of', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     const userId = req.headers['x-user-id'] as string || (req as any).userId;
     
     if (!orgId) {
@@ -51,7 +51,7 @@ router.get('/projects/:projectId/as-of', async (req, res) => {
 
 router.get('/projects/:projectId/timeline', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     
     if (!orgId) {
       return res.status(401).json({ error: 'Organization ID required' });
@@ -79,7 +79,7 @@ router.get('/projects/:projectId/timeline', async (req, res) => {
 
 router.post('/projects/:projectId/snapshots', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     const userId = req.headers['x-user-id'] as string || (req as any).userId;
     
     if (!orgId) {
@@ -112,7 +112,7 @@ router.post('/projects/:projectId/snapshots', async (req, res) => {
 
 router.get('/projects/:projectId/current', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     const userId = req.headers['x-user-id'] as string || (req as any).userId;
     
     if (!orgId) {
@@ -140,7 +140,7 @@ router.get('/projects/:projectId/current', async (req, res) => {
 
 router.post('/sync', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     const userId = req.headers['x-user-id'] as string || (req as any).userId;
     
     if (!orgId) {
@@ -176,7 +176,7 @@ const pushToModelingSchema = z.object({
 
 router.post('/projects/:projectId/push-to-modeling', async (req, res) => {
   try {
-    const orgId = req.headers['x-org-id'] as string || (req as any).orgId;
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || req.headers['x-org-id'] as string || null;
     const userId = req.headers['x-user-id'] as string || (req as any).userId;
     
     if (!orgId) {

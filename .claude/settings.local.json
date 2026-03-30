@@ -120,7 +120,12 @@
       "Bash(find /home/runner/workspace/server/routes -name \"*.ts\" -type f -exec wc -l {})",
       "Bash(grep -r \"res\\\\.status\\(500\\)\" /home/runner/workspace/server/routes/*.ts)",
       "Bash(grep -r \"next\\(error\\)\" /home/runner/workspace/server/routes/*.ts)",
-      "Bash(sort -t: -k1 -n)"
+      "Bash(sort -t: -k1 -n)",
+      "Bash(grep -rn \"|| ''''default-org''''\" server/routes/)",
+      "Bash(grep -n \"|| ''''default-org''''\" server/routes.ts)",
+      "Bash(find /home/runner/workspace/server -name \"*.ts\" -exec grep -l \"select\\\\|insert\\\\|update\\\\|delete\" {})",
+      "Bash(find /home/runner/workspace/server/modules -type f -name *.ts)",
+      "Bash(git diff:*)"
     ]
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useOmEditorStore } from '@/stores/om-editor-store';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ export function useAutosave(omId: string | null, userId: string, options: UseAut
   } = options;
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { isDirty, getSnapshot, markSaved } = useOmEditorStore();
   const lastSavedSnapshotRef = useRef<string | null>(null);
   
@@ -40,6 +41,11 @@ export function useAutosave(omId: string | null, userId: string, options: UseAut
     },
     onSuccess: () => {
       markSaved();
+      // Sync React Query cache so other components see the latest version
+      if (omId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/om-builder/oms', omId] });
+        queryClient.invalidateQueries({ queryKey: ['om-document', omId] });
+      }
       onSaveSuccess?.();
     },
     onError: (error: Error) => {

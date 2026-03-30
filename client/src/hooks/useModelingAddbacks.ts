@@ -76,6 +76,9 @@ export function useModelingAddbacks(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
       toast({ title: 'Addback Saved', description: 'Addback has been saved.' });
     },
     onError: (error: Error) => {
@@ -90,6 +93,9 @@ export function useModelingAddbacks(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -103,6 +109,9 @@ export function useModelingAddbacks(projectId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'addbacks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'historical-pl'] });
       toast({ title: 'Addback Removed', description: 'Addback has been removed.' });
     },
     onError: (error: Error) => {

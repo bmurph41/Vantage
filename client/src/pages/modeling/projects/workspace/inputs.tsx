@@ -1037,6 +1037,12 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
       if (projectData.purchasePrice) projectData.purchasePrice = parseFloat(projectData.purchasePrice) || 0;
       if (projectData.holdPeriod) {
         projectData.holdPeriodYears = parseInt(projectData.holdPeriod) || 5;
+        // Sync hold period to config table (canonical source for pro-forma engine)
+        try {
+          await apiRequest('PATCH', `/api/modeling/projects/${projectId}/config`, {
+            holdPeriod: projectData.holdPeriodYears,
+          });
+        } catch (_) { /* config table may not exist yet for this project */ }
         delete projectData.holdPeriod;
       }
 

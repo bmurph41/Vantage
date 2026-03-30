@@ -18,12 +18,12 @@ import { AuthenticatedRequest } from "../middleware/auth-resolver";
 
 const router = Router();
 
-function getOrgId(req: Request): string {
+function getOrgId(req: Request): string | null {
   const authReq = req as AuthenticatedRequest;
   if (authReq.validatedOrgId) {
     return authReq.validatedOrgId;
   }
-  return (req as any).tenantId || (req as any).user?.orgId || (req as any).session?.orgId || 'org-1';
+  return (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || (req as any).session?.orgId || null;
 }
 
 function getUserId(req: Request): string {

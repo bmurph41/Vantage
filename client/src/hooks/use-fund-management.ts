@@ -642,3 +642,190 @@ export function useGenerateFundReport(fundId: string) {
       }),
   });
 }
+
+// ============================================================================
+// DISTRIBUTION APPROVAL WORKFLOW (Institutional)
+// ============================================================================
+
+export const distributionDraftKeys = {
+  all: (fundId: string) => [...fundKeys.detail(fundId), 'distribution-drafts'] as const,
+  byStatus: (fundId: string, status?: string) => [...fundKeys.detail(fundId), 'distribution-drafts', status] as const,
+};
+
+/** List distribution drafts for a fund */
+export function useDistributionDrafts(fundId: string | undefined, status?: string) {
+  const qs = status ? `?status=${status}` : '';
+  return useQuery({
+    queryKey: distributionDraftKeys.byStatus(fundId!, status),
+    queryFn: () => fetchApi<any[]>(`/api/funds/${fundId}/distribution-drafts${qs}`),
+    enabled: !!fundId,
+  });
+}
+
+/** Create a distribution draft (does NOT execute) */
+export function useCreateDistributionDraft(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      totalProceeds: number;
+      distributionType: string;
+      dealAllocationId?: string;
+      notes?: string;
+      yearsHeld?: number;
+    }) => fetchApi<any>(`/api/funds/${fundId}/distribution-drafts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: distributionDraftKeys.all(fundId) });
+    },
+  });
+}
+
+/** Submit draft for approval */
+export function useSubmitDistributionForApproval(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) =>
+      fetchApi<any>(`/api/funds/${fundId}/distribution-drafts/${draftId}/submit`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: distributionDraftKeys.all(fundId) });
+    },
+  });
+}
+
+/** Approve a distribution (enforces dual control) */
+export function useApproveDistribution(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, notes }: { draftId: string; notes?: string }) =>
+      fetchApi<any>(`/api/funds/${fundId}/distribution-drafts/${draftId}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: distributionDraftKeys.all(fundId) });
+    },
+  });
+}
+
+/** Reject a distribution */
+export function useRejectDistribution(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, reason }: { draftId: string; reason: string }) =>
+      fetchApi<any>(`/api/funds/${fundId}/distribution-drafts/${draftId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: distributionDraftKeys.all(fundId) });
+    },
+  });
+}
+
+/** Execute an approved distribution (runs waterfall, creates movements) */
+export function useExecuteDistribution(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) =>
+      fetchApi<any>(`/api/funds/${fundId}/distribution-drafts/${draftId}/execute`, { method: 'POST' }),
+    onSuccess: () => {
+      // Full invalidation — execution touches everything
+      qc.invalidateQueries({ queryKey: fundKeys.detail(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.metrics(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.distributions(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.capitalMovements(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.investors(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.capitalAccounts(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.waterfall(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.cashFlows(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.preferredReturn(fundId) });
+      qc.invalidateQueries({ queryKey: distributionDraftKeys.all(fundId) });
+      qc.invalidateQueries({ queryKey: fundKeys.lists() });
+    },
+  });
+}
+
+// ============================================================================
+// PERIOD LOCKS
+// ============================================================================
+
+export const periodLockKeys = {
+  all: (fundId: string) => [...fundKeys.detail(fundId), 'period-locks'] as const,
+};
+
+/** List period locks for a fund */
+export function useFundPeriodLocks(fundId: string | undefined) {
+  return useQuery({
+    queryKey: periodLockKeys.all(fundId!),
+    queryFn: () => fetchApi<any[]>(`/api/funds/${fundId}/period-locks`),
+    enabled: !!fundId,
+  });
+}
+
+/** Lock a period */
+export function useLockPeriod(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { periodLabel: string; periodStart: string; periodEnd: string }) =>
+      fetchApi<any>(`/api/funds/${fundId}/period-locks`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: periodLockKeys.all(fundId) });
+    },
+  });
+}
+
+/** Unlock a period (requires reason) */
+export function useUnlockPeriod(fundId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ lockId, reason }: { lockId: string; reason: string }) =>
+      fetchApi<any>(`/api/funds/${fundId}/period-locks/${lockId}/unlock`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: periodLockKeys.all(fundId) });
+    },
+  });
+}
+
+// ============================================================================
+// FINANCIAL AUDIT TRAIL
+// ============================================================================
+
+export const auditTrailKeys = {
+  fund: (fundId: string) => [...fundKeys.detail(fundId), 'audit-trail'] as const,
+};
+
+/** Query financial audit trail for a fund */
+export function useFundAuditTrail(
+  fundId: string | undefined,
+  filters?: {
+    eventType?: string;
+    investorId?: string;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+    offset?: number;
+  }
+) {
+  const params = new URLSearchParams();
+  if (filters?.eventType) params.set('eventType', filters.eventType);
+  if (filters?.investorId) params.set('investorId', filters.investorId);
+  if (filters?.fromDate) params.set('fromDate', filters.fromDate);
+  if (filters?.toDate) params.set('toDate', filters.toDate);
+  if (filters?.limit) params.set('limit', String(filters.limit));
+  if (filters?.offset) params.set('offset', String(filters.offset));
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  return useQuery({
+    queryKey: [...auditTrailKeys.fund(fundId!), filters],
+    queryFn: () => fetchApi<{ entries: any[]; total: number }>(`/api/funds/${fundId}/audit-trail${qs}`),
+    enabled: !!fundId,
+  });
+}

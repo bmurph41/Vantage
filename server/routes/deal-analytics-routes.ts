@@ -50,12 +50,13 @@ router.post("/crm/deals/:dealId/recalculate-score", async (req: Request, res: Re
 
 router.get("/crm/analytics/velocity", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { startDate, endDate } = req.query;
-    
+
     const start = startDate ? new Date(startDate as string) : undefined;
     const end = endDate ? new Date(endDate as string) : undefined;
-    
+
     const metrics = await dealStageHistoryService.getStageVelocityMetrics(orgId, start, end);
     res.json(metrics);
   } catch (error) {
@@ -65,12 +66,13 @@ router.get("/crm/analytics/velocity", async (req: Request, res: Response, next: 
 
 router.get("/crm/analytics/sales-velocity", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { startDate, endDate } = req.query;
-    
+
     const start = startDate ? new Date(startDate as string) : undefined;
     const end = endDate ? new Date(endDate as string) : undefined;
-    
+
     const velocity = await dealStageHistoryService.getSalesVelocity(orgId, start, end);
     res.json(velocity);
   } catch (error) {
@@ -80,7 +82,8 @@ router.get("/crm/analytics/sales-velocity", async (req: Request, res: Response, 
 
 router.get("/crm/analytics/success-predictors", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const predictors = await dealStageHistoryService.getSuccessPredictors(orgId);
     res.json(predictors);
   } catch (error) {
@@ -90,7 +93,8 @@ router.get("/crm/analytics/success-predictors", async (req: Request, res: Respon
 
 router.get("/crm/analytics/pipeline-health", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     
     const deals = await db.select().from(crmDeals);
     
@@ -172,7 +176,8 @@ router.get("/crm/analytics/win-probability-distribution", async (req: Request, r
 
 router.get("/crm/analytics/deal-velocity", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).user?.orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { startDate, endDate } = req.query;
     
     const start = startDate ? new Date(startDate as string) : undefined;
@@ -214,7 +219,8 @@ router.get("/crm/analytics/deal-velocity", async (req: Request, res: Response, n
 
 router.get("/crm/analytics/win-loss", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).user?.orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { startDate, endDate } = req.query;
     
     const conditions = [];
@@ -403,7 +409,8 @@ router.get("/crm/contacts/:contactId/email-activity", async (req: Request, res: 
 
 router.get("/crm/emails/tracking-stats", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).user?.orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const { startDate, endDate } = req.query;
     
     const ninetyDaysAgo = new Date();
@@ -503,7 +510,8 @@ router.get("/crm/emails/tracking-stats", async (req: Request, res: Response, nex
 
 router.get("/crm/analytics/pipeline-insights", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgId = (req as any).user?.orgId || (req as any).orgId || "org-1";
+    const orgId = (req as any).user?.orgId || (req as any).orgId || (req as any).tenantId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const deals = await db.select().from(crmDeals);
     const engagementScores = await db.select().from(crmDealEngagementScores);

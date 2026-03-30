@@ -9182,10 +9182,57 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  // CRM Pipeline Stages
+  // CRM Pipeline Stages — auto-seeds default acquisition stages on first load
   app.get("/api/pipeline-stages", async (req: any, res) => {
     try {
-      const stages = await storage.getAllCrmPipelineStages(req.user.orgId);
+      const orgId: string = req.user.orgId;
+      let stages = await storage.getAllCrmPipelineStages(orgId);
+
+      // Auto-seed default stages for new orgs that have no stages yet
+      if (stages.length === 0) {
+        // Ensure a default pipeline exists
+        let pipelines = await storage.getCrmPipelinesForOrg(orgId);
+        let defaultPipeline = pipelines.find((p: any) => p.isDefault) || pipelines[0];
+
+        if (!defaultPipeline) {
+          defaultPipeline = await storage.createCrmPipeline({
+            name: 'Acquisitions Pipeline',
+            description: 'Default deal acquisition pipeline',
+            isDefault: true,
+            isActive: true,
+            color: '#3B82F6',
+            type: 'sales',
+            ownerId: req.user.id,
+            orgId,
+          } as any);
+        }
+
+        const DEFAULT_STAGES = [
+          { name: 'Lead',             color: '#6B7280', stageOrder: 1, probability: 10,  stageType: 'active' },
+          { name: 'Underwriting',     color: '#3B82F6', stageOrder: 2, probability: 25,  stageType: 'active' },
+          { name: 'Submitted Offer',  color: '#F59E0B', stageOrder: 3, probability: 40,  stageType: 'active' },
+          { name: 'Under LOI',        color: '#8B5CF6', stageOrder: 4, probability: 60,  stageType: 'active' },
+          { name: 'Under Contract',   color: '#10B981', stageOrder: 5, probability: 80,  stageType: 'active' },
+          { name: 'Closed',           color: '#22C55E', stageOrder: 6, probability: 100, stageType: 'won'    },
+        ];
+
+        for (const s of DEFAULT_STAGES) {
+          await storage.createCrmPipelineStage({
+            pipelineId: defaultPipeline.id,
+            name: s.name,
+            color: s.color,
+            stageOrder: s.stageOrder,
+            probability: s.probability,
+            stageType: s.stageType,
+            pipelineType: 'sales',
+            isActive: true,
+            orgId,
+          } as any);
+        }
+
+        stages = await storage.getAllCrmPipelineStages(orgId);
+      }
+
       res.json(stages);
     } catch (error: any) {
       console.error("Failed to get all pipeline stages:", error);
@@ -12299,7 +12346,7 @@ Current context: Project ${req.params.projectId}`;
   // Property Storage Types - Get all custom types for org
   app.get("/api/crm-storage-types", async (req: any, res) => {
     try {
-      const orgId = req.orgId || 'org-1';
+      const orgId = req.user?.orgId || req.orgId || req.tenantId;
       const types = await storage.getCrmStorageTypes(orgId);
       res.json(types);
     } catch (error: any) {
@@ -12311,7 +12358,7 @@ Current context: Project ${req.params.projectId}`;
   // Property Storage Types - Create custom type
   app.post("/api/crm-storage-types", async (req: any, res) => {
     try {
-      const orgId = req.orgId || 'org-1';
+      const orgId = req.user?.orgId || req.orgId || req.tenantId;
       const userId = req.userId || 'user-1';
       const type = await storage.createCrmStorageType({
         ...req.body,
@@ -12339,7 +12386,7 @@ Current context: Project ${req.params.projectId}`;
   // Property Storage Entries - Bulk upsert entries for a property
   app.put("/api/properties/:id/storage-entries", async (req: any, res) => {
     try {
-      const orgId = req.orgId || 'org-1';
+      const orgId = req.user?.orgId || req.orgId || req.tenantId;
       const entries = await storage.bulkUpsertPropertyStorageEntries(
         req.params.id,
         orgId,
@@ -12367,7 +12414,7 @@ Current context: Project ${req.params.projectId}`;
   app.get("/api/properties/:id/aggregate", async (req: any, res) => {
     try {
       const propertyId = req.params.id;
-      const orgId = req.orgId || 'org-1';
+      const orgId = req.user?.orgId || req.orgId || req.tenantId;
       
       // Fetch property storage entries
       const storageEntries = await storage.getPropertyStorageEntries(propertyId);
@@ -29277,23 +29324,53 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // Capital movement PATCH - disabled for immutable ledger compliance
+  // Corrections must be made via reversal entries, not edits
   app.patch('/api/funds/:fundId/capital-movements/:movementId', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { movementId } = req.params;
+      const { fundId, movementId } = req.params;
+
+      // Check period lock before allowing modification
+      const { periodLockService } = await import('./services/period-lock-service');
       const { fundService } = await import('./services/fund-service');
-      const movement = await fundService.updateCapitalMovement(orgId, movementId, req.body);
-      if (!movement) {
-        return res.status(404).json({ error: 'Capital movement not found' });
+
+      const movement = await fundService.getCapitalMovement(orgId, movementId);
+      if (!movement) return res.status(404).json({ error: 'Capital movement not found' });
+
+      // Only allow status updates (pending → completed), not amount changes
+      const allowedFields = ['status', 'description'];
+      const disallowedFields = Object.keys(req.body).filter(k => !allowedFields.includes(k));
+      if (disallowedFields.length > 0) {
+        return res.status(403).json({
+          error: 'Immutable ledger policy: capital movement amounts cannot be modified after creation. ' +
+                 'Create a reversal entry instead. Only status and description can be updated.',
+          disallowedFields,
+        });
       }
-      res.json(movement);
+
+      // Check period lock
+      if (movement.movementDate) {
+        await periodLockService.enforcePeriodLock(orgId, fundId, new Date(movement.movementDate));
+      }
+
+      const updated = await fundService.updateCapitalMovement(orgId, movementId, req.body);
+      res.json(updated);
     } catch (error: any) {
       console.error('Failed to update capital movement:', error);
-      res.status(500).json({ error: 'Failed to update capital movement' });
+      res.status(error.message?.includes('locked') ? 409 : 500).json({ error: error.message });
     }
   });
 
+  // Capital movement DELETE - disabled for audit compliance
+  // Movements cannot be deleted; they must be reversed with a contra-entry
   app.delete('/api/funds/:fundId/capital-movements/:movementId', authenticateUser, async (req: any, res) => {
+    return res.status(403).json({
+      error: 'Immutable ledger policy: capital movements cannot be deleted. ' +
+             'Create a reversal entry with opposite sign to correct errors. ' +
+             'This policy ensures a complete audit trail for SOC 2 compliance.',
+    });
+    // Original code preserved for reference but unreachable:
     try {
       const orgId = req.user.orgId;
       const { movementId } = req.params;
@@ -29588,14 +29665,178 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // === Distribution Approval Workflow (Institutional) ===
+  app.post('/api/funds/:fundId/distribution-drafts', authenticateUser, async (req: any, res) => {
+    try {
+      const { fundId } = req.params;
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const draft = await distributionApprovalService.createDraft(req, fundId, req.body);
+      res.status(201).json(draft);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/funds/:fundId/distribution-drafts', authenticateUser, async (req: any, res) => {
+    try {
+      const { fundId } = req.params;
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const drafts = await distributionApprovalService.listDrafts(req.user.orgId, fundId, req.query.status);
+      res.json(drafts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/funds/:fundId/distribution-drafts/:draftId/submit', authenticateUser, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const draft = await distributionApprovalService.submitForApproval(req, draftId);
+      res.json(draft);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/funds/:fundId/distribution-drafts/:draftId/approve', authenticateUser, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const { requirePermission } = await import('./middleware/rbac');
+      // Inline permission check for fund:distribution:approve
+      const userRole = req.user?.role;
+      if (!['owner', 'admin'].includes(userRole)) {
+        return res.status(403).json({ error: 'Insufficient permissions: fund:distribution:approve required' });
+      }
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const draft = await distributionApprovalService.approve(req, draftId, req.body.notes);
+      res.json(draft);
+    } catch (error: any) {
+      const status = error.message?.includes('Segregation') ? 403 : 400;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/funds/:fundId/distribution-drafts/:draftId/reject', authenticateUser, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const draft = await distributionApprovalService.reject(req, draftId, req.body.reason);
+      res.json(draft);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/funds/:fundId/distribution-drafts/:draftId/execute', authenticateUser, async (req: any, res) => {
+    try {
+      const { draftId } = req.params;
+      const userRole = req.user?.role;
+      if (!['owner', 'admin'].includes(userRole)) {
+        return res.status(403).json({ error: 'Insufficient permissions: only owner/admin can execute distributions' });
+      }
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const result = await distributionApprovalService.execute(req, draftId);
+      res.json(result);
+    } catch (error: any) {
+      const status = error.message?.includes('Compliance') ? 409 : 400;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  // === Period Lock Management ===
+  app.post('/api/funds/:fundId/period-locks', authenticateUser, async (req: any, res) => {
+    try {
+      const { fundId } = req.params;
+      const userRole = req.user?.role;
+      if (!['owner', 'admin'].includes(userRole)) {
+        return res.status(403).json({ error: 'Only owner/admin can lock periods' });
+      }
+      const { periodLockService } = await import('./services/period-lock-service');
+      const { periodLabel, periodStart, periodEnd } = req.body;
+      if (!periodLabel || !periodStart || !periodEnd) {
+        return res.status(400).json({ error: 'periodLabel, periodStart, and periodEnd are required' });
+      }
+      const lock = await periodLockService.lockPeriod(req, fundId, periodLabel, new Date(periodStart), new Date(periodEnd));
+      res.status(201).json(lock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/funds/:fundId/period-locks', authenticateUser, async (req: any, res) => {
+    try {
+      const { fundId } = req.params;
+      const { periodLockService } = await import('./services/period-lock-service');
+      const locks = await periodLockService.listPeriodLocks(req.user.orgId, fundId);
+      res.json(locks);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/funds/:fundId/period-locks/:lockId/unlock', authenticateUser, async (req: any, res) => {
+    try {
+      const { lockId } = req.params;
+      const userRole = req.user?.role;
+      if (userRole !== 'owner') {
+        return res.status(403).json({ error: 'Only owner can unlock periods (audit control)' });
+      }
+      const { periodLockService } = await import('./services/period-lock-service');
+      const lock = await periodLockService.unlockPeriod(req, lockId, req.body.reason);
+      res.json(lock);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // === Financial Audit Trail ===
+  app.get('/api/funds/:fundId/audit-trail', authenticateUser, async (req: any, res) => {
+    try {
+      const { fundId } = req.params;
+      const userRole = req.user?.role;
+      if (!['owner', 'admin', 'auditor'].includes(userRole)) {
+        return res.status(403).json({ error: 'Audit trail access requires owner, admin, or auditor role' });
+      }
+      const { financialAuditService } = await import('./services/financial-audit-service');
+      const { eventType, fromDate, toDate, investorId, limit, offset } = req.query;
+      const result = await financialAuditService.getAuditTrail(req.user.orgId, {
+        fundId,
+        eventType,
+        investorId,
+        fromDate: fromDate ? new Date(fromDate) : undefined,
+        toDate: toDate ? new Date(toDate) : undefined,
+        limit: limit ? parseInt(limit) : undefined,
+        offset: offset ? parseInt(offset) : undefined,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // === Fund-Level Capital Calls ===
   app.post('/api/funds/:fundId/capital-calls', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
 
+      // RBAC: require capital call creation permission
+      const userRole = req.user?.role;
+      if (!['owner', 'admin', 'editor'].includes(userRole)) {
+        return res.status(403).json({ error: 'Insufficient permissions to create capital calls' });
+      }
+
+      // Period lock check
+      const { periodLockService } = await import('./services/period-lock-service');
+      await periodLockService.enforcePeriodLock(orgId, fundId, new Date());
+
+      // Compliance: check investor accreditation before calling capital
+      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      await distributionApprovalService.runComplianceChecks(orgId, fundId);
+
+      const { fundService } = await import('./services/fund-service');
       const { totalAmount, purpose, dueDate, callNumber, notes, dealAllocationId } = req.body;
 
       if (!totalAmount || !purpose || !dueDate) {
@@ -29611,10 +29852,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         dealAllocationId,
       });
 
+      // Audit log
+      const { financialAuditService } = await import('./services/financial-audit-service');
+      await financialAuditService.logFromRequest(req, {
+        fundId,
+        eventType: 'capital_call.created',
+        amount: parseFloat(totalAmount),
+        afterState: { callNumber: result.capitalCall.callNumber, investorCount: result.investorLineItems.length, totalAllocated: result.totalAllocated },
+      });
+
       res.status(201).json(result);
     } catch (error: any) {
       console.error('Failed to create fund capital call:', error);
-      res.status(error.message?.includes('exceeds') ? 400 : 500).json({ error: error.message || 'Failed to create capital call' });
+      const status = error.message?.includes('exceeds') ? 400 : error.message?.includes('locked') ? 409 : error.message?.includes('Compliance') ? 409 : 500;
+      res.status(status).json({ error: error.message || 'Failed to create capital call' });
     }
   });
 
