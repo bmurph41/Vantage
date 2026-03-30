@@ -1,6 +1,60 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-28)
+## Current State (2026-03-30)
+
+### ✅ COMPLETE — Deal Timeline / Gantt View (2026-03-30)
+Full implementation of the Deal Timeline/Gantt view feature (CRM priority #2).
+
+**Backend Enhancements**
+- Enhanced `GET /api/crm/pipeline-enhancements/timeline` with query params: `pipelineId`, `stageIds`, `ownerId`, `startDate`, `endDate`, `groupBy`
+- Response restructured to `{ deals, events, timeRange }` format with per-deal `slaStatus` computation
+- Enhanced `GET /api/crm/pipeline-enhancements/timeline/:dealId` with `include` param supporting: `key_dates`, `stages`, `tasks`, `red_flags`, `milestones`, `playbook`, `activities`
+- Extended `buildTimelineEventsForDeal()` helper to emit red_flag, milestone, playbook, and activity event types
+- Added `computeSlaStatus()` helper comparing days-in-stage against stage SLA thresholds
+
+**Pipeline-Level Gantt View**
+- New `DealGanttView` component (`client/src/components/crm/deal-gantt-view.tsx`)
+- Fixed-width left panel (240px) with deal name, value, stage badge, SLA indicator
+- Scrollable right panel with positioned SVG/div timeline elements
+- Event rendering: diamond markers (key dates), rounded bars (stages), thin bars (tasks), warning icons (red flags), outlined diamonds (milestones)
+- Three zoom levels: Day (20px/day), Week (8px/day), Month (2px/day)
+- Group-by dropdown: Deal / Stage / Owner
+- Today marker: dashed Harbor Teal (#2DD4BF) vertical line
+- SLA-breached rows tinted red; overdue key dates pulse with red ring
+- Export: PNG via html-to-image, Print via browser print
+- Empty state when no deals
+
+**Single-Deal Timeline Tab**
+- New `DealTimelineTab` component (`client/src/components/deals/deal-timeline-tab.tsx`)
+- Existing `DealTimelineVisualizer` (PSA→DD→Closing bar) at top in compact mode
+- Below it: category swimlane Gantt with rows for Stages, Key Dates, Tasks, Playbook, Approvals, Red Flags, Activity
+- Toggle chips to enable/disable each category
+- Zoom controls and Today button
+- Empty state: "Add key dates to see your deal timeline"
+
+**Shared Components**
+- `GanttToolbar` (`client/src/components/crm/gantt-toolbar.tsx`) — zoom, group-by, today, export controls
+- `GanttPopover` (`client/src/components/crm/gantt-popover.tsx`) — click popover showing event details + "Open Deal" link
+
+**Integration**
+- Pipeline page: new "Gantt" view toggle button (alongside Kanban, List, Map)
+- Deal detail page: new "Timeline" tab (between Activities and FM)
+- No new npm packages (Gantt built with plain HTML/CSS divs, uses existing html-to-image for export)
+
+**Files Created:**
+- `client/src/components/crm/deal-gantt-view.tsx`
+- `client/src/components/crm/gantt-toolbar.tsx`
+- `client/src/components/crm/gantt-popover.tsx`
+- `client/src/components/deals/deal-timeline-tab.tsx`
+
+**Files Modified:**
+- `server/routes/crm-pipeline-enhancements-routes.ts` — enhanced timeline endpoints + extended buildTimelineEventsForDeal
+- `client/src/pages/pipeline.tsx` — added Gantt view mode + DealGanttView rendering
+- `client/src/pages/deal-detail.tsx` — added Timeline tab to centerTabs
+
+---
+
+## Prior State (2026-03-28)
 
 ### ✅ COMPLETE — Bookkeeping Budget Editor: 4 Sprints + Polish (2026-03-27 → 2026-03-28)
 Production-grade budget creation/editing tool built in 4 sprints, then hardened with audit, UX polish, and export features.

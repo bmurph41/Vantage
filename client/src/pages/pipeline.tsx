@@ -33,7 +33,7 @@ import {
   TrendingUp, Filter, ArrowUpDown, Settings2, Edit2, Check, X,
   ExternalLink, Timer, AlertTriangle, Target, BarChart3, Award, Map,
   Flame, Skull, Zap, ChevronDown, Bookmark, Eye, MoreHorizontal,
-  Clock, ArrowRight, Phone, Mail, StickyNote,
+  Clock, ArrowRight, Phone, Mail, StickyNote, GanttChart,
 } from "lucide-react";
 import { Link } from "wouter";
 import { format, differenceInDays, isAfter, addDays } from "date-fns";
@@ -48,6 +48,7 @@ import SimpleDealTracker from "@/components/pipeline/SimpleDealTracker";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
 import { PipelineNudges } from "@/components/pipeline/PipelineNudges";
+import DealGanttView from "@/components/crm/deal-gantt-view";
 import { ForecastChart } from "@/components/pipeline/ForecastChart";
 import PipelineTemplateSelector from "@/components/pipeline/PipelineTemplateSelector";
 import {
@@ -452,7 +453,7 @@ export default function Pipeline() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
   const [sortBy, setSortBy] = useState("value");
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "automations" | "templates" | "forecast">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list" | "map" | "gantt" | "automations" | "templates" | "forecast">("kanban");
   const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -811,6 +812,7 @@ export default function Pipeline() {
             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
               {[
                 { key: "kanban" as const, icon: LayoutGrid, label: "Kanban" },
+                { key: "gantt" as const, icon: GanttChart, label: "Gantt" },
                 { key: "list" as const, icon: List, label: "List" },
                 { key: "map" as const, icon: Map, label: "Map" },
               ].map(v => (
@@ -1061,6 +1063,11 @@ export default function Pipeline() {
               </DragOverlay>
             </DndContext>
           </div>
+        )}
+
+        {/* Gantt View */}
+        {viewMode === "gantt" && (
+          <DealGanttView pipelineId={selectedPipelineId || undefined} className="h-full" />
         )}
 
         {/* Map View */}

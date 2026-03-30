@@ -26,6 +26,7 @@ import DocumentGeneratorModal from "@/components/modals/document-generator-modal
 import CompSetSelector from "@/components/comp-set-selector";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { RedFlagsPanel } from "@/components/crm/_wip/red-flags-panel";
+import DealTimelineTab from "@/components/deals/deal-timeline-tab";
 import { PhaseGatesPanel } from "@/components/crm/_wip/phase-gates-panel";
 import { DealPlaybookPanel } from "@/components/crm/_wip/deal-playbook-panel";
 import { CommentThreadsPanel } from "@/components/crm/_wip/comment-threads-panel";
@@ -691,6 +692,11 @@ export default function DealDetail() {
             label: 'Activities',
             count: summaryData?.activities?.openCount || 0,
             content: <DealActivitiesTab dealId={dealId} />,
+          },
+          {
+            value: 'timeline',
+            label: 'Timeline',
+            content: <DealTimelineTab dealId={dealId} deal={deal} />,
           },
           {
             value: 'model',

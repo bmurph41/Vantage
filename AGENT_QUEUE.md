@@ -2,8 +2,7 @@
 
 ## 🔴 TIER 1 — CRM / DEAL PIPELINE (Active Priority)
 
-- [spec] [done] Write detailed build spec for Deal Timeline/Gantt view (CRM priority #2)
-- [feature] [todo] Implement Deal Timeline/Gantt view — see agents/specs/deal-timeline-gantt-spec.md
+- [feature] [done] Implement Deal Timeline/Gantt view — see agents/specs/deal-timeline-gantt-spec.md
 - [spec] [todo] Write detailed build spec for Deal Comparison workspace — pull DCF + Pro Forma per deal (CRM priority #3)
 - [feature] [todo] Add key dates display to Kanban pipeline cards — created, expected close, next follow-up (CRM priority #4)
 - [feature] [todo] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
@@ -63,6 +62,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [spec] [done] Write detailed build spec for Deal Timeline/Gantt view (CRM priority #2)
 
 - [feature] [done] Workflow Automation engine
 - [feature] [done] MarketplaceListings.tsx

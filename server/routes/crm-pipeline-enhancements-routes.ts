@@ -8,6 +8,10 @@ import {
   crmDealStageHistory,
   crmContacts,
   crmCompanies,
+  crmRedFlags,
+  crmPhaseGateApprovals,
+  crmDealPlaybookProgress,
+  crmTimelineEvents,
 } from '@shared/schema';
 import { eq, and, desc, sql, inArray, isNotNull, count, max } from 'drizzle-orm';
 import Anthropic from '@anthropic-ai/sdk';
@@ -28,7 +32,24 @@ function urgencyColor(date: Date | null | undefined): { color: string; label: st
   return { color: '#9CA3AF', label: 'normal' };
 }
 
-function buildTimelineEventsForDeal(deal: any, tasks: any[], stageHistory: any[]) {
+interface BuildTimelineOptions {
+  includeRedFlags?: boolean;
+  includeMilestones?: boolean;
+  includePlaybook?: boolean;
+  includeActivities?: boolean;
+}
+
+function buildTimelineEventsForDeal(
+  deal: any,
+  tasks: any[],
+  stageHistory: any[],
+  extras?: {
+    redFlags?: any[];
+    phaseGates?: any[];
+    playbookItems?: any[];
+    activities?: any[];
+  },
+) {
   const events: any[] = [];
 
   // Key dates from deal
@@ -88,6 +109,7 @@ function buildTimelineEventsForDeal(deal: any, tasks: any[], stageHistory: any[]
       endDate: task.dueDate || task.createdAt,
       status: task.status,
       color: task.priority === 'urgent' ? '#EF4444' : task.priority === 'high' ? '#F97316' : '#3B82F6',
+      metadata: { priority: task.priority },
     });
   }
 
@@ -102,11 +124,99 @@ function buildTimelineEventsForDeal(deal: any, tasks: any[], stageHistory: any[]
       startDate: sh.enteredAt,
       endDate: sh.exitedAt || new Date(),
       status: sh.isCurrentStage ? 'active' : 'completed',
-      color: '#8B5CF6',
+      color: '#4A6FA5',
     });
   }
 
+  // Red flags
+  if (extras?.redFlags) {
+    const severityColors: Record<string, string> = {
+      critical: '#DC2626', high: '#EF4444', medium: '#F97316', low: '#EAB308',
+    };
+    for (const rf of extras.redFlags) {
+      events.push({
+        id: `redflag-${rf.id}`,
+        dealId: deal.id,
+        dealName: deal.title,
+        eventType: 'red_flag',
+        title: rf.title,
+        startDate: rf.raisedAt || rf.createdAt,
+        endDate: rf.raisedAt || rf.createdAt,
+        status: rf.status,
+        color: severityColors[rf.severity] || '#F97316',
+        metadata: { severity: rf.severity, category: rf.category },
+      });
+    }
+  }
+
+  // Phase gate approvals (milestones)
+  if (extras?.phaseGates) {
+    for (const pg of extras.phaseGates) {
+      events.push({
+        id: `milestone-${pg.id}`,
+        dealId: deal.id,
+        dealName: deal.title,
+        eventType: 'milestone',
+        title: `Approval: ${pg.status}`,
+        startDate: pg.requestedAt || pg.createdAt,
+        endDate: pg.reviewedAt || pg.requestedAt || pg.createdAt,
+        status: pg.status,
+        color: pg.status === 'approved' ? '#10B981' : pg.status === 'rejected' ? '#EF4444' : '#6366F1',
+        metadata: { fromStageId: pg.fromStageId, toStageId: pg.toStageId },
+      });
+    }
+  }
+
+  // Playbook items
+  if (extras?.playbookItems) {
+    for (const pb of extras.playbookItems) {
+      if (pb.completedAt || pb.dueDate) {
+        events.push({
+          id: `playbook-${pb.id}`,
+          dealId: deal.id,
+          dealName: deal.title,
+          eventType: 'playbook',
+          title: `Playbook: ${pb.status}`,
+          startDate: pb.completedAt || pb.dueDate || pb.createdAt,
+          endDate: pb.completedAt || pb.dueDate || pb.createdAt,
+          status: pb.status,
+          color: pb.status === 'completed' ? '#10B981' : '#94A3B8',
+        });
+      }
+    }
+  }
+
+  // Activity events
+  if (extras?.activities) {
+    for (const act of extras.activities) {
+      events.push({
+        id: `activity-${act.id}`,
+        dealId: deal.id,
+        dealName: deal.title,
+        eventType: 'activity',
+        title: act.title || act.subject || act.eventType,
+        startDate: act.occurredAt || act.createdAt,
+        endDate: act.occurredAt || act.createdAt,
+        status: 'completed',
+        color: '#94A3B8',
+        metadata: { eventType: act.eventType },
+      });
+    }
+  }
+
   return events;
+}
+
+function computeSlaStatus(deal: any, stage: any): 'ok' | 'warning' | 'overdue' {
+  if (!stage || !deal.currentStageEnteredAt) return 'ok';
+  const daysInStage = Math.floor(
+    (Date.now() - new Date(deal.currentStageEnteredAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const slaMax = stage.slaMaxDays ?? stage.sla_max_days;
+  const slaWarn = stage.slaWarningDays ?? stage.sla_warning_days;
+  if (slaMax && daysInStage > slaMax) return 'overdue';
+  if (slaWarn && daysInStage > slaWarn) return 'warning';
+  return 'ok';
 }
 
 // ─── 10.2  Deal Timeline / Gantt ────────────────────────────────────
@@ -116,41 +226,105 @@ crmPipelineEnhancementsRouter.get('/timeline', async (req, res) => {
     const orgId = req.user?.orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const deals = await db
-      .select()
-      .from(crmDeals)
-      .where(eq(crmDeals.orgId, orgId));
+    const {
+      pipelineId,
+      stageIds: stageIdsParam,
+      ownerId,
+      startDate: startDateParam,
+      endDate: endDateParam,
+      includeTasks: includeTasksParam,
+      includeActivities: includeActivitiesParam,
+      groupBy = 'deal',
+    } = req.query as Record<string, string | undefined>;
 
-    if (deals.length === 0) return res.json([]);
+    const includeTasks = includeTasksParam !== 'false';
+    const includeActivities = includeActivitiesParam === 'true';
+
+    // Default time window: ±90 days
+    const now = new Date();
+    const startDate = startDateParam ? new Date(startDateParam) : new Date(now.getTime() - 90 * 86400000);
+    const endDate = endDateParam ? new Date(endDateParam) : new Date(now.getTime() + 90 * 86400000);
+
+    // Build deal filter conditions
+    const dealConditions: any[] = [eq(crmDeals.orgId, orgId), eq(crmDeals.isClosed, false)];
+    if (pipelineId) dealConditions.push(eq(crmDeals.pipelineId, pipelineId));
+    if (ownerId) dealConditions.push(eq(crmDeals.ownerId, ownerId));
+
+    const stageIdsFilter = stageIdsParam ? stageIdsParam.split(',').filter(Boolean) : null;
+    if (stageIdsFilter?.length) dealConditions.push(inArray(crmDeals.stageId, stageIdsFilter));
+
+    const deals = await db.select().from(crmDeals).where(and(...dealConditions));
+    if (deals.length === 0) {
+      return res.json({ deals: [], events: [], timeRange: { start: startDate.toISOString(), end: endDate.toISOString() } });
+    }
 
     const dealIds = deals.map((d) => d.id);
 
-    const [tasks, stageHistory] = await Promise.all([
-      db.select().from(crmTasks).where(and(eq(crmTasks.orgId, orgId), inArray(crmTasks.dealId, dealIds))),
-      db.select().from(crmDealStageHistory).where(and(eq(crmDealStageHistory.orgId, orgId), inArray(crmDealStageHistory.dealId, dealIds))).orderBy(crmDealStageHistory.enteredAt),
-    ]);
+    // Fetch all stage metadata
+    const allStages = await db.select().from(crmPipelineStages).where(eq(crmPipelineStages.orgId, orgId));
+    const stageMap = new Map(allStages.map((s) => [s.id, s]));
 
+    // Fetch parallel data
+    const queries: Promise<any>[] = [
+      db.select().from(crmDealStageHistory).where(and(eq(crmDealStageHistory.orgId, orgId), inArray(crmDealStageHistory.dealId, dealIds))).orderBy(crmDealStageHistory.enteredAt),
+    ];
+    if (includeTasks) {
+      queries.push(db.select().from(crmTasks).where(and(eq(crmTasks.orgId, orgId), inArray(crmTasks.dealId, dealIds))));
+    } else {
+      queries.push(Promise.resolve([]));
+    }
+
+    const [stageHistory, tasks] = await Promise.all(queries);
+
+    // Group by deal
     const tasksByDeal = new Map<string, any[]>();
     for (const t of tasks) {
       if (!t.dealId) continue;
       if (!tasksByDeal.has(t.dealId)) tasksByDeal.set(t.dealId, []);
       tasksByDeal.get(t.dealId)!.push(t);
     }
-
     const historyByDeal = new Map<string, any[]>();
     for (const h of stageHistory) {
       if (!historyByDeal.has(h.dealId)) historyByDeal.set(h.dealId, []);
       historyByDeal.get(h.dealId)!.push(h);
     }
 
+    // Build response
+    const dealSummaries: any[] = [];
     const allEvents: any[] = [];
+
     for (const deal of deals) {
+      const stage = deal.stageId ? stageMap.get(deal.stageId) : null;
+      const slaStatus = computeSlaStatus(deal, stage);
+      const daysInCurrentStage = deal.currentStageEnteredAt
+        ? Math.floor((Date.now() - new Date(deal.currentStageEnteredAt).getTime()) / 86400000)
+        : deal.daysInCurrentStage || 0;
+
+      dealSummaries.push({
+        id: deal.id,
+        title: deal.title,
+        stage: deal.stage,
+        stageName: stage?.name || deal.stage || '',
+        stageColor: (stage as any)?.color || '#4A6FA5',
+        owner: deal.ownerId ? { id: deal.ownerId, name: (deal as any).ownerName || '' } : null,
+        priority: deal.priority,
+        probability: deal.probability,
+        value: deal.value || deal.amount,
+        expectedCloseDate: deal.expectedCloseDate,
+        daysInCurrentStage,
+        slaStatus,
+      });
+
       const dealTasks = tasksByDeal.get(deal.id) || [];
       const dealHistory = historyByDeal.get(deal.id) || [];
       allEvents.push(...buildTimelineEventsForDeal(deal, dealTasks, dealHistory));
     }
 
-    return res.json(allEvents);
+    return res.json({
+      deals: dealSummaries,
+      events: allEvents,
+      timeRange: { start: startDate.toISOString(), end: endDate.toISOString() },
+    });
   } catch (error: any) {
     console.error('Error fetching timeline:', error);
     return res.status(500).json({ error: 'Failed to fetch timeline events' });
@@ -163,21 +337,61 @@ crmPipelineEnhancementsRouter.get('/timeline/:dealId', async (req, res) => {
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const { dealId } = req.params;
+    const includeParam = (req.query.include as string) || 'key_dates,stages,tasks';
+    const includes = new Set(includeParam.split(',').map((s) => s.trim()));
 
     const [dealRows] = await Promise.all([
       db.select().from(crmDeals).where(and(eq(crmDeals.id, dealId), eq(crmDeals.orgId, orgId))),
     ]);
 
     if (dealRows.length === 0) return res.status(404).json({ error: 'Deal not found' });
-
     const deal = dealRows[0];
 
-    const [tasks, stageHistory] = await Promise.all([
-      db.select().from(crmTasks).where(and(eq(crmTasks.dealId, dealId), eq(crmTasks.orgId, orgId))),
-      db.select().from(crmDealStageHistory).where(and(eq(crmDealStageHistory.dealId, dealId), eq(crmDealStageHistory.orgId, orgId))).orderBy(crmDealStageHistory.enteredAt),
-    ]);
+    // Always fetch stage history and tasks (unless excluded)
+    const queries: Record<string, Promise<any[]>> = {};
+    if (includes.has('stages') || includes.has('key_dates')) {
+      queries.stageHistory = db.select().from(crmDealStageHistory)
+        .where(and(eq(crmDealStageHistory.dealId, dealId), eq(crmDealStageHistory.orgId, orgId)))
+        .orderBy(crmDealStageHistory.enteredAt);
+    }
+    if (includes.has('tasks')) {
+      queries.tasks = db.select().from(crmTasks)
+        .where(and(eq(crmTasks.dealId, dealId), eq(crmTasks.orgId, orgId)));
+    }
+    if (includes.has('red_flags')) {
+      queries.redFlags = db.select().from(crmRedFlags)
+        .where(and(eq(crmRedFlags.dealId, dealId), eq(crmRedFlags.orgId, orgId)));
+    }
+    if (includes.has('milestones')) {
+      queries.phaseGates = db.select().from(crmPhaseGateApprovals)
+        .where(and(eq(crmPhaseGateApprovals.dealId, dealId), eq(crmPhaseGateApprovals.orgId, orgId)));
+    }
+    if (includes.has('playbook')) {
+      queries.playbookItems = db.select().from(crmDealPlaybookProgress)
+        .where(and(eq(crmDealPlaybookProgress.dealId, dealId), eq(crmDealPlaybookProgress.orgId, orgId)));
+    }
+    if (includes.has('activities')) {
+      queries.activities = db.select().from(crmTimelineEvents)
+        .where(and(eq(crmTimelineEvents.entityType, 'deal'), eq(crmTimelineEvents.entityId, dealId), eq(crmTimelineEvents.orgId, orgId)));
+    }
 
-    const events = buildTimelineEventsForDeal(deal, tasks, stageHistory);
+    const keys = Object.keys(queries);
+    const results = await Promise.all(Object.values(queries));
+    const data: Record<string, any[]> = {};
+    keys.forEach((k, i) => { data[k] = results[i]; });
+
+    const events = buildTimelineEventsForDeal(
+      deal,
+      data.tasks || [],
+      data.stageHistory || [],
+      {
+        redFlags: data.redFlags,
+        phaseGates: data.phaseGates,
+        playbookItems: data.playbookItems,
+        activities: data.activities,
+      },
+    );
+
     return res.json(events);
   } catch (error: any) {
     console.error('Error fetching deal timeline:', error);
