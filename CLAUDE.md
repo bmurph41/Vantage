@@ -147,6 +147,89 @@ what decisions were made, and what comes next.
 
 ---
 
+## Institutional Audit — Completed Work (2026-03-29 → 2026-03-30)
+
+A full Blackstone-grade audit was performed and the following was built/fixed.
+All code is committed on branch `feat/exit-engine-patches`.
+
+### ✅ Completed (DO NOT REDO)
+
+**GP/LP Fund Management (Full Lifecycle)**
+- `server/services/fund-service.ts` — 6 new methods: `accruePreferredReturn()`, `calculateFundNav()`, `createFundCapitalCall()`, `completeFundCapitalCall()`, `processFundDistribution()`, `generateInvestorStatement()`
+- `server/routes.ts` — 11 new fund API endpoints (capital calls, distributions, pref return, NAV, sync deal returns, LP statements, LP reporting)
+- `client/src/hooks/use-fund-management.ts` — NEW FILE, 40+ React Query hooks with proper cross-invalidation
+- LP reporting endpoint (`GET /api/modeling/projects/:projectId/lp-reporting`) wired to real fund data
+
+**Deal-to-Modeling Pipeline Bridge**
+- Added `modeling_project_id` column to `crm_deals` (migrated to DB)
+- `POST /api/deals/:dealId/create-modeling-project` — creates model from deal data, links both directions
+- `GET /api/deals/:dealId/modeling-project` — smart lookup with auto-linking
+
+**Database Cascade Fixes** (11 FK constraints migrated)
+- tasks, projectSettings, projectShares, risks, projectContacts, projectDealMembers, projectPendingContacts → CASCADE
+- auditLogs → SET NULL, projects.createdBy → SET NULL
+- projectSettings gained `created_at`/`updated_at`
+
+**Lease Hooks Migration to React Query**
+- `client/src/hooks/use-leases.ts` — REWRITTEN from manual useState to React Query with `leaseKeys` factory
+- `client/src/hooks/use-unified-leases.ts` — Fixed: `syncToProForma` and `bulkRecompute` now invalidate pro-forma/actuals
+
+**Query Invalidation Fixes** (stale data elimination)
+- `useModelingAddbacks.ts` — all mutations now invalidate pro-forma, actuals, historical-pl
+- `useDdFees.ts` — all mutations now invalidate fees/summary
+- `use-autosave.ts` — onSuccess now syncs React Query cache
+- `GlobalAssumptionsSidebar.tsx` — invalidates deal-pricing, lp-reporting, tax-waterfall
+- `fund-gna-model.tsx` — invalidates pro-forma, returns, lp-reporting
+- `gp-partner-economics.tsx` — invalidates returns, pro-forma, lp-reporting, tax-waterfall
+- `inputs.tsx` — invalidates pro-forma, returns, lp-reporting + syncs hold period to config
+- `fund-cashflow-detail.tsx` — reads hold period from config table first (canonical source)
+
+**Backend Security: orgId Standardization**
+- Removed ALL `|| 'org-1'` and `|| 'default-org'` hardcoded fallbacks across 20+ route files
+- Pattern: `(req as any).user?.orgId || (req as any).tenantId || (req as any).orgId`
+- Files fixed: analytics, email-marketing, playbook, institutional-analysis, valuation-timeline, comment, sla, budget, rra, executive-dashboard, billing, returns, tax-waterfall, operations-management, modeling-rent-roll, leases, entity-linking, deal-analytics, settings, integrations, routes.ts
+
+**Institutional Compliance Infrastructure**
+- `server/middleware/authenticate.ts` — Removed unconditional admin fallback (now dev-only with `ALLOW_DEMO_AUTH=true`)
+- `server/middleware/rbac.ts` — 14 new fund permissions (capital_call:create/approve, distribution:create/approve, period:lock/unlock, etc.)
+- `server/services/financial-audit-service.ts` — NEW: immutable append-only audit log (PostgreSQL RULES prevent UPDATE/DELETE), 22 event types
+- `server/services/distribution-approval-service.ts` — NEW: Draft → Pending → Approved → Executed workflow, dual control, $50M dual-signature threshold, compliance gates (accreditation/AML/KYC check)
+- `server/services/period-lock-service.ts` — NEW: lock/unlock periods, enforcePeriodLock() guard, owner-only unlock with documented reason
+- Capital movement DELETE disabled (403: use reversal entries), PATCH restricted to status/description only
+- 6 distribution approval endpoints, 3 period lock endpoints, 1 audit trail endpoint
+- DB tables created: `financial_audit_log`, `distribution_approvals`, `fund_period_locks`
+- CHECK constraints: `commitment_amount > 0`, `called_capital >= 0`
+
+**Waterfall & XIRR Fixes**
+- `shared/exit/waterfall-engine.ts` — V1 clawback fixed: now profit-based (was gross-proceeds), GP MOIC configurable (was hardcoded 2%), tier rounding added
+- `shared/finance/xirr.ts` — UTC timezone enforcement on date parsing
+- `decimal.js` installed (available for future refactoring)
+
+### Remaining Items from Audit (NOT YET DONE)
+
+**Phase 4 — LP Experience (next priority)**
+1. PDF statement generation (pdf-lib is installed, endpoint returns JSON — needs binary PDF output)
+2. Dedicated LP portal with independent auth (separate from GP login)
+3. K-1 tax document generation (schema exists, no generation logic)
+4. Quarterly automated statement delivery
+
+**Reporting Enhancements**
+5. PME (Public Market Equivalent) calculation vs S&P 500
+6. J-curve analysis and vintage cohort performance
+7. Peer fund benchmarking (Preqin/Cambridge data integration)
+8. Return attribution (top 5/bottom 5 deal contribution)
+
+**Data Integrity Hardening**
+9. Refactor fund-service.ts financial math from parseFloat to decimal.js (72 parseFloat calls)
+10. Derive capital account balances from immutable ledger entries (currently stored as mutable state)
+11. PII field encryption at rest (SSN, Tax ID — AES-256-GCM, key exists)
+
+**Multi-Currency**
+12. Deal-level multi-currency modeling
+13. LP statements in investor's base currency with FX gain/loss
+
+---
+
 ## Common Failure Patterns to Avoid
 
 | Symptom | Root Cause | Fix |
