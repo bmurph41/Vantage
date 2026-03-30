@@ -1,20 +1,14 @@
 # MarinaMatch Build Status
-_Last updated: 2026-03-30 23:14:39_
+_Last updated: 2026-03-30 23:55:00_
 
 ## Last Agent Run
 - Type: feature
-- Task: Implement Deal Timeline/Gantt view — see agents/specs/deal-timeline-gantt-spec.md
+- Task: Fix AI advisor markdown rendering — add react-markdown renderer to chat UI
 - Result: ✅ SUCCESS
-- Duration: 894s
-
+- Duration: ~120s
 
 ## TypeScript
-
+Vite build: ✅ SUCCESS (47.61s)
 
 ## Tests
-npm error Missing script: "test"
-npm error
-npm error To see a list of scripts, run:
-npm error   npm run
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-03-30T23_14_39_359Z-debug-0.log
-
+Not run this cycle

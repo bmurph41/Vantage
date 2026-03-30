@@ -2,6 +2,32 @@
 
 ## Current State (2026-03-30)
 
+### ✅ COMPLETE — AI Advisor Markdown Rendering Fix (2026-03-30)
+Replaced custom hand-rolled markdown parser with `react-markdown` + `remark-gfm` for proper GFM rendering.
+
+**What was done:**
+- Installed `react-markdown` v10 and `remark-gfm` as dependencies
+- Created shared `MarkdownRenderer` component (`client/src/components/ui/markdown-renderer.tsx`)
+- Replaced 185-line custom `renderMarkdown()`/`inlineMarkdown()`/`MarkdownTable()` in `ai-assistant.tsx` with `<MarkdownRenderer>`
+- Added markdown rendering to `cdd-advisor.tsx` (was plain text only — `whitespace-pre-wrap`)
+- Styling preserved: same color scheme, font sizes, code block theme (zinc-900), table borders, blockquote blue accent
+
+**Files created:**
+- `client/src/components/ui/markdown-renderer.tsx`
+
+**Files modified:**
+- `client/src/components/ai-assistant.tsx` — removed custom renderer, imported shared component
+- `client/src/components/cdd-advisor.tsx` — added markdown rendering for assistant messages
+
+**Improvements over old custom renderer:**
+- Proper nested list support (the old parser only handled single-level)
+- Links rendered as clickable (`<a>` tags with `target="_blank"`)
+- Strikethrough support via GFM
+- Task list / checkbox support via GFM
+- More robust table parsing (handles edge cases the regex-based parser missed)
+
+---
+
 ### ✅ COMPLETE — Email Send Integration Spec (2026-03-30)
 
 ## Planner Agent — 2026-03-30

@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,28 +9,43 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  Phone, Mail, Calendar, FileText, Search, 
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Phone, Mail, Calendar, FileText, Search,
   ArrowUpRight, ArrowDownRight, Clock, User, Building, Home, Handshake, Loader2,
-  Activity, MessageSquare, CheckCircle2, Plus, X, TrendingUp, BarChart3, Zap
+  Activity, CheckCircle2, Plus, X, TrendingUp, BarChart3, Zap,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from "lucide-react";
-import { format, subDays, isAfter, startOfDay } from "date-fns";
+import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type Activity = {
+type ActivityItem = {
   id: string;
-  type: 'call' | 'email' | 'meeting' | 'note' | 'task' | 'task_created' | 'stage_change' | 'deal_created' | 'lead_activity';
-  lead?: { id: string; name: string; status?: string };
-  direction: 'inbound' | 'outbound' | 'internal';
+  type: string;
+  direction: string;
   subject: string;
   description?: string;
   date: string;
   user: string;
+  userId?: string;
+  entityType?: string;
+  lead?: { id: string; name: string };
   contact?: { id: string; name: string };
   company?: { id: string; name: string };
   property?: { id: string; name: string };
   deal?: { id: string; name: string };
+};
+
+type ActorOption = { id: string; name: string };
+
+type ActivitiesResponse = {
+  items: ActivityItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  actors: ActorOption[];
 };
 
 function KpiSkeleton() {
@@ -49,13 +64,42 @@ function KpiSkeleton() {
   );
 }
 
+function RelativeTimestamp({ date }: { date: string }) {
+  const d = new Date(date);
+  const absolute = format(d, 'MMM d, yyyy h:mm a');
+
+  let relative: string;
+  if (isToday(d)) {
+    relative = formatDistanceToNow(d, { addSuffix: true });
+  } else if (isYesterday(d)) {
+    relative = `Yesterday at ${format(d, 'h:mm a')}`;
+  } else {
+    relative = format(d, 'MMM d, yyyy');
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-gray-500 cursor-default">{relative}</span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <p className="text-xs">{absolute}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 
 export default function ActivityLog() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [directionFilter, setDirectionFilter] = useState<string>('all');
+  const [entityFilter, setEntityFilter] = useState<string>('all');
+  const [actorFilter, setActorFilter] = useState<string>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<string>('all');
-  const [entityFilter, setEntityFilter] = useState<string>('all'); // all | deal | lead | contact | company
+  const [page, setPage] = useState(1);
   const [showLogForm, setShowLogForm] = useState(false);
   const [newActivity, setNewActivity] = useState({
     subject: '',
@@ -66,13 +110,38 @@ export default function ActivityLog() {
 
   const { toast } = useToast();
 
-  const { data: activities, isLoading } = useQuery({
-    queryKey: ['/api/activities'],
+  // Debounce search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const queryParams = new URLSearchParams();
+  queryParams.set('page', String(page));
+  queryParams.set('pageSize', '25');
+  if (typeFilter !== 'all') queryParams.set('type', typeFilter);
+  if (entityFilter !== 'all') queryParams.set('entityType', entityFilter);
+  if (actorFilter !== 'all') queryParams.set('actorId', actorFilter);
+  if (dateRangeFilter !== 'all') queryParams.set('dateRange', dateRangeFilter);
+  if (debouncedSearch) queryParams.set('q', debouncedSearch);
+
+  const { data, isLoading } = useQuery<ActivitiesResponse>({
+    queryKey: ['/api/activities', page, typeFilter, entityFilter, actorFilter, dateRangeFilter, debouncedSearch],
+    queryFn: () => fetch(`/api/activities?${queryParams.toString()}`, { credentials: 'include' }).then(r => r.json()),
   });
 
+  const items = data?.items || [];
+  const totalPages = data?.totalPages || 1;
+  const total = data?.total || 0;
+  const actors = data?.actors || [];
+
   const createActivityMutation = useMutation({
-    mutationFn: async (data: typeof newActivity) => {
-      return apiRequest('POST', '/api/activities', data);
+    mutationFn: async (actData: typeof newActivity) => {
+      return apiRequest('POST', '/api/activities', actData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
@@ -85,73 +154,24 @@ export default function ActivityLog() {
     },
   });
 
-  const displayActivities = (activities as Activity[]) || [];
-
-  const filteredActivities = displayActivities.filter(activity => {
-    const matchesSearch = !searchQuery || 
-                         activity.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.contact?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.company?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === 'all' || activity.type === typeFilter;
-    const matchesDirection = directionFilter === 'all' || activity.direction === directionFilter;
-
-    let matchesDate = true;
-    if (dateRangeFilter !== 'all') {
-      const activityDate = new Date(activity.date);
-      const now = new Date();
-      if (dateRangeFilter === 'today') {
-        matchesDate = isAfter(activityDate, startOfDay(now));
-      } else if (dateRangeFilter === 'week') {
-        matchesDate = isAfter(activityDate, subDays(now, 7));
-      } else if (dateRangeFilter === 'month') {
-        matchesDate = isAfter(activityDate, subDays(now, 30));
-      }
-    }
-
-    // Entity filter: all | deal | lead | contact | company
-    let matchesEntity = true;
-    if (entityFilter === 'deal') matchesEntity = !!activity.deal;
-    else if (entityFilter === 'lead') matchesEntity = !!(activity as any).lead;
-    else if (entityFilter === 'contact') matchesEntity = !!activity.contact && !activity.deal;
-    else if (entityFilter === 'company') matchesEntity = !!activity.company && !activity.deal;
-
-    return matchesSearch && matchesType && matchesDirection && matchesDate && matchesEntity;
-  });
-
   const kpiStats = useMemo(() => {
-    const total = displayActivities.length;
-    const calls = displayActivities.filter(a => a.type === 'call').length;
-    const emails = displayActivities.filter(a => a.type === 'email').length;
-    const meetings = displayActivities.filter(a => a.type === 'meeting').length;
-    const notes = displayActivities.filter(a => a.type === 'note' || a.type === 'task_created').length;
+    const calls = items.filter(a => a.type === 'call').length;
+    const emails = items.filter(a => a.type === 'email').length;
+    const meetings = items.filter(a => a.type === 'meeting').length;
+    const notes = items.filter(a => a.type === 'note' || a.type === 'task_created').length;
     return { total, calls, emails, meetings, notes };
-  }, [displayActivities]);
+  }, [items, total]);
 
   const trendStats = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = subDays(now, 7);
-    const thisWeekCount = displayActivities.filter(a => isAfter(new Date(a.date), sevenDaysAgo)).length;
-
-    const total = displayActivities.length;
-    const inboundCount = displayActivities.filter(a => a.direction === 'inbound').length;
-    const responseRate = total > 0 ? Math.round((inboundCount / total) * 100) : 0;
-
     const typeCounts: Record<string, number> = {};
-    displayActivities.forEach(a => {
-      typeCounts[a.type] = (typeCounts[a.type] || 0) + 1;
-    });
+    items.forEach(a => { typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; });
     let mostActiveType = 'None';
     let maxCount = 0;
-    Object.entries(typeCounts).forEach(([type, count]) => {
-      if (count > maxCount) {
-        maxCount = count;
-        mostActiveType = type;
-      }
+    Object.entries(typeCounts).forEach(([t, count]) => {
+      if (count > maxCount) { maxCount = count; mostActiveType = t; }
     });
-
-    return { thisWeekCount, responseRate, mostActiveType };
-  }, [displayActivities]);
+    return { mostActiveType };
+  }, [items]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -192,6 +212,8 @@ export default function ActivityLog() {
       case 'task_created': return 'Task';
       case 'stage_change': return 'Stage Change';
       case 'deal_created': return 'Deal Created';
+      case 'site_visit': return 'Site Visit';
+      case 'follow_up': return 'Follow Up';
       default: return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
@@ -203,6 +225,18 @@ export default function ActivityLog() {
     }
     createActivityMutation.mutate(newActivity);
   };
+
+  const resetFilters = () => {
+    setTypeFilter('all');
+    setEntityFilter('all');
+    setActorFilter('all');
+    setDateRangeFilter('all');
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = typeFilter !== 'all' || entityFilter !== 'all' || actorFilter !== 'all' || dateRangeFilter !== 'all' || debouncedSearch;
 
   return (
     <div className="flex-1 overflow-auto p-6 bg-gray-50">
@@ -223,7 +257,7 @@ export default function ActivityLog() {
           </Button>
         </div>
 
-        {isLoading ? (
+        {isLoading && !data ? (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[...Array(5)].map((_, i) => <KpiSkeleton key={i} />)}
@@ -235,6 +269,7 @@ export default function ActivityLog() {
           </div>
         ) : (
           <>
+            {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <Card>
                 <CardContent className="p-4">
@@ -303,6 +338,7 @@ export default function ActivityLog() {
               </Card>
             </div>
 
+            {/* Trend Row */}
             <div className="grid grid-cols-3 gap-4 mb-6">
               <Card>
                 <CardContent className="p-4">
@@ -311,8 +347,8 @@ export default function ActivityLog() {
                       <TrendingUp className="w-4 h-4 text-indigo-600" />
                     </div>
                     <div>
-                      <div className="text-lg font-semibold text-gray-900">{trendStats.thisWeekCount}</div>
-                      <div className="text-xs text-gray-500">This Week</div>
+                      <div className="text-lg font-semibold text-gray-900">{total}</div>
+                      <div className="text-xs text-gray-500">{hasActiveFilters ? 'Matching' : 'All Time'}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -324,8 +360,8 @@ export default function ActivityLog() {
                       <BarChart3 className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div>
-                      <div className="text-lg font-semibold text-gray-900">{trendStats.responseRate}%</div>
-                      <div className="text-xs text-gray-500">Response Rate</div>
+                      <div className="text-lg font-semibold text-gray-900">{totalPages}</div>
+                      <div className="text-xs text-gray-500">Pages</div>
                     </div>
                   </div>
                 </CardContent>
@@ -345,20 +381,34 @@ export default function ActivityLog() {
               </Card>
             </div>
 
+            {/* Filters */}
             <Card className="bg-white mb-6">
               <CardContent className="p-4">
-                <div className="flex items-center space-x-4">
-                  <div className="relative flex-1">
+                <div className="flex items-center flex-wrap gap-3">
+                  <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
                       placeholder="Search activities..."
                       className="pl-10"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => handleSearchChange(e.target.value)}
                       data-testid="input-search-activities"
                     />
                   </div>
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <Select value={entityFilter} onValueChange={(v) => { setEntityFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-36" data-testid="select-entity-filter">
+                      <SelectValue placeholder="Entity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Entities</SelectItem>
+                      <SelectItem value="deal">Deals</SelectItem>
+                      <SelectItem value="contact">Contacts</SelectItem>
+                      <SelectItem value="company">Companies</SelectItem>
+                      <SelectItem value="lead">Leads</SelectItem>
+                      <SelectItem value="property">Properties</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
                     <SelectTrigger className="w-36" data-testid="select-type-filter">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
@@ -368,23 +418,23 @@ export default function ActivityLog() {
                       <SelectItem value="email">Emails</SelectItem>
                       <SelectItem value="meeting">Meetings</SelectItem>
                       <SelectItem value="note">Notes</SelectItem>
-                      <SelectItem value="task_created">Tasks</SelectItem>
-                      <SelectItem value="stage_change">Stage Changes</SelectItem>
-                      <SelectItem value="deal_created">Deals Created</SelectItem>
+                      <SelectItem value="task">Tasks</SelectItem>
+                      <SelectItem value="site_visit">Site Visits</SelectItem>
+                      <SelectItem value="follow_up">Follow Ups</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={directionFilter} onValueChange={setDirectionFilter}>
-                    <SelectTrigger className="w-36" data-testid="select-direction-filter">
-                      <SelectValue placeholder="Direction" />
+                  <Select value={actorFilter} onValueChange={(v) => { setActorFilter(v); setPage(1); }}>
+                    <SelectTrigger className="w-40" data-testid="select-actor-filter">
+                      <SelectValue placeholder="Actor" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="outbound">Outbound</SelectItem>
-                      <SelectItem value="inbound">Inbound</SelectItem>
-                      <SelectItem value="internal">Internal</SelectItem>
+                      <SelectItem value="all">All Team Members</SelectItem>
+                      {actors.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  <Select value={dateRangeFilter} onValueChange={setDateRangeFilter}>
+                  <Select value={dateRangeFilter} onValueChange={(v) => { setDateRangeFilter(v); setPage(1); }}>
                     <SelectTrigger className="w-36" data-testid="select-date-filter">
                       <SelectValue placeholder="Date Range" />
                     </SelectTrigger>
@@ -395,10 +445,16 @@ export default function ActivityLog() {
                       <SelectItem value="month">This Month</SelectItem>
                     </SelectContent>
                   </Select>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={resetFilters} className="text-gray-500 hover:text-gray-700">
+                      <X className="w-3 h-3 mr-1" /> Clear
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Log Form */}
             <div className="space-y-3">
               {showLogForm && (
                 <Card className="bg-white border-2 border-indigo-200 shadow-md">
@@ -468,31 +524,30 @@ export default function ActivityLog() {
                 </Card>
               )}
 
-              {filteredActivities.map((activity) => (
+              {/* Activity Cards */}
+              {items.map((activity) => (
                 <Card key={activity.id} className="bg-white hover:shadow-md transition-shadow" data-testid={`activity-card-${activity.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start space-x-4">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getTypeColor(activity.type)}`}>
                         {getTypeIcon(activity.type)}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
                           <h3 className="font-medium text-gray-900 truncate">{activity.subject}</h3>
                           {getDirectionIcon(activity.direction)}
                         </div>
-                        
+
                         {activity.description && (
                           <p className="text-sm text-gray-600 mb-2 line-clamp-2">{activity.description}</p>
                         )}
-                        
+
                         <div className="flex items-center flex-wrap gap-2 text-xs">
-                          <span className="text-gray-500">
-                            {format(new Date(activity.date), 'MM/dd/yyyy h:mm a')}
-                          </span>
+                          <RelativeTimestamp date={activity.date} />
                           <span className="text-gray-300">&bull;</span>
-                          <span className="text-gray-500">{activity.user}</span>
-                          
+                          <span className="text-gray-600 font-medium">{activity.user}</span>
+
                           {activity.contact && (
                             <>
                               <span className="text-gray-300">&bull;</span>
@@ -504,7 +559,7 @@ export default function ActivityLog() {
                               </Link>
                             </>
                           )}
-                          
+
                           {activity.company && (
                             <Link href={`/crm/companies/${activity.company.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                               <Badge variant="outline" className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
@@ -513,7 +568,7 @@ export default function ActivityLog() {
                               </Badge>
                             </Link>
                           )}
-                          
+
                           {activity.property && (
                             <Link href={`/crm/properties/${activity.property.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                               <Badge variant="outline" className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
@@ -522,12 +577,12 @@ export default function ActivityLog() {
                               </Badge>
                             </Link>
                           )}
-                          
-                          {(activity as any).lead && (
-                            <Link href={`/crm/leads/${(activity as any).lead.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+
+                          {activity.lead && (
+                            <Link href={`/crm/leads/${activity.lead.id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                               <Badge variant="outline" className="text-[10px] h-5 px-1.5 hover:bg-purple-50 cursor-pointer gap-1">
                                 <TrendingUp className="h-2.5 w-2.5 text-purple-600" />
-                                Lead: {(activity as any).lead.name}
+                                Lead: {activity.lead.name}
                               </Badge>
                             </Link>
                           )}
@@ -539,9 +594,15 @@ export default function ActivityLog() {
                               </Badge>
                             </Link>
                           )}
+
+                          {activity.entityType && (
+                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-gray-100 text-gray-500">
+                              {activity.entityType}
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                      
+
                       <Badge className={`flex-shrink-0 ${getTypeColor(activity.type)}`}>
                         {getTypeLabel(activity.type)}
                       </Badge>
@@ -551,7 +612,8 @@ export default function ActivityLog() {
               ))}
             </div>
 
-            {filteredActivities.length === 0 && (
+            {/* Empty state */}
+            {items.length === 0 && !isLoading && (
               <Card className="mt-6">
                 <CardContent className="py-12">
                   <div className="text-center">
@@ -560,13 +622,90 @@ export default function ActivityLog() {
                     </div>
                     <h3 className="text-lg font-medium text-gray-900">No activities found</h3>
                     <p className="text-gray-500 mt-1">
-                      {searchQuery || typeFilter !== 'all' || directionFilter !== 'all' || dateRangeFilter !== 'all'
+                      {hasActiveFilters
                         ? 'Try adjusting your search or filters'
                         : 'Activities from deals, contacts, and pipeline changes will appear here'}
                     </p>
+                    {hasActiveFilters && (
+                      <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
+                        Clear all filters
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <p className="text-sm text-gray-500">
+                  Showing {((page - 1) * 25) + 1}–{Math.min(page * 25, total)} of {total} activities
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page <= 1}
+                    onClick={() => setPage(1)}
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="flex items-center gap-1 mx-2">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (page <= 3) {
+                        pageNum = i + 1;
+                      } else if (page >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = page - 2 + i;
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === page ? "default" : "outline"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(totalPages)}
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </>
         )}

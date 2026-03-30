@@ -13622,7 +13622,7 @@ Current context: Project ${req.params.projectId}`;
       const rows = await db
         .select({
           activity: crmActivities,
-          actorName: users.displayName,
+          actorName: users.name,
           actorEmail: users.email,
         })
         .from(crmActivities)
@@ -13751,7 +13751,7 @@ Current context: Project ${req.params.projectId}`;
 
       // Fetch distinct actors for the filter dropdown
       const actors = await db
-        .selectDistinct({ id: users.id, name: users.displayName, email: users.email })
+        .selectDistinct({ id: users.id, name: users.name, email: users.email })
         .from(crmActivities)
         .innerJoin(users, eq(crmActivities.userId, users.id))
         .where(eq(crmActivities.orgId, orgId));
