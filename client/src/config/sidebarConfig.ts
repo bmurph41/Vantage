@@ -438,9 +438,9 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       {
         id: 'marina-map',
-        label: 'Marina Map',
+        label: 'Property Intelligence Map',
         href: '/marinalytics/marina-map',
-        icon: Anchor,
+        icon: MapPin,
         matchRoutes: ['/marinalytics/marina-map'],
         requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
       },
