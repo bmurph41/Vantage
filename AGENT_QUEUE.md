@@ -53,6 +53,10 @@
 - [migration] [todo] Create billing tables — subscriptions, invoices, usage_events, plan_entitlements
 - [feature] [todo] Build Billing Engine — Stripe webhook handler, plan upgrade/downgrade, entitlement sync
 
+## ⚙️ TIER 8 — PLATFORM INFRASTRUCTURE
+
+- [feature] [todo] Make Asset Classes fully dynamic — DB-driven everywhere — replace all hardcoded ASSET_CLASS_OPTIONS/ASSET_CLASS_CONFIGS arrays in the frontend with a useAssetClasses() hook backed by GET /api/asset-classes; extend platformAssetClasses schema with sizeLabel, occLabel, priceUnit, revenueStreams, demandKey, group, color fields; seed all 36 asset class types from the canonical registry (Marina, Dry Stack, Yacht Club, Waterfront Resort, Boat Rental, Hotel, Boutique Hotel, Motel, Extended Stay, RV Park, Glamping, Multifamily, Garden Apts, Senior Housing, Student Housing, MHP, Condo, SFR, Industrial, Warehouse, Cold Storage, Self Storage, Data Center, Truck Terminal, Office, Medical Office, Co-working, Creative Office, Retail Strip, Anchored Shopping Ctr, NNN Single Tenant, Car Wash, Laundromat, Business Acquisition, Mixed Use, Land); add Create New Asset Class form to Admin UI; lock admin routes with requireRole("owner") server-side; ensure unknown asset class keys fall back to default strategy instead of erroring — full spec in AGENT_QUEUE_ASSET_CLASS_SPEC.md
+
 ## 🔍 AUDIT TASKS
 
 - [audit] [todo] Full connectivity audit — verify every feature in Connectivity Matrix is wired end-to-end
