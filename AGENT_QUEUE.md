@@ -143,6 +143,80 @@
 
 - [feature] [todo] Build lease completeness enforcer — add a `completenessScore` column to `rra_leases` (0–100 int); computed on every save: +20 for having a rate, +20 for having a start date, +20 for having an end date or contractTerm, +20 for having a unit type, +20 for having a valid status; display completeness score as a colored pill in LeasesTable.tsx; add a filter "Show incomplete leases only" to the leases table toolbar
 
+## 🏢 TIER 11 — CRM (Institutional-Grade Completion)
+
+> **Diagnosis Summary — Current State: ~70% institutional-grade**
+>
+> **What works:** Extraordinary breadth — 192+ CRM API routes, 24 dedicated route files (crm-activities, crm-advanced-search, crm-associations, crm-extended, crm-intelligence, crm-notes, crm-pipeline-enhancements, crm-preview, crm-relationship-intelligence, crm-relationship-score, crm-saved-views, crm-summary, crm-timeline, deal-analytics, deal-dd, deal-health, deal-scoring, deal-sourcing, deal-workspace, lead-scoring, pipeline-analytics, pipeline-automation, pipeline-template, ai-deal-intelligence, red-flag). Core entities: Deals, Contacts, Companies, Properties — full CRUD + search + duplicate detection + merge. Multi-view pipeline (Kanban, List, Map, Gantt, Automations, Templates, Forecast). Google Calendar sync for activities and tasks. Email sequences backend with steps and enrollments. CSV import with preview, rollback. Red flags (fully wired). Deal scoring config. Lead scoring engine. 13 _wip components (5,457 lines) imported into production pages — most have backend routes already registered but are gated behind `_wip/`.
+>
+> **Critical gaps:** Email send integration still `mailto:` only (no in-app SendGrid send — Tier 1 already queued); 13 `_wip/` panels need graduation to production; no in-app email inbox for replies; property record missing rent roll KPI panel and demographics auto-load; prospecting → deal conversion path unclear; no IC (Investment Committee) memo auto-generation from deal; no LOI/offer/term sheet date tracking; no commission tracking for broker relationships; DealComparison page built but not linked from pipeline; CRM global smart-search component exists in `_wip` but not graduated; lead score not feeding into deal score.
+>
+> **Key files:** `server/routes/` (24 route files above), `client/src/pages/deal-detail.tsx`, `client/src/pages/pipeline.tsx`, `client/src/components/crm/` (50+ components), `client/src/components/crm/_wip/` (13 components, 5,457 lines).
+
+### 11A — Graduate _wip Panels to Production
+
+- [feature] [todo] Graduate `CrmListsManager.tsx` from _wip — backend routes `/api/crm/lists` are fully built (GET, POST, PATCH, DELETE, add/remove members); move `_wip/CrmListsManager.tsx` to `client/src/components/crm/CrmListsManager.tsx`; verify all API calls match the existing routes; wire the "Lists" tab in contacts, properties, and companies pages so users can add any entity to a named smart list; add list membership count badge to each record page header
+
+- [feature] [todo] Graduate `pipeline-forecasting-panel.tsx` from _wip — the `pipeline-analytics-routes.ts` route file exists; verify the panel's API calls (`/api/pipeline/forecast` or similar) match actual routes; if routes are missing, implement them in `pipeline-analytics-routes.ts`: compute probability-weighted pipeline value by summing (deal value × close probability) grouped by month for next 12 months; move the component to production and render it in the Pipeline page "Forecast" tab instead of being gated
+
+- [feature] [todo] Graduate `sla-tracking-panel.tsx` from _wip — check `crm-pipeline-enhancements-routes.ts` for SLA routes; if missing, add GET `/api/crm/sla/summary` (count of deals exceeding SLA per stage), GET `/api/crm/deals/:id/sla-status` (days in stage vs. stage SLA threshold), PATCH `/api/crm/pipeline-stages/:id/sla-days` (set stage SLA); move component to production; wire into the Deal Detail page as a visible panel (not hidden)
+
+- [feature] [todo] Graduate `phase-gates-panel.tsx` from _wip — verify phase gate routes in `crm-pipeline-enhancements-routes.ts`; phase gates are completion criteria per deal stage; ensure GET `/api/crm/deals/:id/phase-gates` and PATCH `/api/crm/deals/:dealId/phase-gates/:gateId` exist; graduation: move to `client/src/components/crm/phase-gates-panel.tsx`; render visibly in deal workspace "Due Diligence" or "Checklist" section
+
+- [feature] [todo] Graduate `deal-playbook-panel.tsx` from _wip — verify playbook routes in `deal-sourcing-routes.ts` or `crm-extended-routes.ts`; move to production; surface as a "Playbook" tab in the deal workspace; the panel provides stage-specific action checklists that guide the deal team through each pipeline stage
+
+- [feature] [todo] Graduate `smart-search.tsx` from _wip — the `crm-advanced-search-routes.ts` route file exists; verify the component's query shape matches the advanced search route; move to `client/src/components/crm/SmartSearch.tsx`; add to the CRM top bar as a global search button (⌘K shortcut) that searches across all entity types simultaneously (deals, contacts, companies, properties) and shows categorized results; add to `CrmTopBar.tsx`
+
+- [feature] [todo] Graduate `StageTemplateEditor.tsx` from _wip — verify `pipeline-template-routes.ts` routes; move to production; surface in Pipeline settings (gear icon → "Stage Templates") so admins can define re-usable pipeline templates with pre-set stages, SLA thresholds, phase gates, and playbook steps; wire "Apply Template" button when creating a new pipeline
+
+### 11B — In-App Email Inbox & Threading
+
+- [feature] [todo] Build in-app email inbox for CRM — email send integration is in Tier 1 (queued); once send works via SendGrid, implement inbound email parsing using SendGrid Inbound Parse webhook at POST `/api/email/inbound`; parse sender email, match to CRM contact by `fromEmail`, create an `crm_email_thread` record linking contact, company, and deal; store thread messages in `crm_email_messages` table (`threadId`, `direction: 'inbound'|'outbound'`, `subject`, `body`, `sentAt`, `openedAt`, `clickedAt`); expose GET `/api/crm/contacts/:id/email-threads` and GET `/api/crm/deals/:id/email-threads`
+
+- [feature] [todo] Build email thread viewer UI — add an "Inbox" tab to both the contact record page and the deal detail page; render a Gmail-style thread list: subject, preview, date, direction badge (Sent/Received); clicking a thread expands the full conversation; add "Reply" button that pre-fills the email composer with the thread subject and recipient; show open/click status badges (Opened, Clicked, Not Opened) using data from `EmailTrackingStats.tsx` which already exists and calls tracking routes
+
+### 11C — Property Record Cross-Module Enrichment
+
+- [feature] [todo] Add Rent Roll KPI panel to property record — when a CRM property has a linked rent roll project (`rra_projects` table, `propertyId` FK), surface a "Rent Roll" tab in `PropertyRecordTabs.tsx`; fetch rent roll KPIs: current occupancy %, effective gross income (EGI), avg rent per unit, WALT (for commercial), last snapshot date; use GET `/api/rra/projects?propertyId=` to find the project, then GET `/api/rra/projects/:id/kpis`; show a "Open Rent Roll" button linking to the full RRA dashboard for that project; if no rent roll exists, show "Start Rent Roll Analysis" CTA
+
+- [feature] [todo] Add Demographics auto-load to property record — as specified in Tier 10E (11E cross-reference); in `PropertyRecordTabs.tsx`, add a "Market" tab that auto-fetches demographics for the property's latitude/longitude using POST `/api/demographics/location` with 5-mile radius on tab activation; display: population, median HHI, market potential index score, site suitability score vs. org's default target demographics profile, OZ eligibility badge, flood zone risk badge; cache result with 7-day TTL linked to the property; add "Full Analysis" link to `/analysis/demographics` pre-populated with the property address
+
+### 11D — Prospecting → Deal Conversion
+
+- [feature] [todo] Build prospecting → deal pipeline conversion flow — in `ProspectingPage.tsx`, add a "Convert to Deal" button on each prospecting entry card; clicking opens a drawer that pre-fills: deal name (marina name), property (match or create new CRM property), stage (default first pipeline stage), asking price (from prospecting entry), and contact (if a contact was logged against the entry); on submit, creates a CRM deal + links the source prospecting entry via `sourceProspectingEntryId` FK; adds an activity log entry "Converted from prospecting" to the deal timeline; navigates to the new deal detail page; add GET `/api/crm/deals?sourceProspectingEntryId=` to check if already converted (prevents duplicates)
+
+- [feature] [todo] Add prospecting entry preview on deal record — if a deal has a `sourceProspectingEntryId`, show a "Prospecting Origin" card in the deal detail sidebar with: source (cold call, email, referral, etc.), first contact date, number of touchpoints, original notes from the prospecting entry; this gives the deal team full context on how the deal was sourced
+
+### 11E — LOI / Offer / Term Sheet Tracking
+
+- [feature] [todo] Add LOI and offer milestone tracking to deal schema — add fields to `crmDeals`: `loiSubmittedAt` (timestamp), `loiAcceptedAt`, `loiRejectedAt`, `loiExpiresAt`, `offerPrice` (numeric), `offerSubmittedAt`, `termSheetSignedAt`, `psaExecutedAt`, `closingScheduledAt`; add a "Transaction Timeline" card to the deal detail panel that shows these milestones as a visual timeline (each milestone as a node: date, status — completed/pending/overdue); calculate days between milestones (e.g., LOI to PSA days) and show average benchmarks based on historical closed deals; render in `deal-detail-panel.tsx` as a collapsible section
+
+- [feature] [todo] Add LOI/offer quick-entry form to deal workspace — in the deal workspace sidebar, add a "Transaction Milestones" card with inline date-pickers for each milestone; auto-update the deal stage when milestones are set (e.g., setting `loiAcceptedAt` moves deal to "Under LOI" stage if a stage with that name exists); PATCH `/api/crm/deals/:id` already exists — reuse it for milestone field updates; add a "Days to Close" countdown badge if `closingScheduledAt` is set
+
+### 11F — Commission & Broker Relationship Tracking
+
+- [feature] [todo] Add commission tracking to deals — add a `deal_commissions` table: `dealId`, `contactId` (broker), `side` ('buy'|'sell'|'both'), `commissionPct` (numeric), `commissionAmount` (numeric, computed from deal value), `status` ('pending'|'earned'|'paid'|'disputed'), `paidAt`, `notes`; add a "Commission" section to the deal detail panel listing all commission obligations with broker name, side, % and $, status; CRUD routes: GET `/api/crm/deals/:id/commissions`, POST, PATCH, DELETE; this is critical for tracking broker compensation obligations on closed deals and for relationship management
+
+- [feature] [todo] Surface commission history on contact record — in `ContactRecordTabs.tsx`, add a "Commission History" tab for contacts with role Broker or Agent; show all deals where this contact has a commission record, total earned ($), total paid ($), average commission % per deal; this allows tracking broker relationships based on actual financial transactions not just activity logs
+
+### 11G — IC Memo Auto-Generation
+
+- [feature] [todo] Build Investment Committee memo auto-generation from deal — add an "Generate IC Memo" button in the deal workspace; clicking POST `/api/crm/deals/:id/generate-ic-memo` which: fetches the deal's financial data (from linked modeling project if present), property details (from linked CRM property), demographics (from saved demographics for the property), deal team notes, red flags, phase gate completion status; passes to the AI content service to fill a pre-built IC memo Document Builder template; returns a Document Studio doc ID; navigates to Document Studio to review/finalize the generated memo; the IC memo template should include sections: Executive Summary, Property Overview, Market Demographics, Financial Summary, Risk Factors, Deal Team Recommendation
+
+### 11H — DealComparison Workspace Activation
+
+- [feature] [todo] Activate Deal Comparison workspace — `DealComparison.tsx` (535 lines) and `deal-comparison-page.tsx` are fully built; add a "Compare Deals" button to the Pipeline page header and to the multi-select bulk operations bar; the button opens the comparison page (`/deal-comparison`) pre-populating selected deal IDs; verify the comparison component fetches the right data (deal financials, property data, demographics, modeling KPIs) and renders side-by-side; add a "Save Comparison" feature that snapshots the comparison to a `deal_comparison_snapshots` table for sharing with LPs
+
+### 11I — Lead Score → Deal Score Unification
+
+- [feature] [todo] Unify lead scoring and deal scoring into a single CRM score — currently `lead-scoring.tsx` (automation module, rules-based) and `deal-scoring.tsx` (config UI for IC weights) are parallel; add a `crmScore` computed field on each deal: weighted sum of (lead score at acquisition × 0.3) + (deal-stage-specific score × 0.7); the deal score evolves as the deal progresses (more weight on financial factors post-LOI vs. demographic factors pre-LOI); display a single "Deal Health Score" (0–100) badge on the deal kanban card and deal detail header; add trend indicator (↑↓→) showing whether score improved or declined since last week; POST `/api/crm/deals/:id/score/recalculate` to trigger recomputation
+
+### 11J — Pipeline Analytics & Velocity Completion
+
+- [feature] [todo] Complete pipeline velocity metrics — `client/src/pages/crm/PipelineVelocity.tsx` and `client/src/pages/crm/PipelineInsights.tsx` exist; verify they are calling real backend routes in `pipeline-analytics-routes.ts`; if routes are stubs, implement: `getAverageTimeInStage(orgId, pipelineId, stageId, last90days)` → avg days per stage across all deals; `getPipelineVelocity(orgId)` → (avg deal value × win rate × deals per month) / avg sales cycle days; `getConversionRateByStage(orgId)` → % of deals that advance from each stage vs. drop out; surface these in PipelineVelocity.tsx with benchmark comparison to prior quarter
+
+- [feature] [todo] Build deal sourcing analytics dashboard — `deal-sourcing-routes.ts` exists; implement GET `/api/crm/analytics/sourcing` returning deals grouped by source (cold outreach, broker referral, prospecting, inbound, repeat seller, network) with count, avg deal value, avg time to close, win rate per source; add a "Deal Sourcing" tab to `DealAnalyticsPage.tsx` showing source mix donut chart, source performance table, and YoY sourcing trend by channel
+
 ## 🌍 TIER 10 — DEMOGRAPHICS (Institutional-Grade Completion)
 
 > **Diagnosis Summary — Current State: ~55% institutional-grade**
