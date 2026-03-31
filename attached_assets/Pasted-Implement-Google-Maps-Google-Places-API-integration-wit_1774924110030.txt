@@ -1,0 +1,122 @@
+Implement Google Maps & Google Places API integration with encrypted key storage
+
+Add the following features to this app. The Google API key should be stored encrypted in the database (not hardcoded or in .env), and a single key handles both Places (autocomplete + details) and Geocoding.
+
+1. Server-side: API key encryption/decryption
+
+Store the Google API key encrypted using AES-256-GCM. When saving the key to the database, encrypt it with the pattern enc:iv:ciphertext. When reading it back to use in API calls, decrypt it first. Never send the raw encrypted value to Google — always decrypt before use.
+
+Use this decrypt helper wherever the key is read from the database:
+
+function decryptSetting(value) {
+  if (!value || !value.startsWith('enc:')) return value
+  try {
+    const parts = value.split(':')
+    const iv = parts[1]
+    const encrypted = parts.slice(2).join(':')
+    // Use your AES-256-GCM decrypt function here with the app's CREDENTIAL_ENCRYPTION_KEY
+    return decryptCredentials(encrypted, iv)
+  } catch {
+    return value // fall back to raw if decryption fails
+  }
+}
+2. Server route: /api/google-places/autocomplete
+
+Accepts ?input=<text>&types=establishment (GET). Proxies to:
+
+https://maps.googleapis.com/maps/api/place/autocomplete/json?input=INPUT&types=TYPES&key=DECRYPTED_KEY
+Returns { predictions: [{ place_id, description, structured: { main_text, secondary_text } }] }.
+
+3. Server route: /api/google-places/details/:placeId
+
+Fetches full place details for a place_id. Fields to request: name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,price_level,geometry,photos,opening_hours,types,place_id,url
+
+Returns a normalized object:
+
+{
+  name, address, phone, website,
+  rating, reviews_count,
+  price_level,           // "$", "$$", "$$$", "$$$$"
+  latitude, longitude,
+  google_place_id,
+  hours,                 // opening_hours.weekday_text joined with "; "
+  photo_urls,            // up to 3, built with the Places photo API
+}
+4. Server route: /api/google-places/geocode (POST, body: { address })
+
+Proxies to Google Geocoding API. Returns { latitude, longitude, formatted_address, place_id }.
+
+5. Frontend: GooglePlaceSearch React component
+
+A search-as-you-type input that:
+
+Debounces 300ms before calling the autocomplete route
+Shows a dropdown of predictions with main text (bold) and secondary text (muted)
+On selection, fetches details and calls onSelect(placeDetails)
+Requires no Google SDK — all calls go through your own backend
+function GooglePlaceSearch({ onSelect, searchType = 'establishment', placeholder = 'Search Google for a place...' }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [showResults, setShowResults] = useState(false)
+  const debounceRef = useRef(null)
+  const search = (input) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (input.length < 2) { setResults([]); return }
+    debounceRef.current = setTimeout(async () => {
+      const res = await fetch(`/api/google-places/autocomplete?input=${encodeURIComponent(input)}&types=${searchType}`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      const data = await res.json()
+      setResults(data.predictions || [])
+      setShowResults(true)
+    }, 300)
+  }
+  const selectPlace = async (prediction) => {
+    setShowResults(false)
+    setQuery(prediction.description)
+    const res = await fetch(`/api/google-places/details/${prediction.place_id}`, {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    })
+    const data = await res.json()
+    onSelect(data)
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <input value={query} placeholder={placeholder}
+        onChange={e => { setQuery(e.target.value); search(e.target.value) }} />
+      {showResults && results.length > 0 && (
+        <div style={{ position: 'absolute', zIndex: 50, background: 'white', border: '1px solid #ddd', borderRadius: 8, width: '100%' }}>
+          {results.map((r, i) => (
+            <button key={i} type="button" onClick={() => selectPlace(r)}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px' }}>
+              <div style={{ fontWeight: 600 }}>{r.structured?.main_text || r.description}</div>
+              <div style={{ fontSize: 12, color: '#888' }}>{r.structured?.secondary_text}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+6. Usage example (auto-populate a restaurant form)
+
+<GooglePlaceSearch
+  searchType="establishment"
+  placeholder="Search restaurants on Google..."
+  onSelect={(place) => setForm(f => ({
+    ...f,
+    name: place.name || f.name,
+    address: place.address || f.address,
+    phone: place.phone || f.phone,
+    website: place.website || f.website,
+    rating: place.rating ? String(place.rating) : f.rating,
+    hours: place.hours || f.hours,
+    image_url: place.photo_urls?.[0] || f.image_url,
+    price_range: place.price_level || f.price_range,
+  }))}
+/>
+7. Settings UI
+
+Add a settings field where the user pastes their Google API key. On save, encrypt it before storing. On load, decrypt it before displaying (masked). A single key covers both Places and Geocoding APIs — no need for two separate keys.
+
+Important: Always await any async function that reads settings from the database. A common bug is calling getSettings() without await, which gives you a Promise instead of actual data, causing all key lookups to silently return undefined.
