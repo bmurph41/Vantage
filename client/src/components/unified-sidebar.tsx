@@ -166,6 +166,7 @@ export default function UnifiedSidebar() {
   const [investorServicesExpanded, setInvestorServicesExpanded] = useState(false);
   const [marketIntelExpanded, setMarketIntelExpanded] = useState(false);
   const [documentStudioExpanded, setDocumentStudioExpanded] = useState(false);
+  const [adminExpanded, setAdminExpanded] = useState(false);
   const [pendingExpanded, setPendingExpanded] = useState(false);
   const [expandedSubcats, setExpandedSubcats] = useState<Set<string>>(new Set()); // all start collapsed
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -339,6 +340,7 @@ export default function UnifiedSidebar() {
     setInvestorServicesExpanded(isInvestorServicesPage);
     setMarketIntelExpanded(isMarketIntelPage);
     setDocumentStudioExpanded(isDocumentStudioPage);
+    setAdminExpanded(location.startsWith('/admin'));
   }, [location]);
 
   // Check if there are any pending items to show the Pending section
@@ -1069,16 +1071,15 @@ export default function UnifiedSidebar() {
             {sidebarCollapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/admin/customers">
-                    <div 
-                      className={cn(
-                        "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors",
-                        location.startsWith('/admin') ? "bg-sidebar-accent" : ""
-                      )}
-                    >
-                      <Shield className={cn("w-4 h-4", location.startsWith('/admin') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
-                    </div>
-                  </Link>
+                  <div
+                    className={cn(
+                      "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors",
+                      location.startsWith('/admin') ? "bg-sidebar-accent" : ""
+                    )}
+                    onClick={() => setSidebarCollapsed(false)}
+                  >
+                    <Shield className={cn("w-4 h-4", location.startsWith('/admin') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent side="right" sideOffset={10}>
                   <p>Admin</p>
@@ -1086,27 +1087,22 @@ export default function UnifiedSidebar() {
               </Tooltip>
             ) : (
               <>
-                <Link href="/admin/customers">
-                  <div
-                    className={cn(
-                      "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
-                      location.startsWith('/admin')
-                        ? "bg-blue-600 text-white hover:bg-blue-700" 
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                    data-testid="nav-admin"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-3.5 h-3.5" />
-                      <span>Admin</span>
-                    </div>
+                <SectionHeader
+                  title="Admin"
+                  icon={Shield}
+                  expanded={adminExpanded}
+                  onToggle={() => setAdminExpanded(!adminExpanded)}
+                  isActive={location.startsWith('/admin')}
+                />
+                {adminExpanded && (
+                  <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
+                    <NavLink item={{ name: "Customers", href: "/admin/customers" }} />
+                    <NavLink item={{ name: "Organizations", href: "/admin/organizations" }} />
+                    <NavLink item={{ name: "Activity Log", href: "/admin/audit-trail" }} />
+                    <NavLink item={{ name: "Data Sources", href: "/admin/data-sources" }} />
+                    <NavLink item={{ name: "Asset Classes", href: "/admin/asset-classes" }} />
                   </div>
-                </Link>
-                <NavLink item={{ name: "Customers", href: "/admin/customers" }} />
-                <NavLink item={{ name: "Organizations", href: "/admin/organizations" }} />
-                <NavLink item={{ name: "Activity Log", href: "/admin/audit-trail" }} />
-                <NavLink item={{ name: "Data Sources", href: "/admin/data-sources" }} />
-                <NavLink item={{ name: "Asset Classes", href: "/admin/asset-classes" }} />
+                )}
               </>
             )}
           </div>

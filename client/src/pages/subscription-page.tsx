@@ -3,11 +3,15 @@
 // Subscription selection and management page
 
 import React, { useState } from 'react';
-import { Check, Sparkles, Building2, TrendingUp, Anchor, Briefcase, HelpCircle, Landmark } from 'lucide-react';
+import { Check, Sparkles, Building2, TrendingUp, Anchor, Briefcase, HelpCircle, Landmark, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEntitlements } from '@/contexts/EntitlementsContext';
-import { 
-  SUBSCRIPTION_PACKAGES, 
+import { useStripeStatus } from '@/hooks/useStripeStatus';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import {
+  SUBSCRIPTION_PACKAGES,
   PERSONA_OPTIONS,
   SubscriptionPackage,
   MODULE_INFO,
@@ -41,6 +45,23 @@ export function SubscriptionPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   const { subscription, upgradeToPackage, addModule } = useEntitlements();
+  const { isStripeConfigured } = useStripeStatus();
+  const { toast } = useToast();
+
+  const checkoutMutation = useMutation({
+    mutationFn: async ({ packType, billingCycle }: { packType: string; billingCycle: string }) => {
+      const res = await apiRequest("POST", "/api/stripe/checkout", { packType, billingCycle });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   // ─────────────────────────────────────────────────────────────
   // Get recommended package based on persona
@@ -61,12 +82,17 @@ export function SubscriptionPage() {
   // Handle final subscription
   // ─────────────────────────────────────────────────────────────
   const handleSubscribe = () => {
-    if (selectedPackage) {
+    if (!selectedPackage) return;
+
+    if (isStripeConfigured) {
+      // Route through Stripe checkout for paid subscription
+      checkoutMutation.mutate({ packType: selectedPackage, billingCycle });
+    } else {
+      // Stripe not configured — activate locally (beta/trial mode)
       upgradeToPackage(selectedPackage);
       addOnModules.forEach(m => addModule(m));
+      toast({ title: "Plan activated", description: "Your subscription has been activated. Free trial active during beta." });
     }
-    // TODO: Integrate with Stripe checkout
-    alert('Subscription updated! (In production, this would go to Stripe checkout)');
   };
 
   // ─────────────────────────────────────────────────────────────

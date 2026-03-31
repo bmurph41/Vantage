@@ -1,8 +1,19 @@
-// Stripe integration is coming soon - always return not configured
+import { useQuery } from "@tanstack/react-query";
+
+interface StripeStatus {
+  configured: boolean;
+  message: string;
+}
+
 export function useStripeStatus() {
+  const { data, isLoading } = useQuery<StripeStatus>({
+    queryKey: ["/api/stripe/status"],
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  });
+
   return {
-    isStripeConfigured: false,
-    message: "Payment processing coming soon - free trials available during beta",
-    isLoading: false,
+    isStripeConfigured: data?.configured ?? false,
+    message: data?.message ?? "Checking payment status...",
+    isLoading,
   };
 }
