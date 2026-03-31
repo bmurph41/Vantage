@@ -79,6 +79,21 @@ export default function PacksSettingsPage() {
     },
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: async ({ packType, billingCycle }: { packType: string; billingCycle: string }) => {
+      const res = await apiRequest("POST", "/api/stripe/checkout", { packType, billingCycle });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const deactivateMutation = useMutation({
     mutationFn: async (packType: PackType) => {
       await apiRequest('POST', `/api/organization/packs/${packType}/deactivate`);
@@ -173,11 +188,17 @@ export default function PacksSettingsPage() {
                       Start 14-Day Trial
                     </Button>
                     <Button
-                      onClick={() => activateMutation.mutate({ packType: pack.packType })}
-                      disabled={isPending}
+                      onClick={() => {
+                        if (isStripeConfigured) {
+                          checkoutMutation.mutate({ packType: pack.packType, billingCycle: "monthly" });
+                        } else {
+                          activateMutation.mutate({ packType: pack.packType });
+                        }
+                      }}
+                      disabled={isPending || checkoutMutation.isPending}
                       data-testid={`button-activate-${pack.packType}`}
                     >
-                      {activateMutation.isPending ? (
+                      {(activateMutation.isPending || checkoutMutation.isPending) ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : null}
                       Subscribe

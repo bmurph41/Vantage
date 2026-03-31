@@ -292,9 +292,14 @@ export function SubscriptionPage() {
 
               <button
                 onClick={handleSubscribe}
-                className="w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                disabled={checkoutMutation.isPending}
+                className={cn(
+                  "w-full py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2",
+                  checkoutMutation.isPending && "opacity-70 cursor-not-allowed"
+                )}
               >
-                {subscription.packageSlug ? 'Update Subscription' : 'Start Free Trial'}
+                {checkoutMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {subscription.packageSlug ? 'Update Subscription' : isStripeConfigured ? 'Subscribe Now' : 'Start Free Trial'}
               </button>
               
               <p className="text-xs text-muted-foreground text-center mt-3">

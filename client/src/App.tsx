@@ -110,6 +110,7 @@ const DesignPreview = lazy(() => import("@/pages/design-preview"));
 const LegalPage = lazy(() => import("@/pages/LegalPage"));
 const MMUIDemo = lazy(() => import("@/pages/mm-ui-demo"));
 const PacksSettings = lazy(() => import("@/pages/packs-settings"));
+const SubscriptionPage = lazy(() => import("@/pages/subscription-page"));
 const IntegrationsMarketplace = lazy(() => import("@/pages/integrations/IntegrationsMarketplace"));
 const IntegrationDetail = lazy(() => import("@/pages/integrations/IntegrationDetail"));
 const MigrationDashboard = lazy(() => import("@/pages/integrations/MigrationDashboard"));
@@ -559,6 +560,20 @@ function Router() {
         {() => (
           <UnifiedLayout>
             <PacksSettings />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/settings/subscription">
+        {() => (
+          <UnifiedLayout>
+            <SubscriptionPage />
+          </UnifiedLayout>
+        )}
+      </Route>
+      <Route path="/pricing">
+        {() => (
+          <UnifiedLayout>
+            <SubscriptionPage />
           </UnifiedLayout>
         )}
       </Route>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Check, Sparkles, Building, Calculator, ChartLine, Anchor, Briefcase, Users, Target, BarChart3, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useStripeStatus } from "@/hooks/useStripeStatus";
 import { formatCurrency } from "@/lib/utils";
 
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -54,16 +55,17 @@ interface PaywallModalProps {
 export function PaywallModal({ open, onOpenChange, packType, featureName }: PaywallModalProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+  const { isStripeConfigured } = useStripeStatus();
+
   const { data: packsWithStatus = [] } = useQuery<PackWithStatus[]>({
     queryKey: ['/api/organization/packs'],
     enabled: open,
   });
-  
+
   const packDetails = packsWithStatus.find(p => p.packType === packType);
   const Icon = PACK_ICONS[packType] || Briefcase;
   const price = packDetails?.info.monthlyPriceCents ? formatPrice(packDetails.info.monthlyPriceCents) : null;
-  
+
   const missingDependencies = packDetails?.dependencies.filter(dep => {
     const depPack = packsWithStatus.find(p => p.packType === dep);
     return !depPack?.isActive;
@@ -92,10 +94,27 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
     },
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: async ({ packType, billingCycle }: { packType: string; billingCycle: string }) => {
+      const res = await apiRequest("POST", "/api/stripe/checkout", { packType, billingCycle });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleSubscribe = () => {
     if (missingDependencies.length > 0) {
       setLocation('/settings/packs');
       onOpenChange(false);
+    } else if (isStripeConfigured) {
+      checkoutMutation.mutate({ packType, billingCycle: "monthly" });
     } else {
       activateMutation.mutate({ packType });
     }
@@ -168,10 +187,10 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
           <Button
             className="w-full"
             onClick={handleSubscribe}
-            disabled={activateMutation.isPending}
+            disabled={activateMutation.isPending || checkoutMutation.isPending}
             data-testid="button-subscribe"
           >
-            {activateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {(activateMutation.isPending || checkoutMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {missingDependencies.length > 0 ? 'View Required Packs' : 'Subscribe Now'}
           </Button>
           {missingDependencies.length === 0 && (
