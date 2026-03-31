@@ -377,7 +377,7 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'marinalytics',
     label: 'Market Intelligence',
     icon: BarChart3,
-    matchRoutes: ['/marinalytics', '/analytics', '/docket', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis'],
+    matchRoutes: ['/marinalytics', '/analytics', '/docket', '/sales-comps', '/rate-comps', '/demographics', '/capital-markets', '/portfolio-analytics', '/financial-analysis', '/marina-map'],
     requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
     children: [
       {
@@ -435,6 +435,14 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: TrendingUp,
         matchRoutes: ['/marinalytics/financial-analysis', '/financial-analysis'],
         requiredModules: [FEATURE_MODULES.ANALYTICS_PORTFOLIO],
+      },
+      {
+        id: 'marina-map',
+        label: 'Marina Map',
+        href: '/marinalytics/marina-map',
+        icon: Anchor,
+        matchRoutes: ['/marinalytics/marina-map'],
+        requiredModules: [FEATURE_MODULES.ANALYTICS_NEWS],
       },
     ],
   },

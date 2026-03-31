@@ -32,6 +32,7 @@ import {
   Package,
   FolderLock,
   MessageSquare,
+  Anchor,
 } from "lucide-react";
 import debounce from "lodash.debounce";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ const navigationItems = [
   { name: 'Ship Store', href: '/operations/ship-store/dashboard', icon: Package, category: 'Operations' },
   { name: 'VDR', href: '/vdr', icon: FolderLock, category: 'Documents' },
   { name: 'The Docket', href: '/docket', icon: MessageSquare, category: 'Intelligence' },
+  { name: 'Marina Map', href: '/marinalytics/marina-map', icon: Anchor, category: 'Intelligence' },
   { name: 'Settings', href: '/settings', icon: Settings, category: 'System' },
 ];
 
