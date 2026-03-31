@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -21,21 +21,11 @@ import {
   Star,
   Pin,
   Clock,
-  LayoutDashboard,
-  Briefcase,
-  Settings,
   FileText,
-  Target,
-  Send,
-  BarChart3,
-  Fuel,
-  Package,
-  FolderLock,
-  MessageSquare,
-  Anchor,
 } from "lucide-react";
 import debounce from "lodash.debounce";
 import { Badge } from "@/components/ui/badge";
+import { getNavigationItems } from "@/config/sidebarConfig";
 
 type SearchResultType = 'contact' | 'company' | 'deal' | 'property' | 'modelingProject' | 'ddProject';
 
@@ -79,26 +69,8 @@ const typeColors: Record<SearchResultType, string> = {
   ddProject: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
 };
 
-const navigationItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, category: 'Navigation' },
-  { name: 'CRM Dashboard', href: '/crm', icon: Briefcase, category: 'CRM' },
-  { name: 'Contacts', href: '/crm/contacts', icon: Users, category: 'CRM' },
-  { name: 'Companies', href: '/crm/companies', icon: Building, category: 'CRM' },
-  { name: 'Properties', href: '/crm/properties', icon: Home, category: 'CRM' },
-  { name: 'Deals', href: '/crm/deals', icon: Handshake, category: 'CRM' },
-  { name: 'Pipeline', href: '/crm/pipeline', icon: Target, category: 'CRM' },
-  { name: 'Prospecting', href: '/prospecting', icon: Target, category: 'Prospecting' },
-  { name: 'Campaigns', href: '/prospecting/campaigns', icon: Send, category: 'Prospecting' },
-  { name: 'Modeling Projects', href: '/modeling', icon: Calculator, category: 'Modeling' },
-  { name: 'Sales Comps', href: '/sales-comps', icon: BarChart3, category: 'Analytics' },
-  { name: 'Due Diligence', href: '/projects', icon: ClipboardList, category: 'Due Diligence' },
-  { name: 'Fuel Sales', href: '/operations/fuel/dashboard', icon: Fuel, category: 'Operations' },
-  { name: 'Ship Store', href: '/operations/ship-store/dashboard', icon: Package, category: 'Operations' },
-  { name: 'VDR', href: '/vdr', icon: FolderLock, category: 'Documents' },
-  { name: 'The Docket', href: '/docket', icon: MessageSquare, category: 'Intelligence' },
-  { name: 'Marina Map', href: '/marinalytics/marina-map', icon: Anchor, category: 'Intelligence' },
-  { name: 'Settings', href: '/settings', icon: Settings, category: 'System' },
-];
+// Derived once at module load — automatically reflects any changes to sidebarConfig
+const navigationItems = getNavigationItems();
 
 interface QuickAccessItem {
   id: string;
@@ -214,11 +186,27 @@ export function CommandPalette() {
     handleSelect(item.itemType, item.itemId);
   };
 
-  const filteredNavigation = navigationItems.filter(
-    (item) =>
-      searchQuery.length === 0 ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter navigation items by search query
+  const filteredNavigation = useMemo(() => {
+    if (searchQuery.length === 0) return navigationItems;
+    const q = searchQuery.toLowerCase();
+    return navigationItems.filter(
+      item =>
+        item.name.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
+
+  // Group filtered navigation by category for cleaner display when searching
+  const groupedNavigation = useMemo(() => {
+    if (searchQuery.length === 0) return null;
+    const groups: Record<string, typeof navigationItems> = {};
+    for (const item of filteredNavigation) {
+      if (!groups[item.category]) groups[item.category] = [];
+      groups[item.category].push(item);
+    }
+    return groups;
+  }, [filteredNavigation, searchQuery]);
 
   const groupedResults = searchResults?.results?.reduce((acc, result) => {
     if (!acc[result.type]) {
@@ -368,26 +356,54 @@ export function CommandPalette() {
           </>
         )}
 
-        {filteredNavigation.length > 0 && (
-          <CommandGroup heading="Quick Navigation">
-            {filteredNavigation.slice(0, searchQuery.length > 0 ? 10 : 6).map((item) => {
-              const Icon = item.icon;
-              return (
-                <CommandItem
-                  key={item.href}
-                  onSelect={() => handleNavigate(item.href)}
-                  className="flex items-center gap-2"
-                  data-testid={`command-palette-nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span>{item.name}</span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {item.category}
-                  </span>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
+        {/* When searching: group by category for clarity */}
+        {searchQuery.length >= 2 && filteredNavigation.length > 0 && groupedNavigation && (
+          <>
+            {Object.entries(groupedNavigation).map(([category, items]) => (
+              <CommandGroup key={category} heading={category}>
+                {items.map((item) => {
+                  const Icon = item.icon ?? FileText;
+                  return (
+                    <CommandItem
+                      key={item.href}
+                      onSelect={() => handleNavigate(item.href)}
+                      className="flex items-center gap-2"
+                      data-testid={`command-palette-nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <span>{item.name}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            ))}
+          </>
+        )}
+
+        {/* When not searching: show a flat quick-navigation list (top 6) */}
+        {searchQuery.length < 2 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Quick Navigation">
+              {navigationItems.slice(0, 6).map((item) => {
+                const Icon = item.icon ?? FileText;
+                return (
+                  <CommandItem
+                    key={item.href}
+                    onSelect={() => handleNavigate(item.href)}
+                    className="flex items-center gap-2"
+                    data-testid={`command-palette-nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{item.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {item.category}
+                    </span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
         )}
       </CommandList>
     </CommandDialog>
@@ -415,4 +431,17 @@ export function CommandPaletteTrigger() {
       </kbd>
     </button>
   );
+}
+
+export function useCommandPaletteShortcut(onOpen: () => void) {
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        onOpen();
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, [onOpen]);
 }

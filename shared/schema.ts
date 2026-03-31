@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, uniqueIndex, index, customType, decimal, numeric, real, time } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, date, boolean, jsonb, pgEnum, primaryKey, unique, uniqueIndex, index, customType, decimal, numeric, real, time, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -28879,3 +28879,42 @@ export const aiMessages = pgTable("ai_messages", {
   convIdx: index("ai_messages_conv_idx").on(table.conversationId),
 }));
 export type AiMessage = typeof aiMessages.$inferSelect;
+
+// Acquisition Properties — asset-class agnostic; use raw pool.query() for all operations
+export const acquisitionProperties = pgTable("acquisition_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  address: text("address"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  assetType: varchar("asset_type").default('marina'),
+  unitCount: integer("unit_count"),
+  status: varchar("status").default('available'),
+  askingPrice: numeric("asking_price", { precision: 15, scale: 2 }),
+  noi: numeric("noi", { precision: 15, scale: 2 }),
+  capRate: numeric("cap_rate", { precision: 6, scale: 4 }),
+  occupancy: numeric("occupancy", { precision: 5, scale: 2 }),
+  yearBuilt: integer("year_built"),
+  acreage: numeric("acreage", { precision: 10, scale: 2 }),
+  frontage: numeric("frontage", { precision: 10, scale: 2 }),
+  ancillaryRevenue1: numeric("ancillary_revenue_1", { precision: 15, scale: 2 }),
+  ancillaryRevenue2: numeric("ancillary_revenue_2", { precision: 15, scale: 2 }),
+  ancillaryRevenue3: numeric("ancillary_revenue_3", { precision: 15, scale: 2 }),
+  siteManager: varchar("site_manager"),
+  permits: jsonb("permits").default(sql`'[]'::jsonb`),
+  amenities: jsonb("amenities").default(sql`'[]'::jsonb`),
+  score: numeric("score", { precision: 5, scale: 2 }),
+  tier: varchar("tier"),
+  orgId: varchar("org_id").notNull(),
+  customFields: jsonb("custom_fields").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("acq_properties_org_idx").on(table.orgId),
+  statusIdx: index("acq_properties_status_idx").on(table.status),
+  scoreIdx: index("acq_properties_score_idx").on(table.score),
+  latLngIdx: index("acq_properties_lat_lng_idx").on(table.lat, table.lng),
+  assetTypeIdx: index("acq_properties_asset_type_idx").on(table.assetType),
+}));
+export type AcquisitionProperty = typeof acquisitionProperties.$inferSelect;
+export type InsertAcquisitionProperty = typeof acquisitionProperties.$inferInsert;

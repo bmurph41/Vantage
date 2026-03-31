@@ -667,3 +667,64 @@ export function getAllRequiredModules(): Set<FeatureModule> {
   
   return modules;
 }
+
+/**
+ * Flattens the full sidebarConfig into a list of navigation items
+ * suitable for the command palette. Any item added to sidebarConfig
+ * will automatically appear in search without touching CommandPalette.tsx.
+ */
+export interface NavItem {
+  name: string;
+  href: string;
+  icon?: LucideIcon;
+  category: string;
+}
+
+export function getNavigationItems(): NavItem[] {
+  const items: NavItem[] = [];
+
+  for (const group of sidebarConfig) {
+    if (group.featureFlag === false) continue;
+
+    // Leaf group (no children — e.g. Dashboard)
+    if (!group.children && !group.subcategories && group.href) {
+      items.push({
+        name: group.label,
+        href: group.href,
+        icon: group.icon,
+        category: 'Navigation',
+      });
+      continue;
+    }
+
+    // Children-based group
+    if (group.children) {
+      for (const item of group.children) {
+        if (item.featureFlag === false || item.disabled) continue;
+        items.push({
+          name: item.label,
+          href: item.href,
+          icon: item.icon,
+          category: group.label,
+        });
+      }
+    }
+
+    // Subcategories-based group (e.g. Operations)
+    if (group.subcategories) {
+      for (const sub of group.subcategories) {
+        for (const item of sub.items) {
+          if (item.featureFlag === false || item.disabled) continue;
+          items.push({
+            name: item.label,
+            href: item.href,
+            icon: item.icon,
+            category: `${group.label} › ${sub.label}`,
+          });
+        }
+      }
+    }
+  }
+
+  return items;
+}
