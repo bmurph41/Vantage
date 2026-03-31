@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, Settings, PieChart, Info, Clock, CheckCircle, XCircle, AlertCircle, Sparkles, Brain, Map } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { uwStageLabels } from '@shared/schema';
@@ -203,6 +203,12 @@ export default function ModelingProjectsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/marinalytics/marina-map?source=projects">
+            <Button variant="outline" data-testid="button-view-on-map">
+              <Map className="h-4 w-4 mr-2" />
+              View on Map
+            </Button>
+          </Link>
           <Link href="/modeling/portfolio">
             <Button variant="outline" data-testid="button-portfolio">
               <PieChart className="h-4 w-4 mr-2" />

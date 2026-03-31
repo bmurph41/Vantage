@@ -2,11 +2,12 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GoogleMap, Marker, MarkerClusterer, InfoWindow } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/lib/google-maps-provider';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import {
   Anchor, Search, Filter, MapPin, Loader2, Building2, Calculator,
   BarChart3, ShoppingCart, ChevronDown, ChevronRight, X, Layers,
-  Navigation, ExternalLink, DollarSign, Ship, Maximize2, List, Cpu
+  Navigation, ExternalLink, DollarSign, Ship, Maximize2, List, Cpu,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ import {
 
 interface MarinaLocation {
   id: string;
-  source: 'property' | 'project' | 'comp' | 'listing';
+  source: 'property' | 'project' | 'comp' | 'rate_comp' | 'listing' | 'pipeline';
   name: string;
   address: string | null;
   city: string | null;
@@ -54,21 +55,27 @@ const SOURCE_COLORS: Record<string, string> = {
   property: '#4285F4',
   project: '#EA4335',
   comp: '#FBBC04',
-  listing: '#34A853',
+  rate_comp: '#34A853',
+  listing: '#9C27B0',
+  pipeline: '#FF5722',
 };
 
 const SOURCE_LABELS: Record<string, string> = {
   property: 'CRM Properties',
   project: 'Financial Models',
   comp: 'Sales Comps',
+  rate_comp: 'Rate Comps',
   listing: 'Listings',
+  pipeline: 'Pipeline Deals',
 };
 
 const SOURCE_ICONS: Record<string, typeof Anchor> = {
   property: Building2,
   project: Calculator,
   comp: BarChart3,
+  rate_comp: TrendingUp,
   listing: ShoppingCart,
+  pipeline: Anchor,
 };
 
 const mapContainerStyle = { width: '100%', height: '100%' };
@@ -583,6 +590,19 @@ function IntelPropertyDetail({
             <div style={{ background: '#0a1a2a', borderRadius: 6, padding: 12, border: '1px solid #1e3a5f' }}>
               <div style={{ fontSize: 10, color: '#4a7fa5', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Data Source</div>
               <IntelPill label={p.source} color="#4a9fd5" />
+              {p.source === 'Financial Models' && (
+                <a
+                  href={`/modeling/projects/${p.id}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10,
+                    fontSize: 11, color: '#4a9fd5', textDecoration: 'none', fontWeight: 600,
+                    border: '1px solid #1e3a5f', borderRadius: 4, padding: '5px 10px',
+                    background: '#0d1b2a',
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>⤢</span> Open Financial Model
+                </a>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {p.rawMetrics?.wetSlips != null && (
@@ -629,9 +649,86 @@ function IntelPropertyDetail({
   );
 }
 
+function DemographicsOverlay({ locations }: { locations: MarinaLocation[] }) {
+  const stateStats = useMemo(() => {
+    const byState: Record<string, { count: number; slips: number; capRates: number[]; totalValue: number }> = {};
+    for (const loc of locations) {
+      if (!loc.state) continue;
+      if (!byState[loc.state]) byState[loc.state] = { count: 0, slips: 0, capRates: [], totalValue: 0 };
+      const st = byState[loc.state];
+      st.count++;
+      st.slips += loc.slips ?? 0;
+      if (loc.metrics?.capRate) {
+        const cr = normalizeCapRate(loc.metrics.capRate);
+        if (cr !== null) st.capRates.push(cr);
+      }
+      if (loc.price) st.totalValue += loc.price;
+    }
+    return Object.entries(byState)
+      .map(([state, d]) => ({
+        state,
+        count: d.count,
+        slips: d.slips,
+        avgCapRate: d.capRates.length > 0 ? d.capRates.reduce((a, b) => a + b, 0) / d.capRates.length : null,
+        totalValue: d.totalValue,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [locations]);
+
+  const maxCount = Math.max(...stateStats.map(s => s.count), 1);
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', background: '#040d16', padding: '16px' }}>
+      <div style={{ fontSize: 10, color: '#4a7fa5', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>
+        State-Level Market Intelligence · {stateStats.length} states · {locations.length} total marinas
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {stateStats.map(st => {
+          const barWidth = (st.count / maxCount) * 100;
+          const capColor = st.avgCapRate !== null
+            ? (st.avgCapRate >= 8 ? '#00f5a0' : st.avgCapRate >= 6 ? '#4ade80' : st.avgCapRate >= 4 ? '#facc15' : '#f87171')
+            : '#3a6080';
+          return (
+            <div key={st.state} style={{ background: '#08131d', border: '1px solid #0e2338', borderRadius: 6, padding: '10px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div style={{ width: 32, fontSize: 13, fontWeight: 700, color: '#e8f4fd' }}>{st.state}</div>
+                <div style={{ flex: 1, height: 6, background: '#0e2338', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${barWidth}%`, height: '100%', background: '#4285F4', borderRadius: 3 }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#c8e6f7', fontFamily: 'monospace', width: 28, textAlign: 'right' }}>{st.count}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, fontSize: 10, color: '#4a7fa5' }}>
+                {st.slips > 0 && (
+                  <span>
+                    <span style={{ color: '#3a6080' }}>Slips: </span>
+                    <span style={{ color: '#c8e6f7', fontFamily: 'monospace' }}>{st.slips.toLocaleString()}</span>
+                  </span>
+                )}
+                {st.avgCapRate !== null && (
+                  <span>
+                    <span style={{ color: '#3a6080' }}>Avg Cap: </span>
+                    <span style={{ color: capColor, fontWeight: 700, fontFamily: 'monospace' }}>{st.avgCapRate.toFixed(2)}%</span>
+                  </span>
+                )}
+                {st.totalValue > 0 && (
+                  <span>
+                    <span style={{ color: '#3a6080' }}>Vol: </span>
+                    <span style={{ color: '#c8e6f7', fontFamily: 'monospace' }}>${(st.totalValue / 1e6).toFixed(0)}M</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function IntelligenceView({ locations }: { locations: MarinaLocation[] }) {
   const [selected, setSelected] = useState<IntelProperty | null>(null);
   const [filterTier, setFilterTier] = useState('ALL');
+  const [intelLayer, setIntelLayer] = useState<'heatmap' | 'demographics'>('heatmap');
   const tiers = ['ALL', 'A+', 'A', 'B', 'C'];
 
   const allIntel = useMemo(() => {
@@ -670,7 +767,38 @@ function IntelligenceView({ locations }: { locations: MarinaLocation[] }) {
       background: '#040d16', color: '#c8e6f7', height: '100%', display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* Body */}
+      {/* Layer toggle bar */}
+      <div style={{ borderBottom: '1px solid #0e2338', background: '#050e1b', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <span style={{ fontSize: 9, color: '#4a7fa5', letterSpacing: 1.5, textTransform: 'uppercase', marginRight: 4 }}>View:</span>
+        {([
+          { key: 'heatmap', label: 'Heat Map', icon: '◉' },
+          { key: 'demographics', label: 'Demographics', icon: '◈' },
+        ] as const).map(({ key, label, icon }) => (
+          <button
+            key={key}
+            onClick={() => setIntelLayer(key)}
+            style={{
+              background: intelLayer === key ? '#0e2a42' : 'none',
+              border: `1px solid ${intelLayer === key ? '#4a9fd5' : '#1a3050'}`,
+              borderRadius: 4, padding: '3px 10px', fontSize: 10, fontWeight: 600,
+              color: intelLayer === key ? '#4a9fd5' : '#3a6080', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            <span>{icon}</span> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Demographics mode */}
+      {intelLayer === 'demographics' && (
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <DemographicsOverlay locations={locations} />
+        </div>
+      )}
+
+      {/* Heat Map mode */}
+      {intelLayer === 'heatmap' && (
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left sidebar */}
         <div style={{ width: 270, borderRight: '1px solid #0e2338', display: 'flex', flexDirection: 'column', background: '#050e1b', flexShrink: 0 }}>
@@ -754,6 +882,7 @@ function IntelligenceView({ locations }: { locations: MarinaLocation[] }) {
           )}
         </div>
       </div>
+      )}
 
       {/* Status bar */}
       <div style={{
@@ -762,7 +891,9 @@ function IntelligenceView({ locations }: { locations: MarinaLocation[] }) {
       }}>
         <span style={{ fontSize: 9, color: '#2a5070', letterSpacing: 0.5 }}>{allIntel.length} properties indexed · live data</span>
         <span style={{ fontSize: 9, color: '#2a5070' }}>·</span>
-        <span style={{ fontSize: 9, color: '#2a5070' }}>Heat Map: Concentration by Score × Slip Count</span>
+        <span style={{ fontSize: 9, color: '#2a5070' }}>
+          {intelLayer === 'demographics' ? 'Demographics: State-Level Market Intelligence' : 'Heat Map: Concentration by Score × Slip Count'}
+        </span>
         <span style={{ fontSize: 9, color: '#2a5070', marginLeft: 'auto' }}>MarinaMatch Intelligence</span>
       </div>
     </div>
@@ -776,12 +907,27 @@ export default function MarinaMapPage() {
   const { isLoaded, loadError } = useGoogleMaps();
   const mapRef = useRef<google.maps.Map | null>(null);
   
+  const searchString = useSearch();
+  const urlParams = useMemo(() => new URLSearchParams(searchString), [searchString]);
+  const initialSource = urlParams.get('source') || 'all';
+
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>(initialSource);
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<MarinaLocation | null>(null);
-  const [visibleSources, setVisibleSources] = useState<Set<string>>(new Set(['property', 'project', 'comp', 'listing']));
+  const [visibleSources, setVisibleSources] = useState<Set<string>>(() => {
+    const allSources = new Set(['property', 'project', 'comp', 'rate_comp', 'listing', 'pipeline']);
+    if (initialSource !== 'all' && initialSource !== '') {
+      const srcMap: Record<string, string> = {
+        properties: 'property', projects: 'project', comps: 'comp',
+        rate_comps: 'rate_comp', listings: 'listing', pipeline: 'pipeline',
+      };
+      const mapped = srcMap[initialSource] || initialSource;
+      if (allSources.has(mapped)) return new Set([mapped]);
+    }
+    return allSources;
+  });
   const [viewMode, setViewMode] = useState<'map' | 'split' | 'intelligence'>('split');
   const [listExpanded, setListExpanded] = useState(true);
 
@@ -843,7 +989,9 @@ export default function MarinaMapPage() {
     if (loc.source === 'property') navigate(`/crm/properties`);
     else if (loc.source === 'project') navigate(`/modeling/projects/${loc.id}`);
     else if (loc.source === 'comp') navigate(`/analysis/sales-comps`);
+    else if (loc.source === 'rate_comp') navigate(`/analysis/sales-comps`);
     else if (loc.source === 'listing') navigate(`/analysis/sales-comps`);
+    else if (loc.source === 'pipeline') navigate(`/crm/deals/${loc.id}`);
   };
 
   const focusOnLocation = (loc: MarinaLocation) => {
@@ -912,15 +1060,17 @@ export default function MarinaMapPage() {
             </SelectContent>
           </Select>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-[140px] h-9">
+            <SelectTrigger className="w-[150px] h-9">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sources</SelectItem>
-              <SelectItem value="properties">Properties</SelectItem>
-              <SelectItem value="projects">Models</SelectItem>
+              <SelectItem value="properties">CRM Properties</SelectItem>
+              <SelectItem value="projects">Financial Models</SelectItem>
               <SelectItem value="comps">Sales Comps</SelectItem>
+              <SelectItem value="rate_comps">Rate Comps</SelectItem>
               <SelectItem value="listings">Listings</SelectItem>
+              <SelectItem value="pipeline">Pipeline Deals</SelectItem>
             </SelectContent>
           </Select>
         </div>

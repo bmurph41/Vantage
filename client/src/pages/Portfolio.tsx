@@ -292,6 +292,14 @@ export default function Portfolio() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => navigate("/marinalytics/marina-map")}
+            data-testid="button-view-on-map"
+          >
+            <Map className="h-4 w-4 mr-2" />
+            View on Map
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate("/deal-workspace")}
             data-testid="button-view-deals"
           >

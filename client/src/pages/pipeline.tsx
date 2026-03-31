@@ -1047,6 +1047,12 @@ export default function Pipeline() {
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Stages
             </Button>
 
+            <Link href="/marinalytics/marina-map?source=pipeline">
+              <Button variant="outline" size="sm" className="h-8 text-xs">
+                <Map className="w-3.5 h-3.5 mr-1" /> Map
+              </Button>
+            </Link>
+
             <Button className="bg-blue-600 hover:bg-blue-700 h-8 text-xs" size="sm" onClick={handleAddNewDeal}>
               <Plus className="w-3.5 h-3.5 mr-1" /> New Deal
             </Button>

@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Target, TrendingUp, TrendingDown, Phone, Mail, Calendar, Users, 
   ArrowUpRight, ArrowDownRight, Minus, RefreshCcw, Download,
-  Briefcase, DollarSign, Handshake, ExternalLink
+  Briefcase, DollarSign, Handshake, ExternalLink, Map
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -200,6 +200,12 @@ export default function ProspectingOverview() {
             <p className="text-gray-500 mt-1">Track your outreach performance and conversion metrics</p>
           </div>
           <div className="flex items-center space-x-3">
+            <Link href="/marinalytics/marina-map?source=properties" className="inline-flex">
+              <Button variant="outline" size="sm" className="flex items-center gap-2" data-testid="button-view-on-map">
+                <Map className="w-4 h-4" />
+                View on Map
+              </Button>
+            </Link>
             <Link href="/prospecting/workroom" className="inline-flex">
               <Button variant="default" size="sm" className="flex items-center gap-2" data-testid="button-go-to-workroom">
                 <Target className="w-4 h-4" />
