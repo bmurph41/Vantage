@@ -143,6 +143,76 @@
 
 - [feature] [todo] Build lease completeness enforcer — add a `completenessScore` column to `rra_leases` (0–100 int); computed on every save: +20 for having a rate, +20 for having a start date, +20 for having an end date or contractTerm, +20 for having a unit type, +20 for having a valid status; display completeness score as a colored pill in LeasesTable.tsx; add a filter "Show incomplete leases only" to the leases table toolbar
 
+## 🌍 TIER 10 — DEMOGRAPHICS (Institutional-Grade Completion)
+
+> **Diagnosis Summary — Current State: ~55% institutional-grade**
+>
+> **What works:** 1,346-line CensusService pulling ACS 5-year estimates with population-weighted multi-tract radius aggregation; FRED state-level economic indicators; real drive-time isochrones (polygon-based); distance ring multi-analysis; weighted Site Suitability Score against user-saved Target Demographic profiles; 7 UI components (Suitability, Trends, Comparison, Business Environment, Market Potential, Daytime Population, Target Form); Census County Business Patterns via NAICS; 20+ API endpoints; PDF export; Document Builder token binding; project-location save.
+>
+> **Critical gaps:** No marina-specific demographic signals (boat ownership, waterfront lifestyle, wealth beyond HHI); CRM integration is theoretical not wired; SiteSuitabilityScore disconnected from the CRM lead scoring engine; no BLS MSA-level employment data; no Opportunity Zone overlay; no FEMA flood zone layer; no competitive density count; no boat registration data; no saved analysis history UI; no Excel export; MarketPotentialIndex formula is opaque/unlabeled; no demographics heatmap on marina map; no population growth → pro forma auto-inject.
+>
+> **Key files:** `server/services/census-service.ts`, `server/services/demographics-service.ts`, `client/src/pages/analysis/demographics/Index.tsx`, `client/src/components/demographics/` (7 components), API routes in `server/routes.ts` lines 32824–33303.
+
+### 10A — Marina-Specific Demographic Signals
+
+- [feature] [todo] Add boat ownership / recreational boating penetration to CensusService — ACS table B08301 includes "Boat, canoe, or kayak" as a commute mode; also fetch ACS table S0801 (commuting characteristics) for boat ownership proxy; additionally call the Census County Business Patterns for NAICS 441222 (Boat Dealers) and 713930 (Marinas) to show local marina industry employment; expose as new fields on `DemographicSummary`: `boatCommuterCount`, `boatingPenetrationPct`, `marinaEmploymentCount`; add to the Demographics page Population tab as a "Boating Community" sub-section with count, penetration %, and year
+
+- [feature] [todo] Add boat registration data layer — integrate USCG/USMCA state boat registration counts; fetch from the Census Bureau's Recreation Survey or the USCG Recreational Boating Statistics API (public, no key required at `https://www.uscg.mil/Portals/0/...`); alternatively pull the published annual state-level totals as a static seed table `boat_registrations (state, year, registeredVessels)` updated yearly; expose as a `boatRegistrationRate` (vessels per 1000 residents) card in the demographics Population tab; compute trend if multi-year data is available
+
+- [feature] [todo] Add wealth and lifestyle signal scoring — beyond median HHI, compute a "Waterfront Lifestyle Index" using: percent households with income >$150K (from ACS income distribution), percent owner-occupied housing (from ACS housing data), median home value (already fetched), and education (bachelor's+); normalize each to 0–100, weight equally, display as a single index score (0–100) with a gauge chart in the Market Potential tab; label clearly with methodology tooltip so institutional users understand the formula
+
+### 10B — Opportunity Zone & Risk Overlays
+
+- [feature] [todo] Add Opportunity Zone overlay to demographics map — seed a `opportunity_zones (tractFips, designation_year, state)` table from the IRS/Census OZ shapefile (public dataset: `https://www.cdfifund.gov/opportunity-zones`); on each demographics analysis, cross-reference the selected location's census tract FIPS against this table; display an "OZ Eligible" badge on the map circle and in the location card header when the tract is in an OZ; also show a tooltip explaining the tax benefit; register a GET `/api/demographics/opportunity-zone/:tractFips` endpoint
+
+- [feature] [todo] Add FEMA flood zone risk indicator — integrate FEMA's National Flood Hazard Layer (NFHL) API (`https://msc.fema.gov/arcgis/rest/services/`); for each demographic analysis point, query the NFHL for the flood zone designation (AE, X, VE, etc.) within 500ft of the coordinates; display a flood risk badge ("Minimal", "Moderate", "High", "Coastal") with color coding in the location card header; add to the Site Suitability Score as an optional negative weight factor (user can toggle "Penalize flood zone" in TargetDemographicsForm); register GET `/api/demographics/flood-zone` accepting lat/lng
+
+### 10C — BLS MSA-Level Employment Data
+
+- [feature] [todo] Build BLS (Bureau of Labor Statistics) service — create `server/services/bls-service.ts`; use the BLS Public Data API v2 (`https://api.bls.gov/publicAPI/v2/timeseries/data/`) with a registered key (environment variable `BLS_API_KEY`); fetch MSA-level employment series by NAICS super-sector for a given MSA code; implement `getMSAEmploymentTrends(msaCode, years=5)` returning total employment, unemployment rate, and top-3 growing sectors by YoY % change; implement `getMSACode(latitude, longitude)` by cross-referencing Census CBSA delineation file (seed as `cbsa_delineations (countyFips, msaCode, msaName)` table); cache results in `demographicsCache` with 30-day TTL
+
+- [feature] [todo] Surface BLS MSA employment in demographics UI — add a new "Employment" sub-tab in the demographics analysis (alongside Population, Income, Housing, Education); display: MSA name badge, total non-farm employment, unemployment rate (vs. state and national), top-3 growing sectors (name, YoY % growth, current employment count), a 5-year total employment trend line chart; register GET `/api/demographics/bls-employment?lat=&lng=`; show a "MSA: [Name]" label so users understand the geographic scope vs. the Census tract data shown elsewhere
+
+### 10D — Competitive Density Analysis
+
+- [feature] [todo] Build competitive marina density layer — within the demographics trade area query, count how many internal `salesComps` / CRM properties of type 'marina' exist within the specified radius using PostGIS `ST_DWithin`; also call Google Places API (if configured) for `type=marina` and `type=boat_rental` within the radius; return `{ internalMarinaCount, googlePlacesMarinaCount, nearestCompetitorMiles, competitorList: [{name, distanceMiles, type}] }`; add a "Competitive Landscape" card to the demographics page showing count, nearest competitor, and a mini list; register POST `/api/demographics/competitive-density` accepting `{ lat, lng, radiusMiles }`
+
+- [feature] [todo] Add competitive density to Site Suitability Score — expose `minCompetitorDistanceMiles` and `maxCompetitorCount` as optional criteria in `TargetDemographicsForm.tsx` (with weight slider); score the location: if nearest competitor is > minDistance AND total competitors < maxCount, passes; surface in the SiteSuitabilityScore component criteria breakdown list; this makes the suitability score actually useful for site selection and prospecting
+
+### 10E — CRM Integration (Property → Demographics)
+
+- [feature] [todo] Wire "Run Demographics" from CRM property detail page — on the CRM property detail page (`client/src/pages/crm/properties/[id].tsx` or equivalent), add a "Demographics" tab that is visible when the property has latitude/longitude; this tab should auto-fetch demographics for the property's coordinates using POST `/api/demographics/location` with a 5-mile default radius; render a read-only summary: population, median HHI, market potential score, suitability score (if target demographics are configured), flood zone risk, and OZ eligibility; add a "Open Full Analysis" button that navigates to `/analysis/demographics` with the address pre-populated
+
+- [feature] [todo] Auto-link CRM property demographics run to save as project location — when a user clicks "Open Full Analysis" from a CRM property, pass the property's `id`, `name`, `latitude`, `longitude` as query params to the demographics page; the demographics page should detect these params and pre-add the location to the analysis, auto-running the Census query; also offer to save it to any active modeling project associated with that property
+
+### 10F — Lead Scoring Integration
+
+- [feature] [todo] Connect SiteSuitabilityScore to CRM lead scoring engine — in `client/src/components/automation/lead-scoring.tsx`, the lead score is computed independently of the demographics suitability score; add a "Market Demographics Score" factor to the lead scoring model that reads from the most recent demographics analysis saved for that property's location; POST `/api/lead-scoring/demographics-factor` accepting `{ propertyId }` should look up the saved demographics for the property's coordinates, compute the weighted suitability score against the org's default target demographics profile, and return a 0–100 factor score; weight this factor at 20% of the overall lead score by default (configurable in lead scoring settings)
+
+### 10G — Population Growth → Pro Forma Auto-Inject
+
+- [feature] [todo] Extract population growth rate from Census historical trends and inject into pro forma — CensusService.getHistoricalTrends() already computes YoY population growth; when a user is on the Modeling workspace and their modeling project has a saved demographics location, show a "Sync Demographics" button in the pro forma revenue assumptions panel; clicking it reads the 5-year CAGR for population and household income growth from the saved demographics and pre-fills: revenue growth rate = population CAGR + 0.5% (configurable), market rent growth = income CAGR; add a provenance label "Based on [Location] 5-yr Census CAGR" next to the auto-filled value; POST `/api/demographics/project-locations/:locationId/pro-forma-inject` returning suggested growth rates
+
+### 10H — Marina Map Demographics Heatmap Layer
+
+- [feature] [todo] Add demographics heatmap overlays to marina map — in `client/src/pages/marina-map.tsx`, add a "Demographics" layer group to the existing layer controls; layers: "Median Income Heatmap" (choropleth coloring counties by median HHI using Census county-level data from a `county_demographics` seed table), "Population Density" (dot density overlay), "Boat Registration Rate" (state-level choropleth); seed `county_demographics (fipsCounty, state, medianHHI, population, populationDensity, year)` from ACS 5-year county-level bulk download; render as Google Maps Data layer (GeoJSON choropleth) or Polygon layer with fill-opacity proportional to value; add a legend showing the color scale
+
+- [feature] [todo] Add Opportunity Zone layer to marina map — render OZ census tracts as a semi-transparent green polygon overlay on the marina map; fetch GeoJSON boundaries from the seeded `opportunity_zones` table joined to Census tract boundaries (seed tract boundaries as simplified GeoJSON in `census_tract_boundaries` table for the top 20 marina states); toggle via LayerToggles component alongside existing layers; clicking an OZ polygon shows a tooltip with tract FIPS and "Opportunity Zone — Tax-Advantaged Investment"
+
+### 10I — Saved Analysis History & Export
+
+- [feature] [todo] Build Saved Demographics Analyses list view — create a new page at `/analysis/demographics/saved` (or a drawer within the main demographics page); query all `demographicsProjectLocations` records across all projects for the org; display as a table: location name, address, trade area type (distance/drivetime), radius/minutes, last analyzed date, linked project name, suitability score (if computed), quick actions (re-run, open, delete); add a "Recents" section to the demographics page sidebar showing the 5 most recent analyses
+
+- [feature] [todo] Add Excel export for demographics analysis — in `client/src/pages/analysis/demographics/Index.tsx`, add an "Export Excel" button alongside the existing ExportPdfButton; use ExcelJS on the server; POST `/api/demographics/export/excel` accepting the full demographics payload; generate a workbook with sheets: "Summary" (all KPI cards), "Population" (age distribution, generational cohorts, race/ethnicity tables), "Income" (income distribution, HHI, per capita), "Education & Employment" (education levels, industry distribution), "Housing" (housing stats), "Business Environment" (County Business Patterns by NAICS sector); trigger file download
+
+### 10J — MarketPotentialIndex Transparency & Methodology
+
+- [feature] [todo] Make MarketPotentialIndex formula transparent and configurable — the current `MarketPotentialIndex.tsx` computes a proprietary score from population, income, education, employment density; add a "Methodology" info popover (ⓘ icon) that lists each factor with its weight (e.g., "Median HHI: 30% weight — national benchmark $75K"), the national benchmark used, and the formula; add a "Customize Weights" mode that lets the user adjust the 4 factor weights (must sum to 100%) and saves the preference; factor weights should be stored in a `marketPotentialConfig` user preference (localStorage or DB); the score label should say "Market Potential Index (MPI)" not just "Market Potential" to use consistent institutional terminology
+
+### 10K — Historical Trend Accuracy
+
+- [feature] [todo] Fix and validate MarketTrendAnalysis historical data — the `MarketTrendAnalysis.tsx` component calls FRED for state-level trends; FRED covers state-level unemployment (STATEUUR) and income (MEHOINUSXXX) but not local-level; clearly label in the UI whether each trend line is "State-Level (FRED)" or "Trade Area (Census ACS)"; for trade-area-specific trends, call the existing `getHistoricalTrends()` Census endpoint (POST `/api/demographics/historical-trends`) which fetches ACS 5-year estimates; display the data vintage label (e.g., "ACS 2023 5-Year Estimates") on every chart so institutional users know the currency of the data; add a data freshness indicator (last updated date) to each chart card header
+
 ## 🔍 AUDIT TASKS
 
 - [audit] [todo] Full connectivity audit — verify every feature in Connectivity Matrix is wired end-to-end
