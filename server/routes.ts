@@ -23,6 +23,7 @@ import { setTenantContext, clearTenantContext } from "./middleware/tenant-contex
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
 import vdrRouter from "./vdr-routes";
 import { workflowAutomationRouter } from "./routes/workflow-automation-routes";
+import { workflowEmailRouter } from "./routes/workflow-email-routes";
 import { aiDealIntelligenceRouter } from "./routes/ai-deal-intelligence-routes";
 import { investorPortalRouter } from "./routes/investor-portal-routes";
 import { portfolioMarketRouter } from "./routes/portfolio-market-routes";
@@ -489,6 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/analytics", authenticateUser, enforceTenant, requirePack("crm_pipeline"), pipelineAnalyticsRoutes);
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
   app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
+  app.use("/api/workflow-email", authenticateUser, enforceTenant, workflowEmailRouter);
 
   // ── Billing (auth required except for public plan catalog and webhooks) ──
   app.use("/api/billing", (req: any, res: any, next: any) => {

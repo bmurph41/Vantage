@@ -30,11 +30,21 @@ export type TriggerType =
 
 export interface TriggerContext {
   deal?: Record<string, any>;
+  contact?: {
+    id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+  };
   fromStage?: string;
   toStage?: string;
   score?: number;
   staleAfterDays?: number;
   triggeredBy?: string; // userId for manual trigger
+  ruleId?: string;
+  ruleName?: string;
+  executionId?: string;
   meta?: Record<string, any>;
 }
 
@@ -215,12 +225,113 @@ async function executeAction(
         return { status: 'success', result: { statusCode: res.status } };
       }
 
-      // ── Email (stub — wire to your email service) ─────────────────────────
+      // ── Send email via email-service ──────────────────────────────────────
       case 'send_email': {
-        const { to, subject, body } = action.config;
-        // TODO: wire to your email provider (Sendgrid, Resend, SES)
-        console.log(`[WorkflowEngine] EMAIL stub — to=${to} subject="${subject}"`);
-        return { status: 'success', result: { to, subject, stub: true } };
+        const { to, subject, body, templateId, recipientType } = action.config;
+
+        // Resolve recipient email
+        let recipientEmail: string;
+        let recipientName: string | undefined;
+
+        if (to === '{{deal.ownerEmail}}' || to === 'deal_owner') {
+          recipientEmail = deal?.assignedToEmail || deal?.ownerEmail || '';
+          recipientName = deal?.assignedToName || deal?.ownerName;
+        } else if (to === '{{contact.email}}' || to === 'primary_contact') {
+          recipientEmail = context.contact?.email || '';
+          recipientName = `${context.contact?.firstName || ''} ${context.contact?.lastName || ''}`.trim();
+        } else {
+          recipientEmail = interpolateTemplate(to || '', context);
+          recipientName = undefined;
+        }
+
+        if (!recipientEmail) {
+          return { status: 'failed', error: 'No recipient email resolved' };
+        }
+
+        // Resolve subject and body (template or inline)
+        let renderedSubject: string;
+        let renderedHtml: string;
+        let renderedText: string;
+        let usedTemplateId: string | null = null;
+
+        if (templateId) {
+          const tplResult = await pool.query(
+            'SELECT * FROM workflow_email_templates WHERE id = $1 AND org_id = $2',
+            [templateId, orgId]
+          );
+          if (tplResult.rows.length === 0) {
+            return { status: 'failed', error: `Template ${templateId} not found` };
+          }
+          const tpl = tplResult.rows[0];
+          renderedSubject = interpolateTemplate(tpl.subject, context);
+          const { wrapEmailTemplate } = await import('../services/email-service.js');
+          renderedHtml = wrapEmailTemplate(interpolateTemplate(tpl.body_html, context));
+          renderedText = tpl.body_text
+            ? interpolateTemplate(tpl.body_text, context)
+            : stripHtmlTags(renderedHtml);
+          usedTemplateId = templateId;
+        } else {
+          renderedSubject = interpolateTemplate(subject || '', context);
+          const { wrapEmailTemplate } = await import('../services/email-service.js');
+          renderedHtml = wrapEmailTemplate(interpolateTemplate(body || '', context));
+          renderedText = stripHtmlTags(renderedHtml);
+        }
+
+        // Send via email-service.ts
+        const { sendEmail } = await import('../services/email-service.js');
+        const sent = await sendEmail({
+          to: recipientEmail,
+          subject: renderedSubject,
+          html: renderedHtml,
+          text: renderedText,
+        });
+
+        // Log to workflow_email_log
+        await pool.query(
+          `INSERT INTO workflow_email_log
+             (org_id, rule_id, execution_id, template_id, recipient_email,
+              recipient_name, recipient_type, subject, body_preview, status, provider, sent_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            orgId,
+            context.ruleId || null,
+            context.executionId || null,
+            usedTemplateId,
+            recipientEmail,
+            recipientName || null,
+            recipientType || 'custom',
+            renderedSubject,
+            renderedHtml.substring(0, 500),
+            sent ? 'sent' : 'failed',
+            sent ? 'sendgrid' : null,
+            sent ? new Date() : null,
+          ]
+        );
+
+        // Log CRM activity
+        await pool.query(
+          `INSERT INTO crm_activities (id, org_id, entity_type, entity_id, action, actor_id, metadata, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW())`,
+          [
+            orgId,
+            deal ? 'deal' : 'contact',
+            deal?.id || context.contact?.id || null,
+            'email_sent',
+            context.triggeredBy || 'system',
+            JSON.stringify({
+              workflowRuleId: context.ruleId,
+              templateId: usedTemplateId,
+              recipientEmail,
+              subject: renderedSubject,
+              provider: 'workflow_automation',
+            }),
+          ]
+        );
+
+        return {
+          status: sent ? 'success' : 'failed',
+          result: { to: recipientEmail, subject: renderedSubject, templateId: usedTemplateId },
+        };
       }
 
       default:
@@ -233,6 +344,10 @@ async function executeAction(
 
 // ─── Template interpolation ───────────────────────────────────────────────────
 // Replaces {{deal.propertyName}}, {{deal.state}}, etc. in text templates.
+
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
 
 function interpolateTemplate(template: string, context: TriggerContext): string {
   return template.replace(/\{\{([\w.]+)\}\}/g, (_, path) => {
@@ -296,6 +411,54 @@ export const WorkflowEngine = {
       ]
     );
     executionId = exec.id;
+
+    // Enrich context for email actions
+    context.ruleId = rule.id;
+    context.ruleName = rule.name;
+    context.executionId = executionId;
+
+    // Resolve deal owner email if deal is present
+    if (context.deal?.id && !context.deal.assignedToEmail) {
+      try {
+        const { rows: ownerRows } = await pool.query(
+          `SELECT u.email, u.username FROM sourced_deals sd
+           LEFT JOIN users u ON sd.assigned_to::text = u.id::text
+           WHERE sd.id = $1 AND sd.org_id = $2`,
+          [context.deal.id, rule.org_id]
+        );
+        if (ownerRows.length > 0 && ownerRows[0].email) {
+          context.deal.assignedToEmail = ownerRows[0].email;
+          if (!context.deal.assignedToName) {
+            context.deal.assignedToName = ownerRows[0].username;
+          }
+        }
+      } catch { /* non-critical enrichment */ }
+    }
+
+    // Resolve primary contact if not already present
+    if (context.deal?.id && !context.contact) {
+      try {
+        const { rows: contactRows } = await pool.query(
+          `SELECT c.id, c.first_name, c.last_name, c.email, c.company
+           FROM crm_deal_contacts dc
+           JOIN crm_contacts c ON dc.contact_id = c.id
+           WHERE dc.deal_id = $1 AND c.org_id = $2
+           ORDER BY dc.is_primary DESC NULLS LAST, dc.created_at ASC
+           LIMIT 1`,
+          [context.deal.id, rule.org_id]
+        );
+        if (contactRows.length > 0) {
+          const c = contactRows[0];
+          context.contact = {
+            id: c.id,
+            firstName: c.first_name,
+            lastName: c.last_name,
+            email: c.email,
+            company: c.company,
+          };
+        }
+      } catch { /* non-critical enrichment */ }
+    }
 
     // Check conditions
     const conditionsPassed = evaluateConditions(rule.conditions, context);

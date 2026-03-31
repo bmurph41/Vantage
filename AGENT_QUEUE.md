@@ -3,12 +3,11 @@
 ## 🔴 TIER 1 — CRM / DEAL PIPELINE (Active Priority)
 
 - [spec] [in-progress] Write detailed build spec for Deal Comparison workspace — pull DCF + Pro Forma per deal (CRM priority #3)
-- [feature] [done] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
-- [feature] [todo] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
+- [feature] [in-progress] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
 
 ## 🟠 TIER 2 — AI ADVISOR
 
-- [spec] [todo] Spec entity injection for AI Advisor — auto-inject current Deal Room context into AI prompts
+- [spec] [in-progress] Spec entity injection for AI Advisor — auto-inject current Deal Room context into AI prompts
 - [feature] [todo] Implement AI advisor entity injection — reads modeling_project, pro forma, DCF for current deal
 
 ## 🟡 TIER 3 — DOCUMENT STUDIO / MARKETING PACKAGES
@@ -59,6 +58,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [feature] [done] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
 - [feature] [done] Add key dates display to Kanban pipeline cards — created, expected close, next follow-up (CRM priority #4)
 - [feature] [done] Fix AI advisor markdown rendering — add react-markdown renderer to chat UI
 - [spec] [done] Spec out Email send integration for CRM Workflow Automation (CRM priority #6)
@@ -81,4 +81,5 @@
 - [feature] [done] Institutional readiness
 
 ## Failed / Blocked
+- [feature] [todo] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md — 
 

@@ -124,7 +124,7 @@ export async function getSendGridClient() {
 
 // ── Email Template Helpers ──────────────────────────────────────────────
 
-function wrapEmailTemplate(bodyContent: string): string {
+export function wrapEmailTemplate(bodyContent: string): string {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: 'Lato', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #343E5C; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #EFEFF4;">

@@ -502,12 +502,39 @@ function WorkflowFormModal({ isOpen, onClose, workflow, onSubmit, isPending }: W
                     </Button>
                   </div>
                   {action.type === 'send_email' && (
-                    <Input
-                      placeholder="Email template ID or recipient"
-                      value={action.to || ''}
-                      onChange={(e) => updateAction(index, 'to', e.target.value)}
-                      data-testid={`input-action-to-${index}`}
-                    />
+                    <div className="space-y-2">
+                      <Select
+                        value={action.recipientType || 'deal_owner'}
+                        onValueChange={(value) => {
+                          const to = value === 'deal_owner' ? 'deal_owner' : value === 'contact' ? 'primary_contact' : '';
+                          updateAction(index, 'recipientType', value);
+                          updateAction(index, 'to', to);
+                        }}
+                      >
+                        <SelectTrigger data-testid={`select-action-recipient-${index}`}>
+                          <SelectValue placeholder="Recipient" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="deal_owner">Deal Owner</SelectItem>
+                          <SelectItem value="contact">Primary Contact</SelectItem>
+                          <SelectItem value="custom">Custom Email</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {action.recipientType === 'custom' && (
+                        <Input
+                          placeholder="email@example.com or {{contact.email}}"
+                          value={action.to || ''}
+                          onChange={(e) => updateAction(index, 'to', e.target.value)}
+                          data-testid={`input-action-to-${index}`}
+                        />
+                      )}
+                      <Input
+                        placeholder="Subject (supports {{tokens}})"
+                        value={action.subject || ''}
+                        onChange={(e) => updateAction(index, 'subject', e.target.value)}
+                        data-testid={`input-action-subject-${index}`}
+                      />
+                    </div>
                   )}
                   {action.type === 'create_task' && (
                     <Input

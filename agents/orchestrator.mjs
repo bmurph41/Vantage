@@ -85,7 +85,7 @@ ${journal}
 
   const result = spawnSync('claude', ['--dangerously-skip-permissions', '-p', fullPrompt], {
     cwd: WORKSPACE,
-    timeout: 15 * 60 * 1000,
+    timeout: 25 * 60 * 1000,
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
   });

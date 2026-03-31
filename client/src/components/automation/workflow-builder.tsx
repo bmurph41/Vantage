@@ -145,7 +145,7 @@ export default function WorkflowBuilder({ workflow, onSave, isOpen, onClose }: W
       case 'create_task':
         return { title: '', description: '', type: 'call', priority: 'medium', dueInDays: 1 };
       case 'send_email':
-        return { template: 'welcome', subject: '', personalizedContent: true };
+        return { recipientType: 'deal_owner', to: 'deal_owner', subject: '', body: '' };
       case 'assign_to_user':
         return { userId: '', notifyUser: true };
       case 'update_field':
@@ -513,27 +513,97 @@ function ActionEditor({ action, index, onUpdate, onRemove }: ActionEditorProps) 
       )}
 
       {action.type === 'send_email' && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div>
-            <Label className="text-xs">Email Template</Label>
-            <Select 
-              value={action.parameters.template}
-              onValueChange={(value) => onUpdate({
-                ...action,
-                parameters: { ...action.parameters, template: value }
-              })}
+            <Label className="text-xs">Recipient</Label>
+            <Select
+              value={action.parameters.recipientType || 'deal_owner'}
+              onValueChange={(value) => {
+                const to = value === 'deal_owner' ? 'deal_owner' : value === 'contact' ? 'primary_contact' : '';
+                onUpdate({
+                  ...action,
+                  parameters: { ...action.parameters, recipientType: value, to }
+                });
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="welcome">Welcome Email</SelectItem>
-                <SelectItem value="follow_up">Follow Up</SelectItem>
-                <SelectItem value="property_match">Property Match</SelectItem>
-                <SelectItem value="newsletter">Newsletter</SelectItem>
+                <SelectItem value="deal_owner">Deal Owner</SelectItem>
+                <SelectItem value="contact">Primary Contact</SelectItem>
+                <SelectItem value="custom">Custom Email</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {action.parameters.recipientType === 'custom' && (
+            <div>
+              <Label className="text-xs">Email Address</Label>
+              <Input
+                value={action.parameters.to || ''}
+                onChange={(e) => onUpdate({
+                  ...action,
+                  parameters: { ...action.parameters, to: e.target.value }
+                })}
+                placeholder="email@example.com or {{contact.email}}"
+              />
+            </div>
+          )}
+          <div>
+            <Label className="text-xs">Content Source</Label>
+            <Select
+              value={action.parameters.templateId ? 'template' : 'custom'}
+              onValueChange={(value) => {
+                if (value === 'template') {
+                  onUpdate({
+                    ...action,
+                    parameters: { ...action.parameters, subject: undefined, body: undefined }
+                  });
+                } else {
+                  onUpdate({
+                    ...action,
+                    parameters: { ...action.parameters, templateId: undefined }
+                  });
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="template">Use Template</SelectItem>
+                <SelectItem value="custom">Custom Content</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {!action.parameters.templateId && (
+            <>
+              <div>
+                <Label className="text-xs">Subject</Label>
+                <Input
+                  value={action.parameters.subject || ''}
+                  onChange={(e) => onUpdate({
+                    ...action,
+                    parameters: { ...action.parameters, subject: e.target.value }
+                  })}
+                  placeholder="{{deal.propertyName}} — Update"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Body</Label>
+                <Textarea
+                  value={action.parameters.body || ''}
+                  onChange={(e) => onUpdate({
+                    ...action,
+                    parameters: { ...action.parameters, body: e.target.value }
+                  })}
+                  placeholder="<p>Hello {{contact.firstName}},</p>"
+                  rows={3}
+                  className="font-mono text-xs"
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
