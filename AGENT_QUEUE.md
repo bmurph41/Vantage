@@ -18,7 +18,7 @@
 - [spec] [done] Spec IC Deal Review Deck — section layout, token map, PDF output route — see agents/specs/ic-deal-review-deck-spec.md
 - [feature] [in-progress] Build IC Deal Review Deck — token resolver extensions, 3 API routes, section renderer, frontend generate flow — see agents/specs/ic-deal-review-deck-spec.md
 - [spec] [done] Spec Offering Memorandum template — section modularity, token map, PDF output — see agents/specs/offering-memorandum-spec.md
-- [feature] [todo] Build Offering Memorandum — OM renderer, 3 API routes (token-status/preview/generate), frontend generate flow — see agents/specs/offering-memorandum-spec.md
+- [feature] [in-progress] Build Offering Memorandum — OM renderer, 3 API routes (token-status/preview/generate), frontend generate flow — see agents/specs/offering-memorandum-spec.md
 - [feature] [todo] Build Document Studio UI tab — InvestmentMaterialsTab with IC Deck and OM cards and generate buttons
 
 ## 🟢 TIER 4 — PROSPECTING / MARKETPLACE
@@ -469,6 +469,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [spec] [done] Spec Offering Memorandum template — section modularity, token map, PDF output
 - [spec] [done] Spec IC Deal Review Deck — section layout, token map, PDF output route
 - [migration] [done] Create document_templates and document_renders tables for Document Studio
 - [spec] [done] Spec the shared token substitution engine for Document Studio

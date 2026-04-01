@@ -140,6 +140,7 @@ import FundCashFlowDetail from './workspace/fund-cashflow-detail';
 import GlobalAssumptionsSidebar from '@/components/modeling/GlobalAssumptionsSidebar';
 import ScenarioBar from '@/components/modeling/ScenarioBar';
 import ICDeckGenerateButton from './workspace/ic-deck-generate';
+import OMGenerateButton from './workspace/om-generate';
 
 interface TabItem {
   value: string;
@@ -950,6 +951,9 @@ export default function ProjectWorkspace() {
         <TabsContent value="investment-materials" className="mt-4 space-y-6">
           {/* IC Deal Review Deck */}
           <ICDeckGenerateButton dealId={(project as any)?.dealId} projectId={projectId!} />
+
+          {/* Offering Memorandum */}
+          <OMGenerateButton dealId={(project as any)?.dealId} projectId={projectId!} />
 
           <Card>
             <CardHeader>

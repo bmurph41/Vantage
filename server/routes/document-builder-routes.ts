@@ -36,6 +36,8 @@ import {
 import { IC_DEAL_REVIEW_DECK_TEMPLATE } from '@shared/document-builder/templates/ic-deal-review-deck';
 import { pool } from '../db';
 import { renderICDeckToHtml } from '../services/document-builder/ic-deck-renderer';
+import { renderOMSectionToHtml, renderFullOMDocument } from '../services/document-builder/om-renderer';
+import { OFFERING_MEMORANDUM_TEMPLATE } from '@shared/document-builder/templates/offering-memorandum';
 
 const router = Router();
 
@@ -2021,6 +2023,324 @@ router.post('/ic-deck/generate', async (req: any, res) => {
   } catch (error: any) {
     console.error('[IC Deck] Generate error:', error);
     res.status(500).json({ error: 'Failed to generate IC Deck' });
+  }
+});
+
+// =============================================================================
+// Offering Memorandum Routes
+// =============================================================================
+
+const OM_TEMPLATE = OFFERING_MEMORANDUM_TEMPLATE;
+
+/** OM section auto-disable: optional sections disabled when primary data absent */
+function getOMDisabledSections(resolved: Record<string, any>): Record<string, string> {
+  const disabled: Record<string, string> = {};
+  if (!resolved.COMP_SET_TABLE) disabled.om_nearby_marinas = 'No competitive set data';
+  if (!resolved.MARKET_OVERVIEW_NARRATIVE && !resolved.POPULATION_5MI) {
+    disabled.om_market_overview = 'No market overview or population data';
+  }
+  return disabled;
+}
+
+/**
+ * GET /om/token-status/:dealId
+ * Check which OM tokens can be auto-resolved for this deal.
+ */
+router.get('/om/token-status/:dealId', async (req: any, res) => {
+  try {
+    const { dealId } = req.params;
+    const projectId = req.query.projectId as string | undefined;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+    const formatted = buildFormattedTokenMap(resolved, undefined, undefined, 'om');
+    const disabledSections = getOMDisabledSections(resolved);
+
+    // Walk sections and compute readiness
+    const sectionReadiness = OM_TEMPLATE.sections.map(section => {
+      const autoDisabled = !!disabledSections[section.key];
+      const resolvedTokens = section.tokens.filter(t =>
+        resolved[t] !== null && resolved[t] !== undefined
+      ).length;
+      return {
+        key: section.key,
+        title: section.title,
+        required: section.required,
+        totalTokens: section.tokens.length,
+        resolvedTokens,
+        ready: resolvedTokens === section.tokens.length || autoDisabled,
+        autoDisabled,
+      };
+    });
+
+    // Build resolved/unresolved lists
+    const allTokens = [...new Set(OM_TEMPLATE.sections.flatMap(s => s.tokens))];
+    const resolvedList = allTokens
+      .filter(t => resolved[t] !== null && resolved[t] !== undefined)
+      .map(t => ({
+        token: t,
+        formatted: formatted[t]?.formatted || String(resolved[t]),
+        source: formatted[t]?.source || 'live',
+      }));
+    const unresolvedList = allTokens
+      .filter(t => resolved[t] === null || resolved[t] === undefined)
+      .map(t => ({
+        token: t,
+        source: formatted[t]?.source || 'unknown',
+        isManual: formatted[t]?.isManual || false,
+      }));
+
+    const overallReady = sectionReadiness
+      .filter(s => s.required)
+      .every(s => s.ready);
+
+    res.json({
+      total: allTokens.length,
+      resolved: resolvedList.length,
+      unresolved: unresolvedList.length,
+      resolvedList,
+      unresolvedList,
+      sectionReadiness,
+      overallReady,
+    });
+  } catch (error: any) {
+    console.error('[OM] Token status error:', error);
+    res.status(500).json({ error: 'Failed to check OM token status' });
+  }
+});
+
+/**
+ * GET /om/preview/:dealId
+ * Returns HTML preview of the full OM for in-browser rendering with token highlighting.
+ */
+router.get('/om/preview/:dealId', async (req: any, res) => {
+  try {
+    const { dealId } = req.params;
+    const projectId = req.query.projectId as string | undefined;
+    const sectionsFilter = req.query.sections ? (req.query.sections as string).split(',') : undefined;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+    const formatted = buildFormattedTokenMap(resolved, undefined, undefined, 'om');
+    const disabledSections = getOMDisabledSections(resolved);
+
+    // Filter sections
+    const sections = OM_TEMPLATE.sections.filter(s => {
+      if (!s.enabled) return false;
+      if (disabledSections[s.key]) return false;
+      if (sectionsFilter && !sectionsFilter.includes(s.key)) return false;
+      return true;
+    });
+
+    // Render each section
+    const renderedSections = sections.map(section => {
+      const html = renderOMSectionToHtml(section, resolved, formatted);
+      const sectionUnresolved = section.tokens.filter(t =>
+        resolved[t] === null || resolved[t] === undefined
+      );
+      return { key: section.key, title: section.title, enabled: true, html, unresolvedTokens: sectionUnresolved };
+    });
+
+    // Token summary
+    const allTokens = [...new Set(OM_TEMPLATE.sections.flatMap(s => s.tokens))];
+    const resolvedCount = allTokens.filter(t => resolved[t] !== null && resolved[t] !== undefined).length;
+    const unresolvedList = allTokens.filter(t => resolved[t] === null || resolved[t] === undefined);
+
+    // Full HTML document
+    const fullHtml = renderFullOMDocument(sections, resolved, formatted, {
+      watermark: req.query.watermark as string | undefined,
+      confidentialFooter: true,
+      waveMotif: true,
+      includePageNumbers: true,
+    });
+
+    res.json({
+      html: fullHtml,
+      sections: renderedSections,
+      tokenSummary: {
+        total: allTokens.length,
+        resolved: resolvedCount,
+        unresolved: unresolvedList.length,
+        unresolvedList,
+      },
+    });
+  } catch (error: any) {
+    console.error('[OM] Preview error:', error);
+    res.status(500).json({ error: 'Failed to generate OM preview' });
+  }
+});
+
+/**
+ * POST /om/generate
+ * Full OM generation — creates document, resolves tokens, renders all sections, queues export.
+ */
+router.post('/om/generate', async (req: any, res) => {
+  try {
+    const { dealId, projectId, format, overrides, sections: sectionFilter, options } = req.body;
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+    const exportFormat = format || 'pdf';
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // 1. Validate deal exists and belongs to org
+    const dealResult = await pool.query(
+      'SELECT id, title, name, modeling_project_id FROM crm_deals WHERE id = $1 AND org_id = $2 LIMIT 1',
+      [dealId, orgId]
+    );
+    if (dealResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+    const deal = dealResult.rows[0];
+    const resolvedProjectId = projectId || deal.modeling_project_id;
+    const propertyName = deal.title || deal.name || 'Untitled';
+
+    // 2. Resolve all tokens
+    const resolved = await resolveTokens({ dealId, projectId: resolvedProjectId, orgId });
+
+    // 3. Apply overrides
+    if (overrides && typeof overrides === 'object') {
+      Object.assign(resolved, overrides);
+    }
+    const formatted = buildFormattedTokenMap(resolved, overrides, undefined, 'om');
+    const disabledSections = getOMDisabledSections(resolved);
+
+    // 4. Determine enabled sections
+    const enabledSections = OM_TEMPLATE.sections.filter(s => {
+      if (!s.enabled) return false;
+      if (disabledSections[s.key]) return false;
+      if (sectionFilter && sectionFilter.length > 0 && !sectionFilter.includes(s.key)) return false;
+      return true;
+    });
+
+    // 5. Token summary
+    const allTokens = [...new Set(OM_TEMPLATE.sections.flatMap(s => s.tokens))];
+    const resolvedCount = allTokens.filter(t => resolved[t] !== null && resolved[t] !== undefined).length;
+    const unresolvedList = allTokens.filter(t => resolved[t] === null || resolved[t] === undefined);
+
+    // 6. Create om_builder_documents record
+    const docId = crypto.randomUUID();
+    const now = new Date();
+    await db.insert(omBuilderDocuments).values({
+      id: docId,
+      dealId,
+      documentType: 'offering_memorandum' as any,
+      title: `Offering Memorandum — ${propertyName}`,
+      audience: 'potential_buyer' as any,
+      status: 'generating' as any,
+      metadata: {
+        propertyName,
+        generatedAt: now.toISOString(),
+        format: exportFormat,
+        templateId: OM_TEMPLATE.id,
+      },
+      completionStatus: {
+        totalSections: enabledSections.length,
+        completedSections: enabledSections.length,
+        percentage: 100,
+        readyToExport: true,
+      },
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // 7. Create om_document_sections records with rendered content
+    for (const section of enabledSections) {
+      const sectionHtml = renderOMSectionToHtml(section, resolved, formatted);
+      await db.insert(omDocumentSections).values({
+        id: crypto.randomUUID(),
+        documentId: docId,
+        sectionKey: section.key,
+        order: section.order,
+        enabled: true,
+        content: { renderedHtml: sectionHtml },
+        dataBindings: {},
+        media: {},
+        completionStatus: { isComplete: true, percentage: 100, completedFields: [], missingFields: [], missingMedia: [], warnings: [] },
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // 8. Create document_renders record (token snapshot for audit)
+    const renderId = crypto.randomUUID();
+    try {
+      await pool.query(
+        `INSERT INTO document_renders (id, org_id, document_id, deal_id, rendered_html, token_snapshot, token_stats, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', NOW())`,
+        [
+          renderId,
+          orgId,
+          docId,
+          dealId,
+          'OM rendered',
+          JSON.stringify(resolved),
+          JSON.stringify({ total: allTokens.length, resolved: resolvedCount, unresolved: unresolvedList.length }),
+        ]
+      );
+    } catch (renderErr) {
+      console.warn('[OM] document_renders insert failed (non-critical):', renderErr);
+    }
+
+    // 9. Create export job
+    const exportJobId = crypto.randomUUID();
+    const exportFileName = `OM_${propertyName.replace(/[^a-zA-Z0-9]/g, '_')}_${now.toISOString().split('T')[0]}.${exportFormat}`;
+    await db.insert(omExportJobs).values({
+      id: exportJobId,
+      documentId: docId,
+      format: exportFormat as any,
+      status: 'queued' as any,
+      outputFileName: exportFileName,
+      options: {
+        includePageNumbers: options?.includePageNumbers ?? true,
+        includeTableOfContents: options?.includeTableOfContents ?? true,
+        confidentialFooter: options?.confidentialFooter ?? true,
+        watermark: options?.watermark,
+        companyName: options?.companyName,
+        companyLogo: options?.companyLogo,
+        orientation: 'portrait',
+        waveMotif: options?.waveMotif ?? true,
+      },
+      createdAt: now,
+    });
+
+    // 10. Log CRM activity
+    try {
+      await pool.query(
+        `INSERT INTO crm_activities (id, org_id, entity_type, entity_id, type, description, metadata, user_id, created_at)
+         VALUES (gen_random_uuid(), $1, 'deal', $2, 'document', $3, $4, $5, NOW())`,
+        [
+          orgId,
+          dealId,
+          `Offering Memorandum generated for ${propertyName}`,
+          JSON.stringify({ documentType: 'offering_memorandum', documentId: docId, renderId, format: exportFormat, sections: enabledSections.length }),
+          userId,
+        ]
+      );
+    } catch (actErr) {
+      console.warn('[OM] Activity log failed (non-critical):', actErr);
+    }
+
+    res.json({
+      documentId: docId,
+      exportJobId,
+      renderId,
+      status: 'queued',
+      tokenSummary: {
+        total: allTokens.length,
+        resolved: resolvedCount,
+        unresolved: unresolvedList.length,
+        unresolvedList,
+      },
+      estimatedPages: OM_TEMPLATE.estimatedPages.min,
+      message: `Offering Memorandum queued for ${exportFormat.toUpperCase()} export with ${enabledSections.length} sections`,
+    });
+  } catch (error: any) {
+    console.error('[OM] Generate error:', error);
+    res.status(500).json({ error: 'Failed to generate Offering Memorandum' });
   }
 });
 

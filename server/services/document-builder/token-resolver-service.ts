@@ -57,15 +57,16 @@ export async function resolveTokens(ctx: ResolverContext): Promise<ResolvedToken
     resolveProformaTokens(ctx),
   ]);
 
-  // Resolve table tokens + system tokens
-  const [tableData, systemData, sourcesUsesData] = await Promise.all([
+  // Resolve table tokens + system tokens + OM-specific tokens
+  const [tableData, systemData, sourcesUsesData, omData] = await Promise.all([
     resolveTableTokens(ctx),
     resolveSystemTokens(),
     resolveSourcesUsesToken(ctx, capitalStackData, modelingData),
+    resolveOmTokens(ctx),
   ]);
 
   // Merge all resolved values
-  Object.assign(resolved, dealData, propertyData, modelingData, capitalStackData, exitData, compsData, demoData, proformaData, tableData, systemData, sourcesUsesData);
+  Object.assign(resolved, dealData, propertyData, modelingData, capitalStackData, exitData, compsData, demoData, proformaData, tableData, systemData, sourcesUsesData, omData);
 
   return resolved;
 }
@@ -483,6 +484,186 @@ function buildSensitivityTable(label: string, baseCagr: number, baseIrr: number 
     { scenario: 'Base', cagr: baseCagr, irrGross: baseIrr, isBaseCase: true },
     { scenario: 'High', cagr: highCagr, irrGross: baseIrr ? baseIrr + 2.0 : null },
   ];
+}
+
+// ─── OM-Specific Tokens ───────────────────────────────────────────────────
+
+async function resolveOmTokens(ctx: ResolverContext): Promise<ResolvedTokenMap> {
+  const result: ResolvedTokenMap = {};
+  try {
+    const projectId = ctx.projectId || await findProjectForDeal(ctx.dealId, ctx.orgId);
+
+    // LOCATION_TAGLINE — manual token, check om_document_sections or om_builder_documents metadata
+    try {
+      const { rows: docRows } = await pool.query(
+        `SELECT metadata FROM om_builder_documents
+         WHERE deal_id = $1 AND document_type = 'offering_memorandum'
+         ORDER BY created_at DESC LIMIT 1`,
+        [ctx.dealId]
+      );
+      if (docRows.length > 0 && docRows[0].metadata?.locationTagline) {
+        result.LOCATION_TAGLINE = docRows[0].metadata.locationTagline;
+      }
+      if (docRows.length > 0 && docRows[0].metadata?.tourismFacts) {
+        result.TOURISM_FACTS = docRows[0].metadata.tourismFacts;
+      }
+    } catch {
+      // Non-critical — manual tokens may not exist yet
+    }
+
+    // BOATING_PARTICIPATION_PCT — from demographics
+    if (projectId) {
+      try {
+        const [demo] = await db.select().from(targetDemographics)
+          .where(eq(targetDemographics.projectId, projectId))
+          .limit(1);
+        if (demo && (demo as any).boatingParticipationPct) {
+          result.BOATING_PARTICIPATION_PCT = parseNum((demo as any).boatingParticipationPct);
+        }
+      } catch {
+        // Demographics may not have this field
+      }
+    }
+
+    // OM_NOI_TABLE — structured table from pro forma (RLS)
+    if (projectId) {
+      try {
+        const { rows } = await pool.query(
+          `SELECT revenue, noi, cogs, operating_expenses, assumptions, cash_flows
+           FROM modeling_scenario_versions
+           WHERE modeling_project_id = $1 AND scenario_type = 'base' AND is_current_version = true
+           ORDER BY created_at DESC LIMIT 1`,
+          [projectId]
+        );
+        if (rows.length > 0) {
+          const sv = rows[0];
+          const cashFlows = sv.cash_flows;
+          const assumptions = sv.assumptions || {};
+
+          // Build OM_NOI_TABLE — Current year NOI with adjustments
+          const revenue = parseNum(sv.revenue) || 0;
+          const cogs = parseNum(sv.cogs) || 0;
+          const opex = parseNum(sv.operating_expenses) || 0;
+          const noi = parseNum(sv.noi) || 0;
+          const grossProfit = revenue - cogs;
+
+          result.OM_NOI_TABLE = {
+            headers: ['Line Item', 'Owner F/C', 'Adjustment Amount', 'Adj F/C'],
+            sections: [
+              {
+                title: 'Revenue',
+                rows: [{ 'Line Item': 'Total Revenue', 'Owner F/C': revenue, 'Adjustment Amount': 0, 'Adj F/C': revenue }],
+                subtotal: { 'Line Item': 'Total Revenue', 'Owner F/C': revenue, 'Adjustment Amount': 0, 'Adj F/C': revenue },
+              },
+              {
+                title: 'COGS',
+                rows: [{ 'Line Item': 'Cost of Goods Sold', 'Owner F/C': cogs, 'Adjustment Amount': 0, 'Adj F/C': cogs }],
+                subtotal: { 'Line Item': 'Total COGS', 'Owner F/C': cogs, 'Adjustment Amount': 0, 'Adj F/C': cogs },
+              },
+              {
+                title: 'Gross Profit',
+                rows: [{ 'Line Item': 'Gross Profit', 'Owner F/C': grossProfit, 'Adjustment Amount': 0, 'Adj F/C': grossProfit }],
+              },
+              {
+                title: 'Operating Expenses',
+                rows: [{ 'Line Item': 'Total Operating Expenses', 'Owner F/C': opex, 'Adjustment Amount': 0, 'Adj F/C': opex }],
+                subtotal: { 'Line Item': 'Total OpEx', 'Owner F/C': opex, 'Adjustment Amount': 0, 'Adj F/C': opex },
+              },
+            ],
+            totals: { 'Line Item': 'Net Operating Income (NOI)', 'Owner F/C': noi, 'Adjustment Amount': 0, 'Adj F/C': noi },
+          };
+
+          // Build OM_PROFORMA_TABLE — multi-year projection
+          if (Array.isArray(cashFlows) && cashFlows.length > 0) {
+            const years = cashFlows.slice(0, 5);
+            const pfHeaders = ['Line Item', 'F/C', ...years.map((_: any, i: number) => `Year ${i + 1}`)];
+            const buildRow = (label: string, fcVal: number, field: string) => {
+              const row: Record<string, string | number> = { 'Line Item': label, 'F/C': fcVal };
+              years.forEach((cf: any, i: number) => {
+                row[`Year ${i + 1}`] = parseNum(cf[field]) || 0;
+              });
+              return row;
+            };
+
+            result.OM_PROFORMA_TABLE = {
+              headers: pfHeaders,
+              sections: [
+                {
+                  title: 'Revenue',
+                  rows: [buildRow('Total Revenue', revenue, 'revenue')],
+                  subtotal: buildRow('Total Revenue', revenue, 'revenue'),
+                },
+                {
+                  title: 'COGS',
+                  rows: [buildRow('Cost of Goods Sold', cogs, 'cogs')],
+                },
+                {
+                  title: 'Operating Expenses',
+                  rows: [buildRow('Operating Expenses', opex, 'operatingExpenses')],
+                },
+              ],
+              totals: buildRow('Net Operating Income', noi, 'noi'),
+            };
+
+            // Build OM_EXPENSE_ASSUMPTIONS_TABLE
+            const expenseRows: Array<Record<string, string | number>> = [];
+            if (assumptions.payrollCagr) {
+              expenseRows.push({
+                'Line Item': 'Payroll',
+                'F/C Amount': 0,
+                'Year 1 Amount': 0,
+                'Comment / Methodology': `${assumptions.payrollCagr}% annual growth`,
+              });
+            }
+            if (assumptions.insuranceCagr) {
+              expenseRows.push({
+                'Line Item': 'Insurance',
+                'F/C Amount': 0,
+                'Year 1 Amount': 0,
+                'Comment / Methodology': `${assumptions.insuranceCagr}% annual growth`,
+              });
+            }
+            if (assumptions.propertyTaxCagr) {
+              expenseRows.push({
+                'Line Item': 'Property Tax',
+                'F/C Amount': 0,
+                'Year 1 Amount': 0,
+                'Comment / Methodology': `${assumptions.propertyTaxCagr}% annual growth`,
+              });
+            }
+            if (assumptions.mgmtFeePct) {
+              expenseRows.push({
+                'Line Item': 'Management Fee',
+                'F/C Amount': 0,
+                'Year 1 Amount': 0,
+                'Comment / Methodology': `${assumptions.mgmtFeePct}% of revenue`,
+              });
+            }
+            if (assumptions.capexReservePct) {
+              expenseRows.push({
+                'Line Item': 'CapEx Reserve',
+                'F/C Amount': 0,
+                'Year 1 Amount': 0,
+                'Comment / Methodology': `${assumptions.capexReservePct}% of revenue`,
+              });
+            }
+
+            if (expenseRows.length > 0) {
+              result.OM_EXPENSE_ASSUMPTIONS_TABLE = {
+                headers: ['Line Item', 'F/C Amount', 'Year 1 Amount', 'Comment / Methodology'],
+                rows: expenseRows,
+              };
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[TokenResolver] OM table tokens resolve error:', e);
+      }
+    }
+  } catch (e) {
+    console.error('[TokenResolver] OM resolve error:', e);
+  }
+  return result;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

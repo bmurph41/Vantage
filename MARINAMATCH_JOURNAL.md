@@ -2,6 +2,21 @@
 
 ## Current State (2026-04-01)
 
+### ✅ COMPLETE — Offering Memorandum Rendering Pipeline (2026-04-01)
+
+## Builder Agent — 2026-04-01
+- Completed: OM renderer, 3 API routes, frontend generate/preview flow
+- Files changed:
+  - `server/services/document-builder/om-renderer.ts` — NEW (~500 lines). Portrait HTML renderer with all block type handlers: section dividers (large numeral), heading, text, image (collage + standard), metric_grid (6 styles: offering_terms, offering_summary, highlights_4grid, stat_callouts, broker_cards, opportunity_cards, demographics_3ring), table (key_value, amenities_checklist, lease_panel, structured/sectioned financial tables, rate_table, bnb_vessel, toc_numbered, comp_table), chart (data table v1), bullet_list. Full OM CSS: cream/gold/navy palette, Playfair Display + Source Sans Pro typography, wave motif SVG, page breaks, token highlighting.
+  - `server/services/document-builder/token-resolver-service.ts` — MODIFIED. Added `resolveOmTokens()` function: resolves 6 OM-specific tokens (OM_NOI_TABLE, OM_PROFORMA_TABLE, OM_EXPENSE_ASSUMPTIONS_TABLE from pro forma via raw pool.query; LOCATION_TAGLINE and TOURISM_FACTS from om_builder_documents metadata; BOATING_PARTICIPATION_PCT from demographics).
+  - `server/routes/document-builder-routes.ts` — MODIFIED. Added 3 OM routes: `GET /om/token-status/:dealId` (section-level readiness with auto-disable), `GET /om/preview/:dealId` (full HTML preview), `POST /om/generate` (document creation + section rendering + export job + CRM activity log). Added `getOMDisabledSections()` for auto-disable logic (nearby_marinas when no comps, market_overview when no population data).
+  - `client/src/pages/modeling/projects/workspace/om-generate.tsx` — NEW (~280 lines). OMGenerateButton component with: token readiness check, section-level readiness display (resolved/total per section), section toggle checklist, PDF/DOCX format selector, watermark input, generate mutation with export job polling, HTML preview in iframe dialog.
+  - `client/src/pages/modeling/projects/workspace.tsx` — MODIFIED. Imported OMGenerateButton, rendered in Investment Materials tab below IC Deck button.
+- Validation: Server restarted, all 3 GET routes return 200. Token status shows 88 tokens, section readiness with auto-disable. Preview generates 24KB HTML across 7 sections. POST route requires auth/CSRF (correct).
+- Notes: Market Overview section correctly auto-disabled when population data absent. OM_NOI_TABLE builds structured JSON with Revenue/COGS/Gross Profit/Operating Expenses/NOI sections. All OM routes follow same pattern as IC Deck routes.
+
+---
+
 ### ✅ COMPLETE — Offering Memorandum Spec (2026-04-01)
 
 ## Planner Agent — 2026-04-01
