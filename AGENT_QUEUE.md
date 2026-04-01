@@ -4,16 +4,16 @@
 
 - [spec] [in-progress] Write detailed build spec for Deal Comparison workspace — pull DCF + Pro Forma per deal (CRM priority #3)
 - [feature] [in-progress] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
-- [feature] [todo] Implement Google Maps & Google Places API integration with encrypted key storage — AES-256-GCM encrypted key in DB (pattern: enc:iv:ciphertext), server-side proxy routes for autocomplete (/api/google-places/autocomplete), place details (/api/google-places/details/:placeId), and geocoding (/api/google-places/geocode), reusable GooglePlaceSearch frontend component (debounced, no Google SDK), and Settings UI for key entry/masking — see attached_assets/Pasted-Implement-Google-Maps-Google-Places-API-integration-wit_1774924110030.txt for full spec
+- [feature] [in-progress] Implement Google Maps & Google Places API integration with encrypted key storage — AES-256-GCM encrypted key in DB (pattern: enc:iv:ciphertext), server-side proxy routes for autocomplete (/api/google-places/autocomplete), place details (/api/google-places/details/:placeId), and geocoding (/api/google-places/geocode), reusable GooglePlaceSearch frontend component (debounced, no Google SDK), and Settings UI for key entry/masking — see attached_assets/Pasted-Implement-Google-Maps-Google-Places-API-integration-wit_1774924110030.txt for full spec
 
 ## 🟠 TIER 2 — AI ADVISOR
 
 - [spec] [in-progress] Spec entity injection for AI Advisor — auto-inject current Deal Room context into AI prompts
-- [feature] [todo] Implement AI advisor entity injection — reads modeling_project, pro forma, DCF for current deal
+- [feature] [in-progress] Implement AI advisor entity injection — reads modeling_project, pro forma, DCF for current deal
 
 ## 🟡 TIER 3 — DOCUMENT STUDIO / MARKETING PACKAGES
 
-- [spec] [todo] Spec the shared token substitution engine for Document Studio
+- [spec] [done] Spec the shared token substitution engine for Document Studio — see agents/specs/token-substitution-engine-spec.md
 - [migration] [todo] Create document_templates and document_renders tables for Document Studio
 - [feature] [todo] Build token substitution engine — Express route + token resolver pulling live Pro Forma and DCF data
 - [spec] [todo] Spec IC Deal Review Deck — section layout, token map, PDF output route

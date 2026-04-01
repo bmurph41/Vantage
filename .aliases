@@ -1,0 +1,1 @@
+alias agentcheck='pgrep -f run-loop.sh && echo ✅ Running || (echo ❌ Stopped - restarting... && nohup bash ~/workspace/agents/run-loop.sh 10 > ~/workspace/agent-logs/nohup.log 2>&1 & echo ✅ Restarted)'

@@ -1,6 +1,18 @@
 # MarinaMatch Platform Journal
 
-## Current State (2026-03-30)
+## Current State (2026-04-01)
+
+### ✅ COMPLETE — Token Substitution Engine Spec (2026-04-01)
+
+## Planner Agent — 2026-04-01
+- Spec written: Shared Token Substitution Engine for Document Studio
+- Output: agents/specs/token-substitution-engine-spec.md
+- Builder task added: yes (already existed in AGENT_QUEUE.md)
+- Notes: Existing `token-resolver-service.ts` already resolves 120+ tokens from 8 data sources (deal, property, modeling, capital stack, exit, pro forma, comps, demographics). Three parallel interpolation systems exist: AI Content (`{{key}}`), Workflow Engine (`{{entity.field}}`), Document Builder (`{{TOKEN_NAME}}`). Spec covers the **missing middle layer**: format-aware substitution (currency/percent/number/date), 3 new API endpoints (resolve-formatted, render, render-all), frontend TokenCatalog/ManualTokenEditor components, and optional wiring into workflow email templates for consistent formatting. Medium complexity (~500-700 lines across 4-5 files). No new DB tables needed — uses existing `om_builder_documents` + `om_document_sections` + `MASTER_TOKEN_MAP`.
+
+---
+
+## Previous State (2026-03-30)
 
 ### ✅ COMPLETE — Global Activity Log Polish (2026-03-30)
 Full polish of the global activity log (CRM priority #5): timestamps, filters, pagination.
