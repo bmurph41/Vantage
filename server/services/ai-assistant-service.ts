@@ -13,7 +13,7 @@
 
 import OpenAI from 'openai';
 import { db } from '../db';
-import { eq, and, desc, inArray, sql as drizzleSql } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql as drizzleSql, ilike } from 'drizzle-orm';
 import {
   crmDeals,
   modelingProjects,
@@ -21,6 +21,9 @@ import {
   crmProperties,
   salesComps,
   aiAssistantFeedback,
+  dealWorkspaces,
+  crmNotes,
+  crmContacts,
 } from '@shared/schema';
 import { getRAGContext, learnFromFeedback } from './knowledge-base-service';
 import { trackAIUsage } from './ai/spending-guard';
@@ -354,21 +357,148 @@ Vague action items are not action items. Every item should be completable and ve
 // ─── Entity data enrichment ───────────────────────────────────────────────────
 
 async function enrichEntityData(context: AssistantContext): Promise<Record<string, any>> {
-  if (!context.entityId || !context.orgId) return {};
+  if (!context.entityId || !context.orgId) return context.entityData ?? {};
 
   try {
     if (context.entityType === 'deal') {
       const [deal] = await db.select().from(crmDeals)
         .where(and(eq(crmDeals.id, context.entityId), eq(crmDeals.ownerId, context.orgId)))
         .limit(1);
-      if (deal) return { deal };
+      if (!deal) return context.entityData ?? {};
+
+      const enriched: Record<string, any> = { deal };
+
+      // Attach linked modeling project (IRR, cap rate, purchase price, EBITDA)
+      if (deal.modelingProjectId) {
+        const [model] = await db.select({
+          id: modelingProjects.id,
+          marinaName: modelingProjects.marinaName,
+          purchasePrice: modelingProjects.purchasePrice,
+          year1CapRate: modelingProjects.year1CapRate,
+          totalStorageUnits: modelingProjects.totalStorageUnits,
+          ebitda: modelingProjects.ebitda,
+          uwStage: modelingProjects.uwStage,
+          customMetrics: modelingProjects.customMetrics,
+          notes: modelingProjects.notes,
+        }).from(modelingProjects)
+          .where(and(eq(modelingProjects.id, deal.modelingProjectId), eq(modelingProjects.orgId, context.orgId)))
+          .limit(1);
+        if (model) enriched.financialModel = model;
+      }
+
+      // Attach linked workspace (DD progress, doc count)
+      const [workspace] = await db.select({
+        id: dealWorkspaces.id,
+        name: dealWorkspaces.name,
+        status: dealWorkspaces.status,
+        openDdTasks: dealWorkspaces.openDdTasks,
+        totalDdTasks: dealWorkspaces.totalDdTasks,
+        pendingDocuments: dealWorkspaces.pendingDocuments,
+        targetPrice: dealWorkspaces.targetPrice,
+        expectedCloseDate: dealWorkspaces.expectedCloseDate,
+        priority: dealWorkspaces.priority,
+      }).from(dealWorkspaces)
+        .where(and(eq(dealWorkspaces.dealId, context.entityId), eq(dealWorkspaces.orgId, context.orgId)))
+        .limit(1);
+      if (workspace) {
+        const completedTasks = (workspace.totalDdTasks ?? 0) - (workspace.openDdTasks ?? 0);
+        const ddPct = workspace.totalDdTasks ? Math.round((completedTasks / workspace.totalDdTasks) * 100) : 0;
+        enriched.workspace = { ...workspace, ddCompletionPct: ddPct };
+      }
+
+      // Attach recent notes (last 5)
+      const notes = await db.select({
+        content: crmNotes.content,
+        createdAt: crmNotes.createdAt,
+      }).from(crmNotes)
+        .where(and(eq(crmNotes.entityId, context.entityId), eq(crmNotes.orgId, context.orgId)))
+        .orderBy(desc(crmNotes.createdAt))
+        .limit(5);
+      if (notes.length) enriched.recentNotes = notes;
+
+      return enriched;
     }
 
     if (context.entityType === 'modeling_project') {
       const [model] = await db.select().from(modelingProjects)
         .where(and(eq(modelingProjects.id, context.entityId), eq(modelingProjects.orgId, context.orgId)))
         .limit(1);
-      if (model) return { financialModel: model };
+      if (!model) return context.entityData ?? {};
+
+      const enriched: Record<string, any> = { financialModel: model };
+
+      // Attach linked deal context if available
+      if (model.dealId) {
+        const [deal] = await db.select({
+          id: crmDeals.id,
+          name: crmDeals.name,
+          stage: crmDeals.stage,
+          askingPrice: crmDeals.askingPrice,
+          city: crmDeals.city,
+          state: crmDeals.state,
+        }).from(crmDeals)
+          .where(and(eq(crmDeals.id, model.dealId), eq(crmDeals.ownerId, context.orgId)))
+          .limit(1);
+        if (deal) enriched.deal = deal;
+      }
+
+      return enriched;
+    }
+
+    if (context.entityType === 'workspace') {
+      const [workspace] = await db.select().from(dealWorkspaces)
+        .where(and(eq(dealWorkspaces.id, context.entityId), eq(dealWorkspaces.orgId, context.orgId)))
+        .limit(1);
+      if (!workspace) return context.entityData ?? {};
+
+      const enriched: Record<string, any> = { workspace };
+      const completedTasks = (workspace.totalDdTasks ?? 0) - (workspace.openDdTasks ?? 0);
+      enriched.workspace.ddCompletionPct = workspace.totalDdTasks
+        ? Math.round((completedTasks / workspace.totalDdTasks) * 100) : 0;
+
+      // Attach linked deal
+      if (workspace.dealId) {
+        const [deal] = await db.select({
+          id: crmDeals.id,
+          name: crmDeals.name,
+          stage: crmDeals.stage,
+          askingPrice: crmDeals.askingPrice,
+          city: crmDeals.city,
+          state: crmDeals.state,
+        }).from(crmDeals)
+          .where(and(eq(crmDeals.id, workspace.dealId), eq(crmDeals.ownerId, context.orgId)))
+          .limit(1);
+        if (deal) enriched.deal = deal;
+      }
+
+      // Attach linked financial model
+      if (workspace.modelingProjectId) {
+        const [model] = await db.select({
+          id: modelingProjects.id,
+          purchasePrice: modelingProjects.purchasePrice,
+          year1CapRate: modelingProjects.year1CapRate,
+          ebitda: modelingProjects.ebitda,
+          uwStage: modelingProjects.uwStage,
+          customMetrics: modelingProjects.customMetrics,
+        }).from(modelingProjects)
+          .where(and(eq(modelingProjects.id, workspace.modelingProjectId), eq(modelingProjects.orgId, context.orgId)))
+          .limit(1);
+        if (model) enriched.financialModel = model;
+      }
+
+      // Attach linked DD project
+      if (workspace.ddProjectId) {
+        const [ddProject] = await db.select({
+          id: projects.id,
+          name: projects.name,
+          status: projects.status,
+        }).from(projects)
+          .where(and(eq(projects.id, workspace.ddProjectId), eq(projects.orgId, context.orgId)))
+          .limit(1);
+        if (ddProject) enriched.ddProject = ddProject;
+      }
+
+      return enriched;
     }
 
     if (context.entityType === 'property') {
@@ -521,25 +651,233 @@ async function getTenantContext(orgId: string): Promise<string> {
   }
 }
 
+// ─── Advisor tool definitions (OpenAI function calling) ─────────────────────
+
+const ADVISOR_TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'lookup_deal',
+      description: 'Look up a deal by name or ID to get current stage, asking price, location, linked financial model KPIs, and DD progress.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Deal name (partial match) or exact deal ID' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_workspace_status',
+      description: 'Get the due diligence status, open tasks, pending documents, and financial model KPIs for a deal workspace by workspace ID or deal name.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Workspace name, deal name, or workspace ID' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_deal_note',
+      description: 'Create a note on a CRM deal. Use this when the user asks to "add a note", "log something", or "save this to the deal".',
+      parameters: {
+        type: 'object',
+        properties: {
+          dealId: { type: 'string', description: 'The deal ID to attach the note to' },
+          content: { type: 'string', description: 'Note content to save' },
+        },
+        required: ['dealId', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_pipeline_deals',
+      description: 'List active deals in the pipeline with their stage, asking price, and key metrics. Use when the user asks about the overall pipeline or deal count.',
+      parameters: {
+        type: 'object',
+        properties: {
+          stage: { type: 'string', description: 'Optional stage filter (e.g. "loi", "due_diligence", "active")' },
+          limit: { type: 'number', description: 'Maximum number of deals to return (default 10)' },
+        },
+      },
+    },
+  },
+];
+
+async function executeAdvisorTool(
+  toolName: string,
+  args: Record<string, any>,
+  orgId: string,
+  userId?: string
+): Promise<string> {
+  try {
+    if (toolName === 'lookup_deal') {
+      const q = args.query as string;
+      const deals = await db.select({
+        id: crmDeals.id,
+        name: crmDeals.name,
+        stage: crmDeals.stage,
+        askingPrice: crmDeals.askingPrice,
+        city: crmDeals.city,
+        state: crmDeals.state,
+        modelingProjectId: crmDeals.modelingProjectId,
+      }).from(crmDeals)
+        .where(and(
+          eq(crmDeals.ownerId, orgId),
+          ilike(crmDeals.name, `%${q}%`)
+        ))
+        .limit(3);
+
+      if (!deals.length) return JSON.stringify({ error: `No deal found matching "${q}"` });
+
+      const deal = deals[0];
+      const result: Record<string, any> = { deal };
+
+      if (deal.modelingProjectId) {
+        const [model] = await db.select({
+          purchasePrice: modelingProjects.purchasePrice,
+          year1CapRate: modelingProjects.year1CapRate,
+          ebitda: modelingProjects.ebitda,
+          uwStage: modelingProjects.uwStage,
+        }).from(modelingProjects)
+          .where(eq(modelingProjects.id, deal.modelingProjectId))
+          .limit(1);
+        if (model) result.financialModel = model;
+      }
+
+      const [workspace] = await db.select({
+        id: dealWorkspaces.id,
+        openDdTasks: dealWorkspaces.openDdTasks,
+        totalDdTasks: dealWorkspaces.totalDdTasks,
+        pendingDocuments: dealWorkspaces.pendingDocuments,
+        status: dealWorkspaces.status,
+      }).from(dealWorkspaces)
+        .where(and(eq(dealWorkspaces.dealId, deal.id), eq(dealWorkspaces.orgId, orgId)))
+        .limit(1);
+      if (workspace) {
+        const completed = (workspace.totalDdTasks ?? 0) - (workspace.openDdTasks ?? 0);
+        const pct = workspace.totalDdTasks ? Math.round((completed / workspace.totalDdTasks) * 100) : 0;
+        result.workspace = { ...workspace, ddCompletionPct: pct };
+      }
+
+      return JSON.stringify(result);
+    }
+
+    if (toolName === 'get_workspace_status') {
+      const q = args.query as string;
+      const workspaces = await db.select().from(dealWorkspaces)
+        .where(and(
+          eq(dealWorkspaces.orgId, orgId),
+          ilike(dealWorkspaces.name, `%${q}%`)
+        ))
+        .limit(3);
+
+      if (!workspaces.length) return JSON.stringify({ error: `No workspace found matching "${q}"` });
+
+      const ws = workspaces[0];
+      const completed = (ws.totalDdTasks ?? 0) - (ws.openDdTasks ?? 0);
+      const ddPct = ws.totalDdTasks ? Math.round((completed / ws.totalDdTasks) * 100) : 0;
+      const result: Record<string, any> = { workspace: { ...ws, ddCompletionPct: ddPct } };
+
+      if (ws.modelingProjectId) {
+        const [model] = await db.select({
+          purchasePrice: modelingProjects.purchasePrice,
+          year1CapRate: modelingProjects.year1CapRate,
+          ebitda: modelingProjects.ebitda,
+          uwStage: modelingProjects.uwStage,
+        }).from(modelingProjects)
+          .where(eq(modelingProjects.id, ws.modelingProjectId))
+          .limit(1);
+        if (model) result.financialModel = model;
+      }
+
+      return JSON.stringify(result);
+    }
+
+    if (toolName === 'create_deal_note') {
+      if (!userId) return JSON.stringify({ error: 'User authentication required to create notes' });
+      const { dealId, content } = args as { dealId: string; content: string };
+
+      const [deal] = await db.select({ id: crmDeals.id })
+        .from(crmDeals)
+        .where(and(eq(crmDeals.id, dealId), eq(crmDeals.ownerId, orgId)))
+        .limit(1);
+      if (!deal) return JSON.stringify({ error: `Deal ${dealId} not found` });
+
+      await db.insert(crmNotes).values({
+        content,
+        entityType: 'deal',
+        entityId: dealId,
+        orgId,
+        createdById: userId,
+        ownerId: userId,
+      });
+
+      return JSON.stringify({ success: true, message: 'Note added to deal successfully' });
+    }
+
+    if (toolName === 'list_pipeline_deals') {
+      const limit = Math.min(args.limit ?? 10, 20);
+      const deals = await db.select({
+        id: crmDeals.id,
+        name: crmDeals.name,
+        stage: crmDeals.stage,
+        askingPrice: crmDeals.askingPrice,
+        city: crmDeals.city,
+        state: crmDeals.state,
+      }).from(crmDeals)
+        .where(eq(crmDeals.ownerId, orgId))
+        .orderBy(desc(crmDeals.createdAt))
+        .limit(limit);
+
+      return JSON.stringify({ deals, count: deals.length });
+    }
+
+    return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+  } catch (err: any) {
+    console.error(`[AI Advisor Tool] ${toolName} error:`, err);
+    return JSON.stringify({ error: err.message ?? 'Tool execution failed' });
+  }
+}
+
 // ─── Page context ─────────────────────────────────────────────────────────────
 
 const PAGE_CONTEXT: Record<string, string> = {
-  '/': 'User is on the Dashboard.',
+  '/': 'User is on the Dashboard — shows portfolio KPIs, pipeline snapshot, and recent activity.',
   '/crm': 'User is in the CRM module.',
-  '/crm/deals': 'User is viewing the Deals list.',
-  '/crm/pipeline': 'User is viewing the Pipeline Kanban board.',
-  '/crm/contacts': 'User is viewing Contacts.',
-  '/crm/companies': 'User is viewing Companies.',
-  '/crm/properties': 'User is viewing Properties.',
+  '/crm/deals': 'User is viewing the Deals list — all active acquisition targets.',
+  '/crm/pipeline': 'User is viewing the Pipeline Kanban board — deals organized by stage.',
+  '/crm/contacts': 'User is viewing Contacts — brokers, sellers, lenders, and partners.',
+  '/crm/companies': 'User is viewing Companies — property owners and partner firms.',
+  '/crm/properties': 'User is viewing Properties — owned/tracked marina and CRE assets.',
   '/dd': 'User is in Due Diligence.',
-  '/dd/projects': 'User is viewing DD Projects.',
-  '/modeling': 'User is in the Financial Modeling module.',
-  '/rent-roll': 'User is in the Rent Roll module.',
-  '/sales-comps': 'User is in Sales Comps.',
-  '/docket': 'User is in The Docket (market intelligence).',
-  '/vdr': 'User is in the Virtual Data Room.',
-  '/analytics': 'User is in Analytics.',
-  '/knowledge-base': 'User is managing the AI Knowledge Base.',
+  '/dd/projects': 'User is viewing DD Projects — active and completed diligence workstreams.',
+  '/modeling': 'User is in the Financial Modeling module — DCF, waterfall, and scenario analysis.',
+  '/rent-roll': 'User is in the Rent Roll module — lease management and occupancy analytics.',
+  '/rent-roll/executive': 'User is viewing the Executive Rent Roll Dashboard — portfolio-wide revenue and occupancy trends.',
+  '/sales-comps': 'User is in Sales Comps — comparable transaction database.',
+  '/docket': 'User is in The Docket — real-time marina and CRE market intelligence, news, and deal flow signals.',
+  '/vdr': 'User is in the Virtual Data Room — secure document repository for deals.',
+  '/analytics': 'User is in Analytics — custom reports and portfolio performance metrics.',
+  '/knowledge-base': 'User is managing the AI Knowledge Base — document and URL ingestion for RAG context.',
+  '/workspaces': 'User is viewing Deal Workspaces — unified hub linking CRM, DD, VDR, and modeling for each deal.',
+  '/workspaces/': 'User is inside a Deal Workspace — the central command center for a specific acquisition, containing DD checklist, financials, VDR docs, capital markets, and red flags.',
+  '/demographics': 'User is viewing Demographics — population, income, and market data for target geographies.',
+  '/capital-markets': 'User is in Capital Markets — lender matrix, financing terms, and debt market comps.',
+  '/document-studio': 'User is in Document Studio — AI-generated IC memos, LOIs, and investment briefs.',
+  '/operations': 'User is in Operations — marina operational metrics, maintenance logs, and P&L.',
+  '/marina-map': 'User is viewing the Marina Map — geographic visualization of assets and deal targets.',
+  '/prospecting': 'User is in Prospecting — off-market deal sourcing and outreach pipeline.',
+  '/lp-portal': 'User is in the LP Portal — investor reporting, capital account summaries, and distributions.',
 };
 
 // ─── System prompt builder ────────────────────────────────────────────────────
@@ -613,29 +951,61 @@ export async function chat(
   ];
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      max_completion_tokens: 2048,
-    });
+    const activeMessages = [...messages] as OpenAI.Chat.ChatCompletionMessageParam[];
+    let finalContent = '';
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const MAX_TOOL_ROUNDS = 5;
 
-    const content = response.choices[0].message.content ?? "I'm sorry, I couldn't generate a response. Please try again.";
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: activeMessages,
+        max_completion_tokens: 2048,
+        tools: ADVISOR_TOOLS,
+        tool_choice: 'auto',
+      });
+
+      totalInputTokens += response.usage?.prompt_tokens ?? 0;
+      totalOutputTokens += response.usage?.completion_tokens ?? 0;
+
+      const choice = response.choices[0];
+      activeMessages.push(choice.message as OpenAI.Chat.ChatCompletionMessageParam);
+
+      if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls?.length) {
+        const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
+        for (const tc of choice.message.tool_calls) {
+          const args = JSON.parse(tc.function.arguments ?? '{}');
+          const result = await executeAdvisorTool(tc.function.name, args, context.orgId ?? '', context.userId);
+          toolResults.push({ role: 'tool', tool_call_id: tc.id, content: result });
+        }
+        activeMessages.push(...toolResults);
+        continue;
+      }
+
+      finalContent = choice.message.content ?? "I'm sorry, I couldn't generate a response. Please try again.";
+      break;
+    }
+
+    if (!finalContent) {
+      finalContent = "I'm sorry, I couldn't generate a response after processing. Please try again.";
+    }
 
     // Track token usage for spending guard
-    if (context.orgId && context.userId && response.usage) {
+    if (context.orgId && context.userId && (totalInputTokens || totalOutputTokens)) {
       trackAIUsage({
         orgId: context.orgId,
         userId: context.userId,
         operationType: 'chat',
         provider: 'openai',
         model: 'gpt-4o',
-        inputTokens: response.usage.prompt_tokens,
-        outputTokens: response.usage.completion_tokens,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
         metadata: { page: context.currentPage, advisoryMode: context.advisoryMode ?? 'general' },
       }).catch(() => {});
     }
 
-    return { response: content, ragChunkIds: ragResult.chunkIds };
+    return { response: finalContent, ragChunkIds: ragResult.chunkIds };
   } catch (error: any) {
     console.error('[AI Assistant] Chat error:', error);
     throw new Error('Failed to get AI response: ' + error.message);

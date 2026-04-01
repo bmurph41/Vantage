@@ -3018,7 +3018,8 @@ export async function getExecutiveRevenueTrendByStorageType(
 }
 
 /**
- * Get executive ancillary revenue trend (placeholder)
+ * Get executive ancillary revenue trend — sums per-lease ancillary charges
+ * (electric, water, liveaboard, pump-out, sewer) for months where cash flows exist.
  */
 export async function getExecutiveAncillaryRevenueTrend(
   orgId: string,
@@ -3026,11 +3027,67 @@ export async function getExecutiveAncillaryRevenueTrend(
   endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<AncillaryRevenueTrendDataPoint[]> {
-  return [];
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const startYear = startDateObj.getFullYear();
+  const startMonth = startDateObj.getMonth() + 1;
+  const endYear = endDateObj.getFullYear();
+  const endMonth = endDateObj.getMonth() + 1;
+
+  const result = await db
+    .select({
+      year: leaseCashFlows.year,
+      month: leaseCashFlows.month,
+      electricRevenue: sql<string>`COALESCE(SUM(CAST(${leases.electricCharge} AS NUMERIC)), 0)`,
+      liveaboardRevenue: sql<string>`COALESCE(SUM(CASE WHEN ${leases.isLiveaboard} = true THEN CAST(${leases.liveaboardRate} AS NUMERIC) ELSE 0 END), 0)`,
+      waterRevenue: sql<string>`COALESCE(SUM(CAST(${leases.waterCharge} AS NUMERIC)), 0)`,
+      pumpoutRevenue: sql<string>`COALESCE(SUM(CAST(${leases.pumpoutCharge} AS NUMERIC)), 0)`,
+      sewerRevenue: sql<string>`COALESCE(SUM(CAST(${leases.sewerCharge} AS NUMERIC)), 0)`,
+    })
+    .from(leaseCashFlows)
+    .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
+    .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+    .where(
+      and(
+        sql`(
+          (${leaseCashFlows.year} > ${startYear} OR (${leaseCashFlows.year} = ${startYear} AND ${leaseCashFlows.month} >= ${startMonth}))
+          AND
+          (${leaseCashFlows.year} < ${endYear} OR (${leaseCashFlows.year} = ${endYear} AND ${leaseCashFlows.month} <= ${endMonth}))
+        )`,
+        filterCondition
+      )
+    )
+    .groupBy(leaseCashFlows.year, leaseCashFlows.month)
+    .orderBy(leaseCashFlows.year, leaseCashFlows.month);
+
+  return result.map(row => {
+    const electric = parseFloat(row.electricRevenue) || 0;
+    const liveaboard = parseFloat(row.liveaboardRevenue) || 0;
+    const water = parseFloat(row.waterRevenue) || 0;
+    const pumpout = parseFloat(row.pumpoutRevenue) || 0;
+    const sewer = parseFloat(row.sewerRevenue) || 0;
+    const other = water + pumpout + sewer;
+    const total = electric + liveaboard + other;
+    return {
+      periodDate: `${row.year}-${String(row.month).padStart(2, '0')}-01`,
+      periodLabel: new Date(row.year, row.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      electricRevenue: electric.toFixed(2),
+      liveaboardRevenue: liveaboard.toFixed(2),
+      otherRevenue: other.toFixed(2),
+      totalAncillaryRevenue: total.toFixed(2),
+    };
+  });
 }
 
 /**
- * Get executive transient revenue trend (placeholder)
+ * Get executive transient revenue trend — cash flows for leases measured in days
+ * (numDays is set and numMonths is null, indicating day-use / transient dockage).
  */
 export async function getExecutiveTransientRevenueTrend(
   orgId: string,
@@ -3038,7 +3095,49 @@ export async function getExecutiveTransientRevenueTrend(
   endDate: string,
   filterOptions?: KpiFilterOptions
 ): Promise<RevenueTrendDataPoint[]> {
-  return [];
+  const baseFilterCondition = buildProjectFilterConditions(marinaLocations, filterOptions);
+  const filterCondition = and(
+    eq(marinaLocations.orgId, orgId),
+    baseFilterCondition || sql`1=1`
+  );
+
+  const startDateObj = new Date(startDate);
+  const endDateObj = new Date(endDate);
+  const startYear = startDateObj.getFullYear();
+  const startMonth = startDateObj.getMonth() + 1;
+  const endYear = endDateObj.getFullYear();
+  const endMonth = endDateObj.getMonth() + 1;
+
+  const result = await db
+    .select({
+      year: leaseCashFlows.year,
+      month: leaseCashFlows.month,
+      totalRevenue: sql<string>`COALESCE(SUM(${leaseCashFlows.amount}), 0)`,
+      leaseCount: sql<number>`CAST(COUNT(DISTINCT ${leaseCashFlows.leaseId}) AS INTEGER)`,
+    })
+    .from(leaseCashFlows)
+    .innerJoin(leases, eq(leaseCashFlows.leaseId, leases.id))
+    .innerJoin(marinaLocations, eq(leases.locationId, marinaLocations.id))
+    .where(
+      and(
+        sql`(
+          (${leaseCashFlows.year} > ${startYear} OR (${leaseCashFlows.year} = ${startYear} AND ${leaseCashFlows.month} >= ${startMonth}))
+          AND
+          (${leaseCashFlows.year} < ${endYear} OR (${leaseCashFlows.year} = ${endYear} AND ${leaseCashFlows.month} <= ${endMonth}))
+        )`,
+        sql`${leases.numDays} IS NOT NULL AND ${leases.numMonths} IS NULL`,
+        filterCondition
+      )
+    )
+    .groupBy(leaseCashFlows.year, leaseCashFlows.month)
+    .orderBy(leaseCashFlows.year, leaseCashFlows.month);
+
+  return result.map(row => ({
+    periodDate: `${row.year}-${String(row.month).padStart(2, '0')}-01`,
+    periodLabel: new Date(row.year, row.month - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+    revenue: row.totalRevenue,
+    leaseCount: row.leaseCount,
+  }));
 }
 
 /**
