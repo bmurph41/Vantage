@@ -469,6 +469,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [feature] [done] Build Offering Memorandum — OM renderer, 3 API routes (token-status/preview/generate), frontend generate flow — see agents/specs/offering-memorandum-spec.md
 - [spec] [done] Spec Offering Memorandum template — section modularity, token map, PDF output
 - [spec] [done] Spec IC Deal Review Deck — section layout, token map, PDF output route
 - [migration] [done] Create document_templates and document_renders tables for Document Studio
