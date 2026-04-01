@@ -1,11 +1,11 @@
 # MarinaMatch Build Status
-_Last updated: 2026-03-31 00:20:31_
+_Last updated: 2026-04-01 13:25:29_
 
 ## Last Agent Run
-- Type: feature
-- Task: Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md
-- Result: ❌ FAILED
-- Duration: 900s
+- Type: spec
+- Task: Spec the shared token substitution engine for Document Studio
+- Result: ✅ SUCCESS
+- Duration: 385s
 
 
 ## TypeScript

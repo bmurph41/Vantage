@@ -14,7 +14,7 @@
 ## 🟡 TIER 3 — DOCUMENT STUDIO / MARKETING PACKAGES
 
 - [spec] [done] Spec the shared token substitution engine for Document Studio — see agents/specs/token-substitution-engine-spec.md
-- [migration] [todo] Create document_templates and document_renders tables for Document Studio
+- [migration] [done] Create document_templates and document_renders tables for Document Studio
 - [feature] [todo] Build token substitution engine — Express route + token resolver pulling live Pro Forma and DCF data
 - [spec] [todo] Spec IC Deal Review Deck — section layout, token map, PDF output route
 - [feature] [todo] Build IC Deal Review Deck template + POST /api/marinamatch/documents/ic-deck PDF route
@@ -470,6 +470,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [spec] [done] Spec the shared token substitution engine for Document Studio
 - [feature] [done] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
 - [feature] [done] Add key dates display to Kanban pipeline cards — created, expected close, next follow-up (CRM priority #4)
 - [feature] [done] Fix AI advisor markdown rendering — add react-markdown renderer to chat UI

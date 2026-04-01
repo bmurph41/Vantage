@@ -2,6 +2,19 @@
 
 ## Current State (2026-04-01)
 
+### ✅ COMPLETE — Document Studio DB Migration (2026-04-01)
+
+## DB Agent — 2026-04-01
+- Migration: Created `document_templates` and `document_renders` tables for Document Studio
+- Tables affected: `document_templates`, `document_renders`, `om_document_sections`
+- Changes:
+  - `document_templates`: org-scoped template definitions (name, document_type, sections JSONB, styles, token_defaults, is_global flag). Indexed on org_id, document_type, and partial index on is_global.
+  - `document_renders`: render output log with FK to om_builder_documents, document_templates, and crm_deals. Stores rendered_html, rendered_json, token_snapshot, token_stats, overrides. Indexed on org_id, document_id, deal_id, status.
+  - `om_document_sections`: Added `rendered_content TEXT` column for caching token-substituted output (per token substitution engine spec).
+- Validation: passed — all tables and columns verified via `\d`
+
+---
+
 ### ✅ COMPLETE — Token Substitution Engine Spec (2026-04-01)
 
 ## Planner Agent — 2026-04-01
