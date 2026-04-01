@@ -70,7 +70,7 @@ export default function RateCompsHeader({
               )}
             </div>
             <div className="text-sm text-muted-foreground ml-4 px-3 py-1 bg-muted rounded-md">
-              <span data-testid="text-count" className="font-semibold">{total.toLocaleString()}</span> rate comps found
+              <span data-testid="text-count" className="font-semibold">{(total ?? 0).toLocaleString()}</span> rate comps found
             </div>
           </div>
           
