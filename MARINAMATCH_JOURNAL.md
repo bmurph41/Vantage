@@ -15,6 +15,16 @@
 
 ---
 
+### ✅ COMPLETE — IC Deal Review Deck Spec (2026-04-01)
+
+## Planner Agent — 2026-04-01
+- Spec written: IC Deal Review Deck
+- Output: agents/specs/ic-deal-review-deck-spec.md
+- Builder task added: yes (updated in AGENT_QUEUE.md)
+- Notes: 14-section landscape deck template already defined at `shared/document-builder/templates/ic-deal-review-deck.ts` (128 tokens). Spec covers the rendering pipeline: token resolver extensions (28 missing tokens including table builders for PROFORMA_SUMMARY_TABLE, SOURCES_USES_TABLE, sensitivity tables), 3 new API routes (generate, preview, token-status), a new `ic-deck-renderer.ts` section→PDF renderer, and 3 frontend components (generate button with readiness check, HTML preview, section toggle). Charts rendered as data tables in v1 PDF (native charts in PPTX via pptxgen). Optional sections auto-disable when primary data absent. High complexity (~1,050 lines across 6-8 files). Depends on token substitution engine being built first.
+
+---
+
 ### ✅ COMPLETE — Token Substitution Engine Spec (2026-04-01)
 
 ## Planner Agent — 2026-04-01
