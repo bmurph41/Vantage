@@ -73,7 +73,7 @@ export default function SalesCompsHeader({
               )}
             </div>
             <div className="text-sm text-muted-foreground sm:ml-4 px-3 py-1 bg-muted rounded-md whitespace-nowrap hidden sm:block">
-              <span data-testid="text-count" className="font-semibold">{total.toLocaleString()}</span> comps found
+              <span data-testid="text-count" className="font-semibold">{(total ?? 0).toLocaleString()}</span> comps found
             </div>
           </div>
 

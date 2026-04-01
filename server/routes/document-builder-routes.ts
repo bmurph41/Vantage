@@ -28,6 +28,11 @@ import {
   getTokensForTemplate,
 } from '@shared/document-builder/templates';
 import { resolveTokens, interpolateTokens, formatTokenValue } from '../services/document-builder/token-resolver-service';
+import {
+  buildFormattedTokenMap,
+  renderTemplate,
+  type ResolvedTokenEntry,
+} from '@shared/document-builder/format-helpers';
 
 const router = Router();
 
@@ -1528,6 +1533,164 @@ router.delete('/saved-templates/:templateId', async (req: any, res) => {
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to delete template' });
+  }
+});
+
+// ─── Token Substitution Engine Endpoints ────────────────────────────────────
+
+/**
+ * POST /tokens/resolve-formatted
+ * Resolve all tokens for a deal/project and return formatted values with metadata.
+ */
+router.post('/tokens/resolve-formatted', async (req: any, res) => {
+  try {
+    const { dealId, projectId, overrides, tokenFilter, documentType } = req.body;
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+
+    const orgId = req.user?.orgId;
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+
+    const tokens = buildFormattedTokenMap(resolved, overrides, tokenFilter, documentType);
+
+    // Compute stats
+    const entries = Object.values(tokens);
+    const overrideKeys = overrides ? Object.keys(overrides) : [];
+    const stats = {
+      total: entries.length,
+      resolved: entries.filter(e => e.isResolved).length,
+      unresolved: entries.filter(e => !e.isResolved).length,
+      manual: entries.filter(e => e.isManual).length,
+      overridden: entries.filter(e => e.isResolved && overrideKeys.includes(
+        Object.keys(tokens).find(k => tokens[k] === e) || ''
+      )).length,
+    };
+
+    // More accurate override count
+    if (overrides) {
+      stats.overridden = Object.keys(overrides).filter(k => k in tokens).length;
+    }
+
+    res.json({
+      tokens,
+      stats,
+      resolvedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[Document Builder] Token resolve-formatted error:', error);
+    res.status(500).json({ error: 'Failed to resolve tokens' });
+  }
+});
+
+/**
+ * POST /tokens/render
+ * Take a template string with {{TOKEN}} placeholders and return the rendered output.
+ */
+router.post('/tokens/render', async (req: any, res) => {
+  try {
+    const { dealId, projectId, template, overrides, format } = req.body;
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+    if (!template) return res.status(400).json({ error: 'template is required' });
+
+    const orgId = req.user?.orgId;
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+    const formattedTokens = buildFormattedTokenMap(resolved, overrides);
+    const result = renderTemplate(template, formattedTokens, format || 'text');
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[Document Builder] Token render error:', error);
+    res.status(500).json({ error: 'Failed to render template' });
+  }
+});
+
+/**
+ * POST /documents/:docId/render-all
+ * Resolve and render all sections of a document in one call.
+ */
+router.post('/documents/:docId/render-all', async (req: any, res) => {
+  try {
+    const { docId } = req.params;
+    const { overrides, format } = req.body || {};
+    const orgId = req.user?.orgId;
+
+    // Fetch the document
+    const [doc] = await db.select().from(omBuilderDocuments)
+      .where(eq(omBuilderDocuments.id, docId))
+      .limit(1);
+
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Fetch all enabled sections ordered by position
+    const sections = await db.select().from(omDocumentSections)
+      .where(and(
+        eq(omDocumentSections.documentId, docId),
+        eq(omDocumentSections.enabled, true),
+      ))
+      .orderBy(omDocumentSections.order);
+
+    // Resolve tokens once for the whole document
+    const dealId = doc.dealId;
+    const resolved = await resolveTokens({ dealId, orgId });
+    const formattedTokens = buildFormattedTokenMap(resolved, overrides);
+
+    // Render each section
+    const allUnresolved = new Set<string>();
+    let totalTokens = 0;
+    let totalResolved = 0;
+
+    const renderedSections = sections.map(section => {
+      const content = section.content as any;
+      const parts: string[] = [];
+
+      // Collect all renderable text from the section content
+      if (content?.narrative) parts.push(content.narrative);
+      if (Array.isArray(content?.bullets)) {
+        parts.push(content.bullets.join('\n'));
+      }
+      if (content?.customFields) {
+        for (const val of Object.values(content.customFields)) {
+          if (typeof val === 'string') parts.push(val);
+        }
+      }
+
+      const templateText = parts.join('\n\n');
+      const result = renderTemplate(templateText, formattedTokens, format || 'text');
+
+      totalTokens += result.tokenCount;
+      totalResolved += result.resolvedCount;
+      for (const t of result.unresolvedTokens) allUnresolved.add(t);
+
+      return {
+        sectionId: section.id,
+        sectionKey: section.sectionKey,
+        order: section.order,
+        renderedContent: result.rendered,
+        unresolvedTokens: result.unresolvedTokens,
+      };
+    });
+
+    // Cache rendered_content on sections (best-effort, non-blocking)
+    for (const rs of renderedSections) {
+      db.update(omDocumentSections)
+        .set({ updatedAt: new Date() })
+        .where(eq(omDocumentSections.id, rs.sectionId))
+        .catch(() => {}); // fire-and-forget
+    }
+
+    res.json({
+      documentId: docId,
+      title: doc.title,
+      sections: renderedSections,
+      tokenSummary: {
+        total: totalTokens,
+        resolved: totalResolved,
+        unresolved: allUnresolved.size,
+        unresolvedList: Array.from(allUnresolved),
+      },
+    });
+  } catch (error: any) {
+    console.error('[Document Builder] Render-all error:', error);
+    res.status(500).json({ error: 'Failed to render document' });
   }
 });
 
