@@ -16,9 +16,9 @@
 - [spec] [done] Spec the shared token substitution engine for Document Studio — see agents/specs/token-substitution-engine-spec.md
 - [feature] [in-progress] Build token substitution engine — Express route + token resolver pulling live Pro Forma and DCF data
 - [spec] [done] Spec IC Deal Review Deck — section layout, token map, PDF output route — see agents/specs/ic-deal-review-deck-spec.md
-- [feature] [todo] Build IC Deal Review Deck — token resolver extensions, 3 API routes, section renderer, frontend generate flow — see agents/specs/ic-deal-review-deck-spec.md
-- [spec] [todo] Spec Offering Memorandum template — section modularity, token map, PDF output
-- [feature] [todo] Build Offering Memorandum template + POST /api/marinamatch/documents/om PDF route
+- [feature] [in-progress] Build IC Deal Review Deck — token resolver extensions, 3 API routes, section renderer, frontend generate flow — see agents/specs/ic-deal-review-deck-spec.md
+- [spec] [done] Spec Offering Memorandum template — section modularity, token map, PDF output — see agents/specs/offering-memorandum-spec.md
+- [feature] [todo] Build Offering Memorandum — OM renderer, 3 API routes (token-status/preview/generate), frontend generate flow — see agents/specs/offering-memorandum-spec.md
 - [feature] [todo] Build Document Studio UI tab — InvestmentMaterialsTab with IC Deck and OM cards and generate buttons
 
 ## 🟢 TIER 4 — PROSPECTING / MARKETPLACE
@@ -469,6 +469,7 @@
 - [audit] [todo] Empty state audit — check every page and tab for blank screen conditions
 
 ## Completed
+- [spec] [done] Spec IC Deal Review Deck — section layout, token map, PDF output route
 - [migration] [done] Create document_templates and document_renders tables for Document Studio
 - [spec] [done] Spec the shared token substitution engine for Document Studio
 - [feature] [done] Polish global activity log — timestamps, filters by entity type and actor, pagination (CRM priority #5)
@@ -494,5 +495,6 @@
 - [feature] [done] Institutional readiness
 
 ## Failed / Blocked
+- [feature] [failed] Build IC Deal Review Deck — token resolver extensions, 3 API routes, section renderer, frontend generate flow — see agents/specs/ic-deal-review-deck-spec.md — 
 - [feature] [todo] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md — 
 

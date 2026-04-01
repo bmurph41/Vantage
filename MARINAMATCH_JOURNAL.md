@@ -2,6 +2,16 @@
 
 ## Current State (2026-04-01)
 
+### ✅ COMPLETE — Offering Memorandum Spec (2026-04-01)
+
+## Planner Agent — 2026-04-01
+- Spec written: Offering Memorandum — Rendering Pipeline
+- Output: agents/specs/offering-memorandum-spec.md
+- Builder task added: yes (updated in AGENT_QUEUE.md)
+- Notes: OM template already exists at `shared/document-builder/templates/offering-memorandum.ts` (8 sections, 86 tokens, portrait layout). Spec covers the rendering pipeline: `om-renderer.ts` (portrait HTML renderer with warm cream/gold/navy styling, 10+ table styles, section dividers with large numerals), 3 API routes (token-status, preview, generate), 6 new OM-specific tokens (3 financial table tokens: OM_NOI_TABLE, OM_PROFORMA_TABLE, OM_EXPENSE_ASSUMPTIONS_TABLE + LOCATION_TAGLINE, BOATING_PARTICIPATION_PCT, TOURISM_FACTS), and 2 frontend components (generate button with readiness check, HTML preview). Charts rendered as data tables in v1 PDF. Optional sections (Nearby Marinas, Market Overview) auto-disable when primary data absent. High complexity (~1,420 lines across 5-6 files). Depends on token substitution engine being built first. Shares resolver/export infrastructure with IC Deck but needs its own renderer due to portrait vs. landscape layout and distinct broker-facing aesthetic.
+
+---
+
 ### ✅ COMPLETE — Document Studio DB Migration (2026-04-01)
 
 ## DB Agent — 2026-04-01

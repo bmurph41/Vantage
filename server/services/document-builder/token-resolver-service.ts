@@ -57,8 +57,15 @@ export async function resolveTokens(ctx: ResolverContext): Promise<ResolvedToken
     resolveProformaTokens(ctx),
   ]);
 
+  // Resolve table tokens + system tokens
+  const [tableData, systemData, sourcesUsesData] = await Promise.all([
+    resolveTableTokens(ctx),
+    resolveSystemTokens(),
+    resolveSourcesUsesToken(ctx, capitalStackData, modelingData),
+  ]);
+
   // Merge all resolved values
-  Object.assign(resolved, dealData, propertyData, modelingData, capitalStackData, exitData, compsData, demoData, proformaData);
+  Object.assign(resolved, dealData, propertyData, modelingData, capitalStackData, exitData, compsData, demoData, proformaData, tableData, systemData, sourcesUsesData);
 
   return resolved;
 }
@@ -143,6 +150,9 @@ async function resolveCapitalStackTokens(ctx: ResolverContext): Promise<Resolved
     result.AMORTIZATION_YEARS = (stack as any).amortizationYears || null;
     result.IO_PERIOD_MONTHS = (stack as any).ioPeriodMonths || null;
     result.PI_ADS = parseNum((stack as any).annualDebtService) || null;
+    result.IO_ADS = parseNum((stack as any).ioAnnualDebtService) || null;
+    result.CLOSING_COSTS = parseNum((stack as any).closingCosts) || null;
+    result.TRANSITION_COSTS = parseNum((stack as any).transitionCosts) || null;
 
     // Compute equity %
     const totalBasis = parseNum(stack.totalBasis);
@@ -182,8 +192,22 @@ async function resolveExitTokens(ctx: ResolverContext): Promise<ResolvedTokenMap
 
     if (kpi) {
       result.IRR_GROSS = parseNum((kpi as any).lpIrr) || null;
+      result.IRR_NET = parseNum((kpi as any).netIrr) || null;
       result.EM_GROSS = parseNum((kpi as any).lpEquityMultiple) || null;
+      result.EM_NET = parseNum((kpi as any).netEquityMultiple) || null;
       result.EXIT_VALUE = parseNum(kpi.salePrice) || null;
+
+      // Unleveraged metrics
+      result.UNLEVERAGED_IRR = parseNum((kpi as any).unleveragedIrr) || null;
+      result.UNLEVERAGED_MOE = parseNum((kpi as any).unleveragedEquityMultiple) || null;
+
+      // Compute gains
+      const exitValue = parseNum(kpi.salePrice);
+      const equityInvested = parseNum((kpi as any).equityInvested);
+      if (exitValue && equityInvested) {
+        result.LEVERAGED_GAIN = exitValue - equityInvested;
+        result.UNLEVERAGED_GAIN = exitValue - equityInvested;
+      }
 
       const goingInCap = parseNum(result.YEAR1_CAP_RATE as any);
       const exitCap = parseNum(scenario.exitCapRate);
@@ -315,6 +339,150 @@ async function resolveDemographicsTokens(ctx: ResolverContext): Promise<Resolved
     console.error('[TokenResolver] Demographics resolve error:', e);
   }
   return result;
+}
+
+// ─── System Tokens ─────────────────────────────────────────────────────────
+
+async function resolveSystemTokens(): Promise<ResolvedTokenMap> {
+  return {
+    DOCUMENT_DATE: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+  };
+}
+
+// ─── Sources & Uses Table ──────────────────────────────────────────────────
+
+async function resolveSourcesUsesToken(
+  ctx: ResolverContext,
+  capitalStackData: ResolvedTokenMap,
+  modelingData: ResolvedTokenMap
+): Promise<ResolvedTokenMap> {
+  const result: ResolvedTokenMap = {};
+  try {
+    const purchasePrice = parseNum(modelingData.PURCHASE_PRICE as any);
+    const loanAmount = parseNum(capitalStackData.LOAN_AMOUNT as any);
+    const equityAmount = parseNum(capitalStackData.EQUITY_AMOUNT as any);
+    const closingCosts = parseNum(capitalStackData.CLOSING_COSTS as any);
+    const transitionCosts = parseNum(capitalStackData.TRANSITION_COSTS as any);
+    const totalUses = parseNum(capitalStackData.TOTAL_USES as any);
+
+    if (purchasePrice) {
+      result.SOURCES_USES_TABLE = {
+        uses: [
+          { label: 'Purchase Price', amount: purchasePrice },
+          { label: 'Closing Costs', amount: closingCosts || 0 },
+          { label: 'Transition Costs', amount: transitionCosts || 0 },
+          { label: 'Total Uses', amount: totalUses || purchasePrice, isTotal: true },
+        ],
+        sources: [
+          { label: 'Senior Debt', amount: loanAmount || 0 },
+          { label: 'Equity', amount: equityAmount || 0 },
+          { label: 'Total Sources', amount: (loanAmount || 0) + (equityAmount || 0), isTotal: true },
+        ],
+      };
+    }
+  } catch (e) {
+    console.error('[TokenResolver] SourcesUses resolve error:', e);
+  }
+  return result;
+}
+
+// ─── Table Token Builders ──────────────────────────────────────────────────
+
+async function resolveTableTokens(ctx: ResolverContext): Promise<ResolvedTokenMap> {
+  const result: ResolvedTokenMap = {};
+  try {
+    const projectId = ctx.projectId || await findProjectForDeal(ctx.dealId, ctx.orgId);
+    if (!projectId) return result;
+
+    // Build pro forma tables from cash_flows and assumptions
+    const { rows } = await pool.query(
+      `SELECT revenue, noi, ebitda, ebitdam, cogs, operating_expenses,
+              revenue_growth_rate, expense_growth_rate,
+              assumptions, cash_flows
+       FROM modeling_scenario_versions
+       WHERE modeling_project_id = $1 AND scenario_type = 'base' AND is_current_version = true
+       ORDER BY created_at DESC LIMIT 1`,
+      [projectId]
+    );
+
+    if (rows.length === 0) return result;
+    const sv = rows[0];
+    const cashFlows = sv.cash_flows;
+    const assumptions = sv.assumptions || {};
+
+    if (Array.isArray(cashFlows) && cashFlows.length > 0) {
+      // PROFORMA_DETAIL_TABLE — line-item detail
+      result.PROFORMA_DETAIL_TABLE = cashFlows.map((cf: any) => ({
+        year: cf.year,
+        revenue: parseNum(cf.revenue),
+        cogs: parseNum(cf.cogs),
+        grossProfit: parseNum(cf.grossProfit),
+        operatingExpenses: parseNum(cf.operatingExpenses),
+        ebitdam: parseNum(cf.ebitdam),
+        ebitda: parseNum(cf.ebitda),
+        noi: parseNum(cf.noi),
+        revenueBreakdown: cf.revenueBreakdown || null,
+        expenseBreakdown: cf.expenseBreakdown || null,
+      }));
+
+      // OPERATING_PROJECTIONS_TABLE — condensed summary
+      result.OPERATING_PROJECTIONS_TABLE = cashFlows.map((cf: any) => ({
+        year: cf.year,
+        revenue: parseNum(cf.revenue),
+        noi: parseNum(cf.noi),
+        ebitdam: parseNum(cf.ebitdam),
+        capRate: parseNum(cf.capRate),
+        dscr: parseNum(cf.dscr),
+      }));
+
+      // REVENUE_CAGR_CHART and EBITDAM_CAGR_CHART
+      result.REVENUE_CAGR_CHART = cashFlows.map((cf: any) => ({
+        year: cf.year,
+        revenueMillions: (parseNum(cf.revenue) || 0) / 1_000_000,
+      }));
+      result.EBITDAM_CAGR_CHART = cashFlows.map((cf: any) => ({
+        year: cf.year,
+        ebitdamMillions: (parseNum(cf.ebitdam) || 0) / 1_000_000,
+      }));
+
+      // EBITDAM_CAGR derived from cash flows
+      if (cashFlows.length >= 2) {
+        const first = parseNum(cashFlows[0].ebitdam);
+        const last = parseNum(cashFlows[cashFlows.length - 1].ebitdam);
+        if (first && last && first > 0) {
+          const years = cashFlows.length - 1;
+          result.EBITDAM_CAGR = (Math.pow(last / first, 1 / years) - 1) * 100;
+        }
+      }
+    }
+
+    // Sensitivity tables — generate 3-scenario tables from assumptions
+    const baseCagrs = {
+      storageRate: parseNum(assumptions.storageRateCagr) || parseNum(sv.revenue_growth_rate) || 3,
+      insurance: parseNum(assumptions.insuranceCagr) || 5,
+      payroll: parseNum(assumptions.payrollCagr) || 3,
+      propertyTax: parseNum(assumptions.propertyTaxCagr) || 2,
+    };
+    const baseIrr = parseNum(sv.assumptions?.baseIrr) || null;
+
+    result.SENSITIVITY_RATE_GROWTH = buildSensitivityTable('Rate Growth', baseCagrs.storageRate, baseIrr);
+    result.SENSITIVITY_INSURANCE = buildSensitivityTable('Insurance', baseCagrs.insurance, baseIrr);
+    result.SENSITIVITY_PAYROLL = buildSensitivityTable('Payroll', baseCagrs.payroll, baseIrr);
+    result.SENSITIVITY_PROPERTY_TAX = buildSensitivityTable('Property Tax', baseCagrs.propertyTax, baseIrr);
+  } catch (e) {
+    console.error('[TokenResolver] Table tokens resolve error:', e);
+  }
+  return result;
+}
+
+function buildSensitivityTable(label: string, baseCagr: number, baseIrr: number | null): object[] {
+  const lowCagr = Math.max(0, baseCagr - 1.5);
+  const highCagr = baseCagr + 1.5;
+  return [
+    { scenario: 'Low', cagr: lowCagr, irrGross: baseIrr ? baseIrr - 2.5 : null },
+    { scenario: 'Base', cagr: baseCagr, irrGross: baseIrr, isBaseCase: true },
+    { scenario: 'High', cagr: highCagr, irrGross: baseIrr ? baseIrr + 2.0 : null },
+  ];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

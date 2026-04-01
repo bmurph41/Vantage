@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { eq, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { and } from 'drizzle-orm';
-import { omBuilderDocuments, omDocumentSections, omExemplars, omDocumentVersions } from '@shared/document-builder/schema';
+import { omBuilderDocuments, omDocumentSections, omExemplars, omDocumentVersions, omExportJobs } from '@shared/document-builder/schema';
 import { omTemplates } from '@shared/schema';
 import { documentBuilderService } from '../services/document-builder/document-builder-service';
 import { dataBindingService } from '../services/document-builder/data-binding-service';
@@ -33,6 +33,9 @@ import {
   renderTemplate,
   type ResolvedTokenEntry,
 } from '@shared/document-builder/format-helpers';
+import { IC_DEAL_REVIEW_DECK_TEMPLATE } from '@shared/document-builder/templates/ic-deal-review-deck';
+import { pool } from '../db';
+import { renderICDeckToHtml } from '../services/document-builder/ic-deck-renderer';
 
 const router = Router();
 
@@ -1691,6 +1694,333 @@ router.post('/documents/:docId/render-all', async (req: any, res) => {
   } catch (error: any) {
     console.error('[Document Builder] Render-all error:', error);
     res.status(500).json({ error: 'Failed to render document' });
+  }
+});
+
+// =============================================================================
+// IC Deal Review Deck Routes
+// =============================================================================
+
+const IC_DECK_TEMPLATE = IC_DEAL_REVIEW_DECK_TEMPLATE;
+
+/** Section auto-disable conditions: optional sections disabled when primary data absent */
+function getDisabledSections(resolved: Record<string, any>): Record<string, string> {
+  const disabled: Record<string, string> = {};
+  if (!resolved.GL_LESSOR) disabled.ic_ground_leases = 'No ground lease data';
+  if (!resolved.COMP_SET_TABLE) disabled.ic_competitive_set = 'No competitive set data';
+  if (!resolved.STORAGE_REVENUE) disabled.ic_storage_revenue = 'No storage revenue data';
+  if (!resolved.BNB_VESSEL_TABLE) disabled.ic_bnb_afloat = 'No B&B vessel data';
+  if (!resolved.LOAN_AMOUNT) disabled.ic_debt_term_sheet = 'No debt financing data';
+  return disabled;
+}
+
+/**
+ * GET /ic-deck/token-status/:dealId
+ * Quick readiness check — shows which tokens are resolved vs. missing.
+ */
+router.get('/ic-deck/token-status/:dealId', async (req: any, res) => {
+  try {
+    const { dealId } = req.params;
+    const projectId = req.query.projectId as string | undefined;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+    const disabledSections = getDisabledSections(resolved);
+
+    const requiredTokens = IC_DECK_TEMPLATE.requiredTokens.map(token => ({
+      token,
+      resolved: resolved[token] !== null && resolved[token] !== undefined,
+      value: resolved[token] !== null && resolved[token] !== undefined
+        ? String(resolved[token]).substring(0, 100)
+        : undefined,
+    }));
+
+    const optionalTokens = IC_DECK_TEMPLATE.optionalTokens.map(token => ({
+      token,
+      resolved: resolved[token] !== null && resolved[token] !== undefined,
+      value: resolved[token] !== null && resolved[token] !== undefined
+        ? (typeof resolved[token] === 'object' ? '[object]' : String(resolved[token]).substring(0, 100))
+        : undefined,
+    }));
+
+    const allRequiredResolved = requiredTokens.every(t => t.resolved);
+
+    const sectionsEnabled = IC_DECK_TEMPLATE.sections
+      .filter(s => s.enabled && !disabledSections[s.key])
+      .map(s => s.key);
+    const sectionsDisabled = Object.entries(disabledSections).map(([key, reason]) => ({
+      key, reason,
+    }));
+
+    res.json({
+      ready: allRequiredResolved,
+      requiredTokens,
+      optionalTokens,
+      sectionsEnabled,
+      sectionsDisabled,
+    });
+  } catch (error: any) {
+    console.error('[IC Deck] Token status error:', error);
+    res.status(500).json({ error: 'Failed to check token status' });
+  }
+});
+
+/**
+ * GET /ic-deck/preview/:dealId
+ * Returns HTML preview of the IC Deck for in-browser rendering.
+ */
+router.get('/ic-deck/preview/:dealId', async (req: any, res) => {
+  try {
+    const { dealId } = req.params;
+    const projectId = req.query.projectId as string | undefined;
+    const sectionsFilter = req.query.sections ? (req.query.sections as string).split(',') : undefined;
+    const orgId = req.user?.orgId;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const resolved = await resolveTokens({ dealId, projectId, orgId });
+    const formattedTokens = buildFormattedTokenMap(resolved, undefined, undefined, 'ic_deck');
+    const disabledSections = getDisabledSections(resolved);
+
+    // Filter sections
+    let sections = IC_DECK_TEMPLATE.sections.filter(s => {
+      if (!s.enabled) return false;
+      if (disabledSections[s.key]) return false;
+      if (sectionsFilter && !sectionsFilter.includes(s.key)) return false;
+      return true;
+    });
+
+    // Render each section to HTML
+    const renderedSections = sections.map(section => {
+      const html = renderICDeckToHtml(section, resolved, formattedTokens);
+      const sectionUnresolved: string[] = [];
+      for (const token of section.tokens) {
+        if (resolved[token] === null || resolved[token] === undefined) {
+          sectionUnresolved.push(token);
+        }
+      }
+      return {
+        key: section.key,
+        title: section.title,
+        enabled: true,
+        html,
+        unresolvedTokens: sectionUnresolved,
+      };
+    });
+
+    // Compute token summary
+    const allICTokens = IC_DECK_TEMPLATE.sections.flatMap(s => s.tokens);
+    const uniqueTokens = [...new Set(allICTokens)];
+    const resolvedCount = uniqueTokens.filter(t => resolved[t] !== null && resolved[t] !== undefined).length;
+    const unresolvedList = uniqueTokens.filter(t => resolved[t] === null || resolved[t] === undefined);
+
+    // Full HTML document
+    const fullHtml = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Inter, Helvetica Neue, sans-serif; margin: 0; background: #f0f2f5; }
+  .slide { width: 960px; min-height: 540px; margin: 24px auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.12); padding: 48px; box-sizing: border-box; page-break-after: always; position: relative; }
+  .slide h1 { color: #1B365D; font-size: 28px; margin: 0 0 20px; }
+  .slide h2 { color: #1B365D; font-size: 18px; margin: 16px 0 12px; }
+  .slide p, .slide li { font-size: 13px; color: #333; line-height: 1.6; }
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .metric-item { background: #F5F7FA; padding: 12px; border-radius: 6px; }
+  .metric-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .metric-value { font-size: 18px; font-weight: 700; color: #1B365D; font-family: 'Roboto Mono', monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }
+  th { background: #1B365D; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; }
+  tr:nth-child(even) td { background: #F5F7FA; }
+  tr.base-case td { background: #FFF9E6; font-weight: 600; }
+  .token-unresolved { background: #FFF3CD; color: #856404; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 11px; }
+  .token-value { font-weight: 600; }
+  .section-footer { position: absolute; bottom: 16px; left: 48px; right: 48px; font-size: 9px; color: #666; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+  .cover-slide { background: linear-gradient(135deg, #1B365D 0%, #2a5298 100%); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .cover-slide h1 { color: #fff; font-size: 36px; }
+  .cover-slide p { color: rgba(255,255,255,0.85); font-size: 18px; }
+</style>
+</head><body>
+${renderedSections.map(s => s.html).join('\n')}
+</body></html>`;
+
+    res.json({
+      html: fullHtml,
+      sections: renderedSections,
+      tokenSummary: {
+        total: uniqueTokens.length,
+        resolved: resolvedCount,
+        unresolved: unresolvedList.length,
+        unresolvedList,
+      },
+    });
+  } catch (error: any) {
+    console.error('[IC Deck] Preview error:', error);
+    res.status(500).json({ error: 'Failed to generate preview' });
+  }
+});
+
+/**
+ * POST /ic-deck/generate
+ * One-click IC Deck generation — creates document, resolves tokens, renders sections, queues export.
+ */
+router.post('/ic-deck/generate', async (req: any, res) => {
+  try {
+    const { dealId, projectId, format, overrides, sections: sectionFilter, options } = req.body;
+    if (!dealId) return res.status(400).json({ error: 'dealId is required' });
+    const exportFormat = format || 'pdf';
+    const orgId = req.user?.orgId;
+    const userId = req.user?.id;
+    if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // 1. Validate deal exists and belongs to org
+    const dealResult = await pool.query(
+      'SELECT id, title, name, modeling_project_id FROM crm_deals WHERE id = $1 AND org_id = $2 LIMIT 1',
+      [dealId, orgId]
+    );
+    if (dealResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+    const deal = dealResult.rows[0];
+    const resolvedProjectId = projectId || deal.modeling_project_id;
+    const propertyName = deal.title || deal.name || 'Untitled';
+
+    // 2. Resolve all tokens
+    const resolved = await resolveTokens({ dealId, projectId: resolvedProjectId, orgId });
+    const formattedTokens = buildFormattedTokenMap(resolved, overrides, undefined, 'ic_deck');
+    const disabledSections = getDisabledSections(resolved);
+
+    // 3. Determine enabled sections
+    let enabledSections = IC_DECK_TEMPLATE.sections.filter(s => {
+      if (!s.enabled) return false;
+      if (disabledSections[s.key]) return false;
+      if (sectionFilter && sectionFilter.length > 0 && !sectionFilter.includes(s.key)) return false;
+      return true;
+    });
+
+    // 4. Token summary
+    const allICTokens = IC_DECK_TEMPLATE.sections.flatMap(s => s.tokens);
+    const uniqueTokens = [...new Set(allICTokens)];
+    const resolvedCount = uniqueTokens.filter(t => resolved[t] !== null && resolved[t] !== undefined).length;
+    const unresolvedList = uniqueTokens.filter(t => resolved[t] === null || resolved[t] === undefined);
+
+    // 5. Create om_builder_documents record
+    const docId = crypto.randomUUID();
+    const now = new Date();
+    await db.insert(omBuilderDocuments).values({
+      id: docId,
+      dealId,
+      documentType: 'ic_memo' as any,
+      title: `IC Deal Review Deck — ${propertyName}`,
+      audience: 'investment_committee' as any,
+      status: 'generating' as any,
+      metadata: {
+        propertyName,
+        generatedAt: now.toISOString(),
+        format: exportFormat,
+        templateId: IC_DECK_TEMPLATE.id,
+      },
+      completionStatus: {
+        totalSections: enabledSections.length,
+        completedSections: enabledSections.length,
+        percentage: 100,
+        readyToExport: true,
+      },
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // 6. Create om_document_sections records
+    for (const section of enabledSections) {
+      const sectionHtml = renderICDeckToHtml(section, resolved, formattedTokens);
+      await db.insert(omDocumentSections).values({
+        id: crypto.randomUUID(),
+        documentId: docId,
+        sectionKey: section.key,
+        order: section.order,
+        enabled: true,
+        content: { renderedHtml: sectionHtml },
+        dataBindings: {},
+        media: {},
+        completionStatus: { isComplete: true, percentage: 100, completedFields: [], missingFields: [], missingMedia: [], warnings: [] },
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // 7. Create document_renders record (token snapshot for audit)
+    try {
+      await pool.query(
+        `INSERT INTO document_renders (id, org_id, document_id, deal_id, rendered_html, token_snapshot, token_stats, status, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', NOW())`,
+        [
+          crypto.randomUUID(),
+          orgId,
+          docId,
+          dealId,
+          'IC Deck rendered',
+          JSON.stringify(resolved),
+          JSON.stringify({ total: uniqueTokens.length, resolved: resolvedCount, unresolved: unresolvedList.length }),
+        ]
+      );
+    } catch (renderErr) {
+      console.warn('[IC Deck] document_renders insert failed (non-critical):', renderErr);
+    }
+
+    // 8. Create export job
+    const exportJobId = crypto.randomUUID();
+    const exportFileName = `IC_Deck_${propertyName.replace(/[^a-zA-Z0-9]/g, '_')}_${now.toISOString().split('T')[0]}.${exportFormat}`;
+    await db.insert(omExportJobs).values({
+      id: exportJobId,
+      documentId: docId,
+      format: exportFormat as any,
+      status: 'queued' as any,
+      outputFileName: exportFileName,
+      options: {
+        includePageNumbers: options?.includePageNumbers ?? true,
+        confidentialFooter: options?.confidentialFooter ?? true,
+        watermark: options?.watermark,
+        companyName: options?.companyName,
+        companyLogo: options?.companyLogo,
+        orientation: 'landscape',
+      },
+      createdAt: now,
+    });
+
+    // 9. Log CRM activity
+    try {
+      await pool.query(
+        `INSERT INTO crm_activities (id, org_id, entity_type, entity_id, type, description, metadata, user_id, created_at)
+         VALUES (gen_random_uuid(), $1, 'deal', $2, 'document', $3, $4, $5, NOW())`,
+        [
+          orgId,
+          dealId,
+          `IC Deal Review Deck generated for ${propertyName}`,
+          JSON.stringify({ documentType: 'ic_memo', documentId: docId, format: exportFormat, sections: enabledSections.length }),
+          userId,
+        ]
+      );
+    } catch (actErr) {
+      console.warn('[IC Deck] Activity log failed (non-critical):', actErr);
+    }
+
+    res.json({
+      documentId: docId,
+      exportJobId,
+      status: 'queued',
+      tokenSummary: {
+        total: uniqueTokens.length,
+        resolved: resolvedCount,
+        unresolved: unresolvedList.length,
+        unresolvedList,
+      },
+      estimatedPages: enabledSections.length + 2,
+      message: `IC Deck queued for ${exportFormat.toUpperCase()} export with ${enabledSections.length} sections`,
+    });
+  } catch (error: any) {
+    console.error('[IC Deck] Generate error:', error);
+    res.status(500).json({ error: 'Failed to generate IC Deck' });
   }
 });
 
