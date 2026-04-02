@@ -96,19 +96,48 @@ export function EntitlementsProvider({
   useEffect(() => {
     async function loadSubscription() {
       try {
-        // TODO: Replace with actual API call
-        // const response = await fetch('/api/user/subscription');
-        // const data = await response.json();
-        // setSubscriptionState(data);
-        
-        // For now, check localStorage for demo purposes
+        // Fetch from real API first, fall back to localStorage
+        const response = await fetch('/api/billing/subscription', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.tier) {
+            // Map billing tier to package slug
+            const tierToSlug: Record<string, string> = {
+              starter: 'owner-operator',
+              growth: 'growth',
+              institutional: 'institutional',
+              enterprise: 'enterprise',
+            };
+            setSubscriptionState({
+              packageSlug: tierToSlug[data.tier] || data.tier,
+              status: data.status || 'active',
+              trialEndsAt: data.trialEndsAt || null,
+              addons: data.addons || [],
+            });
+            // Sync to localStorage as cache
+            localStorage.setItem('user-subscription', JSON.stringify({
+              packageSlug: tierToSlug[data.tier] || data.tier,
+              status: data.status || 'active',
+            }));
+          }
+        } else {
+          // API not available — fall back to localStorage cache
+          const stored = localStorage.getItem('user-subscription');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setSubscriptionState(parsed);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load subscription from API, using cache:', error);
         const stored = localStorage.getItem('user-subscription');
         if (stored) {
           const parsed = JSON.parse(stored);
           setSubscriptionState(parsed);
         }
-      } catch (error) {
-        console.error('Failed to load subscription:', error);
       } finally {
         setIsLoading(false);
       }
@@ -123,8 +152,13 @@ export function EntitlementsProvider({
   useEffect(() => {
     if (!isLoading) {
       localStorage.setItem('user-subscription', JSON.stringify(subscription));
-      // TODO: Also sync to API
-      // fetch('/api/user/subscription', { method: 'PUT', body: JSON.stringify(subscription) });
+      // Sync subscription changes to API
+      fetch('/api/billing/subscription', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription),
+      }).catch(() => { /* API sync is best-effort */ });
     }
   }, [subscription, isLoading]);
 

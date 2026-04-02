@@ -128,7 +128,9 @@
       "Bash(git diff:*)",
       "Bash(find /home/runner/workspace -name *vantage* -o -name *intelligence-map*)",
       "Bash(find /home/runner/workspace/client/src -name *intelligence* -o -name *marina-map* -o -name *MarinaMap* -o -name *IntelligenceMap* -o -name *vantage*)",
-      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit --pretty false)"
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit --pretty false)",
+      "Bash(NODE_OPTIONS=\"--max-old-space-size=8192\" npx tsc --noEmit --skipLibCheck)",
+      "Bash(pkill -f 'tsx server')"
     ]
   }
 }

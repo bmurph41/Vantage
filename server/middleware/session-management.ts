@@ -183,13 +183,24 @@ export async function logSessionSecurityEvent(event: {
     timestamp: new Date().toISOString(),
     ...event
   });
-  
-  // TODO: Store in security_audit_log table
-  // await db.insert(securityAuditLog).values({
-  //   userId: event.userId,
-  //   action: event.eventType,
-  //   ipAddress: event.ipAddress,
-  //   userAgent: event.userAgent,
-  //   timestamp: new Date()
-  // });
+
+  // Store in security_audit_log table
+  try {
+    const { db } = await import('../db');
+    const { sql } = await import('drizzle-orm');
+    await db.execute(sql`
+      INSERT INTO security_audit_log (id, user_id, event_type, ip_address, user_agent, metadata, created_at)
+      VALUES (
+        gen_random_uuid(),
+        ${String(event.userId)}::uuid,
+        ${event.eventType},
+        ${event.ipAddress || null},
+        ${event.userAgent || null},
+        '{}'::jsonb,
+        now()
+      )
+    `);
+  } catch (err) {
+    console.error('Failed to persist security event:', err);
+  }
 }

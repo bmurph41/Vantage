@@ -22,6 +22,14 @@ import { AuditService } from "./services/audit-service";
 import { setTenantContext, clearTenantContext } from "./middleware/tenant-context";
 import { enforceTenant, requireTenantMatch } from "./middleware/tenant-isolation";
 import vdrRouter from "./vdr-routes";
+import { accountingRouter } from "./routes/accounting-routes";
+import { securityComplianceRouter } from "./routes/security-compliance-routes";
+import { operationsEngineRouter } from "./routes/operations-engine-routes";
+import { reportingEngineRouter } from "./routes/reporting-engine-routes";
+import { integrationsEngineRouter } from "./routes/integrations-engine-routes";
+import { workflowEnhancementsRouter } from "./routes/workflow-enhancements-routes";
+import { crmEnhancementsRouter } from "./routes/crm-enhancements-routes";
+import { lpPortalRouter } from "./routes/lp-portal-routes";
 import { workflowAutomationRouter } from "./routes/workflow-automation-routes";
 import { workflowEmailRouter } from "./routes/workflow-email-routes";
 import { aiDealIntelligenceRouter } from "./routes/ai-deal-intelligence-routes";
@@ -128,7 +136,7 @@ import institutionalAnalysisRoutes from "./routes/institutional-analysis-routes"
 import returnsRoutes from "./routes/returns-routes";
 import budgetRoutes from "./routes/budget-routes";
 import bookkeepingGlRoutes from "./routes/bookkeeping-gl-routes";
-import lpPortalRoutes from "./routes/lp-portal-routes";
+// lpPortalRoutes now imported as named export above (lpPortalRouter)
 import taxWaterfallRoutes from "./routes/tax-waterfall-routes";
 import operationsContextRoutes from "./routes/operations-context-routes";
 import hotelOpsRoutes from "./routes/hotel-ops-routes";
@@ -741,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/returns", authenticateUser, enforceTenant, returnsRoutes);
   app.use("/api/budgets", authenticateUser, enforceTenant, budgetRoutes);
   app.use("/api/bookkeeping", authenticateUser, enforceTenant, bookkeepingGlRoutes);
-  app.use("/api/lp-portal", authenticateUser, enforceTenant, lpPortalRoutes);
+  // LP portal mount moved below (with own auth)
   app.use("/api/tax-waterfall", authenticateUser, enforceTenant, taxWaterfallRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
@@ -952,6 +960,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/exit-studio", authenticateUser, enforceTenant, exitStudioRouter);
   app.use("/api/sc", authenticateUser, enforceTenant, salesCompsExtRouter);
   app.use("/api/docket", authenticateUser, enforceTenant, docketExtRouter);
+  app.use("/api/accounting", authenticateUser, enforceTenant, accountingRouter);
+  app.use("/api/security", authenticateUser, enforceTenant, securityComplianceRouter);
+  app.use("/api/ops-engine", authenticateUser, enforceTenant, operationsEngineRouter);
+  app.use("/api/reporting", authenticateUser, enforceTenant, reportingEngineRouter);
+  app.use("/api/integrations-v2", authenticateUser, enforceTenant, integrationsEngineRouter);
+  app.use("/api/workflow-v2", authenticateUser, enforceTenant, workflowEnhancementsRouter);
+  app.use("/api/crm-v2", authenticateUser, enforceTenant, crmEnhancementsRouter);
+  app.use("/api/lp-portal", lpPortalRouter); // LP portal has its own auth
 
   // Dockit Marina Operations Module - mounted at /dockit/api
   try {
