@@ -539,13 +539,13 @@ class ReportingEngine {
     // If setting as default, unset other defaults first
     if (data.isDefault) {
       await pool.query(
-        `UPDATE dashboards SET is_default = false, updated_at = $1 WHERE org_id = $2 AND is_default = true`,
+        `UPDATE kpi_dashboards SET is_default = false, updated_at = $1 WHERE org_id = $2 AND is_default = true`,
         [now, orgId]
       );
     }
 
     const result = await pool.query(
-      `INSERT INTO dashboards (id, org_id, name, description, is_default, created_by, created_at, updated_at)
+      `INSERT INTO kpi_dashboards (id, org_id, name, description, is_default, created_by, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [id, orgId, data.name, data.description || null, data.isDefault ?? false, data.createdBy, now, now]
@@ -570,7 +570,7 @@ class ReportingEngine {
   ): Promise<DashboardWidget> {
     // Verify dashboard ownership
     const dbRes = await pool.query(
-      `SELECT id FROM dashboards WHERE id = $1 AND org_id = $2`,
+      `SELECT id FROM kpi_dashboards WHERE id = $1 AND org_id = $2`,
       [dashboardId, orgId]
     );
     if (dbRes.rows.length === 0) {
@@ -600,7 +600,7 @@ class ReportingEngine {
     await pool.query(
       `DELETE FROM dashboard_widgets
        WHERE id = $1 AND dashboard_id = $2
-         AND dashboard_id IN (SELECT id FROM dashboards WHERE org_id = $3)`,
+         AND dashboard_id IN (SELECT id FROM kpi_dashboards WHERE org_id = $3)`,
       [widgetId, dashboardId, orgId]
     );
   }
@@ -610,7 +610,7 @@ class ReportingEngine {
     dashboardId: string
   ): Promise<{ dashboard: Dashboard; widgets: (DashboardWidget & { data: any })[] }> {
     const dashRes = await pool.query(
-      `SELECT * FROM dashboards WHERE id = $1 AND org_id = $2`,
+      `SELECT * FROM kpi_dashboards WHERE id = $1 AND org_id = $2`,
       [dashboardId, orgId]
     );
     if (dashRes.rows.length === 0) {
@@ -636,7 +636,7 @@ class ReportingEngine {
 
   async listDashboards(orgId: string): Promise<Dashboard[]> {
     const result = await pool.query(
-      `SELECT * FROM dashboards WHERE org_id = $1 ORDER BY is_default DESC, updated_at DESC`,
+      `SELECT * FROM kpi_dashboards WHERE org_id = $1 ORDER BY is_default DESC, updated_at DESC`,
       [orgId]
     );
     return result.rows.map(mapDashboardRow);

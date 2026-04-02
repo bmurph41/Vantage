@@ -75,21 +75,26 @@ export async function ensureKnowledgeBaseSchema(): Promise<void> {
 
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_conversations_org_user ON ai_conversations(org_id, user_id)`);
 
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS ai_conversation_messages (
-        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
-        role            TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
-        content         TEXT NOT NULL,
-        advisory_mode   TEXT,
-        page            TEXT,
-        rag_chunk_ids   JSONB DEFAULT '[]',
-        metadata        JSONB DEFAULT '{}',
-        created_at      TIMESTAMPTZ DEFAULT NOW()
-      )
-    `);
-
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON ai_conversation_messages(conversation_id)`);
+    // ai_conversation_messages may already exist with a different schema (session_id vs conversation_id).
+    // Wrap in its own try/catch so type/column mismatches don't abort the rest of bootstrap.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS ai_conversation_messages (
+          id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          conversation_id UUID NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+          role            TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+          content         TEXT NOT NULL,
+          advisory_mode   TEXT,
+          page            TEXT,
+          rag_chunk_ids   JSONB DEFAULT '[]',
+          metadata        JSONB DEFAULT '{}',
+          created_at      TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON ai_conversation_messages(conversation_id)`);
+    } catch (_innerErr) {
+      // Existing table schema differs — index/FK creation skipped gracefully
+    }
 
     console.log('[KnowledgeBase] Schema ensured');
   } catch (err) {

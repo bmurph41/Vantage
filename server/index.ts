@@ -44,6 +44,23 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// Graceful shutdown — release the port so the next start doesn't hit EADDRINUSE
+function gracefulShutdown(signal: string) {
+  console.log(`[Server] ${signal} received — shutting down gracefully`);
+  if ((global as any).__httpServer) {
+    (global as any).__httpServer.close(() => {
+      console.log('[Server] HTTP server closed');
+      process.exit(0);
+    });
+    // Force-exit after 5 s if connections are still open
+    setTimeout(() => process.exit(0), 5000).unref();
+  } else {
+    process.exit(0);
+  }
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 // Validate required environment variables before starting
 function validateRequiredEnvVars() {
   const required = ['DATABASE_URL'];
@@ -116,6 +133,7 @@ app.use('/api', deprecationWarning('2027-06-01'));
 (async () => {
   try {
     const server = await registerRoutes(app);
+    (global as any).__httpServer = server; // used by gracefulShutdown
 
     // Auth middleware for routes mounted outside registerRoutes()
     app.use(authenticateUser);

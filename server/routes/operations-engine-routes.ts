@@ -34,7 +34,7 @@ operationsEngineRouter.get('/fuel/reorder-alerts', async (req: Request, res: Res
   try {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: 'Authentication required' });
-    const alerts = await operationsEngine.getFuelReorderAlerts(orgId, {
+    const alerts = await operationsEngine.checkReorderPoints(orgId, {
       daysOfSupply: parseInt(req.query.daysOfSupply as string) || 7,
     });
     res.json(alerts);
