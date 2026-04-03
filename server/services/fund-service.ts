@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { db } from '../db';
 import {
   funds,
@@ -99,6 +100,23 @@ export interface WaterfallDistributionResult {
 export interface XirrCashFlow {
   date: Date;
   amount: number;
+}
+
+/**
+ * Convert a potentially null/undefined DB numeric field to a number using Decimal.js
+ * for precision. DB stores numeric columns as strings; this replaces parseFloat
+ * to avoid floating-point rounding errors in financial calculations.
+ */
+function d(value: any, fallback: string = '0'): Decimal {
+  if (value == null) return new Decimal(fallback);
+  const s = value.toString();
+  if (!s || s === 'NaN' || s === 'null' || s === 'undefined') return new Decimal(fallback);
+  try { return new Decimal(s); } catch { return new Decimal(fallback); }
+}
+
+/** Convert DB numeric to JS number via Decimal (precision-safe conversion) */
+function dn(value: any, fallback: string = '0'): number {
+  return d(value, fallback).toNumber();
 }
 
 export class FundService {
@@ -567,7 +585,7 @@ export class FundService {
   }
 
   private async processCapitalMovement(orgId: string, movement: FundCapitalMovement): Promise<void> {
-    const amount = parseFloat(movement.amount?.toString() || '0');
+    const amount = dn(movement.amount);
 
     if (movement.movementType === 'call' || movement.movementType === 'contribution') {
       await this.updateFundCalledCapital(orgId, movement.fundId, amount);
@@ -734,17 +752,17 @@ export class FundService {
       this.getAllocationsByFund(orgId, fundId),
     ]);
 
-    const committedCapital = parseFloat(fund.committedCapital?.toString() || '0');
-    const calledCapital = parseFloat(fund.calledCapital?.toString() || '0');
-    const distributedCapital = parseFloat(fund.distributedCapital?.toString() || '0');
-    const recycledCapital = parseFloat(fund.recycledCapital?.toString() || '0');
+    const committedCapital = dn(fund.committedCapital);
+    const calledCapital = dn(fund.calledCapital);
+    const distributedCapital = dn(fund.distributedCapital);
+    const recycledCapital = dn(fund.recycledCapital);
 
     const unfundedCommitments = investors.reduce((sum, inv) => {
-      return sum + parseFloat(inv.unfundedCommitment?.toString() || '0');
+      return sum + dn(inv.unfundedCommitment);
     }, 0);
 
     const deployedCapital = allocations.reduce((sum, alloc) => {
-      return sum + parseFloat(alloc.fundedAmount?.toString() || '0');
+      return sum + dn(alloc.fundedAmount);
     }, 0);
 
     const dryPowder = calledCapital - deployedCapital + recycledCapital;
@@ -752,7 +770,7 @@ export class FundService {
     let nav = 0;
     for (const alloc of allocations) {
       if (alloc.exitStatus !== 'exited' && alloc.exitStatus !== 'written_off') {
-        nav += parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0');
+        nav += dn(alloc.currentValue ?? alloc.fundedAmount);
       }
     }
 
@@ -770,7 +788,7 @@ export class FundService {
     if (cashFlows.length > 1) {
       const xirrFlows: XirrCashFlow[] = cashFlows.map(cf => ({
         date: new Date(cf.flowDate),
-        amount: parseFloat(cf.grossAmount?.toString() || '0'),
+        amount: dn(cf.grossAmount),
       }));
       
       if (nav > 0) {
@@ -781,7 +799,7 @@ export class FundService {
 
       const netFlows: XirrCashFlow[] = cashFlows.map(cf => ({
         date: new Date(cf.flowDate),
-        amount: parseFloat(cf.netAmount?.toString() || '0'),
+        amount: dn(cf.netAmount),
       }));
       
       if (nav > 0) {
@@ -1060,25 +1078,25 @@ export class FundService {
     const fund = await this.getFund(orgId, fundId);
     
     const totalCommitment = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
     return investors.map(inv => {
-      const commitment = parseFloat(inv.commitmentAmount?.toString() || '0');
+      const commitment = dn(inv.commitmentAmount);
       return {
         investorId: inv.id,
         investorName: inv.investorName,
         investorType: inv.investorType,
         commitment,
-        calledCapital: parseFloat(inv.calledCapital?.toString() || '0'),
-        unfundedCommitment: parseFloat(inv.unfundedCommitment?.toString() || String(commitment)),
-        distributions: parseFloat(inv.distributedCapital?.toString() || '0'),
-        preferredReturnAccrued: parseFloat(inv.preferredReturnAccrued?.toString() || '0'),
-        preferredReturnPaid: parseFloat(inv.preferredReturnPaid?.toString() || '0'),
-        carriedInterestEarned: parseFloat(inv.carriedInterestEarned?.toString() || '0'),
-        carriedInterestPaid: parseFloat(inv.carriedInterestPaid?.toString() || '0'),
-        capitalAccountBalance: parseFloat(inv.capitalAccountBalance?.toString() || '0'),
+        calledCapital: dn(inv.calledCapital),
+        unfundedCommitment: dn(inv.unfundedCommitment ?? commitment),
+        distributions: dn(inv.distributedCapital),
+        preferredReturnAccrued: dn(inv.preferredReturnAccrued),
+        preferredReturnPaid: dn(inv.preferredReturnPaid),
+        carriedInterestEarned: dn(inv.carriedInterestEarned),
+        carriedInterestPaid: dn(inv.carriedInterestPaid),
+        capitalAccountBalance: dn(inv.capitalAccountBalance),
         ownershipPct: totalCommitment > 0 ? (commitment / totalCommitment) * 100 : 0,
       };
     });
@@ -1091,7 +1109,7 @@ export class FundService {
   private async updateFundCommittedCapital(orgId: string, fundId: string): Promise<void> {
     const investors = await this.getInvestorsByFund(orgId, fundId);
     const totalCommitted = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
@@ -1111,7 +1129,7 @@ export class FundService {
     const fund = await this.getFund(orgId, fundId);
     if (!fund) return;
 
-    const current = parseFloat(fund.calledCapital?.toString() || '0');
+    const current = dn(fund.calledCapital);
     await db.update(funds)
       .set({
         calledCapital: String(current + additionalAmount),
@@ -1128,7 +1146,7 @@ export class FundService {
     const fund = await this.getFund(orgId, fundId);
     if (!fund) return;
 
-    const current = parseFloat(fund.distributedCapital?.toString() || '0');
+    const current = dn(fund.distributedCapital);
     await db.update(funds)
       .set({
         distributedCapital: String(current + additionalAmount),
@@ -1145,7 +1163,7 @@ export class FundService {
     const fund = await this.getFund(orgId, fundId);
     if (!fund) return;
 
-    const current = parseFloat(fund.recycledCapital?.toString() || '0');
+    const current = dn(fund.recycledCapital);
     await db.update(funds)
       .set({
         recycledCapital: String(current + additionalAmount),
@@ -1162,8 +1180,8 @@ export class FundService {
     const investor = await this.getInvestor(orgId, investorId);
     if (!investor) return;
 
-    const currentCalled = parseFloat(investor.calledCapital?.toString() || '0');
-    const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+    const currentCalled = dn(investor.calledCapital);
+    const commitment = dn(investor.commitmentAmount);
 
     await db.update(fundInvestors)
       .set({
@@ -1183,8 +1201,8 @@ export class FundService {
     const investor = await this.getInvestor(orgId, investorId);
     if (!investor) return;
 
-    const currentDistributed = parseFloat(investor.distributedCapital?.toString() || '0');
-    const currentBalance = parseFloat(investor.capitalAccountBalance?.toString() || '0');
+    const currentDistributed = dn(investor.distributedCapital);
+    const currentBalance = dn(investor.capitalAccountBalance);
 
     await db.update(fundInvestors)
       .set({
@@ -1221,7 +1239,7 @@ export class FundService {
     if (!fund) throw new Error('Fund not found');
 
     const investors = await this.getInvestorsByFund(orgId, fundId);
-    const prefRate = parseFloat(fund.preferredReturn?.toString() || '0.08');
+    const prefRate = dn(fund.preferredReturn, '0.08');
     const compounding = options.compoundingMethod || 'simple';
     const periodMonths = options.periodMonths || 3;
     const periodFraction = periodMonths / 12;
@@ -1233,11 +1251,11 @@ export class FundService {
     for (const investor of investors) {
       if (!investor.isActive) continue;
 
-      const calledCapital = parseFloat(investor.calledCapital?.toString() || '0');
-      const distributedCapital = parseFloat(investor.distributedCapital?.toString() || '0');
-      const returnedCapital = parseFloat(investor.returnedCapital?.toString() || '0');
-      const currentAccrued = parseFloat(investor.preferredReturnAccrued?.toString() || '0');
-      const currentPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+      const calledCapital = dn(investor.calledCapital);
+      const distributedCapital = dn(investor.distributedCapital);
+      const returnedCapital = dn(investor.returnedCapital);
+      const currentAccrued = dn(investor.preferredReturnAccrued);
+      const currentPaid = dn(investor.preferredReturnPaid);
 
       // Unreturned capital basis for preferred return calculation
       const unreturnedCapital = calledCapital - returnedCapital;
@@ -1352,8 +1370,8 @@ export class FundService {
     for (const alloc of allocations) {
       if (alloc.exitStatus === 'exited' || alloc.exitStatus === 'written_off') continue;
 
-      const currentValue = parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0');
-      const costBasis = parseFloat(alloc.costBasis?.toString() || alloc.fundedAmount?.toString() || '0');
+      const currentValue = dn(alloc.currentValue ?? alloc.fundedAmount);
+      const costBasis = dn(alloc.costBasis ?? alloc.fundedAmount);
       const unrealizedGain = currentValue - costBasis;
 
       grossAssetValue += currentValue;
@@ -1381,12 +1399,12 @@ export class FundService {
 
     // Calculate per-investor allocation
     const totalCommitment = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
     const investorAllocations = investors.map(inv => {
-      const commitment = parseFloat(inv.commitmentAmount?.toString() || '0');
+      const commitment = dn(inv.commitmentAmount);
       const ownershipPct = totalCommitment > 0 ? (commitment / totalCommitment) * 100 : 0;
       const navAllocation = totalNav * (ownershipPct / 100);
 
@@ -1465,13 +1483,13 @@ export class FundService {
     if (investors.length === 0) throw new Error('No active investors in fund');
 
     const totalCommitment = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
     // Validate call doesn't exceed unfunded commitments
     const totalUnfunded = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.unfundedCommitment?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.unfundedCommitment),
       0
     );
 
@@ -1513,9 +1531,9 @@ export class FundService {
     let totalAllocated = 0;
 
     for (const investor of investors) {
-      const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+      const commitment = dn(investor.commitmentAmount);
       const commitmentPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
-      const unfundedBefore = parseFloat(investor.unfundedCommitment?.toString() || '0');
+      const unfundedBefore = dn(investor.unfundedCommitment);
 
       // Calculate pro-rata share, but cap at investor's unfunded commitment
       let amountCalled = Math.round(data.totalAmount * commitmentPct * 100) / 100;
@@ -1596,7 +1614,7 @@ export class FundService {
         .set({ status: 'completed', updatedAt: new Date() })
         .where(eq(fundCapitalMovements.id, movement.id));
 
-      const amount = parseFloat(movement.amount?.toString() || '0');
+      const amount = dn(movement.amount);
 
       // Update investor balances if investor-specific
       if (movement.fundInvestorId) {
@@ -1672,8 +1690,8 @@ export class FundService {
     const waterfallResult = this.calculateWaterfallDistribution(
       data.totalProceeds,
       metrics.calledCapital,
-      parseFloat(fund.preferredReturn?.toString() || '0.08'),
-      parseFloat(fund.gpCatchUpPct?.toString() || '1.00'),
+      dn(fund.preferredReturn, '0.08'),
+      dn(fund.gpCatchUpPct, '1.00'),
       fund.promoteTiers || [{ irrHurdle: 0.08, gpSplit: 20, lpSplit: 80 }],
       yearsHeld
     );
@@ -1683,7 +1701,7 @@ export class FundService {
 
     // Calculate ownership percentages
     const totalCommitment = investors.reduce(
-      (sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'),
+      (sum, inv) => sum + dn(inv.commitmentAmount),
       0
     );
 
@@ -1701,7 +1719,7 @@ export class FundService {
     let totalDistributed = 0;
 
     for (const investor of investors) {
-      const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+      const commitment = dn(investor.commitmentAmount);
       const ownershipPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
       const isGp = investor.investorType === 'gp';
 
@@ -1751,7 +1769,7 @@ export class FundService {
 
       // Update preferred return paid
       if (preferredReturn > 0) {
-        const currentPrefPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+        const currentPrefPaid = dn(investor.preferredReturnPaid);
         await db.update(fundInvestors)
           .set({
             preferredReturnPaid: String(currentPrefPaid + preferredReturn),
@@ -1762,8 +1780,8 @@ export class FundService {
 
       // Update carried interest paid (GP only)
       if (carriedInterest > 0 && isGp) {
-        const currentCarryPaid = parseFloat(investor.carriedInterestPaid?.toString() || '0');
-        const currentCarryEarned = parseFloat(investor.carriedInterestEarned?.toString() || '0');
+        const currentCarryPaid = dn(investor.carriedInterestPaid);
+        const currentCarryEarned = dn(investor.carriedInterestEarned);
         await db.update(fundInvestors)
           .set({
             carriedInterestEarned: String(Math.max(currentCarryEarned, currentCarryPaid + carriedInterest)),
@@ -1913,46 +1931,46 @@ export class FundService {
     const contributions = allMovements
       .filter(m => m.movementType === 'call' || m.movementType === 'contribution')
       .filter(m => m.status === 'completed')
-      .reduce((sum, m) => sum + parseFloat(m.amount?.toString() || '0'), 0);
+      .reduce((sum, m) => sum + dn(m.amount), 0);
 
     const distributionMovements = allMovements
       .filter(m => m.movementType === 'distribution' || m.movementType === 'return_of_capital')
       .filter(m => m.status === 'completed');
 
     const totalDistributed = distributionMovements
-      .reduce((sum, m) => sum + parseFloat(m.amount?.toString() || '0'), 0);
+      .reduce((sum, m) => sum + dn(m.amount), 0);
 
     // Build distributions breakdown
     const distributions = distributionMovements.map(m => ({
       date: new Date(m.movementDate),
       type: m.movementType,
-      returnOfCapital: parseFloat(m.returnOfCapital?.toString() || '0'),
-      preferredReturn: parseFloat(m.preferredReturn?.toString() || '0'),
-      carriedInterest: parseFloat(m.carriedInterest?.toString() || '0'),
-      profitShare: parseFloat(m.amount?.toString() || '0') -
-        parseFloat(m.returnOfCapital?.toString() || '0') -
-        parseFloat(m.preferredReturn?.toString() || '0') -
-        parseFloat(m.carriedInterest?.toString() || '0'),
-      total: parseFloat(m.amount?.toString() || '0'),
+      returnOfCapital: dn(m.returnOfCapital),
+      preferredReturn: dn(m.preferredReturn),
+      carriedInterest: dn(m.carriedInterest),
+      profitShare: dn(m.amount) -
+        dn(m.returnOfCapital) -
+        dn(m.preferredReturn) -
+        dn(m.carriedInterest),
+      total: dn(m.amount),
     }));
 
     // Preferred return tracking
-    const prefRate = parseFloat(fund.preferredReturn?.toString() || '0.08');
-    const totalAccrued = parseFloat(investor.preferredReturnAccrued?.toString() || '0');
-    const totalPrefPaid = parseFloat(investor.preferredReturnPaid?.toString() || '0');
+    const prefRate = dn(fund.preferredReturn, '0.08');
+    const totalAccrued = dn(investor.preferredReturnAccrued);
+    const totalPrefPaid = dn(investor.preferredReturnPaid);
 
     // Deal exposure
     const allocations = await this.getAllocationsByFund(orgId, fundId);
-    const commitment = parseFloat(investor.commitmentAmount?.toString() || '0');
+    const commitment = dn(investor.commitmentAmount);
     const totalFundCommitment = (await this.getInvestorsByFund(orgId, fundId))
-      .reduce((sum, inv) => sum + parseFloat(inv.commitmentAmount?.toString() || '0'), 0);
+      .reduce((sum, inv) => sum + dn(inv.commitmentAmount), 0);
     const ownershipPct = totalFundCommitment > 0 ? commitment / totalFundCommitment : 0;
 
     const dealExposure = [];
     for (const alloc of allocations) {
       if (alloc.exitStatus === 'written_off') continue;
-      const investedAmount = parseFloat(alloc.fundedAmount?.toString() || '0') * ownershipPct;
-      const currentValue = parseFloat(alloc.currentValue?.toString() || alloc.fundedAmount?.toString() || '0') * ownershipPct;
+      const investedAmount = dn(alloc.fundedAmount) * ownershipPct;
+      const currentValue = dn(alloc.currentValue ?? alloc.fundedAmount) * ownershipPct;
 
       let projectName = 'Unknown Project';
       if (alloc.modelingProjectId) {
@@ -1982,16 +2000,16 @@ export class FundService {
         name: fund.name,
         vintage: fund.vintage,
         status: fund.status,
-        targetSize: parseFloat(fund.targetSize?.toString() || '0'),
-        committedCapital: parseFloat(fund.committedCapital?.toString() || '0'),
+        targetSize: dn(fund.targetSize),
+        committedCapital: dn(fund.committedCapital),
       },
       investor: {
         name: investor.investorName,
         type: investor.investorType,
         commitmentAmount: commitment,
         commitmentPct: Math.round(ownershipPct * 10000) / 100,
-        calledCapital: parseFloat(investor.calledCapital?.toString() || '0'),
-        unfundedCommitment: parseFloat(investor.unfundedCommitment?.toString() || String(commitment)),
+        calledCapital: dn(investor.calledCapital),
+        unfundedCommitment: dn(investor.unfundedCommitment ?? commitment),
       },
       capitalAccount: {
         openingBalance: 0,
@@ -2054,7 +2072,7 @@ export class FundService {
       // Compute XIRR
       const cashflows: { date: Date; amount: number }[] = entries.map(e => ({
         date: new Date(e.asOfDate as string),
-        amount: parseFloat(e.amount),
+        amount: dn(e.amount),
       }));
 
       const irr = this.calculateXirr(cashflows);

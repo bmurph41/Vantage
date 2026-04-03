@@ -30313,6 +30313,37 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // === LP Investor Statement — PDF Download ===
+  app.get('/api/funds/:fundId/investors/:investorId/statement/pdf', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { fundId, investorId } = req.params;
+      const { fundService } = await import('./services/fund-service');
+      const { generateStatementPDF } = await import('./services/lp-statement-pdf');
+
+      const { periodStart, periodEnd, asOfDate } = req.query as Record<string, string>;
+      const asOf = asOfDate ? new Date(asOfDate) : undefined;
+
+      const statement = await fundService.generateInvestorStatement(orgId, fundId, investorId, {
+        asOfDate: asOf,
+        periodStart: periodStart ? new Date(periodStart) : undefined,
+        periodEnd: periodEnd ? new Date(periodEnd) : undefined,
+      });
+
+      const pdfBytes = await generateStatementPDF(statement, asOf);
+
+      const filename = `${statement.fund.name.replace(/[^a-zA-Z0-9]/g, '_')}_${statement.investor.name.replace(/[^a-zA-Z0-9]/g, '_')}_Statement.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBytes.length);
+      res.end(Buffer.from(pdfBytes));
+    } catch (error: any) {
+      console.error('Failed to generate PDF statement:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate PDF statement' });
+    }
+  });
+
   // === LP Reporting (project-level, for workspace tab) ===
   app.get('/api/modeling/projects/:projectId/lp-reporting', authenticateUser, async (req: any, res) => {
     try {

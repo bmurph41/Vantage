@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatPercent } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import FundReporting from '@/components/funds/fund-reporting';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -637,6 +638,7 @@ function FundDetailView({ fund }: { fund: Fund }) {
           <TabsTrigger value="investors" data-testid="tab-investors">Investors</TabsTrigger>
           <TabsTrigger value="allocations" data-testid="tab-allocations">Deal Allocations</TabsTrigger>
           <TabsTrigger value="waterfall" data-testid="tab-waterfall">Waterfall</TabsTrigger>
+          <TabsTrigger value="reporting" data-testid="tab-reporting">Reporting</TabsTrigger>
         </TabsList>
 
         <TabsContent value="investors">
@@ -838,6 +840,10 @@ function FundDetailView({ fund }: { fund: Fund }) {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="reporting">
+          <FundReporting fundId={fund.id} />
         </TabsContent>
       </Tabs>
     </div>

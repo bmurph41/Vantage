@@ -970,3 +970,62 @@ fundManagementRouter.post('/management-fees/:id/paid', async (req: Request, res:
     res.status(500).json({ error: 'Failed to update invoice status' });
   }
 });
+
+// ============================================================================
+// FUND REPORTING — PME, Return Attribution, J-Curve, Vintage Cohorts
+// ============================================================================
+
+// GET /funds/:fundId/pme — Public Market Equivalent (Kaplan-Schoar)
+fundManagementRouter.get('/funds/:fundId/pme', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    const { fundId } = req.params;
+    const { calculatePME } = await import('../services/fund-reporting-service');
+    const result = await calculatePME(orgId, fundId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error calculating PME:', error);
+    res.status(500).json({ error: error.message || 'Failed to calculate PME' });
+  }
+});
+
+// GET /funds/:fundId/attribution — Return Attribution (top/bottom deals)
+fundManagementRouter.get('/funds/:fundId/attribution', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    const { fundId } = req.params;
+    const { calculateReturnAttribution } = await import('../services/fund-reporting-service');
+    const result = await calculateReturnAttribution(orgId, fundId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error calculating return attribution:', error);
+    res.status(500).json({ error: error.message || 'Failed to calculate return attribution' });
+  }
+});
+
+// GET /funds/:fundId/j-curve — J-Curve Analysis
+fundManagementRouter.get('/funds/:fundId/j-curve', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    const { fundId } = req.params;
+    const { calculateJCurve } = await import('../services/fund-reporting-service');
+    const result = await calculateJCurve(orgId, fundId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error calculating J-curve:', error);
+    res.status(500).json({ error: error.message || 'Failed to calculate J-curve' });
+  }
+});
+
+// GET /vintage-cohorts — Vintage Year Cohort Performance
+fundManagementRouter.get('/vintage-cohorts', async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user?.orgId;
+    const { getVintageCohorts } = await import('../services/fund-reporting-service');
+    const result = await getVintageCohorts(orgId);
+    res.json({ cohorts: result });
+  } catch (error: any) {
+    console.error('Error fetching vintage cohorts:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch vintage cohorts' });
+  }
+});
