@@ -86,7 +86,7 @@ import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
 import pnlRouter from "./services/pnl/routes";
 import valuatorExportRoutes from "./routes/valuator-export-routes";
-import capitalMarketsRouter from "./services/capital-markets/routes";
+import capitalMarketsServiceRouter from "./services/capital-markets/routes";
 import rraRoutes from "./routes/rra-routes";
 import modelingRentRollRoutes from "./routes/modeling-rent-roll-routes";
 import marinaIntegrationsRoutes from "./routes/marina-integrations-routes";
@@ -429,7 +429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enterprise authentication middleware with session support
   const authenticateUser = async (req: any, res: any, next: any) => {
     // Skip authentication for non-API routes (let SPA handle auth)
-    if (!req.path.startsWith('/api/')){return next();}
+    // Use originalUrl since req.path is relative to the mount point
+    if (!req.originalUrl.startsWith('/api/')){return next();}
     try {
       // Check for session token in cookie
       const sessionToken = req.cookies?.sessionToken;
@@ -753,7 +754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/tax-waterfall", authenticateUser, enforceTenant, taxWaterfallRoutes);
   app.use("/api/marina-integrations", authenticateUser, enforceTenant, marinaIntegrationsRoutes);
   app.use("/api/executive-dashboard", authenticateUser, enforceTenant, requireRentRoll(), executiveDashboardRoutes);
-  app.use("/api/capital-markets", authenticateUser, enforceTenant, capitalMarketsRouter);
+  app.use("/api/capital-markets/services", authenticateUser, enforceTenant, capitalMarketsServiceRouter);
 
   app.get("/api/geocode", authenticateUser, async (req: any, res) => {
     try {
@@ -9424,21 +9425,22 @@ Current context: Project ${req.params.projectId}`;
       res.status(500).json({ error: "Failed to delete note" });
     }
   });
-  // CRM Tasks
-  app.get("/api/crm/tasks", async (req: any, res) => {
+  // CRM Tasks (crm_tasks table has no org_id column — use assignee_id only)
+  app.get("/api/crm/tasks", authenticateUser, async (req: any, res) => {
     try {
-      const tasks = await db.query.crmTasks.findMany({
-        where: eq(crmTasks.assigneeId, req.user.id),
-        orderBy: [desc(crmTasks.createdAt)],
-      });
-      res.json(tasks);
+      const userId = req.user?.id;
+      const { rows } = await db.execute(sql`
+        SELECT * FROM crm_tasks WHERE assignee_id = ${userId}
+        ORDER BY created_at DESC LIMIT 200
+      `);
+      res.json(rows);
     } catch (error: any) {
       console.error("Failed to get tasks:", error);
       res.status(500).json({ error: "Failed to retrieve tasks" });
     }
   });
 
-  app.post("/api/crm/tasks", async (req: any, res) => {
+  app.post("/api/crm/tasks", authenticateUser, async (req: any, res) => {
     try {
       const { 
         addToCalendar, 
@@ -9525,7 +9527,7 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
-  app.put("/api/crm/tasks/:id", async (req: any, res) => {
+  app.put("/api/crm/tasks/:id", authenticateUser, async (req: any, res) => {
     try {
       // First, verify the task exists and belongs to the user
       const existingTask = await db.query.crmTasks.findFirst({

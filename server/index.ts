@@ -28,7 +28,6 @@ import { workspaceRouter } from './routes/workspace-routes';
 import { ddChecklistRouter } from "./routes/dd-checklist-routes";
 import healthRoutes from './routes/health';
 import { deprecationWarning } from './routes/api-versioning';
-import { exitStudioRouter } from './routes/exit-studio-routes';
 import legalBenchmarkingRoutes from './routes/legal-benchmarking-routes';
 import { authenticateUser } from './middleware/authenticate';
 import { configureEnhancedSecurityHeaders } from './middleware/enhanced-security-headers';
@@ -145,7 +144,7 @@ app.use('/api', deprecationWarning('2027-06-01'));
     app.use('/api/wizard-drafts', wizardDraftsRouter);
 app.use(ddChecklistRouter);
     app.use(workspaceRouter);
-    app.use(exitStudioRouter);
+    // exitStudioRouter mounted in routes.ts with auth middleware
 
     // Initialize Docket storage and register routes
     const docketStorage = new DocketStorage();
