@@ -220,24 +220,33 @@ export default function WorkspaceDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10" />
-          <div><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-48 mt-2" /></div>
+      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-8 w-8 rounded" />
+            <div className="space-y-1"><Skeleton className="h-5 w-64" /><Skeleton className="h-4 w-48" /></div>
+          </div>
         </div>
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="grid grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
+          </div>
+        </div>
+        <div className="px-6 py-4 space-y-4">
+          <Skeleton className="h-10 w-full rounded" />
+          <Skeleton className="h-64 w-full rounded" />
+        </div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="container mx-auto py-6">
-        <Card><CardContent className="py-12 text-center">
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-6">
+        <Card className="w-full max-w-md"><CardContent className="py-12 text-center">
           <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <h3 className="text-lg font-medium mb-2">Workspace not found</h3>
-          <p className="text-muted-foreground mb-4">This workspace may have been archived or you don't have access.</p>
+          <h3 className="text-lg font-semibold mb-2">Workspace not found</h3>
+          <p className="text-gray-500 mb-4">This workspace may have been archived or you don't have access.</p>
           <Button onClick={() => navigate('/workspaces')}><ArrowLeft className="h-4 w-4 mr-2" />Back to Workspaces</Button>
         </CardContent></Card>
       </div>
@@ -313,70 +322,124 @@ export default function WorkspaceDetailPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/workspaces')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold" data-testid="workspace-title">{workspace.name}</h1>
-              <Badge className={`${statusConfig.color} text-white`}>{statusConfig.label}</Badge>
-              {workspace.role && <Badge variant="outline">{ROLE_LABELS[workspace.role] || workspace.role}</Badge>}
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+
+      {/* ─── Page Header ─────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-gray-900" onClick={() => navigate('/workspaces')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-gray-900" data-testid="workspace-title">{workspace.name}</h1>
+                <Badge className={`${statusConfig.color} text-white text-xs px-2`}>{statusConfig.label}</Badge>
+                {workspace.role && <Badge variant="outline" className="text-xs px-2">{ROLE_LABELS[workspace.role] || workspace.role}</Badge>}
+              </div>
+              <p className="text-sm text-gray-500">{workspace.description || 'No description'}</p>
             </div>
-            <p className="text-muted-foreground">{workspace.description || 'No description'}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportIcs}>
+              <Calendar className="h-4 w-4 mr-1.5" />Export .ics
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/workspaces/${workspaceId}/settings`)}>
+              <Settings className="h-4 w-4 mr-1.5" />Settings
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportIcs}>
-            <Calendar className="h-4 w-4 mr-2" />Export .ics
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/workspaces/${workspaceId}/settings`)}>
-            <Settings className="h-4 w-4 mr-2" />Settings
-          </Button>
+      </div>
+
+      {/* ─── KPI Stat Strip ──────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <DollarSign className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-gray-900">{formatCurrency(workspace.targetPrice)}</div>
+              <div className="text-xs text-gray-500">Deal Value</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <ClipboardList className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-gray-900">
+                {stats.dd.completed}/{stats.dd.total}
+                {stats.dd.overdue > 0 && <span className="text-xs font-normal text-red-500 ml-1">· {stats.dd.overdue} overdue</span>}
+              </div>
+              <div className="text-xs text-gray-500">DD Tasks</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FolderOpen className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-gray-900">{stats.vdr.documents}</div>
+              <div className="text-xs text-gray-500">Data Room Docs</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Users className="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <div className="text-base font-bold text-gray-900">{stats.team?.members || 0}</div>
+              <div className="text-xs text-gray-500">Team Members</div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Guided Deal Flow - shown in simplified mode */}
       {simplifiedMode && workspaceId && (
-        <GuidedDealFlow workspaceId={workspaceId} />
+        <div className="px-6 pt-4">
+          <GuidedDealFlow workspaceId={workspaceId} />
+        </div>
       )}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:grid-cols-none lg:flex">
-          <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
-            <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="financials" className="gap-2" data-testid="tab-financials">
-            <Calculator className="h-4 w-4" /><span className="hidden sm:inline">Financials</span>
-          </TabsTrigger>
-          <TabsTrigger value="diligence" className="gap-2" data-testid="tab-diligence">
-            <ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">Diligence</span>
-            {stats.dd.overdue > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">{stats.dd.overdue}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="dd-status" className="gap-2" data-testid="tab-dd-status">
-            <ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">DD Status</span>
-          </TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
-            <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">Documents</span>
-          </TabsTrigger>
-          <TabsTrigger value="competition" className="gap-2" data-testid="tab-competition">
-            <Swords className="h-4 w-4" /><span className="hidden sm:inline">Competition</span>
-          </TabsTrigger>
-          <TabsTrigger value="scoring" className="gap-2" data-testid="tab-scoring">
-            <Award className="h-4 w-4" /><span className="hidden sm:inline">Scoring</span>
-          </TabsTrigger>
-          <TabsTrigger value="team" className="gap-2" data-testid="tab-team">
-            <Users className="h-4 w-4" /><span className="hidden sm:inline">Team</span>
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{stats.team?.members || 0}</Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* ─── Tab Rail + Content ───────────────────────────────────── */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white border-b border-gray-200 px-6">
+          <TabsList className="h-auto bg-transparent p-0 gap-0 flex">
+            <TabsTrigger value="overview" data-testid="tab-overview" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="financials" data-testid="tab-financials" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <Calculator className="h-4 w-4" /><span className="hidden sm:inline">Financials</span>
+            </TabsTrigger>
+            <TabsTrigger value="diligence" data-testid="tab-diligence" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">Diligence</span>
+              {stats.dd.overdue > 0 && <Badge variant="destructive" className="ml-1 h-4 px-1 text-[10px]">{stats.dd.overdue}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="dd-status" data-testid="tab-dd-status" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">DD Status</span>
+            </TabsTrigger>
+            <TabsTrigger value="documents" data-testid="tab-documents" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <FolderOpen className="h-4 w-4" /><span className="hidden sm:inline">Documents</span>
+            </TabsTrigger>
+            <TabsTrigger value="competition" data-testid="tab-competition" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <Swords className="h-4 w-4" /><span className="hidden sm:inline">Competition</span>
+            </TabsTrigger>
+            <TabsTrigger value="scoring" data-testid="tab-scoring" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <Award className="h-4 w-4" /><span className="hidden sm:inline">Scoring</span>
+            </TabsTrigger>
+            <TabsTrigger value="team" data-testid="tab-team" className="flex items-center gap-1.5 px-4 py-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none text-gray-600 hover:text-gray-900">
+              <Users className="h-4 w-4" /><span className="hidden sm:inline">Team</span>
+              <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{stats.team?.members || 0}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <main className="flex-1 overflow-y-auto px-6 py-4">
 
         {/* ═══ OVERVIEW TAB ═══ */}
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="space-y-4 mt-0">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4 text-green-600" />Deal Value</CardTitle></CardHeader>
@@ -417,7 +480,7 @@ export default function WorkspaceDetailPage() {
 
           {/* Milestones */}
           {milestones.length > 0 && (
-            <Card className="mt-6">
+            <Card className="">
               <CardHeader><CardTitle className="text-base">Milestones</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -441,7 +504,7 @@ export default function WorkspaceDetailPage() {
           )}
 
           {/* Recent Activity (uses existing vdrAuditLogs fields) */}
-          <Card className="mt-6">
+          <Card className="">
             <CardHeader><CardTitle className="text-base">Recent Activity</CardTitle></CardHeader>
             <CardContent>
               {data.recentActivity && data.recentActivity.length > 0 ? (
@@ -469,7 +532,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ FINANCIALS TAB ═══ */}
-        <TabsContent value="financials" className="mt-6">
+        <TabsContent value="financials" className="space-y-4 mt-0">
           <Card>
             <CardHeader><CardTitle>Financial Modeling</CardTitle><CardDescription>Valuation analysis, pro forma, and exit strategies</CardDescription></CardHeader>
             <CardContent>
@@ -496,7 +559,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ DILIGENCE TAB ═══ */}
-        <TabsContent value="diligence" className="mt-6">
+        <TabsContent value="diligence" className="space-y-4 mt-0">
           {simplifiedMode ? (
             <SimplifiedDDChecklist workspaceId={workspaceId} />
           ) : (
@@ -522,7 +585,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ DD STATUS TAB ═══ */}
-        <TabsContent value="dd-status" className="mt-6">
+        <TabsContent value="dd-status" className="space-y-4 mt-0">
           {hasDDProject && workspace.ddProjectId ? (
             <DDStatusReport projectId={workspace.ddProjectId} />
           ) : (
@@ -540,7 +603,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ DOCUMENTS TAB ═══ */}
-        <TabsContent value="documents" className="mt-6">
+        <TabsContent value="documents" className="space-y-4 mt-0">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -603,7 +666,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ TEAM TAB ═══ */}
-        <TabsContent value="team" className="mt-6">
+        <TabsContent value="team" className="space-y-4 mt-0">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -658,7 +721,7 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ COMPETITION TAB ═══ */}
-        <TabsContent value="competition" className="mt-6">
+        <TabsContent value="competition" className="space-y-4 mt-0">
           <CompetitiveTracker
             dealId={workspaceId!}
             ourBid={workspace.targetPrice ? Number(workspace.targetPrice) : undefined}
@@ -666,9 +729,11 @@ export default function WorkspaceDetailPage() {
         </TabsContent>
 
         {/* ═══ SCORING TAB ═══ */}
-        <TabsContent value="scoring" className="mt-6">
+        <TabsContent value="scoring" className="space-y-4 mt-0">
           <DealScoringCard dealId={workspaceId!} dealTitle={workspace.name} />
         </TabsContent>
+
+        </main>
       </Tabs>
 
       {/* ═══ CREATE DD DIALOG ═══ */}
