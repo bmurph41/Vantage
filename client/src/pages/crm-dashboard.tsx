@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatCurrency } from "@/lib/utils";
-import { DealMetricsDashboard } from "@/components/crm/_wip/DealMetricsDashboard";
+import { DealMetricsDashboard } from "@/components/crm/panels/DealMetricsDashboard";
 import { FeatureChecklist } from "@/components/ui/_primitives/feature-highlight";
 import { ExportPdfButton } from "@/components/ui/export-pdf-button";
 import { formatDistanceToNow, isToday, isBefore, startOfDay, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";

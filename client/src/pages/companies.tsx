@@ -21,7 +21,7 @@ import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { apiRequest } from "@/lib/queryClient";
-import { CrmListsManager } from "@/components/crm/_wip/CrmListsManager";
+import { CrmListsManager } from "@/components/crm/panels/CrmListsManager";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/utils";
 import type { Company, KpiConfigItem, Contact, Property } from "@shared/schema";

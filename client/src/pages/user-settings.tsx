@@ -46,23 +46,23 @@ const CALENDAR_PROVIDERS = [
 ];
 
 const TOUR_INFO = [
-  { id: TOUR_IDS.DASHBOARD, name: "Dashboard", description: "Overview of your marina acquisitions", route: "/" },
+  { id: TOUR_IDS.DASHBOARD, name: "Dashboard", description: "Overview of your portfolio and pipeline", route: "/" },
   { id: TOUR_IDS.DEALS, name: "CRM Deals", description: "Manage your deal pipeline", route: "/deals" },
   { id: TOUR_IDS.DOCKET, name: "The Docket", description: "M&A intelligence feed", route: "/docket" },
   { id: TOUR_IDS.FUEL_SALES, name: "Fuel Sales", description: "Track fuel operations", route: "/operations/fuel" },
   { id: TOUR_IDS.SHIP_STORE, name: "Ship Store", description: "Retail inventory tracking", route: "/operations/ship-store" },
   { id: TOUR_IDS.COMMERCIAL_TENANTS, name: "Commercial Tenants", description: "Lease management", route: "/operations/commercial-tenants" },
   { id: TOUR_IDS.VDR, name: "Virtual Data Room", description: "Secure document storage", route: "/vdr" },
-  { id: TOUR_IDS.RENT_ROLL, name: "Rent Roll", description: "Marina lease tracking", route: "/operations/rent-roll" },
+  { id: TOUR_IDS.RENT_ROLL, name: "Rent Roll", description: "Lease tracking and analysis", route: "/operations/rent-roll" },
   { id: TOUR_IDS.VALUATOR, name: "Financial Model", description: "Financial modeling", route: "/modeling" },
   { id: TOUR_IDS.SALES_COMPS, name: "Sales Comps", description: "Comparable sales analysis", route: "/analysis/sales-comps" },
 ];
 
-const VIDEO_PLACEHOLDERS = [
-  { title: "Getting Started with MarinaMatch", description: "Learn the basics of navigating the platform", duration: "5 min", link: "/" },
-  { title: "CRM & Deal Management", description: "How to manage your acquisition pipeline", duration: "8 min", link: "/deals" },
-  { title: "Rent Roll Deep Dive", description: "Advanced rent roll features and reporting", duration: "12 min", link: "/operations/rent-roll" },
-  { title: "Financial Modeling", description: "Building accurate marina valuations", duration: "15 min", link: "/modeling" },
+const QUICK_START_GUIDES = [
+  { title: "Getting Started", description: "Navigate the dashboard and set up your workspace", icon: "compass", link: "/" },
+  { title: "CRM & Deal Pipeline", description: "Add deals, manage contacts, and track your pipeline", icon: "briefcase", link: "/deals" },
+  { title: "Rent Roll & Operations", description: "Lease tracking, occupancy analysis, and NOI reporting", icon: "building", link: "/operations/rent-roll" },
+  { title: "Financial Modeling", description: "Pro Forma, DCF, Monte Carlo, and exit analysis", icon: "calculator", link: "/modeling" },
 ];
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
@@ -1535,31 +1535,23 @@ export default function UserSettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Play className="h-5 w-5" />
-              Video Tutorials
+              Quick Start Guides
             </CardTitle>
             <CardDescription>
-              In-depth video guides for platform features
+              Jump into key platform features
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2">
-              {VIDEO_PLACEHOLDERS.map((video, index) => (
+              {QUICK_START_GUIDES.map((guide, index) => (
                 <div
                   key={index}
-                  onClick={() => setLocation(video.link)}
+                  onClick={() => setLocation(guide.link)}
                   className="flex items-center gap-4 p-4 border border-border rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/60 transition-colors"
                 >
-                  <div className="flex-shrink-0 w-16 h-12 bg-muted rounded flex items-center justify-center">
-                    <Play className="h-6 w-6 text-muted-foreground" />
-                  </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-foreground truncate">{video.title}</h4>
-                    <p className="text-sm text-muted-foreground truncate">{video.description}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs">{video.duration}</Badge>
-                      <Badge variant="outline" className="text-xs text-primary border-primary">Interactive Guide</Badge>
-                    </div>
+                    <h4 className="font-medium text-foreground truncate">{guide.title}</h4>
+                    <p className="text-sm text-muted-foreground truncate">{guide.description}</p>
                   </div>
                 </div>
               ))}

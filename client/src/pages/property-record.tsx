@@ -26,8 +26,8 @@ import {
   PropertyIntelTab,
   PropertyActivitiesTab,
 } from '@/components/crm/PropertyRecordTabs';
-import { PropertyStatusPanel } from '@/components/crm/_wip/PropertyStatusPanel';
-import { CommentThreadsPanel } from '@/components/crm/_wip/comment-threads-panel';
+import { PropertyStatusPanel } from '@/components/crm/panels/PropertyStatusPanel';
+import { CommentThreadsPanel } from '@/components/crm/panels/comment-threads-panel';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────

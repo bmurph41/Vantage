@@ -824,7 +824,6 @@ export default function Dashboard() {
     'portfolio-breakdown',
     'fuel-operations',
     'ship-store',
-    'rent-roll',
   ];
 
   const { data: dashboardData, isLoading } = useQuery({
@@ -1265,7 +1264,7 @@ export default function Dashboard() {
     },
     {
       id: 'marina-analytics',
-      title: 'Rent Roll',
+      title: 'Operational KPIs',
       icon: Activity,
       link: '/rent-roll',
       data: marinaAnalyticsData,

@@ -18,7 +18,7 @@ import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { BulkActionBar } from "@/components/ui/_primitives/bulk-action-bar";
 import { apiRequest } from "@/lib/queryClient";
-import { CrmListsManager } from "@/components/crm/_wip/CrmListsManager";
+import { CrmListsManager } from "@/components/crm/panels/CrmListsManager";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 

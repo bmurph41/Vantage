@@ -25,12 +25,12 @@ import ConvertToProjectModal from "@/components/modals/convert-to-project-modal"
 import DocumentGeneratorModal from "@/components/modals/document-generator-modal";
 import CompSetSelector from "@/components/comp-set-selector";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { RedFlagsPanel } from "@/components/crm/_wip/red-flags-panel";
+import { RedFlagsPanel } from "@/components/crm/panels/red-flags-panel";
 import DealTimelineTab from "@/components/deals/deal-timeline-tab";
-import { PhaseGatesPanel } from "@/components/crm/_wip/phase-gates-panel";
-import { DealPlaybookPanel } from "@/components/crm/_wip/deal-playbook-panel";
-import { CommentThreadsPanel } from "@/components/crm/_wip/comment-threads-panel";
-import { PipelineForecastingPanel } from "@/components/crm/_wip/pipeline-forecasting-panel";
+import { PhaseGatesPanel } from "@/components/crm/panels/phase-gates-panel";
+import { DealPlaybookPanel } from "@/components/crm/panels/deal-playbook-panel";
+import { CommentThreadsPanel } from "@/components/crm/panels/comment-threads-panel";
+import { PipelineForecastingPanel } from "@/components/crm/panels/pipeline-forecasting-panel";
 
 // ── Helpers ───────────────────────────────────────────────
 function fmtCurrency(v: string | number | null | undefined): string {
@@ -230,7 +230,7 @@ function DealOverviewTab({ deal, workspace }: { deal: any; workspace: any }) {
       {deal.propertyDetails && Object.keys(deal.propertyDetails).length > 0 && (
         <Card>
           <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-sm flex items-center gap-2"><Anchor className="h-4 w-4" />Marina Property Details</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2"><Anchor className="h-4 w-4" />Property Details</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -440,7 +440,7 @@ function DealIntelTab({ state }: { state?: string | null }) {
   });
   const articles: any[] = Array.isArray(data) ? data : data?.articles || [];
   if (isLoading) return <div className="space-y-3">{[...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>)}</div>;
-  if (!articles.length) return <EmptyState icon={Newspaper} title="No market intel" subtitle="Marina industry news will appear here as it's ingested" />;
+  if (!articles.length) return <EmptyState icon={Newspaper} title="No market intel" subtitle="Industry news will appear here as it's ingested" />;
   return (
     <div className="space-y-3">
       {articles.map((a: any) => {
@@ -504,8 +504,8 @@ function DealAboutSidebar({ deal }: { deal: any }) {
         </RecordFieldGroup>
       )}
       {(deal.marinaName || deal.slipNumber) && (
-        <RecordFieldGroup title="Marina Details" icon={Anchor}>
-          {deal.marinaName && <RecordField label="Marina" value={deal.marinaName} icon={Anchor} />}
+        <RecordFieldGroup title="Asset Details" icon={Anchor}>
+          {deal.marinaName && <RecordField label="Property" value={deal.marinaName} icon={Anchor} />}
           {deal.slipNumber && <RecordField label="Slip #" value={deal.slipNumber} icon={Hash} />}
           {deal.boatName && <RecordField label="Boat" value={deal.boatName} icon={Anchor} />}
         </RecordFieldGroup>

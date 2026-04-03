@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, DollarSign, Target, Calendar, Award, Percent, BarChart3, Loader2, AlertTriangle, Clock, Zap, Layers, ArrowRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, addMonths, differenceInDays } from "date-fns";
 import { formatCurrency, formatPercent } from "@/lib/utils";
-import { PipelineForecastingPanel } from "@/components/crm/_wip/pipeline-forecasting-panel";
+import { PipelineForecastingPanel } from "@/components/crm/panels/pipeline-forecasting-panel";
 import { Link } from "wouter";
 import type { Deal, CrmPipelineStage } from "@shared/schema";
 

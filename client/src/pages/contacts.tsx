@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { CrmListsManager } from "@/components/crm/_wip/CrmListsManager";
+import { CrmListsManager } from "@/components/crm/panels/CrmListsManager";
 import { useToast } from "@/hooks/use-toast";
 import ContactFormModal from "@/components/modals/contact-form-modal";
 import { CreateContactWizardModal } from "@/components/modals/create-contact-wizard-modal";
