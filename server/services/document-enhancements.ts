@@ -342,13 +342,15 @@ class ESignatureEngine {
   async listSignatureRequests(orgId: string, filters?: {
     status?: string; documentId?: string; limit?: number;
   }): Promise<ESignatureRequest[]> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters?.status) conditions.push(`status = '${filters.status}'`);
-    if (filters?.documentId) conditions.push(`document_id = '${filters.documentId}'`);
+    const conditions = [sql`org_id = ${orgId}`];
+    if (filters?.status) conditions.push(sql`status = ${filters.status}`);
+    if (filters?.documentId) conditions.push(sql`document_id = ${filters.documentId}`);
+    const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} AND ${c}`);
+    const limit = Math.min(Math.max(1, filters?.limit || 50), 200);
 
-    const result = await db.execute(sql.raw(
-      `SELECT * FROM esignature_requests WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT ${filters?.limit || 50}`
-    ));
+    const result = await db.execute(
+      sql`SELECT * FROM esignature_requests WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`
+    );
 
     return (result.rows as any[]).map(row => ({
       id: row.id, orgId: row.org_id, documentId: row.document_id,
@@ -572,13 +574,15 @@ class LoanPackageEngine {
   async listLoanPackages(orgId: string, filters?: {
     dealId?: string; status?: string; limit?: number;
   }): Promise<LoanPackage[]> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters?.dealId) conditions.push(`deal_id = '${filters.dealId}'`);
-    if (filters?.status) conditions.push(`status = '${filters.status}'`);
+    const conditions = [sql`org_id = ${orgId}`];
+    if (filters?.dealId) conditions.push(sql`deal_id = ${filters.dealId}`);
+    if (filters?.status) conditions.push(sql`status = ${filters.status}`);
+    const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} AND ${c}`);
+    const limit = Math.min(Math.max(1, filters?.limit || 50), 200);
 
-    const result = await db.execute(sql.raw(
-      `SELECT * FROM loan_packages WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT ${filters?.limit || 50}`
-    ));
+    const result = await db.execute(
+      sql`SELECT * FROM loan_packages WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`
+    );
 
     return (result.rows as any[]).map(row => ({
       id: row.id, orgId: row.org_id, dealId: row.deal_id,
@@ -830,12 +834,13 @@ Sincerely,
   }
 
   async listTemplates(orgId: string, templateType?: string): Promise<InvestorLetterTemplate[]> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (templateType) conditions.push(`template_type = '${templateType}'`);
+    const conditions = [sql`org_id = ${orgId}`];
+    if (templateType) conditions.push(sql`template_type = ${templateType}`);
+    const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} AND ${c}`);
 
-    const result = await db.execute(sql.raw(
-      `SELECT * FROM investor_letter_templates WHERE ${conditions.join(' AND ')} ORDER BY is_default DESC, name`
-    ));
+    const result = await db.execute(
+      sql`SELECT * FROM investor_letter_templates WHERE ${whereClause} ORDER BY is_default DESC, name`
+    );
 
     return (result.rows as any[]).map(r => ({
       id: r.id, orgId: r.org_id, name: r.name, templateType: r.template_type,

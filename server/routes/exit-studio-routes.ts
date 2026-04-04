@@ -31,7 +31,7 @@ const router = Router();
 // POST /api/exit-studio/calculate
 // Canonical compute endpoint — stateless computation
 // ============================================================
-router.post('/api/exit-studio/calculate', async (req: any, res) => {
+router.post('/calculate', async (req: any, res) => {
   try {
     // 1. Validate input
     const parseResult = ExitScenarioInputSchema.safeParse(req.body);
@@ -59,7 +59,7 @@ router.post('/api/exit-studio/calculate', async (req: any, res) => {
 // POST /api/exit-studio/scenarios/:scenarioId/compute
 // Compute + persist — loads from DB, computes, saves result + KPIs
 // ============================================================
-router.post('/api/exit-studio/scenarios/:scenarioId/compute', async (req: any, res) => {
+router.post('/scenarios/:scenarioId/compute', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const userId = req.user?.id;
@@ -184,7 +184,7 @@ router.post('/api/exit-studio/scenarios/:scenarioId/compute', async (req: any, r
 // PATCH /api/exit-studio/scenarios/:scenarioId/inputs
 // Save v2 inputs to the scenario
 // ============================================================
-router.patch('/api/exit-studio/scenarios/:scenarioId/inputs', async (req: any, res) => {
+router.patch('/scenarios/:scenarioId/inputs', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const userId = req.user?.id;
@@ -237,7 +237,7 @@ router.patch('/api/exit-studio/scenarios/:scenarioId/inputs', async (req: any, r
 // GET /api/exit-studio/scenarios/:scenarioId/results
 // Get latest cached result
 // ============================================================
-router.get('/api/exit-studio/scenarios/:scenarioId/results', async (req: any, res) => {
+router.get('/scenarios/:scenarioId/results', async (req: any, res) => {
   try {
     const { scenarioId } = req.params;
 
@@ -262,7 +262,7 @@ router.get('/api/exit-studio/scenarios/:scenarioId/results', async (req: any, re
 // GET /api/exit-studio/scenarios/:scenarioId/kpis
 // Get KPI projection (fast, flat columns)
 // ============================================================
-router.get('/api/exit-studio/scenarios/:scenarioId/kpis', async (req: any, res) => {
+router.get('/scenarios/:scenarioId/kpis', async (req: any, res) => {
   try {
     const { scenarioId } = req.params;
 
@@ -286,7 +286,7 @@ router.get('/api/exit-studio/scenarios/:scenarioId/kpis', async (req: any, res) 
 // GET /api/exit-studio/compare
 // Compare multiple scenarios using KPI projection
 // ============================================================
-router.get('/api/exit-studio/compare', async (req: any, res) => {
+router.get('/compare', async (req: any, res) => {
   try {
     const scenarioIds = (req.query.ids as string)?.split(',') ?? [];
     if (scenarioIds.length < 2) {
@@ -317,7 +317,7 @@ router.get('/api/exit-studio/compare', async (req: any, res) => {
 // GET /api/exit-studio/scenarios/:scenarioId/events
 // Audit trail
 // ============================================================
-router.get('/api/exit-studio/scenarios/:scenarioId/events', async (req: any, res) => {
+router.get('/scenarios/:scenarioId/events', async (req: any, res) => {
   try {
     const { scenarioId } = req.params;
 
@@ -338,7 +338,7 @@ router.get('/api/exit-studio/scenarios/:scenarioId/events', async (req: any, res
 // POST /api/exit-studio/scenarios/:scenarioId/lock
 // Lock scenario to prevent drift
 // ============================================================
-router.post('/api/exit-studio/scenarios/:scenarioId/lock', async (req: any, res) => {
+router.post('/scenarios/:scenarioId/lock', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const userId = req.user?.id;
@@ -378,7 +378,7 @@ router.post('/api/exit-studio/scenarios/:scenarioId/lock', async (req: any, res)
 // GET /api/exit-studio/assumption-sets
 // Get asset class defaults
 // ============================================================
-router.get('/api/exit-studio/assumption-sets', async (req: any, res) => {
+router.get('/assumption-sets', async (req: any, res) => {
   try {
     const { assetClass } = req.query;
 
@@ -399,7 +399,7 @@ router.get('/api/exit-studio/assumption-sets', async (req: any, res) => {
 // POST /api/exit-studio/sync/exit-to-financial-model
 // Push exit results → financial model (DCF, scenario versions, capital stack)
 // ============================================================
-router.post('/api/exit-studio/sync/exit-to-financial-model', async (req: any, res) => {
+router.post('/sync/exit-to-financial-model', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const { projectId, scenarioId } = req.body;
@@ -424,7 +424,7 @@ router.post('/api/exit-studio/sync/exit-to-financial-model', async (req: any, re
 // POST /api/exit-studio/sync/financial-model-to-exit
 // Pull financial model assumptions → exit scenario
 // ============================================================
-router.post('/api/exit-studio/sync/financial-model-to-exit', async (req: any, res) => {
+router.post('/sync/financial-model-to-exit', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const { projectId, scenarioId } = req.body;
@@ -449,7 +449,7 @@ router.post('/api/exit-studio/sync/financial-model-to-exit', async (req: any, re
 // POST /api/exit-studio/sync/deal-pricing
 // Sync deal pricing ↔ exit scenarios
 // ============================================================
-router.post('/api/exit-studio/sync/deal-pricing', async (req: any, res) => {
+router.post('/sync/deal-pricing', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const { projectId, direction } = req.body;
@@ -484,7 +484,7 @@ router.post('/api/exit-studio/sync/deal-pricing', async (req: any, res) => {
 // POST /api/exit-studio/sync/hold-period
 // Sync hold period across all systems
 // ============================================================
-router.post('/api/exit-studio/sync/hold-period', async (req: any, res) => {
+router.post('/sync/hold-period', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const { projectId, holdPeriodYears } = req.body;
@@ -505,7 +505,7 @@ router.post('/api/exit-studio/sync/hold-period', async (req: any, res) => {
 // GET /api/exit-studio/portfolio/exit-kpis
 // Get actual exit KPIs for portfolio rollup (replaces hardcoded caps)
 // ============================================================
-router.get('/api/exit-studio/portfolio/exit-kpis', async (req: any, res) => {
+router.get('/portfolio/exit-kpis', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const projectIds = (req.query.projectIds as string)?.split(',').filter(Boolean);
@@ -522,7 +522,7 @@ router.get('/api/exit-studio/portfolio/exit-kpis', async (req: any, res) => {
 // GET /api/exit-studio/portfolio/irr
 // Compute portfolio IRR from actual exit KPIs
 // ============================================================
-router.get('/api/exit-studio/portfolio/irr', async (req: any, res) => {
+router.get('/portfolio/irr', async (req: any, res) => {
   try {
     const orgId = req.user?.orgId;
     const projectIds = (req.query.projectIds as string)?.split(',').filter(Boolean);

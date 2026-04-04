@@ -124,6 +124,7 @@ import marinaCompRoutes from "./routes/marina-comp-routes";
 import valuationTimelineRoutes from "./routes/valuation-timeline-routes";
 import dealAnalyticsRoutes from "./routes/deal-analytics-routes";
 import dealDDRoutes from "./routes/deal-dd-routes";
+import { ddReviewRouter } from "./routes/dd-review-routes";
 import commercialTenantsRoutes from "./routes/commercial-tenants-routes";
 import commercialLeaseRoutes from "./routes/commercial-lease-routes";
 import unifiedLeaseRoutes from "./routes/unified-lease-routes";
@@ -450,9 +451,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Fall back to demo user in development if no session
-      if (!req.user && process.env.NODE_ENV !== 'production') {
-        req.user = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Demo User" };
+      // Fall back to demo user in development if no session (requires explicit opt-in)
+      if (!req.user && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
+        req.user = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "demo@localhost", name: "Demo User" };
       }
       
       if (!req.user) {
@@ -582,6 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm", authenticateUser, requirePack("crm_pipeline"), crmAdvancedSearchRoutes);
   app.use("/api", authenticateUser, dealAnalyticsRoutes);
   app.use("/api", authenticateUser, dealDDRoutes);
+  app.use("/api/dd-review", authenticateUser, enforceTenant, ddReviewRouter);
   app.use("/api/prospecting", authenticateUser, requireProspecting());
   app.use("/api/sla", getSlaRouter());
   registerCommentRoutes(app);

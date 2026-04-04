@@ -427,14 +427,17 @@ class LPStatementGenerator {
   async listStatements(orgId: string, filters: {
     fundId?: string; investorId?: string; statementType?: string; limit?: number;
   }): Promise<LPStatement[]> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters.fundId) conditions.push(`fund_id = '${filters.fundId}'`);
-    if (filters.investorId) conditions.push(`investor_id = '${filters.investorId}'`);
-    if (filters.statementType) conditions.push(`statement_type = '${filters.statementType}'`);
+    const conditions = [sql`org_id = ${orgId}`];
+    if (filters.fundId) conditions.push(sql`fund_id = ${filters.fundId}`);
+    if (filters.investorId) conditions.push(sql`investor_id = ${filters.investorId}`);
+    if (filters.statementType) conditions.push(sql`statement_type = ${filters.statementType}`);
 
-    const result = await db.execute(sql.raw(
-      `SELECT * FROM lp_statements WHERE ${conditions.join(' AND ')} ORDER BY period_end DESC LIMIT ${filters.limit || 50}`
-    ));
+    const whereClause = conditions.reduce((acc, cond, i) => i === 0 ? cond : sql`${acc} AND ${cond}`);
+    const limit = Math.min(Math.max(1, filters.limit || 50), 200);
+
+    const result = await db.execute(
+      sql`SELECT * FROM lp_statements WHERE ${whereClause} ORDER BY period_end DESC LIMIT ${limit}`
+    );
 
     return (result.rows as any[]).map(r => ({
       id: r.id, orgId: r.org_id, fundId: r.fund_id, investorId: r.investor_id,
