@@ -293,10 +293,10 @@ export async function getOrCreateConversation(params: {
 }): Promise<string> {
   if (params.conversationId) {
     const existing = await db.execute(sql`
-      SELECT id FROM ai_conversations WHERE id = ${params.conversationId}::uuid AND org_id = ${params.orgId}
+      SELECT id FROM ai_conversations WHERE id = ${params.conversationId} AND org_id = ${params.orgId}
     `);
     if (existing.rows.length) {
-      await db.execute(sql`UPDATE ai_conversations SET updated_at = NOW() WHERE id = ${params.conversationId}::uuid`).catch(() => {});
+      await db.execute(sql`UPDATE ai_conversations SET last_message_at = NOW() WHERE id = ${params.conversationId}`).catch(() => {});
       return params.conversationId;
     }
   }
@@ -312,14 +312,18 @@ export async function saveMessage(params: {
   conversationId: string; role: 'user' | 'assistant'; content: string;
   advisoryMode?: string; page?: string; ragChunkIds?: string[]; metadata?: Record<string, any>;
 }): Promise<void> {
+  const meta = {
+    ...(params.metadata ?? {}),
+    ...(params.advisoryMode ? { advisoryMode: params.advisoryMode } : {}),
+    ...(params.page ? { page: params.page } : {}),
+    ...(params.ragChunkIds?.length ? { ragChunkIds: params.ragChunkIds } : {}),
+  };
   await db.execute(sql`
     INSERT INTO ai_conversation_messages
-      (conversation_id, role, content, advisory_mode, page, rag_chunk_ids, metadata)
+      (session_id, role, content, metadata)
     VALUES (
       ${params.conversationId}::uuid, ${params.role}, ${params.content},
-      ${params.advisoryMode ?? 'general'}, ${params.page ?? '/'},
-      ${JSON.stringify(params.ragChunkIds ?? [])}::jsonb,
-      ${JSON.stringify(params.metadata ?? {})}::jsonb
+      ${JSON.stringify(meta)}::jsonb
     )
   `);
 }
@@ -327,7 +331,7 @@ export async function saveMessage(params: {
 export async function getConversationHistory(conversationId: string): Promise<any[]> {
   const result = await db.execute(sql`
     SELECT role, content, created_at FROM ai_conversation_messages
-    WHERE conversation_id = ${conversationId}::uuid
+    WHERE session_id = ${conversationId}::uuid
     ORDER BY created_at ASC LIMIT 50
   `);
   return (result.rows as any[]).map(r => ({ role: r.role, content: r.content, createdAt: r.created_at }));
@@ -335,15 +339,15 @@ export async function getConversationHistory(conversationId: string): Promise<an
 
 export async function listConversations(orgId: string, userId: string): Promise<any[]> {
   const result = await db.execute(sql`
-    SELECT c.id, c.advisory_mode, c.title, c.updated_at, COUNT(m.id)::int as message_count
+    SELECT c.id, c.advisory_mode, c.title, c.last_message_at, COUNT(m.id)::int as message_count
     FROM ai_conversations c
-    LEFT JOIN ai_conversation_messages m ON m.conversation_id = c.id
+    LEFT JOIN ai_conversation_messages m ON m.session_id = c.id::uuid
     WHERE c.org_id = ${orgId} AND c.user_id = ${userId}
-    GROUP BY c.id ORDER BY c.updated_at DESC LIMIT 50
+    GROUP BY c.id ORDER BY c.last_message_at DESC NULLS LAST LIMIT 50
   `);
   return (result.rows as any[]).map(r => ({
     id: r.id, advisoryMode: r.advisory_mode, title: r.title,
-    updatedAt: r.updated_at, messageCount: r.message_count,
+    updatedAt: r.last_message_at, messageCount: r.message_count,
   }));
 }
 
