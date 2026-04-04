@@ -1,7 +1,7 @@
 /**
  * IC / Deal Review Deck Template
  * Modeled after the Southern Marinas internal deal review presentation.
- * 14 sections, institutional CRE deck format.
+ * 15 sections, institutional CRE deck format.
  *
  * Style: Navy/white corporate palette, clean sans-serif, data-dense tables,
  *        sponsor logo top-right, "PROPRIETARY AND CONFIDENTIAL" footer.
@@ -64,6 +64,34 @@ export const IC_DEAL_REVIEW_DECK_TEMPLATE = {
         { type: 'heading', key: 'title', config: { level: 1, text: '{{PROPERTY_NAME}}', color: '#FFFFFF' } },
         { type: 'text', key: 'location', config: { text: '{{PROPERTY_CITY}}, {{PROPERTY_STATE}}', color: '#FFFFFF', size: '18px' } },
         { type: 'image', key: 'logo', config: { position: 'bottom-center', maxHeight: 80 } },
+      ],
+    },
+
+    // ─── 1b. PHOTO GALLERY ──────────────────────────────────────────────────
+    {
+      key: 'ic_photo_gallery',
+      title: 'Photo Gallery',
+      order: 1.5,
+      enabled: true,
+      required: false,
+      description: 'Property photo gallery — 3-photo grid layout with one large hero and two smaller images',
+      tokens: ['PROPERTY_NAME', 'GALLERY_IMAGE_1_URL', 'GALLERY_IMAGE_2_URL', 'GALLERY_IMAGE_3_URL'],
+      blocks: [
+        { type: 'heading', key: 'title', config: { level: 1, text: '{{PROPERTY_NAME}}' } },
+        {
+          type: 'image',
+          key: 'gallery',
+          config: {
+            layout: 'gallery_3up',
+            images: [
+              { token: 'GALLERY_IMAGE_1_URL', width: '60%', height: '100%', position: 'left' },
+              { token: 'GALLERY_IMAGE_2_URL', width: '38%', height: '48%', position: 'top-right' },
+              { token: 'GALLERY_IMAGE_3_URL', width: '38%', height: '48%', position: 'bottom-right' },
+            ],
+            gap: 12,
+            borderRadius: 4,
+          },
+        },
       ],
     },
 

@@ -52,6 +52,7 @@ import {
   ListTree,
   GitMerge,
   Sparkles,
+  Shield,
 } from 'lucide-react';
 
 import { FEATURE_MODULES, FeatureModule } from './featureModules';
@@ -266,7 +267,7 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'deal-room',
     label: 'Deal Room',
     icon: FolderKanban,
-    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room'],
+    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room', '/deal-workspace/dd-review'],
     requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
     children: [
       {
@@ -283,6 +284,14 @@ export const sidebarConfig: SidebarGroup[] = [
         href: '/deal-workspace/dd-projects',
         icon: FileCheck,
         matchRoutes: ['/deal-workspace/dd-projects', '/dd-projects'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_DD],
+      },
+      {
+        id: 'dd-review',
+        label: 'DD Review',
+        href: '/deal-workspace/dd-review',
+        icon: Shield,
+        matchRoutes: ['/deal-workspace/dd-review'],
         requiredModules: [FEATURE_MODULES.DEALROOM_DD],
       },
       {

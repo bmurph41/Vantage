@@ -30,3 +30,9 @@ id = "-ayrRUvXEnElZfvCpPEN-"
 uri = "file://MARINAMATCH_FOR_CLAUDE.md"
 type = "text"
 title = "MarinaMatch — Complete Claude Agent Context Package"
+
+[[outputs]]
+id = "AdO392Q7_D-uGAUdgH5Op"
+uri = "file://SECURITY_ASSESSMENT.md"
+type = "text"
+title = "Security Assessment + Replication Prompt"

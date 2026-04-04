@@ -160,7 +160,13 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('OK -', len\\(d.get\\('templates',[]\\)\\), 'templates'\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('OK -', len\\(d\\), 'budgets'\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('error','OK: ksPme=' + str\\(d.get\\('ksPme',''\\)\\)\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('error','OK: ' + str\\(len\\(d.get\\('cohorts',[]\\)\\)\\) + ' cohorts'\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('error','OK: ' + str\\(len\\(d.get\\('cohorts',[]\\)\\)\\) + ' cohorts'\\)\\)\")",
+      "Read(//proc/3998/**)",
+      "Bash(netstat -tlnp)",
+      "Bash(timeout 5 bash -c 'echo -n \"\" > /dev/tcp/localhost/5000')",
+      "Bash(echo \"exit: $?\")",
+      "Bash(echo \"Server started, PID: $!\")",
+      "Bash(xargs -r kill)"
     ]
   }
 }

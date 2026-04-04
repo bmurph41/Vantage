@@ -6,18 +6,14 @@
  */
 
 import { Router, Request, Response, NextFunction } from "express";
-import { db } from "../db";
-import { pool } from "../db";
+import { db, pool } from "../db";
 import {
   crmDeals,
   crmPipelineStages,
   dealDeposits,
   dealExtensions,
-  ddChecklists,
-  ddChecklistSections,
-  ddChecklistItems,
 } from "@shared/schema";
-import { eq, and, inArray, isNull, not, or, desc, asc, sql } from "drizzle-orm";
+import { eq, and, inArray, isNull, or, asc, sql } from "drizzle-orm";
 
 const router = Router();
 

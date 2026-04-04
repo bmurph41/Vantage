@@ -1603,6 +1603,13 @@ function Router() {
           </GatedLayout>
         )}
       </Route>
+      <Route path="/deal-workspace/dd-review">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <DDReviewDashboard />
+          </GatedLayout>
+        )}
+      </Route>
       
       {/* Pipeline sub-pages */}
       <Route path="/pipeline/deal-board">

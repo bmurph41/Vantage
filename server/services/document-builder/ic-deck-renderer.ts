@@ -269,6 +269,33 @@ function renderChart(block: any, resolved: ResolvedTokenMap, formatted: Record<s
 
 function renderImage(block: any, resolved: ResolvedTokenMap, formatted: Record<string, ResolvedTokenEntry>): string {
   const config = block.config || {};
+
+  // Gallery layout — 3-photo grid (1 large left, 2 stacked right)
+  if (config.layout === 'gallery_3up' && config.images) {
+    const gap = config.gap || 12;
+    const radius = config.borderRadius || 4;
+    const images = config.images.map((img: any) => {
+      const raw = getTokenRaw(img.token, resolved);
+      return { ...img, url: raw && typeof raw === 'string' ? raw : null };
+    });
+
+    const renderImg = (img: any, style: string) => {
+      if (img.url) {
+        return `<img src="${escapeHtml(img.url)}" style="${style} object-fit: cover; border-radius: ${radius}px;" alt="Property photo" />`;
+      }
+      return `<div style="${style} background: #E5E7EB; border-radius: ${radius}px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px;">Photo</div>`;
+    };
+
+    return `<div style="display: flex; gap: ${gap}px; margin: 16px 0; height: 420px;">
+      <div style="flex: 0 0 60%;">${renderImg(images[0] || {}, 'width: 100%; height: 100%;')}</div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: ${gap}px;">
+        <div style="flex: 1;">${renderImg(images[1] || {}, 'width: 100%; height: 100%;')}</div>
+        <div style="flex: 1;">${renderImg(images[2] || {}, 'width: 100%; height: 100%;')}</div>
+      </div>
+    </div>`;
+  }
+
+  // Single image
   const token = config.token;
   let url: string | null = null;
 
@@ -288,7 +315,7 @@ function renderImage(block: any, resolved: ResolvedTokenMap, formatted: Record<s
   // Placeholder
   const label = token || 'IMAGE';
   return `<div style="background: #E5E7EB; border-radius: 4px; padding: 40px; text-align: center; color: #666; margin: 16px 0;">
-    <p style="font-size: 13px;">📷 Image placeholder: {{${label}}}</p>
+    <p style="font-size: 13px;">Image placeholder: {{${label}}}</p>
   </div>`;
 }
 
