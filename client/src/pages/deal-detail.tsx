@@ -23,6 +23,7 @@ import {
 } from "@/components/crm/CrmRecordPage";
 import ConvertToProjectModal from "@/components/modals/convert-to-project-modal";
 import DocumentGeneratorModal from "@/components/modals/document-generator-modal";
+import { ComposeEmailModal } from "@/components/email/compose-email-modal";
 import CompSetSelector from "@/components/comp-set-selector";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { RedFlagsPanel } from "@/components/crm/panels/red-flags-panel";
@@ -585,6 +586,7 @@ export default function DealDetail() {
   const dealId = params.dealId;
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [isDocGenModalOpen, setIsDocGenModalOpen] = useState(false);
+  const [isEmailComposeOpen, setIsEmailComposeOpen] = useState(false);
 
   const { data: deal, isLoading } = useQuery<any>({
     queryKey: ['/api/deals', dealId],
@@ -643,6 +645,9 @@ export default function DealDetail() {
           <FolderOpen className="h-4 w-4 mr-1.5" />Convert to DD
         </Button>
       )}
+      <Button size="sm" variant="outline" onClick={() => setIsEmailComposeOpen(true)}>
+        <Mail className="h-4 w-4 mr-1.5" />Email
+      </Button>
       <Button size="sm" variant="outline" onClick={() => setIsDocGenModalOpen(true)}>
         <FileText className="h-4 w-4 mr-1.5" />Docs
       </Button>
@@ -657,6 +662,12 @@ export default function DealDetail() {
       {deal && (
         <DocumentGeneratorModal isOpen={isDocGenModalOpen} onClose={() => setIsDocGenModalOpen(false)} dealId={dealId} dealName={deal.title} />
       )}
+      <ComposeEmailModal
+        open={isEmailComposeOpen}
+        onOpenChange={setIsEmailComposeOpen}
+        dealId={dealId}
+        dealName={deal?.title}
+      />
       <CrmRecordPage
         entityType="deal"
         entityId={dealId}

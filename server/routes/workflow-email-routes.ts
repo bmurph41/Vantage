@@ -441,3 +441,61 @@ workflowEmailRouter.get('/logs', async (req: any, res) => {
 workflowEmailRouter.get('/available-tokens', async (_req: any, res) => {
   res.json({ tokens: AVAILABLE_TOKENS });
 });
+
+// ── POST /compose-send ──────────────────────────────────────────────
+// Ad-hoc email compose and send — used from deal/contact pages
+workflowEmailRouter.post('/compose-send', async (req: any, res) => {
+  try {
+    const orgId = req.user?.orgId || req.tenantId || req.orgId;
+    if (!orgId) return res.status(401).json({ error: 'No org context' });
+
+    const { to, cc, bcc, subject, body, dealId, contactId, fromName } = req.body;
+
+    if (!to || !subject || !body) {
+      return res.status(400).json({ error: 'to, subject, and body are required' });
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const senderName = fromName || req.user?.name || req.user?.username || 'MarinaMatch';
+    const htmlBody = wrapEmailTemplate(body);
+    const textBody = stripHtml(body);
+
+    const sent = await sendEmail({
+      to,
+      subject,
+      html: htmlBody,
+      text: textBody,
+      from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com', name: senderName },
+    });
+
+    // Log the email
+    await pool.query(
+      `INSERT INTO workflow_email_log
+         (org_id, recipient_email, recipient_type, subject, body_preview, status, provider, sent_at)
+       VALUES ($1, $2, 'manual', $3, $4, $5, 'compose', $6)`,
+      [
+        orgId, to, subject, body.substring(0, 500),
+        sent ? 'sent' : 'failed', sent ? new Date() : null,
+      ]
+    );
+
+    // Log as CRM activity if tied to a deal or contact
+    if (dealId || contactId) {
+      await pool.query(
+        `INSERT INTO crm_activities (type, subject, description, direction, entity_type, entity_id, org_id, user_id, created_at)
+         VALUES ('email', $1, $2, 'outbound', $3, $4, $5, $6, NOW())`,
+        [subject, `Sent to ${to}`, dealId ? 'deal' : 'contact', dealId || contactId, orgId, req.user?.id || null]
+      );
+    }
+
+    res.json({ success: sent, to, subject });
+  } catch (error: any) {
+    console.error('Failed to send composed email:', error);
+    res.status(500).json({ error: error.message || 'Failed to send email' });
+  }
+});

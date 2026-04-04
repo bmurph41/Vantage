@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
+import { ComposeEmailModal } from '@/components/email/compose-email-modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -176,6 +178,7 @@ function formatAddress(c: ContactRecord): string | null {
 export default function ContactRecordPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const [isEmailComposeOpen, setIsEmailComposeOpen] = useState(false);
 
   const { data: contact, isLoading } = useQuery<ContactRecord>({
     queryKey: ['crm-contact-record', id],
@@ -269,6 +272,11 @@ export default function ContactRecordPage() {
       owner={contact?.owner}
       isLoading={isLoading}
       kpiChips={kpiChips}
+      headerActions={contact?.email && (
+        <Button size="sm" variant="outline" onClick={() => setIsEmailComposeOpen(true)}>
+          <Mail className="h-4 w-4 mr-1.5" />Email
+        </Button>
+      )}
       belowHeader={contact.nextFollowupDate && (
         <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
           <Clock className="h-3 w-3" />
@@ -334,6 +342,13 @@ export default function ContactRecordPage() {
       rightSidebar={contact && (
         <ContactAssociationsSidebar contact={contact} onNavigate={setLocation} />
       )}
+    />
+    <ComposeEmailModal
+      open={isEmailComposeOpen}
+      onOpenChange={setIsEmailComposeOpen}
+      defaultTo={contact?.email || ""}
+      contactId={id}
+      contactName={contact ? `${contact.firstName} ${contact.lastName}`.trim() : undefined}
     />
   );
 }

@@ -232,6 +232,13 @@ export function AIAssistant() {
     setStreamingContent('');
 
     try {
+      const csrfToken = decodeURIComponent(
+        document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)?.[1] ?? ''
+      );
+      const csrfHeaders: Record<string, string> = csrfToken
+        ? { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
+        : { 'Content-Type': 'application/json' };
+
       const endpoint = compareMode && compareIds.length >= 2
         ? '/api/ai-assistant/compare'
         : '/api/ai-assistant/chat/stream';
@@ -240,7 +247,7 @@ export function AIAssistant() {
         // Non-streaming compare request
         const res = await fetch('/api/ai-assistant/compare', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: csrfHeaders,
           body: JSON.stringify({
             entityIds: compareIds,
             entityType: entityContext.entityType ?? 'deal',
@@ -262,7 +269,7 @@ export function AIAssistant() {
       // Streaming chat
       const res = await fetch('/api/ai-assistant/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders,
         body: JSON.stringify({
           message: content.trim(),
           context: getContext(),
@@ -350,9 +357,15 @@ export function AIAssistant() {
     const prevMsg = messagesRef.current[messagesRef.current.findIndex(m => m.id === messageId) - 1];
 
     try {
+      const csrfToken = decodeURIComponent(
+        document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)?.[1] ?? ''
+      );
       await fetch('/api/ai-assistant/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        },
         body: JSON.stringify({
           messageId,
           rating: feedback === 'helpful' ? 'positive' : 'negative',

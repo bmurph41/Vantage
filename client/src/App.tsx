@@ -79,6 +79,7 @@ const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
 const DDReviewDashboard = lazy(() => import("@/pages/dd-review"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
 const DealComparison = lazy(() => import("@/pages/deal-comparison"));
+const DealTimelinePage = lazy(() => import("@/pages/deal-timeline"));
 const Properties = lazy(() => import("@/pages/properties"));
 const PendingProperties = lazy(() => import("@/pages/pending-properties"));
 const PendingContacts = lazy(() => import("@/pages/pending-contacts"));
@@ -1607,6 +1608,20 @@ function Router() {
         {() => (
           <GatedLayout pack="crm_pipeline">
             <DDReviewDashboard />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/deal-workspace/timeline">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <DealTimelinePage />
+          </GatedLayout>
+        )}
+      </Route>
+      <Route path="/deal-workspace/compare">
+        {() => (
+          <GatedLayout pack="crm_pipeline">
+            <DealComparison />
           </GatedLayout>
         )}
       </Route>

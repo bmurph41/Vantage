@@ -166,7 +166,8 @@
       "Bash(timeout 5 bash -c 'echo -n \"\" > /dev/tcp/localhost/5000')",
       "Bash(echo \"exit: $?\")",
       "Bash(echo \"Server started, PID: $!\")",
-      "Bash(xargs -r kill)"
+      "Bash(xargs -r kill)",
+      "Bash(echo \"started with PID $!\")"
     ]
   }
 }

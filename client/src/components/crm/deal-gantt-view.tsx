@@ -58,12 +58,12 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
   const now = useMemo(() => startOfDay(new Date()), []);
 
   const { data, isLoading } = useQuery<{ deals: DealSummary[]; events: TimelineEvent[]; timeRange: { start: string; end: string } }>({
-    queryKey: ["/api/crm/pipeline-enhancements/timeline", pipelineId],
+    queryKey: ["/api/crm/pipeline/timeline", pipelineId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (pipelineId) params.set("pipelineId", pipelineId);
       params.set("groupBy", groupBy);
-      const res = await apiRequest("GET", `/api/crm/pipeline-enhancements/timeline?${params}`);
+      const res = await apiRequest("GET", `/api/crm/pipeline/timeline?${params}`);
       return res.json();
     },
   });

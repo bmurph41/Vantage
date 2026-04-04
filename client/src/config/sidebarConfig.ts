@@ -267,7 +267,7 @@ export const sidebarConfig: SidebarGroup[] = [
     id: 'deal-room',
     label: 'Deal Room',
     icon: FolderKanban,
-    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room', '/deal-workspace/dd-review'],
+    matchRoutes: ['/deal-workspace', '/projects', '/dd-projects', '/data-room', '/deal-workspace/dd-review', '/deal-workspace/timeline', '/deal-workspace/compare'],
     requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
     children: [
       {
@@ -276,6 +276,22 @@ export const sidebarConfig: SidebarGroup[] = [
         href: '/deal-workspace/projects',
         icon: FolderOpen,
         matchRoutes: ['/deal-workspace/projects', '/projects'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
+      },
+      {
+        id: 'deal-timeline',
+        label: 'Timeline',
+        href: '/deal-workspace/timeline',
+        icon: GitMerge,
+        matchRoutes: ['/deal-workspace/timeline'],
+        requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
+      },
+      {
+        id: 'deal-compare',
+        label: 'Comparison',
+        href: '/deal-workspace/compare',
+        icon: BarChart2,
+        matchRoutes: ['/deal-workspace/compare', '/crm/deals/compare'],
         requiredModules: [FEATURE_MODULES.DEALROOM_PROJECTS],
       },
       {
