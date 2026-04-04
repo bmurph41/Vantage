@@ -76,6 +76,7 @@ const ContactRecordPage = lazy(() => import("@/pages/contact-record"));
 const PropertyRecordPage = lazy(() => import("@/pages/property-record"));
 const Deals = lazy(() => import("@/pages/deals"));
 const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
+const DDReviewDashboard = lazy(() => import("@/pages/dd-review"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
 const DealComparison = lazy(() => import("@/pages/deal-comparison"));
 const Properties = lazy(() => import("@/pages/properties"));
