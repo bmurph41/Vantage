@@ -16,6 +16,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
 import { useDisplayMode } from "@/stores/display-mode-store";
+import { PaywallModal } from "@/components/PaywallModal";
+import { Lock } from "lucide-react";
 
 // CRM Navigation (Core Entity Management only)
 const crmNav = [
