@@ -170,7 +170,9 @@
       "Bash(echo \"started with PID $!\")",
       "Bash(echo \"PID: $!\")",
       "Bash(NODE_ENV=development NODE_OPTIONS=--max-old-space-size=512 npx tsx server/index.ts)",
-      "Bash(pkill -f 'node.*server')"
+      "Bash(pkill -f 'node.*server')",
+      "Bash(kill 14438)",
+      "Bash(disown echo:*)"
     ]
   }
 }
