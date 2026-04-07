@@ -44,7 +44,7 @@ export default function Analytics() {
   const [isExporting, setIsExporting] = useState(false);
 
   // Fetch insights data
-  const { data: insights } = useQuery({
+  const { data: insights, isError: insightsError } = useQuery({
     queryKey: ['/api/analytics/insights', dateRange],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -145,6 +145,13 @@ export default function Analytics() {
           role="main"
           aria-label="Analytics Dashboard"
         >
+          {/* Insights error banner */}
+          {insightsError && (
+            <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              Unable to load analytics insights. Data shown below may be incomplete.
+            </div>
+          )}
+
           {/* Header with filters */}
           <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="min-w-0 flex-1">

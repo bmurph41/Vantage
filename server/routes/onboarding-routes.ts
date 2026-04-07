@@ -17,6 +17,8 @@ import {
   organizationPacks,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+import { sendInviteEmail } from "../services/email-service";
+import { enterpriseAuthService } from "../services/enterprise-auth-service";
 
 export const onboardingRouter = Router();
 
@@ -203,7 +205,21 @@ onboardingRouter.post("/invite-team", async (req: Request, res: Response) => {
 
       created.push({ email: invite.email, userId: newUser.id, status: "invited" });
 
-      // TODO: Send invite email via SendGrid when SENDGRID_API_KEY is configured
+      // Send invite email (fire-and-forget per invitee)
+      (async () => {
+        try {
+          const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
+          const [inviter] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+          const inviteUrl = await enterpriseAuthService.generateInviteToken(newUser.id);
+          await sendInviteEmail(invite.email, inviteUrl, {
+            inviteeName: newUser.name || undefined,
+            inviterName: inviter?.name || undefined,
+            orgName: org?.name || undefined,
+          });
+        } catch (emailErr) {
+          console.error('[Invite] Failed to send invite email:', emailErr);
+        }
+      })();
     }
 
     // Mark step complete

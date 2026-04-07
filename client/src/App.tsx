@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useCallback } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useToast } from "@/hooks/use-toast";
 import { Loader2, Anchor } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -38,6 +39,26 @@ function PageLoader() {
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
+}
+
+// Global handler — shows a toast for any query that fails on initial load
+function GlobalQueryErrorHandler() {
+  const { toast } = useToast();
+  const handleQueryError = useCallback((e: Event) => {
+    const { message } = (e as CustomEvent<{ message: string }>).detail;
+    toast({
+      title: "Failed to load data",
+      description: message,
+      variant: "destructive",
+    });
+  }, [toast]);
+
+  useEffect(() => {
+    window.addEventListener('query-error', handleQueryError);
+    return () => window.removeEventListener('query-error', handleQueryError);
+  }, [handleQueryError]);
+
+  return null;
 }
 
 // Auth guard component - shows loading while auth resolves
@@ -2629,6 +2650,7 @@ function App() {
                 <ProspectingActivityProvider>
                   <TooltipProvider>
                     <Toaster />
+                    <GlobalQueryErrorHandler />
                     <Suspense fallback={<PageLoader />}>
                       <Router />
                     </Suspense>

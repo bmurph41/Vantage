@@ -826,11 +826,14 @@ export default function Dashboard() {
     'ship-store',
   ];
 
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: dashboardData, isLoading, isError: dashboardError } = useQuery({
     queryKey: ['/api/dashboards/data', timeRange, selectedModules],
     queryFn: () => {
       const modules = selectedModules.length > 0 ? selectedModules.join(',') : 'all';
-      return fetch(`/api/dashboards/data?timeRange=${timeRange}&modules=${modules}`).then(res => res.json());
+      return fetch(`/api/dashboards/data?timeRange=${timeRange}&modules=${modules}`).then(res => {
+        if (!res.ok) throw new Error(`Dashboard data failed: ${res.status}`);
+        return res.json();
+      });
     },
     enabled: selectedModules.length > 0 || modulePreferences !== undefined,
   });
@@ -916,6 +919,19 @@ export default function Dashboard() {
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Skeleton key={i} className="h-64" />
             ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (dashboardError) {
+    return (
+      <div className="flex-1 overflow-auto bg-background" data-testid="page-dashboard">
+        <div className="container mx-auto p-6 max-w-7xl">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
+            <p className="text-sm font-medium text-destructive">Unable to load dashboard data.</p>
+            <p className="text-xs text-muted-foreground mt-1">Check your connection and try refreshing the page.</p>
           </div>
         </div>
       </div>

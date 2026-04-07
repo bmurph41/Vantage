@@ -16,6 +16,8 @@ import {
   adminAuditLog,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+import { sendInviteEmail } from "../services/email-service";
+import { enterpriseAuthService } from "../services/enterprise-auth-service";
 
 export const orgSettingsRouter = Router();
 
@@ -182,7 +184,22 @@ orgSettingsRouter.post("/team/invite", async (req: Request, res: Response) => {
       metadataJson: { email, role, orgId },
     });
 
-    // TODO: Send invite email when SendGrid is configured
+    // Send invite email (fire-and-forget — don't block the response)
+    (async () => {
+      try {
+        const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
+        const [inviter] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+        const inviteUrl = await enterpriseAuthService.generateInviteToken(created.id);
+        await sendInviteEmail(email, inviteUrl, {
+          inviteeName: created.name || undefined,
+          inviterName: inviter?.name || undefined,
+          orgName: org?.name || undefined,
+        });
+      } catch (emailErr) {
+        // Log but don't fail the request — user is already created in DB
+        console.error('[Invite] Failed to send invite email:', emailErr);
+      }
+    })();
 
     const { passwordHash: _, ...safe } = created as any;
     res.status(201).json(safe);

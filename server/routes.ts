@@ -461,6 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const replitClaims = passportUser?.claims || {};
           const replitUserId = replitClaims.sub;
           if (replitUserId) {
+            // Primary lookup: by Replit user ID (returning Replit OAuth users)
             const [dbUser] = await db.select().from(users).where(eq(users.id, replitUserId)).limit(1);
             if (dbUser) {
               resolvedUser = {
@@ -470,6 +471,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 email: dbUser.email || replitClaims.email || '',
                 name: dbUser.name || replitClaims.first_name || '',
               };
+            } else if (replitClaims.email) {
+              // Fallback: email match for users previously invited via enterprise flow
+              const [invitedUser] = await db.select().from(users).where(eq(users.email, replitClaims.email)).limit(1);
+              if (invitedUser) {
+                resolvedUser = {
+                  id: invitedUser.id,
+                  orgId: invitedUser.orgId,
+                  role: invitedUser.role || 'viewer',
+                  email: invitedUser.email,
+                  name: invitedUser.name || replitClaims.first_name || '',
+                };
+              }
             }
           }
         }

@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryCache, QueryFunction } from "@tanstack/react-query";
 
 function getCsrfToken(): string {
   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
@@ -58,14 +58,27 @@ export const getQueryFn: <T>(options: {
   };
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      // Only surface errors for initial fetches, not background refetches
+      if (query.state.data !== undefined) return;
+      // Suppress 401s — auth layer handles those via redirect
+      if (error instanceof Error && error.message.startsWith('401')) return;
+      window.dispatchEvent(
+        new CustomEvent('query-error', { detail: { message: error instanceof Error ? error.message : 'Failed to load data' } })
+      );
+    },
+  }),
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes - balance between freshness and performance
-      gcTime: 10 * 60 * 1000, // 10 minutes - keep unused data cached
-      retry: (failureCount) => {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: (failureCount, error) => {
+        // Don't retry auth failures
+        if (error instanceof Error && error.message.startsWith('401')) return false;
         return failureCount < 1;
       },
     },

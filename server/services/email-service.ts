@@ -266,3 +266,28 @@ export async function sendTrialLastDayEmail(to: string, userName?: string): Prom
     `),
   });
 }
+
+export async function sendInviteEmail(
+  to: string,
+  inviteUrl: string,
+  options: { inviteeName?: string; inviterName?: string; orgName?: string } = {}
+): Promise<boolean> {
+  const { inviteeName, inviterName, orgName } = options;
+  const greeting = inviteeName ? `Hi ${inviteeName},` : 'Hi,';
+  const inviterText = inviterName ? `<strong>${inviterName}</strong>` : 'A team member';
+  const orgText = orgName ? ` to <strong>${orgName}</strong> on MarinaMatch` : ' to MarinaMatch';
+
+  return sendEmail({
+    to,
+    subject: `You've been invited to MarinaMatch`,
+    text: `${greeting}\n\n${inviterName || 'A team member'} has invited you${orgName ? ' to ' + orgName + ' on' : ' to'} MarinaMatch — the institutional-grade marina & CRE investment platform.\n\nClick the link below to accept your invitation and set up your account (link expires in 7 days):\n${inviteUrl}\n\n— The MarinaMatch Team`,
+    html: wrapEmailTemplate(`
+      <h2 style="margin-top: 0; color: #1e293b;">You're Invited to MarinaMatch</h2>
+      <p>${greeting}</p>
+      <p>${inviterText} has invited you${orgText} — the institutional-grade marina &amp; CRE investment platform.</p>
+      <p>Click the button below to accept your invitation and set up your account:</p>
+      ${emailButton('Accept Invitation', inviteUrl)}
+      <p style="color: #64748b; font-size: 13px;">This invitation link expires in 7 days. If you weren't expecting this, you can safely ignore it.</p>
+    `),
+  });
+}

@@ -720,6 +720,22 @@ export class EnterpriseAuthService {
       return { success: false, error: 'Password reset failed' };
     }
   }
+
+  async generateInviteToken(userId: string): Promise<string> {
+    await db.delete(passwordResetTokens)
+      .where(eq(passwordResetTokens.userId, userId));
+
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days for invites
+
+    await db.insert(passwordResetTokens).values({ userId, token, expiresAt });
+
+    const baseUrl = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : process.env.APP_URL || 'http://localhost:5000';
+
+    return `${baseUrl}/reset-password?token=${token}`;
+  }
 }
 
 export const enterpriseAuthService = new EnterpriseAuthService();
