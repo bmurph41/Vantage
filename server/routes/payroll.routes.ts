@@ -344,7 +344,7 @@ payrollRouter.get("/plans/:id/calc", checkAccess, async (req: Request, res: Resp
 
 payrollRouter.get("/departments", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const depts = await db
       .select()
       .from(payrollDepartments)
@@ -371,7 +371,7 @@ payrollRouter.post("/departments", checkAccess, async (req: Request, res: Respon
 
 payrollRouter.get("/positions", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const { templateOnly, assetClass } = req.query;
 
     let conditions: any[] = [eq(payrollPositions.orgId, orgId as string)];
@@ -406,7 +406,7 @@ payrollRouter.post("/positions", checkAccess, async (req: Request, res: Response
 payrollRouter.get("/employees", checkAccess, async (req: Request, res: Response) => {
   try {
     const perms = (req as any).payrollPerms as EffectivePermissions;
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
 
     const emps = await db
       .select()
@@ -447,7 +447,7 @@ payrollRouter.post("/employees", checkAccess, async (req: Request, res: Response
 
 payrollRouter.get("/burden-profiles", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const profiles = await db
       .select()
       .from(payrollBurdenProfiles)
@@ -504,7 +504,7 @@ payrollRouter.post("/burden-profiles", checkAccess, async (req: Request, res: Re
 
 payrollRouter.get("/seasonality-templates", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const templates = await db
       .select()
       .from(seasonalityTemplates)
@@ -576,7 +576,7 @@ payrollRouter.post(
 
 payrollRouter.get("/integrations", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const integrations = await db
       .select()
       .from(payrollIntegrations)

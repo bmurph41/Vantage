@@ -11542,7 +11542,7 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/deals", async (req: any, res) => {
     try {
-      const orgId = req.body.orgId || req.user?.orgId || req.orgId;
+      const orgId = req.user?.orgId || req.orgId;
       const userId = req.user.id;
       const { dealContacts, depositSchedule, createDDProject, ddProjectName, ...rest } = req.body;
 
@@ -12460,7 +12460,7 @@ Current context: Project ${req.params.projectId}`;
   });
   app.post("/api/properties", async (req: any, res) => {
     try {
-      const orgId = req.body.orgId || req.user?.orgId || req.orgId;
+      const orgId = req.user?.orgId || req.orgId;
       if (!orgId) {
         return res.status(400).json({ error: "Organization ID is required" });
       }

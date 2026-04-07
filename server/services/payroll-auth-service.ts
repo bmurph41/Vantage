@@ -267,7 +267,7 @@ export function requirePayrollAccess(defaultScopeType: ScopeType = "ORG") {
       };
       const auth: AuthContext = {
         userId: req.user?.id,
-        orgId: req.user?.orgId ?? req.query.orgId ?? req.params.orgId,
+        orgId: req.user?.orgId,
         orgRole: roleMap[rawRole] ?? rawRole,
       };
 

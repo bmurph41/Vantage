@@ -82,7 +82,7 @@ deptPnlRouter.get("/calculate", checkAccess, async (req: Request, res: Response)
 
 deptPnlRouter.get("/categories", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const categories = await db
       .select()
       .from(pnlCategories)
@@ -110,7 +110,7 @@ deptPnlRouter.post("/categories", checkAccess, async (req: Request, res: Respons
 
 deptPnlRouter.get("/mappings", checkAccess, async (req: Request, res: Response) => {
   try {
-    const orgId = (req as any).payrollAuth?.orgId ?? req.query.orgId;
+    const orgId = (req as any).payrollAuth.orgId;
     const mappings = await db
       .select()
       .from(pnlDepartmentMappings)
