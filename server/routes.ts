@@ -1084,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/organization/packs/:packType/activate", authenticateUser, requireRole("owner"), async (req: any, res) => {
+  app.post("/api/organization/packs/:packType/activate", authenticateUser, async (req: any, res) => {
     try {
       const { packType } = req.params;
       const { isTrial, trialDays, expiresAt, notes } = req.body;
@@ -40825,7 +40825,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         // Also activate the pack locally
         try {
           const packService = (await import("./services/pack-service")).default;
-          await packService.activatePack(orgId, packType);
+          await packService.activatePack(orgId, packType, userId);
         } catch (e: any) {
           console.warn("Pack activation after stripe subscribe:", e.message);
         }
@@ -40843,7 +40843,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         // No Stripe / free trial path: just activate the pack
         try {
           const packService = (await import("./services/pack-service")).default;
-          await packService.activatePack(orgId, packType, { isTrial: true });
+          await packService.activatePack(orgId, packType, userId, { isTrial: true });
         } catch (e: any) {
           console.warn("Pack trial activation:", e.message);
         }
