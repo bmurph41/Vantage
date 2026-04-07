@@ -2313,15 +2313,14 @@ input[type="range"]::-moz-range-track {
   }
 }
 
-  /* ── Viewport height: use dvh where available ──
-     This overrides Tailwind's h-screen and any h-[calc(100vh-...)]
-     containers so the layout accounts for mobile browser chrome. */
-  @supports (height: 100dvh) {
-    .h-screen,
-    .min-h-screen {
-      height: 100dvh !important;
-      min-height: 100dvh !important;
-    }
+/* ── Viewport height: use dvh where available ──
+   This overrides Tailwind's h-screen and any h-[calc(100vh-...)]
+   containers so the layout accounts for mobile browser chrome. */
+@supports (height: 100dvh) {
+  .h-screen,
+  .min-h-screen {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
   }
 }
 
