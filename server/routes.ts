@@ -51,6 +51,7 @@ import { docusignRouter } from "./routes/docusign-routes";
 import { publicRecordsRouter } from "./routes/public-records-routes";
 import { predictiveAnalyticsRouter } from "./routes/predictive-analytics-routes";
 import { apiV1Router } from "./routes/api-v1-routes";
+import { googlePlacesRouter } from "./routes/google-places-routes";
 import { authenticateApiKey } from "./middleware/api-key-auth";
 import { cashFlowForecastingRouter } from "./routes/cash-flow-forecasting-routes";
 import { aiUnderwritingRouter } from "./routes/ai-underwriting-routes";
@@ -533,6 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pipeline/automation", authenticateUser, enforceTenant, pipelineAutomationRoutes);
   app.use("/api/workflow-automations", authenticateUser, enforceTenant, workflowAutomationRouter);
   app.use("/api/workflow-email", authenticateUser, enforceTenant, workflowEmailRouter);
+  app.use("/api/google-places", authenticateUser, googlePlacesRouter);
 
   // ── Billing (auth required except for public plan catalog and webhooks) ──
   app.use("/api/billing", (req: any, res: any, next: any) => {
