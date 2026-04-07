@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings, Activity,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen, Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPS_MODULE_SUBCATEGORY, OPS_SUBCATEGORY_META, type OpsSubcategory } from '@shared/asset-class-ops-modules';
@@ -17,7 +17,6 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
 import { useDisplayMode } from "@/stores/display-mode-store";
 import { PaywallModal } from "@/components/PaywallModal";
-import { Lock } from "lucide-react";
 
 // CRM Navigation (Core Entity Management only)
 const crmNav = [
@@ -221,20 +220,25 @@ export default function UnifiedSidebar() {
   const pendingContactsCount = bootstrapData?.pendingCounts?.contacts || 0;
   const pendingCompaniesCount = bootstrapData?.pendingCounts?.companies || 0;
 
+  // Paywall modal state
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallPackType, setPaywallPackType] = useState<PackType>('crm_pipeline');
+  const [paywallFeatureName, setPaywallFeatureName] = useState<string>('');
+
+  const showPaywall = (packType: PackType, featureName: string) => {
+    setPaywallPackType(packType);
+    setPaywallFeatureName(featureName);
+    setPaywallOpen(true);
+  };
+
   // Helper function to check if user has access to a pack
-  // In development mode, always grant access so the sidebar is fully usable regardless of DB pack state
   const hasPack = (packType: PackType): boolean => {
-    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-    if (isDev) return true;
     return activePacks.includes(packType);
   };
 
   // Helper function to check if user has access to Rent Roll (requires owner, investor, broker, operations, or modeling_tools pack)
   // Operations pack and Analysis (modeling_tools) pack include Rent Roll as a bundled feature
-  // In development mode, always show Rent Roll for testing
   const hasRentRollAccess = (): boolean => {
-    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-    if (isDev) return true;
     return hasPack('owner') || hasPack('investor') || hasPack('broker') || hasPack('operations') || hasPack('modeling_tools');
   };
 
@@ -279,9 +283,8 @@ export default function UnifiedSidebar() {
     .filter(Boolean) as (typeof OPS_SUBCATEGORY_META[0] & { items: typeof operationsModulesNav })[];
 
   // Helper function to check if user can see a section based on persona
+  // Always show all sections so users can see what's available (locked items show paywall)
   const canViewSection = (section: string): boolean => {
-    const isDev = import.meta.env.DEV || import.meta.env.MODE === 'development';
-    if (isDev) return true; // Show all sections in dev regardless of persona
     if (!userPersona) return true; // Default to show all if no persona assigned
     
     const persona = userPersona.primaryPersona;
@@ -495,50 +498,66 @@ export default function UnifiedSidebar() {
     return linkContent;
   };
 
-  const SectionHeader = ({ 
-    title, 
-    expanded, 
+  const SectionHeader = ({
+    title,
+    expanded,
     onToggle,
     isActive = false,
-    icon
-  }: { 
-    title: string; 
-    expanded: boolean; 
+    icon,
+    locked = false,
+    onLockedClick,
+  }: {
+    title: string;
+    expanded: boolean;
     onToggle: () => void;
     isActive?: boolean;
     icon?: any;
+    locked?: boolean;
+    onLockedClick?: () => void;
   }) => {
     const IconComponent = icon;
-    
+
     if (sidebarCollapsed) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
-            <div 
+            <div
               className={cn(
-                "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors",
-                isActive && "bg-sidebar-accent"
+                "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors relative",
+                isActive && "bg-sidebar-accent",
+                locked && "opacity-60"
               )}
-              onClick={() => setSidebarCollapsed(false)}
+              onClick={() => {
+                if (locked && onLockedClick) {
+                  onLockedClick();
+                } else {
+                  setSidebarCollapsed(false);
+                }
+              }}
             >
               {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />}
+              {locked && (
+                <Lock className="w-2.5 h-2.5 absolute bottom-1 right-1 text-amber-500" />
+              )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            <p>{title}</p>
+            <p>{title}{locked ? ' (Locked)' : ''}</p>
           </TooltipContent>
         </Tooltip>
       );
     }
-    
+
     return (
       <button
-        onClick={onToggle}
+        onClick={locked && onLockedClick ? onLockedClick : onToggle}
         className={cn(
           "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors",
-          expanded
-            ? "bg-blue-600 text-white hover:bg-blue-700" 
-            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          locked
+            ? "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
+            : expanded
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
         data-testid={`toggle-${title.toLowerCase()}`}
       >
@@ -546,7 +565,14 @@ export default function UnifiedSidebar() {
           {IconComponent && <IconComponent className="w-4 h-4" />}
           <span>{title}</span>
         </div>
-        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {locked ? (
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3 h-3 text-amber-500" />
+            <span className="text-[10px] font-normal text-amber-500 uppercase tracking-wide">Upgrade</span>
+          </div>
+        ) : (
+          expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />
+        )}
       </button>
     );
   };
@@ -678,16 +704,18 @@ export default function UnifiedSidebar() {
         </div>
         
         {/* Operations Section - Flattened navigation with in-page tabs */}
-        {canViewSection('operations') && hasPack('operations') && (
+        {canViewSection('operations') && (
           <div className="mb-2">
-            <SectionHeader 
-              title="Operations" 
+            <SectionHeader
+              title="Operations"
               icon={Building2}
-              expanded={operationsExpanded} 
+              expanded={operationsExpanded && hasPack('operations')}
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
+              locked={!hasPack('operations')}
+              onLockedClick={() => showPaywall('operations', 'Operations')}
             />
-            {operationsExpanded && (
+            {operationsExpanded && hasPack('operations') && (
               <>
                 {/* Asset Switcher — only when multiple assets owned */}
                 {(opsModulesData?.assets?.length || 0) > 1 && (
@@ -765,16 +793,18 @@ export default function UnifiedSidebar() {
         )}
         
         {/* CRM Section - Contacts, Companies, Properties */}
-        {canViewSection('crm') && hasPack('crm_pipeline') && (
+        {canViewSection('crm') && (
           <div className="mb-2">
-            <SectionHeader 
-              title="CRM" 
+            <SectionHeader
+              title="CRM"
               icon={Users}
-              expanded={crmExpanded} 
+              expanded={crmExpanded && hasPack('crm_pipeline')}
               onToggle={() => setCrmExpanded(!crmExpanded)}
               isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
+              locked={!hasPack('crm_pipeline')}
+              onLockedClick={() => showPaywall('crm_pipeline', 'CRM')}
             />
-            {crmExpanded && (
+            {crmExpanded && hasPack('crm_pipeline') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {crmNav.map((item) => (
                   <NavLink key={item.name} item={item} />
@@ -812,16 +842,18 @@ export default function UnifiedSidebar() {
         )}
 
         {/* Prospecting Section - Overview and Workroom */}
-        {canViewSection('prospecting') && hasPack('prospecting') && (
+        {canViewSection('prospecting') && (
           <div className="mb-2">
             <SectionHeader
               title="Prospecting"
               icon={Search}
-              expanded={prospectingExpanded}
+              expanded={prospectingExpanded && hasPack('prospecting')}
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
               isActive={location === '/prospecting' || (location.startsWith('/prospecting/') && !location.startsWith('/prospecting/marketing') && !location.startsWith('/prospecting/campaigns'))}
+              locked={!hasPack('prospecting')}
+              onLockedClick={() => showPaywall('prospecting', 'Prospecting')}
             />
-            {prospectingExpanded && (
+            {prospectingExpanded && hasPack('prospecting') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {prospectingNav.map((item) => (
                   <NavLink key={item.name} item={item} />
@@ -832,16 +864,18 @@ export default function UnifiedSidebar() {
         )}
 
         {/* Marketing Section */}
-        {canViewSection('prospecting') && hasPack('prospecting') && (
+        {canViewSection('prospecting') && (
           <div className="mb-2">
             <SectionHeader
               title="Marketing"
               icon={Megaphone}
-              expanded={marketingExpanded}
+              expanded={marketingExpanded && hasPack('prospecting')}
               onToggle={() => setMarketingExpanded(!marketingExpanded)}
               isActive={location.startsWith('/marketing') || location.startsWith('/prospecting/marketing') || location.startsWith('/prospecting/campaigns')}
+              locked={!hasPack('prospecting')}
+              onLockedClick={() => showPaywall('prospecting', 'Marketing')}
             />
-            {marketingExpanded && (
+            {marketingExpanded && hasPack('prospecting') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {marketingNav.map((item) => (
                   <NavLink key={item.name} item={item} />
@@ -852,16 +886,18 @@ export default function UnifiedSidebar() {
         )}
         
         {/* Pipeline Section - Deal Board, Activity Log, Follow-Ups, Forecast */}
-        {canViewSection('crm') && hasPack('crm_pipeline') && (
+        {canViewSection('crm') && (
           <div className="mb-2">
-            <SectionHeader 
-              title="Pipeline" 
+            <SectionHeader
+              title="Pipeline"
               icon={Handshake}
-              expanded={pipelineExpanded} 
+              expanded={pipelineExpanded && hasPack('crm_pipeline')}
               onToggle={() => setPipelineExpanded(!pipelineExpanded)}
               isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/')}
+              locked={!hasPack('crm_pipeline')}
+              onLockedClick={() => showPaywall('crm_pipeline', 'Pipeline')}
             />
-            {pipelineExpanded && (
+            {pipelineExpanded && hasPack('crm_pipeline') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {pipelineDealNav.map((item) => (
                   <NavLink key={item.name} item={item} />
@@ -900,16 +936,18 @@ export default function UnifiedSidebar() {
         )}
         
         {/* Analysis Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
-        {canViewSection('modeling_tools') && hasPack('modeling_tools') && (
+        {canViewSection('modeling_tools') && (
           <div className="mb-2">
-            <SectionHeader 
-              title="Analysis" 
+            <SectionHeader
+              title="Analysis"
               icon={Calculator}
-              expanded={analysisExpanded} 
+              expanded={analysisExpanded && hasPack('modeling_tools')}
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+              locked={!hasPack('modeling_tools')}
+              onLockedClick={() => showPaywall('modeling_tools', 'Analysis Tools')}
             />
-            {analysisExpanded && (
+            {analysisExpanded && hasPack('modeling_tools') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {analysisNav
                   .filter((item) => {
@@ -948,31 +986,31 @@ export default function UnifiedSidebar() {
           )}
         </div>
         
-        {/* Investor Services Section - Fund Management, LP Portal (GP users only via pack check) */}
-        {(hasPack('fund_management') || hasPack('lp_portal')) && (
-          <div className="mb-2">
-            <SectionHeader 
-              title="Fund Management" 
-              icon={DollarSign}
-              expanded={investorServicesExpanded} 
-              onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
-              isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
-            />
-            {investorServicesExpanded && (
-              <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
-                {investorServicesNav
-                  .filter((item) => {
-                    if (item.href === '/modeling/funds') return hasPack('fund_management');
-                    if (item.href === '/modeling/lp-portal') return hasPack('lp_portal');
-                    return true;
-                  })
-                  .map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Investor Services Section - Fund Management, LP Portal */}
+        <div className="mb-2">
+          <SectionHeader
+            title="Fund Management"
+            icon={DollarSign}
+            expanded={investorServicesExpanded && (hasPack('fund_management') || hasPack('lp_portal'))}
+            onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
+            isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
+            locked={!hasPack('fund_management') && !hasPack('lp_portal')}
+            onLockedClick={() => showPaywall('fund_management', 'Fund Management')}
+          />
+          {investorServicesExpanded && (hasPack('fund_management') || hasPack('lp_portal')) && (
+            <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
+              {investorServicesNav
+                .filter((item) => {
+                  if (item.href === '/modeling/funds') return hasPack('fund_management');
+                  if (item.href === '/modeling/lp-portal') return hasPack('lp_portal');
+                  return true;
+                })
+                .map((item) => (
+                  <NavLink key={item.name} item={item} />
+                ))}
+            </div>
+          )}
+        </div>
         
         
         {/* MarinaMatch - Section Title Style Link */}
@@ -1048,16 +1086,18 @@ export default function UnifiedSidebar() {
         </div>
         
         {/* Market Intelligence Section */}
-        {canViewSection('market_intelligence') && hasPack('analysis') && (
+        {canViewSection('market_intelligence') && (
           <div className="mb-2">
-            <SectionHeader 
-              title="Market Intelligence" 
+            <SectionHeader
+              title="Market Intelligence"
               icon={BarChart3}
-              expanded={marketIntelExpanded} 
+              expanded={marketIntelExpanded && hasPack('analysis')}
               onToggle={() => setMarketIntelExpanded(!marketIntelExpanded)}
               isActive={location.startsWith('/analysis/')}
+              locked={!hasPack('analysis')}
+              onLockedClick={() => showPaywall('analytics_pro', 'Market Intelligence')}
             />
-            {marketIntelExpanded && (
+            {marketIntelExpanded && hasPack('analysis') && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
                 {marketIntelligenceNav.map((item) => (
                   <NavLink key={item.name} item={item} />
@@ -1214,6 +1254,14 @@ export default function UnifiedSidebar() {
             }}
           />
         )}
+
+        {/* Paywall Modal — triggered when clicking locked sidebar sections */}
+        <PaywallModal
+          open={paywallOpen}
+          onOpenChange={setPaywallOpen}
+          packType={paywallPackType as any}
+          featureName={paywallFeatureName}
+        />
       </div>
       </>
     </TooltipProvider>

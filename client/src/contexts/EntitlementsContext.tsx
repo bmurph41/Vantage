@@ -60,9 +60,9 @@ export interface EntitlementsContextValue {
 // ═══════════════════════════════════════════════════════════════
 
 const defaultSubscription: UserSubscription = {
-  packageSlug: 'owner-operator',
-  packageName: 'Owner/Operator',
-  status: 'active',
+  packageSlug: null,
+  packageName: null,
+  status: 'none',
   addOnModules: [],
 };
 
