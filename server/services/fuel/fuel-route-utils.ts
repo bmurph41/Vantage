@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../audit-service';
+import { hasPermission, getUserRole } from '../../middleware/rbac';
+import { workflowEnhancements } from '../workflow-enhancements';
 
 export type FuelEntityType = 
   | 'fuel_transaction'
@@ -148,27 +150,53 @@ export const FUEL_ROUTE_PERMISSIONS = {
   unlockPeriod: ['fuel:period:unlock'],
 } as const;
 
-// Approval workflow middleware for sensitive operations
+// Approval workflow middleware for sensitive fuel operations.
+// Users with fuel:approval:approve permission (managers/owners) pass through
+// immediately. All other roles get a pending approval request created and
+// receive a 202 Accepted response so the operation can be retried once approved.
 export function requireApprovalCheck(operationType: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // TODO: Check if this operation requires approval
-    // For now, we'll log the request and allow it through
-    // In Phase 1 completion, this will check for pending/approved requests
-    
-    const context = AuditService.extractContext(req);
-    await AuditService.log(context, {
-      eventType: 'approve',
-      entityType: 'approval_workflow',
-      action: `Sensitive operation requested: ${operationType}`,
-      metadata: {
+    const user = (req as any).user;
+    if (!user?.id || !user?.orgId) {
+      return res.status(401).json({ message: 'Authentication required', code: 'AUTH_REQUIRED' });
+    }
+
+    try {
+      const userRole = await getUserRole(user.id, user.orgId, user.role);
+      const canSelfApprove = userRole ? hasPermission(userRole, 'fuel:approval:approve') : false;
+
+      if (canSelfApprove) {
+        // Managers/owners can perform the operation directly — no pending request needed.
+        return next();
+      }
+
+      // The user lacks approve permission — create a pending approval request
+      // and return 202 so the client knows to wait for manager approval.
+      const approvalId = await workflowEnhancements.requestApproval(user.orgId, {
+        title: `Fuel operation approval: ${operationType}`,
+        description: `User ${user.email ?? user.id} requested a sensitive fuel operation (${operationType}). Please review and approve or reject.`,
+        requiredApprovers: [],   // Any manager can approve
+        entityType: 'fuel_integration',
+        entityId: (req.params?.id as string) ?? null,
+      });
+
+      const context = AuditService.extractContext(req);
+      await AuditService.log(context, {
+        eventType: 'approve',
+        entityType: 'approval_workflow',
+        action: `Fuel operation requires approval: ${operationType}`,
+        metadata: { operationType, approvalId, requestedBy: user.id },
+        severity: 'warning',
+        isSuccess: true,
+      });
+
+      return res.status(202).json({
+        message: 'This operation requires manager approval before it can be completed.',
+        approvalId,
         operationType,
-        status: 'auto_approved', // Will be 'pending' when approval UI is built
-        requestData: req.body,
-      },
-      severity: 'warning',
-      isSuccess: true,
-    });
-    
-    next();
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: 'Failed to process approval check', error: err.message });
+    }
   };
 }

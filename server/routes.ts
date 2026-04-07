@@ -16,6 +16,7 @@ import { DuplicateDetectionService } from "./duplicate-detection-service";
 import { CompanyLinkingService } from "./company-linking-service";
 import { CalendarService } from "./calendar-service";
 import { FuelSyncService } from "./services/fuel/fuel-sync-service";
+import { requireApprovalCheck } from "./services/fuel/fuel-route-utils";
 import { findAllPotentialDuplicates, getDuplicateExplanation } from "./services/duplicate-finder";
 import { findCompanyDuplicates, type CompanyDuplicateMatch } from "./services/company-duplicate-service";
 import { requirePermission, requireRole } from "./middleware/rbac";
@@ -39122,8 +39123,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // Delete fuel integration
-  app.delete("/api/operations/fuel-integrations/:id", requirePermission('fuel:integration:manage'), async (req: any, res) => {
+  // Delete fuel integration (requires manager approval for non-manager roles)
+  app.delete("/api/operations/fuel-integrations/:id", requirePermission('fuel:integration:manage'), requireApprovalCheck('deleteIntegration'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
@@ -39189,8 +39190,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // Trigger manual sync
-  app.post("/api/operations/fuel-integrations/:id/sync", requirePermission('fuel:integration:manage'), async (req: any, res) => {
+  // Trigger manual sync (requires manager approval for non-manager roles)
+  app.post("/api/operations/fuel-integrations/:id/sync", requirePermission('fuel:integration:manage'), requireApprovalCheck('syncIntegration'), async (req: any, res) => {
     try {
       const integration = await storage.getFuelIntegrationById(req.params.id);
       
