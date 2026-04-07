@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { Loader2, Lock, Sparkles, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaywallModal } from '@/components/PaywallModal';
+import { PaywallModal, getPackDisplayName } from '@/components/PaywallModal';
 
 // Core packs that users purchase first
 export type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -131,7 +131,7 @@ export function PackGate({ pack, children, upgradeMessage, showUpgradePrompt = t
   const packInfo = packsWithStatus.find(ps => ps.packType === firstMissingPack);
   const packNames = missingPacks.map(p => {
     const info = packsWithStatus.find(ps => ps.packType === p);
-    return info?.info.name || p.replace(/_/g, ' ');
+    return getPackDisplayName(p, info?.info.name);
   }).join(', ');
 
   const price = packInfo?.info.monthlyPriceCents

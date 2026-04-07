@@ -44,6 +44,23 @@ const PACK_ICONS: Record<PackType, typeof Briefcase> = {
   analytics_pro: BarChart3,
 };
 
+export const PACK_DISPLAY_NAMES: Record<string, string> = {
+  crm_pipeline: 'CRM Pipeline',
+  modeling_tools: 'Modeling Tools',
+  analysis: 'Analysis',
+  operations: 'Operations',
+  fund_management: 'Fund Management',
+  lp_portal: 'LP Portal',
+  prospecting: 'Prospecting',
+  analytics_pro: 'Analytics Pro',
+};
+
+export function getPackDisplayName(packType: string, dbName?: string | null): string {
+  return PACK_DISPLAY_NAMES[packType]
+    || dbName?.replace(/\b\w/g, c => c.toUpperCase())
+    || packType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function formatPrice(cents: number): string {
   return formatCurrency(cents / 100);
 }
@@ -284,7 +301,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
 
     toast({
       title: "Welcome aboard!",
-      description: `${packDetails?.info.name || packType.replace(/_/g, ' ')} is now active.`,
+      description: `${getPackDisplayName(packType, packDetails?.info.name)} is now active.`,
     });
     onOpenChange(false);
     // Reset view for next open
@@ -314,7 +331,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
                 <Icon className="h-8 w-8 text-primary" />
               </div>
               <DialogTitle className="text-xl" data-testid="text-paywall-title">
-                {featureName ? `Unlock ${featureName}` : `Upgrade to ${packDetails?.info.name || 'Premium'}`}
+                {featureName ? `Unlock ${featureName}` : `Upgrade to ${getPackDisplayName(packType, packDetails?.info.name)}`}
               </DialogTitle>
               <DialogDescription data-testid="text-paywall-description">
                 {packDetails?.info.description || 'Access premium features with this pack'}
@@ -351,7 +368,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
                       Requires{' '}
                       {missingDependencies.map(d => {
                         const depPack = packsWithStatus.find(p => p.packType === d);
-                        return depPack?.info.name || d.replace(/_/g, ' ');
+                        return getPackDisplayName(d, depPack?.info.name);
                       }).join(' and ')}{' '}
                       pack{missingDependencies.length > 1 ? 's' : ''} first
                     </span>
@@ -425,7 +442,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
           <Elements stripe={stripePromise}>
             <InlinePaymentForm
               packType={packType}
-              packName={packDetails?.info.name || packType.replace(/_/g, ' ')}
+              packName={getPackDisplayName(packType, packDetails?.info.name)}
               priceCents={priceCents}
               onSuccess={handlePaymentSuccess}
               onBack={() => setView('info')}
@@ -436,7 +453,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
         {/* ── PROVISIONING VIEW ── */}
         {view === 'provisioning' && (
           <ProvisioningAnimation
-            packName={packDetails?.info.name || packType.replace(/_/g, ' ')}
+            packName={getPackDisplayName(packType, packDetails?.info.name)}
             onComplete={handleProvisioningComplete}
           />
         )}
