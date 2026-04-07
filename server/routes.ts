@@ -40767,6 +40767,100 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
+  // POST /api/stripe/subscribe-pack — inline pack subscription using payment method from Stripe Elements
+  app.post("/api/stripe/subscribe-pack", authenticateUser, async (req: any, res) => {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+      const orgId = req.user?.orgId || req.tenantId;
+      const userId = req.user?.id;
+      const email = req.user?.email;
+      const { packType, paymentMethodId, billingCycle = "monthly" } = req.body;
+
+      if (!packType) return res.status(400).json({ error: "packType is required" });
+
+      // Look up pack in catalog
+      const [pack] = await db.select().from(packCatalog).where(eq(packCatalog.packType, packType));
+      if (!pack) return res.status(404).json({ error: `Pack '${packType}' not found in catalog` });
+
+      if (stripe && paymentMethodId) {
+        // Stripe path: create customer, attach payment, create subscription
+        let customerId: string | undefined;
+        const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, orgId)).limit(1);
+        if (existingSub?.providerCustomerId) {
+          customerId = existingSub.providerCustomerId;
+        } else {
+          const customer = await stripe.customers.create({
+            email,
+            metadata: { orgId, userId },
+          });
+          customerId = customer.id;
+        }
+
+        // Attach payment method and set as default
+        await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+        await stripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: paymentMethodId },
+        });
+
+        const priceId = billingCycle === "yearly" ? pack.stripePriceIdYearly : pack.stripePriceIdMonthly;
+        const subscription = await stripe.subscriptions.create({
+          customer: customerId,
+          items: priceId
+            ? [{ price: priceId }]
+            : [{
+                price_data: {
+                  currency: "usd",
+                  product_data: { name: pack.name || packType },
+                  unit_amount: billingCycle === "yearly" ? (pack.yearlyPriceCents || 0) : (pack.monthlyPriceCents || 0),
+                  recurring: { interval: billingCycle === "yearly" ? "year" : "month" },
+                },
+              }],
+          metadata: { orgId, packType },
+          payment_behavior: "default_incomplete",
+          expand: ["latest_invoice.payment_intent"],
+        });
+
+        // Also activate the pack locally
+        try {
+          const packService = (await import("./services/pack-service")).default;
+          await packService.activatePack(orgId, packType);
+        } catch (e: any) {
+          console.warn("Pack activation after stripe subscribe:", e.message);
+        }
+
+        const invoice = subscription.latest_invoice as any;
+        const paymentIntent = invoice?.payment_intent as any;
+
+        res.json({
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          clientSecret: paymentIntent?.client_secret,
+          packType,
+        });
+      } else {
+        // No Stripe / free trial path: just activate the pack
+        try {
+          const packService = (await import("./services/pack-service")).default;
+          await packService.activatePack(orgId, packType, { isTrial: true });
+        } catch (e: any) {
+          console.warn("Pack trial activation:", e.message);
+        }
+
+        res.json({
+          subscriptionId: null,
+          status: "trialing",
+          clientSecret: null,
+          packType,
+        });
+      }
+    } catch (error: any) {
+      console.error("Stripe subscribe-pack error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/stripe/webhook — handle Stripe webhooks for subscription lifecycle
   app.post("/api/stripe/webhook", async (req: any, res) => {
     try {
