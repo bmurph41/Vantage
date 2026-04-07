@@ -1,5 +1,6 @@
 import { syncLoansToCapitalStack, clearDebtFromCapitalStack } from "./services/loan-to-capital-stack-sync";
 import type { Express, Request, Response, NextFunction } from "express";
+import { logger } from "./lib/logger";
 import { createServer, type Server } from "http";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { storage } from "./storage";
@@ -1025,7 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   try {
     const { attachDockitRoutes } = await import("../modules/dockit/server/integration");
     await attachDockitRoutes(app, (req: any, res: any, next: any) => next(), "dockit-session-secret");
-    console.log("[Dockit] Module routes registered successfully");
+    logger.info("[Dockit] Module routes registered successfully");
   } catch (error: any) {
     console.error("[Dockit] Failed to load module:", error);
   }
@@ -1541,7 +1542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pipelineStage: "lead",
           });
           propertyId = newProperty.id;
-          console.log(`[DD Project] Auto-created CRM property ${propertyId} for new project`);
+          logger.info({ propertyId }, "[DD Project] Auto-created CRM property for new project");
         } catch (propError) {
           console.error("[DD Project] Failed to auto-create property:", propError);
         }
@@ -3989,17 +3990,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteContact(req.params.id);
 
-      // Skip audit log for now due to database constraint issue
-      // TODO: Fix audit_logs table to allow null projectId for org-level operations
-      // await storage.createAuditLog({
+      await storage.createAuditLog({
         orgId: req.user.orgId,
-      //   projectId: null,
-      //   userId: req.user.id,
-      //   entityType: "contact",
-      //   entityId: req.params.id,
-      //   action: "deleted",
-      //   before: existingContact,
-      // });
+        projectId: null,
+        userId: req.user.id,
+        entityType: "contact",
+        entityId: req.params.id,
+        action: "deleted",
+        before: existingContact,
+      });
 
       res.json({ success: true });
     } catch (error: any) {
@@ -7428,7 +7427,7 @@ Current context: Project ${req.params.projectId}`;
           }
           
           if (tasksCreated > 0) {
-            console.log(`[Pipeline Automation] Created ${tasksCreated} tasks for deal ${req.params.id} on stage change to "${newStage?.name}"`);
+            logger.info({ dealId: req.params.id, tasksCreated, stage: newStage?.name }, "[Pipeline Automation] Created tasks for deal on stage change");
           }
         } catch (automationError) {
           // Don't fail the deal update if automation fails
@@ -9566,7 +9565,7 @@ Current context: Project ${req.params.projectId}`;
             userId: req.user.id,
             orgId: req.user.orgId,
           }).onConflictDoNothing();
-          console.log(`Task ${task.id} added to calendar`);
+          logger.info({ taskId: task.id }, "Task added to calendar");
         } catch (calError) {
           console.error("Failed to add task to calendar (non-fatal):", calError);
         }
@@ -12957,7 +12956,7 @@ Current context: Project ${req.params.projectId}`;
           if (propertyId && !existingPropertyIds.has(propertyId)) {
             try {
               await storage.linkPropertyToCompany(propertyId, companyId, cp.relationship || 'associated', null);
-              console.log(`Auto-linked property ${propertyId} to company ${companyId} via contact ${contactId}`);
+              logger.info({ propertyId, companyId, contactId }, "Auto-linked property to company via contact");
             } catch (linkError: any) {
               // Ignore duplicate key errors - property may already be linked
               if (!linkError.message?.includes('duplicate') && !linkError.code?.includes('23505')) {
@@ -13005,7 +13004,7 @@ Current context: Project ${req.params.projectId}`;
 
               if (!alreadyLinked) {
                 await storage.linkPropertyToCompany(propertyId, companyId, relationship || 'associated', null);
-                console.log(`Auto-linked property ${propertyId} to company ${companyId} via contact ${contactId}`);
+                logger.info({ propertyId, companyId, contactId }, "Auto-linked property to company via contact");
               }
             } catch (linkError: any) {
               // Ignore duplicate key errors
@@ -13171,7 +13170,7 @@ Current context: Project ${req.params.projectId}`;
 
               if (!alreadyLinked) {
                 await storage.linkPropertyToContact(propertyId, contactId, relationship || 'associated', null);
-                console.log(`Auto-linked property ${propertyId} to contact ${contactId} via company ${companyId}`);
+                logger.info({ propertyId, contactId, companyId }, "Auto-linked property to contact via company");
               }
             } catch (linkError: any) {
               // Ignore duplicate key errors
@@ -15675,7 +15674,7 @@ Current context: Project ${req.params.projectId}`;
               },
               createdBy: userId,
             });
-            console.log('[SalesComps] Created pending property for "' + compData.marina + '"');
+            logger.info({ marina: compData.marina }, "[SalesComps] Created pending property");
           }
         } catch (propertyError) {
           console.error('Error auto-creating pending property:', propertyError);
@@ -15694,7 +15693,7 @@ Current context: Project ${req.params.projectId}`;
             city: compData.city,
             state: compData.state,
           });
-          console.log('[SalesComps] Created pending brokerage company "' + compData.brokerage + '"');
+          logger.info({ brokerage: compData.brokerage }, "[SalesComps] Created pending brokerage company");
         } catch (brokerageError) {
           console.error('Error auto-creating pending brokerage company:', brokerageError);
         }
@@ -15741,7 +15740,7 @@ Current context: Project ${req.params.projectId}`;
                   },
                   createdBy: userId,
                 });
-                console.log('[SalesComps] Created pending contact for additional agent "' + agent.name + '"');
+                logger.info({ agentName: agent.name }, "[SalesComps] Created pending contact for additional agent");
               }
             } catch (agentError) {
               console.error('Error auto-creating pending contact for additional agent "' + agent.name + '":', agentError);
@@ -22140,7 +22139,7 @@ Current context: Project ${req.params.projectId}`;
       // ── Learning: auto-classify pending items on load ─────────────────
       try {
         const { appliedCount } = await applyLearningRules(orgId, items as any);
-        if (appliedCount > 0) console.log(`[Learning] Applied ${appliedCount} rule(s) on items fetch`);
+        if (appliedCount > 0) logger.info(`[Learning] Applied ${appliedCount} rule(s) on items fetch`);
       } catch (e) {
         console.warn('[Learning] applyLearningRules failed silently:', e);
       }
@@ -25406,11 +25405,11 @@ Current context: Project ${req.params.projectId}`;
 
       setImmediate(async () => {
         try {
-          console.log(`[DocIntel] Starting automatic AI parsing for VDR import ${result.upload.id}`);
+          logger.info(`[DocIntel] Starting automatic AI parsing for VDR import ${result.upload.id}`);
           await docIntelService.parseAndExtract(orgId, result.upload.id);
-          console.log(`[DocIntel] Parsing complete for VDR import ${result.upload.id}, categorizing...`);
+          logger.info(`[DocIntel] Parsing complete for VDR import ${result.upload.id}, categorizing...`);
           await docIntelService.categorizeItems(orgId, result.upload.id);
-          console.log(`[DocIntel] Categorization complete for VDR import ${result.upload.id}`);
+          logger.info(`[DocIntel] Categorization complete for VDR import ${result.upload.id}`);
           await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
         } catch (parseError: any) {
           console.error(`[DocIntel] Background parsing failed for VDR import ${result.upload.id}:`, parseError.message);
@@ -26687,7 +26686,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               tags: [req.body.docType],
             });
             savedToVdr = true;
-            console.log(`[DocIntel] Document ${result.upload.id} saved to VDR folder: ${folderPath}`);
+            logger.info(`[DocIntel] Document ${result.upload.id} saved to VDR folder: ${folderPath}`);
           }
         } catch (vdrError: any) {
           console.error(`[DocIntel] Failed to save to VDR for upload ${result.upload.id}:`, vdrError.message);
@@ -26710,11 +26709,11 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         // Auto-parse ALL parseable document types in background (P&L, rent rolls, balance sheets, rate sheets, invoices)
         setImmediate(async () => {
           try {
-            console.log(`[DocIntel] Starting automatic AI parsing for ${docType} upload ${result.upload.id}`);
+            logger.info(`[DocIntel] Starting automatic AI parsing for ${docType} upload ${result.upload.id}`);
             await docIntelService.parseAndExtract(orgId, result.upload.id);
-            console.log(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
+            logger.info(`[DocIntel] Parsing complete for upload ${result.upload.id}, categorizing...`);
             await docIntelService.categorizeItems(orgId, result.upload.id);
-            console.log(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
+            logger.info(`[DocIntel] Categorization complete for upload ${result.upload.id}`);
             await docIntelService.updateUpload(orgId, result.upload.id, { status: 'reviewing' });
           } catch (parseError: any) {
             console.error(`[DocIntel] Background parsing failed for ${docType} upload ${result.upload.id}:`, parseError.message);
@@ -27304,7 +27303,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
               orgId, item.uploadId, upload[0].projectId, userId, upload[0].year || undefined
             );
             _reimported = true;
-            console.log(`[AutoReimport] Re-imported upload ${item.uploadId} after classification change`);
+            logger.info(`[AutoReimport] Re-imported upload ${item.uploadId} after classification change`);
           }
         } catch (reimportErr) {
           console.warn('[AutoReimport] Failed:', reimportErr);
@@ -27445,7 +27444,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
                 orgId, uploadId, upload[0].projectId, userId, upload[0].year || undefined
               );
               _reimported = true;
-              console.log('[AutoReimport] Re-imported upload ' + uploadId + ' after bulk classification change');
+              logger.info('[AutoReimport] Re-imported upload ' + uploadId + ' after bulk classification change');
             }
           }
         } catch (reimportErr) {
@@ -27511,10 +27510,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { projectId, uploadId } = req.params;
       const { fiscalYear } = req.body;
       
-      console.log("[Doc Intel Import] projectId:", projectId, "uploadId:", uploadId, "fiscalYear:", fiscalYear);
+      logger.info("[Doc Intel Import] projectId:", projectId, "uploadId:", uploadId, "fiscalYear:", fiscalYear);
       const lines = await docIntelService.importConfirmedItems(orgId, uploadId, projectId, userId, fiscalYear);
       res.json({ imported: lines.length, lines });
-      console.log("[Doc Intel Import] Result - imported lines:", lines.length);
+      logger.info("[Doc Intel Import] Result - imported lines:", lines.length);
     } catch (error: any) {
       console.error('Failed to import items:', error);
       res.status(500).json({ error: 'Failed to import items' });
@@ -27571,7 +27570,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         console.warn('[Reimport] P&L pipeline promote skipped:', pnlErr);
       }
 
-      console.log(`[Reimport] Re-imported ${totalImported} doc-intel actuals + ${pnlPromoted} P&L pipeline actuals across ${results.length} uploads for project ${projectId}`);
+      logger.info(`[Reimport] Re-imported ${totalImported} doc-intel actuals + ${pnlPromoted} P&L pipeline actuals across ${results.length} uploads for project ${projectId}`);
 
       // Audit trail
       try {
@@ -27664,11 +27663,11 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       setImmediate(async () => {
         try {
-          console.log(`[DocIntel] Retrying parse for upload ${uploadId}`);
+          logger.info(`[DocIntel] Retrying parse for upload ${uploadId}`);
           const items = await docIntelService.retryParse(orgId, uploadId);
-          console.log(`[DocIntel] Retry parse complete for ${uploadId}, ${items.length} items extracted`);
+          logger.info(`[DocIntel] Retry parse complete for ${uploadId}, ${items.length} items extracted`);
           await docIntelService.categorizeItems(orgId, uploadId);
-          console.log(`[DocIntel] Retry categorization complete for ${uploadId}`);
+          logger.info(`[DocIntel] Retry categorization complete for ${uploadId}`);
           const { updateUpload } = docIntelService;
           await docIntelService.updateUpload(orgId, uploadId, { status: "reviewing" });
         } catch (parseError: any) {
@@ -41094,7 +41093,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return { totalDebtAtClose, annualDebtService, remainingBalanceAtExit, blendedRate };
       },  // TODO: wire debt engine
     });
-    console.log('[DCF] Refactored routes registered (Layers 1-4)');
+    logger.info('[DCF] Refactored routes registered (Layers 1-4)');
   } catch (dcfErr: any) {
     console.error('[DCF] ROUTE REGISTRATION FAILED:', dcfErr.message);
     console.error(dcfErr.stack);

@@ -18,7 +18,7 @@ export default function AuditLogsPage() {
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  const { data: auditLogs = [], isLoading } = useQuery<AuditLog[]>({
+  const { data: auditLogs = [], isLoading, isError: logsError } = useQuery<AuditLog[]>({
     queryKey: ['/api/audit-logs', { action: actionFilter, entity: entityFilter, search: searchQuery }],
   });
 
@@ -105,6 +105,11 @@ export default function AuditLogsPage() {
           Export CSV
         </Button>
       </div>
+      {logsError && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          Unable to load audit logs. Check your connection and try refreshing.
+        </div>
+      )}
 
       <Card>
         <CardHeader>

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import {
   rbacRoles,
@@ -1037,10 +1038,16 @@ infrastructureRouter.post("/2fa/setup/sms", async (req: AuthenticatedRequest, re
       });
     }
 
-    // In production, send SMS via Twilio/SNS. For now, log it.
-    // TODO: integrate with SMS provider
-    console.log(`[2FA SMS] Code for user ${userId}: ${verificationCode}`);
+    // SMS dispatch requires TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN to be configured.
+    const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+    if (!smsConfigured) {
+      logger.warn({ userId }, "SMS 2FA setup attempted but no SMS provider is configured");
+      return res.status(503).json({
+        error: "SMS delivery is not configured on this deployment. Use an authenticator app instead.",
+      });
+    }
 
+    // When Twilio is wired in, call the SDK here and send `verificationCode` to `phoneNumber`.
     res.json({ message: "Verification code sent", phoneLast4: phoneNumber.slice(-4) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

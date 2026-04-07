@@ -123,7 +123,7 @@ export default function Companies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: companies, isLoading } = useQuery<Company[]>({
+  const { data: companies, isLoading, isError: companiesError } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
 
@@ -514,6 +514,11 @@ export default function Companies() {
           currentFilters={{ industry: industryFilter !== 'all' ? industryFilter : undefined, size: sizeFilter !== 'all' ? sizeFilter : undefined }}
         />
         <div className="flex-1 flex flex-col min-w-0">
+          {companiesError && (
+            <div className="mx-4 mt-3 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+              Unable to load companies. Check your connection and try refreshing.
+            </div>
+          )}
       <CrmTopBar
         title="Companies"
         subtitle={`${companies?.length || 0} companies`}

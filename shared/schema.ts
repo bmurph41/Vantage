@@ -13708,8 +13708,9 @@ export const shipStoreCategories = pgTable("ship_store_categories", {
 
 export const shipStoreProducts = pgTable("ship_store_products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
   name: text("name").notNull(),
-  sku: text("sku").notNull().unique(),
+  sku: text("sku").notNull(),
   categoryId: varchar("category_id").references(() => shipStoreCategories.id),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }),
@@ -13796,6 +13797,7 @@ export const shipStoreFinancialMetrics = pgTable("ship_store_financial_metrics",
 
 export const shipStoreSettings = pgTable("ship_store_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").references(() => organizations.id),
   storeName: text("store_name").default("Ship Store"),
   address: text("address"),
   phone: text("phone"),

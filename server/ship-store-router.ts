@@ -113,16 +113,16 @@ router.get('/customers', async (req: Request, res: Response) => {
 
 router.get('/products', async (req: Request, res: Response) => {
   try {
+    const orgId = (req as any).user?.orgId;
     const categoryId = req.query.categoryId as string;
-    let query = db.select().from(shipStoreProducts).where(eq(shipStoreProducts.isActive, true));
-    
-    if (categoryId) {
-      query = db.select().from(shipStoreProducts).where(
-        and(eq(shipStoreProducts.categoryId, categoryId), eq(shipStoreProducts.isActive, true))
-      );
-    }
-    
-    const result = await query.orderBy(shipStoreProducts.name);
+    const baseConditions = and(
+      eq(shipStoreProducts.isActive, true),
+      orgId ? eq(shipStoreProducts.orgId, orgId) : undefined,
+    );
+    const where = categoryId
+      ? and(baseConditions, eq(shipStoreProducts.categoryId, categoryId))
+      : baseConditions;
+    const result = await db.select().from(shipStoreProducts).where(where).orderBy(shipStoreProducts.name);
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching products' });
@@ -131,10 +131,12 @@ router.get('/products', async (req: Request, res: Response) => {
 
 router.get('/products/low-stock', async (req: Request, res: Response) => {
   try {
+    const orgId = (req as any).user?.orgId;
     const result = await db.select().from(shipStoreProducts)
       .where(
         and(
           eq(shipStoreProducts.isActive, true),
+          orgId ? eq(shipStoreProducts.orgId, orgId) : undefined,
           sql`${shipStoreProducts.stock} <= ${shipStoreProducts.lowStockThreshold}`
         )
       )
@@ -147,7 +149,13 @@ router.get('/products/low-stock', async (req: Request, res: Response) => {
 
 router.get('/products/:id', async (req: Request, res: Response) => {
   try {
-    const [product] = await db.select().from(shipStoreProducts).where(eq(shipStoreProducts.id, req.params.id));
+    const orgId = (req as any).user?.orgId;
+    const [product] = await db.select().from(shipStoreProducts).where(
+      and(
+        eq(shipStoreProducts.id, req.params.id),
+        orgId ? eq(shipStoreProducts.orgId, orgId) : undefined,
+      )
+    );
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
@@ -159,7 +167,8 @@ router.get('/products/:id', async (req: Request, res: Response) => {
 
 router.post('/products', requireManager, async (req: Request, res: Response) => {
   try {
-    const data = insertProductSchema.parse(req.body);
+    const orgId = (req as any).user?.orgId;
+    const data = insertProductSchema.parse({ ...req.body, orgId });
     const [product] = await db.insert(shipStoreProducts).values(data).returning();
     
     await logAudit({
@@ -578,7 +587,10 @@ router.get('/dashboard/metrics', async (req: Request, res: Response) => {
 
 router.get('/settings', async (req: Request, res: Response) => {
   try {
-    const [settings] = await db.select().from(shipStoreSettings).limit(1);
+    const orgId = (req as any).user?.orgId;
+    const [settings] = orgId
+      ? await db.select().from(shipStoreSettings).where(eq(shipStoreSettings.orgId, orgId)).limit(1)
+      : await db.select().from(shipStoreSettings).limit(1);
     res.json(settings || {});
   } catch (error) {
     res.status(500).json({ message: 'Error fetching settings' });
@@ -587,10 +599,13 @@ router.get('/settings', async (req: Request, res: Response) => {
 
 router.put('/settings', requireManager, async (req: Request, res: Response) => {
   try {
+    const orgId = (req as any).user?.orgId;
     const data = insertStoreSettingsSchema.partial().parse(req.body);
     
-    // Get existing settings
-    const [existing] = await db.select().from(shipStoreSettings).limit(1);
+    // Get existing settings for this org
+    const [existing] = orgId
+      ? await db.select().from(shipStoreSettings).where(eq(shipStoreSettings.orgId, orgId)).limit(1)
+      : await db.select().from(shipStoreSettings).limit(1);
     
     let settings;
     if (existing) {
@@ -600,8 +615,8 @@ router.put('/settings', requireManager, async (req: Request, res: Response) => {
         .where(eq(shipStoreSettings.id, existing.id))
         .returning();
     } else {
-      // Create new
-      [settings] = await db.insert(shipStoreSettings).values(data).returning();
+      // Create new — stamped with this org
+      [settings] = await db.insert(shipStoreSettings).values({ ...data, orgId: orgId ?? undefined }).returning();
     }
     
     res.json(settings);
