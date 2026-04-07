@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,7 +138,7 @@ function SectionBlock({
           <h3 className="text-xl font-bold mb-3">{section.title}</h3>
           <div
             className="prose prose-sm max-w-none dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: section.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(section.content) }}
           />
         </div>
         {section.layout !== 'full-width' && (
@@ -221,7 +222,7 @@ function SectionBlock({
               ref={editorRef}
               contentEditable
               className="min-h-[150px] p-4 prose prose-sm max-w-none dark:prose-invert focus:outline-none"
-              dangerouslySetInnerHTML={{ __html: section.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(section.content) }}
               onInput={handleContentChange}
               suppressContentEditableWarning
             />

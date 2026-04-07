@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Rnd, type RndResizeCallback, type RndDragCallback } from 'react-rnd';
 import { useOmEditorStore, type OmBlock, type OmPage } from '@/stores/om-editor-store';
 import { cn, formatCurrency, formatPercent, formatNumber } from '@/lib/utils';
@@ -330,7 +331,7 @@ function TextBlock({ data }: { data: { type: 'text'; content: string; fontSize?:
         lineHeight: data.lineHeight || 1.5,
         color: data.color || 'inherit',
       }}
-      dangerouslySetInnerHTML={{ __html: data.content }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.content) }}
     />
   );
 }

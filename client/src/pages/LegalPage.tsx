@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -142,7 +143,7 @@ export default function LegalPage({ docType }: { docType: 'terms' | 'privacy' | 
         <CardContent className="p-6">
           <div
             className="prose dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(data.contentMd) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(data.contentMd)) }}
           />
         </CardContent>
       </Card>

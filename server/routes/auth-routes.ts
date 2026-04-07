@@ -370,7 +370,7 @@ router.post('/register', async (req: Request, res: Response) => {
     if (result.success && result.session) {
       res.cookie('sessionToken', result.session.sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.REPLIT_DEV_DOMAIN,
         sameSite: 'strict',
         maxAge: 8 * 60 * 60 * 1000,
         path: '/',

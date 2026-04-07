@@ -1474,7 +1474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Projects
-  app.get("/api/dd/projects", async (req: any, res) => {
+  app.get("/api/dd/projects", authenticateUser, async (req: any, res) => {
     try {
       const projects = await storage.getProjectsForOrg(req.user.orgId);
       
@@ -1507,7 +1507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects", async (req: any, res) => {
+  app.post("/api/dd/projects", authenticateUser, async (req: any, res) => {
     try {
       let propertyId = req.body.propertyId;
       
@@ -1644,7 +1644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Portfolio Management Routes
   
   // Get child projects of a portfolio
-  app.get("/api/dd/projects/:id/children", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/children", authenticateUser, async (req: any, res) => {
     try {
       const { db } = await import("./db");
       const { projects } = await import("@shared/schema");
@@ -1678,7 +1678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Add a property to a portfolio (creates child project)
-  app.post("/api/dd/projects/:id/add-property", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/add-property", authenticateUser, async (req: any, res) => {
     try {
       const { db } = await import("./db");
       const { projects, crmProperties } = await import("@shared/schema");
@@ -1769,7 +1769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/projects/:id", async (req: any, res) => {
+  app.get("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
       // Query database directly (bypassing storage method which has interception issue)
       const { db } = await import("./db");
@@ -1792,7 +1792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/dd/projects/:id", async (req: any, res) => {
+  app.patch("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
       const updates = insertProjectSchema.partial().parse(req.body);
       const updated = await storage.updateProject(req.params.id, updates);
@@ -1815,7 +1815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Settings
-  app.delete("/api/dd/projects/:id", async (req: any, res) => {
+  app.delete("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
       const project = await authorizeProjectAccess(req.params.id, req.user.orgId);
       
@@ -1841,7 +1841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Accept Project (Mark DD as accepted/completed)
-  app.post("/api/dd/projects/:id/accept", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/accept", authenticateUser, async (req: any, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -1878,7 +1878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Unaccept Project (Undo DD approval - for mistakes, extensions, etc.)
-  app.post("/api/dd/projects/:id/unaccept", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/unaccept", authenticateUser, async (req: any, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -1914,7 +1914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/dd/projects/:id/settings", async (req: any, res) => {
+  app.patch("/api/dd/projects/:id/settings", authenticateUser, async (req: any, res) => {
     try {
       const updates = insertProjectSettingsSchema.partial().parse(req.body);
       const updated = await storage.updateProjectSettings(req.params.id, updates);
@@ -1925,7 +1925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project Shares
-  app.get("/api/dd/projects/:id/shares", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/shares", authenticateUser, async (req: any, res) => {
     try {
       const shares = await storage.getProjectShares(req.params.id);
       res.json(shares);
@@ -1934,7 +1934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:id/shares", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/shares", authenticateUser, async (req: any, res) => {
     try {
       const shareToken = crypto.randomBytes(32).toString('hex');
       const shareData = insertProjectShareSchema.parse({
@@ -1963,7 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/shares/:id", async (req: any, res) => {
+  app.delete("/api/dd/shares/:id", authenticateUser, async (req: any, res) => {
     try {
       await storage.deleteProjectShare(req.params.id);
       res.json({ success: true });
@@ -2232,7 +2232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk update task sort orders
-  app.patch("/api/dd/projects/:projectId/tasks/bulk-sort-order", async (req: any, res) => {
+  app.patch("/api/dd/projects/:projectId/tasks/bulk-sort-order", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -2268,7 +2268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tasks
-  app.get("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/tasks", authenticateUser, async (req: any, res) => {
     try {
       const includeArchived = req.query.includeArchived === 'true';
       const tasks = await storage.getTasksForProject(req.params.projectId, includeArchived);
@@ -2278,7 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/projects/:projectId/assignees", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/assignees", authenticateUser, async (req: any, res) => {
     try {
       const assignees = await storage.getProjectAssignees(req.params.projectId);
       res.json(assignees);
@@ -2287,7 +2287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/tasks", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/tasks", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -2426,7 +2426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Poke task owner with email reminder
-  app.post("/api/dd/tasks/:id/poke", async (req: any, res) => {
+  app.post("/api/dd/tasks/:id/poke", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -2511,7 +2511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/dd/tasks/:id", async (req: any, res) => {
+  app.patch("/api/dd/tasks/:id", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -2694,7 +2694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/tasks/:id", async (req: any, res) => {
+  app.delete("/api/dd/tasks/:id", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -2739,7 +2739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Archive task
-  app.patch("/api/dd/tasks/:id/archive", async (req: any, res) => {
+  app.patch("/api/dd/tasks/:id/archive", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -2780,7 +2780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Unarchive task
-  app.patch("/api/dd/tasks/:id/unarchive", async (req: any, res) => {
+  app.patch("/api/dd/tasks/:id/unarchive", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.id);
       if (!task) {
@@ -2821,7 +2821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task Dependencies (Enhanced CPM Support)
-  app.get("/api/dd/projects/:projectId/task-dependencies", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/task-dependencies", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       const dependencies = await storage.getTaskDependenciesForProject(req.params.projectId);
@@ -2831,7 +2831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/tasks/:taskId/dependencies", async (req: any, res) => {
+  app.get("/api/dd/tasks/:taskId/dependencies", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.taskId);
       if (!task) {
@@ -2846,7 +2846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/task-dependencies", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/task-dependencies", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -2899,7 +2899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/dd/task-dependencies/:id", async (req: any, res) => {
+  app.put("/api/dd/task-dependencies/:id", authenticateUser, async (req: any, res) => {
     try {
       // First, get the existing dependency to verify ownership
       const dependency = await storage.getTaskDependency(req.params.id);
@@ -2948,7 +2948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/task-dependencies/:id", async (req: any, res) => {
+  app.delete("/api/dd/task-dependencies/:id", authenticateUser, async (req: any, res) => {
     try {
       // First, get the existing dependency to verify ownership before deletion
       const dependency = await storage.getTaskDependency(req.params.id);
@@ -2996,7 +2996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/tasks/:taskId/dependencies", async (req: any, res) => {
+  app.delete("/api/dd/tasks/:taskId/dependencies", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.taskId);
       if (!task) {
@@ -3069,7 +3069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task File Management
-  app.post("/api/dd/tasks/:taskId/files", upload.single('file'), validateFileUpload({ maxSize: 20 * 1024 * 1024 }), async (req: any, res) => {
+  app.post("/api/dd/tasks/:taskId/files", authenticateUser, upload.single('file'), validateFileUpload({ maxSize: 20 * 1024 * 1024 }), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -3129,7 +3129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/tasks/:taskId/files", async (req: any, res) => {
+  app.get("/api/dd/tasks/:taskId/files", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.taskId);
       if (!task) {
@@ -3145,7 +3145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/files/:fileId", async (req: any, res) => {
+  app.get("/api/dd/files/:fileId", authenticateUser, async (req: any, res) => {
     try {
       const file = await storage.getTaskFile(req.params.fileId);
       if (!file) {
@@ -3173,7 +3173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/files/:fileId", async (req: any, res) => {
+  app.delete("/api/dd/files/:fileId", authenticateUser, async (req: any, res) => {
     try {
       const file = await storage.getTaskFile(req.params.fileId);
       if (!file) {
@@ -3210,7 +3210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Timeline Notes
-  app.get("/api/dd/tasks/:taskId/timeline-notes", async (req: any, res) => {
+  app.get("/api/dd/tasks/:taskId/timeline-notes", authenticateUser, async (req: any, res) => {
     try {
       const notes = await storage.getTimelineNotesForTask(req.params.taskId);
       res.json(notes);
@@ -3219,7 +3219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/tasks/:taskId/timeline-notes", async (req: any, res) => {
+  app.post("/api/dd/tasks/:taskId/timeline-notes", authenticateUser, async (req: any, res) => {
     try {
       const task = await storage.getTask(req.params.taskId);
       if (!task) {
@@ -3255,7 +3255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/dd/timeline-notes/:id", async (req: any, res) => {
+  app.put("/api/dd/timeline-notes/:id", authenticateUser, async (req: any, res) => {
     try {
       // Note: For proper authorization, we'd need a getTimelineNote method
       // For now, this is a limitation - timeline notes authorization is not fully implemented
@@ -3267,7 +3267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/timeline-notes/:id", async (req: any, res) => {
+  app.delete("/api/dd/timeline-notes/:id", authenticateUser, async (req: any, res) => {
     try {
       // Note: For proper authorization, we'd need a getTimelineNote method
       // For now, this is a limitation in the current storage interface
@@ -3278,7 +3278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   // Project Templates
-  app.get("/api/dd/project-templates", async (req: any, res) => {
+  app.get("/api/dd/project-templates", authenticateUser, async (req: any, res) => {
     try {
       const templates = await storage.getProjectTemplatesForOrg(req.user.orgId);
       res.json(templates);
@@ -3287,7 +3287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/project-templates", async (req: any, res) => {
+  app.post("/api/dd/project-templates", authenticateUser, async (req: any, res) => {
     try {
       const templateData = insertProjectTemplateSchema.parse({
         ...req.body,
@@ -3302,7 +3302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Apply Template
-  app.post("/api/dd/projects/:projectId/apply-template/:templateId", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/apply-template/:templateId", authenticateUser, async (req: any, res) => {
     try {
       const project = await storage.getProject(req.params.projectId);
       if (!project) {
@@ -3395,7 +3395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export endpoints
-  app.get("/api/dd/projects/:id/export.csv", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/export.csv", authenticateUser, async (req: any, res) => {
     try {
       const tasks = await storage.getTasksForProject(req.params.id);
       
@@ -3413,7 +3413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Email report endpoint
-  app.post("/api/dd/send-report-email", async (req: any, res) => {
+  app.post("/api/dd/send-report-email", authenticateUser, async (req: any, res) => {
     try {
       const payload = z.object({
         to: z.string().email(),
@@ -3457,7 +3457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/projects/:id/export.ics", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/export.ics", authenticateUser, async (req: any, res) => {
     try {
       const tasks = await storage.getTasksForProject(req.params.id);
       
@@ -3484,7 +3484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Audit logs
-  app.get("/api/dd/projects/:id/audit", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/audit", authenticateUser, async (req: any, res) => {
     try {
       const logs = await storage.getAuditLogsForProject(req.params.id);
       res.json(logs);
@@ -3496,7 +3496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === RISK MANAGEMENT API ===
 
   // Get all risks for a project
-  app.get("/api/dd/projects/:id/risks", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks", authenticateUser, async (req: any, res) => {
     try {
       const risks = await storage.getRisksForProject(req.params.id);
       res.json(risks);
@@ -3507,7 +3507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get risk analytics and summary
-  app.get("/api/dd/projects/:id/risks/analytics", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/analytics", authenticateUser, async (req: any, res) => {
     try {
       const summary = await storage.getProjectRiskSummary(req.params.id);
       res.json(summary);
@@ -3518,7 +3518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get AI-powered risk analysis
-  app.get("/api/dd/projects/:id/risks/ai-analysis", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/ai-analysis", authenticateUser, async (req: any, res) => {
     try {
       const projectId = req.params.id;
       
@@ -3571,7 +3571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // === EXECUTIVE NOTES API ===
   
   // Update executive notes for a project
-  app.patch("/api/dd/projects/:id/executive-notes", async (req: any, res) => {
+  app.patch("/api/dd/projects/:id/executive-notes", authenticateUser, async (req: any, res) => {
     try {
       const { executiveNotes } = req.body;
       const projectId = req.params.id;
@@ -3587,7 +3587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get AI-enhanced narrative from executive notes
-  app.get("/api/dd/projects/:id/executive-notes/ai-enhanced", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/executive-notes/ai-enhanced", authenticateUser, async (req: any, res) => {
     try {
       const projectId = req.params.id;
       
@@ -3637,7 +3637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get top risks by score
-  app.get("/api/dd/projects/:id/risks/top", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/top", authenticateUser, async (req: any, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 3;
       const topRisks = await storage.getHighestRisksByScore(req.params.id, limit);
@@ -3649,7 +3649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get risks by category
-  app.get("/api/dd/projects/:id/risks/category/:category", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/category/:category", authenticateUser, async (req: any, res) => {
     try {
       const risks = await storage.getRisksByCategory(req.params.id, req.params.category);
       res.json(risks);
@@ -3660,7 +3660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get risks by status
-  app.get("/api/dd/projects/:id/risks/status/:status", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/status/:status", authenticateUser, async (req: any, res) => {
     try {
       const risks = await storage.getRisksByStatus(req.params.id, req.params.status);
       res.json(risks);
@@ -3671,7 +3671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new risk
-  app.post("/api/dd/projects/:id/risks", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/risks", authenticateUser, async (req: any, res) => {
     try {
       const riskData = insertRiskSchema.parse({
         ...req.body,
@@ -3703,7 +3703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get a specific risk
-  app.get("/api/dd/risks/:id", async (req: any, res) => {
+  app.get("/api/dd/risks/:id", authenticateUser, async (req: any, res) => {
     try {
       const risk = await storage.getRisk(req.params.id);
       if (!risk) {
@@ -3717,7 +3717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a risk
-  app.put("/api/dd/risks/:id", async (req: any, res) => {
+  app.put("/api/dd/risks/:id", authenticateUser, async (req: any, res) => {
     try {
       const existingRisk = await storage.getRisk(req.params.id);
       if (!existingRisk) {
@@ -3751,7 +3751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete a risk
-  app.delete("/api/dd/risks/:id", async (req: any, res) => {
+  app.delete("/api/dd/risks/:id", authenticateUser, async (req: any, res) => {
     try {
       const existingRisk = await storage.getRisk(req.params.id);
       if (!existingRisk) {
@@ -3779,7 +3779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk update all risk scores for a project
-  app.post("/api/dd/projects/:id/risks/recalculate", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/risks/recalculate", authenticateUser, async (req: any, res) => {
     try {
       await storage.bulkUpdateRiskScores(req.params.id);
       
@@ -3801,7 +3801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Risk heatmap data
-  app.get("/api/dd/projects/:id/risks/heatmap", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/risks/heatmap", authenticateUser, async (req: any, res) => {
     try {
       const risks = await storage.getRisksForProject(req.params.id);
       
@@ -3837,7 +3837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== NOTIFICATION SYSTEM ROUTES ==========
 
   // Contact Management Routes
-  app.get("/api/dd/contacts", async (req: any, res) => {
+  app.get("/api/dd/contacts", authenticateUser, async (req: any, res) => {
     try {
       const contacts = await storage.getContactsByOrg(req.user.orgId);
       res.json(contacts);
@@ -3847,7 +3847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/contacts", async (req: any, res) => {
+  app.post("/api/dd/contacts", authenticateUser, async (req: any, res) => {
     try {
       const contactData = insertDDContactSchema.parse({
         ...req.body,
@@ -3904,7 +3904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/dd/contacts/:id", async (req: any, res) => {
+  app.put("/api/dd/contacts/:id", authenticateUser, async (req: any, res) => {
     try {
       const existingContact = await storage.getContactById(req.params.id);
       if (!existingContact) {
@@ -3962,7 +3962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/contacts/:id", async (req: any, res) => {
+  app.delete("/api/dd/contacts/:id", authenticateUser, async (req: any, res) => {
     try {
       const existingContact = await storage.getContactById(req.params.id);
       if (!existingContact) {
@@ -3998,7 +3998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project-Contact Association Routes
-  app.get("/api/dd/projects/:projectId/contacts", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/contacts", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4014,7 +4014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/contacts", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/contacts", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4047,7 +4047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/projects/:projectId/contacts/:contactId/:role", async (req: any, res) => {
+  app.delete("/api/dd/projects/:projectId/contacts/:contactId/:role", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4070,7 +4070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project-Pending-Contact Association Routes
-  app.get("/api/dd/projects/:projectId/pending-contacts", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/pending-contacts", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4086,7 +4086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/pending-contacts/quick-add", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/pending-contacts/quick-add", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4130,7 +4130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/projects/:projectId/pending-contacts/:pendingContactId/:role", async (req: any, res) => {
+  app.delete("/api/dd/projects/:projectId/pending-contacts/:pendingContactId/:role", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4153,7 +4153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notification Subscription Routes
-  app.get("/api/dd/projects/:projectId/subscriptions", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/subscriptions", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4169,7 +4169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/subscriptions", async (req: any, res) => {
+  app.post("/api/dd/subscriptions", authenticateUser, async (req: any, res) => {
     try {
       const subscriptionData = insertNotificationSubscriptionSchema.parse(req.body);
 
@@ -4223,7 +4223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/dd/subscriptions/:id", async (req: any, res) => {
+  app.put("/api/dd/subscriptions/:id", authenticateUser, async (req: any, res) => {
     try {
       // Get existing subscription to verify access
       const existingSubscription = await storage.getSubscriptionsByProject("dummy");
@@ -4243,7 +4243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/subscriptions/:id", async (req: any, res) => {
+  app.delete("/api/dd/subscriptions/:id", authenticateUser, async (req: any, res) => {
     try {
       await storage.deleteSubscription(req.params.id);
       res.json({ success: true });
@@ -4253,7 +4253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/users/:userId/subscriptions", async (req: any, res) => {
+  app.get("/api/dd/users/:userId/subscriptions", authenticateUser, async (req: any, res) => {
     try {
       // Verify user belongs to org
       const user = await storage.getUser(req.params.userId);
@@ -4270,7 +4270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notification History and Management Routes
-  app.get("/api/dd/notifications/history/:projectId", async (req: any, res) => {
+  app.get("/api/dd/notifications/history/:projectId", authenticateUser, async (req: any, res) => {
     try {
       // Verify project access
       const project = await storage.getProject(req.params.projectId);
@@ -4287,7 +4287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/notifications/test", async (req: any, res) => {
+  app.post("/api/dd/notifications/test", authenticateUser, async (req: any, res) => {
     try {
       const { recipientEmail, templateType } = req.body;
 
@@ -4314,7 +4314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/notifications/scheduled", async (req: any, res) => {
+  app.get("/api/dd/notifications/scheduled", authenticateUser, async (req: any, res) => {
     try {
       // Only allow admin users to view scheduled notifications
       if (req.user.role !== "owner") {
@@ -4334,7 +4334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Validation endpoint for notification configuration
-  app.get("/api/dd/notifications/validate-config", async (req: any, res) => {
+  app.get("/api/dd/notifications/validate-config", authenticateUser, async (req: any, res) => {
     try {
       const channels = req.query.channels 
         ? (req.query.channels as string).split(",")
@@ -4349,7 +4349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Deadline monitoring endpoints
-  app.get("/api/dd/deadlines/upcoming", async (req: any, res) => {
+  app.get("/api/dd/deadlines/upcoming", authenticateUser, async (req: any, res) => {
     try {
       // Only allow authenticated users to view upcoming deadlines
       const days = req.query.days ? parseInt(req.query.days as string) : 7;
@@ -4364,7 +4364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/deadlines/check", async (req: any, res) => {
+  app.post("/api/dd/deadlines/check", authenticateUser, async (req: any, res) => {
     try {
       // Only allow owner users to manually trigger deadline checks
       if (req.user.role !== "owner") {
@@ -4381,7 +4381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/deadlines/monitor/status", async (req: any, res) => {
+  app.get("/api/dd/deadlines/monitor/status", authenticateUser, async (req: any, res) => {
     try {
       const { deadlineMonitor } = await import('./deadline-monitor');
       const status = deadlineMonitor.getStatus();
@@ -4396,7 +4396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reconciliation Service Monitoring Endpoints
 
   // Get reconciliation service health status
-  app.get("/api/dd/reconciliation/health", async (req: any, res) => {
+  app.get("/api/dd/reconciliation/health", authenticateUser, async (req: any, res) => {
     try {
       const healthStatus = reconciliationService.getHealthStatus();
       res.json(healthStatus);
@@ -4407,7 +4407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get sync status for all integrations
-  app.get("/api/dd/reconciliation/status", async (req: any, res) => {
+  app.get("/api/dd/reconciliation/status", authenticateUser, async (req: any, res) => {
     try {
       const syncStatuses = reconciliationService.getSyncStatuses();
       res.json(syncStatuses);
@@ -4418,7 +4418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get sync history for a specific integration
-  app.get("/api/dd/reconciliation/status/:projectId/:provider", async (req: any, res) => {
+  app.get("/api/dd/reconciliation/status/:projectId/:provider", authenticateUser, async (req: any, res) => {
     try {
       const { projectId, provider } = req.params;
       
@@ -4438,7 +4438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manually trigger sync for a specific integration
-  app.post("/api/dd/reconciliation/sync/:projectId/:provider", async (req: any, res) => {
+  app.post("/api/dd/reconciliation/sync/:projectId/:provider", authenticateUser, async (req: any, res) => {
     try {
       const { projectId, provider } = req.params;
       
@@ -4466,7 +4466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get reconciliation service configuration
-  app.get("/api/dd/reconciliation/config", async (req: any, res) => {
+  app.get("/api/dd/reconciliation/config", authenticateUser, async (req: any, res) => {
     try {
       const config = reconciliationService.getConfig();
       res.json(config);
@@ -4477,7 +4477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reset sync status for a specific integration (useful for recovery)
-  app.post("/api/dd/reconciliation/reset/:projectId/:provider", async (req: any, res) => {
+  app.post("/api/dd/reconciliation/reset/:projectId/:provider", authenticateUser, async (req: any, res) => {
     try {
       const { projectId, provider } = req.params;
       
@@ -4501,7 +4501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Trigger health check manually
-  app.post("/api/dd/reconciliation/health-check", async (req: any, res) => {
+  app.post("/api/dd/reconciliation/health-check", authenticateUser, async (req: any, res) => {
     try {
       const healthStatus = await reconciliationService.triggerHealthCheck();
       res.json({
@@ -4515,7 +4515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Notification system testing endpoint
-  app.post("/api/dd/notifications/run-tests", async (req: any, res) => {
+  app.post("/api/dd/notifications/run-tests", authenticateUser, async (req: any, res) => {
     try {
       // Only allow owner users to run comprehensive tests
       if (req.user.role !== "owner") {
@@ -4540,7 +4540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/notifications/test-report", async (req: any, res) => {
+  app.get("/api/dd/notifications/test-report", authenticateUser, async (req: any, res) => {
     try {
       const { notificationTestSuite } = await import('./notification-test');
       const report = await notificationTestSuite.generateTestReport();
@@ -4554,7 +4554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar Events API
-  app.get("/api/dd/projects/:projectId/calendar-events", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/calendar-events", authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
       
@@ -4593,7 +4593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/calendar-events/sync", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/calendar-events/sync", authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
       
@@ -4629,7 +4629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/calendar/generate-ics", async (req: any, res) => {
+  app.post("/api/dd/calendar/generate-ics", authenticateUser, async (req: any, res) => {
     try {
       // SECURITY: Validate request body with Zod schema
       const bodyValidation = generateIcsSchema.safeParse(req.body);
@@ -4701,7 +4701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/projects/:projectId/calendar-events/download", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/calendar-events/download", authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
       
@@ -4744,7 +4744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dd/calendar/event-types", async (req: any, res) => {
+  app.get("/api/dd/calendar/event-types", authenticateUser, async (req: any, res) => {
     try {
       const eventTypes = [
         { value: "dd_expiration", label: "DD Expiration", description: "Due diligence deadline events" },
@@ -4761,7 +4761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/dd/projects/:projectId/calendar-events", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/calendar-events", authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
       
@@ -4798,7 +4798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/dd/calendar-events/:id", async (req: any, res) => {
+  app.patch("/api/dd/calendar-events/:id", authenticateUser, async (req: any, res) => {
     try {
       const { id } = req.params;
       
@@ -4834,7 +4834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/dd/calendar-events/:id", async (req: any, res) => {
+  app.delete("/api/dd/calendar-events/:id", authenticateUser, async (req: any, res) => {
     try {
       const { id } = req.params;
       
@@ -4884,7 +4884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // GET /api/dd/tasks/:taskId/requirements - List requirements for a task
-  app.get("/api/dd/tasks/:taskId/requirements", async (req: any, res) => {
+  app.get("/api/dd/tasks/:taskId/requirements", authenticateUser, async (req: any, res) => {
     try {
       const { taskId } = req.params;
       
@@ -4905,7 +4905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/dd/tasks/:taskId/requirements - Create requirement for a task
-  app.post("/api/dd/tasks/:taskId/requirements", async (req: any, res) => {
+  app.post("/api/dd/tasks/:taskId/requirements", authenticateUser, async (req: any, res) => {
     try {
       const { taskId } = req.params;
       
@@ -4944,7 +4944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/dd/tasks/:taskId/requirements/:id - Update requirement with manual overrides
-  app.patch("/api/dd/tasks/:taskId/requirements/:id", async (req: any, res) => {
+  app.patch("/api/dd/tasks/:taskId/requirements/:id", authenticateUser, async (req: any, res) => {
     try {
       const { taskId, id } = req.params;
       
@@ -4989,7 +4989,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // =============================================================================
 
   // GET /api/dd/projects/:id/integrations - List project integrations
-  app.get("/api/dd/projects/:id/integrations", async (req: any, res) => {
+  app.get("/api/dd/projects/:id/integrations", authenticateUser, async (req: any, res) => {
     try {
       const projectId = req.params.id;
       
@@ -5010,7 +5010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/dd/projects/:id/integrations/:integrationId - Update integration settings
-  app.patch("/api/dd/projects/:id/integrations/:integrationId", async (req: any, res) => {
+  app.patch("/api/dd/projects/:id/integrations/:integrationId", authenticateUser, async (req: any, res) => {
     try {
       const { id: projectId, integrationId } = req.params;
       
@@ -5051,7 +5051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/dd/projects/:id/integrations/docs/register - Register webhook with external app
-  app.post("/api/dd/projects/:id/integrations/docs/register", async (req: any, res) => {
+  app.post("/api/dd/projects/:id/integrations/docs/register", authenticateUser, async (req: any, res) => {
     try {
       const projectId = req.params.id;
       
@@ -5141,7 +5141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/dd/integrations/:id/test-webhook - Test webhook connectivity
-  app.post("/api/dd/integrations/:id/test-webhook", async (req: any, res) => {
+  app.post("/api/dd/integrations/:id/test-webhook", authenticateUser, async (req: any, res) => {
     try {
       const integrationId = req.params.id;
       
@@ -5262,7 +5262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/dd/integrations/:id/status - Get integration status and health
-  app.get("/api/dd/integrations/:id/status", async (req: any, res) => {
+  app.get("/api/dd/integrations/:id/status", authenticateUser, async (req: any, res) => {
     try {
       const integrationId = req.params.id;
       
@@ -5579,7 +5579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Direct Calendar Sync API
-  app.post("/api/dd/calendar/sync-direct", async (req: any, res) => {
+  app.post("/api/dd/calendar/sync-direct", authenticateUser, async (req: any, res) => {
     try {
       const { eventIds, emailIds, projectId } = syncToCalendarSchema.parse(req.body);
       
@@ -5676,7 +5676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar connection status
-  app.get("/api/dd/calendar/status", async (req: any, res) => {
+  app.get("/api/dd/calendar/status", authenticateUser, async (req: any, res) => {
     try {
       const isAvailable = await checkCalendarAvailability();
       res.json({ 
@@ -5692,7 +5692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   // DD Project by ID (for breadcrumb resolution)
-  app.get("/api/dd/projects/:id", async (req: any, res) => {
+  app.get("/api/dd/projects/:id", authenticateUser, async (req: any, res) => {
     try {
       const project = await authorizeProjectAccess(req.params.id, req.user.orgId);
       if (!project) {
@@ -5872,7 +5872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Upload CDD Document
-  app.post("/api/dd/projects/:projectId/cdd-documents", cddUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/cdd-documents", authenticateUser, cddUpload.single('file'), validateFileUpload({ maxSize: 50 * 1024 * 1024 }), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
       const { inArray } = await import('drizzle-orm');
@@ -5931,7 +5931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all CDD documents for a project
-  app.get("/api/dd/projects/:projectId/cdd-documents", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/cdd-documents", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       const documents = await storage.getCddDocumentsForProject(req.params.projectId);
@@ -5943,7 +5943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get specific CDD document
-  app.get("/api/dd/documents/:documentId", async (req: any, res) => {
+  app.get("/api/dd/documents/:documentId", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -5959,7 +5959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete CDD document
-  app.delete("/api/dd/documents/:documentId", async (req: any, res) => {
+  app.delete("/api/dd/documents/:documentId", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -5997,7 +5997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Parse CDD Document
-  app.post("/api/dd/documents/:documentId/parse", async (req: any, res) => {
+  app.post("/api/dd/documents/:documentId/parse", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -6065,7 +6065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get document pages
-  app.get("/api/dd/documents/:documentId/pages", async (req: any, res) => {
+  app.get("/api/dd/documents/:documentId/pages", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -6083,7 +6083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate embeddings for a document
-  app.post("/api/dd/documents/:documentId/embeddings", async (req: any, res) => {
+  app.post("/api/dd/documents/:documentId/embeddings", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -6163,7 +6163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get vector chunks for a document
-  app.get("/api/dd/documents/:documentId/chunks", async (req: any, res) => {
+  app.get("/api/dd/documents/:documentId/chunks", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -6181,7 +6181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // RAG Query API - Semantic search with citations
-  app.post("/api/dd/projects/:projectId/rag", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/rag", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -6264,7 +6264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CDD Advisor Chat API - Conversational AI with function calling
-  app.post("/api/dd/projects/:projectId/chat", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/chat", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -6407,7 +6407,7 @@ Current context: Project ${req.params.projectId}`;
 
   // KPI Management
   // Get all KPIs for a project
-  app.get("/api/dd/projects/:projectId/kpis", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/kpis", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -6420,7 +6420,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a KPI
-  app.post("/api/dd/projects/:projectId/kpis", async (req: any, res) => {
+  app.post("/api/dd/projects/:projectId/kpis", authenticateUser, async (req: any, res) => {
     try {
       await authorizeProjectAccess(req.params.projectId, req.user.orgId);
       
@@ -6447,7 +6447,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a KPI
-  app.put("/api/dd/kpis/:id", async (req: any, res) => {
+  app.put("/api/dd/kpis/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getKpi(req.params.id);
       if (!existing) {
@@ -6477,7 +6477,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a KPI
-  app.delete("/api/dd/kpis/:id", async (req: any, res) => {
+  app.delete("/api/dd/kpis/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getKpi(req.params.id);
       if (!existing) {
@@ -6506,7 +6506,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Extract KPIs from a document using AI
-  app.post("/api/dd/documents/:documentId/extract-kpis", async (req: any, res) => {
+  app.post("/api/dd/documents/:documentId/extract-kpis", authenticateUser, async (req: any, res) => {
     try {
       const document = await storage.getCddDocument(req.params.documentId);
       if (!document) {
@@ -6585,7 +6585,7 @@ Current context: Project ${req.params.projectId}`;
   // === FINDINGS MANAGEMENT API ===
 
   // Get all findings for a project
-  app.get("/api/dd/projects/:projectId/findings", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/findings", authenticateUser, async (req: any, res) => {
     try {
       // Authorize project access
       try {
@@ -6603,7 +6603,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get a single finding
-  app.get("/api/dd/findings/:id", async (req: any, res) => {
+  app.get("/api/dd/findings/:id", authenticateUser, async (req: any, res) => {
     try {
       const finding = await storage.getFinding(req.params.id);
       if (!finding) {
@@ -6625,7 +6625,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new finding
-  app.post("/api/dd/findings", async (req: any, res) => {
+  app.post("/api/dd/findings", authenticateUser, async (req: any, res) => {
     try {
       // Validate request body
       const validatedData = insertFindingSchema.parse({
@@ -6663,7 +6663,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a finding
-  app.put("/api/dd/findings/:id", async (req: any, res) => {
+  app.put("/api/dd/findings/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getFinding(req.params.id);
       if (!existing) {
@@ -6712,7 +6712,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a finding
-  app.delete("/api/dd/findings/:id", async (req: any, res) => {
+  app.delete("/api/dd/findings/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getFinding(req.params.id);
       if (!existing) {
@@ -6747,7 +6747,7 @@ Current context: Project ${req.params.projectId}`;
 
   // CDD Reports Management
   // Get all reports for a project
-  app.get("/api/dd/projects/:projectId/reports", async (req: any, res) => {
+  app.get("/api/dd/projects/:projectId/reports", authenticateUser, async (req: any, res) => {
     try {
       try {
         await authorizeProjectAccess(req.params.projectId, req.user.orgId);
@@ -6779,7 +6779,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Get a single report
-  app.get("/api/dd/reports/:id", async (req: any, res) => {
+  app.get("/api/dd/reports/:id", authenticateUser, async (req: any, res) => {
     try {
       const report = await storage.getCddReport(req.params.id);
       if (!report) {
@@ -6814,7 +6814,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Create a new report
-  app.post("/api/dd/reports", async (req: any, res) => {
+  app.post("/api/dd/reports", authenticateUser, async (req: any, res) => {
     try {
       // Validate request body
       const validatedData = insertCddReportSchema.parse(req.body);
@@ -6855,7 +6855,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Update a report
-  app.put("/api/dd/reports/:id", async (req: any, res) => {
+  app.put("/api/dd/reports/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getCddReport(req.params.id);
       if (!existing) {
@@ -6903,7 +6903,7 @@ Current context: Project ${req.params.projectId}`;
   });
 
   // Delete a report
-  app.delete("/api/dd/reports/:id", async (req: any, res) => {
+  app.delete("/api/dd/reports/:id", authenticateUser, async (req: any, res) => {
     try {
       const existing = await storage.getCddReport(req.params.id);
       if (!existing) {

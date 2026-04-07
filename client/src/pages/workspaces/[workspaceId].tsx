@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -836,7 +837,7 @@ export default function WorkspaceDetailPage() {
           {agreementInfo?.agreement?.bodyHtml && (
             <div
               className="border rounded-lg p-4 my-4 max-h-[400px] overflow-y-auto text-sm"
-              dangerouslySetInnerHTML={{ __html: agreementInfo.agreement.bodyHtml }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(agreementInfo.agreement.bodyHtml) }}
             />
           )}
           <DialogFooter>

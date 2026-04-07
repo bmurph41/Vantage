@@ -4,6 +4,7 @@
  */
 
 import * as React from 'react';
+import DOMPurify from 'dompurify';
 import { cn, formatCurrency, formatPercent, formatNumber, formatDate } from '@/lib/utils';
 import {
   TrendingUp,
@@ -510,7 +511,7 @@ export function TextBlock({ content, variant = 'body', className }: TextBlockPro
   return (
     <div
       className={cn(variantStyles[variant], 'prose prose-sm max-w-none', className)}
-      dangerouslySetInnerHTML={{ __html: content }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
     />
   );
 }

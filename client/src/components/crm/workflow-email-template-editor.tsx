@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import DOMPurify from "dompurify";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
@@ -287,7 +288,7 @@ export default function WorkflowEmailTemplateEditor({ templateId, onSave, onClos
                 <span className="text-sm font-medium">Preview — Subject: {previewSubject}</span>
                 <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>Close</Button>
               </div>
-              <div className="p-4 max-h-64 overflow-auto" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+              <div className="p-4 max-h-64 overflow-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }} />
             </div>
           )}
 

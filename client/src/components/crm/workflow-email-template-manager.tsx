@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -204,7 +205,7 @@ export default function WorkflowEmailTemplateManager() {
               <span className="font-medium">Email Preview</span>
               <Button variant="ghost" size="sm" onClick={() => setPreviewHtml(null)}>Close</Button>
             </div>
-            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }} />
           </div>
         </div>
       )}

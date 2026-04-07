@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -144,7 +145,7 @@ export default function WorkflowEmailLog() {
                     {log.bodyPreview && (
                       <div>
                         <span className="text-xs font-medium text-gray-600">Body Preview:</span>
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-3" dangerouslySetInnerHTML={{ __html: log.bodyPreview }} />
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-3" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(log.bodyPreview) }} />
                       </div>
                     )}
                     {log.errorMessage && (
