@@ -482,6 +482,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register auth routes (no authentication required for login/register)
   app.use("/api/auth", authRoutes);
+
+  // Public subscription tiers endpoint (no auth needed — used by pricing page and paywall)
+  app.get("/api/subscription/tiers", async (_req: any, res) => {
+    const { SUBSCRIPTION_TIERS } = await import("./services/pack-service");
+    res.json(SUBSCRIPTION_TIERS);
+  });
   app.use("/api/dd", authenticateUser, enforceTenant);
   app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"));
   app.use("/api/crm", playbookRoutes);
@@ -1055,12 +1061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Organization Packs endpoints
-  // ── Subscription Tiers ──────────────────────────────────────
-  app.get("/api/subscription/tiers", async (_req: any, res) => {
-    const { SUBSCRIPTION_TIERS } = await import("./services/pack-service");
-    res.json(SUBSCRIPTION_TIERS);
-  });
-
+  // ── Subscription Tiers (authenticated endpoints) ──────────────────
   app.get("/api/subscription/current-tier", authenticateUser, async (req: any, res) => {
     try {
       const { detectTierFromPacks } = await import("./services/pack-service");
