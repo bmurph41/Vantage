@@ -40,10 +40,10 @@ const QUICK_START_STEPS: QuickStartStep[] = [
   {
     id: "create-deal",
     title: "Create Your First Deal",
-    description: "Add a marina acquisition to start tracking in CRM and modeling tools",
+    description: "Start analyzing a marina acquisition with financial modeling tools",
     icon: Briefcase,
-    href: "/crm",
-    tourId: "crm-deals",
+    href: "/modeling/projects",
+    tourId: "modeling-projects",
     category: "essential",
   },
   {

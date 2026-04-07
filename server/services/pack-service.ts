@@ -204,6 +204,142 @@ const PACK_INFO: Record<PackType, { name: string; description: string; features:
   },
 };
 
+// ═══════════════════════════════════════════════════════════════
+// SUBSCRIPTION TIERS — bundles of packs sold as named plans
+// ═══════════════════════════════════════════════════════════════
+
+export interface TierDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  monthlyPriceCents: number;
+  yearlyPriceCents: number;
+  packs: PackType[];
+  features: string[];
+  popular?: boolean;
+  recommended?: boolean;
+}
+
+export const SUBSCRIPTION_TIERS: TierDefinition[] = [
+  {
+    id: "tier_starter",
+    name: "Starter",
+    slug: "starter",
+    description: "Explore the platform with market news, sample analytics, and limited deal tracking.",
+    monthlyPriceCents: 0,
+    yearlyPriceCents: 0,
+    packs: [], // No packs — base features only (dashboard, docket, limited analysis preview)
+    features: [
+      "Dashboard overview",
+      "The Docket — industry news & alerts",
+      "MarinaMatch marketplace (browse)",
+      "3 sample sales comps",
+      "Demographics preview",
+      "1 deal workspace (view only)",
+    ],
+  },
+  {
+    id: "tier_investor",
+    name: "Investor",
+    slug: "investor",
+    description: "Full analysis and modeling tools for evaluating marina acquisitions.",
+    monthlyPriceCents: 9900,
+    yearlyPriceCents: 99000,
+    packs: ["modeling_tools", "analysis", "investor"],
+    features: [
+      "Everything in Starter",
+      "Unlimited deal workspaces",
+      "Financial modeling (Pro Forma, DCF, Monte Carlo)",
+      "Exit Strategy Suite",
+      "Sales & Rate Comps (full access)",
+      "Demographics & Capital Markets data",
+      "Secure Data Room",
+    ],
+  },
+  {
+    id: "tier_broker",
+    name: "Broker",
+    slug: "broker",
+    description: "Complete deal management toolkit for brokers and advisors.",
+    monthlyPriceCents: 19900,
+    yearlyPriceCents: 199000,
+    popular: true,
+    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "investor", "broker"],
+    features: [
+      "Everything in Investor",
+      "Full CRM (contacts, companies, properties)",
+      "Deal Pipeline & Kanban board",
+      "Tasks, Follow-ups & Forecasting",
+      "Prospecting & Marketing tools",
+      "OM Builder & Investment Materials",
+      "Debt Scenarios modeling",
+    ],
+  },
+  {
+    id: "tier_owner_operator",
+    name: "Owner / Operator",
+    slug: "owner-operator",
+    description: "End-to-end marina management — deals, operations, and financials.",
+    monthlyPriceCents: 24900,
+    yearlyPriceCents: 249000,
+    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "operations", "investor", "broker", "owner"],
+    features: [
+      "Everything in Broker",
+      "Full Operations suite (Dockit, Fuel, Ship Store, Service)",
+      "Rent Roll management",
+      "Bookkeeping & Payroll",
+      "Commercial Tenants",
+      "Portfolio Analytics",
+    ],
+  },
+  {
+    id: "tier_institutional",
+    name: "Institutional",
+    slug: "institutional",
+    description: "Enterprise-grade platform for PE firms and institutional investors.",
+    monthlyPriceCents: 49900,
+    yearlyPriceCents: 499000,
+    recommended: true,
+    packs: ["modeling_tools", "analysis", "crm_pipeline", "prospecting", "operations", "fund_management", "lp_portal", "analytics_pro", "investor", "broker", "owner"],
+    features: [
+      "Everything in Owner / Operator",
+      "Fund Management (capital calls, distributions, NAV)",
+      "LP Portal with investor statements",
+      "Analytics Pro (predictive, benchmarking)",
+      "API access",
+      "Priority support",
+    ],
+  },
+];
+
+/**
+ * Given a set of active packs, determine which tier the user is on
+ */
+export function detectTierFromPacks(activePacks: PackType[]): TierDefinition {
+  // Walk tiers from highest to lowest, return the first that matches
+  for (let i = SUBSCRIPTION_TIERS.length - 1; i >= 0; i--) {
+    const tier = SUBSCRIPTION_TIERS[i];
+    if (tier.packs.length === 0) continue; // skip free tier
+    if (tier.packs.every(p => activePacks.includes(p))) {
+      return tier;
+    }
+  }
+  return SUBSCRIPTION_TIERS[0]; // Starter
+}
+
+/**
+ * Given a locked pack, recommend the minimum tier that unlocks it
+ */
+export function getMinimumTierForPack(packType: PackType): TierDefinition {
+  for (const tier of SUBSCRIPTION_TIERS) {
+    if (tier.packs.includes(packType)) {
+      return tier;
+    }
+  }
+  return SUBSCRIPTION_TIERS[SUBSCRIPTION_TIERS.length - 1]; // Institutional fallback
+}
+
 class PackService {
   async getOrganizationPacks(orgId: string): Promise<OrganizationPack[]> {
     return db

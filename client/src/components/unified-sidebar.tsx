@@ -17,6 +17,8 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { SimplifiedModeToggle } from "@/components/SimplifiedModeToggle";
 import { useDisplayMode } from "@/stores/display-mode-store";
 import { PaywallModal } from "@/components/PaywallModal";
+import { SupportContactModal } from "@/components/support/SupportContactModal";
+import { HeadphonesIcon } from "lucide-react";
 
 // CRM Navigation (Core Entity Management only)
 const crmNav = [
@@ -224,6 +226,7 @@ export default function UnifiedSidebar() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallPackType, setPaywallPackType] = useState<PackType>('crm_pipeline');
   const [paywallFeatureName, setPaywallFeatureName] = useState<string>('');
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const showPaywall = (packType: PackType, featureName: string) => {
     setPaywallPackType(packType);
@@ -1085,23 +1088,48 @@ export default function UnifiedSidebar() {
           )}
         </div>
         
-        {/* Market Intelligence Section */}
+        {/* Market Intelligence Section — always visible (free users see preview items) */}
         {canViewSection('market_intelligence') && (
           <div className="mb-2">
             <SectionHeader
               title="Market Intelligence"
               icon={BarChart3}
-              expanded={marketIntelExpanded && hasPack('analysis')}
+              expanded={marketIntelExpanded}
               onToggle={() => setMarketIntelExpanded(!marketIntelExpanded)}
               isActive={location.startsWith('/analysis/')}
-              locked={!hasPack('analysis')}
-              onLockedClick={() => showPaywall('analytics_pro', 'Market Intelligence')}
             />
-            {marketIntelExpanded && hasPack('analysis') && (
+            {marketIntelExpanded && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
-                {marketIntelligenceNav.map((item) => (
-                  <NavLink key={item.name} item={item} />
-                ))}
+                {hasPack('analysis') ? (
+                  // Full access — show all items
+                  marketIntelligenceNav.map((item) => (
+                    <NavLink key={item.name} item={item} />
+                  ))
+                ) : (
+                  // Free tier — show preview items + locked items
+                  <>
+                    <NavLink item={{ name: "Analysis Hub", href: "/analysis/hub" }} />
+                    <NavLink item={{ name: "Sales Comps", href: "/analysis/sales-comps", badge: "Preview" }} />
+                    <NavLink item={{ name: "Demographics", href: "/analysis/demographics", badge: "Preview" }} />
+                    {/* Locked items show paywall on click */}
+                    {[
+                      { name: "Rate Comps" },
+                      { name: "Financial Analysis" },
+                      { name: "Capital Markets" },
+                      { name: "Portfolio Analytics" },
+                      { name: "Predictive Analytics" },
+                    ].map((item) => (
+                      <button
+                        key={item.name}
+                        onClick={() => showPaywall('analysis', 'Market Intelligence')}
+                        className="flex items-center w-full px-4 py-[7px] text-[12px] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 transition-colors"
+                      >
+                        <Lock className="w-3 h-3 mr-2 text-amber-500/70" />
+                        <span>{item.name}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1223,7 +1251,29 @@ export default function UnifiedSidebar() {
               <a href="/terms" target="_blank" className="hover:text-foreground transition-colors">Terms</a>
               <a href="/privacy" target="_blank" className="hover:text-foreground transition-colors">Privacy</a>
               <a href="/benchmarking" target="_blank" className="hover:text-foreground transition-colors">Benchmarking</a>
+              <button
+                onClick={() => setSupportOpen(true)}
+                className="ml-auto flex items-center gap-1 hover:text-foreground transition-colors"
+              >
+                <HeadphonesIcon className="w-3 h-3" />
+                Help
+              </button>
             </div>
+          )}
+          {sidebarCollapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSupportOpen(true)}
+                  className="flex items-center justify-center py-2.5 px-2 w-full hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
+                >
+                  <HeadphonesIcon className="w-4 h-4 text-sidebar-foreground/50" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                <p>Help & Support</p>
+              </TooltipContent>
+            </Tooltip>
           )}
           <div className={cn(
             "border-t border-sidebar-border bg-sidebar flex-shrink-0 safe-area-bottom",
@@ -1254,6 +1304,14 @@ export default function UnifiedSidebar() {
             }}
           />
         )}
+
+        {/* Support Contact Modal */}
+        <SupportContactModal
+          open={supportOpen}
+          onOpenChange={setSupportOpen}
+          userName={user?.name || user?.email?.split('@')[0] || ''}
+          userEmail={user?.email || ''}
+        />
 
         {/* Paywall Modal — triggered when clicking locked sidebar sections */}
         <PaywallModal

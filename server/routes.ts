@@ -41,6 +41,7 @@ import { crmRelationshipIntelligenceRouter } from "./routes/crm-relationship-int
 import { reportingQuickWinsRouter } from "./routes/reporting-quickwins-routes";
 import { crmPipelineEnhancementsRouter } from "./routes/crm-pipeline-enhancements-routes";
 import { billingRouter } from "./routes/billing-routes";
+import { supportRouter } from "./routes/support-routes";
 import { infrastructureRouter } from "./routes/infrastructure-routes";
 import { fundManagementRouter } from "./routes/fund-management-routes";
 import { tenantConstructionRouter } from "./routes/tenant-construction-routes";
@@ -510,6 +511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     authenticateUser(req, res, next);
   }, billingRouter);
+
+  app.use("/api/support", authenticateUser, supportRouter);
 
   // ── Gap Spec (Volume 2) Feature Modules ────────────────────────────
   // A.2-A.5: RBAC, Audit Trail, SSO, 2FA
@@ -1052,6 +1055,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Organization Packs endpoints
+  // ── Subscription Tiers ──────────────────────────────────────
+  app.get("/api/subscription/tiers", async (_req: any, res) => {
+    const { SUBSCRIPTION_TIERS } = await import("./services/pack-service");
+    res.json(SUBSCRIPTION_TIERS);
+  });
+
+  app.get("/api/subscription/current-tier", authenticateUser, async (req: any, res) => {
+    try {
+      const { detectTierFromPacks } = await import("./services/pack-service");
+      const activePacks = await packService.getActivePacks(req.user.orgId);
+      const tier = detectTierFromPacks(activePacks);
+      res.json({ tier, activePacks });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/subscription/subscribe-tier", authenticateUser, async (req: any, res) => {
+    try {
+      const { SUBSCRIPTION_TIERS } = await import("./services/pack-service");
+      const { tierSlug, isTrial } = req.body;
+      const orgId = req.user.orgId;
+      const userId = req.user.id;
+
+      const tier = SUBSCRIPTION_TIERS.find((t: any) => t.slug === tierSlug);
+      if (!tier) return res.status(400).json({ error: `Unknown tier: ${tierSlug}` });
+
+      // Activate all packs in this tier
+      const results = [];
+      for (const packType of tier.packs) {
+        try {
+          const result = await packService.activatePack(orgId, packType as any, userId, {
+            isTrial: isTrial || false,
+            trialDays: isTrial ? 14 : undefined,
+            notes: `Activated via ${tier.name} tier subscription`,
+          });
+          results.push({ packType, status: "activated" });
+        } catch (e: any) {
+          results.push({ packType, status: "error", message: e.message });
+        }
+      }
+
+      res.json({ tier: tier.slug, tierName: tier.name, activatedPacks: results });
+    } catch (error: any) {
+      console.error("Subscribe-tier error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/organization/packs", authenticateUser, async (req: any, res) => {
     try {
       const packsWithStatus = await packService.getAllPacksWithStatus(req.user.orgId);

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +16,10 @@ import {
   Loader2,
   Bug,
   Lightbulb,
+  HeadphonesIcon,
 } from 'lucide-react';
 import type { UserSettings, UserProfile, Organization } from '@/types/settings';
+import { SupportContactModal } from '@/components/support/SupportContactModal';
 
 interface HelpAboutSettingsProps {
   settings: UserSettings;
@@ -42,6 +45,15 @@ export function HelpAboutSettings({
   organization,
 }: HelpAboutSettingsProps) {
   const { data: appInfo, isLoading } = useAppInfo();
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportCategory, setSupportCategory] = useState<'bug' | 'feature' | 'quickbooks' | 'billing' | 'general'>('general');
+  const [supportSubject, setSupportSubject] = useState('');
+
+  function openSupport(category: typeof supportCategory, subject = '') {
+    setSupportCategory(category);
+    setSupportSubject(subject);
+    setSupportOpen(true);
+  }
 
   return (
     <div className="space-y-6">
@@ -52,7 +64,7 @@ export function HelpAboutSettings({
             <HelpCircle className="h-5 w-5" />
             Get Help
           </CardTitle>
-          <CardDescription>Resources to help you get the most out of MarinaMatch</CardDescription>
+          <CardDescription>Resources to help you get the most out of Vantage</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
           <a
@@ -69,29 +81,29 @@ export function HelpAboutSettings({
             <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
           </a>
 
-          <a
-            href={`mailto:${appInfo?.supportEmail || 'support@marinamatch.com'}`}
-            className="flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors"
+          <button
+            onClick={() => openSupport('general')}
+            className="flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left w-full"
           >
             <Mail className="h-5 w-5 text-primary" />
             <div>
               <h4 className="font-medium text-sm">Email Support</h4>
               <p className="text-xs text-muted-foreground">{appInfo?.supportEmail || 'support@marinamatch.com'}</p>
             </div>
-            <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
-          </a>
+            <HeadphonesIcon className="h-4 w-4 ml-auto text-muted-foreground" />
+          </button>
 
-          <a
-            href="mailto:support@marinamatch.com?subject=Live%20Chat%20Support%20Request"
-            className="flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors"
+          <button
+            onClick={() => openSupport('general', 'Live Chat Request')}
+            className="flex items-center gap-3 p-4 rounded-lg border hover:bg-muted transition-colors text-left w-full"
           >
             <MessageCircle className="h-5 w-5 text-primary" />
             <div>
-              <h4 className="font-medium text-sm">Live Chat</h4>
-              <p className="text-xs text-muted-foreground">Chat with our team</p>
+              <h4 className="font-medium text-sm">Contact Support</h4>
+              <p className="text-xs text-muted-foreground">Send a message to our team</p>
             </div>
-            <ExternalLink className="h-4 w-4 ml-auto text-muted-foreground" />
-          </a>
+            <HeadphonesIcon className="h-4 w-4 ml-auto text-muted-foreground" />
+          </button>
 
           <a
             href={appInfo?.changelogUrl || '#'}
@@ -116,7 +128,7 @@ export function HelpAboutSettings({
             <Lightbulb className="h-5 w-5" />
             Feedback
           </CardTitle>
-          <CardDescription>Help us improve MarinaMatch</CardDescription>
+          <CardDescription>Help us improve Vantage</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between p-4 rounded-lg border">
@@ -129,7 +141,7 @@ export function HelpAboutSettings({
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => openSupport('feature', 'Feature Request')}>
               Submit Idea
             </Button>
           </div>
@@ -144,7 +156,7 @@ export function HelpAboutSettings({
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => openSupport('bug', 'Bug Report')}>
               Report Bug
             </Button>
           </div>
@@ -191,7 +203,7 @@ export function HelpAboutSettings({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Code className="h-5 w-5" />
-            About MarinaMatch
+            About Vantage
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -232,6 +244,15 @@ export function HelpAboutSettings({
           )}
         </CardContent>
       </Card>
+
+      <SupportContactModal
+        open={supportOpen}
+        onOpenChange={setSupportOpen}
+        defaultCategory={supportCategory}
+        defaultSubject={supportSubject}
+        userName={profile?.name || ''}
+        userEmail={profile?.email || ''}
+      />
     </div>
   );
 }

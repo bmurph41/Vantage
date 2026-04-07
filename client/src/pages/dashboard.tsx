@@ -1772,9 +1772,9 @@ export default function Dashboard() {
         description={`${recentDeals?.length || 0} active deals in your pipeline`}
         icon={DollarSign}
         sourceLink={`/crm/deals?timeRange=${timeRange}&status=open`}
-        sourceLinkText="Go to CRM"
+        sourceLinkText="Go to Deals"
         actions={
-          <Link href="/crm/deals/new">
+          <Link href="/modeling/projects">
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Create Deal

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
-import { Loader2, Lock, Sparkles, CreditCard } from 'lucide-react';
+import { Loader2, Lock, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaywallModal, getPackDisplayName } from '@/components/PaywallModal';
 
@@ -128,15 +128,7 @@ export function PackGate({ pack, children, upgradeMessage, showUpgradePrompt = t
 
   const missingPacks = packArray.filter(p => !hasPack(p));
   const firstMissingPack = missingPacks[0];
-  const packInfo = packsWithStatus.find(ps => ps.packType === firstMissingPack);
-  const packNames = missingPacks.map(p => {
-    const info = packsWithStatus.find(ps => ps.packType === p);
-    return getPackDisplayName(p, info?.info.name);
-  }).join(', ');
-
-  const price = packInfo?.info.monthlyPriceCents
-    ? `$${(packInfo.info.monthlyPriceCents / 100).toFixed(0)}/mo`
-    : null;
+  const tierName = getPackDisplayName(firstMissingPack);
 
   return (
     <div className="flex items-center justify-center min-h-[400px] p-8">
@@ -146,32 +138,16 @@ export function PackGate({ pack, children, upgradeMessage, showUpgradePrompt = t
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold">Unlock {packNames}</h2>
+          <h2 className="text-2xl font-bold">Upgrade to {tierName}</h2>
           <p className="text-muted-foreground">
-            {upgradeMessage || packInfo?.info.description || `This feature requires the ${packNames} pack to access.`}
+            {upgradeMessage || `This section is available on the ${tierName} plan and above.`}
           </p>
         </div>
 
-        {packInfo?.info.features && (
-          <ul className="text-left space-y-2 bg-muted/50 rounded-lg p-4">
-            {packInfo.info.features.slice(0, 4).map((feature, idx) => (
-              <li key={idx} className="flex items-center gap-2 text-sm">
-                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-        )}
-
         <div className="space-y-3">
-          {price && (
-            <p className="text-sm text-muted-foreground">
-              Starting at <span className="font-semibold text-foreground">{price}</span>
-            </p>
-          )}
           <Button size="lg" className="w-full" onClick={() => setPaywallOpen(true)}>
             <CreditCard className="mr-2 h-4 w-4" />
-            Upgrade Now
+            View {tierName} Plan
           </Button>
           <p className="text-xs text-muted-foreground">
             14-day free trial available
@@ -179,12 +155,11 @@ export function PackGate({ pack, children, upgradeMessage, showUpgradePrompt = t
         </div>
       </div>
 
-      {/* Inline Paywall Modal with CC payment */}
       <PaywallModal
         open={paywallOpen}
         onOpenChange={setPaywallOpen}
         packType={firstMissingPack}
-        featureName={packNames}
+        featureName={tierName}
       />
     </div>
   );

@@ -6,48 +6,93 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, Sparkles, Building, Calculator, ChartLine, Anchor, Briefcase, Users, Target, BarChart3, Lock, CreditCard, ArrowLeft, Shield } from "lucide-react";
+import { Loader2, Check, Sparkles, Lock, CreditCard, ArrowLeft, Shield, TrendingUp, Handshake, Anchor, Building2, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useStripeStatus } from "@/hooks/useStripeStatus";
 import { formatCurrency } from "@/lib/utils";
 import { ProvisioningAnimation } from "@/components/subscription/ProvisioningAnimation";
 
-type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
-type AddonPackType = 'fund_management' | 'lp_portal' | 'prospecting' | 'analytics_pro';
-type PackType = CorePackType | AddonPackType;
+// ═══════════════════════════════════════════════════════════════
+// TIER DEFINITIONS (mirrors server-side SUBSCRIPTION_TIERS)
+// ═══════════════════════════════════════════════════════════════
 
-interface PackInfo {
+interface TierDef {
+  slug: string;
   name: string;
   description: string;
+  monthlyPriceCents: number;
+  icon: typeof TrendingUp;
+  packs: string[];
   features: string[];
-  isCore?: boolean;
-  monthlyPriceCents?: number;
+  popular?: boolean;
+  recommended?: boolean;
 }
 
-interface PackWithStatus {
-  packType: PackType;
-  info: PackInfo;
-  isActive: boolean;
-  dependencies: PackType[];
-  canActivate: boolean;
+const TIERS: TierDef[] = [
+  {
+    slug: 'starter',
+    name: 'Starter',
+    description: 'Explore the platform with market news and sample analytics.',
+    monthlyPriceCents: 0,
+    icon: Sparkles,
+    packs: [],
+    features: ['Dashboard', 'The Docket', 'Marketplace (browse)', '3 sample comps', 'Demographics preview'],
+  },
+  {
+    slug: 'investor',
+    name: 'Investor',
+    description: 'Full analysis and modeling tools for evaluating acquisitions.',
+    monthlyPriceCents: 9900,
+    icon: TrendingUp,
+    packs: ['modeling_tools', 'analysis', 'investor'],
+    features: ['Unlimited deal workspaces', 'Financial modeling (Pro Forma, DCF, Monte Carlo)', 'Exit Strategy Suite', 'Sales & Rate Comps (full)', 'Demographics & Capital Markets', 'Secure Data Room'],
+  },
+  {
+    slug: 'broker',
+    name: 'Broker',
+    description: 'Complete deal management toolkit for brokers and advisors.',
+    monthlyPriceCents: 19900,
+    icon: Handshake,
+    packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'investor', 'broker'],
+    features: ['Everything in Investor', 'Full CRM & Deal Pipeline', 'Tasks, Follow-ups & Forecasting', 'Prospecting & Marketing', 'OM Builder & Investment Materials'],
+    popular: true,
+  },
+  {
+    slug: 'owner-operator',
+    name: 'Owner / Operator',
+    description: 'End-to-end marina management — deals, operations, and financials.',
+    monthlyPriceCents: 24900,
+    icon: Anchor,
+    packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'operations', 'investor', 'broker', 'owner'],
+    features: ['Everything in Broker', 'Full Operations suite', 'Rent Roll management', 'Bookkeeping & Payroll', 'Portfolio Analytics'],
+  },
+  {
+    slug: 'institutional',
+    name: 'Institutional',
+    description: 'Enterprise-grade platform for PE firms and institutional investors.',
+    monthlyPriceCents: 49900,
+    icon: Crown,
+    packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'operations', 'fund_management', 'lp_portal', 'analytics_pro', 'investor', 'broker', 'owner'],
+    features: ['Everything in Owner / Operator', 'Fund Management', 'LP Portal', 'Analytics Pro', 'API access', 'Priority support'],
+    recommended: true,
+  },
+];
+
+/**
+ * Given a pack type the user needs, return the minimum tier that includes it
+ */
+function getMinimumTierForPack(packType: string): TierDef {
+  for (const tier of TIERS) {
+    if (tier.packs.includes(packType)) return tier;
+  }
+  return TIERS[TIERS.length - 1]; // Institutional fallback
 }
 
-const PACK_ICONS: Record<PackType, typeof Briefcase> = {
-  crm_pipeline: Building,
-  modeling_tools: Calculator,
-  analysis: ChartLine,
-  operations: Anchor,
-  fund_management: Briefcase,
-  lp_portal: Users,
-  prospecting: Target,
-  analytics_pro: BarChart3,
-};
-
+// Re-export for use in PackContext etc.
 export const PACK_DISPLAY_NAMES: Record<string, string> = {
-  crm_pipeline: 'CRM Pipeline',
-  modeling_tools: 'Modeling Tools',
-  analysis: 'Analysis',
+  crm_pipeline: 'CRM & Pipeline',
+  modeling_tools: 'Analysis Tools',
+  analysis: 'Market Intelligence',
   operations: 'Operations',
   fund_management: 'Fund Management',
   lp_portal: 'LP Portal',
@@ -56,9 +101,9 @@ export const PACK_DISPLAY_NAMES: Record<string, string> = {
 };
 
 export function getPackDisplayName(packType: string, dbName?: string | null): string {
-  return PACK_DISPLAY_NAMES[packType]
-    || dbName?.replace(/\b\w/g, c => c.toUpperCase())
-    || packType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  // Return the tier name instead of the raw pack name
+  const tier = getMinimumTierForPack(packType);
+  return tier.name;
 }
 
 function formatPrice(cents: number): string {
@@ -84,14 +129,14 @@ const CARD_ELEMENT_OPTIONS = {
 // INLINE PAYMENT FORM (uses Stripe Elements)
 // ═══════════════════════════════════════════════════════════════
 interface InlinePaymentFormProps {
-  packType: PackType;
-  packName: string;
+  tierSlug: string;
+  tierName: string;
   priceCents: number;
   onSuccess: () => void;
   onBack: () => void;
 }
 
-function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }: InlinePaymentFormProps) {
+function InlinePaymentForm({ tierSlug, tierName, priceCents, onSuccess, onBack }: InlinePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -107,7 +152,6 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
     setCardError(null);
 
     try {
-      // Create payment method from card element
       const cardElement = elements.getElement(CardElement);
       if (!cardElement) throw new Error('Card element not found');
 
@@ -122,9 +166,9 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
         return;
       }
 
-      // Subscribe to pack with payment method
+      // Subscribe to tier (server activates all packs in the tier)
       const res = await apiRequest('POST', '/api/stripe/subscribe-pack', {
-        packType,
+        packType: tierSlug, // The subscribe-pack endpoint handles tier lookup
         paymentMethodId: paymentMethod.id,
         billingCycle: 'monthly',
       });
@@ -132,7 +176,6 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
       const data = await res.json();
 
       if (data.clientSecret && data.status === 'incomplete') {
-        // Confirm payment if needed
         const { error: confirmError } = await stripe.confirmCardPayment(data.clientSecret);
         if (confirmError) {
           setCardError(confirmError.message || 'Payment confirmation failed');
@@ -150,7 +193,6 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Back button */}
       <button
         type="button"
         onClick={onBack}
@@ -160,16 +202,14 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
         Back
       </button>
 
-      {/* Order summary */}
       <div className="bg-muted/50 rounded-lg p-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="font-medium">{packName}</span>
+          <span className="font-medium">{tierName}</span>
           <span className="font-semibold">{formatPrice(priceCents)}/mo</span>
         </div>
         <p className="text-xs text-muted-foreground">Billed monthly. Cancel anytime.</p>
       </div>
 
-      {/* Card input */}
       <div className="space-y-2">
         <label className="text-sm font-medium flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -192,13 +232,11 @@ function InlinePaymentForm({ packType, packName, priceCents, onSuccess, onBack }
         )}
       </div>
 
-      {/* Security badge */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Shield className="h-3.5 w-3.5" />
         <span>Secured by Stripe. Your card info never touches our servers.</span>
       </div>
 
-      {/* Submit */}
       <Button
         type="submit"
         className="w-full"
@@ -227,8 +265,8 @@ type ModalView = 'info' | 'payment' | 'provisioning';
 interface PaywallModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  packType: PackType;
-  featureName?: string;
+  packType: string;       // The pack that triggered the paywall
+  featureName?: string;   // Human-readable name of the locked section
 }
 
 export function PaywallModal({ open, onOpenChange, packType, featureName }: PaywallModalProps) {
@@ -236,6 +274,10 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
   const { toast } = useToast();
   const { isStripeConfigured } = useStripeStatus();
   const [view, setView] = useState<ModalView>('info');
+
+  // Determine the minimum tier needed for this pack
+  const recommendedTier = getMinimumTierForPack(packType);
+  const TierIcon = recommendedTier.icon;
 
   // Fetch publishable key for Stripe Elements
   const { data: stripeKeyData } = useQuery<{ publishableKey: string | null }>({
@@ -247,25 +289,11 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
     ? loadStripe(stripeKeyData.publishableKey)
     : null;
 
-  const { data: packsWithStatus = [] } = useQuery<PackWithStatus[]>({
-    queryKey: ['/api/organization/packs'],
-    enabled: open,
-  });
-
-  const packDetails = packsWithStatus.find(p => p.packType === packType);
-  const Icon = PACK_ICONS[packType] || Briefcase;
-  const price = packDetails?.info.monthlyPriceCents ? formatPrice(packDetails.info.monthlyPriceCents) : null;
-  const priceCents = packDetails?.info.monthlyPriceCents || 0;
-
-  const missingDependencies = packDetails?.dependencies.filter(dep => {
-    const depPack = packsWithStatus.find(p => p.packType === dep);
-    return !depPack?.isActive;
-  }) || [];
-
-  // Trial activation (no Stripe)
-  const activateMutation = useMutation({
-    mutationFn: async ({ packType, isTrial }: { packType: PackType; isTrial?: boolean }) => {
-      await apiRequest('POST', `/api/organization/packs/${packType}/activate`, { isTrial });
+  // Subscribe to tier (activates all packs at once)
+  const subscribeMutation = useMutation({
+    mutationFn: async ({ tierSlug, isTrial }: { tierSlug: string; isTrial?: boolean }) => {
+      const res = await apiRequest('POST', '/api/subscription/subscribe-tier', { tierSlug, isTrial });
+      return res.json();
     },
     onSuccess: () => {
       setView('provisioning');
@@ -273,19 +301,18 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
     onError: (error: any) => {
       toast({
         title: "Activation Failed",
-        description: error.message || "Failed to activate pack.",
+        description: error.message || "Failed to activate subscription.",
         variant: "destructive",
       });
     },
   });
 
+  const handleSubscribe = () => {
+    subscribeMutation.mutate({ tierSlug: recommendedTier.slug });
+  };
+
   const handleStartTrial = () => {
-    if (missingDependencies.length > 0) {
-      setLocation('/settings/packs');
-      onOpenChange(false);
-    } else {
-      activateMutation.mutate({ packType, isTrial: true });
-    }
+    subscribeMutation.mutate({ tierSlug: recommendedTier.slug, isTrial: true });
   };
 
   const handlePaymentSuccess = () => {
@@ -293,28 +320,29 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
   };
 
   const handleProvisioningComplete = useCallback(() => {
-    // Invalidate all relevant queries so the app reflects the new state
     queryClient.invalidateQueries({ queryKey: ['/api/organization/packs'] });
     queryClient.invalidateQueries({ queryKey: ['/api/organization/packs/active'] });
     queryClient.invalidateQueries({ queryKey: ['/api/bootstrap'] });
     queryClient.invalidateQueries({ queryKey: ['/api/billing/subscription'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/subscription/current-tier'] });
 
     toast({
       title: "Welcome aboard!",
-      description: `${getPackDisplayName(packType, packDetails?.info.name)} is now active.`,
+      description: `You're now on the ${recommendedTier.name} plan.`,
     });
     onOpenChange(false);
-    // Reset view for next open
     setTimeout(() => setView('info'), 300);
-  }, [packDetails, packType, toast, onOpenChange]);
+  }, [recommendedTier, toast, onOpenChange]);
 
-  // Reset view when modal opens
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
       setTimeout(() => setView('info'), 300);
     }
     onOpenChange(isOpen);
   };
+
+  const priceCents = recommendedTier.monthlyPriceCents;
+  const priceStr = priceCents > 0 ? formatPrice(priceCents) : 'Free';
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -328,58 +356,54 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
           <>
             <DialogHeader className="text-center">
               <div className="mx-auto mb-4 p-4 rounded-full bg-primary/10">
-                <Icon className="h-8 w-8 text-primary" />
+                <TierIcon className="h-8 w-8 text-primary" />
               </div>
               <DialogTitle className="text-xl" data-testid="text-paywall-title">
-                {featureName ? `Unlock ${featureName}` : `Upgrade to ${getPackDisplayName(packType, packDetails?.info.name)}`}
+                {featureName
+                  ? `Upgrade to unlock ${featureName}`
+                  : `Upgrade to ${recommendedTier.name}`}
               </DialogTitle>
               <DialogDescription data-testid="text-paywall-description">
-                {packDetails?.info.description || 'Access premium features with this pack'}
+                {recommendedTier.description}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              {price && (
+              {/* Price */}
+              {priceCents > 0 && (
                 <div className="text-center">
-                  <span className="text-4xl font-bold">{price}</span>
+                  <span className="text-4xl font-bold">{priceStr}</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
               )}
 
-              {packDetails?.info.features && (
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">What you'll get:</h4>
-                  <ul className="space-y-2">
-                    {packDetails.info.features.slice(0, 5).map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm">
-                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+              {/* Tier badge */}
+              {recommendedTier.popular && (
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    <Sparkles className="h-3 w-3" />
+                    Most Popular
+                  </span>
                 </div>
               )}
 
-              {missingDependencies.length > 0 && (
-                <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
-                  <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-400">
-                    <Lock className="h-4 w-4" />
-                    <span>
-                      Requires{' '}
-                      {missingDependencies.map(d => {
-                        const depPack = packsWithStatus.find(p => p.packType === d);
-                        return getPackDisplayName(d, depPack?.info.name);
-                      }).join(' and ')}{' '}
-                      pack{missingDependencies.length > 1 ? 's' : ''} first
-                    </span>
-                  </div>
-                </div>
-              )}
+              {/* Features */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-muted-foreground">What you'll get:</h4>
+                <ul className="space-y-2">
+                  {recommendedTier.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm">
+                      <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
-              {/* Primary CTA: go to payment if Stripe is ready and no missing deps */}
-              {missingDependencies.length === 0 && isStripeConfigured && stripePromise ? (
+              {/* Primary CTA */}
+              {isStripeConfigured && stripePromise && priceCents > 0 ? (
                 <Button
                   className="w-full"
                   size="lg"
@@ -387,51 +411,40 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
                   data-testid="button-subscribe"
                 >
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Subscribe Now
-                </Button>
-              ) : missingDependencies.length > 0 ? (
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => { setLocation('/settings/packs'); onOpenChange(false); }}
-                  data-testid="button-subscribe"
-                >
-                  View Required Packs
+                  Subscribe to {recommendedTier.name} — {priceStr}/mo
                 </Button>
               ) : (
                 <Button
                   className="w-full"
                   size="lg"
-                  onClick={handleStartTrial}
-                  disabled={activateMutation.isPending}
+                  onClick={handleSubscribe}
+                  disabled={subscribeMutation.isPending}
                   data-testid="button-subscribe"
                 >
-                  {activateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Activate Now
+                  {subscribeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Activate {recommendedTier.name}
                 </Button>
               )}
 
-              {/* Trial option */}
-              {missingDependencies.length === 0 && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleStartTrial}
-                  disabled={activateMutation.isPending}
-                  data-testid="button-trial"
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Start 14-Day Free Trial
-                </Button>
-              )}
+              {/* Trial */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleStartTrial}
+                disabled={subscribeMutation.isPending}
+                data-testid="button-trial"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Start 14-Day Free Trial
+              </Button>
 
+              {/* View all plans */}
               <Button
                 variant="ghost"
-                className="w-full"
-                onClick={() => onOpenChange(false)}
-                data-testid="button-cancel"
+                className="w-full text-xs"
+                onClick={() => { setLocation('/pricing'); onOpenChange(false); }}
               >
-                Maybe Later
+                Compare all plans
               </Button>
             </div>
           </>
@@ -441,8 +454,8 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
         {view === 'payment' && stripePromise && (
           <Elements stripe={stripePromise}>
             <InlinePaymentForm
-              packType={packType}
-              packName={getPackDisplayName(packType, packDetails?.info.name)}
+              tierSlug={recommendedTier.slug}
+              tierName={recommendedTier.name}
               priceCents={priceCents}
               onSuccess={handlePaymentSuccess}
               onBack={() => setView('info')}
@@ -453,7 +466,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
         {/* ── PROVISIONING VIEW ── */}
         {view === 'provisioning' && (
           <ProvisioningAnimation
-            packName={getPackDisplayName(packType, packDetails?.info.name)}
+            packName={recommendedTier.name}
             onComplete={handleProvisioningComplete}
           />
         )}
@@ -463,11 +476,11 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
 }
 
 // ═══════════════════════════════════════════════════════════════
-// usePaywall HOOK (convenience)
+// usePaywall HOOK
 // ═══════════════════════════════════════════════════════════════
 
 interface UsePaywallOptions {
-  packType: PackType;
+  packType: string;
   featureName?: string;
 }
 
