@@ -245,6 +245,7 @@ export default function ContactRecordPage() {
     : null;
 
   return (
+    <>
     <CrmRecordPage
       entityType="contact"
       entityId={id}
@@ -343,13 +344,16 @@ export default function ContactRecordPage() {
         <ContactAssociationsSidebar contact={contact} onNavigate={setLocation} />
       )}
     />
-    <ComposeEmailModal
-      open={isEmailComposeOpen}
-      onOpenChange={setIsEmailComposeOpen}
-      defaultTo={contact?.email || ""}
-      contactId={id}
-      contactName={contact ? `${contact.firstName} ${contact.lastName}`.trim() : undefined}
-    />
+    {isEmailComposeOpen && (
+      <ComposeEmailModal
+        open={isEmailComposeOpen}
+        onOpenChange={setIsEmailComposeOpen}
+        defaultTo={contact?.email || ""}
+        contactId={id}
+        contactName={contact ? `${contact.firstName} ${contact.lastName}`.trim() : undefined}
+      />
+    )}
+    </>
   );
 }
 
