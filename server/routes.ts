@@ -434,15 +434,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Use originalUrl since req.path is relative to the mount point
     if (!req.originalUrl.startsWith('/api/')){return next();}
     try {
-      // Check for session token in cookie
+      // resolvedUser will hold the normalized { id, orgId, role, email, name } shape
+      let resolvedUser: { id: string; orgId: string; role: string; email: string; name: string } | null = null;
+
+      // 1. Enterprise email/password auth — sessionToken cookie
       const sessionToken = req.cookies?.sessionToken;
-      
       if (sessionToken) {
-        // Validate session using enterprise auth service
         const sessionData = await enterpriseAuthService.validateSession(sessionToken);
-        
         if (sessionData) {
-          req.user = {
+          resolvedUser = {
             id: sessionData.user.id,
             orgId: sessionData.user.orgId,
             role: sessionData.user.role,
@@ -451,15 +451,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
       }
-      
-      // Fall back to demo user in development if no session (requires explicit opt-in)
-      if (!req.user && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
-        req.user = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "demo@localhost", name: "Demo User" };
+
+      // 2. Replit OAuth session (passport.js) — req.user set by passport before this middleware
+      if (!resolvedUser && req.isAuthenticated && req.isAuthenticated()) {
+        const passportUser = req.user as any;
+        const replitClaims = passportUser?.claims || {};
+        const replitUserId = replitClaims.sub;
+        if (replitUserId) {
+          const [dbUser] = await db.select().from(users).where(eq(users.id, replitUserId)).limit(1);
+          if (dbUser) {
+            resolvedUser = {
+              id: dbUser.id,
+              orgId: dbUser.orgId,
+              role: dbUser.role || 'viewer',
+              email: dbUser.email || replitClaims.email || '',
+              name: dbUser.name || replitClaims.first_name || '',
+            };
+          }
+        }
       }
       
-      if (!req.user) {
+      // 3. Demo user fallback in development (requires explicit opt-in)
+      if (!resolvedUser && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
+        resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "demo@localhost", name: "Demo User" };
+      }
+      
+      if (!resolvedUser) {
         return res.status(401).json({ error: 'Authentication required' });
       }
+
+      // Overwrite req.user with normalized shape for downstream handlers
+      req.user = resolvedUser;
       
       // Set tenant context for RLS
       if (req.user?.orgId) {
