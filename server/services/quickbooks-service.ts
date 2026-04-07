@@ -134,6 +134,13 @@ export class QuickBooksService {
     return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
   }
 
+  private captureIntuitTid(response: any, operationName: string): void {
+    const tid = response?.headers?.['intuit_tid'] || response?.headers?.['intuit-tid'];
+    if (tid) {
+      console.info(`[QuickBooks] intuit_tid for ${operationName}: ${tid}`);
+    }
+  }
+
   createError(code: QuickBooksError['code'], message: string, retryable: boolean = false, originalError?: any): QuickBooksError {
     return { code, message, retryable, originalError };
   }
@@ -200,6 +207,7 @@ export class QuickBooksService {
       }
     );
 
+    this.captureIntuitTid(response, 'exchangeAuthCode');
     const { access_token, refresh_token, expires_in } = response.data;
     const expiresAt = new Date(Date.now() + expires_in * 1000);
 
@@ -274,6 +282,7 @@ export class QuickBooksService {
         ),
         'Token refresh'
       );
+      this.captureIntuitTid(response, 'refreshTokens');
 
       const { access_token, refresh_token, expires_in } = response.data;
       const expiresAt = new Date(Date.now() + expires_in * 1000);
@@ -430,6 +439,7 @@ export class QuickBooksService {
         }
       }
     );
+    this.captureIntuitTid(response, 'getCompanyInfo');
 
     return response.data.CompanyInfo;
   }
@@ -455,6 +465,7 @@ export class QuickBooksService {
         }
       }
     );
+    this.captureIntuitTid(response, 'getChartOfAccounts');
 
     return response.data.QueryResponse?.Account || [];
   }
@@ -479,6 +490,7 @@ export class QuickBooksService {
         }
       }
     );
+    this.captureIntuitTid(response, 'getProfitAndLoss');
 
     return this.parseProfitAndLossReport(response.data, startDate, endDate);
   }
