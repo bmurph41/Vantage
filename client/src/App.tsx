@@ -5,7 +5,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Loader2 } from "lucide-react";
+import { Loader2, Anchor } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -580,11 +580,20 @@ function Router() {
       </Route>
       <Route path="/pricing">
         {() => (
-          <UnifiedLayout>
-            <EntitlementsProvider>
+          <EntitlementsProvider>
+            <div className="min-h-screen bg-background">
+              <div className="border-b bg-card px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-lg">
+                  <Anchor className="h-5 w-5 text-primary" />
+                  MarinaMatch
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+                  ← Back
+                </Button>
+              </div>
               <SubscriptionPage />
-            </EntitlementsProvider>
-          </UnifiedLayout>
+            </div>
+          </EntitlementsProvider>
         )}
       </Route>
       <Route path="/settings/integrations">
