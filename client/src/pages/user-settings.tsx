@@ -1607,7 +1607,7 @@ export default function UserSettingsPage() {
       {/* Body: sidebar + content */}
       <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
+        <aside className="hidden md:block w-64 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
           {/* User avatar area */}
           <div className="p-5 border-b border-border">
             <div className="flex items-center gap-3">
@@ -1655,8 +1655,20 @@ export default function UserSettingsPage() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
+          {/* Mobile section selector */}
+          <div className="md:hidden px-4 pt-3 pb-1">
+            <select
+              value={activeSection}
+              onChange={(e) => setActiveSection(e.target.value as SectionId)}
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium"
+            >
+              {SIDEBAR_SECTIONS.map((section) => (
+                <option key={section.id} value={section.id}>{section.label}</option>
+              ))}
+            </select>
+          </div>
           <ScrollArea className="h-full">
-            <div className="max-w-3xl mx-auto p-6">
+            <div className="max-w-3xl mx-auto p-4 md:p-6">
               <div className="mb-6">
                 <h2 className="text-lg font-semibold text-foreground">
                   {SIDEBAR_SECTIONS.find((s) => s.id === activeSection)?.label}
