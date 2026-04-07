@@ -944,28 +944,42 @@ export default function UnifiedSidebar() {
             <SectionHeader
               title="Analysis"
               icon={Calculator}
-              expanded={analysisExpanded && hasPack('modeling_tools')}
+              expanded={analysisExpanded}
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
               isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
-              locked={!hasPack('modeling_tools')}
-              onLockedClick={() => showPaywall('modeling_tools', 'Analysis Tools')}
             />
-            {analysisExpanded && hasPack('modeling_tools') && (
+            {analysisExpanded && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
-                {analysisNav
-                  .filter((item) => {
-                    if (!simplifiedMode) return true;
-                    const hiddenInSimplifiedMode = [
-                      "/modeling/scenarios",
-                      "/modeling/returns-valuation",
-                      "/modeling/portfolio/returns",
-                      "/modeling/exit-strategies",
-                    ];
-                    return !hiddenInSimplifiedMode.includes(item.href);
-                  })
-                  .map((item) => (
-                    <NavLink key={item.name} item={item} />
-                  ))}
+                {hasPack('modeling_tools') ? (
+                  analysisNav
+                    .filter((item) => {
+                      if (!simplifiedMode) return true;
+                      const hiddenInSimplifiedMode = [
+                        "/modeling/scenarios",
+                        "/modeling/returns-valuation",
+                        "/modeling/portfolio/returns",
+                        "/modeling/exit-strategies",
+                      ];
+                      return !hiddenInSimplifiedMode.includes(item.href);
+                    })
+                    .map((item) => (
+                      <NavLink key={item.name} item={item} />
+                    ))
+                ) : (
+                  <>
+                    <NavLink item={{ name: "Financial Model", href: "/modeling/projects", badge: "Preview" }} />
+                    {["Pipeline Returns", "Debt Scenarios", "Exit Strategies", "Model Settings"].map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => showPaywall('modeling_tools', 'Analysis Tools')}
+                        className="flex items-center w-full px-4 py-[7px] text-[12px] text-sidebar-foreground/40 hover:bg-sidebar-accent/50 transition-colors"
+                      >
+                        <Lock className="w-3 h-3 mr-2 text-amber-500/70" />
+                        <span>{name}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
