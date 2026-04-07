@@ -26,6 +26,7 @@ export const ASSET_CLASSES = [
   { value: 'land',         label: 'Land / Dev Site',   icon: 'Mountain',  color: '#84cc16' },
   { value: 'self_storage', label: 'Self Storage',      icon: 'Warehouse', color: '#f97316' },
   { value: 'mobile_home',  label: 'Mobile Home Park',  icon: 'Home',      color: '#a855f7' },
+  { value: 'business',     label: 'Business Acquisition', icon: 'Briefcase', color: '#10b981' },
   { value: 'other',        label: 'Other',             icon: 'Boxes',     color: '#94a3b8' },
 ] as const;
 
@@ -78,6 +79,18 @@ export const PIPELINE_STAGE_TEMPLATES: Record<AssetClassValue, PipelineStageTemp
   land:         SHARED_STAGES,
   self_storage: SHARED_STAGES,
   mobile_home:  SHARED_STAGES,
+  business: [
+    { name: 'Prospect',          color: '#6366f1', probability: 5,  rotDays: 14 },
+    { name: 'NDA / Intro',       color: '#8b5cf6', probability: 15, rotDays: 14 },
+    { name: 'Financials Review',  color: '#0ea5e9', probability: 30, rotDays: 21, requiredFields: ['amount'] },
+    { name: 'LOI Submitted',     color: '#3b82f6', probability: 50, rotDays: 21, requiredFields: ['amount'] },
+    { name: 'LOI Accepted',      color: '#f59e0b', probability: 65, rotDays: 30 },
+    { name: 'Due Diligence',     color: '#14b8a6', probability: 80, rotDays: 45, requiredFields: ['amount', 'expectedCloseDate'] },
+    { name: 'Financing / SBA',   color: '#84cc16', probability: 90, rotDays: 45 },
+    { name: 'Closing',           color: '#22c55e', probability: 95, rotDays: 30 },
+    { name: 'Closed Won',        color: '#10b981', probability: 100, rotDays: 999 },
+    { name: 'Closed Lost',       color: '#ef4444', probability: 0,  rotDays: 999 },
+  ],
   other:        SHARED_STAGES,
 };
 
@@ -161,6 +174,44 @@ const OFFICE_FIELDS: DynamicFieldDef[] = [
   { key: 'parkingRatio',   label: 'Parking Ratio',     type: 'text',     group: 'Property Details', placeholder: 'e.g. 4:1000' },
 ];
 
+const BUSINESS_FIELDS: DynamicFieldDef[] = [
+  { key: 'annualRevenue',       label: 'Annual Revenue',          type: 'currency', group: 'Financials' },
+  { key: 'sde',                 label: 'SDE',                     type: 'currency', group: 'Financials', tooltip: "Seller's Discretionary Earnings" },
+  { key: 'ebitda',              label: 'EBITDA',                  type: 'currency', group: 'Financials' },
+  { key: 'grossMargin',        label: 'Gross Margin',            type: 'percent',  group: 'Financials' },
+  { key: 'recurringRevenuePct', label: 'Recurring Revenue %',     type: 'percent',  group: 'Financials', tooltip: 'Percentage of revenue from contracts, subscriptions, or repeat customers' },
+  { key: 'employeeCount',      label: 'Employees (FTEs)',        type: 'number',   group: 'Operations' },
+  { key: 'yearsInOperation',   label: 'Years in Operation',      type: 'number',   group: 'Operations' },
+  { key: 'numberOfLocations',  label: 'Locations',               type: 'number',   group: 'Operations' },
+  { key: 'businessType',       label: 'Business Type',           type: 'select',   group: 'Operations', options: [
+    { value: 'cleaning_service', label: 'Cleaning / Janitorial' },
+    { value: 'home_services', label: 'Home Services' },
+    { value: 'landscaping', label: 'Landscaping / Lawn Care' },
+    { value: 'pest_control', label: 'Pest Control' },
+    { value: 'hvac_plumbing', label: 'HVAC / Plumbing / Electrical' },
+    { value: 'auto_service', label: 'Auto Service / Repair' },
+    { value: 'restaurant', label: 'Restaurant / Food Service' },
+    { value: 'franchise', label: 'Franchise' },
+    { value: 'professional_services', label: 'Professional Services' },
+    { value: 'healthcare_services', label: 'Healthcare / Dental / Veterinary' },
+    { value: 'fitness', label: 'Fitness / Gym / Wellness' },
+    { value: 'childcare', label: 'Childcare / Daycare' },
+    { value: 'ecommerce', label: 'E-Commerce / DTC' },
+    { value: 'manufacturing', label: 'Manufacturing / Distribution' },
+    { value: 'staffing', label: 'Staffing / Recruiting' },
+    { value: 'it_services', label: 'IT / Managed Services' },
+    { value: 'retail_store', label: 'Retail Store' },
+    { value: 'other', label: 'Other' },
+  ]},
+  { key: 'ownerInvolved',      label: 'Owner-Operated',          type: 'select',   group: 'Operations', options: [
+    { value: 'absentee', label: 'Absentee Owner' },
+    { value: 'semi_absentee', label: 'Semi-Absentee' },
+    { value: 'owner_operated', label: 'Owner-Operated' },
+  ]},
+  { key: 'customerConcentration', label: 'Top Customer % Rev',   type: 'percent',  group: 'Risk', tooltip: 'Revenue concentration risk from single largest customer' },
+  { key: 'contractBacklog',    label: 'Contract Backlog',        type: 'currency', group: 'Revenue', tooltip: 'Value of signed but unperformed contracts' },
+];
+
 const GENERIC_CRE_FIELDS: DynamicFieldDef[] = [
   { key: 'totalSqFt',      label: 'Total SF',          type: 'number',   group: 'Property Details' },
   { key: 'occupancyRate',   label: 'Occupancy',         type: 'percent',  group: 'Revenue' },
@@ -187,6 +238,7 @@ export const ASSET_CLASS_FIELDS: Record<AssetClassValue, DynamicFieldDef[]> = {
   ],
   self_storage: GENERIC_CRE_FIELDS,
   mobile_home:  GENERIC_CRE_FIELDS,
+  business:     BUSINESS_FIELDS,
   other:        GENERIC_CRE_FIELDS,
 };
 

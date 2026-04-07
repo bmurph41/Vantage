@@ -34,7 +34,7 @@ export default function InboxPage() {
   );
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <div className="h-[calc(100dvh-4rem)] flex flex-col">
       <div className="border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>

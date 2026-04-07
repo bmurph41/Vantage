@@ -238,7 +238,7 @@ export default function DealGanttView({ pipelineId, className = "" }: DealGanttV
       {/* Gantt body */}
       <div className="flex-1 overflow-hidden flex">
         {/* Left panel: deal names */}
-        <div className="w-60 min-w-[240px] flex-shrink-0 border-r bg-white overflow-y-auto">
+        <div className="w-40 md:w-60 min-w-[160px] md:min-w-[240px] flex-shrink-0 border-r bg-white overflow-y-auto">
           {/* Header */}
           <div className="sticky top-0 z-10 bg-gray-50 border-b px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider h-9 flex items-center">
             Deal

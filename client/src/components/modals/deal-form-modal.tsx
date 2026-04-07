@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
-  CalendarIcon, Percent, DollarSign, Anchor, MapPin, 
+  CalendarIcon, Percent, DollarSign, Anchor, MapPin, Briefcase,
   FileText, Users, TrendingUp, Calendar as CalendarClock, Clock, Plus, X, Trash2,
   Zap, Info, ExternalLink, UserPlus, Building2, Check, Loader2
 } from "lucide-react";
@@ -915,6 +915,18 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
         priority: "medium",
       }
     },
+    {
+      name: "Business Acquisition",
+      icon: Briefcase,
+      color: "from-emerald-500 to-emerald-600",
+      data: {
+        type: "business_acquisition",
+        assetClass: "business",
+        commissionType: "percentage",
+        commissionRate: "5.0",
+        priority: "high",
+      }
+    },
   ];
 
   const applyTemplate = (template: typeof dealTemplates[0]) => {
@@ -1098,6 +1110,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                               <SelectContent>
                                 <SelectItem value="storage_lease">Storage Lease</SelectItem>
                                 <SelectItem value="marina_acquisition">Marina Acquisition</SelectItem>
+                                <SelectItem value="business_acquisition">Business Acquisition</SelectItem>
                                 <SelectItem value="new_listing">New Listing</SelectItem>
                                 <SelectItem value="other">Other</SelectItem>
                               </SelectContent>

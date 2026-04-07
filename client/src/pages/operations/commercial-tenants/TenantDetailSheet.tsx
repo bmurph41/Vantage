@@ -296,7 +296,7 @@ export function TenantDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[680px] sm:max-w-[680px] overflow-y-auto">
+      <SheetContent className="w-full md:w-[680px] md:max-w-[680px] overflow-y-auto">
         <SheetHeader>
           <div className="flex items-start justify-between">
             <div>

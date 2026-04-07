@@ -16,14 +16,15 @@ import type { LucideIcon } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────
 
-export type AssetClass = 
-  | "marina" 
-  | "multifamily" 
-  | "retail" 
-  | "office" 
-  | "industrial" 
-  | "self_storage" 
-  | "mixed_use";
+export type AssetClass =
+  | "marina"
+  | "multifamily"
+  | "retail"
+  | "office"
+  | "industrial"
+  | "self_storage"
+  | "mixed_use"
+  | "business";
 
 export interface FieldDefinition {
   key: string;
@@ -474,6 +475,84 @@ const mixedUseConfig: AssetClassConfig = {
   ],
 };
 
+// ─── Business / Operating Company ────────────────────────────────
+
+const businessConfig: AssetClassConfig = {
+  id: "business",
+  label: "Business Acquisition",
+  icon: Briefcase,
+  color: "bg-emerald-100 dark:bg-emerald-900/30",
+  textColor: "text-emerald-700 dark:text-emerald-300",
+  borderColor: "border-emerald-300 dark:border-emerald-700",
+  fieldGroups: [
+    { key: "financials", label: "Deal Financials", icon: DollarSign, defaultOpen: true },
+    { key: "operations", label: "Operations", icon: Users, defaultOpen: true },
+    { key: "revenue", label: "Revenue Profile", icon: TrendingUp, defaultOpen: false },
+    { key: "property", label: "Property Details", icon: MapPin, defaultOpen: false },
+    { key: "location", label: "Location", icon: MapPin, defaultOpen: false },
+  ],
+  fields: [
+    ...sharedFields,
+    // Financials — override pricePerUnit label
+    { key: "sde", label: "SDE", type: "currency", group: "financials", icon: DollarSign, tooltip: "Seller's Discretionary Earnings" },
+    { key: "ebitda", label: "EBITDA", type: "currency", group: "financials", icon: DollarSign },
+    { key: "grossMargin", label: "Gross Margin", type: "percent", group: "financials", icon: BarChart3 },
+    { key: "annualRevenue", label: "Annual Revenue", type: "currency", group: "financials", icon: TrendingUp },
+    // Operations
+    { key: "employeeCount", label: "Employees (FTEs)", type: "number", group: "operations", icon: Users },
+    { key: "yearsInOperation", label: "Years in Operation", type: "number", group: "operations", icon: Calendar },
+    { key: "numberOfLocations", label: "Locations", type: "number", group: "operations" },
+    { key: "ownerInvolved", label: "Owner Involvement", type: "select", group: "operations", options: [
+      { value: "absentee", label: "Absentee" }, { value: "semi_absentee", label: "Semi-Absentee" },
+      { value: "owner_operated", label: "Owner-Operated" },
+    ]},
+    // Revenue Profile
+    { key: "recurringRevenuePct", label: "Recurring Revenue %", type: "percent", group: "revenue", icon: TrendingUp, tooltip: "% of revenue from contracts or repeat customers" },
+    { key: "customerConcentration", label: "Top Customer % Rev", type: "percent", group: "revenue", tooltip: "Revenue from single largest customer" },
+    { key: "contractBacklog", label: "Contract Backlog", type: "currency", group: "revenue", tooltip: "Signed but unperformed contracts" },
+    { key: "customerCount", label: "Active Customers", type: "number", group: "revenue" },
+    { key: "avgContractValue", label: "Avg Contract Value", type: "currency", group: "revenue" },
+  ],
+  kpis: [
+    {
+      key: "sdeMultiple",
+      label: "SDE Multiple",
+      format: "ratio",
+      icon: BarChart3,
+      color: "text-emerald-600",
+      compute: (e) => e.sde && e.askingPrice ? e.askingPrice / e.sde : null,
+      tooltip: "Asking Price / SDE"
+    },
+    {
+      key: "ebitdaMultiple",
+      label: "EBITDA Multiple",
+      format: "ratio",
+      icon: TrendingUp,
+      color: "text-emerald-500",
+      compute: (e) => e.ebitda && e.askingPrice ? e.askingPrice / e.ebitda : null,
+      tooltip: "Asking Price / EBITDA"
+    },
+    {
+      key: "revenuePerEmployee",
+      label: "Rev / Employee",
+      format: "currency",
+      icon: Users,
+      color: "text-blue-600",
+      compute: (e) => e.annualRevenue && e.employeeCount ? e.annualRevenue / e.employeeCount : null,
+      tooltip: "Annual Revenue / Headcount"
+    },
+    {
+      key: "recurringRevenuePct",
+      label: "Recurring Rev %",
+      format: "percent",
+      icon: TrendingUp,
+      color: "text-green-600",
+      compute: (e) => e.recurringRevenuePct ?? null,
+      tooltip: "Contracted or repeat revenue share"
+    },
+  ],
+};
+
 // ─── Registry ─────────────────────────────────────────────────────
 
 export const ASSET_CLASS_CONFIGS: Record<AssetClass, AssetClassConfig> = {
@@ -484,6 +563,7 @@ export const ASSET_CLASS_CONFIGS: Record<AssetClass, AssetClassConfig> = {
   industrial: industrialConfig,
   self_storage: selfStorageConfig,
   mixed_use: mixedUseConfig,
+  business: businessConfig,
 };
 
 export const ASSET_CLASS_OPTIONS = Object.values(ASSET_CLASS_CONFIGS).map(c => ({

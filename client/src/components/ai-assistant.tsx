@@ -435,7 +435,7 @@ export function AIAssistant() {
 
       {/* Chat panel */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-[420px] h-[640px] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed bottom-0 right-0 z-50 w-full h-full md:bottom-4 md:right-4 md:w-[420px] md:h-[640px] md:rounded-xl bg-background border border-border shadow-2xl flex flex-col overflow-hidden">
 
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2.5 border-b bg-background shrink-0">

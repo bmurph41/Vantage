@@ -1077,7 +1077,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
 
   return (
     <Sheet open={!!item} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent className="w-[500px] sm:w-[540px] overflow-y-auto">
+      <SheetContent className="w-full sm:w-[500px] md:w-[540px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-base">{item.title}</SheetTitle>
           <SheetDescription>{section?.title}</SheetDescription>

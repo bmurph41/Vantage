@@ -152,7 +152,7 @@ export default function MarinaDatabase() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 p-4 bg-background">
+    <div className="flex h-[calc(100dvh-4rem)] gap-4 p-2 md:p-4 bg-background">
       {/* Left Panel - Marina List */}
       <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 flex flex-col overflow-hidden">
@@ -420,7 +420,7 @@ export default function MarinaDatabase() {
       </div>
 
       {/* Right Panel - Marina Details & Rate History */}
-      <div className="w-[450px] flex-shrink-0">
+      <div className="hidden md:block w-[450px] flex-shrink-0">
         {selectedMarina ? (
           <Card className="h-full flex flex-col">
             <CardHeader className="pb-3">

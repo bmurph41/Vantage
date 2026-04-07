@@ -1073,7 +1073,7 @@ export function Breadcrumb() {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="flex items-center text-sm px-3 md:px-6 py-2 border-b border-border bg-card/50 overflow-x-auto"
+      className="flex items-center text-xs md:text-sm px-3 md:px-6 py-1.5 md:py-2 border-b border-border bg-card/50 overflow-x-auto scrollbar-hide"
       data-testid="breadcrumb-nav"
     >
       <ol className="flex items-center gap-1.5 whitespace-nowrap min-w-0">

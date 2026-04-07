@@ -152,7 +152,7 @@ export function PreviewDrawer({ open, onOpenChange, entityType, entityId }: Prev
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-[420px] sm:w-[480px] p-0 flex flex-col gap-0 overflow-hidden"
+        className="w-full sm:w-[420px] md:w-[480px] p-0 flex flex-col gap-0 overflow-hidden"
       >
         {/* Header */}
         <div className={cn("px-5 pt-5 pb-4 border-b", config.bgColor)}>

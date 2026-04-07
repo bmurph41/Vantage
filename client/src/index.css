@@ -2117,17 +2117,16 @@ input[type="range"]::-moz-range-track {
      Only target bare grid-cols (not responsive prefixed ones).
      Tailwind JIT generates class names like "grid-cols-3" in the DOM. */
   .grid-cols-3,
-  .grid-cols-4 {
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* ── AI Assistant: full-screen on mobile ── */
-  [data-testid="ai-assistant"],
-  .ai-assistant-panel {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    right: 0 !important;
-    border-radius: 0 !important;
+  /* ── AI Assistant FAB: adjust position for mobile header ── */
+  [data-testid="ai-assistant"] {
+    bottom: 1rem;
+    right: 1rem;
   }
 
   /* ── Command palette: wider on mobile ── */
@@ -2282,6 +2281,47 @@ input[type="range"]::-moz-range-track {
 
   [role="tabpanel"] .flex.items-center.gap-2 {
     flex-wrap: wrap;
+  }
+
+  /* ── Large text: cap on mobile ── */
+  .text-4xl { font-size: 1.5rem !important; line-height: 2rem !important; }
+  .text-5xl { font-size: 1.75rem !important; line-height: 2.25rem !important; }
+  .text-6xl { font-size: 2rem !important; line-height: 2.5rem !important; }
+
+  /* ── Flex row layouts in forms: stack on mobile ── */
+  .flex.flex-row.items-center.justify-between.rounded-lg.border {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  /* ── Kanban board: horizontal scroll ── */
+  [data-testid="kanban-board"],
+  .kanban-board {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Fixed bottom action bars: account for safe area ── */
+  .fixed.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ── MapView sidebar: stack below map on mobile ── */
+  .flex > [class*="w-full"][class*="md:w-[380px]"] {
+    order: -1;
+  }
+}
+
+  /* ── Viewport height: use dvh where available ──
+     This overrides Tailwind's h-screen and any h-[calc(100vh-...)]
+     containers so the layout accounts for mobile browser chrome. */
+  @supports (height: 100dvh) {
+    .h-screen,
+    .min-h-screen {
+      height: 100dvh !important;
+      min-height: 100dvh !important;
+    }
   }
 }
 

@@ -53,7 +53,7 @@ export default function NotificationCenter() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[440px]">
+      <SheetContent className="w-full sm:w-[400px] md:w-[440px]">
         <SheetHeader>
           <div className="flex items-center justify-between">
             <SheetTitle>Notifications</SheetTitle>

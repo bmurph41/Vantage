@@ -1605,7 +1605,7 @@ export default function UserSettingsPage() {
       </div>
 
       {/* Body: sidebar + content */}
-      <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 flex-shrink-0 border-r border-border bg-card overflow-y-auto">
           {/* User avatar area */}

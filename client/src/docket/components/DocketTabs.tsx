@@ -78,27 +78,27 @@ export default function DocketTabs({ activeTab }: DocketTabsProps) {
         </Link>
       </TabsList>
 
-      <TabsContent value="all-articles" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="all-articles" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <AllArticlesPage />
       </TabsContent>
 
-      <TabsContent value="market-intelligence" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="market-intelligence" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <MarketIntelligencePage />
       </TabsContent>
 
-      <TabsContent value="m&a-spotlight" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="m&a-spotlight" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <DealsPage />
       </TabsContent>
 
-      <TabsContent value="saved" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="saved" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <SavedArticlesPage />
       </TabsContent>
 
-      <TabsContent value="watchlist" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="watchlist" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <WatchlistPage />
       </TabsContent>
 
-      <TabsContent value="email-alerts" className="mt-0 h-[calc(100vh-140px)] overflow-auto">
+      <TabsContent value="email-alerts" className="mt-0 h-[calc(100dvh-140px)] overflow-auto">
         <SavedSearchesPage />
       </TabsContent>
     </Tabs>

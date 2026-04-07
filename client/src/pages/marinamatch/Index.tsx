@@ -307,7 +307,7 @@ function ListingsSection({ onNavigateToBrokers }: { onNavigateToBrokers: () => v
           <MarketIntelTab onNavigateToBrokers={onNavigateToBrokers} />
         </TabsContent>
         <TabsContent value="marketplace" className="mt-0">
-          <div className="h-[calc(100vh-220px)]">
+          <div className="h-[calc(100dvh-220px)]">
             <MarketplaceListings />
           </div>
         </TabsContent>

@@ -57,9 +57,11 @@ const companySizes = [
 ];
 
 const companyTypes = [
+  // Investment & Ownership
   { value: "investor", label: "Investor" },
   { value: "owner", label: "Owner" },
   { value: "broker", label: "Broker" },
+  // Marina / Marine
   { value: "boat_dealer", label: "Boat Dealer" },
   { value: "boat_broker", label: "Boat Broker" },
   { value: "marina_operator", label: "Marina Operator" },
@@ -69,9 +71,27 @@ const companyTypes = [
   { value: "boat_manufacturer", label: "Boat Manufacturer" },
   { value: "marine_services", label: "Marine Services" },
   { value: "fuel_supplier", label: "Fuel Supplier" },
+  // Service Businesses / Operating Companies
+  { value: "cleaning_service", label: "Cleaning / Janitorial" },
+  { value: "home_services", label: "Home Services" },
+  { value: "landscaping_service", label: "Landscaping / Lawn Care" },
+  { value: "pest_control", label: "Pest Control" },
+  { value: "hvac_plumbing", label: "HVAC / Plumbing / Electrical" },
+  { value: "auto_service", label: "Auto Service / Repair" },
+  { value: "restaurant_food", label: "Restaurant / Food Service" },
+  { value: "franchise_operator", label: "Franchise Operator" },
+  { value: "healthcare_services", label: "Healthcare / Dental / Veterinary" },
+  { value: "fitness_wellness", label: "Fitness / Gym / Wellness" },
+  { value: "childcare", label: "Childcare / Daycare" },
+  { value: "staffing_recruiting", label: "Staffing / Recruiting" },
+  { value: "it_managed_services", label: "IT / Managed Services" },
+  { value: "manufacturing", label: "Manufacturing / Distribution" },
+  { value: "ecommerce", label: "E-Commerce / DTC" },
+  // Professional Services
   { value: "insurance", label: "Insurance" },
   { value: "finance_lender", label: "Finance/Lender" },
   { value: "legal", label: "Legal" },
+  { value: "accounting", label: "Accounting / Bookkeeping" },
   { value: "environmental", label: "Environmental" },
   { value: "government", label: "Government/Regulatory" },
   { value: "other", label: "Other" },

@@ -416,7 +416,7 @@ export default function ProjectPage() {
             </>
           )}
           {effectiveActiveTab === "documents" && (
-            <div className="h-[calc(100vh-20rem)] border rounded-lg bg-card overflow-hidden">
+            <div className="h-[calc(100dvh-20rem)] border rounded-lg bg-card overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b bg-muted/30">
                 <div className="flex items-center gap-2">
                   <FolderOpen className="h-5 w-5 text-primary" />

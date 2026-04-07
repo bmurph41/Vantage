@@ -188,7 +188,7 @@ export function DealKanbanBoard({ deals, stages, onDealClick }: DealKanbanBoardP
                 </div>
               </div>
 
-              <div className="p-2 min-h-[300px] max-h-[calc(100vh-320px)] overflow-y-auto">
+              <div className="p-2 min-h-[300px] max-h-[calc(100dvh-320px)] overflow-y-auto">
                 <div className="space-y-2">
                   {column.items.map((item) => (
                     <DealCard 

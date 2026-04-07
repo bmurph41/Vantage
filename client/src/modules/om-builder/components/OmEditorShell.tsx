@@ -215,7 +215,7 @@ export function OmEditorShell({
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
-                  <ScrollArea className="h-[calc(100vh-200px)]">
+                  <ScrollArea className="h-[calc(100dvh-200px)]">
                     {pages.map((page, index) => (
                       <button
                         key={page.id}

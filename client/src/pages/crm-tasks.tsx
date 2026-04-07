@@ -426,7 +426,7 @@ function TaskColumn({ column, tasks, onTaskClick, onAddTask }: TaskColumnProps) 
       <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div
           ref={setNodeRef}
-          className={`p-3 min-h-[500px] max-h-[calc(100vh-300px)] overflow-y-auto transition-colors ${
+          className={`p-3 min-h-[300px] md:min-h-[500px] max-h-[calc(100dvh-300px)] overflow-y-auto transition-colors ${
             isOver ? "bg-blue-50" : "bg-gray-50"
           }`}
           data-testid={`column-drop-zone-${column.id}`}
