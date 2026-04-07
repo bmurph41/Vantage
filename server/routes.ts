@@ -453,20 +453,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 2. Replit OAuth session (passport.js) — req.user set by passport before this middleware
-      if (!resolvedUser && req.isAuthenticated && req.isAuthenticated()) {
-        const passportUser = req.user as any;
-        const replitClaims = passportUser?.claims || {};
-        const replitUserId = replitClaims.sub;
-        if (replitUserId) {
-          const [dbUser] = await db.select().from(users).where(eq(users.id, replitUserId)).limit(1);
-          if (dbUser) {
-            resolvedUser = {
-              id: dbUser.id,
-              orgId: dbUser.orgId,
-              role: dbUser.role || 'viewer',
-              email: dbUser.email || replitClaims.email || '',
-              name: dbUser.name || replitClaims.first_name || '',
-            };
+      if (!resolvedUser) {
+        const isAuth = typeof req.isAuthenticated === 'function' ? req.isAuthenticated() : false;
+        if (isAuth) {
+          const passportUser = req.user as any;
+          const replitClaims = passportUser?.claims || {};
+          const replitUserId = replitClaims.sub;
+          if (replitUserId) {
+            const [dbUser] = await db.select().from(users).where(eq(users.id, replitUserId)).limit(1);
+            if (dbUser) {
+              resolvedUser = {
+                id: dbUser.id,
+                orgId: dbUser.orgId,
+                role: dbUser.role || 'viewer',
+                email: dbUser.email || replitClaims.email || '',
+                name: dbUser.name || replitClaims.first_name || '',
+              };
+            }
           }
         }
       }

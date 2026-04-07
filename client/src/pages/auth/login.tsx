@@ -433,6 +433,18 @@ export default function LoginPage() {
                 Sign in to your MarinaMatch account
               </p>
 
+              {/* Replit OAuth Button */}
+              <a href="/api/login">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 rounded-xl mb-3 font-medium transition-all duration-200"
+                >
+                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4l4 4H8l4-4zm4 8H8l-4 4 4-4h8l4 4-4-4z"/></svg>
+                  Sign in with Replit
+                </Button>
+              </a>
+
               {/* SSO Button */}
               <Link href="/sso">
                 <Button

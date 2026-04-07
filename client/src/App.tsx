@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { EntitlementsProvider } from "@/contexts/EntitlementsContext";
 import { PackGate, type PackType } from "@/contexts/PackContext";
 import { AIAssistant } from "@/components/ai-assistant";
 import { OpsModuleGuard } from "@/components/operations/OpsModuleGuard";
@@ -361,6 +362,10 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
   
   return (
     <div className="flex h-screen bg-background">
@@ -567,14 +572,18 @@ function Router() {
       <Route path="/settings/subscription">
         {() => (
           <UnifiedLayout>
-            <SubscriptionPage />
+            <EntitlementsProvider>
+              <SubscriptionPage />
+            </EntitlementsProvider>
           </UnifiedLayout>
         )}
       </Route>
       <Route path="/pricing">
         {() => (
           <UnifiedLayout>
-            <SubscriptionPage />
+            <EntitlementsProvider>
+              <SubscriptionPage />
+            </EntitlementsProvider>
           </UnifiedLayout>
         )}
       </Route>
