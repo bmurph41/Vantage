@@ -42,7 +42,7 @@ export default function VerifyEmailPage() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                 <Anchor className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
+              <span className="text-xl font-bold text-slate-800">Vantage</span>
             </div>
           </Link>
         </div>
@@ -116,7 +116,7 @@ export default function VerifyEmailPage() {
         </div>
 
         <div className="p-6 border-t border-slate-100 text-center text-sm text-slate-400">
-          <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+          <span>&copy; 2026 Vantage. All rights reserved.</span>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function VerifyEmailPage() {
           </div>
           <h2 className="text-3xl font-bold mb-4">Email Verification</h2>
           <p className="text-lg text-slate-300 leading-relaxed mb-10">
-            Verifying your email unlocks the full power of MarinaMatch and keeps your account secure.
+            Verifying your email unlocks the full power of Vantage and keeps your account secure.
           </p>
 
           <div className="space-y-5 text-left">

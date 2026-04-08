@@ -82,7 +82,7 @@ import { valuatorPayrollRouter } from "./routes/valuator-payroll-routes";
 import { deptPnlRouter } from "./routes/dept-pnl-routes";
 import integrationRouter from "./integration-routes";
 import { integrationsRouter } from "./integrations";
-import marinamatchRouter from "./marinamatch/routes";
+import vantageRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
 import omBuilderRouter from "./routes/om-builder-routes";
 import documentBuilderRouter from "./routes/document-builder-routes";
@@ -999,7 +999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", authenticateUser, enforceTenant, adminRouter);
   app.use("/api/integration", authenticateUser, integrationRouter);
   app.use(authenticateUser, enforceTenant, integrationsRouter);
-  app.use("/api/marinamatch", authenticateUser, marinamatchRouter);
+  app.use("/api/vantage", authenticateUser, vantageRouter);
   app.use("/api/om", authenticateUser, omRouter);
   app.use(authenticateUser, omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
@@ -2848,7 +2848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         to: payload.to,
         from: {
           email: fromEmail,
-          name: 'MarinaMatch Reports',
+          name: 'Vantage Reports',
         },
         subject: payload.subject,
         html: bodyHtml,
@@ -2999,7 +2999,7 @@ function generateICS(events: Array<{
   let ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//MarinaMatch//Calendar Export//EN',
+    'PRODID:-//Vantage//Calendar Export//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
   ];
@@ -3010,7 +3010,7 @@ function generateICS(events: Array<{
     const isAllDay = event.type === 'task';
     
     ics.push('BEGIN:VEVENT');
-    ics.push(`UID:${event.id}@marinamatch.com`);
+    ics.push(`UID:${event.id}@vantage.com`);
     ics.push(`DTSTAMP:${now}`);
     
     if (isAllDay) {

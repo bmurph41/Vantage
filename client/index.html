@@ -13,7 +13,7 @@
     <!-- CRITICAL: Theme flash prevention - applies theme before React loads -->
     <script>
       (function() {
-        var theme = localStorage.getItem('marinamatch-theme') || 'system';
+        var theme = localStorage.getItem('vantage-theme') || 'system';
         var isDark = theme === 'dark' || 
           (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.add(isDark ? 'dark' : 'light');

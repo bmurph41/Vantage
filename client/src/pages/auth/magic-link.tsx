@@ -61,7 +61,7 @@ export default function MagicLinkPage() {
               <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
                 <Anchor className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
+              <span className="text-xl font-bold text-[#343E5C]">Vantage</span>
             </div>
           </div>
 
@@ -104,7 +104,7 @@ export default function MagicLinkPage() {
               <a href="#" className="hover:text-[#343E5C]">Help</a>
               <a href="#" className="hover:text-[#343E5C]">Privacy Policy</a>
             </div>
-            <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+            <span>&copy; 2026 Vantage. All rights reserved.</span>
           </div>
         </div>
 
@@ -131,7 +131,7 @@ export default function MagicLinkPage() {
             <div className="w-8 h-8 rounded-full bg-[#1E4FAB] flex items-center justify-center">
               <Anchor className="h-4 w-4 text-white" />
             </div>
-            <span className="text-xl font-bold text-[#343E5C]">MarinaMatch</span>
+            <span className="text-xl font-bold text-[#343E5C]">Vantage</span>
           </div>
         </div>
 
@@ -190,7 +190,7 @@ export default function MagicLinkPage() {
             <a href="#" className="hover:text-[#343E5C]">Help</a>
             <a href="#" className="hover:text-[#343E5C]">Privacy Policy</a>
           </div>
-          <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+          <span>&copy; 2026 Vantage. All rights reserved.</span>
         </div>
       </div>
 

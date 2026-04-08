@@ -13,7 +13,7 @@ async function getCredentials() {
   if (!xReplitToken || !hostname) {
     // Fall back to environment variables
     const apiKey = process.env.SENDGRID_API_KEY;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com';
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com';
 
     if (!apiKey) {
       throw new Error('SendGrid not configured: set SENDGRID_API_KEY or configure Replit connector');

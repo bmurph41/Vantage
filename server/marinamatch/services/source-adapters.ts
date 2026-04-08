@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Intel - Source Adapter Registry
+ * Vantage Intel - Source Adapter Registry
  * 
  * This module provides a unified interface for different listing data sources.
  * Each adapter implements the ListingSourceAdapter interface and provides
@@ -170,7 +170,7 @@ export class BrokerSubmitAdapter extends BaseSourceAdapter {
   displayName = "Broker Direct Submission";
   supportedMethods: IngestionMethod[] = ["broker_submit", "manual"];
   blockedMethods: { method: IngestionMethod; reason: string }[] = [];
-  accessNotes = "Brokers can submit listings directly through the MarinaMatch platform.";
+  accessNotes = "Brokers can submit listings directly through the Vantage platform.";
   scrapingStatus: "blocked" | "limited" | "allowed" = "allowed";
   
   async fetchListings(): Promise<FetchResult> {
@@ -305,7 +305,7 @@ export class GovDealsAdapter extends BaseSourceAdapter {
       
       const response = await axios.get(searchUrl, {
         headers: {
-          "User-Agent": "MarinaMatch/1.0 (marina aggregator; contact@marinamatch.com)",
+          "User-Agent": "Vantage/1.0 (marina aggregator; contact@vantage.com)",
           "Accept": "text/html,application/xhtml+xml",
         },
         timeout: 15000,
@@ -399,7 +399,7 @@ export class PublicSurplusAdapter extends BaseSourceAdapter {
       
       const response = await axios.get(searchUrl, {
         headers: {
-          "User-Agent": "MarinaMatch/1.0 (marina aggregator; contact@marinamatch.com)",
+          "User-Agent": "Vantage/1.0 (marina aggregator; contact@vantage.com)",
           "Accept": "text/html,application/xhtml+xml",
         },
         timeout: 15000,

@@ -1,5 +1,5 @@
 /**
- * MarinaMatch LP Portal Service
+ * Vantage LP Portal Service
  * Independent LP auth, PDF statements via pdf-lib, K-1 generation,
  * automated quarterly delivery, ILPA templates, side letter tracking
  */

@@ -125,7 +125,7 @@ export default function IndustryStandards() {
         </div>
         <InlineBanner variant="info">
           <Info className="h-4 w-4 mr-2" />
-          Industry standards are curated by MarinaMatch from authoritative sources including NMMA, industry surveys, and proprietary research.
+          Industry standards are curated by Vantage from authoritative sources including NMMA, industry surveys, and proprietary research.
         </InlineBanner>
 
         <div className="flex flex-wrap items-center gap-4">
@@ -250,7 +250,7 @@ export default function IndustryStandards() {
                             </TableCell>
                             <TableCell>
                               <span className="text-xs text-muted-foreground">
-                                {std.dataSource || "MarinaMatch Research"}
+                                {std.dataSource || "Vantage Research"}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -311,7 +311,7 @@ export default function IndustryStandards() {
                       </TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">
-                          {std.dataSource || "MarinaMatch Research"}
+                          {std.dataSource || "Vantage Research"}
                         </span>
                       </TableCell>
                     </TableRow>

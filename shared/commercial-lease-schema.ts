@@ -9,7 +9,7 @@
  * - Integrates via lease_monthly_cashflows cache table into Historical + Pro Forma rollups
  * - Does NOT jam data into main P&L ingestion tables — uses rollup endpoints instead
  * 
- * CONVENTIONS: matches existing MarinaMatch patterns (uuid PKs, project_id FK, timestamps)
+ * CONVENTIONS: matches existing Vantage patterns (uuid PKs, project_id FK, timestamps)
  */
 
 import {

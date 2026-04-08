@@ -3,7 +3,7 @@ import type { User } from "@shared/schema";
 
 // Extended Request type with Docket user
 export interface DocketRequest extends Request {
-  user?: User;  // MarinaMatch user from req.user
+  user?: User;  // Vantage user from req.user
   docketUser?: {
     id: string;
     marinaUserId: string;
@@ -13,10 +13,10 @@ export interface DocketRequest extends Request {
   };
 }
 
-// Unified auth middleware - bridges MarinaMatch and Docket authentication
-export async function requireMarinaMatchAuth(req: DocketRequest, res: Response, next: NextFunction) {
+// Unified auth middleware - bridges Vantage and Docket authentication
+export async function requireVantageAuth(req: DocketRequest, res: Response, next: NextFunction) {
   try {
-    // Check MarinaMatch authentication - MarinaMatch uses req.user, not req.session.user
+    // Check Vantage authentication - Vantage uses req.user, not req.session.user
     if (!req.user) {
       return res.status(401).json({ error: "Authentication required" });
     }
@@ -37,7 +37,7 @@ export async function requireMarinaMatchAuth(req: DocketRequest, res: Response, 
     let docketUser = await storage.getDocketUserByMarinaUserId(marinaUser.id);
     
     if (!docketUser) {
-      // Create shadow Docket user linked to MarinaMatch user
+      // Create shadow Docket user linked to Vantage user
       docketUser = await storage.createDocketUserFromMarinaUser({
         marinaUserId: marinaUser.id,
         orgId: marinaUser.orgId,
@@ -59,7 +59,7 @@ export async function requireMarinaMatchAuth(req: DocketRequest, res: Response, 
 
     next();
   } catch (error) {
-    console.error("MarinaMatch auth bridge error:", error);
+    console.error("Vantage auth bridge error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 }

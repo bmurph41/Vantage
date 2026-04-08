@@ -1,7 +1,7 @@
 /**
  * Token Resolver Service
  *
- * Resolves live {{TOKENS}} from MarinaMatch workspace data for Document Studio templates.
+ * Resolves live {{TOKENS}} from Vantage workspace data for Document Studio templates.
  * Takes a dealId + optional projectId and returns a map of token → resolved value.
  *
  * Uses raw pool.query() for modelingProjectConfig and modelingScenarioVersions

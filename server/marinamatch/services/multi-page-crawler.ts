@@ -400,7 +400,7 @@ export async function discoverListingUrls(
     maxCrawlDepth: config.maxCrawlDepth || 1,
     tokenBudgetPerRun: isNaN(parsedBudget) ? 0.50 : parsedBudget,
     respectRobotsTxt: config.respectRobotsTxt ?? true,
-    userAgent: config.userAgent || "MarinaMatchBot/1.0 (+https://marinamatch.com)",
+    userAgent: config.userAgent || "VantageBot/1.0 (+https://vantage.com)",
     rateLimitRpm: config.rateLimitRpm || 30,
   };
 

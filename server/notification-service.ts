@@ -24,7 +24,7 @@ interface NotificationContext {
 }
 
 export class NotificationService {
-  private readonly defaultFromName = 'MarinaMatch Due Diligence';
+  private readonly defaultFromName = 'Vantage Due Diligence';
 
   /**
    * Generate professional HTML email template

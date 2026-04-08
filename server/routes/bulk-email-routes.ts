@@ -42,7 +42,7 @@ router.post('/bulk-email/send', async (req: Request, res: Response) => {
           to: contact.email,
           from: {
             email: fromEmail,
-            name: fromName || 'MarinaMatch',
+            name: fromName || 'Vantage',
           },
           subject,
           html: htmlBody,

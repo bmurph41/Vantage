@@ -236,7 +236,7 @@ export default function DesignPreview() {
               Everything You Need to Close Marina Deals
             </h2>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              From first contact to closing, MarinaMatch powers every step of your acquisition journey.
+              From first contact to closing, Vantage powers every step of your acquisition journey.
             </p>
           </div>
           
@@ -321,7 +321,7 @@ export default function DesignPreview() {
             Ready to Transform Your Marina Acquisitions?
           </h2>
           <p className="text-cyan-200 text-lg mb-8">
-            Join marina investment firms using MarinaMatch to source, analyze, and close deals faster.
+            Join marina investment firms using Vantage to source, analyze, and close deals faster.
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link href="/signup">
@@ -349,7 +349,7 @@ export default function DesignPreview() {
               <span className="text-lg font-bold text-white">MARINAMATCH</span>
             </div>
             <p className="text-slate-500 text-sm">
-              © 2026 MarinaMatch. All rights reserved.
+              © 2026 Vantage. All rights reserved.
             </p>
           </div>
         </div>

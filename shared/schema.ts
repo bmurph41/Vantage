@@ -3506,7 +3506,7 @@ export const rraLeaseSnapshots = pgTable("rra_lease_snapshots", {
 }));
 
 // ============================================================================
-// RRA BRIDGE TABLES - Connect to MarinaMatch modules
+// RRA BRIDGE TABLES - Connect to Vantage modules
 // ============================================================================
 
 // Bridge: RRA Projects ↔ MM Modeling Projects
@@ -7359,7 +7359,7 @@ export const salesComps = pgTable('sales_comps', {
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 
   // === GLOBAL/CURATED DATA GOVERNANCE ===
-  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by MarinaMatch, org = org-specific, user = user-specific
+  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by Vantage, org = org-specific, user = user-specific
   requiredPack: text("required_pack"), // Which pack is needed to see this global data (e.g., "analysis", "analytics_pro")
   isCurated: boolean("is_curated").default(false).notNull(), // Whether this is admin-curated data
   curatedByUserId: varchar("curated_by_user_id").references(() => users.id, { onDelete: "set null" }), // Who curated this data
@@ -8000,8 +8000,8 @@ export const docketDeals = pgTable('docket_deals', {
 
   // Origin tracking - Primary vs AI-discovered deals
   origin: dealOriginEnum('origin').notNull().default('aiExtraction'),
-  externalId: varchar('external_id'), // MarinaMatch Sales Comp UUID for sync
-  sourceReference: text('source_reference'), // Link back to MarinaMatch record or news article
+  externalId: varchar('external_id'), // Vantage Sales Comp UUID for sync
+  sourceReference: text('source_reference'), // Link back to Vantage record or news article
   articleId: integer('article_id'), // Optional link to docket_articles for AI-extracted deals
 
   // Docket-specific fields
@@ -8916,7 +8916,7 @@ export const rateComps = pgTable('rate_comps', {
   custom: jsonb('custom').$type<Record<string, unknown>>().default({}),
 
   // === GLOBAL/CURATED DATA GOVERNANCE ===
-  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by MarinaMatch, org = org-specific, user = user-specific
+  scope: dataScopeEnum("scope").default("org").notNull(), // global = curated by Vantage, org = org-specific, user = user-specific
   requiredPack: text("required_pack"), // Which pack is needed to see this global data (e.g., "analysis", "analytics_pro")
   isCurated: boolean("is_curated").default(false).notNull(), // Whether this is admin-curated data
   curatedByUserId: varchar("curated_by_user_id").references(() => users.id, { onDelete: "set null" }), // Who curated this data
@@ -18806,10 +18806,10 @@ export type FundWaterfallCalculation = typeof fundWaterfallCalculations.$inferSe
 export type InsertFundWaterfallCalculation = z.infer<typeof insertFundWaterfallCalculationSchema>;
 
 // ============================================================================
-// MarinaMatch - Deal Sourcing & Prospecting Module
+// Vantage - Deal Sourcing & Prospecting Module
 // ============================================================================
 
-// Enums for MarinaMatch
+// Enums for Vantage
 export const dealSourceTypeEnum = pgEnum("deal_source_type", ["broker", "marketplace", "direct", "referral", "owned_network", "web_scrape", "cold_outreach"]);
 export const feedStatusEnum = pgEnum("feed_status", ["active", "paused", "error", "pending_setup"]);
 export const mandateStatusEnum = pgEnum("mandate_status", ["active", "paused", "archived"]);
@@ -19117,7 +19117,7 @@ export const brokerPortalSubmissions = pgTable("broker_portal_submissions", {
   tokenIdx: index("broker_portal_submissions_token_idx").on(table.submissionToken),
 }));
 
-// Insert schemas and types for MarinaMatch
+// Insert schemas and types for Vantage
 export const insertDealSourceSchema = createInsertSchema(dealSources).omit({
   id: true,
   createdAt: true,
@@ -19215,7 +19215,7 @@ export type InsertBrokerPortalSubmission = z.infer<typeof insertBrokerPortalSubm
 export type UpdateBrokerPortalSubmission = z.infer<typeof updateBrokerPortalSubmissionSchema>;
 
 // ============================================================================
-// MarinaMatch Intel - Scraped Listings & Investment Criteria
+// Vantage Intel - Scraped Listings & Investment Criteria
 // ============================================================================
 
 export const marinaListings = pgTable("marina_listings", {
@@ -19556,7 +19556,7 @@ export const investmentCriteriaStorageTypes = pgTable("investment_criteria_stora
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const marinaMatchGoals = pgTable("marina_match_goals", {
+export const vantageGoals = pgTable("marina_match_goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
   goalType: varchar("goal_type", { length: 50 }).notNull(),
@@ -19578,9 +19578,9 @@ export const marinaMatchGoals = pgTable("marina_match_goals", {
   orgIdx: index("goals_org_idx").on(table.orgId),
 }));
 
-export const marinaMatchGoalProgress = pgTable("marina_match_goal_progress", {
+export const vantageGoalProgress = pgTable("marina_match_goal_progress", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
-  goalId: varchar("goal_id").notNull().references(() => marinaMatchGoals.id, { onDelete: "cascade" }),
+  goalId: varchar("goal_id").notNull().references(() => vantageGoals.id, { onDelete: "cascade" }),
   orgId: varchar("org_id").notNull(),
   recordedValue: numeric("recorded_value", { precision: 15, scale: 2 }).notNull(),
   recordedAt: timestamp("recorded_at").notNull().defaultNow(),
@@ -19600,7 +19600,7 @@ export const marinaScrapeources = pgTable("marina_scrape_sources", {
   config: jsonb("config"),
   rateLimitRpm: integer("rate_limit_rpm").default(30),
   respectRobotsTxt: boolean("respect_robots_txt").default(true),
-  userAgent: varchar("user_agent", { length: 255 }).default("MarinaMatchBot/1.0"),
+  userAgent: varchar("user_agent", { length: 255 }).default("VantageBot/1.0"),
   isActive: boolean("is_active").default(true),
   isManaged: boolean("is_managed").default(false), // True for system-created default sources
 
@@ -19716,7 +19716,7 @@ export const marinaListingMatches = pgTable("marina_listing_matches", {
   profileIdx: index("listing_matches_profile_idx").on(table.criteriaProfileId),
 }));
 
-export const marinaMatchAlerts = pgTable("marina_match_alerts", {
+export const vantageAlerts = pgTable("marina_match_alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
   orgId: varchar("org_id").notNull(),
   userId: varchar("user_id"),
@@ -19736,9 +19736,9 @@ export const marinaMatchAlerts = pgTable("marina_match_alerts", {
   orgIdx: index("alerts_org_idx").on(table.orgId),
 }));
 
-export const marinaMatchAlertHistory = pgTable("marina_match_alert_history", {
+export const vantageAlertHistory = pgTable("marina_match_alert_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
-  alertId: varchar("alert_id").notNull().references(() => marinaMatchAlerts.id, { onDelete: "cascade" }),
+  alertId: varchar("alert_id").notNull().references(() => vantageAlerts.id, { onDelete: "cascade" }),
   listingId: varchar("listing_id").references(() => marinaListings.id, { onDelete: "set null" }),
   orgId: varchar("org_id").notNull(),
   matchScore: integer("match_score").notNull(),
@@ -19748,7 +19748,7 @@ export const marinaMatchAlertHistory = pgTable("marina_match_alert_history", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Insert schemas and types for MarinaMatch Intel
+// Insert schemas and types for Vantage Intel
 export const insertMarinaListingSchema = createInsertSchema(marinaListings).omit({
   id: true,
   createdAt: true,
@@ -19780,13 +19780,13 @@ export type InvestmentCriteriaDepartments = typeof investmentCriteriaDepartments
 export type InvestmentCriteriaStorageTypes = typeof investmentCriteriaStorageTypes.$inferSelect;
 export type MarinaListingMatch = typeof marinaListingMatches.$inferSelect;
 
-export const insertMarinaMatchGoalSchema = createInsertSchema(marinaMatchGoals).omit({
+export const insertVantageGoalSchema = createInsertSchema(vantageGoals).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
-export const updateMarinaMatchGoalSchema = insertMarinaMatchGoalSchema.partial();
-export type MarinaMatchGoal = typeof marinaMatchGoals.$inferSelect;
+export const updateVantageGoalSchema = insertVantageGoalSchema.partial();
+export type VantageGoal = typeof vantageGoals.$inferSelect;
 
 export const insertMarinaScrapeSourceSchema = createInsertSchema(marinaScrapeources).omit({
   id: true,
@@ -19796,16 +19796,16 @@ export const insertMarinaScrapeSourceSchema = createInsertSchema(marinaScrapeour
 export const updateMarinaScrapeSourceSchema = insertMarinaScrapeSourceSchema.partial();
 export type MarinaScrapeSource = typeof marinaScrapeources.$inferSelect;
 
-export const insertMarinaMatchAlertSchema = createInsertSchema(marinaMatchAlerts).omit({
+export const insertVantageAlertSchema = createInsertSchema(vantageAlerts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
-export const updateMarinaMatchAlertSchema = insertMarinaMatchAlertSchema.partial();
-export type MarinaMatchAlert = typeof marinaMatchAlerts.$inferSelect;
+export const updateVantageAlertSchema = insertVantageAlertSchema.partial();
+export type VantageAlert = typeof vantageAlerts.$inferSelect;
 
 // ============================================================================
-// MarinaMatch Listing Feedback System
+// Vantage Listing Feedback System
 // Global feedback collection for AI training and listing quality improvement
 // ============================================================================
 
@@ -22159,7 +22159,7 @@ export const industryStandards = pgTable("industry_standards", {
   effectiveQuarter: integer("effective_quarter"), // 1-4
 
   // Data source
-  dataSource: text("data_source"), // "MarinaMatch Research", "NMMA", "Industry Survey"
+  dataSource: text("data_source"), // "Vantage Research", "NMMA", "Industry Survey"
   sampleSize: integer("sample_size"),
   confidenceLevel: text("confidence_level"), // "high", "medium", "low"
   sourceNotes: text("source_notes"),

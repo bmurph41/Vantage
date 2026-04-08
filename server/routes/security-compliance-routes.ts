@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Security & Compliance Routes
+ * Vantage Security & Compliance Routes
  * 2FA, security events, session management, GDPR, IP allowlists, KYC
  */
 

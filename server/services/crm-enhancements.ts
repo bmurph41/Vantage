@@ -1,7 +1,7 @@
 /**
  * CRM Enhancements Service
  * ========================
- * Extended CRM capabilities for MarinaMatch:
+ * Extended CRM capabilities for Vantage:
  * - Deal Comparison Workspace
  * - Email Open/Click Tracking
  * - Calendar Sync Bridge

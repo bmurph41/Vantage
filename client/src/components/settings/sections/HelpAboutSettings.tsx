@@ -88,7 +88,7 @@ export function HelpAboutSettings({
             <Mail className="h-5 w-5 text-primary" />
             <div>
               <h4 className="font-medium text-sm">Email Support</h4>
-              <p className="text-xs text-muted-foreground">{appInfo?.supportEmail || 'support@marinamatch.com'}</p>
+              <p className="text-xs text-muted-foreground">{appInfo?.supportEmail || 'support@vantage.com'}</p>
             </div>
             <HeadphonesIcon className="h-4 w-4 ml-auto text-muted-foreground" />
           </button>
@@ -235,7 +235,7 @@ export function HelpAboutSettings({
               <Separator />
 
               <div className="text-center text-sm text-muted-foreground">
-                <p>© {new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+                <p>© {new Date().getFullYear()} Vantage. All rights reserved.</p>
                 <p className="mt-1">
                   Built with ❤️ for the marina industry
                 </p>

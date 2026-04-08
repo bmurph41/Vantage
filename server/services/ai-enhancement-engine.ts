@@ -1,5 +1,5 @@
 /**
- * MarinaMatch AI/RAG Enhancement Engine
+ * Vantage AI/RAG Enhancement Engine
  * Real embeddings, document ingestion, deal scoring, anomaly detection, conversational memory
  */
 

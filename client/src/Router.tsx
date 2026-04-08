@@ -254,7 +254,7 @@ const ProspectingAnalytics = lazy(() => import("@/pages/prospecting/Analytics"))
 const DealAnalyticsPage = lazy(() => import("@/pages/crm/DealAnalyticsPage"));
 const PipelineInsights = lazy(() => import("@/pages/crm/PipelineInsights"));
 const PipelineVelocity = lazy(() => import("@/pages/crm/PipelineVelocity"));
-const MarinaMatchIndex = lazy(() => import("@/pages/marinamatch/Index"));
+const VantageIndex = lazy(() => import("@/pages/marinamatch/Index"));
 const BrokerPortal = lazy(() => import("@/pages/BrokerPortal"));
 const ActivityLog = lazy(() => import("@/pages/activity"));
 
@@ -322,7 +322,7 @@ function useOnboardingCheck() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   
   useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem('marinamatch_onboarding_complete');
+    const hasSeenOnboarding = localStorage.getItem('vantage_onboarding_complete');
     if (!hasSeenOnboarding) {
       const timer = setTimeout(() => setShowOnboarding(true), 1000);
       return () => clearTimeout(timer);
@@ -330,7 +330,7 @@ function useOnboardingCheck() {
   }, []);
 
   const completeOnboarding = () => {
-    localStorage.setItem('marinamatch_onboarding_complete', 'true');
+    localStorage.setItem('vantage_onboarding_complete', 'true');
     setShowOnboarding(false);
   };
 
@@ -572,7 +572,7 @@ function Router() {
               <div className="border-b bg-card px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2 font-semibold text-lg">
                   <Anchor className="h-5 w-5 text-primary" />
-                  MarinaMatch
+                  Vantage
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
                   ← Back
@@ -1965,10 +1965,10 @@ function Router() {
           </GatedLayout>
         )}
       </Route>
-      <Route path="/marinamatch">
+      <Route path="/vantage">
         {() => (
           <UnifiedLayout>
-            <MarinaMatchIndex />
+            <VantageIndex />
           </UnifiedLayout>
         )}
       </Route>

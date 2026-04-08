@@ -532,7 +532,7 @@ export default function ShipStoreDashboard() {
         <ContextIntegrationsPanel 
           contextKey="shipStore"
           title="Ship Store Integrations"
-          description="Connect POS and inventory systems to sync data with MarinaMatch."
+          description="Connect POS and inventory systems to sync data with Vantage."
         />
       </div>
 

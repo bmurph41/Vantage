@@ -1405,7 +1405,7 @@ workspaceRouter.post('/api/workspaces/:id/calendar/ics', async (req: Request, re
     const now = fmtDate(new Date());
 
     let ics = [
-      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MarinaMatch//Deal Workspace//EN',
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Vantage//Deal Workspace//EN',
       'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${ws.name} - Milestones`,
     ];
 
@@ -1414,7 +1414,7 @@ workspaceRouter.post('/api/workspaces/:id/calendar/ics', async (req: Request, re
       const end = fmtDate(new Date(new Date(m.dueDate).getTime() + 3600000));
       ics.push(
         'BEGIN:VEVENT', `DTSTART:${dt}`, `DTEND:${end}`, `DTSTAMP:${now}`,
-        `UID:ws-${ws.id}-ms-${m.id}@marinamatch`, `SUMMARY:${m.title}`,
+        `UID:ws-${ws.id}-ms-${m.id}@vantage`, `SUMMARY:${m.title}`,
         `DESCRIPTION:${m.notes || m.type}`,
         `STATUS:${m.status === 'completed' ? 'CANCELLED' : 'CONFIRMED'}`, 'END:VEVENT',
       );

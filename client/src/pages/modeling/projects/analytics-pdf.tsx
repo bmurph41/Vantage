@@ -239,7 +239,7 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
         </View>
 
         <View style={styles.footer}>
-          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 1/3</Text>
+          <Text>Vantage Modeling Projects Analytics • Confidential • Page 1/3</Text>
         </View>
       </Page>
 
@@ -313,7 +313,7 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
         </View>
 
         <View style={styles.footer}>
-          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 2/3</Text>
+          <Text>Vantage Modeling Projects Analytics • Confidential • Page 2/3</Text>
         </View>
       </Page>
 
@@ -393,7 +393,7 @@ export const AnalyticsPDFDocument = ({ analytics, filters }: Props) => {
         )}
 
         <View style={styles.footer}>
-          <Text>MarinaMatch Modeling Projects Analytics • Confidential • Page 3/3</Text>
+          <Text>Vantage Modeling Projects Analytics • Confidential • Page 3/3</Text>
         </View>
       </Page>
     </Document>

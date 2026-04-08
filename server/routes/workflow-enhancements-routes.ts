@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Workflow Enhancements Routes
+ * Vantage Workflow Enhancements Routes
  * Webhooks, Slack/Teams notifications, scheduled triggers,
  * workflow pipelines, approval queues, analytics
  */

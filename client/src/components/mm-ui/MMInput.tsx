@@ -1,7 +1,7 @@
 /**
  * MMInput - Text Input Component
  * 
- * Styled input that matches the MarinaMatch Modal Standard:
+ * Styled input that matches the Vantage Modal Standard:
  * - Light gray background
  * - Subtle border with rounded corners
  * - Blue focus ring

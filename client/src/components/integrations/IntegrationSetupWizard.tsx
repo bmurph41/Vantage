@@ -95,7 +95,7 @@ export function IntegrationSetupWizard({
               </div>
               <VisuallyHidden>
                 <DialogDescription>
-                  Step-by-step wizard to connect {integration.name} to MarinaMatch
+                  Step-by-step wizard to connect {integration.name} to Vantage
                 </DialogDescription>
               </VisuallyHidden>
             </DialogHeader>
@@ -114,7 +114,7 @@ export function IntegrationSetupWizard({
                   <h3 className="font-semibold mb-1">Enter your {integration.name} credentials</h3>
                   <p className="text-sm text-muted-foreground">
                     {integration.connectionGuide?.overview || 
-                      `MarinaMatch syncs ${integration.name} data securely.`}
+                      `Vantage syncs ${integration.name} data securely.`}
                   </p>
                 </div>
 
@@ -315,7 +315,7 @@ export function IntegrationSetupWizard({
               <div className="pt-4">
                 <p className="text-xs text-muted-foreground">
                   Your credentials are stored securely using industry-standard encryption. 
-                  MarinaMatch never shares your data with third parties.
+                  Vantage never shares your data with third parties.
                 </p>
               </div>
             </div>
@@ -367,7 +367,7 @@ function getDefaultSteps(integration: IntegrationItem): Array<{ title: string; d
       description: `Find your API key or generate a new one, then copy it to paste in the field above.`,
     },
     {
-      title: "Paste in MarinaMatch",
+      title: "Paste in Vantage",
       description: "Return here and paste your API key in the field above to complete the connection.",
     },
   ];

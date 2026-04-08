@@ -60,7 +60,7 @@ export function Sidebar({ pathname, className, onUpgradeClick }: SidebarProps) {
         )}>
           {!isCollapsed && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-lg text-primary">MarinaMatch</span>
+              <span className="font-semibold text-lg text-primary">Vantage</span>
               {subscription.status === 'trial' && (
                 <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
                   Trial

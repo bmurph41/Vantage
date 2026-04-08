@@ -7,18 +7,18 @@
  *   router.use('/workflow', workflowRouter);
  *
  * Resulting paths:
- *   GET    /api/marinamatch/workflow/rules
- *   POST   /api/marinamatch/workflow/rules
- *   PATCH  /api/marinamatch/workflow/rules/:id
- *   DELETE /api/marinamatch/workflow/rules/:id
- *   POST   /api/marinamatch/workflow/rules/:id/trigger   (manual fire)
- *   GET    /api/marinamatch/workflow/executions
- *   GET    /api/marinamatch/workflow/tasks
- *   PATCH  /api/marinamatch/workflow/tasks/:id
- *   GET    /api/marinamatch/workflow/notifications
- *   POST   /api/marinamatch/workflow/notifications/:id/read
- *   POST   /api/marinamatch/workflow/notifications/read-all
- *   GET    /api/marinamatch/workflow/stats
+ *   GET    /api/vantage/workflow/rules
+ *   POST   /api/vantage/workflow/rules
+ *   PATCH  /api/vantage/workflow/rules/:id
+ *   DELETE /api/vantage/workflow/rules/:id
+ *   POST   /api/vantage/workflow/rules/:id/trigger   (manual fire)
+ *   GET    /api/vantage/workflow/executions
+ *   GET    /api/vantage/workflow/tasks
+ *   PATCH  /api/vantage/workflow/tasks/:id
+ *   GET    /api/vantage/workflow/notifications
+ *   POST   /api/vantage/workflow/notifications/:id/read
+ *   POST   /api/vantage/workflow/notifications/read-all
+ *   GET    /api/vantage/workflow/stats
  */
 
 import { Router, Request, Response } from 'express';

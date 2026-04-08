@@ -1,6 +1,6 @@
 import { assetClassEnum } from "./analytics-schema";
 /**
- * MarinaMatch Payroll Module — Complete Drizzle Schema
+ * Vantage Payroll Module — Complete Drizzle Schema
  *
  * Tables:
  *   A) Permission scaffolding (payroll_permission_grants)

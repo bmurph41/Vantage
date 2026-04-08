@@ -20,7 +20,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { format } from "date-fns";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 
-interface MarinaMatchGoal {
+interface VantageGoal {
   id: string;
   goalType: string;
   goalName: string;
@@ -58,19 +58,19 @@ export function GoalsDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<MarinaMatchGoal | null>(null);
+  const [editingGoal, setEditingGoal] = useState<VantageGoal | null>(null);
 
-  const { data: goals, isLoading: goalsLoading } = useQuery<MarinaMatchGoal[]>({
-    queryKey: ["/api/marinamatch/intel/goals"],
+  const { data: goals, isLoading: goalsLoading } = useQuery<VantageGoal[]>({
+    queryKey: ["/api/vantage/intel/goals"],
   });
 
   const createGoalMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/marinamatch/intel/goals", data);
+      return apiRequest("POST", "/api/vantage/intel/goals", data);
     },
     onSuccess: () => {
       toast({ title: "Goal created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/goals"] });
       setIsCreating(false);
     },
     onError: (error: any) => {
@@ -80,11 +80,11 @@ export function GoalsDashboard() {
 
   const updateGoalMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return apiRequest("PATCH", `/api/marinamatch/intel/goals/${id}`, data);
+      return apiRequest("PATCH", `/api/vantage/intel/goals/${id}`, data);
     },
     onSuccess: () => {
       toast({ title: "Goal updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/goals"] });
       setEditingGoal(null);
     },
     onError: (error: any) => {
@@ -94,11 +94,11 @@ export function GoalsDashboard() {
 
   const deleteGoalMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/intel/goals/${id}`);
+      return apiRequest("DELETE", `/api/vantage/intel/goals/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Goal deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/goals"] });
     },
     onError: (error: any) => {
       toast({ title: "Failed to delete goal", description: error.message, variant: "destructive" });
@@ -107,11 +107,11 @@ export function GoalsDashboard() {
 
   const updateProgressMutation = useMutation({
     mutationFn: async ({ goalId, value, notes }: { goalId: string; value: number; notes?: string }) => {
-      return apiRequest("POST", `/api/marinamatch/intel/goals/${goalId}/progress`, { recordedValue: value, notes });
+      return apiRequest("POST", `/api/vantage/intel/goals/${goalId}/progress`, { recordedValue: value, notes });
     },
     onSuccess: () => {
       toast({ title: "Progress updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/goals"] });
     },
     onError: (error: any) => {
       toast({ title: "Failed to update progress", description: error.message, variant: "destructive" });
@@ -348,7 +348,7 @@ function GoalForm({
   isLoading,
   onCancel,
 }: {
-  goal?: MarinaMatchGoal;
+  goal?: VantageGoal;
   onSubmit: (data: any) => void;
   isLoading: boolean;
   onCancel: () => void;

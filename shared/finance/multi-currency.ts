@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Multi-Currency Modeling Engine
+ * Vantage Multi-Currency Modeling Engine
  * Deal-level currency, FX rates, LP statements in investor's base currency
  */
 

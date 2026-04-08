@@ -3,10 +3,10 @@
  *
  * Every {{TOKEN}} used across IC Deal Review Deck and Offering Memorandum templates.
  * Tokens are categorized by data source and binding type:
- *   - "live"   = auto-resolved from MarinaMatch workspace (modeling project, deal, rent roll, etc.)
+ *   - "live"   = auto-resolved from Vantage workspace (modeling project, deal, rent roll, etc.)
  *   - "manual" = user-entered or section-specific content filled by the document author
  *
- * Binding paths use dot-notation referencing MarinaMatch data models:
+ * Binding paths use dot-notation referencing Vantage data models:
  *   deal.*              → crmDeals table
  *   property.*          → crmProperties table
  *   modeling.*          → modelingProjects + scenarioVersions

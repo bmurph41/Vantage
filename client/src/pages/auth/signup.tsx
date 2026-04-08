@@ -246,7 +246,7 @@ function RightPanelContent({ step }: { step: StepId }) {
       <div className="flex flex-col justify-center h-full px-12 py-16">
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-white mb-3">Start your journey</h2>
-          <p className="text-cyan-100/80 text-lg">Join hundreds of firms already using MarinaMatch to close deals faster.</p>
+          <p className="text-cyan-100/80 text-lg">Join hundreds of firms already using Vantage to close deals faster.</p>
         </div>
         <div className="space-y-6">
           {features.map((f, i) => (
@@ -431,7 +431,7 @@ export default function SignupPage() {
         setLocation("/settings/packs?setup=true");
       } else {
         toast({
-          title: "Welcome to MarinaMatch!",
+          title: "Welcome to Vantage!",
           description: "Your account has been created. Start by selecting your packs.",
         });
         setLocation("/settings/packs");
@@ -527,7 +527,7 @@ export default function SignupPage() {
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 group-hover:shadow-cyan-500/50 transition-shadow">
                   <Anchor className="h-7 w-7 text-white" />
                 </div>
-                <span className="text-2xl font-bold text-white">MarinaMatch</span>
+                <span className="text-2xl font-bold text-white">Vantage</span>
               </div>
             </Link>
 
@@ -553,7 +553,7 @@ export default function SignupPage() {
                   Create Your Account
                 </CardTitle>
                 <CardDescription data-testid="text-signup-description">
-                  Get started with MarinaMatch in minutes
+                  Get started with Vantage in minutes
                 </CardDescription>
               </CardHeader>
               <Form {...form}>
@@ -714,7 +714,7 @@ export default function SignupPage() {
                         </TooltipProvider>
                       </div>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        MarinaMatch uses aggregated, de-identified platform data to improve analytics and produce industry benchmarks. Your marina's identity and raw financial files are never shared or sold.
+                        Vantage uses aggregated, de-identified platform data to improve analytics and produce industry benchmarks. Your marina's identity and raw financial files are never shared or sold.
                       </p>
                       <a href="/benchmarking" target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-600 hover:underline inline-flex items-center gap-1">
                         Learn how benchmarking works
@@ -743,7 +743,7 @@ export default function SignupPage() {
             </Card>
 
             <p className="text-center text-sm text-slate-400 mt-6">
-              &copy; 2026 MarinaMatch. All rights reserved.
+              &copy; 2026 Vantage. All rights reserved.
             </p>
           </div>
         </div>
@@ -1312,7 +1312,7 @@ export default function SignupPage() {
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
                 <Anchor className="h-5 w-5 text-white" />
               </div>
-              <span className="text-lg font-bold text-slate-800 hidden sm:inline">MarinaMatch</span>
+              <span className="text-lg font-bold text-slate-800 hidden sm:inline">Vantage</span>
             </div>
           </Link>
           <StepIndicator currentStep={step} />

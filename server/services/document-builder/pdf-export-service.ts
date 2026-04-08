@@ -837,7 +837,7 @@ class PdfExportService {
     const { currentPage, fonts, theme, pageSize, margins, options } = ctx;
     const [width] = pageSize;
     const contentWidth = width - margins.left - margins.right;
-    const companyName = options.companyName || 'MarinaMatch';
+    const companyName = options.companyName || 'Vantage';
 
     // Title
     currentPage.drawText('Important Disclosures', {

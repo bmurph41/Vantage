@@ -395,7 +395,7 @@ function resolveBlockContent(blockTemplate: any, project: any): any {
     if (!str) return '';
     return str
       .replace(/\{\{marinaName\}\}/g, project.name || 'Marina Property')
-      .replace(/\{\{companyName\}\}/g, 'MarinaMatch')
+      .replace(/\{\{companyName\}\}/g, 'Vantage')
       .replace(/\{\{location\}\}/g, `${project.city || ''}, ${project.state || ''}`.trim())
       .replace(/\{\{yearBuilt\}\}/g, assumptions.yearBuilt || 'N/A')
       .replace(/\{\{purchasePrice\}\}/g, formatCurrencyOM(assumptions.purchasePrice || 0))
@@ -1098,9 +1098,9 @@ router.get("/data-facade/sources/:projectId", async (req, res) => {
         sheetNames: d.sheetNames ?? [],
         metadata: d.metadata,
       })),
-      { id: "underwriting", name: "Underwriting Model", type: "internal", sourceType: 'marinamatch' },
-      { id: "sales-comps", name: "Sales Comparables", type: "internal", sourceType: 'marinamatch' },
-      { id: "rent-roll", name: "Rent Roll", type: "internal", sourceType: 'marinamatch' },
+      { id: "underwriting", name: "Underwriting Model", type: "internal", sourceType: 'vantage' },
+      { id: "sales-comps", name: "Sales Comparables", type: "internal", sourceType: 'vantage' },
+      { id: "rent-roll", name: "Rent Roll", type: "internal", sourceType: 'vantage' },
       { id: "market-demographics", name: "Market Demographics", type: "api", sourceType: 'external' },
     ];
     
@@ -2511,15 +2511,15 @@ router.post("/oms/:omId/email", async (req, res) => {
 
     const msg = {
       to: recipientEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com',
+      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com',
       subject: `Offering Memorandum: ${omName || 'Document'}`,
-      text: `Please find the attached Offering Memorandum: ${omName || 'Document'}.\n\nThis document was shared with you via MarinaMatch.`,
+      text: `Please find the attached Offering Memorandum: ${omName || 'Document'}.\n\nThis document was shared with you via Vantage.`,
       html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1a365d;">Offering Memorandum</h2>
         <p>You've been sent an Offering Memorandum: <strong>${omName || 'Document'}</strong></p>
-        <p>This document was shared with you via MarinaMatch.</p>
+        <p>This document was shared with you via Vantage.</p>
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="color: #718096; font-size: 12px;">MarinaMatch - Marina Acquisition Platform</p>
+        <p style="color: #718096; font-size: 12px;">Vantage - Marina Acquisition Platform</p>
       </div>`,
     };
 

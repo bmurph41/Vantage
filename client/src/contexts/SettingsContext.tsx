@@ -57,7 +57,7 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
   const root = document.documentElement;
 
   // Save to localStorage for flash prevention script
-  localStorage.setItem('marinamatch-theme', theme);
+  localStorage.setItem('vantage-theme', theme);
 
   // Determine if dark mode
   let isDark: boolean;

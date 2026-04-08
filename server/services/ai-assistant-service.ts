@@ -200,9 +200,9 @@ E) **Development**: ground-up or major expansion
 `;
 
 const PLATFORM_KNOWLEDGE = `
-## MarinaMatch Platform Guide
+## Vantage Platform Guide
 
-MarinaMatch is an institutional-grade multi-asset investment and management platform covering:
+Vantage is an institutional-grade multi-asset investment and management platform covering:
 
 ### Modules
 - **CRM**: Deals, contacts, companies, properties — full pipeline management
@@ -231,7 +231,7 @@ Restaurants, Auto Services, and 30+ more asset classes.
 
 const ADVISORY_SYSTEM_PROMPTS: Record<AdvisoryMode, string> = {
   general: `
-You are the MarinaMatch AI Advisor — an expert commercial real estate and marina acquisition consultant.
+You are the Vantage AI Advisor — an expert commercial real estate and marina acquisition consultant.
 You serve as a strategic sounding board with the precision of a 20-year institutional investor.
 
 Core capabilities:

@@ -125,7 +125,7 @@ export async function validateUrlAccessibility(url: string, timeoutMs: number = 
       method: "HEAD",
       signal: controller.signal,
       headers: {
-        "User-Agent": "MarinaMatch-LinkValidator/1.0",
+        "User-Agent": "Vantage-LinkValidator/1.0",
       },
       redirect: "follow",
     });

@@ -250,7 +250,7 @@ class ExportJobProcessor {
         includePageNumbers: options?.includePageNumbers !== false,
         includeHeaders: options?.includeHeaders !== false,
         includeFooters: options?.includeFooters !== false,
-        companyName: options?.companyName || 'MarinaMatch',
+        companyName: options?.companyName || 'Vantage',
         confidentialityNotice: options?.confidentialityNotice ||
           'CONFIDENTIAL - For Authorized Recipients Only',
       }
@@ -277,7 +277,7 @@ class ExportJobProcessor {
       {
         layout: options?.layout || '16x9',
         includeNotes: options?.includeNotes !== false,
-        companyName: options?.companyName || 'MarinaMatch',
+        companyName: options?.companyName || 'Vantage',
         confidentialityNotice: options?.confidentialityNotice ||
           'CONFIDENTIAL - For Authorized Recipients Only',
       }
@@ -306,7 +306,7 @@ class ExportJobProcessor {
         includePageNumbers: options?.includePageNumbers !== false,
         includeHeaders: options?.includeHeaders !== false,
         includeFooters: options?.includeFooters !== false,
-        companyName: options?.companyName || 'MarinaMatch',
+        companyName: options?.companyName || 'Vantage',
         confidentialityNotice: options?.confidentialityNotice ||
           'CONFIDENTIAL - For Authorized Recipients Only',
       }

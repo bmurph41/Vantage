@@ -71,7 +71,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
   {
     key: "dockmaster",
     name: "Dockmaster",
-    description: "Industry-leading marina management software for slip reservations, billing, and tenant management. Full data sync with MarinaMatch for complete operational visibility.",
+    description: "Industry-leading marina management software for slip reservations, billing, and tenant management. Full data sync with Vantage for complete operational visibility.",
     category: "Marina PMS",
     assetClasses: ["marina"],
     contexts: ["rentRoll", "crm", "financials", "boatRentals"],
@@ -98,7 +98,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Dockmaster to automatically sync your marina's slip inventory, tenant information, lease agreements, and billing data into MarinaMatch.",
+      overview: "Connect Dockmaster to automatically sync your marina's slip inventory, tenant information, lease agreements, and billing data into Vantage.",
       prerequisites: [
         "Dockmaster account with API access enabled",
         "Admin-level access to generate API credentials",
@@ -108,7 +108,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Log into Dockmaster Admin", description: "Go to your Dockmaster admin panel and navigate to Settings > API Configuration." },
         { title: "Generate API Key", description: "Click 'Generate New API Key' and copy the key. This will only be shown once." },
         { title: "Find Your Site ID", description: "Navigate to Settings > Account. Your Site ID is displayed at the top of the page." },
-        { title: "Enter Credentials", description: "Paste your API Key and Site ID into the fields below. MarinaMatch will securely encrypt and store them." },
+        { title: "Enter Credentials", description: "Paste your API Key and Site ID into the fields below. Vantage will securely encrypt and store them." },
         { title: "Test Connection", description: "Click 'Test Connection' to verify the credentials work correctly." },
         { title: "Configure Sync", description: "Choose how often you want data to sync and which modules to import." }
       ],
@@ -171,7 +171,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Marina Office to import your property data, tenant information, and billing records into MarinaMatch for unified management.",
+      overview: "Connect Marina Office to import your property data, tenant information, and billing records into Vantage for unified management.",
       prerequisites: [
         "Marina Office subscription with API access",
         "Property administrator privileges",
@@ -179,10 +179,10 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access Integration Settings", description: "In Marina Office, go to Settings > Integrations > API Access." },
-        { title: "Create API Credentials", description: "Click 'Add Integration' and select 'MarinaMatch' or 'Custom Integration'." },
+        { title: "Create API Credentials", description: "Click 'Add Integration' and select 'Vantage' or 'Custom Integration'." },
         { title: "Copy API Key", description: "Copy the generated API key. Store it safely as it won't be shown again." },
         { title: "Locate Property ID", description: "Go to Settings > Account. Your Property ID is listed under 'Account Details'." },
-        { title: "Connect in MarinaMatch", description: "Enter your credentials below and test the connection." }
+        { title: "Connect in Vantage", description: "Enter your credentials below and test the connection." }
       ],
       supportUrl: "https://help.marinaoffice.com/",
       apiDocsUrl: "https://developer.marinaoffice.com/",
@@ -234,7 +234,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Sharper MMS to sync your marina's slip inventory, tenant data, waiting lists, and service schedules into MarinaMatch.",
+      overview: "Connect Sharper MMS to sync your marina's slip inventory, tenant data, waiting lists, and service schedules into Vantage.",
       prerequisites: [
         "Sharper MMS subscription with API module enabled",
         "Administrator access level",
@@ -244,7 +244,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Enable API Access", description: "Contact Sharper MMS support to enable API access for your account." },
         { title: "Generate API Key", description: "Once enabled, go to Admin > System Settings > API Configuration." },
         { title: "Copy Credentials", description: "Copy your API Key and Marina Code from the settings page." },
-        { title: "Configure MarinaMatch", description: "Enter credentials below and select which data to sync." }
+        { title: "Configure Vantage", description: "Enter credentials below and select which data to sync." }
       ],
       supportUrl: "https://support.sharpermms.com/",
       estimatedTime: "10-15 minutes"
@@ -359,7 +359,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access Developer Settings", description: "In Docklyne, navigate to Settings > Developer > API Keys." },
-        { title: "Create New Key", description: "Click 'Create API Key' and name it 'MarinaMatch Integration'." },
+        { title: "Create New Key", description: "Click 'Create API Key' and name it 'Vantage Integration'." },
         { title: "Copy Credentials", description: "Copy the API Key and your Marina ID." },
         { title: "Complete Setup", description: "Paste credentials below and test the connection." }
       ],
@@ -563,7 +563,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
   {
     key: "dockwa",
     name: "Dockwa",
-    description: "The #1 marina reservation platform. Sync transient bookings, payments, and boater profiles directly into MarinaMatch.",
+    description: "The #1 marina reservation platform. Sync transient bookings, payments, and boater profiles directly into Vantage.",
     category: "Reservations & Booking",
     assetClasses: ["marina"],
     contexts: ["boatRentals", "rentRoll", "crm"],
@@ -584,7 +584,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { key: "apiSecret", label: "API Secret", type: "secret", required: true, helpText: "Your Dockwa API secret. Stored encrypted." },
         { key: "marinaId", label: "Marina ID", type: "string", required: true, helpText: "Found in Dockwa Pro dashboard." },
         { key: "syncTransients", label: "Sync Transient Bookings", type: "boolean", helpText: "Include transient/visitor reservations." },
-        { key: "syncAvailability", label: "Push Availability", type: "boolean", helpText: "Update Dockwa availability from MarinaMatch." },
+        { key: "syncAvailability", label: "Push Availability", type: "boolean", helpText: "Update Dockwa availability from Vantage." },
       ],
     },
     connectionGuide: {
@@ -650,7 +650,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Snag-A-Slip to import bookings made through their marketplace into MarinaMatch.",
+      overview: "Connect Snag-A-Slip to import bookings made through their marketplace into Vantage.",
       prerequisites: [
         "Snag-A-Slip marina partner account",
         "API credentials from partner portal"
@@ -658,7 +658,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       steps: [
         { title: "Access Partner Portal", description: "Log into the Snag-A-Slip partner portal." },
         { title: "Navigate to Integrations", description: "Go to Settings > API & Integrations." },
-        { title: "Generate API Key", description: "Create a new API key for MarinaMatch." },
+        { title: "Generate API Key", description: "Create a new API key for Vantage." },
         { title: "Copy Property Code", description: "Find your property code in account settings." },
         { title: "Complete Connection", description: "Enter both values below to connect." }
       ],
@@ -822,7 +822,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       steps: [
         { title: "Log Into SpeedyDock", description: "Access your SpeedyDock dashboard." },
         { title: "Go to API Settings", description: "Navigate to Settings > API Configuration." },
-        { title: "Generate Key", description: "Create a new API key for MarinaMatch integration." },
+        { title: "Generate Key", description: "Create a new API key for Vantage integration." },
         { title: "Enter Details", description: "Provide your API Key and Location ID below." }
       ],
       supportUrl: "https://support.speedydock.com/",
@@ -878,7 +878,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access API Dashboard", description: "Log into Scribble and go to Settings > API." },
-        { title: "Create API Key", description: "Click 'New Key' and name it 'MarinaMatch'." },
+        { title: "Create API Key", description: "Click 'New Key' and name it 'Vantage'." },
         { title: "Copy Account ID", description: "Find your Account ID at the top of the dashboard." },
         { title: "Set Default Sender", description: "Choose which phone number or email to use for outbound messages." }
       ],
@@ -1045,7 +1045,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
   {
     key: "sage_intacct",
     name: "Sage Intacct",
-    description: "Enterprise-grade cloud accounting for institutional marina operators and PE-backed portfolios. Sync multi-entity financials, GL, AP/AR, and dimensional reporting into MarinaMatch for sophisticated underwriting and portfolio analysis.",
+    description: "Enterprise-grade cloud accounting for institutional marina operators and PE-backed portfolios. Sync multi-entity financials, GL, AP/AR, and dimensional reporting into Vantage for sophisticated underwriting and portfolio analysis.",
     category: "Accounting",
     assetClasses: ["marina", "multifamily", "retail", "office", "industrial", "hotel", "str", "self_storage", "sfr", "rv_park", "mobile_home", "business", "laundromat", "mixed_use", "medical_office", "land", "duplex", "triplex", "quad"],
     contexts: ["financials", "bookkeeping", "analytics"],
@@ -1078,7 +1078,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Sage Intacct to sync your enterprise financial data — general ledger, P&L statements, Chart of Accounts, budgets, AP/AR, and dimensional reporting — directly into MarinaMatch for institutional-grade underwriting and portfolio analysis.",
+      overview: "Connect Sage Intacct to sync your enterprise financial data — general ledger, P&L statements, Chart of Accounts, budgets, AP/AR, and dimensional reporting — directly into Vantage for institutional-grade underwriting and portfolio analysis.",
       prerequisites: [
         "Sage Intacct subscription with Web Services enabled",
         "A Web Services user with appropriate permissions (read access to GL, AP, AR modules)",
@@ -1091,7 +1091,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Obtain Sender Credentials", description: "Contact your Sage Intacct account representative or visit the Sage Marketplace to get your Sender ID and Sender Password for API access." },
         { title: "Enter Credentials", description: "Paste your Company ID, Web Services User ID, password, Sender ID, and Sender Password into the fields above." },
         { title: "Configure Multi-Entity (Optional)", description: "If you manage multiple entities, enter the specific Location/Entity ID to sync, or leave blank to sync all entities." },
-        { title: "Test Connection", description: "Click 'Test Connection' to verify your credentials. MarinaMatch will attempt to read your Chart of Accounts as a validation step." }
+        { title: "Test Connection", description: "Click 'Test Connection' to verify your credentials. Vantage will attempt to read your Chart of Accounts as a validation step." }
       ],
       supportUrl: "https://www.sage.com/en-us/support/",
       apiDocsUrl: "https://developer.intacct.com/api/",
@@ -1140,7 +1140,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
   {
     key: "qualia",
     name: "Qualia",
-    description: "Real estate closing and title management platform. Track title orders, escrow status, closing milestones, and document delivery directly from your MarinaMatch deal pipeline for seamless marina acquisition closings.",
+    description: "Real estate closing and title management platform. Track title orders, escrow status, closing milestones, and document delivery directly from your Vantage deal pipeline for seamless marina acquisition closings.",
     category: "Transaction Management",
     assetClasses: ["marina", "multifamily", "retail", "office", "industrial", "hotel", "self_storage", "sfr", "mixed_use", "medical_office", "land", "duplex", "triplex", "quad"],
     contexts: ["crm", "documents", "financials"],
@@ -1180,7 +1180,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Get OAuth Credentials", description: "After app registration, copy your Client ID and Client Secret from the app settings page." },
         { title: "Choose Environment", description: "Select Sandbox for testing or Production for live transactions. We recommend testing in Sandbox first." },
         { title: "Enter Credentials", description: "Paste your Client ID and Client Secret into the fields above and select your environment." },
-        { title: "Authorize Access", description: "Click 'Connect' to initiate the OAuth flow. You'll be redirected to Qualia to authorize MarinaMatch access." },
+        { title: "Authorize Access", description: "Click 'Connect' to initiate the OAuth flow. You'll be redirected to Qualia to authorize Vantage access." },
         { title: "Configure Automation", description: "Choose whether to auto-create closing orders when deals move to 'Under Contract' and whether to sync closing documents to your VDR." }
       ],
       supportUrl: "https://support.qualia.com/",
@@ -1225,7 +1225,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
   {
     key: "docusign",
     name: "DocuSign",
-    description: "Industry-leading electronic signature platform. Send, track, and manage e-signatures for LOIs, purchase agreements, NDAs, LP subscription documents, and all transaction paperwork directly from MarinaMatch.",
+    description: "Industry-leading electronic signature platform. Send, track, and manage e-signatures for LOIs, purchase agreements, NDAs, LP subscription documents, and all transaction paperwork directly from Vantage.",
     category: "Document & E-Signature",
     assetClasses: ["marina", "multifamily", "retail", "office", "industrial", "hotel", "str", "self_storage", "sfr", "rv_park", "mobile_home", "business", "laundromat", "mixed_use", "medical_office", "land", "duplex", "triplex", "quad"],
     contexts: ["documents", "crm", "financials"],
@@ -1255,7 +1255,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect DocuSign to send documents for electronic signature directly from MarinaMatch. Track signature status on deals, auto-file signed documents to your Virtual Data Room, and use templates for common marina transaction documents.",
+      overview: "Connect DocuSign to send documents for electronic signature directly from Vantage. Track signature status on deals, auto-file signed documents to your Virtual Data Room, and use templates for common marina transaction documents.",
       prerequisites: [
         "DocuSign account (Business Pro or higher recommended for API access)",
         "Admin access to DocuSign to create an integration key",
@@ -1267,7 +1267,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Get Your Account ID", description: "On the API and Keys page, copy your API Account ID (the GUID shown at the top)." },
         { title: "Enter Credentials", description: "Paste your Integration Key, Secret Key, and Account ID into the fields above." },
         { title: "Choose Environment", description: "Select Demo to test with the DocuSign sandbox, or Production for live signatures." },
-        { title: "Authorize & Test", description: "Click 'Connect' to authorize. MarinaMatch will verify access by listing your available templates." },
+        { title: "Authorize & Test", description: "Click 'Connect' to authorize. Vantage will verify access by listing your available templates." },
         { title: "Configure Options", description: "Enable auto-filing to VDR and signature notifications for a fully automated workflow." }
       ],
       supportUrl: "https://support.docusign.com/",
@@ -1340,7 +1340,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Yardi Voyager to sync your multifamily or commercial property's rent roll, tenant data, financial statements, and maintenance records into MarinaMatch for comprehensive asset management.",
+      overview: "Connect Yardi Voyager to sync your multifamily or commercial property's rent roll, tenant data, financial statements, and maintenance records into Vantage for comprehensive asset management.",
       prerequisites: [
         "Yardi Voyager license with API access enabled",
         "System administrator or IT access to generate API credentials",
@@ -1352,7 +1352,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Obtain API Credentials", description: "Your IT team will provide an API key and your Yardi server URL." },
         { title: "Find Property Code", description: "In Yardi Voyager, navigate to Setup > Properties. The property code is listed in the property details." },
         { title: "Enter Credentials", description: "Paste your API Key, Server URL, and Property Code into the fields above." },
-        { title: "Test Connection", description: "Click 'Test Connection' to verify MarinaMatch can reach your Yardi instance." },
+        { title: "Test Connection", description: "Click 'Test Connection' to verify Vantage can reach your Yardi instance." },
         { title: "Configure Sync", description: "Choose sync frequency and which modules to import (rent roll, financials, CRM)." }
       ],
       supportUrl: "https://www.yardi.com/support/",
@@ -1434,7 +1434,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access RealPage Exchange", description: "Log into the RealPage Exchange portal to manage API integrations." },
-        { title: "Generate API Key", description: "Navigate to Integrations > API Keys and create a new key for MarinaMatch." },
+        { title: "Generate API Key", description: "Navigate to Integrations > API Keys and create a new key for Vantage." },
         { title: "Find PMC and Site IDs", description: "Your PMC ID and Site ID are shown in Account Settings > Property Configuration." },
         { title: "Enter Credentials", description: "Input your API Key, PMC ID, and Site ID in the fields above." },
         { title: "Test Connection", description: "Click 'Test Connection' to verify access to your property data." }
@@ -1501,7 +1501,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect AppFolio to sync your property's rent roll, tenant records, financial statements, and maintenance history into MarinaMatch.",
+      overview: "Connect AppFolio to sync your property's rent roll, tenant records, financial statements, and maintenance history into Vantage.",
       prerequisites: [
         "AppFolio Property Manager Plus subscription",
         "Administrator access to enable API integrations",
@@ -1578,7 +1578,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Entrata to sync your multifamily property's leasing data, financials, resident information, and prospect pipeline into MarinaMatch.",
+      overview: "Connect Entrata to sync your multifamily property's leasing data, financials, resident information, and prospect pipeline into Vantage.",
       prerequisites: [
         "Entrata subscription with API access enabled",
         "Administrator access to generate API credentials",
@@ -1651,7 +1651,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect ResMan to import your multifamily property's rent roll, resident data, and financial records into MarinaMatch.",
+      overview: "Connect ResMan to import your multifamily property's rent roll, resident data, and financial records into Vantage.",
       prerequisites: [
         "ResMan subscription with API access",
         "Account ID and Property ID from ResMan settings",
@@ -1659,7 +1659,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access Integration Hub", description: "In ResMan, navigate to Settings > Integration Hub." },
-        { title: "Create API Key", description: "Click 'New Integration' and generate an API key for MarinaMatch." },
+        { title: "Create API Key", description: "Click 'New Integration' and generate an API key for Vantage." },
         { title: "Find Account and Property IDs", description: "Your Account ID is in Settings > Account. Property ID is in the property details." },
         { title: "Enter Credentials", description: "Input your API Key, Account ID, and Property ID." },
         { title: "Test and Sync", description: "Test the connection and configure your initial sync." }
@@ -1720,7 +1720,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect SiteLink to sync your self-storage facility's unit inventory, tenant records, occupancy data, and financial information into MarinaMatch for comprehensive asset analysis.",
+      overview: "Connect SiteLink to sync your self-storage facility's unit inventory, tenant records, occupancy data, and financial information into Vantage for comprehensive asset analysis.",
       prerequisites: [
         "SiteLink Web Edition with API access enabled",
         "Corp Control administrator access",
@@ -1860,7 +1860,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Easy Storage Solutions to import your facility's unit inventory, tenant records, and billing data into MarinaMatch.",
+      overview: "Connect Easy Storage Solutions to import your facility's unit inventory, tenant records, and billing data into Vantage.",
       prerequisites: [
         "Easy Storage Solutions subscription",
         "Account administrator access",
@@ -1995,7 +1995,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Oracle Opera PMS to sync your hotel's reservations, room inventory, guest profiles, and financial performance data into MarinaMatch for comprehensive hospitality asset analysis.",
+      overview: "Connect Oracle Opera PMS to sync your hotel's reservations, room inventory, guest profiles, and financial performance data into Vantage for comprehensive hospitality asset analysis.",
       prerequisites: [
         "Oracle Opera PMS Cloud license",
         "OHIP (Oracle Hospitality Integration Platform) access",
@@ -2080,7 +2080,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Mews to sync your hotel's reservations, guest profiles, room inventory, and revenue data into MarinaMatch.",
+      overview: "Connect Mews to sync your hotel's reservations, guest profiles, room inventory, and revenue data into Vantage.",
       prerequisites: [
         "Mews Operations subscription",
         "Access to Mews Commander (admin panel)",
@@ -2162,7 +2162,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Get OAuth Credentials", description: "Copy your Client ID and Client Secret from the application settings." },
         { title: "Find Property ID", description: "Your Property ID is in your Cloudbeds dashboard under Property Settings." },
         { title: "Enter Credentials", description: "Input your OAuth credentials and Property ID." },
-        { title: "Authorize", description: "Click 'Connect' to authorize MarinaMatch via OAuth." }
+        { title: "Authorize", description: "Click 'Connect' to authorize Vantage via OAuth." }
       ],
       supportUrl: "https://support.cloudbeds.com/",
       apiDocsUrl: "https://docs.cloudbeds.com/",
@@ -2219,7 +2219,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect RoomKey PMS to sync your hotel's reservations, room inventory, and revenue data into MarinaMatch.",
+      overview: "Connect RoomKey PMS to sync your hotel's reservations, room inventory, and revenue data into Vantage.",
       prerequisites: [
         "RoomKey PMS subscription",
         "Administrator access",
@@ -2289,7 +2289,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Guesty to sync your short-term rental portfolio's reservations, listings, guest data, channel performance, and revenue metrics into MarinaMatch for STR asset analysis.",
+      overview: "Connect Guesty to sync your short-term rental portfolio's reservations, listings, guest data, channel performance, and revenue metrics into Vantage for STR asset analysis.",
       prerequisites: [
         "Guesty Pro or Enterprise subscription",
         "API access enabled via Guesty Developer Portal",
@@ -2431,7 +2431,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect OwnerRez to sync vacation rental reservations, listing data, owner statements, and guest information into MarinaMatch.",
+      overview: "Connect OwnerRez to sync vacation rental reservations, listing data, owner statements, and guest information into Vantage.",
       prerequisites: [
         "OwnerRez subscription",
         "API credentials from Settings > API",
@@ -2573,7 +2573,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Campspot to sync your RV park's site inventory, reservations, guest data, occupancy metrics, and revenue information into MarinaMatch.",
+      overview: "Connect Campspot to sync your RV park's site inventory, reservations, guest data, occupancy metrics, and revenue information into Vantage.",
       prerequisites: [
         "Campspot subscription with API access",
         "Park ID from your Campspot dashboard",
@@ -2581,7 +2581,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access Partner Portal", description: "Log into the Campspot Partner Portal to manage API integrations." },
-        { title: "Generate API Key", description: "Navigate to Settings > API and create a new API key for MarinaMatch." },
+        { title: "Generate API Key", description: "Navigate to Settings > API and create a new API key for Vantage." },
         { title: "Find Park ID", description: "Your Park ID is displayed in the dashboard header or in Park Settings." },
         { title: "Enter Credentials", description: "Input your API Key and Park ID into the fields above." },
         { title: "Configure Options", description: "Enable seasonal rate data if you want pricing analytics." },
@@ -2780,7 +2780,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect CampLife to import your RV park's site inventory, reservations, and guest data into MarinaMatch.",
+      overview: "Connect CampLife to import your RV park's site inventory, reservations, and guest data into Vantage.",
       prerequisites: [
         "CampLife subscription",
         "Administrator access",
@@ -2788,7 +2788,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access Settings", description: "Log into CampLife and navigate to Settings > API." },
-        { title: "Generate API Key", description: "Create a new API key for MarinaMatch." },
+        { title: "Generate API Key", description: "Create a new API key for Vantage." },
         { title: "Find Park ID", description: "Your Park ID is displayed on the dashboard." },
         { title: "Enter Credentials", description: "Input your API Key and Park ID below." }
       ],
@@ -2848,7 +2848,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect MRI Software to sync your commercial real estate portfolio's lease data, tenant information, financial statements, and investment analytics into MarinaMatch.",
+      overview: "Connect MRI Software to sync your commercial real estate portfolio's lease data, tenant information, financial statements, and investment analytics into Vantage.",
       prerequisites: [
         "MRI Software license with API access (MRI Connect)",
         "Administrator or IT access to generate API credentials",
@@ -2856,7 +2856,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
       steps: [
         { title: "Access MRI Connect", description: "Log into MRI Connect at connect.mrisoftware.com." },
-        { title: "Register Integration", description: "Navigate to Integrations > New Integration and register MarinaMatch as a new partner." },
+        { title: "Register Integration", description: "Navigate to Integrations > New Integration and register Vantage as a new partner." },
         { title: "Generate API Key", description: "Create API credentials and copy the API Key." },
         { title: "Find Entity ID", description: "Your Entity ID is in the property configuration within MRI." },
         { title: "Enter Credentials", description: "Input your API Key, Client ID, and Entity ID." },
@@ -2923,7 +2923,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect VTS to sync your commercial property's leasing pipeline, space inventory, deal activity, and portfolio analytics into MarinaMatch.",
+      overview: "Connect VTS to sync your commercial property's leasing pipeline, space inventory, deal activity, and portfolio analytics into Vantage.",
       prerequisites: [
         "VTS subscription with API access (VTS Marketplace)",
         "OAuth credentials from VTS Developer Portal",
@@ -2934,7 +2934,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Register Application", description: "Create a new app and obtain your OAuth Client ID and Secret." },
         { title: "Find Building ID", description: "Your Building ID is in the property details within your VTS dashboard." },
         { title: "Enter Credentials", description: "Input your OAuth credentials and Building ID." },
-        { title: "Authorize", description: "Click 'Connect' to authorize MarinaMatch via OAuth flow." }
+        { title: "Authorize", description: "Click 'Connect' to authorize Vantage via OAuth flow." }
       ],
       supportUrl: "https://support.vts.com/",
       apiDocsUrl: "https://developer.vts.com/",
@@ -2993,7 +2993,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect CoStar to access comprehensive commercial real estate market data, comparable sales, property analytics, and demographic intelligence directly within MarinaMatch.",
+      overview: "Connect CoStar to access comprehensive commercial real estate market data, comparable sales, property analytics, and demographic intelligence directly within Vantage.",
       prerequisites: [
         "CoStar subscription with API access",
         "API credentials from CoStar Developer Portal",
@@ -3062,11 +3062,11 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       fields: [
         { key: "apiKey", label: "API Key", type: "secret", required: true, helpText: "Your Buildout API key from Account Settings." },
         { key: "companyId", label: "Company ID", type: "string", required: true, helpText: "Your Buildout company identifier." },
-        { key: "syncListings", label: "Sync Listings Bidirectionally", type: "boolean", helpText: "Push MarinaMatch listings to Buildout." },
+        { key: "syncListings", label: "Sync Listings Bidirectionally", type: "boolean", helpText: "Push Vantage listings to Buildout." },
       ],
     },
     connectionGuide: {
-      overview: "Connect Buildout to sync your CRE listings, prospect pipeline, deal activity, and marketing materials between MarinaMatch and Buildout.",
+      overview: "Connect Buildout to sync your CRE listings, prospect pipeline, deal activity, and marketing materials between Vantage and Buildout.",
       prerequisites: [
         "Buildout subscription with API access",
         "Company ID from Buildout account settings",
@@ -3135,7 +3135,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Propertyware to sync your single-family rental portfolio's lease data, tenant records, financial statements, and owner reports into MarinaMatch.",
+      overview: "Connect Propertyware to sync your single-family rental portfolio's lease data, tenant records, financial statements, and owner reports into Vantage.",
       prerequisites: [
         "Propertyware subscription with API access",
         "Administrator access to generate API credentials",
@@ -3212,7 +3212,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Buildium to sync your residential portfolio's lease data, tenant records, and financial information into MarinaMatch.",
+      overview: "Connect Buildium to sync your residential portfolio's lease data, tenant records, and financial information into Vantage.",
       prerequisites: [
         "Buildium Premium or Growth subscription",
         "API credentials from Settings > API Access"
@@ -3279,7 +3279,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Rent Manager to sync your property portfolio's rent roll, tenant data, general ledger, and financial statements into MarinaMatch.",
+      overview: "Connect Rent Manager to sync your property portfolio's rent roll, tenant data, general ledger, and financial statements into Vantage.",
       prerequisites: [
         "Rent Manager subscription with API module",
         "Admin access to generate API credentials",
@@ -3352,7 +3352,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect TenantCloud to import your rental property's lease data, tenant records, and payment history into MarinaMatch.",
+      overview: "Connect TenantCloud to import your rental property's lease data, tenant records, and payment history into Vantage.",
       prerequisites: [
         "TenantCloud subscription (Growth or Business plan for API access)",
         "Account ID from settings"
@@ -3419,7 +3419,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Gusto to automatically sync payroll data, labor costs, tax withholdings, and benefits expenses into MarinaMatch for accurate operating expense tracking and financial analysis.",
+      overview: "Connect Gusto to automatically sync payroll data, labor costs, tax withholdings, and benefits expenses into Vantage for accurate operating expense tracking and financial analysis.",
       prerequisites: [
         "Gusto subscription (Simple, Plus, or Premium plan)",
         "Company admin access to authorize API connections",
@@ -3430,7 +3430,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         { title: "Get OAuth Credentials", description: "Copy your Client ID and Client Secret from the app settings." },
         { title: "Find Company ID", description: "Your Company ID is in the URL when logged into Gusto (e.g., app.gusto.com/company/UUID)." },
         { title: "Enter Credentials", description: "Paste your OAuth credentials and Company ID into the fields above." },
-        { title: "Authorize Connection", description: "Click 'Connect' to authorize MarinaMatch via Gusto's OAuth flow." },
+        { title: "Authorize Connection", description: "Click 'Connect' to authorize Vantage via Gusto's OAuth flow." },
         { title: "Configure Sync", description: "Choose how often to sync payroll data." }
       ],
       supportUrl: "https://support.gusto.com/",
@@ -3504,7 +3504,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
         "ADP Marketplace API credentials"
       ],
       steps: [
-        { title: "Access ADP Marketplace", description: "Go to the ADP Marketplace and register MarinaMatch as a connected app." },
+        { title: "Access ADP Marketplace", description: "Go to the ADP Marketplace and register Vantage as a connected app." },
         { title: "Get OAuth Credentials", description: "Copy your Client ID and Client Secret from the app registration." },
         { title: "Find Company Code", description: "Your Company Code is in ADP RUN under Company > Company Info." },
         { title: "Enter Credentials", description: "Input your OAuth credentials and Company Code." },
@@ -3639,7 +3639,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect CleanCloud to sync your laundromat's revenue, transaction data, customer records, and business analytics into MarinaMatch for comprehensive operating performance tracking.",
+      overview: "Connect CleanCloud to sync your laundromat's revenue, transaction data, customer records, and business analytics into Vantage for comprehensive operating performance tracking.",
       prerequisites: [
         "CleanCloud subscription with API access",
         "Store ID from your CleanCloud account",
@@ -3712,7 +3712,7 @@ export const INTEGRATION_REGISTRY: IntegrationRegistryItem[] = [
       ],
     },
     connectionGuide: {
-      overview: "Connect Cents to sync your laundromat's revenue, transaction data, machine performance metrics, and customer analytics into MarinaMatch.",
+      overview: "Connect Cents to sync your laundromat's revenue, transaction data, machine performance metrics, and customer analytics into Vantage.",
       prerequisites: [
         "Cents subscription",
         "Admin access to the Cents dashboard",

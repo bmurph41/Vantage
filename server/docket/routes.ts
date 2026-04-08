@@ -7,7 +7,7 @@ import { fetchAllSourcesWithReport } from "./services/rss-fetcher";
 import bcrypt from "bcrypt";
 import { initializeWebSocket } from "./websocket";
 import type { User } from "@shared/docket-schema";
-import { requireMarinaMatchAuth, type DocketRequest } from "./middleware/auth";
+import { requireVantageAuth, type DocketRequest } from "./middleware/auth";
 import {
   generateCategorySummary,
   generateAllCategorySummaries,
@@ -141,12 +141,12 @@ const BookmarkSchema = z.object({
 });
 
 export async function registerDocketRoutes(app: Express, docketStorage: IStorage): Promise<void> {
-  // Note: Docket routes are integrated into MarinaMatch
-  // Authentication is handled by MarinaMatch's central auth system
-  // All routes use requireMarinaMatchAuth middleware
+  // Note: Docket routes are integrated into Vantage
+  // Authentication is handled by Vantage's central auth system
+  // All routes use requireVantageAuth middleware
 
   // Legacy Standalone Authentication Endpoints - DISABLED in integrated version
-  // These endpoints are not used when Docket is integrated into MarinaMatch
+  // These endpoints are not used when Docket is integrated into Vantage
   /* app.post("/api/docket/auth/signup", async (req, res) => {
     try {
       const { username, password } = SignupSchema.parse(req.body);
@@ -284,7 +284,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     criteria: z.string(),
   });
 
-  app.get("/api/docket/saved-filters", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/saved-filters", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       if (!req.docketUser) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -298,7 +298,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/saved-filters", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/saved-filters", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       if (!req.docketUser) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -322,7 +322,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/saved-filters/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/saved-filters/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       if (!req.docketUser) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -346,7 +346,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/saved-filters/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/saved-filters/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       if (!req.docketUser) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -367,7 +367,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Articles endpoints
-  app.get("/api/docket/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const filters = ArticleQuerySchema.parse(req.query);
       const userId = req.docketUser?.id || null;
@@ -387,7 +387,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/articles/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -408,7 +408,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/articles/:id/bookmark", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/articles/:id/bookmark", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { isBookmarked } = BookmarkSchema.parse(req.body);
@@ -425,7 +425,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Analytics endpoints - sentiment trends
-  app.get("/api/docket/sentiment/trends", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/sentiment/trends", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const days = parseInt(req.query.days as string) || 30;
       const trends = await docketStorage.getSentimentTrends(days);
@@ -438,7 +438,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Analytics endpoints
-  app.get("/api/docket/analytics/stats", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/analytics/stats", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const stats = await docketStorage.getSystemStats();
       res.json(stats || {
@@ -457,7 +457,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/analytics/trending", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/analytics/trending", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const trending = await docketStorage.getTrendingTopics();
       res.json(trending);
@@ -467,7 +467,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/analytics/categories", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/analytics/categories", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const categories = await docketStorage.getCategoryDistribution();
       res.json(categories);
@@ -478,7 +478,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Returns all valid categories (for category editing UI)
-  app.get("/api/docket/categories/all", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/categories/all", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       res.json(VALID_CATEGORIES);
     } catch (error) {
@@ -487,7 +487,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/analytics/sources", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/analytics/sources", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       // Get sources from actual articles (dynamically updates as articles are added)
       const sources = await docketStorage.getSourceDistribution();
@@ -499,7 +499,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // RSS Sources endpoints
-  app.get("/api/docket/rss-sources", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/rss-sources", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const sources = await docketStorage.getRssSources();
       res.json(sources);
@@ -510,7 +510,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Manual RSS fetch trigger
-  app.post("/api/docket/rss-sources/fetch", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/rss-sources/fetch", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const newArticles = await triggerManualFetch();
       res.json({ 
@@ -525,7 +525,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // RSS Source Management - Admin endpoint
-  app.get("/api/docket/admin/rss-sources", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/admin/rss-sources", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const sources = await docketStorage.getAllRssSources();
       res.json(sources);
@@ -535,7 +535,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/rss-sources", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/rss-sources", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const RssSourceSchema = z.object({
         name: z.string().min(1, "Name is required"),
@@ -581,7 +581,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
 
 
   // Seed BizJournals regional feeds for marina M&A coverage
-  app.post("/api/docket/rss-sources/seed-bizjournals", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/rss-sources/seed-bizjournals", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       console.log("[Docket] Seeding BizJournals regional feeds...");
       const results = await seedBizJournalsFeeds();
@@ -596,7 +596,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/rss-sources/seed-trade-publications", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/rss-sources/seed-trade-publications", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       console.log("[Docket] Seeding trade publication feeds...");
       const results = await seedTradePublicationFeeds();
@@ -611,7 +611,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/rss-sources/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/rss-sources/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const RssSourceUpdateSchema = z.object({
         name: z.string().min(1).optional(),
@@ -638,7 +638,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/rss-sources/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/rss-sources/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       await docketStorage.deleteRssSource(id);
@@ -650,7 +650,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Preview RSS feed or web scrape before adding
-  app.post("/api/docket/rss-sources/preview", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/rss-sources/preview", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { url, sourceType = "rss" } = req.body;
       const { scoreArticle } = await import("./services/scoring");
@@ -701,7 +701,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Manual fetch trigger
-  app.post("/api/docket/fetch", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/fetch", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const count = await triggerManualFetch();
       res.json({ message: `Successfully fetched ${count} new articles`, newArticles: count });
@@ -711,7 +711,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/fetch-all", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/fetch-all", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const report = await fetchAllSourcesWithReport();
       res.json({
@@ -728,7 +728,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Auto-fetch status endpoint
-  app.get("/api/docket/auto-fetch/status", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/auto-fetch/status", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const status = getAutoFetchStatus();
       res.json(status);
@@ -739,7 +739,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Toggle auto-fetch
-  app.post("/api/docket/auto-fetch/toggle", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/auto-fetch/toggle", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { enabled } = req.body;
       if (typeof enabled !== 'boolean') {
@@ -754,7 +754,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Content freshness check - alerts if no new articles in 24+ hours
-  app.get("/api/docket/health/content-freshness", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/health/content-freshness", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articles = await docketStorage.getArticles(null, { limit: 1, offset: 0 });
       const latestArticle = articles[0];
@@ -791,7 +791,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // AI quota status endpoint
-  app.get("/api/docket/health/ai-quota", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/health/ai-quota", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { getQuotaStatus, resetQuotaState } = await import("./services/ai-quota-manager");
       const status = getQuotaStatus();
@@ -808,7 +808,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Reset AI quota state (admin only)
-  app.post("/api/docket/admin/reset-ai-quota", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/admin/reset-ai-quota", requireVantageAuth, async (req: DocketRequest, res) => {
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
     }
@@ -830,7 +830,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Quick backfill for last 10 days (triggers without requiring admin)
-  app.post("/api/docket/backfill-recent", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/backfill-recent", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { backfillHistoricalArticles } = await import("./services/backfill");
       
@@ -863,7 +863,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Historical backfill endpoint (admin only)
-  app.post("/api/docket/admin/backfill", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/admin/backfill", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -904,7 +904,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Re-summarize existing articles with updated AI prompt (admin only)
-  app.post("/api/docket/admin/resummarize-articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/admin/resummarize-articles", requireVantageAuth, async (req: DocketRequest, res) => {
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
     }
@@ -941,7 +941,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Manual summary generation (admin only)
-  app.post("/api/docket/admin/generate-summaries", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/admin/generate-summaries", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -984,7 +984,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Batch recategorization endpoints
-  app.post("/api/docket/articles/recategorize-batch", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/recategorize-batch", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { categorizeAndTag } = await import("./services/categorizer");
       const articles = await docketStorage.getArticles(null, { limit: 1000, offset: 0 });
@@ -1024,7 +1024,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Deal extraction backfill - extract deals from existing articles
-  app.post("/api/docket/deals/backfill-from-articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/deals/backfill-from-articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { enrichArticle } = await import("./services/ai-enrichment");
       
@@ -1206,7 +1206,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Manual category correction
-  app.patch("/api/docket/articles/:id/category", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/articles/:id/category", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const CategoryUpdateSchema = z.object({
         categories: z.array(z.enum(VALID_CATEGORIES))
@@ -1244,7 +1244,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Manual region correction
-  app.patch("/api/docket/articles/:id/region", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/articles/:id/region", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const RegionUpdateSchema = z.object({
         region: z.enum(["US/Domestic", "International"]).nullable()
@@ -1274,7 +1274,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Full article update (edit title, summary, etc.)
-  app.patch("/api/docket/articles/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/articles/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const ArticleUpdateSchema = z.object({
         title: z.string().min(1).optional(),
@@ -1312,7 +1312,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete article permanently
-  app.delete("/api/docket/articles/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/articles/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -1330,7 +1330,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Auto-recategorize using updated AI logic
-  app.post("/api/docket/articles/:id/recategorize", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:id/recategorize", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { categorizeAndTag } = await import("./services/categorizer");
       const id = parseInt(req.params.id);
@@ -1355,7 +1355,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Export training data
-  app.get("/api/docket/training/export", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/training/export", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const manuallyReviewedArticles = await docketStorage.getManuallyReviewedArticles();
       
@@ -1379,7 +1379,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Remove article with reason for AI learning (requires auth)
-  app.post("/api/docket/articles/:id/remove", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:id/remove", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const RemovalSchema = z.object({
         reason: z.string().min(10, "Removal reason must be at least 10 characters"),
@@ -1388,7 +1388,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
       const id = parseInt(req.params.id);
       const { reason } = RemovalSchema.parse(req.body);
       
-      // Get userId from authenticated session (guaranteed by requireMarinaMatchAuth middleware)
+      // Get userId from authenticated session (guaranteed by requireVantageAuth middleware)
       const userId = req.docketUser!.id;
 
       await docketStorage.removeArticle(id, reason, userId);
@@ -1411,7 +1411,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get removal patterns for review
-  app.get("/api/docket/articles/removal-patterns", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/removal-patterns", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const patterns = await docketStorage.getRemovalPatterns();
       res.json(patterns);
@@ -1424,7 +1424,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // Global Engagement Tracking (NOT org-scoped - powers cross-organization Trending Now)
   
   // Record article view
-  app.post("/api/docket/articles/:id/view", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:id/view", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       if (isNaN(articleId) || articleId < 1) {
@@ -1444,7 +1444,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Toggle article like
-  app.post("/api/docket/articles/:id/like", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:id/like", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       if (isNaN(articleId) || articleId < 1) {
@@ -1468,7 +1468,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get article engagement stats
-  app.get("/api/docket/articles/:id/engagement", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:id/engagement", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       if (isNaN(articleId) || articleId < 1) {
@@ -1487,7 +1487,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get trending articles (global across all organizations)
-  app.get("/api/docket/articles/trending", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/trending", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const limitParam = req.query.limit as string | undefined;
       const hoursBackParam = req.query.hoursBack as string | undefined;
@@ -1515,7 +1515,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get user's liked articles
-  app.get("/api/docket/user/likes", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/user/likes", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const userId = req.docketUser!.id;
       const likedArticleIds = await docketStorage.getUserLikedArticles(userId);
@@ -1527,7 +1527,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Entity Extraction & Tracking endpoints (Institutional Intelligence - Protected)
-  app.get("/api/docket/entities", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const typeParam = req.query.type as string | undefined;
       const limitParam = req.query.limit as string | undefined;
@@ -1550,7 +1550,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/entities/search", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/search", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const query = req.query.q as string;
       const typeParam = req.query.type as string | undefined;
@@ -1575,7 +1575,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/entities/:id/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/:id/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const entityId = parseInt(req.params.id, 10);
       const limitParam = req.query.limit as string | undefined;
@@ -1598,7 +1598,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/articles/:id/entities", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:id/entities", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       
@@ -1629,7 +1629,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
 
   const WatchlistUpdateSchema = WatchlistSchema.partial();
 
-  app.get("/api/docket/watchlists", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/watchlists", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const watchlists = await docketStorage.getWatchlistsByUser(req.docketUser!.id, req.docketUser!.orgId);
       res.json(watchlists);
@@ -1639,7 +1639,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/watchlists", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/watchlists", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -1663,7 +1663,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/watchlists/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/watchlists/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const watchlist = await docketStorage.getWatchlistById(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!watchlist) {
@@ -1677,7 +1677,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/watchlists/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/watchlists/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const data = WatchlistUpdateSchema.parse(req.body);
       const watchlist = await docketStorage.updateWatchlist(req.params.id, req.docketUser!.id, req.docketUser!.orgId, data);
@@ -1696,7 +1696,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/watchlists/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/watchlists/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const deleted = await docketStorage.deleteWatchlist(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!deleted) {
@@ -1710,7 +1710,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/watchlists/:id/entities/:entityId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/watchlists/:id/entities/:entityId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const entityId = parseInt(req.params.entityId, 10);
       if (isNaN(entityId) || entityId < 1) {
@@ -1737,7 +1737,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/watchlists/:id/entities/:entityId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/watchlists/:id/entities/:entityId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const entityId = parseInt(req.params.entityId, 10);
       if (isNaN(entityId) || entityId < 1) {
@@ -1756,7 +1756,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/watchlists/:id/entities", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/watchlists/:id/entities", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const entities = await docketStorage.getWatchlistEntities(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       res.json(entities);
@@ -1766,7 +1766,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/watchlists/:id/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/watchlists/:id/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
       const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
@@ -1780,7 +1780,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Entity endpoints
-  app.get("/api/docket/entities/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const entity = await docketStorage.getEntityById(id);
@@ -1796,7 +1796,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/entities/:id/analytics", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/:id/analytics", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const analytics = await docketStorage.getEntityAnalytics(id);
@@ -1807,7 +1807,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/entities/:id/deals", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/:id/deals", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const role = req.query.role as 'buyer' | 'seller' | undefined;
@@ -1862,7 +1862,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/entities/:id/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/entities/:id/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
@@ -1874,7 +1874,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/ma-spotlight-analytics", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ma-spotlight-analytics", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const region = req.query.region as string | undefined;
 
@@ -1936,7 +1936,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // M&A Spotlight articles - articles tagged with M&A or Marina Sale categories
-  app.get("/api/docket/ma-spotlight-articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ma-spotlight-articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
       const offset = parseInt(req.query.offset as string, 10) || 0;
@@ -1963,7 +1963,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Deal endpoints
-  app.get("/api/docket/deals/analytics", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/deals/analytics", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       // Parse filters (subset of DealQuerySchema)
       const filters: {
@@ -1998,7 +1998,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/deals", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/deals", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const params = DealQuerySchema.parse(req.query);
       
@@ -2074,7 +2074,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/deals/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/deals/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const dealId = parseInt(req.params.id, 10);
       if (isNaN(dealId) || dealId < 1) {
@@ -2103,7 +2103,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     confidence: z.number().min(0).max(100).optional(),
   });
 
-  app.patch("/api/docket/deals/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/deals/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     // Role check for admin, analyst, or partner
     if (!['admin', 'analyst', 'partner'].includes(req.docketUser!.role)) {
       return res.status(403).json({ error: "Admin, Analyst, or Partner access required" });
@@ -2155,11 +2155,11 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     state: z.string().optional(),
   });
 
-  app.post("/api/docket/deals", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/deals", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const data = ManualDealSchema.parse(req.body);
-      const orgId = req.marinaMatchUser?.orgId;
-      const userId = req.marinaMatchUser?.id;
+      const orgId = req.vantageUser?.orgId;
+      const userId = req.vantageUser?.id;
       
       if (!orgId || !userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -2171,7 +2171,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
       const deal = await docketStorage.createDeal({
         orgId,
         createdBy: userId,
-        origin: 'marinaMatch',
+        origin: 'vantage',
         transactionType: data.transactionType,
         dealStatus: (data.dealStatus || 'Announced') as any,
         buyer: data.buyer || null,
@@ -2199,10 +2199,10 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Sync deals from Sales Comps
-  app.post("/api/docket/deals/sync-from-sales-comps", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/deals/sync-from-sales-comps", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
-      const orgId = req.marinaMatchUser?.orgId;
-      const userId = req.marinaMatchUser?.id;
+      const orgId = req.vantageUser?.orgId;
+      const userId = req.vantageUser?.id;
       
       if (!orgId || !userId) {
         return res.status(401).json({ error: "Authentication required" });
@@ -2244,7 +2244,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
         await docketStorage.createDeal({
           orgId,
           createdBy: userId,
-          origin: 'marinaMatch',
+          origin: 'vantage',
           externalId: comp.id,
           sourceReference: `Sales Comp: ${comp.marina}`,
           transactionType: 'Asset Sale',
@@ -2269,7 +2269,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/articles/:id/deals", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:id/deals", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.id, 10);
       if (isNaN(articleId) || articleId < 1) {
@@ -2306,7 +2306,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
 
   const PortfolioCompanyUpdateSchema = PortfolioCompanySchema.partial();
 
-  app.get("/api/docket/portfolio-companies", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/portfolio-companies", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const companies = await docketStorage.getPortfolioCompanies(req.docketUser!.id, req.docketUser!.orgId);
       res.json(companies);
@@ -2316,7 +2316,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/portfolio-companies", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/portfolio-companies", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2340,7 +2340,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/portfolio-companies/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const company = await docketStorage.getPortfolioCompanyById(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!company) {
@@ -2354,7 +2354,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/portfolio-companies/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const data = PortfolioCompanyUpdateSchema.parse(req.body);
       const company = await docketStorage.updatePortfolioCompany(req.params.id, req.docketUser!.id, req.docketUser!.orgId, data);
@@ -2373,7 +2373,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/portfolio-companies/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/portfolio-companies/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const success = await docketStorage.deletePortfolioCompany(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!success) {
@@ -2387,7 +2387,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/portfolio-companies/:id/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/portfolio-companies/:id/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const articles = await docketStorage.getArticlesForPortfolioCompany(
@@ -2405,7 +2405,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // CRM Company Integration - Match Suggestions
-  app.post("/api/docket/portfolio-companies/match-suggestions", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/portfolio-companies/match-suggestions", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { companyName, domain } = req.body;
       if (!companyName) {
@@ -2421,7 +2421,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // CRM Company Integration - Search CRM Companies
-  app.get("/api/docket/crm-companies/search", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/crm-companies/search", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const query = req.query.q as string;
       if (!query || query.length < 2) {
@@ -2438,7 +2438,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // CRM Company Integration - Link Portfolio Company to CRM Company
-  app.post("/api/docket/portfolio-companies/:id/link-crm", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/portfolio-companies/:id/link-crm", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { crmCompanyId } = req.body;
       if (!crmCompanyId) {
@@ -2464,7 +2464,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // CRM Company Integration - Unlink Portfolio Company from CRM Company
-  app.delete("/api/docket/portfolio-companies/:id/unlink-crm", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/portfolio-companies/:id/unlink-crm", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const company = await docketStorage.unlinkPortfolioCompanyFromCrm(
         req.params.id,
@@ -2494,7 +2494,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     description: z.string().optional(),
   });
 
-  app.post("/api/docket/portfolio-companies/:id/create-crm", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/portfolio-companies/:id/create-crm", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const data = CreateCrmCompanySchema.parse(req.body);
       
@@ -2520,7 +2520,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get CRM Company linked to Portfolio Company
-  app.get("/api/docket/portfolio-companies/:id/crm-company", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/portfolio-companies/:id/crm-company", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const company = await docketStorage.getPortfolioCompanyById(
         req.params.id,
@@ -2557,7 +2557,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     isActive: z.boolean().optional(),
   });
 
-  app.get("/api/docket/saved-searches", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/saved-searches", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const searches = await docketStorage.getSavedSearches(req.docketUser!.id, req.docketUser!.orgId);
       res.json(searches);
@@ -2567,7 +2567,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/saved-searches", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/saved-searches", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2606,7 +2606,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/saved-searches/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/saved-searches/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const search = await docketStorage.getSavedSearchById(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!search) {
@@ -2620,7 +2620,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/saved-searches/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/saved-searches/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const data = SavedSearchUpdateSchema.parse(req.body);
       const search = await docketStorage.updateSavedSearch(req.params.id, req.docketUser!.id, req.docketUser!.orgId, data);
@@ -2639,7 +2639,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/saved-searches/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/saved-searches/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const success = await docketStorage.deleteSavedSearch(req.params.id, req.docketUser!.id, req.docketUser!.orgId);
       if (!success) {
@@ -2654,7 +2654,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // User Management (Admin only)
-  app.get("/api/docket/users", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/users", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -2676,7 +2676,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     isActive: z.boolean().optional(),
   });
 
-  app.patch("/api/docket/users/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/users/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -2697,7 +2697,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.delete("/api/docket/users/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/users/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -2713,7 +2713,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Current user endpoints
-  app.get("/api/docket/user/current", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/user/current", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user) {
@@ -2742,7 +2742,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     enabled: z.boolean().default(true),
   });
 
-  app.patch("/api/docket/user/notification-preferences", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/user/notification-preferences", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2789,7 +2789,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Filter Preferences endpoints
-  app.get("/api/docket/user/filter-preferences", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/user/filter-preferences", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const prefs = await docketStorage.getUserFilterPreferences(req.docketUser!.id, req.docketUser!.orgId);
       res.json(prefs || null);
@@ -2808,7 +2808,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     sortBy: z.string().optional(),
   });
 
-  app.put("/api/docket/user/filter-preferences", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.put("/api/docket/user/filter-preferences", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2828,7 +2828,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Unified User Preferences endpoint (combines notification and display preferences)
-  app.get("/api/docket/user-preferences", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/user-preferences", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2867,7 +2867,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     timezone: z.string().optional(),
   });
 
-  app.patch("/api/docket/user-preferences", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/user-preferences", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const user = await docketStorage.getUser(req.docketUser!.id);
       if (!user || !user.orgId) {
@@ -2938,7 +2938,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.get("/api/docket/notifications", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/notifications", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const notifications = await docketStorage.getNotificationsByUser(req.docketUser!.id, req.docketUser!.orgId, 50);
       res.json(notifications);
@@ -2963,7 +2963,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     period: z.enum(["daily", "weekly"])
   });
 
-  app.get("/api/docket/summaries", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/summaries", requireVantageAuth, async (req: DocketRequest, res) => {
     // Pro tier check
     if (req.docketUser?.subscriptionTier !== 'pro' && req.docketUser?.role !== 'admin') {
       return res.status(403).json({ 
@@ -2987,7 +2987,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/summaries/generate", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/summaries/generate", requireVantageAuth, async (req: DocketRequest, res) => {
     // Role check for admin or analyst
     if (!['admin', 'analyst'].includes(req.docketUser!.role)) {
       return res.status(403).json({ 
@@ -3015,7 +3015,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/summaries/generate-all", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/summaries/generate-all", requireVantageAuth, async (req: DocketRequest, res) => {
     // Role check for admin or analyst
     if (!['admin', 'analyst'].includes(req.docketUser!.role)) {
       return res.status(403).json({ 
@@ -3038,7 +3038,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.patch("/api/docket/summaries/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/summaries/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     // Role check for admin, analyst, or partner
     if (!['admin', 'analyst', 'partner'].includes(req.docketUser!.role)) {
       return res.status(403).json({ 
@@ -3067,7 +3067,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Daily Digest Preview Email (admin only)
-  app.post("/api/docket/test-digest", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/test-digest", requireVantageAuth, async (req: DocketRequest, res) => {
     // Admin role check
     if (req.docketUser?.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
@@ -3162,7 +3162,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
     }
   });
 
-  app.post("/api/docket/test-email", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/test-email", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { client, fromEmail } = await getUncachableResendClient();
       
@@ -3238,7 +3238,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============ USER TAG LIBRARY API ============
   
   // Get user's tag library
-  app.get("/api/docket/tags", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/tags", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const tags = await docketStorage.getUserTags(req.docketUser!.id, req.docketUser!.orgId);
       res.json(tags);
@@ -3249,7 +3249,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Create a new tag
-  app.post("/api/docket/tags", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/tags", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const TagSchema = z.object({
         name: z.string().min(1, "Name is required").max(50, "Name too long"),
@@ -3278,7 +3278,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update a tag
-  app.patch("/api/docket/tags/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/tags/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -3308,7 +3308,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete a tag
-  app.delete("/api/docket/tags/:id", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/tags/:id", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -3329,7 +3329,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============ ARTICLE TAG ASSIGNMENTS API ============
 
   // Get tags assigned to an article
-  app.get("/api/docket/articles/:articleId/tags", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:articleId/tags", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       if (isNaN(articleId)) {
@@ -3345,7 +3345,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Assign a tag to an article
-  app.post("/api/docket/articles/:articleId/tags", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:articleId/tags", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       if (isNaN(articleId)) {
@@ -3380,7 +3380,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Remove a tag from an article
-  app.delete("/api/docket/articles/:articleId/tags/:tagId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/articles/:articleId/tags/:tagId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const tagId = parseInt(req.params.tagId);
@@ -3400,7 +3400,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get articles with a specific tag
-  app.get("/api/docket/tags/:tagId/articles", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/tags/:tagId/articles", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const tagId = parseInt(req.params.tagId);
       if (isNaN(tagId)) {
@@ -3419,7 +3419,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============ ARTICLE FEEDBACK API ============
 
   // Get feedback for an article
-  app.get("/api/docket/articles/:articleId/feedback", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/articles/:articleId/feedback", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       if (isNaN(articleId)) {
@@ -3435,7 +3435,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Submit feedback for an article (irrelevant, duplicate, etc.)
-  app.post("/api/docket/articles/:articleId/feedback", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/articles/:articleId/feedback", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       if (isNaN(articleId)) {
@@ -3471,7 +3471,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get feedback statistics
-  app.get("/api/docket/feedback/stats", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/feedback/stats", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const stats = await docketStorage.getFeedbackStats(req.docketUser!.id, req.docketUser!.orgId);
       res.json(stats);
@@ -3484,7 +3484,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============ ENHANCED AI TRAINING ANALYTICS ============
 
   // Get comprehensive training analytics
-  app.get("/api/docket/training/analytics", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/training/analytics", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const allFeedback = await db
         .select()
@@ -3600,7 +3600,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get articles pending review (low confidence or flagged)
-  app.get("/api/docket/training/review-queue", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/training/review-queue", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const filter = req.query.filter as string || 'all';
@@ -3704,7 +3704,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Trigger model refinement (batch process feedback)
-  app.post("/api/docket/training/trigger-refinement", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/training/trigger-refinement", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const unprocessedFeedback = await docketStorage.getUnprocessedFeedback(500);
       
@@ -3765,7 +3765,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Bulk review articles (mark multiple as reviewed with category)
-  app.post("/api/docket/training/bulk-review", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/training/bulk-review", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const BulkReviewSchema = z.object({
         articleIds: z.array(z.number().int().positive()).min(1).max(50),
@@ -3819,7 +3819,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get category suggestions based on training data
-  app.get("/api/docket/training/category-suggestions", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/training/category-suggestions", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       // Get all unique categories from manually reviewed articles
       const reviewedArticles = await docketStorage.getManuallyReviewedArticles();
@@ -3864,7 +3864,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============ AI ADAPTIVE SCORING API ============
   
   // Get AI training analytics dashboard data
-  app.get("/api/docket/ai/analytics", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ai/analytics", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { getTrainingAnalytics, initializeDefaultKeywords } = await import("./services/adaptive-scoring");
       const orgId = req.docketUser!.orgId;
@@ -3881,7 +3881,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get keyword weights
-  app.get("/api/docket/ai/keywords", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ai/keywords", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { getKeywordWeights, initializeDefaultKeywords } = await import("./services/adaptive-scoring");
       const orgId = req.docketUser!.orgId;
@@ -3896,7 +3896,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Add custom keyword
-  app.post("/api/docket/ai/keywords", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/ai/keywords", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const KeywordSchema = z.object({
         keyword: z.string().min(1).max(100),
@@ -3919,7 +3919,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update keyword weight
-  app.patch("/api/docket/ai/keywords/:keywordId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/ai/keywords/:keywordId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const keywordId = parseInt(req.params.keywordId);
       const UpdateSchema = z.object({
@@ -3941,7 +3941,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete keyword
-  app.delete("/api/docket/ai/keywords/:keywordId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/ai/keywords/:keywordId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const keywordId = parseInt(req.params.keywordId);
       const { deleteKeyword } = await import("./services/adaptive-scoring");
@@ -3955,7 +3955,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get source adjustments
-  app.get("/api/docket/ai/sources", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ai/sources", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { getSourceAdjustments } = await import("./services/adaptive-scoring");
       const sources = await getSourceAdjustments(req.docketUser!.orgId);
@@ -3967,7 +3967,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get learning rules
-  app.get("/api/docket/ai/rules", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/ai/rules", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const { getLearningRules } = await import("./services/adaptive-scoring");
       const rules = await getLearningRules(req.docketUser!.orgId);
@@ -3979,7 +3979,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Add learning rule
-  app.post("/api/docket/ai/rules", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/ai/rules", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const RuleSchema = z.object({
         ruleType: z.enum(["include", "exclude", "boost", "penalize"]),
@@ -4003,7 +4003,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete learning rule
-  app.delete("/api/docket/ai/rules/:ruleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/ai/rules/:ruleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const ruleId = parseInt(req.params.ruleId);
       const { deleteLearningRule } = await import("./services/adaptive-scoring");
@@ -4017,7 +4017,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Score an article with adaptive scoring (for testing/preview)
-  app.post("/api/docket/ai/score-preview", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/ai/score-preview", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const ScoreSchema = z.object({
         title: z.string().min(1),
@@ -4040,7 +4040,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Process feedback with adaptive learning (called after feedback submission)
-  app.post("/api/docket/ai/process-feedback/:feedbackId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/ai/process-feedback/:feedbackId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const feedbackId = parseInt(req.params.feedbackId);
       const ProcessSchema = z.object({
@@ -4073,7 +4073,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============================================================================
 
   // Get user's bookmarked articles
-  app.get("/api/docket/bookmarks", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/bookmarks", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const bookmarks = await docketStorage.getUserBookmarks(
         req.docketUser!.id,
@@ -4087,7 +4087,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Bookmark an article
-  app.post("/api/docket/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/bookmarks/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const NotesSchema = z.object({
@@ -4117,7 +4117,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update bookmark notes
-  app.patch("/api/docket/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/bookmarks/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const NotesSchema = z.object({
@@ -4140,7 +4140,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Remove bookmark
-  app.delete("/api/docket/bookmarks/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/bookmarks/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const deleted = await docketStorage.deleteBookmark(req.docketUser!.id, articleId);
@@ -4155,7 +4155,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Check if article is bookmarked
-  app.get("/api/docket/bookmarks/:articleId/status", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/bookmarks/:articleId/status", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const isBookmarked = await docketStorage.isArticleBookmarked(req.docketUser!.id, articleId);
@@ -4171,7 +4171,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============================================================================
 
   // Get user's reading list
-  app.get("/api/docket/reading-list", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/reading-list", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const status = req.query.status as string | undefined;
       const readingList = await docketStorage.getUserReadingList(
@@ -4187,7 +4187,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Add article to reading list
-  app.post("/api/docket/reading-list/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/reading-list/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const AddSchema = z.object({
@@ -4220,7 +4220,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update reading list item
-  app.patch("/api/docket/reading-list/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/reading-list/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const UpdateSchema = z.object({
@@ -4245,7 +4245,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Remove from reading list
-  app.delete("/api/docket/reading-list/:articleId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/reading-list/:articleId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const deleted = await docketStorage.removeFromReadingList(req.docketUser!.id, articleId);
@@ -4260,7 +4260,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Check if article is in reading list
-  app.get("/api/docket/reading-list/:articleId/status", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/reading-list/:articleId/status", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const articleId = parseInt(req.params.articleId);
       const item = await docketStorage.getReadingListItem(req.docketUser!.id, articleId);
@@ -4279,7 +4279,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============================================================================
 
   // Get user's M&A alerts
-  app.get("/api/docket/alerts", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/alerts", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const alerts = await docketStorage.getMaAlerts(
         req.docketUser!.id,
@@ -4293,7 +4293,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Create M&A alert
-  app.post("/api/docket/alerts", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/alerts", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const AlertSchema = z.object({
         name: z.string().min(1).max(100),
@@ -4323,7 +4323,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get single M&A alert
-  app.get("/api/docket/alerts/:alertId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/alerts/:alertId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const alert = await docketStorage.getMaAlertById(
         req.params.alertId,
@@ -4341,7 +4341,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update M&A alert
-  app.patch("/api/docket/alerts/:alertId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/alerts/:alertId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const UpdateSchema = z.object({
         name: z.string().min(1).max(100).optional(),
@@ -4375,7 +4375,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete M&A alert
-  app.delete("/api/docket/alerts/:alertId", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/alerts/:alertId", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const deleted = await docketStorage.deleteMaAlert(
         req.params.alertId,
@@ -4393,7 +4393,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Get unnotified matches for an alert
-  app.get("/api/docket/alerts/:alertId/matches", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/alerts/:alertId/matches", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const alert = await docketStorage.getMaAlertById(
         req.params.alertId,
@@ -4417,7 +4417,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   // ============================================================================
 
   // Get user's digest preferences
-  app.get("/api/docket/digest", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.get("/api/docket/digest", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const prefs = await docketStorage.getDigestPreferences(
         req.docketUser!.id,
@@ -4431,7 +4431,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Create or update digest preferences
-  app.post("/api/docket/digest", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.post("/api/docket/digest", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const DigestSchema = z.object({
         emailAddress: z.string().email(),
@@ -4478,7 +4478,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Update digest preferences
-  app.patch("/api/docket/digest", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.patch("/api/docket/digest", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const UpdateSchema = z.object({
         emailAddress: z.string().email().optional(),
@@ -4514,7 +4514,7 @@ export async function registerDocketRoutes(app: Express, docketStorage: IStorage
   });
 
   // Delete digest preferences
-  app.delete("/api/docket/digest", requireMarinaMatchAuth, async (req: DocketRequest, res) => {
+  app.delete("/api/docket/digest", requireVantageAuth, async (req: DocketRequest, res) => {
     try {
       const deleted = await docketStorage.deleteDigestPreferences(
         req.docketUser!.id,

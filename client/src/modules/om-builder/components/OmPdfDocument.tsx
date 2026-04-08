@@ -694,7 +694,7 @@ export function OmPdfDocument({
   const isLandscape = dimension === 'landscape' || dimension === '16:9';
   
   return (
-    <Document title={documentName} author="MarinaMatch">
+    <Document title={documentName} author="Vantage">
       {pages.map((page, pageIndex) => (
         <Page 
           key={page.id} 

@@ -89,7 +89,7 @@ export function SettingsCenterModal({ open, onOpenChange }: SettingsCenterModalP
               // Apply theme immediately if it's being changed
               if (updates.theme) {
                 const root = document.documentElement;
-                localStorage.setItem('marinamatch-theme', updates.theme);
+                localStorage.setItem('vantage-theme', updates.theme);
                 let isDark = updates.theme === 'dark' || 
                   (updates.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 root.classList.remove('light', 'dark');

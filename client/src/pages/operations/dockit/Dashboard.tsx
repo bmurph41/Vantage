@@ -461,7 +461,7 @@ export default function DockitDashboard() {
         <ContextIntegrationsPanel 
           contextKey="dockit"
           title="Dockit Integrations"
-          description="Connect launch and scheduling software to sync data with MarinaMatch."
+          description="Connect launch and scheduling software to sync data with Vantage."
         />
       </div>
     </DockitAppShell>

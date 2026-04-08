@@ -46,9 +46,9 @@ export default function BrokerPortal() {
   });
 
   const { data: brokerInfo, isLoading, error } = useQuery<BrokerInfo>({
-    queryKey: ["/api/marinamatch/public/broker-portal", token],
+    queryKey: ["/api/vantage/public/broker-portal", token],
     queryFn: async () => {
-      const response = await fetch(`/api/marinamatch/public/broker-portal/${token}`);
+      const response = await fetch(`/api/vantage/public/broker-portal/${token}`);
       if (!response.ok) {
         throw new Error("Invalid or expired portal link");
       }
@@ -59,7 +59,7 @@ export default function BrokerPortal() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch(`/api/marinamatch/public/broker-portal/${token}/submit`, {
+      const response = await fetch(`/api/vantage/public/broker-portal/${token}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -123,7 +123,7 @@ export default function BrokerPortal() {
             </div>
             <CardTitle className="text-xl">Invalid Portal Link</CardTitle>
             <CardDescription>
-              This broker portal link is invalid or has expired. Please contact your MarinaMatch representative for a new link.
+              This broker portal link is invalid or has expired. Please contact your Vantage representative for a new link.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -177,7 +177,7 @@ export default function BrokerPortal() {
           <div className="mx-auto p-3 bg-primary/10 rounded-full w-fit mb-4">
             <Anchor className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">MarinaMatch Deal Submission</h1>
+          <h1 className="text-2xl font-bold mb-2">Vantage Deal Submission</h1>
           <p className="text-muted-foreground">
             Welcome, {brokerInfo.contactName || brokerInfo.brokerName}
           </p>
@@ -370,7 +370,7 @@ export default function BrokerPortal() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Powered by MarinaMatch Intel
+          Powered by Vantage Intel
         </p>
       </div>
     </div>

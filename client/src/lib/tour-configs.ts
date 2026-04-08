@@ -16,7 +16,7 @@ export const TOUR_IDS = {
   VDR: "vdr",
   PORTFOLIO: "portfolio",
   SALES_COMPS: "sales-comps",
-  MARKET_INTEL: "marinamatch-intel",
+  MARKET_INTEL: "vantage-intel",
   DEAL_WORKSPACE: "deal-workspace",
 } as const;
 

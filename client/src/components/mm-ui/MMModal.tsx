@@ -1,7 +1,7 @@
 /**
  * MMModal - Base Modal Component
  * 
- * A reusable modal wrapper that enforces the MarinaMatch Modal Standard:
+ * A reusable modal wrapper that enforces the Vantage Modal Standard:
  * - Header with icon, title, subtitle
  * - Thick blue brand divider
  * - Optional progress dots for wizards

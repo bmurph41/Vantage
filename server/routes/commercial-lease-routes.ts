@@ -1,7 +1,7 @@
 /**
  * Commercial Lease Engine Routes
  * ==============================
- * Drop-in file matching existing MarinaMatch patterns.
+ * Drop-in file matching existing Vantage patterns.
  * 
  * Registration: app.use('/api/commercial-leases', commercialLeaseRoutes);
  */

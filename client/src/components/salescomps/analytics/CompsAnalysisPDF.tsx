@@ -446,7 +446,7 @@ function CompsAnalysisPDFDocument({ comps, trends, filterCriteria }: CompsAnalys
         </View>
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>MarinaMatch Comps Analysis</Text>
+          <Text style={styles.footerText}>Vantage Comps Analysis</Text>
           <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -533,7 +533,7 @@ function CompsAnalysisPDFDocument({ comps, trends, filterCriteria }: CompsAnalys
           )}
 
           <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>MarinaMatch Comps Analysis</Text>
+            <Text style={styles.footerText}>Vantage Comps Analysis</Text>
             <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
           </View>
         </Page>

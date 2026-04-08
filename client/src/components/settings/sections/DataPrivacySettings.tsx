@@ -217,7 +217,7 @@ export function DataPrivacySettings({
             </TooltipProvider>
           </CardTitle>
           <CardDescription>
-            Help improve MarinaMatch benchmarks by contributing de-identified, aggregated statistics derived from your data. Your marina's identity is never disclosed.
+            Help improve Vantage benchmarks by contributing de-identified, aggregated statistics derived from your data. Your marina's identity is never disclosed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

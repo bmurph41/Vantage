@@ -9,7 +9,7 @@
  *  GET  /api/listings/v2/listings           → Liv2ListingCurrent[]
  *  GET  /api/listings/v2/listings/:id       → { listing, assets, payloadHistory }
  *  GET  /api/listings/v2/marketplace/sources → { sources[], allowedDomains[] }
- *  POST /api/marinamatch/sourced-deals       → SourcedDeal  (Add to Pipeline)
+ *  POST /api/vantage/sourced-deals       → SourcedDeal  (Add to Pipeline)
  *
  * New endpoint added via marketplace-pipeline-route.ts (see companion file):
  *  POST /api/listings/v2/listings/:id/pipeline → proxies to sourced-deals
@@ -1721,10 +1721,10 @@ function AddToPipelineModal({
           scrapedAt: l.updatedAt,
         },
       };
-      return apiRequest("POST", "/api/marinamatch/sourced-deals", payload);
+      return apiRequest("POST", "/api/vantage/sourced-deals", payload);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/marinamatch/sourced-deals"] });
+      qc.invalidateQueries({ queryKey: ["/api/vantage/sourced-deals"] });
       onSuccess();
     },
     onError: (err: any) => {

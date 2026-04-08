@@ -190,24 +190,24 @@ export function InvestmentCriteriaTab() {
   const [editingCriteriaTab, setEditingCriteriaTab] = useState("location");
 
   const { data: profiles, isLoading: profilesLoading } = useQuery<CriteriaProfile[]>({
-    queryKey: ["/api/marinamatch/intel/criteria-profiles"],
+    queryKey: ["/api/vantage/intel/criteria-profiles"],
   });
 
   const { data: profileDetail, isLoading: detailLoading } = useQuery<CriteriaProfile>({
-    queryKey: ["/api/marinamatch/intel/criteria-profiles", selectedProfile?.id],
+    queryKey: ["/api/vantage/intel/criteria-profiles", selectedProfile?.id],
     enabled: !!selectedProfile?.id,
   });
 
   const createProfileMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/marinamatch/intel/criteria-profiles", {
+      return apiRequest("/api/vantage/intel/criteria-profiles", {
         method: "POST",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
       toast({ title: "Profile created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/criteria-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/criteria-profiles"] });
       setIsCreating(false);
     },
     onError: (error: any) => {
@@ -217,14 +217,14 @@ export function InvestmentCriteriaTab() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return apiRequest(`/api/marinamatch/intel/criteria-profiles/${id}`, {
+      return apiRequest(`/api/vantage/intel/criteria-profiles/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
       toast({ title: "Profile updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/criteria-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/criteria-profiles"] });
     },
     onError: (error: any) => {
       toast({ title: "Failed to update profile", description: error.message, variant: "destructive" });
@@ -233,13 +233,13 @@ export function InvestmentCriteriaTab() {
 
   const deleteProfileMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/marinamatch/intel/criteria-profiles/${id}`, {
+      return apiRequest(`/api/vantage/intel/criteria-profiles/${id}`, {
         method: "DELETE",
       });
     },
     onSuccess: () => {
       toast({ title: "Profile deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/criteria-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/criteria-profiles"] });
       setSelectedProfile(null);
     },
     onError: (error: any) => {
@@ -249,7 +249,7 @@ export function InvestmentCriteriaTab() {
 
   const rescoreListingsMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/marinamatch/intel/bulk-rescore", {
+      return apiRequest("/api/vantage/intel/bulk-rescore", {
         method: "POST",
       });
     },
@@ -258,7 +258,7 @@ export function InvestmentCriteriaTab() {
         title: "Listings rescored", 
         description: `${data.rescored} listings have been rescored against your criteria.` 
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/listings"] });
     },
     onError: (error: any) => {
       toast({ title: "Failed to rescore", description: error.message, variant: "destructive" });

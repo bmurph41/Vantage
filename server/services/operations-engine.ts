@@ -1,7 +1,7 @@
 /**
  * Operations Engine
  * =================
- * Comprehensive operations management across all MarinaMatch asset classes.
+ * Comprehensive operations management across all Vantage asset classes.
  * Covers fuel ops, ship store/retail, hotel, multifamily, self-storage,
  * retail/office NNN, and marina-specific operations.
  *

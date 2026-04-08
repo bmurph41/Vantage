@@ -276,7 +276,7 @@ async function fetchWithSSRFGuard(
         signal: controller.signal,
         redirect: 'manual',
         headers: {
-          'User-Agent': 'MarinaMatch/1.0 (Listing Image Processor)',
+          'User-Agent': 'Vantage/1.0 (Listing Image Processor)',
           'Accept': 'image/*',
         },
       });

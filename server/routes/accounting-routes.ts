@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Accounting Engine Routes
+ * Vantage Accounting Engine Routes
  * Full double-entry: JE, AR, AP, Bank Rec, Trial Balance, Cash Flow,
  * Month-End Close, 1099, Revenue Recognition, Intercompany
  */

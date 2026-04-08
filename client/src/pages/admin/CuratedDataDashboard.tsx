@@ -114,7 +114,7 @@ const PACKS = [
   { value: "analysis", label: "Analysis Pack" },
   { value: "analytics_pro", label: "Analytics Pro" },
   { value: "fund_management", label: "Fund Management" },
-  { value: "intel", label: "MarinaMatch Intel" },
+  { value: "intel", label: "Vantage Intel" },
 ];
 
 export default function CuratedDataDashboard() {
@@ -418,14 +418,14 @@ export default function CuratedDataDashboard() {
               <CardHeader>
                 <CardTitle>Data Governance Overview</CardTitle>
                 <CardDescription>
-                  Global curated data is maintained by MarinaMatch and made available to subscribers based on their pack subscriptions.
+                  Global curated data is maintained by Vantage and made available to subscribers based on their pack subscriptions.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Badge variant="default" className="bg-blue-500">Global</Badge>
-                    <span className="text-sm">MarinaMatch curated data - available to pack subscribers</span>
+                    <span className="text-sm">Vantage curated data - available to pack subscribers</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary">Organization</Badge>
@@ -898,7 +898,7 @@ export default function CuratedDataDashboard() {
                           <div className="grid gap-2">
                             <Label>Data Source</Label>
                             <Input 
-                              placeholder="e.g., MarinaMatch Research"
+                              placeholder="e.g., Vantage Research"
                               value={newStandard.dataSource || ""}
                               onChange={(e) => setNewStandard({ ...newStandard, dataSource: e.target.value })}
                             />

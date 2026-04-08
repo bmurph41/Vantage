@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Accounting Engine
+ * Vantage Accounting Engine
  * Full double-entry accounting: AR, AP, JE, Bank Reconciliation,
  * Trial Balance, Cash Flow Statement, Month-End Close, 1099 Tracking,
  * Intercompany Eliminations, Revenue Recognition (ASC 606)

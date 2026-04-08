@@ -1,7 +1,7 @@
 /**
  * Security & Compliance Service
  * ==============================
- * Institutional-grade security infrastructure for MarinaMatch.
+ * Institutional-grade security infrastructure for Vantage.
  * Covers TOTP 2FA, PII encryption, session management, GDPR/CCPA,
  * IP allowlisting, AML/KYC, data retention, and security event logging.
  *
@@ -113,7 +113,7 @@ class SecurityComplianceService {
    * Generate a new TOTP secret and return it with the otpauth URI.
    * The secret is base32-encoded for compatibility with authenticator apps.
    */
-  generateTotpSecret(userEmail: string, issuer: string = 'MarinaMatch'): {
+  generateTotpSecret(userEmail: string, issuer: string = 'Vantage'): {
     secret: string;
     uri: string;
     qrData: string;

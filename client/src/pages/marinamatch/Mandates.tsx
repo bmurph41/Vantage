@@ -66,15 +66,15 @@ export function MandatesTab() {
   const { toast } = useToast();
 
   const { data: mandates, isLoading } = useQuery<InvestmentMandate[]>({
-    queryKey: ["/api/marinamatch/investment-mandates"],
+    queryKey: ["/api/vantage/investment-mandates"],
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<InvestmentMandate>) => {
-      return apiRequest("POST", "/api/marinamatch/investment-mandates", data);
+      return apiRequest("POST", "/api/vantage/investment-mandates", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/investment-mandates"] });
       setCreateDialogOpen(false);
       toast({ title: "Success", description: "Investment criteria created successfully" });
     },
@@ -85,10 +85,10 @@ export function MandatesTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InvestmentMandate> }) => {
-      return apiRequest("PATCH", `/api/marinamatch/investment-mandates/${id}`, data);
+      return apiRequest("PATCH", `/api/vantage/investment-mandates/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/investment-mandates"] });
       setEditingMandate(null);
       toast({ title: "Success", description: "Investment criteria updated successfully" });
     },
@@ -99,10 +99,10 @@ export function MandatesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/investment-mandates/${id}`);
+      return apiRequest("DELETE", `/api/vantage/investment-mandates/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/investment-mandates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/investment-mandates"] });
       toast({ title: "Success", description: "Investment criteria deleted" });
     },
     onError: (error: any) => {

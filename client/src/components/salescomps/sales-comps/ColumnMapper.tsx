@@ -678,7 +678,7 @@ export default function ColumnMapper({
             Column Mapping
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Connect your file columns to MarinaMatch fields. Drag from file columns to fields or use the dropdowns.
+            Connect your file columns to Vantage fields. Drag from file columns to fields or use the dropdowns.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -686,7 +686,7 @@ export default function ColumnMapper({
           <div className="grid grid-cols-5 gap-4 items-center text-sm font-medium text-muted-foreground border-b pb-2">
             <div>Your File Column</div>
             <div className="text-center">Connection</div>
-            <div>MarinaMatch Field</div>
+            <div>Vantage Field</div>
             <div className="text-center">Status</div>
             <div>Actions</div>
           </div>
@@ -843,7 +843,7 @@ export default function ColumnMapper({
                           }}
                         >
                           <SelectTrigger className="w-full" data-testid={`select-target-${column}`}>
-                            <SelectValue placeholder="Select MarinaMatch field..." />
+                            <SelectValue placeholder="Select Vantage field..." />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="create-custom">
@@ -902,12 +902,12 @@ export default function ColumnMapper({
             </>
           )}
 
-          {/* Available MarinaMatch Fields */}
+          {/* Available Vantage Fields */}
           {allTargetFields.filter(f => !isFieldMapped(f.key)).length > 0 && (
             <>
               <Separator />
               <div className="space-y-2">
-                <h5 className="font-medium text-sm text-muted-foreground">Available MarinaMatch Fields</h5>
+                <h5 className="font-medium text-sm text-muted-foreground">Available Vantage Fields</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {allTargetFields
                     .filter(f => !isFieldMapped(f.key))

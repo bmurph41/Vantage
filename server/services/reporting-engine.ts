@@ -3,7 +3,7 @@
  * ============================
  * Comprehensive reporting, KPI dashboards, portfolio roll-ups,
  * occupancy/delinquency tracking, investor reporting packages,
- * and form analytics for MarinaMatch.
+ * and form analytics for Vantage.
  *
  * Covers:
  * 1. Scheduled Report Delivery (cron-based, email/store)

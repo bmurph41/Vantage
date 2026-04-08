@@ -1,5 +1,5 @@
 /**
- * MarinaMatch CRM - Preferred Network Page
+ * Vantage CRM - Preferred Network Page
  * 
  * Add to client/src/pages/PreferredNetworkPage.tsx
  * Then add route in your App.tsx

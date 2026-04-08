@@ -40,7 +40,7 @@ const MIGRATION_PHASES: MigrationPhase[] = [
   {
     id: "archive",
     name: "Archive Legacy",
-    description: "Legacy system archived, MarinaMatch is primary",
+    description: "Legacy system archived, Vantage is primary",
     icon: <Archive className="w-4 h-4" />,
   },
 ];
@@ -107,7 +107,7 @@ export default function MigrationDashboard() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold mb-2">Migration Readiness Dashboard</h1>
         <p className="text-muted-foreground">
-          Track your progress migrating from legacy marina software to MarinaMatch as your primary system.
+          Track your progress migrating from legacy marina software to Vantage as your primary system.
         </p>
       </div>
 

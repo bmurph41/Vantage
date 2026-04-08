@@ -18,7 +18,7 @@ const AVAILABLE_TOKENS = [
   { key: 'contact.lastName', label: 'Contact Last Name', example: 'Doe' },
   { key: 'contact.email', label: 'Contact Email', example: 'jane@example.com' },
   { key: 'contact.company', label: 'Contact Company', example: 'Acme Corp' },
-  { key: 'org.name', label: 'Organization Name', example: 'MarinaMatch' },
+  { key: 'org.name', label: 'Organization Name', example: 'Vantage' },
   { key: 'user.name', label: 'Triggered By', example: 'Brett' },
   { key: 'rule.name', label: 'Rule Name', example: 'Stale Deal Alert' },
 ];
@@ -162,7 +162,7 @@ async function buildSampleContext(orgId: string, dealId?: string): Promise<Recor
           daysInStage: '7',
         },
         contact: { firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', company: 'Acme Corp' },
-        org: { name: 'MarinaMatch' },
+        org: { name: 'Vantage' },
         user: { name: 'System' },
         rule: { name: 'Sample Rule' },
       };
@@ -461,7 +461,7 @@ workflowEmailRouter.post('/compose-send', async (req: any, res) => {
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
-    const senderName = fromName || req.user?.name || req.user?.username || 'MarinaMatch';
+    const senderName = fromName || req.user?.name || req.user?.username || 'Vantage';
     const htmlBody = wrapEmailTemplate(body);
     const textBody = stripHtml(body);
 
@@ -470,7 +470,7 @@ workflowEmailRouter.post('/compose-send', async (req: any, res) => {
       subject,
       html: htmlBody,
       text: textBody,
-      from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com', name: senderName },
+      from: { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com', name: senderName },
     });
 
     // Log the email

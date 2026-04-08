@@ -349,7 +349,7 @@ export default function ProjectPage() {
                 </Button>
               </Link>
               <h1 className="text-xl font-semibold text-primary">Due Diligence Tracker</h1>
-              <span className="text-sm text-muted-foreground">MarinaMatch</span>
+              <span className="text-sm text-muted-foreground">Vantage</span>
             </div>
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">

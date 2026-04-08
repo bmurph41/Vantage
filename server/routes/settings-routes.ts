@@ -669,9 +669,9 @@ router.get('/app-info', async (_req: Request, res: Response) => {
     version: process.env.APP_VERSION || '1.0.0',
     buildHash: process.env.GIT_COMMIT_SHA || 'development',
     environment: process.env.NODE_ENV || 'development',
-    supportEmail: 'support@marinamatch.com',
-    docsUrl: 'https://docs.marinamatch.com',
-    changelogUrl: 'https://marinamatch.com/changelog',
+    supportEmail: 'support@vantage.com',
+    docsUrl: 'https://docs.vantage.com',
+    changelogUrl: 'https://vantage.com/changelog',
   });
 });
 

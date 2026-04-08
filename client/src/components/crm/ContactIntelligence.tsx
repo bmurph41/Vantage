@@ -1,5 +1,5 @@
 /**
- * MarinaMatch CRM - Contact Intelligence Components
+ * Vantage CRM - Contact Intelligence Components
  * 
  * Add to client/src/components/crm/ContactIntelligence.tsx
  */

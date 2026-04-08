@@ -89,7 +89,7 @@ export function SupportContactModal({
     } catch (err: any) {
       toast({
         title: 'Failed to send',
-        description: err.message || 'Please try again or email support@marinamatch.com directly.',
+        description: err.message || 'Please try again or email support@vantage.com directly.',
         variant: 'destructive',
       });
     }

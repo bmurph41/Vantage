@@ -302,7 +302,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   const [reportDetails, setReportDetails] = useState("");
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<IntelAnalytics>({
-    queryKey: ["/api/marinamatch/intel/analytics/overview"],
+    queryKey: ["/api/vantage/intel/analytics/overview"],
   });
 
   const buildListingsUrl = (includeGlobal: boolean = true) => {
@@ -314,14 +314,14 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
     if (minScoreFilter && minScoreFilter !== "0") params.set("minScore", minScoreFilter);
     params.set("includeGlobal", includeGlobal ? "true" : "false");
     const queryString = params.toString();
-    return `/api/marinamatch/intel/listings?${queryString}`;
+    return `/api/vantage/intel/listings?${queryString}`;
   };
   
   const listingsUrl = buildListingsUrl(true);
   const pipelineUrl = buildListingsUrl(false);
     
   const { data: allListings, isLoading: listingsLoading, refetch: refetchListings } = useQuery<MarinaListing[]>({
-    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "all"],
+    queryKey: ["/api/vantage/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "all"],
     queryFn: async () => {
       const response = await fetch(listingsUrl);
       if (!response.ok) throw new Error("Failed to fetch listings");
@@ -334,7 +334,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   });
   
   const { data: pipelineListings, isLoading: pipelineLoading, refetch: refetchPipeline } = useQuery<MarinaListing[]>({
-    queryKey: ["/api/marinamatch/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "pipeline"],
+    queryKey: ["/api/vantage/intel/listings", stateFilter, cityFilter, sourceFilter, statusFilter, minScoreFilter, "pipeline"],
     queryFn: async () => {
       const response = await fetch(pipelineUrl);
       if (!response.ok) throw new Error("Failed to fetch pipeline listings");
@@ -346,7 +346,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   const listings = activeTab === "marketplace" ? marketplaceListings : pipelineListings;
 
   const { data: scrapeStats, isLoading: statsLoading } = useQuery({
-    queryKey: ["/api/marinamatch/intel/scrape/stats"],
+    queryKey: ["/api/vantage/intel/scrape/stats"],
   });
 
   const { data: syncStatus } = useQuery<{
@@ -362,7 +362,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
       listingsNew?: number;
     };
   }>({
-    queryKey: ["/api/marinamatch/intel/sync-status"],
+    queryKey: ["/api/vantage/intel/sync-status"],
     refetchInterval: (data) => {
       if (data?.state?.data?.isScraping) return 3000;
       if (!data?.state?.data?.listingsCount) return 5000;
@@ -371,16 +371,16 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   });
 
   const { data: scrapeSources, isLoading: sourcesLoading } = useQuery<ScrapeSource[]>({
-    queryKey: ["/api/marinamatch/intel/scrape-sources"],
+    queryKey: ["/api/vantage/intel/scrape-sources"],
   });
 
   const toggleSourceMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/marinamatch/intel/scrape-sources/${id}`, { isActive });
+      return apiRequest("PATCH", `/api/vantage/intel/scrape-sources/${id}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/analytics/overview"] });
       toast({ title: "Source updated", description: "Listing source status changed successfully." });
     },
     onError: () => {
@@ -405,10 +405,10 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
         maxSlips: data.maxSlips ? parseInt(data.maxSlips) : null,
         pollingIntervalMinutes: data.pollingIntervalMinutes ? parseInt(data.pollingIntervalMinutes) : 60,
       };
-      return apiRequest("POST", "/api/marinamatch/intel/scrape-sources", payload);
+      return apiRequest("POST", "/api/vantage/intel/scrape-sources", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/scrape-sources"] });
       setNewSourceForm({
         platform: "",
         name: "",
@@ -436,11 +436,11 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
   const deleteSourceMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/intel/scrape-sources/${id}`);
+      return apiRequest("DELETE", `/api/vantage/intel/scrape-sources/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/analytics/overview"] });
       toast({ title: "Source deleted", description: "Listing source removed successfully." });
     },
     onError: () => {
@@ -471,10 +471,10 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
         capabilities: originalSource.capabilities,
         capabilityNotes: originalSource.capabilityNotes,
       };
-      return apiRequest("PATCH", `/api/marinamatch/intel/scrape-sources/${id}`, payload);
+      return apiRequest("PATCH", `/api/vantage/intel/scrape-sources/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/scrape-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/scrape-sources"] });
       setEditingSource(null);
       toast({ title: "Source updated", description: "Listing source configuration saved successfully." });
     },
@@ -512,11 +512,11 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
   const triggerScrapeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/marinamatch/intel/scrape/trigger");
+      return apiRequest("POST", "/api/vantage/intel/scrape/trigger");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/sync-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/sync-status"] });
       toast({ title: "Sync started", description: "Fetching new listings from configured sources..." });
     },
     onError: () => {
@@ -539,11 +539,11 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
         capRate: data.capRate ? parseFloat(data.capRate) : null,
         occupancyRate: data.occupancyRate ? parseFloat(data.occupancyRate) : null,
       };
-      return apiRequest("POST", "/api/marinamatch/intel/broker-submit", payload);
+      return apiRequest("POST", "/api/vantage/intel/broker-submit", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/analytics/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/analytics/overview"] });
       setBrokerSubmitOpen(false);
       setBrokerForm(INITIAL_BROKER_FORM);
       toast({ title: "Listing posted", description: "Your marina listing has been submitted successfully." });
@@ -561,20 +561,20 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
   }
 
   const { data: feedbackReasons } = useQuery<FeedbackReason[]>({
-    queryKey: ["/api/marinamatch/intel/feedback/reasons"],
+    queryKey: ["/api/vantage/intel/feedback/reasons"],
     staleTime: 300000,
   });
 
   const reportListingMutation = useMutation({
     mutationFn: async (data: { listingId: string; reason: string; details?: string }) => {
-      return apiRequest("POST", "/api/marinamatch/intel/feedback", data);
+      return apiRequest("POST", "/api/vantage/intel/feedback", data);
     },
     onSuccess: (data: any) => {
       setReportDialogOpen(false);
       setReportingListing(null);
       setReportReason("");
       setReportDetails("");
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/listings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/listings"] });
       toast({ 
         title: data?.autoApproved ? "Listing removed for all users" : "Listing removed from your feed", 
         description: data?.autoApproved 
@@ -1200,7 +1200,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
           <Alert className="border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-800">
             <Crown className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-sm">
-              <span className="font-medium text-foreground">MarinaMatch Marketplace</span>
+              <span className="font-medium text-foreground">Vantage Marketplace</span>
               <span className="text-muted-foreground ml-1">
                 — Curated marina listings from our verified broker network and platform partnerships. Available to all subscribers.
               </span>
@@ -2593,7 +2593,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                   <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
                     <Info className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">Disclaimer:</span> This listing information is aggregated from {selectedListing.sourcePlatform} for informational purposes only. MarinaMatch does not own this listing and makes no representations about its accuracy, completeness, or availability. Contact the listing broker for verified information before making any investment decisions.
+                      <span className="font-medium text-foreground">Disclaimer:</span> This listing information is aggregated from {selectedListing.sourcePlatform} for informational purposes only. Vantage does not own this listing and makes no representations about its accuracy, completeness, or availability. Contact the listing broker for verified information before making any investment decisions.
                     </AlertDescription>
                   </Alert>
                   
@@ -2714,7 +2714,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
           <DialogHeader>
             <DialogTitle>Submit Marina Listing</DialogTitle>
             <DialogDescription>
-              Brokers can directly submit marina listings to MarinaMatch. Your listing will be matched against buyer criteria and displayed with proper attribution.
+              Brokers can directly submit marina listings to Vantage. Your listing will be matched against buyer criteria and displayed with proper attribution.
             </DialogDescription>
           </DialogHeader>
           

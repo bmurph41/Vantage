@@ -8,7 +8,7 @@ import { registerDocketRoutes } from "./docket/routes";
 import { startDocketCronJobs } from "./docket/cron-jobs";
 import { DatabaseStorage as DocketStorage } from "./docket/storage";
 import { initializeWebSocket } from "./docket/websocket";
-import { startMarinaMatchIntelCronJobs } from "./marinamatch/services/intel-cron";
+import { startVantageIntelCronJobs } from "./marinamatch/services/intel-cron";
 import { startScheduler as startListingScheduler } from "./marinamatch/services/listing-scheduler";
 import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
 import { seedIntegrations } from "./integrations";
@@ -453,7 +453,7 @@ server.listen({
         log(`[DocIntel] Recovery check failed: ${err.message}`);
       });
 
-      // DISABLED: Docket, MarinaMatch Intel, and Listing Scraper cron jobs turned off to reduce RAM usage.
+      // DISABLED: Docket, Vantage Intel, and Listing Scraper cron jobs turned off to reduce RAM usage.
       // Re-enable by uncommenting the blocks below.
       /*
       try {
@@ -464,15 +464,15 @@ server.listen({
       }
 
       try {
-        startMarinaMatchIntelCronJobs();
-        log('MarinaMatch Intel background jobs started');
+        startVantageIntelCronJobs();
+        log('Vantage Intel background jobs started');
       } catch (error) {
-        log(`Failed to start MarinaMatch Intel background jobs: ${error}`);
+        log(`Failed to start Vantage Intel background jobs: ${error}`);
       }
 
       try {
         startListingScheduler();
-        log('MarinaMatch listing scrape scheduler started');
+        log('Vantage listing scrape scheduler started');
 
         // Auto-seed global broker sources in background
         autoSeedGlobalBrokerSources().then(result => {
@@ -483,7 +483,7 @@ server.listen({
           log(`[Global Brokers] Auto-seed failed: ${err.message}`);
         });
       } catch (error) {
-        log(`Failed to start MarinaMatch listing scheduler: ${error}`);
+        log(`Failed to start Vantage listing scheduler: ${error}`);
       }
       */
 

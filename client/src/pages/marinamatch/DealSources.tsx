@@ -50,15 +50,15 @@ export function DealSourcesTab() {
   const { toast } = useToast();
 
   const { data: sources, isLoading } = useQuery<DealSource[]>({
-    queryKey: ["/api/marinamatch/deal-sources"],
+    queryKey: ["/api/vantage/deal-sources"],
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<DealSource>) => {
-      return apiRequest("POST", "/api/marinamatch/deal-sources", data);
+      return apiRequest("POST", "/api/vantage/deal-sources", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/deal-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/deal-sources"] });
       setCreateDialogOpen(false);
       toast({ title: "Success", description: "Deal source created successfully" });
     },
@@ -69,10 +69,10 @@ export function DealSourcesTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<DealSource> }) => {
-      return apiRequest("PATCH", `/api/marinamatch/deal-sources/${id}`, data);
+      return apiRequest("PATCH", `/api/vantage/deal-sources/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/deal-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/deal-sources"] });
       setEditingSource(null);
       toast({ title: "Success", description: "Deal source updated successfully" });
     },
@@ -83,10 +83,10 @@ export function DealSourcesTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/deal-sources/${id}`);
+      return apiRequest("DELETE", `/api/vantage/deal-sources/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/deal-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/deal-sources"] });
       toast({ title: "Success", description: "Deal source deleted" });
     },
     onError: (error: any) => {

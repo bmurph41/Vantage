@@ -24,7 +24,7 @@ export async function seedMarinaTaxonomyPack(): Promise<string> {
 
   const [pack] = await db.insert(taxonomyPacks).values({
     assetClass: 'MARINA',
-    name: 'MarinaMatch Marina COA v1',
+    name: 'Vantage Marina COA v1',
     version: '1.0.0',
     isActive: true,
   }).returning();

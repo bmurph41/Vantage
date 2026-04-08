@@ -692,7 +692,7 @@ export interface IStorage {
   // Docket M&A Spotlight - Deal Tracking
   getDocketDeals(params: {
     orgId: string;
-    origin?: 'marinaMatch' | 'aiExtraction';
+    origin?: 'vantage' | 'aiExtraction';
     page?: number;
     pageSize?: number;
   }): Promise<{ deals: DocketDeal[]; total: number }>;
@@ -5135,7 +5135,7 @@ export class DatabaseStorage implements IStorage {
 
   async getDocketDeals(params: {
     orgId: string;
-    origin?: 'marinaMatch' | 'aiExtraction';
+    origin?: 'vantage' | 'aiExtraction';
     page?: number;
     pageSize?: number;
   }): Promise<{ deals: DocketDeal[]; total: number }> {

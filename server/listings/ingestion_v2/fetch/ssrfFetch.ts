@@ -19,7 +19,7 @@ export async function ssrfSafeFetch(
   const {
     timeoutMs = 30000,
     maxRedirects = 5,
-    userAgent = 'MarinaMatch/1.0 (Listing Ingestion)',
+    userAgent = 'Vantage/1.0 (Listing Ingestion)',
   } = options;
 
   let currentUrl = url;

@@ -7,7 +7,7 @@ export const V2_CONFIG = {
   },
   
   fetcher: {
-    userAgent: process.env.DOCKET_V2_USER_AGENT || 'DocketBot/1.0 (+https://marinamatch.com)',
+    userAgent: process.env.DOCKET_V2_USER_AGENT || 'DocketBot/1.0 (+https://vantage.com)',
     timeoutMs: parseInt(process.env.DOCKET_V2_TIMEOUT_MS || '30000', 10),
     maxRetries: parseInt(process.env.DOCKET_V2_MAX_RETRIES || '3', 10),
     retryDelayMs: parseInt(process.env.DOCKET_V2_RETRY_DELAY_MS || '1000', 10),

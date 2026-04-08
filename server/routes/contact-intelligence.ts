@@ -1,5 +1,5 @@
 /**
- * MarinaMatch CRM - Relationship Intelligence Routes
+ * Vantage CRM - Relationship Intelligence Routes
  * 
  * Add to server/routes/contact-intelligence.ts
  * Then import and use in your main routes file

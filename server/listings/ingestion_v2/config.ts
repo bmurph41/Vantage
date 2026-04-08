@@ -6,7 +6,7 @@ export const LIV2_CONFIG = {
     timeoutMs: parseInt(process.env.LISTING_V2_TIMEOUT_MS || '30000', 10),
     maxRetries: 3,
     retryDelayMs: 1000,
-    userAgent: 'MarinaMatch/2.0 (Listing Ingestion; +https://marinamatch.com)',
+    userAgent: 'Vantage/2.0 (Listing Ingestion; +https://vantage.com)',
   },
   
   identity: {

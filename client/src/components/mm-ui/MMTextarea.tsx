@@ -1,7 +1,7 @@
 /**
  * MMTextarea - Textarea Component
  * 
- * Styled textarea that matches the MarinaMatch Modal Standard:
+ * Styled textarea that matches the Vantage Modal Standard:
  * - Light gray background
  * - Subtle border with rounded corners
  * - Blue focus ring

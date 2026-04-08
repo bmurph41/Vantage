@@ -115,12 +115,12 @@ export class DuplicateDetectionService {
 
     // Search by marina name + city (95% confidence - exact match)
     if (propertyData.marinaName && propertyData.city) {
-      const marinaMatches = await this.findPropertiesByMarinaNameAndCity(
+      const vantagees = await this.findPropertiesByMarinaNameAndCity(
         propertyData.marinaName,
         propertyData.city,
         orgId
       );
-      matches.push(...marinaMatches.map(property => ({
+      matches.push(...vantagees.map(property => ({
         existingEntity: property,
         matchedBy: 'marina_name_and_city' as const,
         confidence: 95,

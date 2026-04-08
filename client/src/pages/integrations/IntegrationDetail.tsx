@@ -298,7 +298,7 @@ export default function IntegrationDetail() {
               <CardHeader>
                 <CardTitle>Integration Settings</CardTitle>
                 <CardDescription>
-                  Configure how this integration syncs with your MarinaMatch account.
+                  Configure how this integration syncs with your Vantage account.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -364,7 +364,7 @@ export default function IntegrationDetail() {
             <CardHeader>
               <CardTitle>Data Synchronization</CardTitle>
               <CardDescription>
-                How data flows between {integration.name} and MarinaMatch
+                How data flows between {integration.name} and Vantage
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -464,9 +464,9 @@ export default function IntegrationDetail() {
         <TabsContent value="migration" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Migration to MarinaMatch</CardTitle>
+              <CardTitle>Migration to Vantage</CardTitle>
               <CardDescription>
-                Transition your operations from {integration.name} to MarinaMatch as your central system
+                Transition your operations from {integration.name} to Vantage as your central system
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -507,21 +507,21 @@ export default function IntegrationDetail() {
                         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-600 text-white text-sm flex items-center justify-center">1</span>
                         <div>
                           <h5 className="font-medium">Connect & Sync</h5>
-                          <p className="text-sm text-muted-foreground">Import all data from {integration.name} into MarinaMatch. Validate data parity.</p>
+                          <p className="text-sm text-muted-foreground">Import all data from {integration.name} into Vantage. Validate data parity.</p>
                         </div>
                       </li>
                       <li className="flex gap-3">
                         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-yellow-600 text-white text-sm flex items-center justify-center">2</span>
                         <div>
                           <h5 className="font-medium">Dual-Write Period</h5>
-                          <p className="text-sm text-muted-foreground">Run both systems in parallel. Use MarinaMatch as primary while keeping {integration.name} updated.</p>
+                          <p className="text-sm text-muted-foreground">Run both systems in parallel. Use Vantage as primary while keeping {integration.name} updated.</p>
                         </div>
                       </li>
                       <li className="flex gap-3">
                         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center">3</span>
                         <div>
                           <h5 className="font-medium">Cutover</h5>
-                          <p className="text-sm text-muted-foreground">Switch to MarinaMatch as your system of record. Put {integration.name} in read-only mode.</p>
+                          <p className="text-sm text-muted-foreground">Switch to Vantage as your system of record. Put {integration.name} in read-only mode.</p>
                         </div>
                       </li>
                       <li className="flex gap-3">

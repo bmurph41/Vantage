@@ -594,7 +594,7 @@ export default function MarketIntelligence() {
               )}
             </div>
 
-            {/* Authentication Required - Note: Now handled by MarinaMatch auth */}
+            {/* Authentication Required - Note: Now handled by Vantage auth */}
             {!isAuthenticated && (
               <Card className="p-12 text-center" data-testid="card-auth-required">
                 <Lock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -602,7 +602,7 @@ export default function MarketIntelligence() {
                   Access Required
                 </h3>
                 <p className="text-muted-foreground">
-                  Market Intelligence is an institutional-grade feature. Please sign in to MarinaMatch to access AI-powered category summaries.
+                  Market Intelligence is an institutional-grade feature. Please sign in to Vantage to access AI-powered category summaries.
                 </p>
               </Card>
             )}

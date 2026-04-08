@@ -394,7 +394,7 @@ export default function IntegrationsPage() {
             <CardHeader>
               <CardTitle>Entity Mappings</CardTitle>
               <CardDescription>
-                Links between MarinaMatch entities and external CRM records
+                Links between Vantage entities and external CRM records
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -409,7 +409,7 @@ export default function IntegrationsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Entity Type</TableHead>
-                      <TableHead>MarinaMatch ID</TableHead>
+                      <TableHead>Vantage ID</TableHead>
                       <TableHead>External ID</TableHead>
                       <TableHead>System</TableHead>
                       <TableHead>Status</TableHead>

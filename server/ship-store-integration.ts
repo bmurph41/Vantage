@@ -12,7 +12,7 @@ export function generateShipStoreToken(user: {
     throw new Error('JWT_SECRET is not configured');
   }
 
-  // Map MarinaMatch roles to Ship Store roles (manager/cashier)
+  // Map Vantage roles to Ship Store roles (manager/cashier)
   // Default to 'manager' for admin/owner roles, 'cashier' for others
   let shipStoreRole = 'cashier';
   
@@ -55,7 +55,7 @@ export const shipStoreProxy = createProxyMiddleware({
 // JWT token generation endpoint
 export function shipStoreTokenEndpoint(req: Request, res: Response) {
   try {
-    // Get user from session (assuming MarinaMatch uses session auth)
+    // Get user from session (assuming Vantage uses session auth)
     const user = (req as any).user;
     
     if (!user || !user.id || !user.email) {

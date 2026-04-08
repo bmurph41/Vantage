@@ -1067,7 +1067,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           Welcome{userName ? `, ${userName}` : ''}!
         </h3>
         <p className="text-muted-foreground mt-2">
-          Let's get you set up with MarinaMatch, your all-in-one platform for 
+          Let's get you set up with Vantage, your all-in-one platform for 
           marina acquisitions and portfolio management.
         </p>
       </div>

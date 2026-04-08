@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Document Enhancement Engine
+ * Vantage Document Enhancement Engine
  * IC Deck renderer, PPTX export, document versioning, e-signature,
  * investor letter templates, rent roll PDF, loan package assembly
  */
@@ -967,7 +967,7 @@ class RentRollPDFGenerator {
     </tfoot>
   </table>
 
-  <div class="footer">MarinaMatch Rent Roll Report — Confidential</div>
+  <div class="footer">Vantage Rent Roll Report — Confidential</div>
 </body>
 </html>`;
   }

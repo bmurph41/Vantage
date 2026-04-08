@@ -256,7 +256,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                     type="email" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
-                    placeholder="krissy@marinamatch.com" 
+                    placeholder="krissy@vantage.com" 
                     className={classNames(touched && errors.email && "border-destructive focus-visible:ring-destructive")}
                     data-testid={isEdit ? "input-edit-email" : "input-contact-email"}
                   />

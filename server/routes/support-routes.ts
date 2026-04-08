@@ -5,7 +5,7 @@ import { logger } from '../lib/logger';
 
 export const supportRouter = Router();
 
-const SUPPORT_EMAIL = 'support@marinamatch.com';
+const SUPPORT_EMAIL = 'support@vantage.com';
 
 const contactSchema = z.object({
   name: z.string().min(1).max(100),

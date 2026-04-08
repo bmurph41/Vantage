@@ -487,8 +487,8 @@ onboardingRouter.post("/notifications/dispatch", async (req: Request, res: Respo
           await sendEmail({
             to: user.email,
             subject: content.title,
-            text: `${content.message}\n\nView in MarinaMatch: ${process.env.APP_URL || "https://app.marinamatch.com"}`,
-            html: `<p>${content.message}</p><p><a href="${process.env.APP_URL || "https://app.marinamatch.com"}">View in MarinaMatch</a></p>`,
+            text: `${content.message}\n\nView in Vantage: ${process.env.APP_URL || "https://app.vantage.com"}`,
+            html: `<p>${content.message}</p><p><a href="${process.env.APP_URL || "https://app.vantage.com"}">View in Vantage</a></p>`,
           });
         }
       }

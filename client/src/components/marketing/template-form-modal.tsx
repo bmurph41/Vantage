@@ -210,7 +210,7 @@ export function TemplateFormModal({ open, onClose, template }: TemplateFormModal
                 <FormLabel>Email Subject *</FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Welcome to MarinaMatch!" 
+                    placeholder="Welcome to Vantage!" 
                     {...field} 
                     data-testid="input-template-subject"
                   />
@@ -231,7 +231,7 @@ export function TemplateFormModal({ open, onClose, template }: TemplateFormModal
                 <FormLabel>Email Body *</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Hi {firstName},&#10;&#10;Welcome to MarinaMatch...&#10;&#10;Best regards,&#10;The Team"
+                    placeholder="Hi {firstName},&#10;&#10;Welcome to Vantage...&#10;&#10;Best regards,&#10;The Team"
                     className="min-h-[200px] font-mono text-sm"
                     {...field}
                     data-testid="input-template-body"

@@ -322,7 +322,7 @@ function CompsComparisonPDFDocument({ comps, statistics }: CompsComparisonPDFPro
         </View>
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>MarinaMatch Comparative Analysis</Text>
+          <Text style={styles.footerText}>Vantage Comparative Analysis</Text>
           <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -449,7 +449,7 @@ function CompsComparisonPDFDocument({ comps, statistics }: CompsComparisonPDFPro
           </View>
 
           <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>MarinaMatch Comparative Analysis</Text>
+            <Text style={styles.footerText}>Vantage Comparative Analysis</Text>
             <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
           </View>
         </Page>

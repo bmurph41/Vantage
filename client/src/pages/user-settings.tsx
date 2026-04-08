@@ -1416,7 +1416,7 @@ export default function UserSettingsPage() {
                   </TooltipProvider>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This helps improve industry analytics for all MarinaMatch users. Your marina's identity is never disclosed. You can opt out at any time.
+                  This helps improve industry analytics for all Vantage users. Your marina's identity is never disclosed. You can opt out at any time.
                 </p>
                 {benchmarkingSettings?.benchmarkingOptOut && (
                   <p className="text-xs text-muted-foreground mt-2">Currently opted out of benchmarking</p>

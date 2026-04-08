@@ -5,7 +5,7 @@ import { AlertCircle, X } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect, useCallback } from "react";
 
-const DISMISSED_STORAGE_KEY = 'marinamatch-dismissed-pending-notifications';
+const DISMISSED_STORAGE_KEY = 'vantage-dismissed-pending-notifications';
 
 function loadDismissed(): Set<string> {
   try {

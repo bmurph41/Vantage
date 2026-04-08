@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Integrations Engine
+ * Vantage Integrations Engine
  * Unified integration framework: QuickBooks Online, Xero, Stripe, Twilio,
  * Plaid Bank Feeds, Calendar Sync (Google/Outlook), Email Tracking
  */
@@ -67,14 +67,14 @@ export interface CalendarEvent {
 
 const QBO_CLIENT_ID = process.env.QBO_CLIENT_ID || '';
 const QBO_CLIENT_SECRET = process.env.QBO_CLIENT_SECRET || '';
-const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'https://marinamatch.com/api/integrations/qbo/callback';
+const QBO_REDIRECT_URI = process.env.QBO_REDIRECT_URI || 'https://vantage.com/api/integrations/qbo/callback';
 const QBO_BASE_URL = process.env.QBO_SANDBOX === 'true'
   ? 'https://sandbox-quickbooks.api.intuit.com'
   : 'https://quickbooks.api.intuit.com';
 
 const XERO_CLIENT_ID = process.env.XERO_CLIENT_ID || '';
 const XERO_CLIENT_SECRET = process.env.XERO_CLIENT_SECRET || '';
-const XERO_REDIRECT_URI = process.env.XERO_REDIRECT_URI || 'https://marinamatch.com/api/integrations/xero/callback';
+const XERO_REDIRECT_URI = process.env.XERO_REDIRECT_URI || 'https://vantage.com/api/integrations/xero/callback';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 
@@ -93,13 +93,13 @@ const PLAID_BASE_URL = PLAID_ENV === 'production'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'https://marinamatch.com/api/integrations/google/callback';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'https://vantage.com/api/integrations/google/callback';
 
 const OUTLOOK_CLIENT_ID = process.env.OUTLOOK_CLIENT_ID || '';
 const OUTLOOK_CLIENT_SECRET = process.env.OUTLOOK_CLIENT_SECRET || '';
-const OUTLOOK_REDIRECT_URI = process.env.OUTLOOK_REDIRECT_URI || 'https://marinamatch.com/api/integrations/outlook/callback';
+const OUTLOOK_REDIRECT_URI = process.env.OUTLOOK_REDIRECT_URI || 'https://vantage.com/api/integrations/outlook/callback';
 
-const APP_URL = process.env.APP_URL || 'https://marinamatch.com';
+const APP_URL = process.env.APP_URL || 'https://vantage.com';
 
 // ─── Integrations Engine ────────────────────────────────────────────────────
 
@@ -782,7 +782,7 @@ class IntegrationsEngine {
       body: new URLSearchParams({
         email,
         metadata: JSON.stringify({ orgId }),
-        description: `MarinaMatch org ${orgId}`,
+        description: `Vantage org ${orgId}`,
       }),
     });
 
@@ -1005,7 +1005,7 @@ class IntegrationsEngine {
         created_at = NOW()
     `);
 
-    await this.sendSms(phoneNumber, `Your MarinaMatch verification code is: ${code}. It expires in 10 minutes.`);
+    await this.sendSms(phoneNumber, `Your Vantage verification code is: ${code}. It expires in 10 minutes.`);
 
     logger.info({ userId }, '2FA code sent');
     return { codeSent: true };
@@ -1086,7 +1086,7 @@ class IntegrationsEngine {
       body: JSON.stringify({
         client_id: PLAID_CLIENT_ID,
         secret: PLAID_SECRET,
-        client_name: 'MarinaMatch',
+        client_name: 'Vantage',
         user: { client_user_id: userId },
         products: ['transactions'],
         country_codes: ['US'],

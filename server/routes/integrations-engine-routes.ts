@@ -1,5 +1,5 @@
 /**
- * MarinaMatch Integrations Engine Routes
+ * Vantage Integrations Engine Routes
  * Third-party connections: QuickBooks, Xero, Stripe, Twilio, Plaid,
  * Calendar sync, tracked email delivery
  */

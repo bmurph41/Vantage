@@ -144,8 +144,8 @@ export function scoreArticle(title: string, content: string, source: string): nu
   }
 
   // Score based on marina-specific terms
-  const marinaMatches = MARINA_TERMS.filter(term => text.includes(term)).length;
-  score += Math.min(marinaMatches * 8, 40);
+  const vantagees = MARINA_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(vantagees * 8, 40);
 
   // Investment relevance
   const investmentMatches = INVESTMENT_TERMS.filter(term => text.includes(term)).length;
@@ -229,8 +229,8 @@ export async function scoreArticleAsync(title: string, content: string, source: 
   }
 
   // Score based on marina-specific terms
-  const marinaMatches = MARINA_TERMS.filter(term => text.includes(term)).length;
-  score += Math.min(marinaMatches * 8, 40);
+  const vantagees = MARINA_TERMS.filter(term => text.includes(term)).length;
+  score += Math.min(vantagees * 8, 40);
 
   // Investment relevance
   const investmentMatches = INVESTMENT_TERMS.filter(term => text.includes(term)).length;

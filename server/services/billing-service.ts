@@ -165,7 +165,7 @@ export class BillingService {
         customer: customer.id,
         items: [{ price_data: {
           currency: 'usd',
-          product_data: { name: `MarinaMatch ${tierDef.name}` },
+          product_data: { name: `Vantage ${tierDef.name}` },
           unit_amount: priceInCents,
           recurring: { interval: billingCycle === 'annual' ? 'year' : 'month' },
         }}],
@@ -340,7 +340,7 @@ export class BillingService {
           id: stripeSub.items.data[0].id,
           price_data: {
             currency: 'usd',
-            product_data: { name: `MarinaMatch ${tierDef.name}` },
+            product_data: { name: `Vantage ${tierDef.name}` },
             unit_amount: priceInCents,
             recurring: { interval: sub.billingCycle === 'annual' ? 'year' : 'month' },
           },
@@ -716,7 +716,7 @@ export class BillingService {
             id: stripeSub.items.data[0].id,
             price_data: {
               currency: 'usd',
-              product_data: { name: `MarinaMatch ${tierDef.name}` },
+              product_data: { name: `Vantage ${tierDef.name}` },
               unit_amount: priceInCents,
               recurring: { interval: sub.billingCycle === 'annual' ? 'year' : 'month' },
             },

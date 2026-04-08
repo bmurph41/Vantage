@@ -46,9 +46,9 @@ export default function DocketPage() {
   const getOriginBadge = (origin: string) => {
     if (origin === 'marinaMatch') {
       return (
-        <Badge variant="default" className="bg-blue-600 hover:bg-blue-700" data-testid="badge-origin-marinamatch">
+        <Badge variant="default" className="bg-blue-600 hover:bg-blue-700" data-testid="badge-origin-vantage">
           <Anchor className="w-3 h-3 mr-1" />
-          MarinaMatch Sales Comp
+          Vantage Sales Comp
         </Badge>
       );
     } else {
@@ -127,7 +127,7 @@ export default function DocketPage() {
                   <h3 className="text-lg font-semibold mb-2">No Deals Found</h3>
                   <p className="text-muted-foreground text-center max-w-md">
                     {selectedOrigin === 'marinaMatch' 
-                      ? 'Sales data from MarinaMatch Sales Comps will appear here automatically.'
+                      ? 'Sales data from Vantage Sales Comps will appear here automatically.'
                       : selectedOrigin === 'aiExtraction'
                       ? 'AI-discovered deals from news articles and market intelligence will appear here.'
                       : 'No deals have been tracked yet.'}

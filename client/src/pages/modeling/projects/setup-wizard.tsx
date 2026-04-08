@@ -228,7 +228,7 @@ const DEAL_SOURCES = [
   { value: "listing", label: "Online Listing" },
   { value: "auction", label: "Auction" },
   { value: "referral", label: "Referral" },
-  { value: "marinamatch", label: "MarinaMatch" },
+  { value: "vantage", label: "Vantage" },
   { value: "other", label: "Other" },
 ];
 
@@ -316,7 +316,7 @@ function WelcomeSlide() {
       <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
         <Anchor className="h-10 w-10 text-primary" />
       </div>
-      <h2 className="text-3xl font-bold mb-4">Welcome to MarinaMatch</h2>
+      <h2 className="text-3xl font-bold mb-4">Welcome to Vantage</h2>
       <p className="text-lg text-muted-foreground max-w-md mx-auto mb-8">
         Let's set up your modeling project. We'll walk you through the key
         inputs to get your valuation started.

@@ -554,7 +554,7 @@ export default function CompsDataGrid({
 
   // Load column configuration from localStorage on mount
   useEffect(() => {
-    const savedConfig = localStorage.getItem('marinamatch-column-config');
+    const savedConfig = localStorage.getItem('vantage-column-config');
     if (savedConfig) {
       try {
         setColumnConfig(JSON.parse(savedConfig));
@@ -567,7 +567,7 @@ export default function CompsDataGrid({
   // Save column configuration to localStorage when it changes
   useEffect(() => {
     if (Object.keys(columnConfig).length > 0) {
-      localStorage.setItem('marinamatch-column-config', JSON.stringify(columnConfig));
+      localStorage.setItem('vantage-column-config', JSON.stringify(columnConfig));
     }
   }, [columnConfig]);
 

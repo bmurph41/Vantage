@@ -32,7 +32,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3">
           <CardTitle className="text-2xl text-center">
-            Welcome to MarinaMatch
+            Welcome to Vantage
           </CardTitle>
           <CardDescription className="text-center">
             Comprehensive rent roll analysis for marina operators and PE firms
@@ -41,7 +41,7 @@ export default function LoginPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
-              MarinaMatch provides institutional-grade lease management and financial analytics:
+              Vantage provides institutional-grade lease management and financial analytics:
             </p>
             <ul className="space-y-1 pl-4">
               <li>• Executive dashboards with KPIs and revenue trends</li>

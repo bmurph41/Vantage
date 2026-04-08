@@ -1,7 +1,7 @@
 /**
  * MMRadioCardGroup - Radio Card Selection Component
  * 
- * Styled radio cards that match the MarinaMatch Modal Standard:
+ * Styled radio cards that match the Vantage Modal Standard:
  * - Clean card layout with icon, title, description
  * - Blue border/highlight when selected
  * - Keyboard navigation support

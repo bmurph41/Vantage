@@ -273,7 +273,7 @@ export class ApprovalNotificationService {
 
     const msg = {
       to: params.to,
-      from: { email: fromEmail, name: 'MarinaMatch' },
+      from: { email: fromEmail, name: 'Vantage' },
       subject: `[Action Required] Scenario Approval Request: ${params.scenarioName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -317,7 +317,7 @@ export class ApprovalNotificationService {
 
     const msg = {
       to: params.to,
-      from: { email: fromEmail, name: 'MarinaMatch' },
+      from: { email: fromEmail, name: 'Vantage' },
       subject: `Scenario ${statusText}: ${params.scenarioName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

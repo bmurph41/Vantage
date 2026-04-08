@@ -135,7 +135,7 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   deactivateUser(id: string): Promise<void>;
   
-  // MarinaMatch Integration methods
+  // Vantage Integration methods
   getOrganizationFeature(orgId: string): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null } | undefined>;
   createOrganizationFeature(data: { orgId: string; feature?: string; tier?: string; isActive?: boolean }): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null }>;
   getDocketUserByMarinaUserId(marinaUserId: string): Promise<User | undefined>;
@@ -2147,7 +2147,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // MarinaMatch Integration methods
+  // Vantage Integration methods
   async getOrganizationFeature(orgId: string): Promise<{ id: string; orgId: string; feature: string; tier: string; isActive: boolean; activatedAt: Date; expiresAt: Date | null } | undefined> {
     const [feature] = await db
       .select()
@@ -2208,7 +2208,7 @@ export class DatabaseStorage implements IStorage {
         marinaUserId: data.marinaUserId,
         orgId: data.orgId,
         email: data.email,
-        // username and password remain null for MarinaMatch users
+        // username and password remain null for Vantage users
         username: null,
         password: null,
         role: data.role,

@@ -24,7 +24,7 @@ const CATEGORIES = {
   MODELING: { label: 'Financial Model', href: '/modeling/projects', icon: TrendingUp },
   DOCKET: { label: 'The Docket', href: '/docket', icon: MessageSquare },
   ANALYSIS: { label: 'Market Intelligence', href: '/analysis/sales-comps', icon: BarChart3 },
-  MARINAMATCH: { label: 'MarinaMatch', href: '/marinamatch', icon: Target },
+  MARINAMATCH: { label: 'Vantage', href: '/vantage', icon: Target },
 };
 
 const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
@@ -602,11 +602,11 @@ const ROUTE_MAPPINGS: Record<string, BreadcrumbItem[]> = {
     { label: 'AI Training' },
   ],
   
-  '/marinamatch': [
+  '/vantage': [
     CATEGORIES.MARINAMATCH,
     { label: 'Overview' },
   ],
-  '/marinamatch/intel': [
+  '/vantage/intel': [
     CATEGORIES.MARINAMATCH,
     { label: 'Market Intel' },
   ],
@@ -1055,7 +1055,7 @@ export function Breadcrumb() {
   
   let breadcrumbs = getBreadcrumbsForPath(location);
   
-  if (location === '/marinamatch' || location.startsWith('/marinamatch?')) {
+  if (location === '/vantage' || location.startsWith('/vantage?')) {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') || 'overview';
     const tabLabel = MARINAMATCH_TAB_LABELS[tab] || 'Overview';

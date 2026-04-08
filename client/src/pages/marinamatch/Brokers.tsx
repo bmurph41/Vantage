@@ -70,20 +70,20 @@ export function BrokersTab() {
   const { toast } = useToast();
 
   const { data: brokers, isLoading } = useQuery<BrokerRelationship[]>({
-    queryKey: ["/api/marinamatch/broker-relationships"],
+    queryKey: ["/api/vantage/broker-relationships"],
   });
 
   const { data: activities } = useQuery<BrokerActivity[]>({
-    queryKey: ["/api/marinamatch/broker-relationships", selectedBroker?.id, "activity"],
+    queryKey: ["/api/vantage/broker-relationships", selectedBroker?.id, "activity"],
     enabled: !!selectedBroker,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<BrokerRelationship>) => {
-      return apiRequest("POST", "/api/marinamatch/broker-relationships", data);
+      return apiRequest("POST", "/api/vantage/broker-relationships", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
       setCreateDialogOpen(false);
       toast({ title: "Success", description: "Broker added successfully" });
     },
@@ -94,10 +94,10 @@ export function BrokersTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<BrokerRelationship> }) => {
-      return apiRequest("PATCH", `/api/marinamatch/broker-relationships/${id}`, data);
+      return apiRequest("PATCH", `/api/vantage/broker-relationships/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
       setEditingBroker(null);
       toast({ title: "Success", description: "Broker updated successfully" });
     },
@@ -108,10 +108,10 @@ export function BrokersTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/broker-relationships/${id}`);
+      return apiRequest("DELETE", `/api/vantage/broker-relationships/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
       toast({ title: "Success", description: "Broker removed" });
     },
     onError: (error: any) => {
@@ -121,11 +121,11 @@ export function BrokersTab() {
 
   const logActivityMutation = useMutation({
     mutationFn: async ({ brokerId, data }: { brokerId: string; data: any }) => {
-      return apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/activity`, data);
+      return apiRequest("POST", `/api/vantage/broker-relationships/${brokerId}/activity`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships", selectedBroker?.id, "activity"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships", selectedBroker?.id, "activity"] });
       setActivityDialogOpen(false);
       toast({ title: "Success", description: "Activity logged" });
     },
@@ -136,11 +136,11 @@ export function BrokersTab() {
 
   const submitDealMutation = useMutation({
     mutationFn: async ({ brokerId, data }: { brokerId: string; data: any }) => {
-      return apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/submit-deal`, data);
+      return apiRequest("POST", `/api/vantage/broker-relationships/${brokerId}/submit-deal`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/sourced-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/sourced-deals"] });
       setSubmitDealDialogOpen(false);
       toast({ 
         title: "Deal Submitted", 
@@ -154,11 +154,11 @@ export function BrokersTab() {
 
   const generateTokenMutation = useMutation({
     mutationFn: async (brokerId: string) => {
-      const response = await apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/generate-token`);
+      const response = await apiRequest("POST", `/api/vantage/broker-relationships/${brokerId}/generate-token`);
       return response;
     },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
       if (selectedBroker) {
         setSelectedBroker(prev => prev ? { 
           ...prev, 
@@ -178,10 +178,10 @@ export function BrokersTab() {
 
   const disablePortalMutation = useMutation({
     mutationFn: async (brokerId: string) => {
-      return apiRequest("POST", `/api/marinamatch/broker-relationships/${brokerId}/disable-portal`);
+      return apiRequest("POST", `/api/vantage/broker-relationships/${brokerId}/disable-portal`);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/broker-relationships"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/vantage/broker-relationships"] });
       if (selectedBroker) {
         setSelectedBroker(prev => prev ? { 
           ...prev, 

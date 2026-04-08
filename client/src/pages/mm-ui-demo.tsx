@@ -1,7 +1,7 @@
 /**
  * MM-UI Demo Page
  * 
- * Demonstrates all MarinaMatch Modal Standard components:
+ * Demonstrates all Vantage Modal Standard components:
  * - 3-step New Project wizard
  * - New Contact modal with form fields
  * - Radio card selection example
@@ -541,7 +541,7 @@ export default function MMUIDemo() {
             MM-UI Component Library
           </h1>
           <p style={{ color: 'var(--mm-text-secondary)' }}>
-            MarinaMatch Modal Standard Design System
+            Vantage Modal Standard Design System
           </p>
         </div>
 

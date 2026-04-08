@@ -196,7 +196,7 @@ export default function ColumnMapperSimple({
             <div>
               <CardTitle className="text-lg">Map CSV Columns</CardTitle>
               <CardDescription>
-                Match your CSV columns to MarinaMatch fields. Auto-detected mappings are pre-filled.
+                Match your CSV columns to Vantage fields. Auto-detected mappings are pre-filled.
               </CardDescription>
             </div>
             <div className="text-right">

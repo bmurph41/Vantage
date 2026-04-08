@@ -28,7 +28,7 @@ export default function SalesCompsIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // TODO: Replace with actual MarinaMatch auth when available
+  // TODO: Replace with actual Vantage auth when available
   const user = { role: 'Admin' };
   const isAuthenticated = true;
   const isLoading = false;

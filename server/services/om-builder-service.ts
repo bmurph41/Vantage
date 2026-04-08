@@ -530,7 +530,7 @@ class OMBuilderService {
     
     const pdfOptions: Partial<PDFGeneratorOptions> = {
       templateType,
-      companyName: options?.companyName || 'MarinaMatch',
+      companyName: options?.companyName || 'Vantage',
     };
 
     const pdfBytes = await pdfGeneratorService.generatePDF(omData, pdfOptions);

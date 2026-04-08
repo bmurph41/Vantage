@@ -1,5 +1,5 @@
 /**
- * MarinaMatch CRM Enhancements Routes
+ * Vantage CRM Enhancements Routes
  * Deal comparisons, email tracking, calendar sync, company hierarchy,
  * relationship scoring, bulk email campaigns, deal rooms
  */

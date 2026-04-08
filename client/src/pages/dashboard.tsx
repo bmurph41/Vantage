@@ -1656,7 +1656,7 @@ export default function Dashboard() {
       <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">MarinaMatch Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Vantage Dashboard</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-1">
               Your comprehensive real estate investment intelligence platform
             </p>

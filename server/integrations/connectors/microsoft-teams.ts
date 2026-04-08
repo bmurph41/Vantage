@@ -22,8 +22,8 @@ export class MicrosoftTeamsConnector extends BaseConnector {
           body: JSON.stringify({
             '@type': 'MessageCard',
             '@context': 'http://schema.org/extensions',
-            summary: 'MarinaMatch Connection Test',
-            text: 'MarinaMatch is successfully connected to Microsoft Teams.',
+            summary: 'Vantage Connection Test',
+            text: 'Vantage is successfully connected to Microsoft Teams.',
           }),
         });
         return res.ok
@@ -100,7 +100,7 @@ export class MicrosoftTeamsConnector extends BaseConnector {
       ],
       actions: [{
         '@type': 'OpenUri',
-        name: 'View in MarinaMatch',
+        name: 'View in Vantage',
         targets: [{ os: 'default', uri: deal.url }],
       }],
     });

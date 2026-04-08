@@ -262,7 +262,7 @@ export class EnterpriseAuthService {
     if (!user) throw new Error('User not found');
 
     const secret = speakeasy.generateSecret({
-      name: `MarinaMatch (${user.email})`,
+      name: `Vantage (${user.email})`,
       length: 32
     });
 
@@ -541,18 +541,18 @@ export class EnterpriseAuthService {
     // After too many failed attempts, send a warning email with reset link
     if (attempts >= MAX_LOGIN_ATTEMPTS && user.email) {
       try {
-        const appUrl = process.env.APP_URL || 'https://marinamatch.com';
+        const appUrl = process.env.APP_URL || 'https://vantage.com';
         const resetUrl = `${appUrl}/forgot-password`;
         await sendEmail({
           to: user.email,
-          subject: 'Unusual login activity on your MarinaMatch account',
-          text: `Hi${user.name ? ' ' + user.name : ''},\n\nWe noticed ${attempts} failed login attempts on your MarinaMatch account. If this was you, you can reset your password here: ${resetUrl}\n\nIf you didn't attempt to log in, we recommend resetting your password immediately to secure your account.\n\n— The MarinaMatch Security Team`,
+          subject: 'Unusual login activity on your Vantage account',
+          text: `Hi${user.name ? ' ' + user.name : ''},\n\nWe noticed ${attempts} failed login attempts on your Vantage account. If this was you, you can reset your password here: ${resetUrl}\n\nIf you didn't attempt to log in, we recommend resetting your password immediately to secure your account.\n\n— The Vantage Security Team`,
           html: `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #343E5C; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #EFEFF4;">
   <div style="background: white; border-radius: 8px; padding: 40px; margin: 20px 0;">
     <div style="text-align: center; margin-bottom: 24px;">
-      <h1 style="color: #0891b2; margin: 0; font-size: 22px;">MarinaMatch</h1>
+      <h1 style="color: #0891b2; margin: 0; font-size: 22px;">Vantage</h1>
     </div>
     <h2 style="margin-top: 0; color: #1e293b;">Unusual Login Activity</h2>
     <p>Hi${user.name ? ' ' + user.name : ''},</p>
@@ -566,7 +566,7 @@ export class EnterpriseAuthService {
     <p style="color: #64748b; font-size: 14px;">If you didn't attempt to log in, we recommend resetting your password immediately to secure your account.</p>
   </div>
   <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 20px;">
-    <p>&copy; ${new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+    <p>&copy; ${new Date().getFullYear()} Vantage. All rights reserved.</p>
   </div>
 </body></html>`,
         });

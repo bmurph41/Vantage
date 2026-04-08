@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ColumnConfig } from "@/components/settings/ColumnCustomizer";
 
-const STORAGE_KEY_PREFIX = 'marinamatch_columns_';
+const STORAGE_KEY_PREFIX = 'vantage_columns_';
 
 const DEFAULT_SALES_COMPS_COLUMNS: ColumnConfig[] = [
   { key: 'marina', label: 'Marina', visible: true, sortable: true, type: 'text' },

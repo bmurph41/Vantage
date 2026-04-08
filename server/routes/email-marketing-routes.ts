@@ -13,13 +13,13 @@ const router = Router();
 
 const CONSTANT_CONTACT_CLIENT_ID = process.env.CONSTANT_CONTACT_CLIENT_ID;
 const CONSTANT_CONTACT_CLIENT_SECRET = process.env.CONSTANT_CONTACT_CLIENT_SECRET;
-const CONSTANT_CONTACT_REDIRECT_URI = process.env.CONSTANT_CONTACT_REDIRECT_URI || 'https://marinamatch.replit.app/api/email-marketing/constant-contact/callback';
+const CONSTANT_CONTACT_REDIRECT_URI = process.env.CONSTANT_CONTACT_REDIRECT_URI || 'https://vantage.replit.app/api/email-marketing/constant-contact/callback';
 const CONSTANT_CONTACT_AUTH_BASE = 'https://authz.constantcontact.com/oauth2/default/v1';
 const CONSTANT_CONTACT_API_BASE = 'https://api.cc.email/v3';
 
 const MAILCHIMP_CLIENT_ID = process.env.MAILCHIMP_CLIENT_ID;
 const MAILCHIMP_CLIENT_SECRET = process.env.MAILCHIMP_CLIENT_SECRET;
-const MAILCHIMP_REDIRECT_URI = process.env.MAILCHIMP_REDIRECT_URI || 'https://marinamatch.replit.app/api/email-marketing/mailchimp/callback';
+const MAILCHIMP_REDIRECT_URI = process.env.MAILCHIMP_REDIRECT_URI || 'https://vantage.replit.app/api/email-marketing/mailchimp/callback';
 const MAILCHIMP_AUTH_BASE = 'https://login.mailchimp.com/oauth2';
 const MAILCHIMP_METADATA_URL = 'https://login.mailchimp.com/oauth2/metadata';
 

@@ -603,7 +603,7 @@ export default function UnifiedSidebar() {
               <div className="w-7 h-7 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
                 <Anchor className="w-4 h-4 text-white" />
               </div>
-              <span className="text-base font-bold text-sidebar-foreground">MarinaMatch</span>
+              <span className="text-base font-bold text-sidebar-foreground">Vantage</span>
             </Link>
             <button
               onClick={() => {
@@ -648,7 +648,7 @@ export default function UnifiedSidebar() {
                   <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
                     <Anchor className="w-5 h-5 text-white" />
                   </div>
-                  {!sidebarCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground truncate">MarinaMatch</h1>}
+                  {!sidebarCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground truncate">Vantage</h1>}
                 </div>
               </Link>
               {/* Mobile Close Button */}
@@ -1035,7 +1035,7 @@ export default function UnifiedSidebar() {
         </div>
         
         
-        {/* MarinaMatch - Section Title Style Link */}
+        {/* Vantage - Section Title Style Link */}
         <div className="mb-2">
           {sidebarCollapsed ? (
             <Tooltip>
@@ -1044,27 +1044,27 @@ export default function UnifiedSidebar() {
                   className="flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors"
                   onClick={() => setSidebarCollapsed(false)}
                 >
-                  <Target className={cn("w-4 h-4", location.startsWith('/marinamatch') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
+                  <Target className={cn("w-4 h-4", location.startsWith('/vantage') ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right" sideOffset={10}>
-                <p>MarinaMatch</p>
+                <p>Vantage</p>
               </TooltipContent>
             </Tooltip>
           ) : (
-            <Link href="/marinamatch">
+            <Link href="/vantage">
               <div
                 className={cn(
                   "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
-                  location.startsWith('/marinamatch')
+                  location.startsWith('/vantage')
                     ? "bg-blue-600 text-white hover:bg-blue-700" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
-                data-testid="nav-marinamatch"
+                data-testid="nav-vantage"
               >
                 <div className="flex items-center gap-2">
                   <Target className="w-3.5 h-3.5" />
-                  <span>MarinaMatch</span>
+                  <span>Vantage</span>
                 </div>
               </div>
             </Link>

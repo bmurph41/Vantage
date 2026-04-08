@@ -333,7 +333,7 @@ function RateCompsComparisonPDFDocument({ comps, statistics }: RateCompsComparis
         </View>
 
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>MarinaMatch Rate Comparables Analysis</Text>
+          <Text style={styles.footerText}>Vantage Rate Comparables Analysis</Text>
           <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
@@ -431,7 +431,7 @@ function RateCompsComparisonPDFDocument({ comps, statistics }: RateCompsComparis
             )}
 
             <View style={styles.footer} fixed>
-              <Text style={styles.footerText}>MarinaMatch Rate Comparables Analysis</Text>
+              <Text style={styles.footerText}>Vantage Rate Comparables Analysis</Text>
               <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
             </View>
           </Page>

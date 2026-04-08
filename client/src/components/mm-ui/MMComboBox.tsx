@@ -1,7 +1,7 @@
 /**
  * MMComboBox - Autocomplete/Combobox Component
  * 
- * Styled combobox that matches the MarinaMatch Modal Standard:
+ * Styled combobox that matches the Vantage Modal Standard:
  * - Light gray background
  * - Subtle border with rounded corners
  * - Blue focus ring

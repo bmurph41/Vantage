@@ -2,9 +2,9 @@ import sgMail from '@sendgrid/mail';
 import { logger } from '../lib/logger';
 import crypto from 'crypto';
 
-const DEFAULT_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com';
-const DEFAULT_FROM_NAME = 'MarinaMatch';
-const APP_URL = process.env.APP_URL || 'https://marinamatch.com';
+const DEFAULT_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com';
+const DEFAULT_FROM_NAME = 'Vantage';
+const APP_URL = process.env.APP_URL || 'https://vantage.com';
 
 /**
  * Unified email sender that tries providers in order:
@@ -91,7 +91,7 @@ export async function getSendGridClient() {
 
   if (!xReplitToken || !hostname) {
     const apiKey = process.env.SENDGRID_API_KEY;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@marinamatch.com';
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com';
 
     if (!apiKey) {
       throw new Error('SendGrid not configured');
@@ -131,12 +131,12 @@ export function wrapEmailTemplate(bodyContent: string): string {
   <div style="background: white; border-radius: 8px; padding: 40px; margin: 20px 0;">
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="display: inline-block; width: 40px; height: 40px; background: linear-gradient(135deg, #22d3ee, #2563eb); border-radius: 10px; line-height: 40px; color: white; font-weight: 700; font-size: 20px;">M</div>
-      <h1 style="color: #0891b2; margin: 8px 0 0 0; font-size: 22px;">MarinaMatch</h1>
+      <h1 style="color: #0891b2; margin: 8px 0 0 0; font-size: 22px;">Vantage</h1>
     </div>
     ${bodyContent}
   </div>
   <div style="text-align: center; color: #94a3b8; font-size: 12px; padding: 20px;">
-    <p>&copy; ${new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+    <p>&copy; ${new Date().getFullYear()} Vantage. All rights reserved.</p>
     <p><a href="${APP_URL}/settings" style="color: #94a3b8;">Manage preferences</a></p>
   </div>
 </body></html>`;
@@ -153,12 +153,12 @@ function emailButton(label: string, url: string): string {
 export async function sendPasswordResetEmail(to: string, resetUrl: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Reset Your MarinaMatch Password',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nYou requested to reset your password.\n\nClick this link to reset (expires in 1 hour): ${resetUrl}\n\nIf you didn't request this, ignore this email.\n\n— The MarinaMatch Team`,
+    subject: 'Reset Your Vantage Password',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nYou requested to reset your password.\n\nClick this link to reset (expires in 1 hour): ${resetUrl}\n\nIf you didn't request this, ignore this email.\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
       <h2 style="margin-top: 0; color: #1e293b;">Reset Your Password</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
-      <p>You requested to reset your password for MarinaMatch. Click the button below to create a new password:</p>
+      <p>You requested to reset your password for Vantage. Click the button below to create a new password:</p>
       ${emailButton('Reset Password', resetUrl)}
       <p style="color: #64748b; font-size: 14px;">This link will expire in 1 hour for security reasons.</p>
       <p style="color: #64748b; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
@@ -177,10 +177,10 @@ export function generateVerificationCode(): string {
 export async function sendEmailVerification(to: string, verificationUrl: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Verify Your MarinaMatch Email',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nWelcome to MarinaMatch! Verify your email: ${verificationUrl}\n\nLink expires in 24 hours.\n\n— The MarinaMatch Team`,
+    subject: 'Verify Your Vantage Email',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nWelcome to Vantage! Verify your email: ${verificationUrl}\n\nLink expires in 24 hours.\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
-      <h2 style="margin-top: 0; color: #1e293b; text-align: center;">Welcome to MarinaMatch!</h2>
+      <h2 style="margin-top: 0; color: #1e293b; text-align: center;">Welcome to Vantage!</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
       <p>Thank you for signing up! Please verify your email address to complete your registration.</p>
       ${emailButton('Verify Email Address', verificationUrl)}
@@ -192,13 +192,13 @@ export async function sendEmailVerification(to: string, verificationUrl: string,
 export async function sendMagicLinkEmail(to: string, magicLinkUrl: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Your MarinaMatch Login Link',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nLog in to MarinaMatch: ${magicLinkUrl}\n\nLink expires in 15 minutes.\n\n— The MarinaMatch Team`,
+    subject: 'Your Vantage Login Link',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nLog in to Vantage: ${magicLinkUrl}\n\nLink expires in 15 minutes.\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
-      <h2 style="margin-top: 0; color: #1e293b; text-align: center;">Log In to MarinaMatch</h2>
+      <h2 style="margin-top: 0; color: #1e293b; text-align: center;">Log In to Vantage</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
       <p>Click the button below to securely log in to your account without entering a password:</p>
-      ${emailButton('Log In to MarinaMatch', magicLinkUrl)}
+      ${emailButton('Log In to Vantage', magicLinkUrl)}
       <p style="color: #64748b; font-size: 14px;">This link will expire in 15 minutes for security reasons.</p>
     `),
   });
@@ -209,10 +209,10 @@ export async function sendMagicLinkEmail(to: string, magicLinkUrl: string, userN
 export async function sendTrialDay3Email(to: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Getting the most out of your MarinaMatch trial',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nYou're 3 days into your free trial! Here are some tips to get the most out of MarinaMatch:\n\n1. Upload your first sales comps to see market intelligence\n2. Create a deal in your pipeline to track opportunities\n3. Invite your team to collaborate\n4. Explore the modeling tools for valuations\n\nYour trial ends in 4 days. Visit ${APP_URL} to continue.\n\n— The MarinaMatch Team`,
+    subject: 'Getting the most out of your Vantage trial',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nYou're 3 days into your free trial! Here are some tips to get the most out of Vantage:\n\n1. Upload your first sales comps to see market intelligence\n2. Create a deal in your pipeline to track opportunities\n3. Invite your team to collaborate\n4. Explore the modeling tools for valuations\n\nYour trial ends in 4 days. Visit ${APP_URL} to continue.\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
-      <h2 style="margin-top: 0; color: #1e293b;">Getting the Most Out of MarinaMatch</h2>
+      <h2 style="margin-top: 0; color: #1e293b;">Getting the Most Out of Vantage</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
       <p>You're 3 days into your free trial! Here are the top things to try:</p>
       <div style="background: #f0fdfa; border-radius: 8px; padding: 20px; margin: 16px 0;">
@@ -224,7 +224,7 @@ export async function sendTrialDay3Email(to: string, userName?: string): Promise
         </table>
       </div>
       <p style="color: #64748b; font-size: 14px;">Your trial ends in 4 days.</p>
-      ${emailButton('Explore MarinaMatch', APP_URL)}
+      ${emailButton('Explore Vantage', APP_URL)}
     `),
   });
 }
@@ -232,8 +232,8 @@ export async function sendTrialDay3Email(to: string, userName?: string): Promise
 export async function sendTrialDay5Email(to: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Your MarinaMatch trial expires in 2 days',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nYour 7-day free trial expires in 2 days. After the trial, your card on file will be charged for your selected packs.\n\nTo continue using MarinaMatch, no action is needed — your subscription will activate automatically.\n\nTo cancel, visit ${APP_URL}/settings/billing before your trial ends.\n\n— The MarinaMatch Team`,
+    subject: 'Your Vantage trial expires in 2 days',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nYour 7-day free trial expires in 2 days. After the trial, your card on file will be charged for your selected packs.\n\nTo continue using Vantage, no action is needed — your subscription will activate automatically.\n\nTo cancel, visit ${APP_URL}/settings/billing before your trial ends.\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
       <h2 style="margin-top: 0; color: #1e293b;">Your Trial Expires in 2 Days</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
@@ -251,8 +251,8 @@ export async function sendTrialDay5Email(to: string, userName?: string): Promise
 export async function sendTrialLastDayEmail(to: string, userName?: string): Promise<boolean> {
   return sendEmail({
     to,
-    subject: 'Your MarinaMatch trial ends today',
-    text: `Hi${userName ? ' ' + userName : ''},\n\nYour free trial ends today. Your subscription will begin and your card on file will be charged.\n\nTo cancel before you're charged, visit ${APP_URL}/settings/billing.\n\nThank you for trying MarinaMatch!\n\n— The MarinaMatch Team`,
+    subject: 'Your Vantage trial ends today',
+    text: `Hi${userName ? ' ' + userName : ''},\n\nYour free trial ends today. Your subscription will begin and your card on file will be charged.\n\nTo cancel before you're charged, visit ${APP_URL}/settings/billing.\n\nThank you for trying Vantage!\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
       <h2 style="margin-top: 0; color: #1e293b;">Your Trial Ends Today</h2>
       <p>Hi${userName ? ' ' + userName : ''},</p>
@@ -262,7 +262,7 @@ export async function sendTrialLastDayEmail(to: string, userName?: string): Prom
       </div>
       <p>If you'd like to cancel before you're charged:</p>
       ${emailButton('Manage Billing', APP_URL + '/settings/billing')}
-      <p style="color: #64748b; font-size: 14px;">Thank you for trying MarinaMatch! We hope you love it.</p>
+      <p style="color: #64748b; font-size: 14px;">Thank you for trying Vantage! We hope you love it.</p>
     `),
   });
 }
@@ -275,14 +275,14 @@ export async function sendInviteEmail(
   const { inviteeName, inviterName, orgName } = options;
   const greeting = inviteeName ? `Hi ${inviteeName},` : 'Hi,';
   const inviterText = inviterName ? `<strong>${inviterName}</strong>` : 'A team member';
-  const orgText = orgName ? ` to <strong>${orgName}</strong> on MarinaMatch` : ' to MarinaMatch';
+  const orgText = orgName ? ` to <strong>${orgName}</strong> on Vantage` : ' to Vantage';
 
   return sendEmail({
     to,
-    subject: `You've been invited to MarinaMatch`,
-    text: `${greeting}\n\n${inviterName || 'A team member'} has invited you${orgName ? ' to ' + orgName + ' on' : ' to'} MarinaMatch — the institutional-grade marina & CRE investment platform.\n\nClick the link below to accept your invitation and set up your account (link expires in 7 days):\n${inviteUrl}\n\n— The MarinaMatch Team`,
+    subject: `You've been invited to Vantage`,
+    text: `${greeting}\n\n${inviterName || 'A team member'} has invited you${orgName ? ' to ' + orgName + ' on' : ' to'} Vantage — the institutional-grade marina & CRE investment platform.\n\nClick the link below to accept your invitation and set up your account (link expires in 7 days):\n${inviteUrl}\n\n— The Vantage Team`,
     html: wrapEmailTemplate(`
-      <h2 style="margin-top: 0; color: #1e293b;">You're Invited to MarinaMatch</h2>
+      <h2 style="margin-top: 0; color: #1e293b;">You're Invited to Vantage</h2>
       <p>${greeting}</p>
       <p>${inviterText} has invited you${orgText} — the institutional-grade marina &amp; CRE investment platform.</p>
       <p>Click the button below to accept your invitation and set up your account:</p>

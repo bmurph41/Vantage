@@ -94,7 +94,7 @@ function PipelineSnapshot() {
     conversionRate: string | number;
     topBrokers: any[];
   }>({
-    queryKey: ["/api/marinamatch/analytics/overview"],
+    queryKey: ["/api/vantage/analytics/overview"],
   });
 
   return (
@@ -316,7 +316,7 @@ function ListingsSection({ onNavigateToBrokers }: { onNavigateToBrokers: () => v
   );
 }
 
-export default function MarinaMatchIndex() {
+export default function VantageIndex() {
   const [location, setLocation] = useLocation();
   
   const getTabFromUrl = () => {
@@ -335,9 +335,9 @@ export default function MarinaMatchIndex() {
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
     if (newTab === "listings") {
-      setLocation("/marinamatch");
+      setLocation("/vantage");
     } else {
-      setLocation(`/marinamatch?tab=${newTab}`);
+      setLocation(`/vantage?tab=${newTab}`);
     }
   };
 
@@ -350,8 +350,8 @@ export default function MarinaMatchIndex() {
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="page-title-marinamatch">
-                MarinaMatch Intel
+              <h1 className="text-2xl font-bold text-foreground" data-testid="page-title-vantage">
+                Vantage Intel
               </h1>
               <p className="text-muted-foreground">
                 AI-powered marina acquisition platform

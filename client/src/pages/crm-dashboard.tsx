@@ -659,7 +659,7 @@ export default function CRMDashboard() {
 
         <Card className="bg-gradient-to-br from-blue-50/50 via-white to-teal-50/30 border-2 border-blue-100">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">MarinaMatch CRM Includes:</CardTitle>
+            <CardTitle className="text-base">Vantage CRM Includes:</CardTitle>
           </CardHeader>
           <CardContent>
             <FeatureChecklist

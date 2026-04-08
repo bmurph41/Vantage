@@ -8268,7 +8268,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   </div>
 
   <div style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-    <p>&copy; ${new Date().getFullYear()} MarinaMatch. All rights reserved.</p>
+    <p>&copy; ${new Date().getFullYear()} Vantage. All rights reserved.</p>
   </div>
 </body>
 </html>

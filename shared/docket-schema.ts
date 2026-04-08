@@ -11,7 +11,7 @@ export const featureTierEnum = pgEnum("docket_feature_tier", ["docket_free", "do
 // Organization Features - tracks which organizations have Docket enabled
 export const organizationFeatures = pgTable("organization_features", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  orgId: varchar("org_id").notNull().unique(), // References MarinaMatch organizations.id (not enforced by FK to avoid circular dependency)
+  orgId: varchar("org_id").notNull().unique(), // References Vantage organizations.id (not enforced by FK to avoid circular dependency)
   feature: text("feature").notNull().default("docket"), // Feature identifier
   tier: featureTierEnum("tier").notNull().default("docket_free"),
   activatedAt: timestamp("activated_at").notNull().defaultNow(),
@@ -25,13 +25,13 @@ export const organizationFeatures = pgTable("organization_features", {
   byFeature: index("idx_org_features_feature").on(table.feature),
 }));
 
-// Docket Users - shadow records linked to MarinaMatch users
+// Docket Users - shadow records linked to Vantage users
 export const users = pgTable("docket_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  // Link to MarinaMatch user (null for standalone Docket users if we ever support that)
-  marinaUserId: varchar("marina_user_id"), // References MarinaMatch users.id
-  orgId: varchar("org_id"), // References MarinaMatch organizations.id
-  // Standalone Docket credentials (nullable for MarinaMatch users)
+  // Link to Vantage user (null for standalone Docket users if we ever support that)
+  marinaUserId: varchar("marina_user_id"), // References Vantage users.id
+  orgId: varchar("org_id"), // References Vantage organizations.id
+  // Standalone Docket credentials (nullable for Vantage users)
   username: text("username").unique(),
   password: text("password"),
   email: text("email"),

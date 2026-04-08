@@ -188,7 +188,7 @@ return (
             <Building2 className="w-4.5 h-4.5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-bold text-gray-900 truncate">MarinaMatch</h1>
+            <h1 className="text-sm font-bold text-gray-900 truncate">Vantage</h1>
             <p className="text-[10px] text-gray-400 font-medium">CRM & Deal Platform</p>
           </div>
         </div>

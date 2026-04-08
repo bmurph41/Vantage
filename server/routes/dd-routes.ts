@@ -3781,7 +3781,7 @@ export function registerDDRoutes(
         projectId: integration.projectId,
         integrationId: integration.id,
         data: {
-          message: "Test webhook from MarinaMatch Due Diligence Tracker",
+          message: "Test webhook from Vantage Due Diligence Tracker",
           testId: crypto.randomBytes(16).toString('hex'),
         }
       };

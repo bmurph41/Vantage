@@ -233,7 +233,7 @@ export const SUBSCRIPTION_TIERS: TierDefinition[] = [
     features: [
       "Dashboard overview",
       "The Docket — industry news & alerts",
-      "MarinaMatch marketplace (browse)",
+      "Vantage marketplace (browse)",
       "3 sample sales comps",
       "Demographics preview",
       "1 deal workspace (view only)",

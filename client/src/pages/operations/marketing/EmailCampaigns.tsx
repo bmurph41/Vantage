@@ -324,7 +324,7 @@ export default function EmailCampaigns() {
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>Connect Constant Contact to:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Sync contacts from MarinaMatch leads</li>
+                  <li>Sync contacts from Vantage leads</li>
                   <li>Track email campaign performance</li>
                   <li>Manage subscriber lists</li>
                 </ul>
@@ -418,7 +418,7 @@ export default function EmailCampaigns() {
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>Connect Mailchimp to:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Sync contacts from MarinaMatch leads</li>
+                  <li>Sync contacts from Vantage leads</li>
                   <li>Track email campaign performance</li>
                   <li>Manage subscriber audiences</li>
                 </ul>
@@ -614,7 +614,7 @@ export default function EmailCampaigns() {
                   <CardTitle>Recent Leads</CardTitle>
                 </div>
                 <CardDescription>
-                  Contacts added through MarinaMatch
+                  Contacts added through Vantage
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -670,7 +670,7 @@ export default function EmailCampaigns() {
             <Mail className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Connect Your Email Platform</h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Connect Constant Contact to start syncing contacts, managing lists, and tracking campaign performance directly from MarinaMatch.
+              Connect Constant Contact to start syncing contacts, managing lists, and tracking campaign performance directly from Vantage.
             </p>
             <Button
               onClick={() => connectMutation.mutate()}

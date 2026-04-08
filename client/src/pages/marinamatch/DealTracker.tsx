@@ -82,24 +82,24 @@ export function DealTrackerTab() {
   const { toast } = useToast();
 
   const { data: deals, isLoading } = useQuery<SourcedDeal[]>({
-    queryKey: ["/api/marinamatch/sourced-deals", { status: statusFilter !== "all" ? statusFilter : undefined }],
+    queryKey: ["/api/vantage/sourced-deals", { status: statusFilter !== "all" ? statusFilter : undefined }],
   });
 
   const { data: sources } = useQuery<DealSource[]>({
-    queryKey: ["/api/marinamatch/deal-sources"],
+    queryKey: ["/api/vantage/deal-sources"],
   });
 
   const reviewMutation = useMutation({
     mutationFn: async ({ id, status, notes, reason }: { id: string; status: string; notes?: string; reason?: string }) => {
-      return apiRequest("POST", `/api/marinamatch/sourced-deals/${id}/review`, { 
+      return apiRequest("POST", `/api/vantage/sourced-deals/${id}/review`, { 
         status, 
         notes, 
         disqualificationReason: reason 
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/sourced-deals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/analytics/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/sourced-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/analytics/overview"] });
       setReviewDialogOpen(false);
       setSelectedDeal(null);
       toast({ title: "Success", description: "Deal reviewed successfully" });
@@ -111,11 +111,11 @@ export function DealTrackerTab() {
 
   const convertMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/marinamatch/sourced-deals/${id}/convert`);
+      return apiRequest("POST", `/api/vantage/sourced-deals/${id}/convert`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/sourced-deals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/analytics/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/sourced-deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/analytics/overview"] });
       toast({ title: "Success", description: "Deal marked for CRM conversion" });
     },
     onError: (error: any) => {

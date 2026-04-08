@@ -1,8 +1,8 @@
 /**
- * MarinaMatch UI Design System
+ * Vantage UI Design System
  * 
  * A comprehensive modal and form component library that enforces
- * the MarinaMatch Modal Standard across all interfaces.
+ * the Vantage Modal Standard across all interfaces.
  * 
  * @example
  * import { MMModal, MMModalWizard, MMInput, MMSelect } from '@/components/mm-ui';

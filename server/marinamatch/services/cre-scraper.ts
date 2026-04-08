@@ -103,7 +103,7 @@ async function checkRobotsTxt(baseUrl: string, path: string): Promise<{ allowed:
       
       if (trimmed.startsWith("user-agent:")) {
         const agent = trimmed.replace("user-agent:", "").trim();
-        userAgentMatches = agent === "*" || agent.includes("marinamatch");
+        userAgentMatches = agent === "*" || agent.includes("vantage");
       }
       
       if (userAgentMatches) {
@@ -1148,7 +1148,7 @@ export async function scrapeSourceWithMultiPage(
       maxCrawlDepth: source.maxCrawlDepth || 1,
       tokenBudgetPerRun: parseFloat(source.tokenBudgetPerRun?.toString() || "0.50"),
       respectRobotsTxt: source.respectRobotsTxt ?? true,
-      userAgent: source.userAgent || "MarinaMatchBot/1.0",
+      userAgent: source.userAgent || "VantageBot/1.0",
       rateLimitRpm: source.rateLimitRpm || 30,
     };
 

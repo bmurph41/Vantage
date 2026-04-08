@@ -439,7 +439,7 @@ apiV1Router.delete("/webhooks/:id", requireScope("webhooks:write"), async (req: 
 // GET /v1/ — API info and available endpoints
 apiV1Router.get("/", (req: Request, res: Response) => {
   res.json({
-    api: "MarinaMatch API",
+    api: "Vantage API",
     version: "v1",
     org: req.apiKeyUser?.orgName,
     scopes: req.apiKeyUser?.scopes,

@@ -289,7 +289,7 @@ export default function Upload({ onClose, onImportComplete }: UploadProps) {
     <div>
       <div className="mb-6">
         <h3 className="text-lg font-medium text-foreground mb-2">Step 2: Map Columns</h3>
-        <p className="text-sm text-muted-foreground">Map your file columns to MarinaMatch fields</p>
+        <p className="text-sm text-muted-foreground">Map your file columns to Vantage fields</p>
       </div>
 
       {uploadData && (

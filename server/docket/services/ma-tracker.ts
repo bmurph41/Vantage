@@ -138,8 +138,8 @@ export function analyzeMAContent(title: string, content: string, summary?: strin
   };
   
   // Check for marina industry context
-  const marinaMatches = MARINA_CONTEXT_KEYWORDS.filter(kw => fullText.includes(kw));
-  result.dealIndicators.hasMarinaContext = marinaMatches.length > 0;
+  const vantagees = MARINA_CONTEXT_KEYWORDS.filter(kw => fullText.includes(kw));
+  result.dealIndicators.hasMarinaContext = vantagees.length > 0;
   
   // Check for known entities
   const entityMatches = KNOWN_ENTITIES.filter(entity => fullText.includes(entity));

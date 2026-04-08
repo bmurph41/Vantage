@@ -246,7 +246,7 @@ export default function PacksSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold mb-2" data-testid="text-page-title">Manage Packs</h1>
         <p className="text-muted-foreground" data-testid="text-page-description">
-          Build your MarinaMatch platform with the packs you need. Start with core packs and add specialized features as your business grows.
+          Build your Vantage platform with the packs you need. Start with core packs and add specialized features as your business grows.
         </p>
       </div>
 

@@ -94,38 +94,38 @@ export function FeedbackAdminTab() {
     pagination: { page: number; limit: number; total: number; pages: number };
     stats: { pending: number };
   }>({
-    queryKey: ["/api/marinamatch/intel/feedback", statusFilter, reasonFilter],
+    queryKey: ["/api/vantage/intel/feedback", statusFilter, reasonFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (reasonFilter !== "all") params.set("reason", reasonFilter);
-      const res = await fetch(`/api/marinamatch/intel/feedback?${params.toString()}`);
+      const res = await fetch(`/api/vantage/intel/feedback?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch feedback");
       return res.json();
     },
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<FeedbackStats>({
-    queryKey: ["/api/marinamatch/intel/feedback/stats"],
+    queryKey: ["/api/vantage/intel/feedback/stats"],
   });
 
   const { data: patterns, isLoading: patternsLoading } = useQuery<AiPattern[]>({
-    queryKey: ["/api/marinamatch/intel/ai-patterns"],
+    queryKey: ["/api/vantage/intel/ai-patterns"],
     enabled: showPatterns,
   });
 
   const reviewMutation = useMutation({
     mutationFn: async (data: { id: string; status: "approved" | "dismissed"; reviewNotes?: string; createPattern?: boolean }) => {
-      return apiRequest("PATCH", `/api/marinamatch/intel/feedback/${data.id}`, {
+      return apiRequest("PATCH", `/api/vantage/intel/feedback/${data.id}`, {
         status: data.status,
         reviewNotes: data.reviewNotes,
         createPattern: data.createPattern,
       });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/feedback"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/feedback/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/ai-patterns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/feedback/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/ai-patterns"] });
       setSelectedFeedback(null);
       setReviewNotes("");
       toast({
@@ -142,21 +142,21 @@ export function FeedbackAdminTab() {
 
   const togglePatternMutation = useMutation({
     mutationFn: async (data: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/marinamatch/intel/ai-patterns/${data.id}`, { isActive: data.isActive });
+      return apiRequest("PATCH", `/api/vantage/intel/ai-patterns/${data.id}`, { isActive: data.isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/ai-patterns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/ai-patterns"] });
       toast({ title: "Pattern updated" });
     },
   });
 
   const deletePatternMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/marinamatch/intel/ai-patterns/${id}`);
+      return apiRequest("DELETE", `/api/vantage/intel/ai-patterns/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/ai-patterns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/marinamatch/intel/feedback/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/ai-patterns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vantage/intel/feedback/stats"] });
       toast({ title: "Pattern deleted" });
     },
   });

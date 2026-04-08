@@ -1,7 +1,7 @@
 /**
  * Workflow Enhancements Service
  * =============================
- * Extends the MarinaMatch workflow engine with:
+ * Extends the Vantage workflow engine with:
  *  1. Outbound webhooks (HMAC-signed, retry logic)
  *  2. Slack / Teams notifications
  *  3. Scheduled (cron) triggers
@@ -251,7 +251,7 @@ class WorkflowEnhancements {
   async testWebhook(orgId: string, webhookId: string) {
     const testPayload = {
       test: true,
-      message: 'MarinaMatch webhook test',
+      message: 'Vantage webhook test',
       timestamp: new Date().toISOString(),
     };
     return this.fireWebhook(orgId, webhookId, 'webhook.test', testPayload);
@@ -286,7 +286,7 @@ class WorkflowEnhancements {
     const blocks: SlackBlock[] = [
       {
         type: 'header',
-        text: { type: 'plain_text', text: 'MarinaMatch Notification', emoji: true },
+        text: { type: 'plain_text', text: 'Vantage Notification', emoji: true },
       },
       {
         type: 'section',
@@ -347,7 +347,7 @@ class WorkflowEnhancements {
     if (!config) throw new Error('Teams not configured for this organization');
 
     const sections: TeamsSection[] = [
-      { activityTitle: 'MarinaMatch Notification', text: message },
+      { activityTitle: 'Vantage Notification', text: message },
       {
         facts: [
           { name: 'Sent', value: new Date().toISOString() },

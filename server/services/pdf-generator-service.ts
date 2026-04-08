@@ -41,7 +41,7 @@ interface PDFContext {
 const DEFAULT_OPTIONS: PDFGeneratorOptions = {
   templateType: 'standard',
   includeWatermark: false,
-  companyName: 'MarinaMatch',
+  companyName: 'Vantage',
   primaryColor: { r: 0.047, g: 0.329, b: 0.533 }, // Navy blue
   accentColor: { r: 0.180, g: 0.545, b: 0.671 }, // Teal
 };

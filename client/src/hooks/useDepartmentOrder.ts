@@ -24,7 +24,7 @@ const DEFAULT_EXPENSES_ORDER = [
 ];
 
 function getStorageKey(section: 'revenueCogs' | 'expenses'): string {
-  return `marinamatch-dept-order-${section}`;
+  return `vantage-dept-order-${section}`;
 }
 
 function loadOrder(section: 'revenueCogs' | 'expenses'): string[] {

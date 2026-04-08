@@ -1,7 +1,7 @@
 /**
  * MMSelect - Select/Dropdown Component
  * 
- * Styled select that matches the MarinaMatch Modal Standard:
+ * Styled select that matches the Vantage Modal Standard:
  * - Light gray background
  * - Subtle border with rounded corners
  * - Blue focus ring

@@ -1,10 +1,10 @@
 /**
  * WorkflowAutomation.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Full workflow automation UI for MarinaMatch CRM/Pipeline.
+ * Full workflow automation UI for Vantage CRM/Pipeline.
  * Renders as a tab inside the existing CRM/Pipeline section.
  *
- * API contracts (all mounted under /api/marinamatch/workflow/):
+ * API contracts (all mounted under /api/vantage/workflow/):
  *   GET    /rules
  *   POST   /rules
  *   PATCH  /rules/:id
@@ -258,45 +258,45 @@ export function WorkflowAutomation() {
   const [editingRule, setEditingRule] = useState<WorkflowRule | null>(null);
 
   const { data: stats } = useQuery<WorkflowStats>({
-    queryKey: ["/api/marinamatch/workflow/stats"],
+    queryKey: ["/api/vantage/workflow/stats"],
     refetchInterval: 30_000,
   });
 
   const { data: rules = [], isLoading: rulesLoading, refetch: refetchRules } = useQuery<WorkflowRule[]>({
-    queryKey: ["/api/marinamatch/workflow/rules"],
+    queryKey: ["/api/vantage/workflow/rules"],
   });
 
   const { data: executions = [], isLoading: execLoading } = useQuery<Execution[]>({
-    queryKey: ["/api/marinamatch/workflow/executions"],
+    queryKey: ["/api/vantage/workflow/executions"],
     enabled: activeTab === "log",
     refetchInterval: activeTab === "log" ? 10_000 : false,
   });
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<WorkflowTask[]>({
-    queryKey: ["/api/marinamatch/workflow/tasks"],
+    queryKey: ["/api/vantage/workflow/tasks"],
     enabled: activeTab === "tasks",
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
-      apiRequest("PATCH", `/api/marinamatch/workflow/rules/${id}`, { is_active }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/rules"] }),
+      apiRequest("PATCH", `/api/vantage/workflow/rules/${id}`, { is_active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/rules"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/marinamatch/workflow/rules/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/vantage/workflow/rules/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/rules"] });
+      qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/rules"] });
       toast({ title: "Rule deleted" });
     },
   });
 
   const triggerMutation = useMutation({
     mutationFn: ({ id, dealId }: { id: string; dealId?: string }) =>
-      apiRequest("POST", `/api/marinamatch/workflow/rules/${id}/trigger`, { dealId }),
+      apiRequest("POST", `/api/vantage/workflow/rules/${id}/trigger`, { dealId }),
     onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/executions"] });
-      qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/stats"] });
+      qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/executions"] });
+      qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/stats"] });
       const status = data?.execution?.status ?? "run";
       toast({ title: "Rule triggered", description: `Execution status: ${status}` });
     },
@@ -305,8 +305,8 @@ export function WorkflowAutomation() {
 
   const taskMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiRequest("PATCH", `/api/marinamatch/workflow/tasks/${id}`, { status }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/tasks"] }),
+      apiRequest("PATCH", `/api/vantage/workflow/tasks/${id}`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/tasks"] }),
   });
 
   const openCreate = () => { setEditingRule(null); setRuleDialogOpen(true); };
@@ -373,7 +373,7 @@ export function WorkflowAutomation() {
               </Button>
             )}
             {activeTab === "log" && (
-              <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/executions"] })}>
+              <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/executions"] })}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Refresh
               </Button>
             )}
@@ -446,8 +446,8 @@ export function WorkflowAutomation() {
           onClose={() => setRuleDialogOpen(false)}
           onSaved={() => {
             setRuleDialogOpen(false);
-            qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/rules"] });
-            qc.invalidateQueries({ queryKey: ["/api/marinamatch/workflow/stats"] });
+            qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/rules"] });
+            qc.invalidateQueries({ queryKey: ["/api/vantage/workflow/stats"] });
           }}
         />
       </div>
@@ -831,8 +831,8 @@ function RuleBuilderDialog({
   const mutation = useMutation({
     mutationFn: (data: typeof form) =>
       isEditing
-        ? apiRequest("PATCH", `/api/marinamatch/workflow/rules/${rule!.id}`, data)
-        : apiRequest("POST", "/api/marinamatch/workflow/rules", data),
+        ? apiRequest("PATCH", `/api/vantage/workflow/rules/${rule!.id}`, data)
+        : apiRequest("POST", "/api/vantage/workflow/rules", data),
     onSuccess: () => {
       toast({ title: isEditing ? "Rule updated" : "Rule created" });
       onSaved();

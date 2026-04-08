@@ -1,7 +1,7 @@
-# MarinaMatch Platform
+# Vantage Platform
 
 ## Overview
-MarinaMatch is a comprehensive full-stack platform designed to manage the entire lifecycle of marina acquisition projects, from initial lead generation through to project completion. It unifies CRM functionalities with advanced Due Diligence Tracking and a robust deal pipeline, centralizing complex marina transaction management. The platform aims to enhance efficiency, provide analytical insights for successful acquisitions, and includes capabilities such as Rent Roll management, Sales Comparables analysis, Modeling Projects with an Exit Strategy Suite, AI-powered Document Intelligence, Marketing automation, Fuel Sales, Ship Store management, and a secure Virtual Data Room (VDR).
+Vantage is a comprehensive full-stack platform designed to manage the entire lifecycle of marina acquisition projects, from initial lead generation through to project completion. It unifies CRM functionalities with advanced Due Diligence Tracking and a robust deal pipeline, centralizing complex marina transaction management. The platform aims to enhance efficiency, provide analytical insights for successful acquisitions, and includes capabilities such as Rent Roll management, Sales Comparables analysis, Modeling Projects with an Exit Strategy Suite, AI-powered Document Intelligence, Marketing automation, Fuel Sales, Ship Store management, and a secure Virtual Data Room (VDR).
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -21,7 +21,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order: Dashboard → Operations → CRM (Contacts, Companies, Properties) → Prospecting → Marketing → Pipeline (Deals, Tasks, Activity, Forecast) → Deal Workspace → Analysis → Document Studio → Investor Services → MarinaMatch → Docket → Market Intelligence. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions.
+The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is built with shadcn/ui (on Radix UI), styled using Tailwind CSS with CSS variables, and employs Lucide-React for icons, ensuring mobile optimization. Navigation sidebar order: Dashboard → Operations → CRM (Contacts, Companies, Properties) → Prospecting → Marketing → Pipeline (Deals, Tasks, Activity, Forecast) → Deal Workspace → Analysis → Document Studio → Investor Services → Vantage → Docket → Market Intelligence. Reusable UI components include `skeleton-variants`, `empty-state`, `inline-banner`, and `bulk-action-bar`. Keyboard shortcuts are implemented for common actions.
 
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter, TanStack Query, React Hook Form with Zod.
@@ -56,7 +56,7 @@ The platform utilizes React 18 with TypeScript and Wouter for routing. The UI is
 - **Listing Ingestion V2**: Institutional-grade listing aggregation pipeline with identity resolution and validation.
 - **Analytics**: Marina KPI Calculator, ancillary revenue tracking, benchmarking, and Unified Cross-Module Analytics Dashboard.
 - **AI Assistant**: Context-aware chatbot powered by GPT-5 with streaming responses.
-- **Add-on Packs**: Fund Management, LP Portal, Prospecting, and MarinaMatch Intel.
+- **Add-on Packs**: Fund Management, LP Portal, Prospecting, and Vantage Intel.
 - **Admin Panel**: Enterprise admin dashboard for customer and organization management, usage metrics, audit trails, and user onboarding.
 - **Data Governance & Benchmarking Framework**: Manages legal documents, allows benchmark opt-in/out, stores de-identified benchmark aggregates with cohort suppression, and uses guardrails for data privacy.
 - **Demographics & Market Intelligence**: Integrates real-time Census Bureau ACS data and FRED API economic indicators. Provides components for market trend analysis, business environment, market potential, and site suitability.

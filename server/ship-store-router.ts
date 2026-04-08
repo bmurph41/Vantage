@@ -14,7 +14,7 @@ import { eq, desc, sql, and, gte, lte, like, or } from 'drizzle-orm';
 const router = Router();
 
 // Ship Store uses different auth middleware, so we adapt it here
-// MarinaMatch's authenticateUser sets req.user = { id, orgId, role, email }
+// Vantage's authenticateUser sets req.user = { id, orgId, role, email }
 // Ship Store expects req.user with 'manager' or 'cashier' role
 
 // Middleware to check if user has manager role
@@ -23,7 +23,7 @@ function requireManager(req: Request, res: Response, next: NextFunction) {
   if (!user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
-  // Map MarinaMatch roles: owner/editor -> manager, viewer -> cashier
+  // Map Vantage roles: owner/editor -> manager, viewer -> cashier
   const role = user.role?.toLowerCase();
   if (role === 'owner' || role === 'editor' || role === 'admin') {
     (req as any).shipStoreRole = 'manager';

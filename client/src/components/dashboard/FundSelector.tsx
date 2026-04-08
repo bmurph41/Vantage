@@ -55,7 +55,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-const STORAGE_KEY = 'marinamatch_selected_fund_id';
+const STORAGE_KEY = 'vantage_selected_fund_id';
 
 export function FundSelector() {
   const [selectedFundId, setSelectedFundId] = useState<string | null>(() => {

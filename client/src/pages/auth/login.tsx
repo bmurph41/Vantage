@@ -184,7 +184,7 @@ function RightPanel() {
         {/* Bottom testimonial */}
         <div className="mt-auto pt-8 border-t border-white/10">
           <blockquote className="text-slate-300 text-sm leading-relaxed italic">
-            "MarinaMatch transformed how we evaluate acquisitions. We closed 3 deals in our first quarter, each one fully underwritten through the platform."
+            "Vantage transformed how we evaluate acquisitions. We closed 3 deals in our first quarter, each one fully underwritten through the platform."
           </blockquote>
           <div className="flex items-center gap-3 mt-4">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
@@ -317,7 +317,7 @@ export default function LoginPage() {
                   <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow duration-300">
                     <Anchor className="h-6 w-6 text-white" />
                   </div>
-                  <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
+                  <span className="text-xl font-bold text-slate-800">Vantage</span>
                 </div>
               </Link>
 
@@ -390,7 +390,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="px-6 sm:px-12 lg:px-16 xl:px-20 py-6 border-t border-slate-100">
             <div className="w-full max-w-[420px] mx-auto flex items-center justify-between text-xs text-slate-400">
-              <span>&copy; 2026 MarinaMatch</span>
+              <span>&copy; 2026 Vantage</span>
               <div className="flex items-center gap-4">
                 <a href="/terms" className="hover:text-slate-600 transition-colors">Terms</a>
                 <a href="/privacy" className="hover:text-slate-600 transition-colors">Privacy</a>
@@ -417,7 +417,7 @@ export default function LoginPage() {
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow duration-300">
                   <Anchor className="h-6 w-6 text-white" />
                 </div>
-                <span className="text-xl font-bold text-slate-800">MarinaMatch</span>
+                <span className="text-xl font-bold text-slate-800">Vantage</span>
               </div>
             </Link>
 
@@ -430,7 +430,7 @@ export default function LoginPage() {
                 Welcome back
               </h1>
               <p className="text-slate-500 mb-8">
-                Sign in to your MarinaMatch account
+                Sign in to your Vantage account
               </p>
 
               {/* Replit OAuth Button */}
@@ -600,7 +600,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="px-6 sm:px-12 lg:px-16 xl:px-20 py-6 border-t border-slate-100">
           <div className="w-full max-w-[420px] mx-auto flex items-center justify-between text-xs text-slate-400">
-            <span>&copy; 2026 MarinaMatch. All rights reserved.</span>
+            <span>&copy; 2026 Vantage. All rights reserved.</span>
             <div className="flex items-center gap-4">
               <a href="/terms" className="hover:text-slate-600 transition-colors">Terms</a>
               <a href="/privacy" className="hover:text-slate-600 transition-colors">Privacy</a>

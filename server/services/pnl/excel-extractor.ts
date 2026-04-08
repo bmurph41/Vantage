@@ -1,5 +1,5 @@
 /**
- * excel-extractor.ts — Smart Excel / CSV P&L extraction for MarinaMatch Phase 2.
+ * excel-extractor.ts — Smart Excel / CSV P&L extraction for Vantage Phase 2.
  *
  * Improvements over v1 inline block:
  *  1. Best-sheet selection  — scores all sheets by P&L likelihood.

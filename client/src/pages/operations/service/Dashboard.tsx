@@ -336,7 +336,7 @@ export default function ServiceDashboard() {
       <ContextIntegrationsPanel 
         contextKey="service"
         title="Service Integrations"
-        description="Connect service and work order software to sync data with MarinaMatch."
+        description="Connect service and work order software to sync data with Vantage."
       />
     </div>
   );

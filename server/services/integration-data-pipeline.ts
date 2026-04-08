@@ -317,7 +317,7 @@ export class IntegrationDataPipelineService {
  * 
  * Each integration defines dataMappings that specify:
  * - sourceEntity: The entity type from the external system
- * - targetModule: Which MarinaMatch module receives the data
+ * - targetModule: Which Vantage module receives the data
  * - targetEntity: The specific entity/table within that module
  * - fields: Field-level mapping with optional transforms
  * - syncDirection: read, write, or bidirectional

@@ -13,13 +13,13 @@ import {
   investmentCriteriaCapital,
   investmentCriteriaInvolvement,
   investmentCriteriaCapex,
-  marinaMatchGoals,
-  marinaMatchGoalProgress,
+  vantageGoals,
+  vantageGoalProgress,
   marinaScrapeources,
   marinaScrapeRuns,
   marinaListingMatches,
-  marinaMatchAlerts,
-  marinaMatchAlertHistory,
+  vantageAlerts,
+  vantageAlertHistory,
   marinaListingFeedback,
   marinaAiFilterPatterns,
   userHiddenListings,
@@ -28,16 +28,16 @@ import {
   updateMarinaListingSchema,
   insertInvestmentCriteriaProfileSchema,
   updateInvestmentCriteriaProfileSchema,
-  insertMarinaMatchGoalSchema,
-  updateMarinaMatchGoalSchema,
+  insertVantageGoalSchema,
+  updateVantageGoalSchema,
   insertMarinaScrapeSourceSchema,
   updateMarinaScrapeSourceSchema,
-  insertMarinaMatchAlertSchema,
-  updateMarinaMatchAlertSchema,
+  insertVantageAlertSchema,
+  updateVantageAlertSchema,
   insertListingFeedbackSchema,
   type MarinaListing,
   type InvestmentCriteriaProfile,
-  type MarinaMatchGoal,
+  type VantageGoal,
   type MarinaScrapeSource,
   type ListingFeedback,
 } from "@shared/schema";
@@ -141,11 +141,11 @@ router.get("/listings", async (req: Request, res: Response) => {
 
     // Get user's active packs for filtering global listings
     const userPacks = (req as any).user?.activePacks || (req as any).user?.packs || [];
-    const hasIntelPack = userPacks.includes("intel") || userPacks.includes("marinamatch_intel");
+    const hasIntelPack = userPacks.includes("intel") || userPacks.includes("vantage_intel");
     const hasAnalysisPack = userPacks.includes("analysis") || userPacks.includes("analytics_pro");
     
     // Include both org-specific listings AND global listings (if user has pack access)
-    // Global listings are curated by the MarinaMatch team and available to subscribers
+    // Global listings are curated by the Vantage team and available to subscribers
     // For global listings, filter by requiredPack - show only listings user has access to
     const scopeCondition = includeGlobal === "true"
       ? or(
@@ -231,7 +231,7 @@ router.get("/listings/:id", async (req: Request, res: Response) => {
     // Pack-gated access for global listings
     if (listing.scope === "global" && listing.requiredPack) {
       const userPacks = (req as any).user?.activePacks || (req as any).user?.packs || [];
-      const hasIntelPack = userPacks.includes("intel") || userPacks.includes("marinamatch_intel");
+      const hasIntelPack = userPacks.includes("intel") || userPacks.includes("vantage_intel");
       const hasAnalysisPack = userPacks.includes("analysis") || userPacks.includes("analytics_pro");
       
       const packRequired = listing.requiredPack;
@@ -894,9 +894,9 @@ router.get("/goals", async (req: Request, res: Response) => {
 
     const goals = await db
       .select()
-      .from(marinaMatchGoals)
-      .where(eq(marinaMatchGoals.orgId, orgId))
-      .orderBy(asc(marinaMatchGoals.priority), desc(marinaMatchGoals.isPrimary));
+      .from(vantageGoals)
+      .where(eq(vantageGoals.orgId, orgId))
+      .orderBy(asc(vantageGoals.priority), desc(vantageGoals.isPrimary));
 
     res.json(goals);
   } catch (error) {
@@ -911,8 +911,8 @@ router.post("/goals", async (req: Request, res: Response) => {
     const userId = getUserId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const validated = insertMarinaMatchGoalSchema.parse({ ...req.body, orgId, createdBy: userId });
-    const [goal] = await db.insert(marinaMatchGoals).values(validated).returning();
+    const validated = insertVantageGoalSchema.parse({ ...req.body, orgId, createdBy: userId });
+    const [goal] = await db.insert(vantageGoals).values(validated).returning();
     res.status(201).json(goal);
   } catch (error: any) {
     console.error("Error creating goal:", error);
@@ -925,11 +925,11 @@ router.patch("/goals/:id", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    const validated = updateMarinaMatchGoalSchema.parse(req.body);
+    const validated = updateVantageGoalSchema.parse(req.body);
     const [updated] = await db
-      .update(marinaMatchGoals)
+      .update(vantageGoals)
       .set({ ...validated, updatedAt: new Date() })
-      .where(and(eq(marinaMatchGoals.id, req.params.id), eq(marinaMatchGoals.orgId, orgId)))
+      .where(and(eq(vantageGoals.id, req.params.id), eq(vantageGoals.orgId, orgId)))
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Goal not found" });
@@ -946,8 +946,8 @@ router.delete("/goals/:id", async (req: Request, res: Response) => {
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
     const [deleted] = await db
-      .delete(marinaMatchGoals)
-      .where(and(eq(marinaMatchGoals.id, req.params.id), eq(marinaMatchGoals.orgId, orgId)))
+      .delete(vantageGoals)
+      .where(and(eq(vantageGoals.id, req.params.id), eq(vantageGoals.orgId, orgId)))
       .returning();
 
     if (!deleted) return res.status(404).json({ error: "Goal not found" });
@@ -965,7 +965,7 @@ router.post("/goals/:id/progress", async (req: Request, res: Response) => {
 
     const { recordedValue, notes } = req.body;
     
-    const [progress] = await db.insert(marinaMatchGoalProgress).values({
+    const [progress] = await db.insert(vantageGoalProgress).values({
       goalId: req.params.id,
       orgId,
       recordedValue,
@@ -973,9 +973,9 @@ router.post("/goals/:id/progress", async (req: Request, res: Response) => {
     }).returning();
 
     await db
-      .update(marinaMatchGoals)
+      .update(vantageGoals)
       .set({ currentValue: recordedValue, updatedAt: new Date() })
-      .where(eq(marinaMatchGoals.id, req.params.id));
+      .where(eq(vantageGoals.id, req.params.id));
 
     res.status(201).json(progress);
   } catch (error: any) {
@@ -1056,7 +1056,7 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
-    console.log("[MarinaMatch Intel] Creating scrape source with body:", JSON.stringify(req.body, null, 2));
+    console.log("[Vantage Intel] Creating scrape source with body:", JSON.stringify(req.body, null, 2));
 
     const {
       platform,
@@ -1094,7 +1094,7 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
 
     // Validate required fields
     if (!platform || !name) {
-      console.log("[MarinaMatch Intel] Missing required fields: platform or name");
+      console.log("[Vantage Intel] Missing required fields: platform or name");
       return res.status(400).json({ error: "Platform and name are required" });
     }
 
@@ -1107,7 +1107,7 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
       config,
       rateLimitRpm: rateLimitRpm || 30,
       respectRobotsTxt: respectRobotsTxt ?? true,
-      userAgent: userAgent || "MarinaMatchBot/1.0",
+      userAgent: userAgent || "VantageBot/1.0",
       isActive: isActive ?? true,
       ingestionMethod: ingestionMethod || "scraping",
       propertyType: propertyType || "marina",
@@ -1135,8 +1135,8 @@ router.post("/scrape-sources", async (req: Request, res: Response) => {
     
     res.status(201).json(source);
   } catch (error: any) {
-    console.error("[MarinaMatch Intel] Error creating scrape source:", error);
-    console.error("[MarinaMatch Intel] Error details:", error.message, error.stack);
+    console.error("[Vantage Intel] Error creating scrape source:", error);
+    console.error("[Vantage Intel] Error details:", error.message, error.stack);
     res.status(400).json({ error: error.message || "Failed to create scrape source" });
   }
 });
@@ -1623,7 +1623,7 @@ router.get("/analytics/overview", async (req: Request, res: Response) => {
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
     const allListings = await db.select().from(marinaListings).where(eq(marinaListings.orgId, orgId));
-    const goals = await db.select().from(marinaMatchGoals).where(eq(marinaMatchGoals.orgId, orgId));
+    const goals = await db.select().from(vantageGoals).where(eq(vantageGoals.orgId, orgId));
     const profiles = await db.select().from(investmentCriteriaProfiles).where(eq(investmentCriteriaProfiles.orgId, orgId));
     const sources = await db.select().from(marinaScrapeources).where(eq(marinaScrapeources.orgId, orgId));
 
@@ -2038,7 +2038,7 @@ router.post("/feedback", async (req: Request, res: Response) => {
           listingId,
           reason,
         });
-        console.log(`[MarinaMatch Intel] Listing hidden from user feed:`, { userId, listingId, reason });
+        console.log(`[Vantage Intel] Listing hidden from user feed:`, { userId, listingId, reason });
       }
     }
 
@@ -2086,7 +2086,7 @@ router.post("/feedback", async (req: Request, res: Response) => {
       invalidateLearnedPatternsCache();
 
       autoApproved = true;
-      console.log(`[MarinaMatch Intel] Auto-approved feedback - threshold reached:`, {
+      console.log(`[Vantage Intel] Auto-approved feedback - threshold reached:`, {
         listingId,
         feedbackCount,
         threshold: AUTO_APPROVAL_THRESHOLD,
@@ -2096,7 +2096,7 @@ router.post("/feedback", async (req: Request, res: Response) => {
     }
 
     // Log feedback submission for audit trail and AI training pipeline
-    console.log(`[MarinaMatch Intel] Feedback submitted:`, {
+    console.log(`[Vantage Intel] Feedback submitted:`, {
       feedbackId: feedback.id,
       listingId,
       reason,
@@ -2119,7 +2119,7 @@ router.post("/feedback", async (req: Request, res: Response) => {
       autoApproved,
     });
   } catch (error: any) {
-    console.error("[MarinaMatch Intel] Error submitting feedback:", error);
+    console.error("[Vantage Intel] Error submitting feedback:", error);
     res.status(500).json({ error: error.message || "Failed to submit feedback" });
   }
 });
@@ -2278,7 +2278,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
         invalidateLearnedPatternsCache();
 
         // Log AI pattern creation for training audit
-        console.log(`[MarinaMatch Intel] AI Pattern Created from Feedback:`, {
+        console.log(`[Vantage Intel] AI Pattern Created from Feedback:`, {
           patternId: newPattern.id,
           patternType: "title_keyword",
           pattern: patternKeywords,
@@ -2293,7 +2293,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
     }
 
     // Log feedback review action
-    console.log(`[MarinaMatch Intel] Feedback Reviewed:`, {
+    console.log(`[Vantage Intel] Feedback Reviewed:`, {
       feedbackId: id,
       status,
       reason: feedback.reason,
@@ -2318,7 +2318,7 @@ router.patch("/feedback/:id", async (req: Request, res: Response) => {
         : "Feedback dismissed.",
     });
   } catch (error: any) {
-    console.error("[MarinaMatch Intel] Error updating feedback:", error);
+    console.error("[Vantage Intel] Error updating feedback:", error);
     res.status(500).json({ error: error.message || "Failed to update feedback" });
   }
 });

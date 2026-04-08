@@ -156,7 +156,7 @@ class DocxExportService {
     const doc = new Document({
       title: documentData.title,
       subject: this.getSubjectFromDocType(documentData.documentType),
-      creator: options.companyName || 'MarinaMatch',
+      creator: options.companyName || 'Vantage',
       description: `${this.getDocumentTypeLabel(documentData.documentType)} - ${documentData.title}`,
       styles: {
         default: {
@@ -1284,7 +1284,7 @@ class DocxExportService {
    * Create disclaimer content
    */
   private createDisclaimer(theme: DocxTheme, options: DocxExportOptions): Paragraph[] {
-    const companyName = options.companyName || 'MarinaMatch';
+    const companyName = options.companyName || 'Vantage';
 
     return [
       new Paragraph({

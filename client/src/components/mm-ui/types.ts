@@ -1,5 +1,5 @@
 /**
- * MarinaMatch UI Design System
+ * Vantage UI Design System
  * Type Definitions & Shared Utilities
  */
 

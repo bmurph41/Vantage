@@ -20,9 +20,9 @@ export async function sendDashboardReportEmail(to: string, htmlContent: string, 
       to,
       from: {
         email: fromEmail,
-        name: 'MarinaMatch'
+        name: 'Vantage'
       },
-      subject: `MarinaMatch Dashboard Report - ${new Date().toLocaleDateString()}`,
+      subject: `Vantage Dashboard Report - ${new Date().toLocaleDateString()}`,
       text: 'Dashboard Report - See HTML version for details',
       html: htmlContent,
     };

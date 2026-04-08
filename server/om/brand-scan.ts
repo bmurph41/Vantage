@@ -83,7 +83,7 @@ export async function scanBrandFromUrl(url: string): Promise<BrandScanResult> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'MarinaMatch-BrandScanner/1.0',
+        'User-Agent': 'Vantage-BrandScanner/1.0',
         'Accept': 'text/html,application/xhtml+xml',
       },
       signal: AbortSignal.timeout(10000),
@@ -136,7 +136,7 @@ export async function scanBrandFromUrl(url: string): Promise<BrandScanResult> {
     for (const cssUrl of cssLinks.slice(0, 3)) {
       try {
         const cssResponse = await fetch(cssUrl, {
-          headers: { 'User-Agent': 'MarinaMatch-BrandScanner/1.0' },
+          headers: { 'User-Agent': 'Vantage-BrandScanner/1.0' },
           signal: AbortSignal.timeout(5000),
         });
         if (cssResponse.ok) {

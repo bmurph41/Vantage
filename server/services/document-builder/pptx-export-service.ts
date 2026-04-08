@@ -106,10 +106,10 @@ class PptxExportService {
     const pptx = new PptxGenJS();
 
     // Set presentation properties
-    pptx.author = options.companyName || 'MarinaMatch';
+    pptx.author = options.companyName || 'Vantage';
     pptx.title = document.title;
     pptx.subject = this.getSubjectFromDocType(document.documentType);
-    pptx.company = options.companyName || 'MarinaMatch';
+    pptx.company = options.companyName || 'Vantage';
 
     // Set layout
     pptx.layout = layout === '4x3' ? 'LAYOUT_4x3' : 'LAYOUT_16x9';
@@ -1223,7 +1223,7 @@ class PptxExportService {
       bold: true,
     });
 
-    const disclaimerText = `This presentation has been prepared by ${options.companyName || 'MarinaMatch'} for informational purposes only. The information contained herein is confidential and is being provided to you solely for the purpose of evaluating the potential acquisition of the property described herein.
+    const disclaimerText = `This presentation has been prepared by ${options.companyName || 'Vantage'} for informational purposes only. The information contained herein is confidential and is being provided to you solely for the purpose of evaluating the potential acquisition of the property described herein.
 
 This presentation is not intended to provide any investment, tax, accounting, or legal advice. Recipients should consult with their own advisors regarding investment, tax, accounting, and legal matters.
 

@@ -28,7 +28,7 @@ export function getScrapeStatus(): ScrapeStatus {
 
 export function setAutoScrapeEnabled(enabled: boolean): ScrapeStatus {
   autoScrapeEnabled = enabled;
-  console.log(`[MarinaMatch Intel] Auto-scrape ${enabled ? 'enabled' : 'disabled'}`);
+  console.log(`[Vantage Intel] Auto-scrape ${enabled ? 'enabled' : 'disabled'}`);
   return getScrapeStatus();
 }
 
@@ -346,11 +346,11 @@ async function seedInitialListings(orgId: string): Promise<number> {
 
   try {
     await db.insert(marinaListings).values(sampleListings as any);
-    console.log(`[MarinaMatch Intel] Seeded ${sampleListings.length} initial listings for org ${orgId}`);
+    console.log(`[Vantage Intel] Seeded ${sampleListings.length} initial listings for org ${orgId}`);
     return sampleListings.length;
   } catch (error: any) {
     if (error.code === '23505') {
-      console.log(`[MarinaMatch Intel] Some listings already exist for org ${orgId}`);
+      console.log(`[Vantage Intel] Some listings already exist for org ${orgId}`);
       return 0;
     }
     throw error;
@@ -453,20 +453,20 @@ async function ensureDefaultSources(orgId: string): Promise<number> {
           config: source.config,
           rateLimitRpm: source.rateLimitRpm,
           respectRobotsTxt: true,
-          userAgent: "MarinaMatchBot/1.0 (+https://marinamatch.com/bot)",
+          userAgent: "VantageBot/1.0 (+https://vantage.com/bot)",
           isActive: source.isActive,
           isManaged: true,
         } as any);
         created++;
-        console.log(`[MarinaMatch Intel] Created default source: ${source.platform} for org ${orgId}`);
+        console.log(`[Vantage Intel] Created default source: ${source.platform} for org ${orgId}`);
       }
     } catch (error: any) {
-      console.error(`[MarinaMatch Intel] Error creating default source ${source.platform}: ${error?.message || String(error)}`);
+      console.error(`[Vantage Intel] Error creating default source ${source.platform}: ${error?.message || String(error)}`);
     }
   }
 
   if (created > 0) {
-    console.log(`[MarinaMatch Intel] Created ${created} default sources for org ${orgId}`);
+    console.log(`[Vantage Intel] Created ${created} default sources for org ${orgId}`);
   }
   return created;
 }
@@ -477,13 +477,13 @@ async function ensureSourcesExist(orgId: string): Promise<void> {
 
 async function runAutoScrape(): Promise<void> {
   if (isScraping) {
-    console.log("[MarinaMatch Intel] Scrape already in progress, skipping...");
+    console.log("[Vantage Intel] Scrape already in progress, skipping...");
     return;
   }
 
   try {
     isScraping = true;
-    console.log("[MarinaMatch Intel] Starting automatic scrape...");
+    console.log("[Vantage Intel] Starting automatic scrape...");
 
     // Get all organizations to scrape for
     const orgs = await db.select({ id: organizations.id }).from(organizations);
@@ -500,25 +500,25 @@ async function runAutoScrape(): Promise<void> {
         const platforms = activeSources.map(s => s.platform);
         
         if (platforms.length === 0) {
-          console.log(`[MarinaMatch Intel] No active sources for org ${org.id}, skipping`);
+          console.log(`[Vantage Intel] No active sources for org ${org.id}, skipping`);
           continue;
         }
         
-        console.log(`[MarinaMatch Intel] Scraping ${platforms.length} sources for org ${org.id}: ${platforms.join(", ")}`);
+        console.log(`[Vantage Intel] Scraping ${platforms.length} sources for org ${org.id}: ${platforms.join(", ")}`);
 
         // Run actual scraper for the org
         const { runScrapeJob } = await import("./cre-scraper");
         await runScrapeJob(org.id, platforms);
         
       } catch (error: any) {
-        console.error(`[MarinaMatch Intel] Error scraping for org ${org.id}: ${error?.message || String(error)}`);
+        console.error(`[Vantage Intel] Error scraping for org ${org.id}: ${error?.message || String(error)}`);
       }
     }
 
     lastScrapeTime = new Date();
-    console.log("[MarinaMatch Intel] Automatic scrape completed");
+    console.log("[Vantage Intel] Automatic scrape completed");
   } catch (error: any) {
-    console.error("[MarinaMatch Intel] Error in auto-scrape:", error?.message || String(error));
+    console.error("[Vantage Intel] Error in auto-scrape:", error?.message || String(error));
   } finally {
     isScraping = false;
   }
@@ -535,12 +535,12 @@ export async function ensureListingsExist(orgId: string): Promise<boolean> {
 
     return existingListings.length > 0;
   } catch (error) {
-    console.error("[MarinaMatch Intel] Error checking listings:", error);
+    console.error("[Vantage Intel] Error checking listings:", error);
     return false;
   }
 }
 
-export function startMarinaMatchIntelCronJobs(): void {
+export function startVantageIntelCronJobs(): void {
   if (isInitialized) return;
   
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -548,8 +548,8 @@ export function startMarinaMatchIntelCronJobs(): void {
   // Schedule scraping - every hour in production, every 30 minutes in dev
   const cronSchedule = isDevelopment ? "0 */4 * * *" : "0 * * * *";
   
-  console.log(`[MarinaMatch Intel] Cron jobs enabled (schedule: ${cronSchedule})`);
-  console.log(`[MarinaMatch Intel] Auto-scrape is ${autoScrapeEnabled ? 'ON' : 'OFF'}`);
+  console.log(`[Vantage Intel] Cron jobs enabled (schedule: ${cronSchedule})`);
+  console.log(`[Vantage Intel] Auto-scrape is ${autoScrapeEnabled ? 'ON' : 'OFF'}`);
   
   // Schedule periodic scraping
   cron.schedule(cronSchedule, async () => {
@@ -565,7 +565,7 @@ export function startMarinaMatchIntelCronJobs(): void {
     await new Promise(resolve => setTimeout(resolve, 10000));
     
     if (autoScrapeEnabled) {
-      console.log("[MarinaMatch Intel] Running initial startup scrape...");
+      console.log("[Vantage Intel] Running initial startup scrape...");
       await runAutoScrape();
     }
   });

@@ -689,7 +689,7 @@ router.post('/keyword-bank/seed-default', async (req: any, res) => {
     const { orgId } = getAuthContext(req);
     const isGlobal = req.body.isGlobal === true;
 
-    const defaultKeywordBankPath = 'attached_assets/MarinaMatch_PnL_Keyword_Bank_SS3_2023_2024_1766584332411.xlsx';
+    const defaultKeywordBankPath = 'attached_assets/Vantage_PnL_Keyword_Bank_SS3_2023_2024_1766584332411.xlsx';
     
     if (!fs.existsSync(defaultKeywordBankPath)) {
       return res.status(404).json({ error: 'Default keyword bank file not found' });

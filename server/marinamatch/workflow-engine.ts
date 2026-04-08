@@ -8,11 +8,11 @@
  *   await WorkflowEngine.fire('deal_stage_changed', orgId, { deal, fromStage, toStage });
  *
  * Called from:
- *   - PATCH /api/marinamatch/sourced-deals/:id  (stage changes)
- *   - POST  /api/marinamatch/sourced-deals       (new deal added)
- *   - POST  /api/marinamatch/sourced-deals/:id/convert
+ *   - PATCH /api/vantage/sourced-deals/:id  (stage changes)
+ *   - POST  /api/vantage/sourced-deals       (new deal added)
+ *   - POST  /api/vantage/sourced-deals/:id/convert
  *   - Cron job (deal_stale trigger)
- *   - Manual trigger via POST /api/marinamatch/workflow-rules/:id/trigger
+ *   - Manual trigger via POST /api/vantage/workflow-rules/:id/trigger
  */
 
 import { pool } from '../db'; // adjust path to your pg Pool
