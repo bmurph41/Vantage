@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
 interface SidebarHighlightState {
   highlightedIds: string[];
@@ -22,22 +22,12 @@ export function SidebarHighlightProvider({ children }: { children: ReactNode }) 
     highlightedIds: [],
     active: false,
   });
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setHighlight = useCallback((ids: string[]) => {
-    if (clearTimerRef.current) {
-      clearTimeout(clearTimerRef.current);
-    }
     setState({ highlightedIds: ids, active: true });
-    clearTimerRef.current = setTimeout(() => {
-      setState({ highlightedIds: [], active: false });
-    }, 4000);
   }, []);
 
   const clearHighlight = useCallback(() => {
-    if (clearTimerRef.current) {
-      clearTimeout(clearTimerRef.current);
-    }
     setState({ highlightedIds: [], active: false });
   }, []);
 
