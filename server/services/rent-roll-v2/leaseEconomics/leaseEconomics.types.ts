@@ -15,6 +15,7 @@ import type {
   DayCountConvention,
   BillingFrequency,
   BillingTiming,
+  RraContractCharge,
 } from "@shared/schema";
 
 // ============================================================================
@@ -31,6 +32,7 @@ export interface LeaseEconomicsInput {
   escalations: LeaseEscalation[];
   concessions: LeaseConcession[];
   billingRules: LeaseBillingRule[];
+  contractCharges: RraContractCharge[];
   assumptions: LeaseEconomicsAssumptions;
 }
 

@@ -24,7 +24,8 @@ import {
   leaseEscalations, 
   leaseConcessions,
   leaseBillingRules,
-  tenants
+  tenants,
+  rraContractCharges
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import type { 
@@ -77,12 +78,15 @@ async function fetchLeaseEconomicsInput(leaseId: string): Promise<LeaseEconomics
   }
   
   // Fetch economics data in parallel
-  const [terms, rentSteps, escalationsData, concessionsData, billingRulesData] = await Promise.all([
+  const [terms, rentSteps, escalationsData, concessionsData, billingRulesData, contractChargesData] = await Promise.all([
     db.select().from(leaseTerms).where(eq(leaseTerms.leaseId, leaseId)),
     db.select().from(leaseRentSteps).where(eq(leaseRentSteps.leaseId, leaseId)),
     db.select().from(leaseEscalations).where(eq(leaseEscalations.leaseId, leaseId)),
     db.select().from(leaseConcessions).where(eq(leaseConcessions.leaseId, leaseId)),
     db.select().from(leaseBillingRules).where(eq(leaseBillingRules.leaseId, leaseId)),
+    db.select().from(rraContractCharges).where(
+      and(eq(rraContractCharges.leaseId, leaseId), eq(rraContractCharges.isActive, true))
+    ),
   ]);
   
   return {
@@ -92,6 +96,7 @@ async function fetchLeaseEconomicsInput(leaseId: string): Promise<LeaseEconomics
     escalations: escalationsData,
     concessions: concessionsData,
     billingRules: billingRulesData,
+    contractCharges: contractChargesData,
     assumptions: DEFAULT_ASSUMPTIONS,
   };
 }
@@ -164,6 +169,25 @@ function executePlan(
 }
 
 /**
+ * Normalize a contract charge amount to a monthly equivalent
+ */
+function normalizeChargeToMonthly(amount: number, frequency: string): number {
+  switch (frequency) {
+    case 'annual':
+      return amount / 12;
+    case 'quarterly':
+      return amount / 3;
+    case 'seasonal':
+      return amount / 6;
+    case 'one_time':
+      return 0;
+    case 'monthly':
+    default:
+      return amount;
+  }
+}
+
+/**
  * Generate a single period's cash flow
  */
 function generatePeriod(
@@ -228,11 +252,34 @@ function generatePeriod(
   // Calculate effective rent
   const effectiveBaseRent = proratedEscalatedRent - proratedConcessions;
   
-  // TODO: Integrate other income from existing contract charges system
-  const otherIncome = 0;
+  // Sum other income from active contract charges applicable to this period
+  const otherIncome = input.contractCharges.reduce((total, charge) => {
+    // Check charge date window applicability
+    if (charge.chargeStartDate && new Date(charge.chargeStartDate) > periodEnd) return total;
+    if (charge.chargeEndDate && new Date(charge.chargeEndDate) < periodStart) return total;
+    // Check seasonal applicability (seasonStartMonth/seasonEndMonth are 1-indexed)
+    if (charge.seasonStartMonth != null && charge.seasonEndMonth != null) {
+      const periodMonth = getMonth(periodDate) + 1;
+      const start = charge.seasonStartMonth;
+      const end = charge.seasonEndMonth;
+      const inSeason = start <= end
+        ? periodMonth >= start && periodMonth <= end
+        : periodMonth >= start || periodMonth <= end;
+      if (!inSeason) return total;
+    }
+    const monthlyAmount = normalizeChargeToMonthly(parseFloat(charge.amount), charge.frequency);
+    return total + monthlyAmount * proration.factor;
+  }, 0);
   
   // Total revenue
   const totalRevenue = effectiveBaseRent + otherIncome;
+  
+  // Determine active rent step: sort steps by effectiveDate descending, pick the
+  // latest one whose effectiveDate is on or before periodStart. Step validity is
+  // determined by effective date ordering (each step supersedes the previous).
+  const activeRentStep = [...input.rentSteps]
+    .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+    .find(step => new Date(step.effectiveDate) <= periodStart);
   
   return {
     periodStart,
@@ -256,7 +303,7 @@ function generatePeriod(
     isPartialPeriod: proration.isPartial,
     daysInPeriod: proration.activeDays,
     
-    activeRentStep: undefined, // TODO: Add rent step tracking
+    activeRentStep,
     appliedEscalations,
     appliedConcessions,
   };

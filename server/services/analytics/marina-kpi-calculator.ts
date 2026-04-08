@@ -14,7 +14,8 @@ import {
   rentRolls, 
   rentRollEntries, 
   fuelSales, 
-  shipStoreTransactions 
+  shipStoreTransactions,
+  rentRollSnapshots
 } from "@shared/schema";
 import { eq, and, gte, lte, sql, sum, count, avg } from "drizzle-orm";
 
@@ -482,36 +483,42 @@ export class MarinaKpiCalculator {
    */
   async calculateTrends(
     orgId: string,
-    months: number = 12
+    months: number = 12,
+    ownedAssetId?: string
   ): Promise<{
     occupancyTrend: Array<{ period: string; value: number }>;
     revenueTrend: Array<{ period: string; value: number }>;
   }> {
-    // This would query historical snapshots - for now return placeholder
-    const trends = {
-      occupancyTrend: [] as Array<{ period: string; value: number }>,
-      revenueTrend: [] as Array<{ period: string; value: number }>
-    };
+    const safeMonths = Math.max(1, Math.min(36, Math.floor(Number.isFinite(months) ? months : 12)));
+    const periodFilter = sql`(${rentRollSnapshots.snapshotYear} * 100 + ${rentRollSnapshots.snapshotMonth}) >= (
+      EXTRACT(YEAR FROM NOW() - INTERVAL '${sql.raw(String(safeMonths))} months')::int * 100 +
+      EXTRACT(MONTH FROM NOW() - INTERVAL '${sql.raw(String(safeMonths))} months')::int
+    )`;
+    const whereClause = ownedAssetId
+      ? and(eq(rentRollSnapshots.orgId, orgId), eq(rentRollSnapshots.ownedAssetId, ownedAssetId), periodFilter)
+      : and(eq(rentRollSnapshots.orgId, orgId), periodFilter);
+    const rows = await db
+      .select({
+        year: rentRollSnapshots.snapshotYear,
+        month: rentRollSnapshots.snapshotMonth,
+        occupancyRate: avg(rentRollSnapshots.occupancyRate),
+        revenue: sum(rentRollSnapshots.grossPotentialRevenue),
+      })
+      .from(rentRollSnapshots)
+      .where(whereClause)
+      .groupBy(rentRollSnapshots.snapshotYear, rentRollSnapshots.snapshotMonth)
+      .orderBy(rentRollSnapshots.snapshotYear, rentRollSnapshots.snapshotMonth);
 
-    // Generate sample trend data for the last N months
-    const now = new Date();
-    for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const period = date.toISOString().slice(0, 7); // YYYY-MM
-      
-      // Placeholder values with some variation
-      trends.occupancyTrend.push({
-        period,
-        value: 75 + Math.random() * 20 // 75-95%
-      });
-      
-      trends.revenueTrend.push({
-        period,
-        value: 50000 + Math.random() * 30000 // $50k-$80k
-      });
+    const occupancyTrend: Array<{ period: string; value: number }> = [];
+    const revenueTrend: Array<{ period: string; value: number }> = [];
+
+    for (const row of rows) {
+      const period = `${row.year}-${String(row.month).padStart(2, '0')}`;
+      occupancyTrend.push({ period, value: parseFloat(row.occupancyRate as string ?? '0') });
+      revenueTrend.push({ period, value: parseFloat(row.revenue as string ?? '0') });
     }
 
-    return trends;
+    return { occupancyTrend, revenueTrend };
   }
 }
 

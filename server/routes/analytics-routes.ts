@@ -122,8 +122,9 @@ router.get('/marina/trends', async (req: Request, res: Response) => {
     const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
     const months = req.query.months ? parseInt(req.query.months as string) : 12;
+    const ownedAssetId = req.query.ownedAssetId as string | undefined;
 
-    const trends = await marinaKpiCalculator.calculateTrends(orgId, months);
+    const trends = await marinaKpiCalculator.calculateTrends(orgId, months, ownedAssetId);
 
     res.json(trends);
   } catch (error: any) {
