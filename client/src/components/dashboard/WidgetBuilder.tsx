@@ -201,7 +201,7 @@ export function WidgetBuilder({
 
         <div className="flex-1 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="mx-6 mt-4 grid grid-cols-4 w-auto">
+            <TabsList className="mx-6 mt-4 grid grid-cols-2 lg:grid-cols-4 w-auto">
               <TabsTrigger value="metric" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Metric
@@ -239,13 +239,13 @@ export function WidgetBuilder({
                   <div className="space-y-2">
                     <Label>Select Module</Label>
                     {metricsLoading ? (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {[1, 2, 3, 4, 5, 6].map(i => (
                           <Skeleton key={i} className="h-20" />
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {moduleMetrics?.modules?.map(module => (
                           <Card
                             key={module.key}
@@ -286,7 +286,7 @@ export function WidgetBuilder({
                   {selectedModule && (
                     <div className="space-y-2">
                       <Label>Select Metric</Label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {selectedModule.metrics?.map(metric => (
                           <Card
                             key={metric.key}
@@ -433,7 +433,7 @@ export function WidgetBuilder({
                     {enableComparison && (
                       <div className="space-y-2">
                         <Label>Comparison Type</Label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {COMPARISON_TYPES.map(type => (
                             <Card
                               key={type.value}
@@ -461,7 +461,7 @@ export function WidgetBuilder({
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Visualization Type</Label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {VISUALIZATION_TYPES.map(viz => {
                         const Icon = viz.icon;
                         return (
@@ -494,7 +494,7 @@ export function WidgetBuilder({
 
                   <div className="space-y-2">
                     <Label>Widget Size</Label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {[
                         { value: 'sm', label: 'Small', desc: '1 column' },
                         { value: 'md', label: 'Medium', desc: '2 columns' },
@@ -597,7 +597,7 @@ export function WidgetBuilder({
 
                   <div className="p-4 bg-gray-50 rounded-lg space-y-2">
                     <h4 className="font-medium text-sm">Configuration Summary</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                       <div className="text-gray-500">Module:</div>
                       <div className="font-medium">{selectedModule?.name || '-'}</div>
                       <div className="text-gray-500">Metric:</div>

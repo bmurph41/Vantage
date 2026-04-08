@@ -79,7 +79,7 @@ function LinkedCompCard({ compLink, onUnlink }: {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 <span>{(comp as any).city}, {(comp as any).state || "N/A"}</span>
@@ -260,7 +260,7 @@ function FindCompsModal({ isOpen, onClose, projectId, compType, onLinkComp }: {
                           {comp.relevanceScore}% Match
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-600 mb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-gray-600 mb-2">
                         <div className="flex items-center gap-1">
                           <MapPin className="w-3 h-3" />
                           <span>{comp.city}, {comp.state || "N/A"}</span>
@@ -504,7 +504,7 @@ function LinkCompModal({ isOpen, onClose, projectId, compType, preselectedCompId
 
           {selectedCompId && (
             <div className="space-y-4 pt-2 border-t">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="primary-modeling"
@@ -704,7 +704,7 @@ export default function ModelingProjectIntegrationPanel({ projectId, projectName
             )}
 
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <TabsTrigger value="all" data-testid="tab-all-comps">
                   All ({comps.length})
                 </TabsTrigger>

@@ -86,7 +86,7 @@ export default function DealSourcingPage() {
         {/* Leaderboard */}
         <TabsContent value="leaderboard">
           {/* Tier summary */}
-          <div className="grid grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {["A", "B", "C", "D"].map((tier) => {
               const count = leaderboardData.filter((d: any) => d.tier === tier).length;
               return (
@@ -108,6 +108,7 @@ export default function DealSourcingPage() {
                   <p>No deals scored yet. Generate a Buy Box first, then score your deals.</p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -153,6 +154,7 @@ export default function DealSourcingPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -201,7 +203,7 @@ export default function DealSourcingPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Price Range</p>
                       <p className="font-medium">${Number(defaultProfile.priceMin || 0).toLocaleString()} — ${Number(defaultProfile.priceMax || 0).toLocaleString()}</p>

@@ -990,7 +990,7 @@ export function UnifiedTenantFormDialog({
                       <Separator />
                     </>
                   )}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="tenantName" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tenant Name *</FormLabel>
@@ -1008,7 +1008,7 @@ export function UnifiedTenantFormDialog({
                   </div>
 
                   {isAdvanced && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="tenantType" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Tenant Type</FormLabel>
@@ -1036,7 +1036,7 @@ export function UnifiedTenantFormDialog({
                   )}
 
                   {isAdvanced && <><SectionLabel>Space</SectionLabel><Separator /></>}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="suiteLabel" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Suite / Unit</FormLabel>
@@ -1058,7 +1058,7 @@ export function UnifiedTenantFormDialog({
                   </div>
 
                   {isAdvanced && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="spaceType" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Space Type</FormLabel>
@@ -1081,7 +1081,7 @@ export function UnifiedTenantFormDialog({
                   )}
 
                   {isAdvanced && <><SectionLabel>Dates & Status</SectionLabel><Separator /></>}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="leaseStartDate" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Commencement Date *</FormLabel>
@@ -1105,7 +1105,7 @@ export function UnifiedTenantFormDialog({
                   </div>
 
                   {isAdvanced && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="possessionDate" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Possession Date</FormLabel>
@@ -1117,7 +1117,7 @@ export function UnifiedTenantFormDialog({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="leaseType" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Lease Type</FormLabel>
@@ -1212,7 +1212,7 @@ export function UnifiedTenantFormDialog({
 
                 {/* ════════════ TAB: FINANCIAL ════════════ */}
                 <TabsContent value="financial" className="space-y-4 mt-0">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="baseRentInputUnit" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Rent Input Unit</FormLabel>
@@ -1240,7 +1240,7 @@ export function UnifiedTenantFormDialog({
                   </div>
 
                   {isAdvanced && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="billingFrequency" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Billing Frequency</FormLabel>
@@ -1275,7 +1275,7 @@ export function UnifiedTenantFormDialog({
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium">Derived Rent</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-muted-foreground">Monthly:</span>{" "}
                           <span className="font-mono font-medium">${fmt(derivedRent.monthly)}</span>
@@ -1292,7 +1292,7 @@ export function UnifiedTenantFormDialog({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="escalationType" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Escalation Type</FormLabel>
@@ -1321,7 +1321,7 @@ export function UnifiedTenantFormDialog({
                   </div>
 
                   {showCpi && isAdvanced && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField control={form.control} name="cpiCeiling" render={({ field }) => (
                         <FormItem>
                           <FormLabel>CPI Annual Cap (%)</FormLabel>
@@ -1337,7 +1337,7 @@ export function UnifiedTenantFormDialog({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="securityDeposit" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Security Deposit ($)</FormLabel>
@@ -1369,7 +1369,7 @@ export function UnifiedTenantFormDialog({
                   {showPercentRent && (
                     <>
                       <SectionLabel>Percentage Rent</SectionLabel>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FormField control={form.control} name="percentageRentRate" render={({ field }) => (
                           <FormItem>
                             <FormLabel>% Rent Rate</FormLabel>
@@ -1397,7 +1397,7 @@ export function UnifiedTenantFormDialog({
                         )}
                       </div>
                       {isAdvanced && (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField control={form.control} name="salesReportingFrequency" render={({ field }) => (
                             <FormItem>
                               <FormLabel>Sales Reporting Frequency</FormLabel>
@@ -1426,7 +1426,7 @@ export function UnifiedTenantFormDialog({
                   {isAdvanced && (
                     <>
                       <SectionLabel badge="Advanced">Recovery Structure</SectionLabel>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="recoveryStructure" render={({ field }) => (
                           <FormItem>
                             <FormLabel>Recovery Structure</FormLabel>
@@ -1446,7 +1446,7 @@ export function UnifiedTenantFormDialog({
                   )}
 
                   <SectionLabel>Estimated Recoveries</SectionLabel>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField control={form.control} name="estimatedCamPerSF" render={({ field }) => (
                       <FormItem>
                         <FormLabel>CAM per SF/Year ($)</FormLabel>
@@ -1470,7 +1470,7 @@ export function UnifiedTenantFormDialog({
                   {isAdvanced && (
                     <>
                       <SectionLabel badge="Advanced">Caps & Controls</SectionLabel>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FormField control={form.control} name="camCapPercent" render={({ field }) => (
                           <FormItem>
                             <FormLabel>CAM Cap (% annual)</FormLabel>
@@ -1490,7 +1490,7 @@ export function UnifiedTenantFormDialog({
                           </FormItem>
                         )} />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="auditRights" render={({ field }) => (
                           <FormItem className="flex items-center gap-3">
                             <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
@@ -1517,7 +1517,7 @@ export function UnifiedTenantFormDialog({
                 <TabsContent value="options" className="space-y-4 mt-0">
                   {!isAdvanced ? (
                     <>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FormField control={form.control} name="renewalOptions" render={({ field }) => (
                           <FormItem>
                             <FormLabel>Number of Renewals</FormLabel>
@@ -1551,7 +1551,7 @@ export function UnifiedTenantFormDialog({
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               <FormField control={form.control} name={`leaseOptions.${index}.optionType`} render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs">Type</FormLabel>
@@ -1576,7 +1576,7 @@ export function UnifiedTenantFormDialog({
                                 </FormItem>
                               )} />
                             </div>
-                            <div className="grid grid-cols-2 gap-3 mt-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                               <FormField control={form.control} name={`leaseOptions.${index}.rentResetMethod`} render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs">Rent Reset Method</FormLabel>
@@ -1626,7 +1626,7 @@ export function UnifiedTenantFormDialog({
                 {isAdvanced && (
                   <TabsContent value="ti_costs" className="space-y-4 mt-0">
                     <SectionLabel badge="Advanced">Tenant Improvements</SectionLabel>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="tiStructure" render={({ field }) => (
                         <FormItem>
                           <FormLabel>TI Structure</FormLabel>
@@ -1659,7 +1659,7 @@ export function UnifiedTenantFormDialog({
                       </FormItem>
                     )} />
                     {watchedAmortize && (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField control={form.control} name="amortizationTermMonths" render={({ field }) => (
                           <FormItem>
                             <FormLabel>Amortization Term (months)</FormLabel>
@@ -1676,7 +1676,7 @@ export function UnifiedTenantFormDialog({
                     )}
 
                     <SectionLabel>Leasing Commissions</SectionLabel>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <FormField control={form.control} name="commissionType" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Commission Type</FormLabel>
@@ -1715,7 +1715,7 @@ export function UnifiedTenantFormDialog({
                 {isAdvanced && (
                   <TabsContent value="risk" className="space-y-4 mt-0">
                     <SectionLabel badge="Advanced">Risk Assessment</SectionLabel>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField control={form.control} name="internalRiskRating" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Internal Risk Rating</FormLabel>
@@ -1737,7 +1737,7 @@ export function UnifiedTenantFormDialog({
                     )} />
 
                     <SectionLabel>Critical Clauses</SectionLabel>
-                    <div className="rounded-lg border bg-muted/30 p-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-muted/30 p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <FormField control={form.control} name="assignmentClause" render={({ field }) => (
                         <FormItem className="flex items-center gap-3">
                           <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
@@ -1753,7 +1753,7 @@ export function UnifiedTenantFormDialog({
                     </div>
 
                     <SectionLabel>Insurance Requirements</SectionLabel>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField control={form.control} name="glLimits" render={({ field }) => (
                         <FormItem>
                           <FormLabel>GL Limits</FormLabel>

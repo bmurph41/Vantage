@@ -596,7 +596,7 @@ export function DealAnalyticsDashboard() {
                       </ResponsiveContainer>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-center">
                       <div className="text-2xl font-bold text-green-600">{winLossData.summary.wonDeals}</div>
                       <div className="text-sm text-green-700">Won</div>

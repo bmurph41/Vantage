@@ -162,6 +162,7 @@ export default function BookkeepingStatements() {
                   </p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -254,6 +255,7 @@ export default function BookkeepingStatements() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -291,6 +293,7 @@ export default function BookkeepingStatements() {
                   </p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -355,6 +358,7 @@ export default function BookkeepingStatements() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

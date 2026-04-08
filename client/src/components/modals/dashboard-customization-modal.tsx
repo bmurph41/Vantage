@@ -244,7 +244,7 @@ export default function DashboardCustomizationModal({
       }
     >
       <Tabs defaultValue="widgets" className="flex-1">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
           <TabsTrigger value="widgets">
             <Sparkles className="h-4 w-4 mr-2" />
             Select Widgets
@@ -355,7 +355,7 @@ export default function DashboardCustomizationModal({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from(selectedWidgets).map((widgetKey) => {
                   const widget = widgets.find(w => w.widgetKey === widgetKey);
                   const size = widgetSizes[widgetKey] || 1;

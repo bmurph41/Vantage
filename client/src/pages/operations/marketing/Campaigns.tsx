@@ -474,7 +474,7 @@ export default function Campaigns() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -935,7 +935,7 @@ export default function Campaigns() {
           </CardContent>
         </Card>
       ) : campaigns.length > 0 ? (
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -996,7 +996,7 @@ export default function Campaigns() {
               ))}
             </TableBody>
           </Table>
-        </div>
+          </div>
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           No campaigns yet. Create your first campaign to get started.

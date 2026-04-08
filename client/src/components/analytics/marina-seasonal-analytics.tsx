@@ -223,7 +223,7 @@ export default function MarinaSeasonalAnalytics() {
       <Card>
         <CardContent className="p-0">
           <Tabs defaultValue="trends" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
               <TabsTrigger value="trends">Monthly Trends</TabsTrigger>
               <TabsTrigger value="forecasts">Seasonal Forecasts</TabsTrigger>
               <TabsTrigger value="weather">Weather Impact</TabsTrigger>
@@ -303,7 +303,7 @@ export default function MarinaSeasonalAnalytics() {
                         </Badge>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
                           <div className="text-lg font-bold">{forecast.expectedSales}</div>
                           <div className="text-xs text-gray-600">Expected Sales</div>
@@ -427,7 +427,7 @@ export default function MarinaSeasonalAnalytics() {
                               </div>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                             <div>
                               <div className="font-medium">{show.leadsGenerated}</div>
                               <div className="text-gray-500">Leads</div>

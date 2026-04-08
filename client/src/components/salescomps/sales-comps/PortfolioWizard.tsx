@@ -526,7 +526,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
 
               <Form {...marinaForm}>
                 <form onSubmit={marinaForm.handleSubmit(handleSaveMarina)} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {/* Left Column */}
                     <div className="space-y-6">
                       {/* Identity Section */}
@@ -596,7 +596,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             )}
                           />
                           
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="city"
@@ -661,7 +661,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                           <CardTitle className="text-lg">Physical Characteristics</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="wetSlips"
@@ -701,7 +701,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             />
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="acres"
@@ -748,7 +748,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                               <FormItem>
                                 <FormLabel>Storage Types</FormLabel>
                                 
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                                   {allStorageTypes.map((type) => (
                                     <FormField
                                       key={type}
@@ -820,7 +820,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                           <CardTitle className="text-lg">Financial Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="salePrice"
@@ -865,7 +865,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             />
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="estimatedPurchasePrice"
@@ -888,7 +888,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             <div /> {/* Empty space for grid alignment */}
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="noi"
@@ -938,7 +938,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             />
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="occupancy"
@@ -1045,7 +1045,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                           <CardTitle className="text-lg">Sale Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
                               control={marinaForm.control}
                               name="saleMonth"
@@ -1147,7 +1147,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                             }}
                           />
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                               control={marinaForm.control}
                               name="agentFirstName"
@@ -1205,7 +1205,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                       <CardTitle className="text-lg">Transaction Parties</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {/* Seller Section */}
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm text-gray-700">Seller</h4>
@@ -1364,7 +1364,7 @@ export default function PortfolioWizard({ open, onClose }: PortfolioWizardProps)
                         <FormLabel className="text-base font-semibold">Profit Centers</FormLabel>
                         <div className="space-y-4 mt-3">
                           {/* Simple profit centers without operation types */}
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                               { key: 'profitCenterStorage', label: 'Storage' },
                               { key: 'profitCenterEvents', label: 'Events' },

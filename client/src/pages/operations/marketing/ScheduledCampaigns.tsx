@@ -156,6 +156,7 @@ export default function ScheduledCampaigns() {
               </p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -240,6 +241,7 @@ export default function ScheduledCampaigns() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

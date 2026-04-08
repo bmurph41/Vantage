@@ -90,6 +90,7 @@ export function TemplateList({ templates, isLoading, onEdit }: TemplateListProps
 
   return (
     <>
+      <div className="overflow-x-auto w-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -145,6 +146,7 @@ export function TemplateList({ templates, isLoading, onEdit }: TemplateListProps
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

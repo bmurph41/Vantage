@@ -161,7 +161,7 @@ export default function CohortAnalysisView({ byPriceRange, byYear, isLoading }: 
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           </CardContent>
         </Card>
       )}
@@ -236,7 +236,7 @@ export default function CohortAnalysisView({ byPriceRange, byYear, isLoading }: 
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             </CardContent>
           </Card>
         </>

@@ -151,7 +151,7 @@ export function OmAssetLibraryPanel({ omId }: OmAssetLibraryPanelProps) {
               {searchQuery ? 'No matching assets found' : 'No assets yet. Upload an image to get started.'}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {filteredAssets.map((asset) => (
                 <div
                   key={asset.id}

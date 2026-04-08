@@ -499,7 +499,7 @@ export function RedFlagsPanel({ dealId, showMyEscalations = false }: RedFlagsPan
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="escalations" data-testid="tab-my-escalations">
               My Escalations
@@ -518,7 +518,7 @@ export function RedFlagsPanel({ dealId, showMyEscalations = false }: RedFlagsPan
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="border rounded-lg p-3 text-center" data-testid="stat-open-flags">
                     <p className="text-2xl font-bold text-red-500">{summary?.openCount || 0}</p>
                     <p className="text-sm text-muted-foreground">Open Flags</p>

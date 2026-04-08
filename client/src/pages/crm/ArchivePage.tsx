@@ -279,6 +279,7 @@ export default function ArchivePage() {
                 </div>
               ) : (
                 <ScrollArea className="h-[500px]">
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -343,6 +344,7 @@ export default function ArchivePage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </ScrollArea>
               )}
             </TabsContent>
@@ -360,6 +362,7 @@ export default function ArchivePage() {
                 </div>
               ) : (
                 <ScrollArea className="h-[500px]">
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -436,6 +439,7 @@ export default function ArchivePage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </ScrollArea>
               )}
             </TabsContent>
@@ -456,7 +460,7 @@ export default function ArchivePage() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {selectedContact.email && (
                   <div className="flex items-center gap-2 text-sm">
                     <Mail className="h-4 w-4 text-muted-foreground" />
@@ -552,7 +556,7 @@ export default function ArchivePage() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {selectedCompany.domain && (
                   <div className="flex items-center gap-2 text-sm">
                     <Globe className="h-4 w-4 text-muted-foreground" />

@@ -472,7 +472,7 @@ export default function UserSettingsPage() {
     switch (userRole) {
       case "investor":
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 rounded-lg border border-border bg-muted/30">
               <p className="text-xs text-muted-foreground">Active Investments</p>
               <p className="text-lg font-semibold text-foreground">--</p>
@@ -485,7 +485,7 @@ export default function UserSettingsPage() {
         );
       case "broker":
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 rounded-lg border border-border bg-muted/30">
               <p className="text-xs text-muted-foreground">Active Listings</p>
               <p className="text-lg font-semibold text-foreground">--</p>
@@ -499,7 +499,7 @@ export default function UserSettingsPage() {
       case "admin":
       case "owner":
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 rounded-lg border border-border bg-muted/30">
               <p className="text-xs text-muted-foreground">Team Members</p>
               <p className="text-lg font-semibold text-foreground">--</p>
@@ -512,7 +512,7 @@ export default function UserSettingsPage() {
         );
       default:
         return (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 rounded-lg border border-border bg-muted/30">
               <p className="text-xs text-muted-foreground">Recent Items</p>
               <p className="text-lg font-semibold text-foreground">--</p>

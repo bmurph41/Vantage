@@ -210,7 +210,7 @@ function LeaseEconomicsSection({
     return (
       <div className="space-y-4">
         <Skeleton className="h-6 w-40" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
         </div>
       </div>
@@ -224,7 +224,7 @@ function LeaseEconomicsSection({
         Lease Economics
       </h3>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="p-4 bg-muted/50 rounded-lg">
           <p className="text-sm text-muted-foreground">Scheduled Revenue</p>
           <p className="text-xl font-bold">{formatCurrency(totalScheduled)}</p>
@@ -405,7 +405,7 @@ export function CashFlowDrawer({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <CashFlowSummaryCard
               title="Total Scheduled"
               value={formatCurrency(totals.scheduled)}

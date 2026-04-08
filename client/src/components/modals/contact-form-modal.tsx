@@ -477,7 +477,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                 </div>
 
                 {/* Form Fields */}
-                <div className="flex-1 grid grid-cols-2 gap-4">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="firstName" className="text-sm">First name *</Label>
                 <Input
@@ -824,7 +824,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     <p className="text-xs text-destructive">{errors.address}</p>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div className="col-span-2 space-y-1.5">
                     <Label htmlFor="city" className="text-sm">City *</Label>
                     <Input 
@@ -852,7 +852,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="zipCode" className="text-sm">Zip *</Label>
                     <Input 
@@ -894,7 +894,7 @@ export default function ContactFormModal({ isOpen, onClose, contact }: ContactFo
               </div>
             </CardHeader>
             <CardContent className="px-5 pb-5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-sm">CRE Role</Label>
                   <Select value={crmRole} onValueChange={setCrmRole}>

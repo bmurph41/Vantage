@@ -205,7 +205,7 @@ export default function MarinaDatabase() {
 
             {/* Expandable Filters */}
             {showFilters && (
-              <div className="mt-3 p-3 bg-muted/50 rounded-lg grid grid-cols-3 gap-4">
+              <div className="mt-3 p-3 bg-muted/50 rounded-lg grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">States</label>
                   <MultiSelectDropdown
@@ -248,6 +248,7 @@ export default function MarinaDatabase() {
 
           <CardContent className="flex-1 overflow-hidden p-0">
             <ScrollArea className="h-full">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
@@ -384,6 +385,7 @@ export default function MarinaDatabase() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </ScrollArea>
           </CardContent>
 
@@ -420,7 +422,7 @@ export default function MarinaDatabase() {
       </div>
 
       {/* Right Panel - Marina Details & Rate History */}
-      <div className="hidden md:block w-[450px] flex-shrink-0">
+      <div className="hidden md:block w-full max-w-[450px] flex-shrink-0">
         {selectedMarina ? (
           <Card className="h-full flex flex-col">
             <CardHeader className="pb-3">
@@ -444,7 +446,7 @@ export default function MarinaDatabase() {
 
             <CardContent className="flex-1 overflow-hidden">
               <Tabs defaultValue="rates" className="h-full flex flex-col">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
                   <TabsTrigger value="rates" className="flex items-center gap-1">
                     <DollarSign className="h-4 w-4" />
                     Current Rates
@@ -487,7 +489,7 @@ export default function MarinaDatabase() {
 
             {/* Marina Details Footer */}
             <div className="p-4 border-t bg-muted/30">
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div>
                   <div className="text-muted-foreground">Wet Slips</div>
                   <div className="font-medium">{formatNumber(selectedMarina.wetSlips) || "-"}</div>

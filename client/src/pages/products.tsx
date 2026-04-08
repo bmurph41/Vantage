@@ -243,7 +243,7 @@ function ProductCard({
           {product.description && (
             <p className="text-sm text-gray-600">{product.description}</p>
           )}
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
               <p className="text-xs text-gray-500">Price</p>
               <p className="font-semibold text-green-600" data-testid={`text-price-${product.id}`}>
@@ -302,7 +302,7 @@ function CreateProductForm({
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="name">Product Name *</Label>
             <Input
@@ -336,7 +336,7 @@ function CreateProductForm({
             rows={3}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="price">Price *</Label>
             <CurrencyInput
@@ -450,7 +450,7 @@ function EditProductForm({
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="edit-name">Product Name *</Label>
             <Input
@@ -481,7 +481,7 @@ function EditProductForm({
             rows={3}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="grid gap-2">
             <Label htmlFor="edit-price">Price *</Label>
             <CurrencyInput

@@ -342,7 +342,7 @@ function TierFormDialog({
         <form onSubmit={handleSubmit}>
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4 pb-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="tierLabel">Tier Label</Label>
                   <Input
@@ -371,7 +371,7 @@ function TierFormDialog({
               <Separator />
               <p className="text-sm font-medium">Size Range</p>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sizeBasis">Size Basis</Label>
                   <Select value={formData.sizeBasis} onValueChange={v => handleChange('sizeBasis', v)}>
@@ -399,7 +399,7 @@ function TierFormDialog({
                     />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <Label htmlFor="loaMin">LOA Min (ft)</Label>
                       <Input
@@ -429,7 +429,7 @@ function TierFormDialog({
               <Separator />
               <p className="text-sm font-medium">Pricing</p>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="amountCents">Rate Amount ($)</Label>
                   <Input
@@ -470,7 +470,7 @@ function TierFormDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="seasonality">Seasonality</Label>
                   <Select value={formData.seasonality} onValueChange={v => handleChange('seasonality', v)}>
@@ -541,7 +541,7 @@ function TierFormDialog({
               </div>
 
               {formData.electricIncluded && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="electricAmps">Electric Amps (comma-separated)</Label>
                     <Input
@@ -567,7 +567,7 @@ function TierFormDialog({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="protectionLevel">Protection Level</Label>
                   <Select value={formData.protectionLevel} onValueChange={v => handleChange('protectionLevel', v)}>
@@ -592,7 +592,7 @@ function TierFormDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="liveaboardAllowed">Liveaboard Allowed</Label>
                   <Switch
@@ -634,7 +634,7 @@ function TierFormDialog({
                   <Separator />
                   <p className="text-sm font-medium">Terms & Dates</p>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="minTermMonths">Minimum Term (months)</Label>
                       <Input
@@ -672,7 +672,7 @@ function TierFormDialog({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="effectiveDate">Effective Date</Label>
                       <Input
@@ -698,7 +698,7 @@ function TierFormDialog({
                   <Separator />
                   <p className="text-sm font-medium">Taxes & Availability</p>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="taxesIncluded">Taxes Included</Label>
                       <Switch
@@ -724,7 +724,7 @@ function TierFormDialog({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="waitlistOnly">Waitlist Only</Label>
                       <Switch

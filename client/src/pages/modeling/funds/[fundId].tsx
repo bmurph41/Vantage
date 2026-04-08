@@ -329,7 +329,7 @@ function EditFundDialog({
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="shortName"
@@ -370,7 +370,7 @@ function EditFundDialog({
             </div>
             <div>
               <p className="text-sm font-medium mb-3">Fee Structure</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="assetManagementFeePct"
@@ -818,6 +818,7 @@ function InvestorsTab({ fund }: { fund: Fund }) {
       </CardHeader>
       <CardContent>
         {investorData.length > 0 ? (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -854,6 +855,7 @@ function InvestorsTab({ fund }: { fund: Fund }) {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -892,6 +894,7 @@ function AllocationsTab({ fund }: { fund: Fund }) {
           <div className="grid gap-6 lg:grid-cols-2">
             <div>
               {fund.allocations && fund.allocations.length > 0 ? (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -931,6 +934,7 @@ function AllocationsTab({ fund }: { fund: Fund }) {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />

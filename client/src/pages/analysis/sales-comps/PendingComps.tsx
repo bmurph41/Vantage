@@ -185,6 +185,7 @@ export default function PendingComps() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -264,6 +265,7 @@ export default function PendingComps() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -277,6 +279,7 @@ export default function PendingComps() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -319,6 +322,7 @@ export default function PendingComps() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}

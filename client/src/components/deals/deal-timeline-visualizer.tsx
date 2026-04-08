@@ -277,7 +277,7 @@ export function DealTimelineVisualizer({
         })}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 pt-2 border-t">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t">
         <div className="text-center">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">PSA Signed</p>
           <p className="text-sm font-semibold">{format(parseISO(psaSignedDate), "MM/dd/yyyy")}</p>

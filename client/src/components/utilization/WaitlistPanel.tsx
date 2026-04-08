@@ -291,11 +291,11 @@ export default function WaitlistPanel({ propertyId }: WaitlistPanelProps) {
 
       <CardContent className="space-y-4">
         {metricsLoading ? (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="border rounded-lg p-3 text-center">
               <div className="text-2xl font-bold">{metrics.waitlistCount ?? 0}</div>
               <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -390,6 +390,7 @@ export default function WaitlistPanel({ propertyId }: WaitlistPanelProps) {
                 No entries yet. Add someone to the waitlist.
               </div>
             ) : (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -441,6 +442,7 @@ export default function WaitlistPanel({ propertyId }: WaitlistPanelProps) {
                   })}
                 </TableBody>
               </Table>
+              </div>
             )}
           </div>
         </SheetContent>
@@ -460,7 +462,7 @@ export default function WaitlistPanel({ propertyId }: WaitlistPanelProps) {
                 onChange={e => setNewEntry(p => ({ ...p, contactName: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Email</Label>
                 <Input
@@ -476,7 +478,7 @@ export default function WaitlistPanel({ propertyId }: WaitlistPanelProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Boat Name</Label>
                 <Input

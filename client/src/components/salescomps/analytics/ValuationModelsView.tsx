@@ -166,6 +166,7 @@ export default function ValuationModelsView({ valuationModels, isLoading }: Valu
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -184,6 +185,7 @@ export default function ValuationModelsView({ valuationModels, isLoading }: Valu
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -178,6 +178,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
           </CardHeader>
           <CardContent>
             {analytics.topDocuments.length > 0 ? (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -203,6 +204,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             ) : (
               <div className="text-center py-8 text-gray-500">No document activity yet</div>
             )}
@@ -219,6 +221,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
           </CardHeader>
           <CardContent>
             {analytics.userEngagement.length > 0 ? (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -243,6 +246,7 @@ export function AnalyticsDashboard({ projectId }: AnalyticsDashboardProps) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             ) : (
               <div className="text-center py-8 text-gray-500">No user activity yet</div>
             )}

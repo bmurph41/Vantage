@@ -627,7 +627,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="type" className="font-semibold">Property Type</Label>
                       {isEditing ? (
@@ -754,7 +754,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                       <CardTitle className="text-lg">Specifications</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {specEntries.map(([key, value]) => (
                           <div key={key} className="space-y-1">
                             <div className="text-sm text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
@@ -1062,7 +1062,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                       <p className="text-sm mt-1">Link contacts to track relationships with this property</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {linkedContacts.map((link) => (
                         <div 
                           key={link.id} 
@@ -1145,7 +1145,7 @@ export default function PropertyDetailModal({ isOpen, onClose, property, onConta
                       <p className="text-sm mt-1">Link companies associated with this property</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {linkedCompanies.map((link) => (
                         <div 
                           key={link.id} 

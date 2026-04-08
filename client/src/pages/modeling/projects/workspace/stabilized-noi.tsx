@@ -325,6 +325,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                 <CardTitle className="text-lg">Stabilization Adjustments</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -358,6 +359,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                     )}
                   </TableBody>
                 </Table>
+                </div>
                 {(result.adjustments ?? []).length > 0 && (
                   <div className="flex justify-end mt-4 pt-4 border-t">
                     <div className="text-right">
@@ -383,6 +385,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -408,6 +411,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -420,6 +424,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -445,6 +450,7 @@ function StabilizedNOI({ projectId, onTabChange }: StabilizedNOIProps) {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             </div>

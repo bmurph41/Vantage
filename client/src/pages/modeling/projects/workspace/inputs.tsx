@@ -1323,7 +1323,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                     />
                   ))}
                   {halfFields.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {halfFields.map(field => (
                         <DynamicField
                           key={field.id}
@@ -1335,7 +1335,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                     </div>
                   )}
                   {thirdFields.length > 0 && (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {thirdFields.map(field => (
                         <DynamicField
                           key={field.id}
@@ -1371,7 +1371,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                 seasonLabel={config.seasonConfig.seasonLabel}
               />
               {(config.seasonConfig.type === 'marina' || config.seasonConfig.type === 'str') && (
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">
                       {config.seasonConfig.offSeasonLabel} Discount %
@@ -1414,7 +1414,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                 return (
                   <div key={section} className="mb-3">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">{section}</p>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       {sectionTypes.map(unitType => (
                         <label
                           key={unitType.id}
@@ -1514,7 +1514,7 @@ export default function InputsAssumptions({ project }: InputsAssumptionsProps) {
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{cat.description}</p>
                     {cat.subcategories ? (
-                      <div className="grid grid-cols-2 gap-2 ml-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-5">
                         {cat.subcategories.map(sub => (
                           <div key={sub.id} className="space-y-1">
                             <Label className="text-xs text-muted-foreground">{sub.label}</Label>

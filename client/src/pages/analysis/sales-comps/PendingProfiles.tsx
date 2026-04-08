@@ -249,6 +249,7 @@ export default function PendingProfiles() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -330,6 +331,7 @@ export default function PendingProfiles() {
                 })}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -347,7 +349,7 @@ export default function PendingProfiles() {
             <div className="space-y-4">
               <div className="bg-muted/50 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Sales Comp Details</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div><span className="text-muted-foreground">Name:</span> {selectedComp.name}</div>
                   <div><span className="text-muted-foreground">Location:</span> {selectedComp.city}, {selectedComp.state}</div>
                   <div><span className="text-muted-foreground">Sale Price:</span> {formatCurrency(selectedComp.salePrice)}</div>

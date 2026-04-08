@@ -190,7 +190,7 @@ export const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
         <h3 className="text-sm font-medium text-muted-foreground mb-4">
           Common Document Types
         </h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {primaryTypes.map((type) => (
             <DocumentTypeCard
               key={type}
@@ -208,7 +208,7 @@ export const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
         <h3 className="text-sm font-medium text-muted-foreground mb-4">
           Additional Types
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {secondaryTypes.map((type) => (
             <DocumentTypeCard
               key={type}

@@ -191,7 +191,7 @@ export function MandatesTab() {
                   <p className="text-sm text-muted-foreground">{mandate.description}</p>
                 )}
                 
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   {(mandate.minPrice || mandate.maxPrice) && (
                     <div className="flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
@@ -370,7 +370,7 @@ function MandateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="name">Mandate Name *</Label>
           <Input
@@ -452,7 +452,7 @@ function MandateForm({
 
       <Separator />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="minPrice">Min Price ($)</Label>
           <Input
@@ -477,7 +477,7 @@ function MandateForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="minSlips">Min Slips</Label>
           <Input
@@ -502,7 +502,7 @@ function MandateForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="minCapRate">Min Cap Rate (%)</Label>
           <Input
@@ -529,7 +529,7 @@ function MandateForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="minRevenue">Min Revenue ($)</Label>
           <Input

@@ -326,7 +326,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi, i) => (
           <Card key={i}>
             <CardContent className="pt-4">
@@ -370,6 +370,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
               </Button>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -436,6 +437,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -450,7 +452,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="txnDate">Date</Label>
                   <Input
@@ -477,7 +479,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gallons">Gallons</Label>
                   <Input
@@ -551,7 +553,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
             updateMutation.mutate({ id: editingTransaction.id, data });
           }}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-txnDate">Date</Label>
                   <Input
@@ -578,7 +580,7 @@ export default function ValuatorFuelSalesTab({ projectId, projectName }: Valuato
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-gallons">Gallons</Label>
                   <Input

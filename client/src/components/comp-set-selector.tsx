@@ -444,7 +444,7 @@ export default function CompSetSelector({ dealId, className }: CompSetSelectorPr
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="text-center p-3 bg-green-50 rounded-lg">
             <DollarSign className="w-5 h-5 mx-auto text-green-600 mb-1" />
             <p className="text-2xl font-bold text-green-600">{salesCompsCount}</p>

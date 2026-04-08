@@ -352,7 +352,7 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Loan Type</Label>
                   <Select
@@ -387,7 +387,7 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <DollarSign className="h-3 w-3" />
@@ -648,7 +648,7 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                         <Bar dataKey="principal" stackId="a" fill="#3b82f6" opacity={0.85} radius={[3,3,0,0]} name="Principal" />
                       </BarChart>
                     </ResponsiveContainer>
-                    <div className="grid grid-cols-3 gap-3 mt-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2 text-xs">
                       {[
                         { label: 'Total Interest', val: schedule.reduce((s,r)=>s+(r.interest||0),0), color: 'text-red-600' },
                         { label: 'Total Principal', val: schedule.reduce((s,r)=>s+(r.principal||0),0), color: 'text-blue-600' },
@@ -716,7 +716,7 @@ export default function DebtInputs({ projectId, purchasePrice }: DebtInputsProps
                         </tfoot>
                       )}
                     </Table>
-                  </div>
+                    </div>
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-6">
                     No schedule data available.

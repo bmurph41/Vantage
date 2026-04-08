@@ -1906,7 +1906,7 @@ export function Exchange1031Panel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center gap-1">
                   <Label className="text-xs">Boot Received</Label>
@@ -1970,7 +1970,7 @@ export function Exchange1031Panel() {
                     <Hammer className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
                     <p className="text-xs text-blue-800 font-medium">Build-to-suit exchange allows improvements using exchange proceeds</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Land Cost</Label>
                       <CurrencyInput value={landCost} onChange={setLandCost} />
@@ -2534,7 +2534,7 @@ export function DSTAnalysisPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Distribution Rate (%)</Label>
                 <PercentInput value={distributionRate} onChange={setDistributionRate} />
@@ -2791,7 +2791,7 @@ export function DSTAnalysisPanel() {
                 Risk Assessment
               </h4>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Tenant Concentration</Label>
                     <Select value={tenantConcentration} onValueChange={setTenantConcentration}>
@@ -3256,7 +3256,7 @@ export function SellerFinancingPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Down Payment %</Label>
                 <PercentInput value={downPaymentPercent} onChange={setDownPaymentPercent} />
@@ -3440,7 +3440,7 @@ export function SellerFinancingPanel() {
               </label>
               {useVariableRate && (
                 <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Rate Adjustment (+/- %)</Label>
                       <Input
@@ -3717,7 +3717,7 @@ export function EarnoutPanel() {
             <CardDescription>Contingent payment with probability-weighted analysis</CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center gap-1">
                   <Label className="text-xs">Base Price (Guaranteed)</Label>
@@ -3759,7 +3759,7 @@ export function EarnoutPanel() {
 
             <div className="border-t pt-3 space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Milestone Structure</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs">Revenue Target</Label>
                   <CurrencyInput value={revenueTarget} onChange={setRevenueTarget} />
@@ -4078,7 +4078,7 @@ export function EarnoutPanel() {
               </label>
               {hasClawback && (
                 <div className="border rounded-lg p-4 space-y-3 bg-red-50/30">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-xs flex items-center gap-1">
                         Clawback %
@@ -4958,7 +4958,7 @@ export function WaterfallPanel() {
             <CardDescription>GP/LP fund distribution with IRR-based promote hurdles</CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">LP Capital</Label>
                 <CurrencyInput value={lpCapital} onChange={setLpCapital} />
@@ -5125,7 +5125,7 @@ export function WaterfallPanel() {
                   </div>
                   {enableClawback && (
                     <div className="space-y-3 pt-1">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <Label className="text-[10px] flex items-center gap-1">
                             Escrow % of Promote
@@ -5592,7 +5592,7 @@ export function WaterfallPanel() {
 
               {clawbackResult ? (
                 <div className="bg-red-50/50 border border-red-200 rounded-lg p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                     <div className="flex justify-between py-1">
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
                         LP Target Return
@@ -6028,7 +6028,7 @@ export function IRRCalculatorPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs">Initial Investment</Label>
                 <CurrencyInput value={initialInvestment} onChange={setInitialInvestment} />
@@ -6284,7 +6284,7 @@ export function IRRCalculatorPanel() {
 
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs">LP Equity %</Label>
                     <PercentInput value={lpEquityPct} onChange={setLpEquityPct} />
@@ -6374,7 +6374,7 @@ export function IRRCalculatorPanel() {
 
                 <div className="border-t pt-3 space-y-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">LP vs GP/Sponsor Returns</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-green-50 rounded-lg p-3 space-y-1.5">
                       <p className="text-xs font-semibold text-green-700">LP (Investor)</p>
                       <div className="flex justify-between text-xs"><span className="text-green-600">Total Distributions</span><span className="num font-semibold">{formatCurrency(totalLPDist)}</span></div>
@@ -6752,7 +6752,7 @@ export function SensitivityPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4 max-w-md">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
             <div>
               <Label>Base NOI</Label>
               <CurrencyInput value={baseNOI} onChange={setBaseNOI} />
@@ -8480,7 +8480,7 @@ export function AdvisorInsightsPanel() {
 
             return (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className={`rounded-lg p-3 text-center ${isAboveExemption ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
                     <p className="text-xs text-muted-foreground mb-1">Estate vs. Exemption (Single)</p>
                     <p className={`text-sm font-bold ${isAboveExemption ? "text-red-600" : "text-green-600"}`}>

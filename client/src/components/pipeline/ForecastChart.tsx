@@ -48,7 +48,7 @@ export function ForecastChart({ pipelineId }: ForecastChartProps) {
     return (
       <div className="space-y-4 p-4">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-[300px]" />
@@ -126,7 +126,7 @@ export function ForecastChart({ pipelineId }: ForecastChartProps) {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">

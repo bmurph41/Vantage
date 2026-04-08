@@ -165,6 +165,7 @@ export default function AuditLogsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -223,6 +224,7 @@ export default function AuditLogsPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -234,7 +236,7 @@ export default function AuditLogsPage() {
           {selectedLog && (
             <ScrollArea className="h-[60vh]">
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Timestamp</label>
                     <p className="text-sm">{format(new Date(selectedLog.createdAt), 'PPpp')}</p>

@@ -393,7 +393,7 @@ export default function LoanBuilder({ projectId, purchasePrice, noi, onUpdate }:
                     <AccordionItem value="basic">
                       <AccordionTrigger>Basic Terms</AccordionTrigger>
                       <AccordionContent>
-                        <div className="grid grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label>Principal ($)</Label>
                             <Input
@@ -486,7 +486,7 @@ export default function LoanBuilder({ projectId, purchasePrice, noi, onUpdate }:
                     <AccordionItem value="fees">
                       <AccordionTrigger>Fees & Prepayment</AccordionTrigger>
                       <AccordionContent>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label>Exit Fee (%)</Label>
                             <Input
@@ -519,7 +519,7 @@ export default function LoanBuilder({ projectId, purchasePrice, noi, onUpdate }:
                     <AccordionItem value="dscr">
                       <AccordionTrigger>DSCR Covenants</AccordionTrigger>
                       <AccordionContent>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label>Minimum DSCR</Label>
                             <Input
@@ -795,7 +795,7 @@ export default function LoanBuilder({ projectId, purchasePrice, noi, onUpdate }:
             <Skeleton className="h-96 w-full" />
           ) : amortizationData ? (
             <>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="text-sm text-muted-foreground">Total Payments</div>

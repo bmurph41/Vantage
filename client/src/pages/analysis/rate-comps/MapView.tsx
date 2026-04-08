@@ -451,7 +451,7 @@ export default function RateCompsMapView() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs border-t pt-2 mt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-xs border-t pt-2 mt-1">
                         <div>
                           <span className="text-gray-500">Rate: </span>
                           <span className="font-semibold text-green-700">{formatCurrency(selectedComp.rateAmount)}</span>
@@ -546,7 +546,7 @@ export default function RateCompsMapView() {
                   <BarChart3 className="h-4 w-4 text-emerald-600" />
                   <span className="text-sm font-semibold">Map Statistics</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Comps</p>
                     <p className="text-lg font-bold">{stats.total}</p>

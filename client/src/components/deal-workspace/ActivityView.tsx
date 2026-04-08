@@ -50,7 +50,7 @@ function getActivityConfig(type: string) {
 
 function StatsCards({ counts, isLoading }: { counts: ActivitiesResponse["counts"] | undefined; isLoading: boolean }) {
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       <Card className="bg-white border shadow-sm">
         <CardContent className="p-4">
           <p className="text-xs font-medium text-gray-500">Overdue</p>
@@ -108,7 +108,7 @@ export default function ActivityView() {
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="bg-white border shadow-sm">
               <CardContent className="p-4">

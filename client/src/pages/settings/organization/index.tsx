@@ -147,6 +147,7 @@ export default function OrganizationSettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -189,6 +190,7 @@ export default function OrganizationSettingsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
           <Dialog open={showInvite} onOpenChange={setShowInvite}>
@@ -220,7 +222,7 @@ export default function OrganizationSettingsPage() {
           <Card>
             <CardHeader><CardTitle>Branding</CardTitle><CardDescription>Customize your organization's appearance</CardDescription></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><Label>Firm Name</Label><p className="font-medium">{org?.branding?.firmName || org?.name || "—"}</p></div>
                 <div><Label>Primary Color</Label><div className="flex items-center gap-2"><div className="w-6 h-6 rounded" style={{ backgroundColor: org?.branding?.primaryColor || "#2563eb" }} /><span>{org?.branding?.primaryColor || "#2563eb"}</span></div></div>
                 <div><Label>Support Email</Label><p>{org?.branding?.supportEmail || "—"}</p></div>

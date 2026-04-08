@@ -615,7 +615,7 @@ function StorageBreakdownTab({ entries }: { entries: PropertyRecord['storageEntr
   return (
     <div className="space-y-4">
       {/* Summary strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <Card className="shadow-sm"><CardContent className="p-3 text-center">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total Capacity</p>
           <p className="text-lg font-semibold text-gray-900 dark:text-white">{totalCapacity.toLocaleString()}</p>

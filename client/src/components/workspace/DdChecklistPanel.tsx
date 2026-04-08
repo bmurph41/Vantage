@@ -1124,7 +1124,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
               {yearOptions.map((label) => {
                 const isSelected = existingLabels.has(label);
                 const period = isSelected ? periods.find(p => p.periodLabel === label) : null;
@@ -1177,7 +1177,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
           </div>
 
           <Tabs value={drawerTab} onValueChange={setDrawerTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
               <TabsTrigger value="comments" className="text-xs">Comments ({item.commentCount})</TabsTrigger>
               <TabsTrigger value="history" className="text-xs">History</TabsTrigger>
@@ -1350,7 +1350,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                               <span className="text-[9px] font-mono text-muted-foreground w-7 text-right">{completionPct}%</span>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-1">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
                               <div className="text-center">
                                 <div className="text-[10px] font-semibold">{s.assignedCount}</div>
                                 <div className="text-[8px] text-muted-foreground">Assigned</div>
@@ -1376,7 +1376,7 @@ function ItemDrawer({ item, section, workspaceId, onClose, onStatusChange, onUpd
                 })()}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Due Date</Label>
                   <Input

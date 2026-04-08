@@ -365,7 +365,7 @@ export function TaskModal({
         </div>
 
         {/* Priority and Due Date */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Priority</Label>
             <Select value={priority} onValueChange={setPriority}>
@@ -590,7 +590,7 @@ export function CallModal({
       }}
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Direction</Label>
             <Select value={direction} onValueChange={setDirection}>

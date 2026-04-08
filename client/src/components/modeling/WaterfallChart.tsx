@@ -37,7 +37,7 @@ export default function WaterfallChart({ projectId, cashflows }: Props) {
         <CardDescription className="text-xs">Multi-tier promote with preferred return</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><Label className="text-xs">Pref Return %</Label><Input type="number" step="0.5" value={prefReturn} onChange={e => setPrefReturn(e.target.value)} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">GP Co-Invest %</Label><Input type="number" step="1" value={gpCommit} onChange={e => setGpCommit(e.target.value)} className="h-8 text-xs" /></div>
         </div>
@@ -60,7 +60,7 @@ export default function WaterfallChart({ projectId, cashflows }: Props) {
           </div>
         )}
         {r && (
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
             <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-2 text-xs space-y-0.5">
               <p className="font-medium text-blue-700 dark:text-blue-300 flex items-center gap-1"><Users className="h-3 w-3" />LP</p>
               <div className="flex justify-between"><span className="text-muted-foreground">Equity</span><span className="font-mono">{formatCurrency(r.lpEquity)}</span></div>

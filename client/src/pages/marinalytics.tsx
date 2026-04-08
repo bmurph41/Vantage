@@ -133,7 +133,7 @@ export default function MarinalyticsPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
@@ -312,7 +312,7 @@ function OperatorCard({ company }: { company: PortfolioCompany }) {
             Marina Operator
           </Badge>
         </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-center">
           <div className="bg-muted/50 rounded p-2">
             <p className="text-xs text-muted-foreground">Marinas</p>
             <p className="font-semibold">--</p>

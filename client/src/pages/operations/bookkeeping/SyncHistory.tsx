@@ -318,6 +318,7 @@ export default function BookkeepingSyncHistory() {
               </Button>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -357,6 +358,7 @@ export default function BookkeepingSyncHistory() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

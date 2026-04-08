@@ -1221,7 +1221,7 @@ export function DetailDrawer({
                               </div>
 
                               {/* Contact Info */}
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                   <Label className="text-xs text-muted-foreground">Phone</Label>
                                   <div className="text-sm flex items-center gap-1">
@@ -1261,7 +1261,7 @@ export function DetailDrawer({
                               {/* Financial Info */}
                               <div>
                                 <h4 className="text-xs font-medium text-muted-foreground mb-2">Financial & Business</h4>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <div className="space-y-1">
                                     <Label className="text-xs text-muted-foreground">Annual Revenue</Label>
                                     <div className="text-sm font-medium">
@@ -1309,7 +1309,7 @@ export function DetailDrawer({
                               </div>
 
                               {/* Role/Industry */}
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                   <Label className="text-xs text-muted-foreground">Role</Label>
                                   <div className="text-sm">
@@ -1398,7 +1398,7 @@ export function DetailDrawer({
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                   <Label className="text-xs text-muted-foreground">Listing Price</Label>
                                   <div className="text-sm font-medium flex items-center gap-1">

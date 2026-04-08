@@ -87,7 +87,7 @@ export default function CommissionTrackingWidget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -145,7 +145,7 @@ export default function CommissionTrackingWidget() {
         </div>
         
         {/* Summary Metrics */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div className="text-center">
             <div className="text-lg font-bold text-green-600">
               {formatCurrency(commissionData.earned)}
@@ -179,7 +179,7 @@ export default function CommissionTrackingWidget() {
       
       <CardContent className="pt-0">
         <Tabs defaultValue="recent" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="recent">Recent</TabsTrigger>
             <TabsTrigger value="forecast">Forecast</TabsTrigger>
           </TabsList>

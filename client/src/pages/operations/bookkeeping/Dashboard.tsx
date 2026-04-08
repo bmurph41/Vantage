@@ -322,6 +322,7 @@ export default function BookkeepingDashboard() {
             <CardDescription>Last 10 general ledger entries</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -367,6 +368,7 @@ export default function BookkeepingDashboard() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

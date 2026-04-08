@@ -253,6 +253,7 @@ export default function SecuritySettings() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -308,6 +309,7 @@ export default function SecuritySettings() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -378,7 +380,7 @@ export default function SecuritySettings() {
                 </AlertDescription>
               </Alert>
               
-              <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-4 bg-muted rounded-lg font-mono text-sm">
                 {mfaSetupData.backupCodes.map((code, index) => (
                   <div key={index} className="p-2 bg-background rounded">
                     {code}

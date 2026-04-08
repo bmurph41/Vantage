@@ -716,7 +716,7 @@ export default function TemplateGallery() {
               placeholder="Search templates..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-[240px] pl-9"
+              className="w-full max-w-[240px] pl-9"
             />
           </div>
         </div>
@@ -940,7 +940,7 @@ export default function TemplateGallery() {
               </div>
 
               {/* Meta row */}
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                 <div className="rounded-md border p-3 text-center">
                   <p className="text-2xl font-bold">{previewTemplate.estimatedPages}</p>
                   <p className="text-muted-foreground text-xs">Est. Pages</p>

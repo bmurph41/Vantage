@@ -128,7 +128,7 @@ export default function RcAnalyticsFiltersPanel({
         {/* LOA Range */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Boat Length (LOA)</Label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min (ft)</Label>
               <Input
@@ -163,7 +163,7 @@ export default function RcAnalyticsFiltersPanel({
         {/* Rate Range ($/ft/month) */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Rate Range ($/ft/month)</Label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input

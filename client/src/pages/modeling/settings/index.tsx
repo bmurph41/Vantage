@@ -584,6 +584,7 @@ export default function ModelingSettings() {
           ) : (
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={sortedRegions.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -604,6 +605,7 @@ export default function ModelingSettings() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </SortableContext>
             </DndContext>
           )}

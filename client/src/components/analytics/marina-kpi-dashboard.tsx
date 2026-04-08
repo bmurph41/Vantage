@@ -224,7 +224,7 @@ export default function MarinaKpiDashboard() {
       <Card>
         <CardContent className="p-0">
           <Tabs defaultValue="performance" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
               <TabsTrigger value="performance">Performance</TabsTrigger>
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
               <TabsTrigger value="regional">Regional</TabsTrigger>
@@ -433,7 +433,7 @@ export default function MarinaKpiDashboard() {
                             </Badge>
                           </div>
                           
-                          <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
                             <div>
                               <div className="font-medium">{formatCurrency(marina.revenue)}</div>
                               <div className="text-gray-500">Revenue</div>
@@ -458,7 +458,7 @@ export default function MarinaKpiDashboard() {
                       Boat Show Analytics
                     </h4>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
                           <div className="text-2xl font-bold text-blue-900">
                             {kpiData.regionalData.boatShows.upcoming}

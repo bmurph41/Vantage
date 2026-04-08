@@ -85,6 +85,7 @@ export default function MeetingTranscriptionPage() {
               <p>No meetings yet. Upload a transcript to get started.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -134,6 +135,7 @@ export default function MeetingTranscriptionPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

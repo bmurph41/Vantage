@@ -192,7 +192,7 @@ export default function PipelineSettingsModal({
                 {editingStageId === stage.id ? (
                   // Edit Mode
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>Stage Name</Label>
                         <Input
@@ -309,7 +309,7 @@ export default function PipelineSettingsModal({
             <Card className="border-2 border-dashed border-blue-300 bg-blue-50/50">
               <CardContent className="p-4">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Stage Name</Label>
                       <Input

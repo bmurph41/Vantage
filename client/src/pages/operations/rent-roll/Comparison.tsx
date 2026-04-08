@@ -205,6 +205,7 @@ function MarinaComparisonTable({ data }: { data: PortfolioAggregation['byMarina'
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -233,6 +234,7 @@ function MarinaComparisonTable({ data }: { data: PortfolioAggregation['byMarina'
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -377,7 +379,7 @@ function PortfolioView() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />

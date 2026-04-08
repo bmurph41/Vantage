@@ -501,7 +501,7 @@ export default function IntegrationSettings() {
                     Reset to Defaults
                   </Button>
                 </div>
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -552,7 +552,7 @@ export default function IntegrationSettings() {
                   No import history yet. Sync data to see import logs.
                 </div>
               ) : (
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>

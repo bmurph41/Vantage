@@ -847,7 +847,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   <TabsContent key={tab.id} value={tab.id} className="mt-4">
                     <Form {...form}>
                       <form className="space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                           {/* Left Column */}
                           <div className="space-y-6">
                             {/* Identity Section */}
@@ -904,7 +904,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
             /* Regular Comp Creation/Edit Mode */
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Left Column */}
                   <div className="space-y-6">
                     {/* Identity Section */}
@@ -1050,7 +1050,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         )}
                       />
                       
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <FormField
                           control={form.control}
                           name="city"
@@ -1115,7 +1115,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       <CardTitle className="text-lg">Physical Characteristics</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="acres"
@@ -1169,7 +1169,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                               </Alert>
                             )}
                             
-                            <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                               {allStorageTypes.map((type) => (
                                 <FormField
                                   key={type}
@@ -1268,7 +1268,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       />
 
                       {(showWetSlipsCapacity || showDryRacksCapacity) && (
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
                           {showWetSlipsCapacity && (
                             <FormField
                               control={form.control}
@@ -1324,7 +1324,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       <CardTitle className="text-lg">Financial Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="salePrice"
@@ -1402,7 +1402,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         />
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="estimatedPurchasePrice"
@@ -1425,7 +1425,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <div /> {/* Empty space for grid alignment */}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="noi"
@@ -1479,7 +1479,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         />
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="occupancy"
@@ -1586,7 +1586,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                       <CardTitle className="text-lg">Sale Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField
                           control={form.control}
                           name="saleMonth"
@@ -1932,7 +1932,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   <CardTitle className="text-lg">Transaction Parties</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {/* Seller Section */}
                     <div className="space-y-4">
                       <h4 className="font-semibold text-sm text-gray-700">Seller</h4>
@@ -2339,7 +2339,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                     <FormLabel className="text-base font-semibold">Profit Centers</FormLabel>
                     <div className="space-y-4 mt-3">
                       {/* Simple profit centers without operation types */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {[
                           { key: 'profitCenterStorage', label: 'Storage' },
                           { key: 'profitCenterEvents', label: 'Events' },

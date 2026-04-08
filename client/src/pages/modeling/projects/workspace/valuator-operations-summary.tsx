@@ -108,7 +108,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -195,7 +195,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
 
       {(hasFuelData || hasStoreData) && hasOpsData && (
         <>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
@@ -253,7 +253,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
             </Card>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {hasFuelData && (
               <Card>
                 <CardHeader>
@@ -266,7 +266,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Revenue</p>
                       <p className="text-xl font-semibold">
@@ -308,7 +308,7 @@ export default function ValuatorOperationsSummary({ projectId, projectName }: Va
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Revenue</p>
                       <p className="text-xl font-semibold">

@@ -291,7 +291,7 @@ export function PLBuilder({ project, computedFinancials, isLoading, onRefresh }:
 
               {/* Summary */}
               <div className="border-t pt-3 mt-3">
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="text-xs text-muted-foreground">Total Revenue</div>
                     <div className="text-lg font-bold text-emerald-600">

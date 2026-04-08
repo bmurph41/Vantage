@@ -148,6 +148,7 @@ export default function MultifamilyLeaseExpiry() {
               <p className="text-sm mt-1">Try adjusting your filter.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -192,6 +193,7 @@ export default function MultifamilyLeaseExpiry() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -214,6 +214,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
               <Button variant="outline" size="sm" onClick={addCapitalCall}>Add Call</Button>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -238,6 +239,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -247,6 +249,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
               <Button variant="outline" size="sm" onClick={addDistribution}>Add Distribution</Button>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -271,6 +274,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -351,6 +355,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
                 <CardTitle>Benchmark Quartile Comparison</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -379,6 +384,7 @@ export function FundMetrics({ projectId, onTabChange }: { projectId: string; onT
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}

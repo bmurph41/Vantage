@@ -138,7 +138,7 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
             <Separator />
             <h4 className="font-medium text-sm">Closing Costs</h4>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="brokerCommission">Broker Commission (%)</Label>
                 <Input
@@ -182,7 +182,7 @@ export default function ExitNetProceeds({ projectId }: NetProceedsProps) {
             <Separator />
             <h4 className="font-medium text-sm">Debt & Other</h4>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="outstandingDebt">Outstanding Debt ($)</Label>
                 <Input

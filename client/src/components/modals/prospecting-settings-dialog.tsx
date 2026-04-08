@@ -241,7 +241,7 @@ export function ProspectingSettingsDialog() {
         </DialogHeader>
 
         <Tabs defaultValue="week-start" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="week-start" data-testid="tab-week-start">Week Start Day</TabsTrigger>
             <TabsTrigger value="recurring-goals" data-testid="tab-recurring-goals">Recurring Goals</TabsTrigger>
           </TabsList>

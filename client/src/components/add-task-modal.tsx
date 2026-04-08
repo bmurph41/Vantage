@@ -404,7 +404,7 @@ function TaskDependenciesSelector({
                   <Input placeholder="Dependency name *" value={newCustom.name}
                     onChange={e => setNewCustom(prev => ({ ...prev, name: e.target.value }))}
                     className="h-8 text-sm" />
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     <select value={newCustom.priority}
                       onChange={e => setNewCustom(prev => ({ ...prev, priority: e.target.value }))}
                       className="h-8 text-xs rounded-md border px-2 bg-background">
@@ -1207,7 +1207,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Select
@@ -1520,7 +1520,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
                     <TaskOwnerSelector 
@@ -1590,7 +1590,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             data-testid="input-rep-name"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor="repEmail">Rep Email</Label>
                             <Input
@@ -1666,7 +1666,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                               autoComplete="address-line2"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <Label htmlFor="companyCity">City</Label>
                               <Input
@@ -1678,7 +1678,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                                 autoComplete="address-level2"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
                                 <Label htmlFor="companyState">State</Label>
                                 <Input
@@ -1924,7 +1924,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Select
@@ -2237,7 +2237,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="assignee">Task Owner</Label>
                     <TaskOwnerSelector 
@@ -2307,7 +2307,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                             data-testid="input-rep-name"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <Label htmlFor="repEmail">Rep Email</Label>
                             <Input
@@ -2383,7 +2383,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                               autoComplete="address-line2"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <Label htmlFor="companyCity">City</Label>
                               <Input
@@ -2395,7 +2395,7 @@ export function AddTaskModal({ isOpen, onClose, projectId, editingTask }: AddTas
                                 autoComplete="address-level2"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
                                 <Label htmlFor="companyState">State</Label>
                                 <Input

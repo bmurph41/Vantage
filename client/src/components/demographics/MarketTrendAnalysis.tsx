@@ -242,7 +242,7 @@ export default function MarketTrendAnalysis({ demographics, locationLabel, fipsS
       <CardContent>
         {/* CAGR summary cards */}
         {trendsData?.cagr && (trendsData.cagr.population !== 0 || trendsData.cagr.income !== 0 || trendsData.cagr.homeValue !== 0) && (
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             {[
               { label: "Population CAGR", value: trendsData.cagr.population, color: "text-blue-600" },
               { label: "Income CAGR", value: trendsData.cagr.income, color: "text-green-600" },
@@ -334,7 +334,7 @@ export default function MarketTrendAnalysis({ demographics, locationLabel, fipsS
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-population-growth">
             <p className="text-xs text-muted-foreground">
               {hasRealData ? "" : (trendType === "10-year" ? "10" : "5") + "-Yr "}Pop. Growth

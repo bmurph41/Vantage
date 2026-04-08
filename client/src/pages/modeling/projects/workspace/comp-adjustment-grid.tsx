@@ -260,6 +260,7 @@ export function CompAdjustmentGrid({ projectId, onTabChange }: CompAdjustmentGri
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -372,11 +373,12 @@ export function CompAdjustmentGrid({ projectId, onTabChange }: CompAdjustmentGri
               </TableRow>
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Weighted Indicated Value */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="col-span-1">
           <CardContent className="pt-6 text-center">
             <p className="text-sm text-muted-foreground mb-1">Weighted Indicated Value</p>
@@ -448,7 +450,7 @@ export function CompAdjustmentGrid({ projectId, onTabChange }: CompAdjustmentGri
             <CardTitle>Analysis Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <p className="text-sm text-muted-foreground">Server Indicated Value</p>
                 <p className="text-2xl font-bold">{formatCurrency(results.weightedIndicatedValue)}</p>

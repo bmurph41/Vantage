@@ -128,7 +128,7 @@ export default function BillingSettingsPage() {
                 </p>
               )}
               {usage && (
-                <div className="grid grid-cols-3 gap-4 pt-3 border-t">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-3 border-t">
                   <div><p className="text-sm text-muted-foreground">Deals</p><p className="font-bold">{usage.deals || 0}</p></div>
                   <div><p className="text-sm text-muted-foreground">Models</p><p className="font-bold">{usage.models || 0}</p></div>
                   <div><p className="text-sm text-muted-foreground">Users</p><p className="font-bold">{usage.users || 0}</p></div>

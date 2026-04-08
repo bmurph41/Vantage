@@ -122,7 +122,7 @@ export default function GoalsKpiWidget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -182,7 +182,7 @@ export default function GoalsKpiWidget() {
         </div>
         
         {/* Summary Stats */}
-        <div className="grid grid-cols-4 gap-2 mt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-4">
           <div className="text-center">
             <div className="text-lg font-bold text-blue-600">
               {goalsData.summary.achieved}
@@ -212,7 +212,7 @@ export default function GoalsKpiWidget() {
       
       <CardContent className="pt-0">
         <Tabs defaultValue="goals" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="goals">Active Goals</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
           </TabsList>

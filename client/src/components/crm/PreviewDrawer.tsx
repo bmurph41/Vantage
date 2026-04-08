@@ -263,7 +263,7 @@ function PreviewSkeleton() {
         <Skeleton className="h-8 w-20" />
         <Skeleton className="h-8 w-20" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {[1, 2, 3, 4].map(i => (
           <Skeleton key={i} className="h-16 rounded-lg" />
         ))}
@@ -360,7 +360,7 @@ function KeyMetrics({ data, entityType }: { data: any; entityType: EntityType })
   if (metrics.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {metrics.slice(0, 4).map((m, i) => (
         <div key={i} className="rounded-lg border bg-white dark:bg-gray-800 px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-1">

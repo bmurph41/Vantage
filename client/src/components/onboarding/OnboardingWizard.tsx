@@ -1071,7 +1071,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
           marina acquisitions and portfolio management.
         </p>
       </div>
-      <div className="grid grid-cols-3 gap-4 pt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
         <div className="text-center p-4 rounded-lg bg-muted/50">
           <Building2 className="h-6 w-6 mx-auto text-[#1E4FAB] mb-2" />
           <p className="text-sm font-medium">CRM & Pipeline</p>
@@ -1103,7 +1103,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         <RadioGroup
           value={state.dealStructure || ""}
           onValueChange={(value) => setState(s => ({ ...s, dealStructure: value as DealStructure }))}
-          className="grid grid-cols-2 gap-3"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-3"
         >
           {dealStructures.map((structure) => (
             <div
@@ -1134,7 +1134,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
       {/* Asset Class */}
       <div>
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">Asset Class</Label>
-        <div className="grid grid-cols-3 gap-2 max-h-[320px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {wizardAssetClasses.map((ac) => (
             <div
               key={ac.id}
@@ -1200,7 +1200,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                 <Input placeholder="Property name" value={marina.name} onChange={(e) => updatePortfolioMarinaName(index, e.target.value)} />
                 <AddressAutocompleteInput value={marina.address.line1} placeholder="Address" onChangeText={(text) => updatePortfolioMarinaAddress(index, 'line1', text)} onSelectAddress={(addr) => handleAddressAutocomplete(addr, index)} searchType="address" />
                 <Input placeholder="Address Line 2 (optional)" value={marina.address.line2} onChange={(e) => updatePortfolioMarinaAddress(index, 'line2', e.target.value)} />
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   <Input placeholder="City" value={marina.address.city} onChange={(e) => updatePortfolioMarinaAddress(index, 'city', e.target.value)} />
                   <Input placeholder="State" maxLength={2} value={marina.address.state} onChange={(e) => updatePortfolioMarinaAddress(index, 'state', e.target.value.toUpperCase())} />
                   <Input placeholder="Zip" maxLength={10} value={marina.address.zip} onChange={(e) => updatePortfolioMarinaAddress(index, 'zip', e.target.value)} />
@@ -1235,7 +1235,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
             <Input id="addressLine2" placeholder="Suite, Unit, etc." value={state.marinaAddress.line2} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, line2: e.target.value } }))} />
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
               <Input id="city" placeholder="City" value={state.marinaAddress.city} onChange={(e) => setState(s => ({ ...s, marinaAddress: { ...s.marinaAddress, city: e.target.value } }))} />
@@ -1260,7 +1260,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <Label className="text-sm font-semibold">Property Size</Label>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {wizCfg.propertySizeFields.map((field) => (
                     <div key={field.id} className="space-y-1">
                       <Label className="text-xs text-muted-foreground">{field.label}</Label>
@@ -1329,7 +1329,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                                 </button>
                               )}
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {wizCfg.propertySizeFields.map((field) => (
                                 <div key={field.id} className="space-y-1">
                                   <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
@@ -1410,7 +1410,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
         <h3 className="text-lg font-semibold">What would you like to explore?</h3>
         <p className="text-sm text-muted-foreground">Select the features you're most interested in</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {features.map((feature) => (
           <button key={feature.id} onClick={() => toggleFeature(feature.id)} className={cn("flex items-center gap-3 p-3 rounded-lg border text-left transition-colors", state.featuresToExplore.includes(feature.id) ? "border-[#1E4FAB] bg-[#1E4FAB]/5" : "hover:bg-muted/50")}>
             <div className={cn("p-2 rounded-lg", state.featuresToExplore.includes(feature.id) ? "bg-[#1E4FAB] text-white" : "bg-muted")}>
@@ -1489,7 +1489,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {state.profitCenters.map((pc) => (
             <button
               key={pc.id}
@@ -1575,7 +1575,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
             <Badge variant="secondary" className="mt-2">{enabledCount} selected</Badge>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[320px] overflow-y-auto pr-1">
           {state.amenities.map((amenity) => (
             <button
               key={amenity.id}
@@ -2058,7 +2058,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                 onChange={(e) => setState(s => ({ ...s, acreage: { ...s.acreage, totalAcres: e.target.value } }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Upland Acres</Label>
                 <Input
@@ -2188,7 +2188,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                             className="h-8 text-sm"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Monthly Rent ($)</Label>
                             <Input
@@ -2214,7 +2214,7 @@ export function OnboardingWizard({ open, onOpenChange, userName, mode = "onboard
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Term Remaining</Label>
                             <div className="flex gap-1">

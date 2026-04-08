@@ -1080,7 +1080,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="name"
@@ -1121,7 +1121,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="amount"
@@ -1231,7 +1231,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <FormField
                           control={form.control}
@@ -1275,7 +1275,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                               <UserPlus className="h-3 w-3" />
                               Quick Create Contact
                             </p>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <Input
                                 placeholder="First Name *"
                                 value={quickContactFirst}
@@ -1289,7 +1289,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                 className="h-8 text-xs"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <Input
                                 placeholder="Email"
                                 type="email"
@@ -1370,7 +1370,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                               onChange={(e) => setQuickCompanyName(e.target.value)}
                               className="h-8 text-xs"
                             />
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <Input
                                 placeholder="Phone"
                                 value={quickCompanyPhone}
@@ -1452,7 +1452,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     </div>
 
                     {/* Title Insurance & Lender */}
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
                       <FormField
                         control={form.control}
                         name="titleInsuranceCompany"
@@ -1496,7 +1496,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* Location */}
                     <div>
                       <h4 className="font-semibold text-sm mb-3">Location</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="ddCity"
@@ -1539,7 +1539,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">Timeline Configuration</h4>
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="anchorType"
@@ -1588,7 +1588,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="useBusinessDays"
@@ -1635,7 +1635,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* Key Dates */}
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">Key Dates</h4>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FormField
                           control={form.control}
                           name="psaSignedDate"
@@ -1707,7 +1707,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         </div>
                         {ddPeriodMode === "auto" && <span className="text-[10px] text-muted-foreground ml-auto">Dates auto-calculate from PSA + DD period</span>}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="ddPeriodDays"
@@ -1915,7 +1915,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="slipNumber"
@@ -1993,7 +1993,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="space-y-4 pt-4">
-                                  <div className="grid grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                       <Label className="text-xs">Lease Type</Label>
                                       <Select
@@ -2036,7 +2036,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                       <Label className="text-xs">Start Date</Label>
                                       <DateInput
@@ -2146,7 +2146,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                         <Anchor className="w-4 h-4" />
                         Physical Capacity
                       </h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="propertyDetails.slipsTotal"
@@ -2225,7 +2225,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* Property Details */}
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">Property Details</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="propertyDetails.acreage"
@@ -2422,7 +2422,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     {/* Financial Performance */}
                     <div className="pt-4 border-t">
                       <h4 className="font-semibold text-sm mb-3">Financial Performance</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="propertyDetails.grossRevenue"
@@ -2513,7 +2513,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                     <CardDescription>Configure commission rates and calculations</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="dealSource"
@@ -2565,7 +2565,7 @@ export default function DealFormModal({ isOpen, onClose, deal, defaultStage }: D
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="commissionRate"

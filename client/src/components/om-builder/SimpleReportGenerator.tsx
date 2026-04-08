@@ -131,7 +131,7 @@ function ReportPreview({ property, reportType, omData }: { property: Property; r
               <Building2 className="h-4 w-4 text-blue-600" />
               Property Overview
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex justify-between py-2 px-3 bg-gray-50 rounded">
                 <span className="text-sm text-gray-600">Property Type</span>
                 <span className="text-sm font-medium">{property.propertyType || "N/A"}</span>
@@ -193,7 +193,7 @@ function ReportPreview({ property, reportType, omData }: { property: Property; r
               <PieChart className="h-4 w-4 text-purple-600" />
               Capital Stack
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="border rounded-lg p-4">
                 <p className="text-xs text-gray-500 uppercase">Senior Debt</p>
                 <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(loanAmount)}</p>
@@ -298,7 +298,7 @@ function ReportPreview({ property, reportType, omData }: { property: Property; r
               <Waves className="h-4 w-4 text-teal-600" />
               Comparable Rates ({omData.compAnalytics.rateCompStats.count})
             </h3>
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
               <div className="bg-teal-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-teal-600 uppercase">Avg Rate</p>
                 <p className="text-sm font-bold text-teal-900">{formatCurrency(omData.compAnalytics.rateCompStats.avgRate)}</p>

@@ -242,7 +242,7 @@ export default function GLViewer() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Account Type *</Label>
                   <Select value={formAccountType} onValueChange={setFormAccountType}>
@@ -272,7 +272,7 @@ export default function GLViewer() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="periodStart">Period Start *</Label>
                   <Input
@@ -422,6 +422,7 @@ export default function GLViewer() {
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -476,6 +477,7 @@ export default function GLViewer() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (

@@ -208,7 +208,7 @@ export function DrillDownBarChart({
           </DialogHeader>
           {selectedItem && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.entries(selectedItem).map(([key, value]) => (
                   <div key={key} className="border rounded-lg p-3">
                     <div className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</div>

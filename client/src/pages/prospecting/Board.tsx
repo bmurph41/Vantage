@@ -1072,7 +1072,7 @@ function WeekCard({
         </div>
 
         {/* Summary Stats - Real-time data */}
-        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-200">
           <div className="text-center p-2 rounded-lg bg-green-50">
             <div className="text-lg font-bold text-green-600">{metrics.leadsGenerated}</div>
             <div className="text-xs text-gray-600 font-medium">Leads Generated</div>

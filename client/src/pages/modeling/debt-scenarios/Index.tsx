@@ -496,7 +496,7 @@ export default function DebtScenariosIndex() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="rates" data-testid="tab-rates">Rate Analysis</TabsTrigger>
           <TabsTrigger value="underwriting" data-testid="tab-underwriting">Underwriting Metrics</TabsTrigger>
           <TabsTrigger value="advanced" data-testid="tab-advanced" className="gap-1">
@@ -709,7 +709,7 @@ export default function DebtScenariosIndex() {
                     <p className="text-xs text-muted-foreground italic">Or calculate from NOI ÷ Cap Rate</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="noi">NOI (Annual)</Label>
                       <div className="relative">

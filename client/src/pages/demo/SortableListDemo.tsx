@@ -202,7 +202,7 @@ export function SortableListDemo() {
       </div>
 
       <Tabs defaultValue="simple-list" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
           <TabsTrigger value="simple-list">Simple List</TabsTrigger>
           <TabsTrigger value="kanban">Kanban Board</TabsTrigger>
         </TabsList>

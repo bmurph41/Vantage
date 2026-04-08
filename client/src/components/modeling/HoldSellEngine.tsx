@@ -544,7 +544,7 @@ export function HoldSellEngine({ projectId }: HoldSellEngineProps) {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
         </CardContent>
       </Card>
     </div>

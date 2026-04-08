@@ -319,7 +319,7 @@ export default function RentRollPortfolio() {
                     })}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             </CardContent>
           </Card>
 

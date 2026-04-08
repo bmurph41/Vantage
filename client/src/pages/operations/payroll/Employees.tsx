@@ -128,7 +128,7 @@ export default function Employees() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>First Name <span className="text-destructive">*</span></Label>
                   <Input
@@ -154,7 +154,7 @@ export default function Employees() {
                   onChange={(e) => setEmpForm((prev) => ({ ...prev, displayName: e.target.value }))}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Worker Type</Label>
                   <Select
@@ -296,6 +296,7 @@ export default function Employees() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -351,6 +352,7 @@ export default function Employees() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

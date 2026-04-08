@@ -62,7 +62,7 @@ export function DealDrawer({ deal, isOpen, onClose }: DealDrawerProps) {
         </SheetHeader>
 
         <Tabs defaultValue="notes" className="mt-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
             <TabsTrigger value="notes" data-testid="tab-notes">
               <FileText className="h-4 w-4 mr-2" />
               Notes

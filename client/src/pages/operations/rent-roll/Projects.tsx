@@ -263,7 +263,7 @@ function ProjectCard({ project, onDelete, onEdit }: { project: RRAProject; onDel
           </p>
         )}
         
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
@@ -499,7 +499,7 @@ function LocationFormDrawer({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
                 <TabsTrigger value="basic">Basic</TabsTrigger>
                 <TabsTrigger value="storage">Storage</TabsTrigger>
                 <TabsTrigger value="seasons">Seasons</TabsTrigger>
@@ -554,7 +554,7 @@ function LocationFormDrawer({
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="projectType"
@@ -634,7 +634,7 @@ function LocationFormDrawer({
                         <Sun className="h-5 w-5 text-blue-600" />
                         <h3 className="font-medium text-blue-900 dark:text-blue-100">Summer Season</h3>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="seasonStartDate"
@@ -670,7 +670,7 @@ function LocationFormDrawer({
                         <h3 className="font-medium text-slate-900 dark:text-slate-100">Winter Season</h3>
                         <span className="text-xs text-muted-foreground">(Auto-calculated from Summer)</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="winterStartDate"
@@ -785,7 +785,7 @@ function LocationFormDrawer({
                     <DollarSign className="h-4 w-4" />
                     Base Rent Labels
                   </h4>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="baseRent1Label"
@@ -835,7 +835,7 @@ function LocationFormDrawer({
                     <Settings className="h-4 w-4" />
                     Charge Labels
                   </h4>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="charge1Label"

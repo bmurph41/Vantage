@@ -190,7 +190,7 @@ export default function DocumentVersions({ documentId }: DocumentVersionsProps) 
           ) : compareData ? (
             <div className="space-y-4 py-2">
               {/* Version labels */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <p className="text-xs text-blue-600 font-medium">Version {compareData.version1.version}</p>
                   <p className="text-sm font-medium">{compareData.version1.filename}</p>

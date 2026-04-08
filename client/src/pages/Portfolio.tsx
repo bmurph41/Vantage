@@ -483,7 +483,7 @@ export default function Portfolio() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
               )}
             </CardContent>
           </Card>
@@ -650,7 +650,7 @@ export default function Portfolio() {
                       })}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
               )}
             </CardContent>
           </Card>
@@ -737,7 +737,7 @@ export default function Portfolio() {
                       })}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
               )}
             </CardContent>
           </Card>

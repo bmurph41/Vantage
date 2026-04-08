@@ -154,7 +154,7 @@ export function CustomFieldsEditor({
 
       {isAddingNew && (
         <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="new-field-key">Field Name</Label>
               <Input

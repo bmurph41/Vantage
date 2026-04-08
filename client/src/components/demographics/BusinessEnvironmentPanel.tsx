@@ -80,7 +80,7 @@ export default function BusinessEnvironmentPanel({ latitude, longitude, location
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Skeleton className="h-16 rounded-lg" />
             <Skeleton className="h-16 rounded-lg" />
             <Skeleton className="h-16 rounded-lg" />
@@ -127,7 +127,7 @@ export default function BusinessEnvironmentPanel({ latitude, longitude, location
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-total-businesses">
             <p className="text-xs text-muted-foreground">Total Businesses</p>
             <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">

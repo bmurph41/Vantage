@@ -109,6 +109,7 @@ export default function OfflineBreakdownTable({
               </div>
             </div>
 
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -142,6 +143,7 @@ export default function OfflineBreakdownTable({
                 })}
               </TableBody>
             </Table>
+            </div>
           </>
         )}
       </CardContent>

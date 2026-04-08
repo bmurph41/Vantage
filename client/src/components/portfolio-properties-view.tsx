@@ -204,7 +204,7 @@ export function PortfolioPropertiesView({ portfolioId, portfolioName }: Portfoli
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold">{children.length}</div>
               <div className="text-sm text-muted-foreground">Properties</div>

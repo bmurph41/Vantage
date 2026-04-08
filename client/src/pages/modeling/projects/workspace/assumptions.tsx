@@ -2412,7 +2412,7 @@ export default function WorkspaceAssumptions({ projectId, onTabChange }: Workspa
                 <div className="text-center py-4 text-muted-foreground">Loading comparison...</div>
               ) : comparisonQuery.data ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div className="p-3 bg-muted/50 rounded">
                       <Badge variant="outline" className="mb-2">v{comparisonQuery.data.baseVersion?.version}</Badge>
                       <p className="font-medium">{comparisonQuery.data.baseVersion?.name}</p>

@@ -255,7 +255,7 @@ export function LeadConversionWizard({
                       <User className="h-4 w-4" />
                       Lead Information
                     </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Name:</span>{" "}
                         <span className="font-medium">{lead.firstName} {lead.lastName}</span>
@@ -354,7 +354,7 @@ export function LeadConversionWizard({
                   Step 2: Configure Deal
                 </h3>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="dealName"

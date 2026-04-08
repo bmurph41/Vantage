@@ -695,7 +695,7 @@ export function SlaTrackingPanel({ entityType, entityId }: SlaTrackingPanelProps
                   {entityTypeLabels[selectedTracking.entityType] || selectedTracking.entityType}
                 </Badge>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Due Time</p>
                   <p className="font-medium">{format(new Date(selectedTracking.slaDueTime), 'PPp')}</p>

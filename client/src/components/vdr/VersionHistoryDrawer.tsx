@@ -201,7 +201,7 @@ export function VersionHistoryDrawer({
             {currentVersion && (
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Current Version</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div>
                     <span className="text-gray-600">Version:</span>
                     <span className="ml-2 font-medium">{currentVersion.version}</span>
@@ -258,6 +258,7 @@ export function VersionHistoryDrawer({
                     No version history available
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -322,6 +323,7 @@ export function VersionHistoryDrawer({
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </ScrollArea>
             </div>

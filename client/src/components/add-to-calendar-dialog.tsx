@@ -383,7 +383,7 @@ export function AddToCalendarDialog({ open, onOpenChange, project, settings }: A
         </DialogHeader>
 
         <Tabs defaultValue="download" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="download" data-testid="tab-download">
               <Download className="h-4 w-4 mr-2" />
               Download ICS File

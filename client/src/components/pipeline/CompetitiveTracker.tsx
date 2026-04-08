@@ -166,7 +166,7 @@ export default function CompetitiveTracker({ dealId, ourBid }: CompetitiveTracke
         <CardContent>
           {/* Competitive position summary */}
           {summary.count > 0 && (
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <div className="bg-gray-50 rounded-lg p-3 text-center">
                 <Users className="h-4 w-4 mx-auto mb-1 text-gray-500" />
                 <p className="text-lg font-bold">{summary.count}</p>
@@ -216,6 +216,7 @@ export default function CompetitiveTracker({ dealId, ourBid }: CompetitiveTracke
               <p className="text-xs text-gray-400 mt-1">Add known buyers or bidders for this deal</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -267,6 +268,7 @@ export default function CompetitiveTracker({ dealId, ourBid }: CompetitiveTracke
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -278,7 +280,7 @@ export default function CompetitiveTracker({ dealId, ourBid }: CompetitiveTracke
             <DialogTitle>{editing ? "Edit Competitor" : "Add Competitor"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm">Competitor Name *</Label>
                 <Input
@@ -319,7 +321,7 @@ export default function CompetitiveTracker({ dealId, ourBid }: CompetitiveTracke
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm">Intel Source</Label>
                 <Input

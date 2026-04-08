@@ -68,7 +68,7 @@ export default function CurrencySettingsPage() {
             <CardTitle className="flex items-center gap-2"><ArrowRightLeft className="h-5 w-5" />Currency Converter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <div>
                 <Label>Amount</Label>
                 <Input type="number" value={convertForm.amount} onChange={(e) => setConvertForm({ ...convertForm, amount: e.target.value })} />

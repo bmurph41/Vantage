@@ -213,7 +213,7 @@ export function UnifiedLeaseDetail({
           )}
 
           {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -263,7 +263,7 @@ export function UnifiedLeaseDetail({
 
           {/* Detail Tabs */}
           <Tabs defaultValue="lease" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <TabsTrigger value="lease">Lease Terms</TabsTrigger>
               <TabsTrigger value="rent">Rent Terms</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
@@ -321,6 +321,7 @@ export function UnifiedLeaseDetail({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -361,6 +362,7 @@ export function UnifiedLeaseDetail({
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               ) : (

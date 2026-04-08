@@ -645,7 +645,7 @@ export function AIAssistant() {
 
                 {/* Entity quick actions */}
                 {entityContext.entityId && (
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {[
                       { mode: 'critique' as AdvisoryMode, label: 'Critique Deal', icon: AlertTriangle },
                       { mode: 'risk_analysis' as AdvisoryMode, label: 'Risk Analysis', icon: Shield },

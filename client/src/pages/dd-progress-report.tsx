@@ -1201,7 +1201,7 @@ function DDProgressReport({
                       style={{ width: `${project.status === 'accepted' ? '100' : metrics.completionRate}%` }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-emerald-600">{metrics.completedTasks}</div>
                       <div className="text-xs text-gray-600 uppercase tracking-wide">Completed</div>
@@ -1234,7 +1234,7 @@ function DDProgressReport({
                       style={{ width: `${metrics.timelineProgress}%` }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4 pt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-600">{metrics.daysSinceStart}</div>
                       <div className="text-xs text-gray-600 uppercase tracking-wide">Days Elapsed</div>

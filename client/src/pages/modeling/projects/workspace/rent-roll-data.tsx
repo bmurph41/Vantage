@@ -394,7 +394,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
         </CardHeader>
         <CardContent>
           <Tabs value={mode} onValueChange={handleModeChange} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 max-w-md">
               <TabsTrigger value="standalone" className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
                 Standalone Entry
@@ -486,7 +486,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                       </DialogHeader>
                       <Form {...form}>
                         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                               control={form.control}
                               name="unitNumber"
@@ -860,6 +860,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                     </div>
                   ) : (
                     <div className="overflow-auto max-h-96">
+                      <div className="overflow-x-auto w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -919,6 +920,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -1152,6 +1154,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                             <p className="text-center text-muted-foreground py-8">No active leases found in portfolio</p>
                           ) : (
                             <div className="overflow-auto max-h-96">
+                              <div className="overflow-x-auto w-full">
                               <Table>
                                 <TableHeader>
                                   <TableRow>
@@ -1180,6 +1183,7 @@ export default function RentRollDataTab({ projectId, projectName }: RentRollData
                                   ))}
                                 </TableBody>
                               </Table>
+                              </div>
                               {linkedLeases.length > 10 && (
                                 <p className="text-sm text-muted-foreground text-center mt-4">
                                   Showing 10 of {linkedLeases.length} leases

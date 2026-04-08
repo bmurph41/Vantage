@@ -209,7 +209,7 @@ export function CompanyDetailsModal({
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label htmlFor="company-city" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                         City
@@ -222,7 +222,7 @@ export function CompanyDetailsModal({
                         className="text-sm"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label htmlFor="company-state" className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                           State

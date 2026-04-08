@@ -450,7 +450,7 @@ export function ScenarioVersionDiff({
                     })}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             </CardContent>
           </Card>
 

@@ -620,6 +620,7 @@ function PortfolioSimulationTab({ projectId, projectName }: { projectId: string;
                 <CardTitle className="text-sm font-medium">Portfolio Summary</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableBody>
                     <TableRow>
@@ -648,6 +649,7 @@ function PortfolioSimulationTab({ projectId, projectName }: { projectId: string;
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -875,7 +877,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-64" />
@@ -1235,6 +1237,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
               <CardTitle className="text-sm font-medium">Attribution Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1264,6 +1267,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1307,6 +1311,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
 
           <Card>
             <CardContent className="p-0">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1339,6 +1344,7 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

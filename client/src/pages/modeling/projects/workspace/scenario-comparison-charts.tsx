@@ -415,6 +415,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
               <CardDescription>All key performance indicators across scenarios</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -473,6 +474,7 @@ export default function ScenarioComparisonCharts({ projectId, onTabChange }: Sce
                   })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 

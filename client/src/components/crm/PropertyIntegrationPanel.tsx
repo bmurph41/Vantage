@@ -52,7 +52,7 @@ function SalesCompCard({ comp, linkMetadata, onUnlink }: {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 <span>{comp.city}, {comp.state || "N/A"}</span>
@@ -113,7 +113,7 @@ function RateCompCard({ comp, linkMetadata, onUnlink }: {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 <span>{comp.city}, {comp.state || "N/A"}</span>
@@ -174,7 +174,7 @@ function StorageEntryCard({ entry }: { entry: StorageEntry }) {
               <Warehouse className="w-4 h-4 text-purple-600" />
               <span className="font-semibold text-sm">{entry.storageTypeName || "Unknown Type"}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <Package className="w-3 h-3" />
                 <span>Capacity: {capacity}</span>

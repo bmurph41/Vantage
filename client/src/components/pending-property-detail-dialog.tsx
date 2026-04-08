@@ -497,7 +497,7 @@ export function PendingPropertyDetailDialog({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
               <TabsTrigger value="details" data-testid="tab-details">
                 <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Details
@@ -570,7 +570,7 @@ export function PendingPropertyDetailDialog({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">City</Label>
                           {isEditing ? (
@@ -620,7 +620,7 @@ export function PendingPropertyDetailDialog({
                   <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                     <SectionHeader icon={Anchor} title="Physical Characteristics" accent="emerald" />
                     <div className="p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Wet Slips</Label>
                           {isEditing ? (
@@ -653,7 +653,7 @@ export function PendingPropertyDetailDialog({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Acres</Label>
                           {isEditing ? (
@@ -687,7 +687,7 @@ export function PendingPropertyDetailDialog({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Occupancy (%)</Label>
                           {isEditing ? (
@@ -731,7 +731,7 @@ export function PendingPropertyDetailDialog({
                     onToggle={() => toggleSection('storageTypes')}
                   >
                     {isEditing ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                         {STORAGE_TYPES.map(st => (
                           <label key={st.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
                             <Checkbox
@@ -762,7 +762,7 @@ export function PendingPropertyDetailDialog({
                     onToggle={() => toggleSection('amenities')}
                   >
                     {isEditing ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                         {AMENITIES.map(am => (
                           <label key={am.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
                             <Checkbox
@@ -813,7 +813,7 @@ export function PendingPropertyDetailDialog({
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                       <SectionHeader icon={DollarSign} title="Financial Information" accent="amber" />
                       <div className="p-4 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Sale Price</Label>
                             {isEditing ? (
@@ -846,7 +846,7 @@ export function PendingPropertyDetailDialog({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">NOI</Label>
                             {isEditing ? (
@@ -880,11 +880,11 @@ export function PendingPropertyDetailDialog({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Sale Date</Label>
                             {isEditing ? (
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <Input
                                   type="number"
                                   min="1"
@@ -935,7 +935,7 @@ export function PendingPropertyDetailDialog({
                   <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                     <SectionHeader icon={Handshake} title="Transaction Details" accent="purple" />
                     <div className="p-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Sale Condition</Label>
                           {isEditing ? (
@@ -966,7 +966,7 @@ export function PendingPropertyDetailDialog({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">Seller</Label>
                           {isEditing ? (
@@ -1007,7 +1007,7 @@ export function PendingPropertyDetailDialog({
                     onToggle={() => toggleSection('profitCenters')}
                   >
                     {isEditing ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                         {PROFIT_CENTERS.map(pc => (
                           <label key={pc.key} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded px-1.5 -mx-1.5">
                             <Checkbox
@@ -1208,7 +1208,7 @@ export function PendingPropertyDetailDialog({
                             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                               Match Analysis
                             </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                               <div className="space-y-0.5">
                                 <div className="text-muted-foreground">Name</div>
                                 <div className={`font-semibold ${match.matchDetails.nameMatch >= 80 ? 'text-green-600' : match.matchDetails.nameMatch >= 60 ? 'text-yellow-600' : 'text-gray-600'}`}>

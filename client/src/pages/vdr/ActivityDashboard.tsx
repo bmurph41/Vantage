@@ -416,6 +416,7 @@ export default function VDRActivityDashboard() {
                   <p className="text-sm text-muted-foreground mt-1">Share documents with counterparties to begin tracking access.</p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -471,6 +472,7 @@ export default function VDRActivityDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -494,6 +496,7 @@ export default function VDRActivityDashboard() {
                   <p className="text-sm text-muted-foreground mt-1">Invite counterparties and track their engagement here.</p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -529,6 +532,7 @@ export default function VDRActivityDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -552,6 +556,7 @@ export default function VDRActivityDashboard() {
                   <p className="text-sm text-muted-foreground mt-1">Share documents with investors to start tracking access.</p>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -583,6 +588,7 @@ export default function VDRActivityDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

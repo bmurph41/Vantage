@@ -252,6 +252,7 @@ export default function CAMReconciliation({ marinaId }: CAMReconciliationProps) 
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -290,6 +291,7 @@ export default function CAMReconciliation({ marinaId }: CAMReconciliationProps) 
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </>
           )}
         </CardContent>
@@ -335,6 +337,7 @@ export default function CAMReconciliation({ marinaId }: CAMReconciliationProps) 
               </p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -391,6 +394,7 @@ export default function CAMReconciliation({ marinaId }: CAMReconciliationProps) 
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -425,7 +429,7 @@ export default function CAMReconciliation({ marinaId }: CAMReconciliationProps) 
                 placeholder="e.g., Building insurance premium"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Budget Amount *</Label>
                 <Input

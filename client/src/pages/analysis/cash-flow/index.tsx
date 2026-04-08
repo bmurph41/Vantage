@@ -152,6 +152,7 @@ export default function CashFlowForecastingPage() {
               <p>No forecast generated yet. Click "Generate Forecast" to create a 24-month projection.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -214,6 +215,7 @@ export default function CashFlowForecastingPage() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

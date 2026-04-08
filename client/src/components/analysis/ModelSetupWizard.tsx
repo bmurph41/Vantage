@@ -237,7 +237,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
               <Label htmlFor="address">Address</Label>
               <Input id="address" placeholder="123 Harbor Dr" value={data.address} onChange={(e) => updateField('address', e.target.value)} className="mt-1" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input id="city" placeholder="Miami" value={data.city} onChange={(e) => updateField('city', e.target.value)} className="mt-1" />
@@ -258,7 +258,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="units">Units / SF</Label>
                 <Input id="units" type="number" placeholder="100" value={data.units} onChange={(e) => updateField('units', e.target.value)} className="mt-1" />
@@ -444,7 +444,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
                     </p>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="interestRate">Interest Rate (%)</Label>
                     <Input id="interestRate" type="number" step="0.125" placeholder="6.5" value={data.interestRate} onChange={(e) => updateField('interestRate', e.target.value)} className="mt-1" />
@@ -502,7 +502,7 @@ export default function ModelSetupWizard({ open, onOpenChange, onProjectCreated 
           <div className="space-y-4">
             <Card className="bg-muted/50">
               <CardContent className="p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                   <div>
                     <span className="text-muted-foreground">Property:</span>
                     <span className="ml-2 font-medium">{data.name}</span>

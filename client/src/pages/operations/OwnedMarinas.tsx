@@ -315,7 +315,7 @@ export default function OwnedMarinas() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
               )}
             </CardContent>
           </Card>

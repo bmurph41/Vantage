@@ -223,7 +223,7 @@ export default function WorkflowBuilder({ workflow, onSave, isOpen, onClose }: W
 
         <div className="space-y-6">
           {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Workflow Name</Label>
               <Input
@@ -477,7 +477,7 @@ function ActionEditor({ action, index, onUpdate, onRemove }: ActionEditorProps) 
 
       {/* Action-specific parameters */}
       {action.type === 'create_task' && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label className="text-xs">Task Title</Label>
             <Input

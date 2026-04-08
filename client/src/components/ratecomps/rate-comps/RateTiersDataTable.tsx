@@ -263,7 +263,7 @@ export default function RateTiersDataTable({
         return (
           <Card key={row.id || `new-${index}`} className="border-primary/50 bg-muted/30" data-testid={`tier-edit-${index}`}>
             <CardContent className="pt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">Storage Type</Label>
                   <Select value={row.storageType} onValueChange={(v) => handleRowChange(index, 'storageType', v)}>
@@ -294,7 +294,7 @@ export default function RateTiersDataTable({
               </div>
 
               {row.sizeBasis !== 'any' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-muted-foreground">
                       {row.sizeBasis === 'loa_range' ? 'Min LOA (ft)' : 'LOA (ft)'}
@@ -322,7 +322,7 @@ export default function RateTiersDataTable({
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">Rate</Label>
                   <CurrencyInput
@@ -360,7 +360,7 @@ export default function RateTiersDataTable({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs font-medium text-muted-foreground">Year</Label>
                   <Input

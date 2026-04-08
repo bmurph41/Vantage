@@ -331,7 +331,7 @@ export function TenantDetailSheet({
 
         <div className="mt-6 space-y-6">
           {/* ─── KPI Cards ──────────────────────────────────────────── */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card>
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -399,7 +399,7 @@ export function TenantDetailSheet({
 
           {/* All-in summary strip (when we have data) */}
           {allInAnnual > 0 && (
-            <div className="rounded-lg border bg-muted/40 p-3 grid grid-cols-4 gap-3 text-xs">
+            <div className="rounded-lg border bg-muted/40 p-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <div>
                 <span className="text-muted-foreground">Monthly</span>
                 <div className="font-semibold font-mono">{formatCurrency(annualRent / 12)}</div>
@@ -598,6 +598,7 @@ export function TenantDetailSheet({
                 </CardHeader>
                 <CardContent>
                   {rentSchedule.length > 0 ? (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -624,6 +625,7 @@ export function TenantDetailSheet({
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-8 w-8 mx-auto mb-2" />
@@ -637,6 +639,7 @@ export function TenantDetailSheet({
               {/* Amendments */}
               {amendments.length > 0 && (
                 <SectionCard title="Amendment History" icon={<FileText className="h-4 w-4" />}>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -657,12 +660,14 @@ export function TenantDetailSheet({
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </SectionCard>
               )}
 
               {/* Scenarios (shown if any exist, regardless of context) */}
               {scenarios.length > 0 && (
                 <SectionCard title="Underwriting Scenarios" icon={<BarChart3 className="h-4 w-4" />}>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -693,6 +698,7 @@ export function TenantDetailSheet({
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </SectionCard>
               )}
             </TabsContent>
@@ -715,7 +721,7 @@ export function TenantDetailSheet({
                         </div>
                         <span className="text-xs text-muted-foreground">Option {idx + 1}</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs mt-2">
                         {opt.noticeMonths && (
                           <div><span className="text-muted-foreground">Notice:</span> {opt.noticeMonths} mo</div>
                         )}

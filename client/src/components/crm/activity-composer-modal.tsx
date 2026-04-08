@@ -352,7 +352,7 @@ export function ActivityComposerModal({
           {/* Call Fields */}
           {activityType === "call" && (
             <div className="space-y-3 p-3 rounded-lg bg-green-50/50 dark:bg-green-950/10 border border-green-200/50">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <Clock className="h-3 w-3" /> Duration (min)
@@ -430,7 +430,7 @@ export function ActivityComposerModal({
           {/* Meeting Fields */}
           {activityType === "meeting" && (
             <div className="space-y-3 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/50">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <Calendar className="h-3 w-3" /> Date & Time
@@ -480,7 +480,7 @@ export function ActivityComposerModal({
           {/* Task Fields */}
           {activityType === "task" && (
             <div className="space-y-3 p-3 rounded-lg bg-cyan-50/50 dark:bg-cyan-950/10 border border-cyan-200/50">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs flex items-center gap-1">
                     <Calendar className="h-3 w-3" /> Due Date

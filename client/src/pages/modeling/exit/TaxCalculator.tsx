@@ -124,7 +124,7 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
             <CardDescription>Enter the sale details and tax rates</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="salePrice">Sale Price ($)</Label>
                 <Input
@@ -169,7 +169,7 @@ export default function ExitTaxCalculator({ projectId }: TaxCalculatorProps) {
             
             <Separator />
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="federalCapGainsRate">Federal Cap Gains Rate (%)</Label>
                 <Input

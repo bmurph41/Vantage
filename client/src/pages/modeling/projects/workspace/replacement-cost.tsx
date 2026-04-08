@@ -320,6 +320,7 @@ export function ReplacementCost({ projectId, onTabChange }: { projectId: string;
               <CardTitle>Component Detail Table</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -347,6 +348,7 @@ export function ReplacementCost({ projectId, onTabChange }: { projectId: string;
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

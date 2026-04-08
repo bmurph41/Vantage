@@ -89,7 +89,7 @@ export default function BrandSettings() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
         </div>
@@ -118,7 +118,7 @@ export default function BrandSettings() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Settings Form */}
         <div className="space-y-6">
           <Card>
@@ -188,7 +188,7 @@ export default function BrandSettings() {
               <CardTitle className="text-base">Colors & Typography</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Primary Color</Label>
                   <div className="flex items-center gap-2">
@@ -308,7 +308,7 @@ export default function BrandSettings() {
                   className="h-1 w-24 rounded"
                   style={{ backgroundColor: settings.secondaryColor }}
                 />
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div
                     className="p-4 rounded-lg border"
                     style={{ borderColor: settings.primaryColor + '30' }}

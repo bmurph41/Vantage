@@ -172,6 +172,7 @@ export default function AdminAuditTrailPage() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 border rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -231,6 +232,7 @@ export default function AdminAuditTrailPage() {
             )}
           </TableBody>
         </Table>
+        </div>
 
         {pagination && pagination.totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-4 py-3">

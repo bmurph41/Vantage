@@ -26,7 +26,7 @@ export function VelocityTabContent() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[1,2,3,4].map(i => <Skeleton key={i} className="h-32" />)}
       </div>
     );
@@ -53,7 +53,7 @@ export function VelocityTabContent() {
   return (
     <div className="space-y-6">
       {/* KPI row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">

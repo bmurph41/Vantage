@@ -154,7 +154,7 @@ export default function Transactions() {
           <AssetSelector 
             value={selectedAssetId} 
             onChange={setSelectedAssetId}
-            className="w-[280px]"
+            className="w-full max-w-[280px]"
           />
         </div>
       </div>

@@ -187,7 +187,7 @@ export default function ExitScenarios({ projectId }: ExitScenariosProps) {
                     data-testid="input-scenario-description"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="exitYear">Exit Year</Label>
                     <Input

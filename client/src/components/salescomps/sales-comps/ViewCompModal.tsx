@@ -58,7 +58,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-4 gap-0 border-b bg-gradient-to-b from-muted/20 to-transparent">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 border-b bg-gradient-to-b from-muted/20 to-transparent">
           <div className="p-3 text-center border-r border-border/50">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Sale Price</p>
             <p className="text-base font-bold text-primary" data-testid="text-sale-price-hero">
@@ -93,7 +93,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
         </div>
 
         <div className="p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-card border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
                 <Building className="h-3.5 w-3.5 text-primary" />
@@ -125,7 +125,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-card border rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-2 pb-1.5 border-b">
                 <Droplets className="h-3.5 w-3.5 text-primary" />
@@ -169,7 +169,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit }: ViewCompM
                 <Users className="h-3.5 w-3.5 text-primary" />
                 <h4 className="text-xs font-semibold uppercase tracking-wide">Transaction Parties</h4>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Seller</p>
                   <p className="text-sm font-medium" data-testid="text-seller">{formatValue(comp.seller)}</p>

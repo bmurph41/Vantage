@@ -283,7 +283,7 @@ export function BrokersTab() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Deals Submitted</span>
                       <p className="font-medium">{broker.totalDealsSubmitted}</p>
@@ -369,7 +369,7 @@ export function BrokersTab() {
 
                 <Separator />
 
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-2xl font-bold">{selectedBroker.totalDealsSubmitted}</p>
                     <p className="text-xs text-muted-foreground">Deals Submitted</p>
@@ -615,7 +615,7 @@ function BrokerForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="contactName">Contact Name *</Label>
           <Input
@@ -639,7 +639,7 @@ function BrokerForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -663,7 +663,7 @@ function BrokerForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="tier">Relationship Tier</Label>
           <Select
@@ -874,7 +874,7 @@ function SubmitDealForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="city">City</Label>
           <Input
@@ -903,7 +903,7 @@ function SubmitDealForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="askingPrice">Asking Price ($)</Label>
           <Input

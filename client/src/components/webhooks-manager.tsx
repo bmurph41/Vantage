@@ -242,6 +242,7 @@ export default function WebhooksManager() {
               No webhooks configured. Create your first webhook to get started.
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -358,6 +359,7 @@ export default function WebhooksManager() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -616,7 +618,7 @@ function WebhookLogsDialog({ webhookId, onClose }: { webhookId: string; onClose:
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-2">
                       <div>
                         <span className="text-gray-500">Response Time:</span>{" "}
                         <span className="font-medium">{log.responseTime}ms</span>

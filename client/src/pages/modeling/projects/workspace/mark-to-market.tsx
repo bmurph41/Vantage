@@ -304,6 +304,7 @@ function UnitDetailTab({ units }: { units: MtmUnit[] }) {
       </CardHeader>
       <CardContent>
         <div className="rounded-md border overflow-auto max-h-[600px]">
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -370,6 +371,7 @@ function UnitDetailTab({ units }: { units: MtmUnit[] }) {
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
         <div className="mt-3 text-xs text-muted-foreground">
           Showing {sorted.length} units. Variance = Market Rent - Current Rent. Positive = below market (opportunity).
@@ -419,6 +421,7 @@ function LeaseExpiryTab({ buckets }: { buckets: LeaseExpiryBucket[] }) {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -450,6 +453,7 @@ function LeaseExpiryTab({ buckets }: { buckets: LeaseExpiryBucket[] }) {
                 )}
               </TableBody>
             </Table>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -472,6 +476,7 @@ function ByTypeTab({ typeBreakdown }: { typeBreakdown: MtmTypeBreakdown[] }) {
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -511,6 +516,7 @@ function ByTypeTab({ typeBreakdown }: { typeBreakdown: MtmTypeBreakdown[] }) {
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         {sorted.length > 0 && (
@@ -666,7 +672,7 @@ function MarkToMarket({ projectId, onTabChange }: MarkToMarketProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="unit-detail">Unit Detail</TabsTrigger>
           <TabsTrigger value="lease-expiry">Lease Expiry</TabsTrigger>

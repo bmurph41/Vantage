@@ -353,6 +353,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
             <CardTitle className="text-lg">Capital Account Statement</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -379,6 +380,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -404,6 +406,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -433,6 +436,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -444,6 +448,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
             <CardTitle className="text-lg">Individual Investment Summary</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -487,6 +492,7 @@ function LPReporting({ projectId, onTabChange }: LPReportingProps) {
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

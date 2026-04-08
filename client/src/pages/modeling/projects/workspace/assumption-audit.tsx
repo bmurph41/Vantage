@@ -464,7 +464,7 @@ function AssumptionAudit({ projectId, onTabChange }: AssumptionAuditProps) {
                   })}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
         </CardContent>
       </Card>

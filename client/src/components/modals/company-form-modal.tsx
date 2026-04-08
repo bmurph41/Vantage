@@ -985,7 +985,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="industry"
@@ -1097,7 +1097,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         data-testid="input-unit"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="city" className="text-sm">City *</Label>
                         <Input
@@ -1163,7 +1163,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-5 pb-5 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-sm">CRE Firm Type</Label>
                         <Select value={crmFirmType} onValueChange={setCrmFirmType}>
@@ -1517,7 +1517,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                   <div className="border rounded-lg p-4 bg-muted/50">
                     <h4 className="font-medium mb-3">Link Existing Contact</h4>
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-sm font-medium">Select Contact</label>
                           <SearchableSelect
@@ -1574,7 +1574,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                     <h4 className="font-medium mb-3">Create New Contact</h4>
                     <Form {...contactForm}>
                       <form onSubmit={contactForm.handleSubmit(handleCreateNewContact)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={contactForm.control}
                             name="firstName"
@@ -1615,7 +1615,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                             </FormItem>
                           )}
                         />
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={contactForm.control}
                             name="phone"
@@ -1837,7 +1837,7 @@ export default function CompanyFormModal({ isOpen, onClose, company, pendingComp
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={propertyForm.control}
                         name="city"

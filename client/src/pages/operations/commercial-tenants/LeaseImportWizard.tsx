@@ -367,7 +367,7 @@ export function LeaseImportWizard({
               </div>
             )}
 
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -410,7 +410,7 @@ export function LeaseImportWizard({
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
 
             {parseResult.leases.length === 0 && (
               <div className="text-center py-8">

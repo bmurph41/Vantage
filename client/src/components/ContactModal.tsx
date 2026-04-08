@@ -220,7 +220,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Information</h3>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First name *</Label>
                   <Input
@@ -248,7 +248,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input 
@@ -284,7 +284,7 @@ export default function ContactModal({ open, onClose, onSave, initialData }: {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="timezone">Timezone *</Label>
                   <Select value={timezone} onValueChange={setTimezone}>

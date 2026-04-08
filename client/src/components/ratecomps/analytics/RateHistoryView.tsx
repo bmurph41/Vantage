@@ -299,6 +299,7 @@ export default function RateHistoryView({ rateCompId, marinaName }: RateHistoryV
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -329,6 +330,7 @@ export default function RateHistoryView({ rateCompId, marinaName }: RateHistoryV
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

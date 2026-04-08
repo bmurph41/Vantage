@@ -358,7 +358,7 @@ export default function EntityConversionModal({
               </TabsList>
 
               <TabsContent value="basic" className="space-y-6 mt-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {/* Left Column */}
                   <div className="space-y-4">
                     <FormField
@@ -425,7 +425,7 @@ export default function EntityConversionModal({
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="amount"
@@ -606,7 +606,7 @@ export default function EntityConversionModal({
                     Person
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="contactPhone"
@@ -638,7 +638,7 @@ export default function EntityConversionModal({
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="contactEmail"
@@ -678,7 +678,7 @@ export default function EntityConversionModal({
                     Organization
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="wetSlips"

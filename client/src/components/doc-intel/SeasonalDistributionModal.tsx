@@ -121,7 +121,7 @@ export function SeasonalDistributionModal({ open, onClose, uploadId, projectId, 
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="overview">Overview &amp; Presets</TabsTrigger>
             <TabsTrigger value="department">Per-Department Detail</TabsTrigger>
           </TabsList>
@@ -205,7 +205,7 @@ export function SeasonalDistributionModal({ open, onClose, uploadId, projectId, 
                       </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5">
                     {Object.entries(SEASONAL_PRESETS).map(([key,preset]) => (
                       <button key={key} onClick={() => setDeptProfile(activeDept,key)} disabled={!cur.enabled && key!=='even'}
                         className={cn("text-left p-2 rounded-md border text-[11px] transition-all",

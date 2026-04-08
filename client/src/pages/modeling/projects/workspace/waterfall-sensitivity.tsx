@@ -478,7 +478,7 @@ function WaterfallSensitivity({ projectId, onTabChange }: WaterfallSensitivityPr
                 })}
               </TableBody>
             </Table>
-          </div>
+            </div>
         </CardContent>
       </Card>
 

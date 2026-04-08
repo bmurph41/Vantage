@@ -95,6 +95,7 @@ function SectionTable({ items, label, config }: { items: LineItem[]; label: stri
       <div className={`px-4 py-2 rounded-t-md ${config.color} ${config.textColor} font-semibold text-sm`}>
         {label} ({items.length} items)
       </div>
+      <div className="overflow-x-auto w-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -132,6 +133,7 @@ function SectionTable({ items, label, config }: { items: LineItem[]; label: stri
           </TableRow>
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

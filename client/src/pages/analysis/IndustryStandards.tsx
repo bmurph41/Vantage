@@ -225,6 +225,7 @@ export default function IndustryStandards() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -260,6 +261,7 @@ export default function IndustryStandards() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -274,6 +276,7 @@ export default function IndustryStandards() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -315,6 +318,7 @@ export default function IndustryStandards() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         )}

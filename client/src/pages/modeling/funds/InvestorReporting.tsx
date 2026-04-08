@@ -358,7 +358,7 @@ export default function InvestorReporting() {
                 />
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="p-3 bg-muted/50 rounded-lg text-center">
                       <div className="text-xs text-muted-foreground">Total Investments</div>
                       <div className="text-2xl font-bold">{report.portfolioUpdate.totalDeals}</div>
@@ -413,7 +413,7 @@ export default function InvestorReporting() {
                   rows={5}
                 />
               ) : (
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
                     <div className="text-sm text-muted-foreground">Total Committed</div>
                     <div className="text-lg font-bold">{formatCurrency(report.capitalAccountSummary.committedCapital)}</div>

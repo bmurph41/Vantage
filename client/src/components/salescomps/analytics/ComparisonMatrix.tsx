@@ -328,7 +328,7 @@ export default function ComparisonMatrix({ comps, onRemoveComp, onClose }: Compa
       </div>
 
       {/* Summary Statistics */}
-      <div className="mt-6 pt-6 border-t grid grid-cols-3 gap-4">
+      <div className="mt-6 pt-6 border-t grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <p className="text-xs text-muted-foreground mb-1">Avg Sale Price</p>
           <p className="text-sm font-semibold">

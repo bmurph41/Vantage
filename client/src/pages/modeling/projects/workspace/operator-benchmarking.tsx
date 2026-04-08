@@ -110,7 +110,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
           <h2 className="text-2xl font-bold">Operator Benchmarking</h2>
           <p className="text-muted-foreground">Loading benchmark data...</p>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
             <Card key={i}>
               <CardContent className="pt-6">
@@ -163,7 +163,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
       )}
 
       {benchmarkData && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Radar Chart */}
           <Card>
             <CardHeader>
@@ -230,6 +230,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
             <CardTitle>Metric Rankings</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -269,6 +270,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
                 })}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -280,6 +282,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
             <CardTitle>Opportunity Detail</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -313,6 +316,7 @@ export function OperatorBenchmarking({ projectId, onTabChange }: OperatorBenchma
                 </TableRow>
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

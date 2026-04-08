@@ -154,7 +154,7 @@ export function UnifiedAnalyticsPanel() {
               <Progress value={dealIntegrationRate} className="h-2" />
               <span className="text-xs text-muted-foreground">{dealIntegrationRate}% integration rate</span>
             </div>
-            <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className="text-center p-2 bg-muted/50 rounded">
                 <div className="text-lg font-semibold">{analytics.crossModule.propertiesWithDeals}</div>
                 <div className="text-xs text-muted-foreground">Properties in Deals</div>
@@ -175,7 +175,7 @@ export function UnifiedAnalyticsPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div>
                   <div className="text-2xl font-bold">{analytics.modeling.totalProjects}</div>

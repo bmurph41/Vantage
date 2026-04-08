@@ -516,7 +516,7 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({ entry, rank, o
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-3">
         <div><span className="text-gray-500">Deals:</span> <span className="font-medium">{entry.metricsSummary.dealsClosedWon}</span></div>
         <div><span className="text-gray-500">Volume:</span> <span className="font-medium">{formatCurrency(entry.metricsSummary.totalVolume)}</span></div>
         <div><span className="text-gray-500">Waived:</span> <span className="font-medium">{formatCurrency(entry.metricsSummary.feesWaived)}</span></div>

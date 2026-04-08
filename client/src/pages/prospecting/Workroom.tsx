@@ -419,7 +419,7 @@ export default function ProspectingWorkroom() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-4 gap-6 text-center">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-center">
                 <div>
                   <div className="text-2xl font-bold text-blue-600">
                     {quarterlyMetrics.completedGoals}/{quarterlyMetrics.totalGoals}
@@ -524,7 +524,7 @@ export default function ProspectingWorkroom() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div className="bg-green-50 rounded-lg p-2 text-center">
                           <div className="text-lg font-bold text-green-600">{leads}</div>
                           <div className="text-xs text-gray-500">Leads Generated</div>

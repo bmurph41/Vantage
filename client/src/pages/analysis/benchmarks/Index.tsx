@@ -188,6 +188,7 @@ export default function BenchmarksIndex() {
           </Card>
         ) : (
           <Card>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -212,6 +213,7 @@ export default function BenchmarksIndex() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </Card>
         )}
 

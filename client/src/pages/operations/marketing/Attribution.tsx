@@ -88,7 +88,7 @@ export default function Attribution() {
             <CardTitle>Attribution History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -127,7 +127,7 @@ export default function Attribution() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           </CardContent>
         </Card>
       )}

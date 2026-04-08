@@ -843,7 +843,7 @@ export default function CompanyDetailModal({
               )}
 
               {/* Stats Cards */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -907,7 +907,7 @@ export default function CompanyDetailModal({
               </div>
 
               {/* Two Column Layout */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Left Column - Company Details */}
                 <div className="col-span-2 space-y-6">
                   <Form {...form}>
@@ -936,7 +936,7 @@ export default function CompanyDetailModal({
                           )}
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="industry"
@@ -982,7 +982,7 @@ export default function CompanyDetailModal({
 
                         <Separator />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="website"
@@ -1350,7 +1350,7 @@ export default function CompanyDetailModal({
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {companyContacts.map((contact) => (
                     <div 
                       key={contact.id} 
@@ -1406,7 +1406,7 @@ export default function CompanyDetailModal({
               </div>
 
               {/* Deal Summary Stats */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-muted/30">
                   <CardContent className="p-3 text-center">
                     <p className="text-2xl font-bold">{companyDeals.length}</p>
@@ -1523,7 +1523,7 @@ export default function CompanyDetailModal({
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {allCompanyProperties.map((property) => (
                     <div 
                       key={property.id} 
@@ -2014,7 +2014,7 @@ export default function CompanyDetailModal({
                         </Button>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Property Name *</Label>
                         <Input
@@ -2048,7 +2048,7 @@ export default function CompanyDetailModal({
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2 col-span-2">
                         <Label>Address</Label>
                         <Input

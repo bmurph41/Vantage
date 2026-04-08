@@ -355,16 +355,16 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-x-hidden">
       <Suspense fallback={<SidebarLoader />}>
         <UnifiedSidebar />
       </Suspense>
-      <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
+      <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0 min-w-0">
         <Suspense fallback={<div className="h-10" />}>
           <PendingNotificationsBanner />
         </Suspense>
         <Breadcrumb />
-        <main className="flex-1 overflow-auto mobile-main-content">
+        <main className="flex-1 overflow-auto mobile-main-content min-w-0">
           <Suspense fallback={<PageLoader />}>
             {children}
           </Suspense>

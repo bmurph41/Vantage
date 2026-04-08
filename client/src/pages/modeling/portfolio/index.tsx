@@ -606,6 +606,7 @@ function PerformersSection({
             No data available
           </div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -640,6 +641,7 @@ function PerformersSection({
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -255,6 +255,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -288,6 +289,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -300,6 +302,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="w-full">
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -333,6 +336,7 @@ export default function ICMemoExport({ projectId }: ICMemoExportProps) {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </ScrollArea>
                 </CardContent>
               </Card>

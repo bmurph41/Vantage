@@ -996,7 +996,7 @@ export default function DataRequest() {
             </CardContent>
           </Card>
         ) : viewMode === 'board' ? (
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Outstanding Column */}
             <div className="flex flex-col">
               <div className="bg-red-50 border-2 border-red-200 rounded-t-lg p-3">

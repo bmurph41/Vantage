@@ -189,7 +189,7 @@ export default function ShipStoreDashboard() {
             <AssetSelector 
               value={selectedAssetId} 
               onChange={setSelectedAssetId}
-              className="w-[280px]"
+              className="w-full max-w-[280px]"
             />
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function ShipStoreDashboard() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="revenue" className="w-full">
-                <TabsList className="grid w-full max-w-[200px] grid-cols-2">
+                <TabsList className="grid w-full max-w-[200px] grid-cols-1 sm:grid-cols-2">
                   <TabsTrigger value="revenue">Revenue</TabsTrigger>
                   <TabsTrigger value="transactions">Count</TabsTrigger>
                 </TabsList>
@@ -431,7 +431,7 @@ export default function ShipStoreDashboard() {
               <CardDescription>Inventory efficiency metrics</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="text-center p-4 rounded-lg bg-muted/30">
                   <p className="text-sm text-muted-foreground">Turnover Rate</p>
                   <p className="text-2xl font-bold">{turnoverData.turnoverRate?.toFixed(1) || '0'}x</p>

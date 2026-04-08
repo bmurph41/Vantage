@@ -627,7 +627,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="type"
@@ -741,7 +741,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
                     data-testid="input-unit"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city" className="text-sm">City *</Label>
                     <Input
@@ -810,7 +810,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
             <Separator className="my-4" />
             <div className="space-y-4">
               <FormLabel className="text-base font-medium">Property Details</FormLabel>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <FormLabel className="text-sm">Wet Slips</FormLabel>
                   <Input
@@ -1040,7 +1040,7 @@ export default function PropertyFormModal({ isOpen, onClose, property }: Propert
             <Separator className="my-4" />
             <div className="space-y-4">
               <FormLabel className="text-base font-medium">Sale History</FormLabel>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <FormLabel className="text-sm">Last Sale Month</FormLabel>
                   <Select value={lastSaleMonth} onValueChange={setLastSaleMonth}>

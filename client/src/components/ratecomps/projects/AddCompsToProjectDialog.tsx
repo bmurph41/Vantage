@@ -428,6 +428,7 @@ export default function AddCompsToProjectDialog({
                   </div>
                 </div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background border-b">
                     <TableRow>
@@ -484,6 +485,7 @@ export default function AddCompsToProjectDialog({
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
 
               {/* Load More */}

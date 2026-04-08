@@ -230,6 +230,7 @@ function TaxProfileManager({ projectId }: { projectId: string }) {
         {!profiles?.length ? (
           <div className="text-center py-6 text-muted-foreground text-sm">No tax profiles yet. Create one to get started.</div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -267,6 +268,7 @@ function TaxProfileManager({ projectId }: { projectId: string }) {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
 
@@ -276,7 +278,7 @@ function TaxProfileManager({ projectId }: { projectId: string }) {
             <DialogTitle>{editing ? 'Edit Tax Profile' : 'New Tax Profile'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Individual - High Income" />
@@ -301,7 +303,7 @@ function TaxProfileManager({ projectId }: { projectId: string }) {
               <Label className="flex items-center gap-1">Effective Tax Rate (for flat mode) <TooltipProvider><Tooltip><TooltipTrigger><Info className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent><p>Enter as decimal (e.g. 0.25 for 25%)</p></TooltipContent></Tooltip></TooltipProvider></Label>
               <Input type="number" step="0.01" min="0" max="1" value={form.effectiveTaxRate} onChange={(e) => setForm({ ...form, effectiveTaxRate: e.target.value })} placeholder="0.25" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Ordinary Rate</Label>
                 <Input type="number" step="0.01" min="0" max="1" value={form.ordinaryRate} onChange={(e) => setForm({ ...form, ordinaryRate: e.target.value })} placeholder="0.37" />
@@ -315,7 +317,7 @@ function TaxProfileManager({ projectId }: { projectId: string }) {
                 <Input type="number" step="0.01" min="0" max="1" value={form.recaptureRate} onChange={(e) => setForm({ ...form, recaptureRate: e.target.value })} placeholder="0.25" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>NIIT Rate</Label>
                 <Input type="number" step="0.01" min="0" max="1" value={form.niitRate} onChange={(e) => setForm({ ...form, niitRate: e.target.value })} placeholder="0.038" />
@@ -430,6 +432,7 @@ function PartnersCapTable({ projectId }: { projectId: string }) {
         {!partners?.length ? (
           <div className="text-center py-6 text-muted-foreground text-sm">No partners configured. Add LP and GP partners.</div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -462,6 +465,7 @@ function PartnersCapTable({ projectId }: { projectId: string }) {
               })}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
 
@@ -469,7 +473,7 @@ function PartnersCapTable({ projectId }: { projectId: string }) {
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? 'Edit Partner' : 'Add Partner'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Partner name" />
@@ -488,7 +492,7 @@ function PartnersCapTable({ projectId }: { projectId: string }) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Ownership %</Label>
                 <Input type="number" step="0.1" min="0" max="100" value={form.ownershipPercent} onChange={(e) => setForm({ ...form, ownershipPercent: e.target.value })} placeholder="90" />
@@ -529,7 +533,7 @@ function PartnersCapTable({ projectId }: { projectId: string }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Amount ($)</Label>
                 <Input type="number" step="1" min="0" value={contribForm.amountCents} onChange={(e) => setContribForm({ ...contribForm, amountCents: e.target.value })} placeholder="5000000" />
@@ -869,7 +873,7 @@ function TaxInputsEditor({ projectId }: { projectId: string }) {
         )}
 
         {depMethod === 'simple_building_life' && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>Building Basis ($)</Label>
               <Input type="number" step="1" value={current.buildingBasisDollars ?? ''} onChange={(e) => update('buildingBasisDollars', e.target.value)} placeholder="10000000" />
@@ -981,7 +985,7 @@ function TaxWaterfallResults({ projectId }: { projectId: string }) {
                   <Card key={pid}>
                     <CardContent className="pt-4 pb-3 space-y-2">
                       <p className="text-xs text-muted-foreground font-medium">{pid}</p>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-sm">
                         <span className="text-muted-foreground">Pre-Tax IRR</span>
                         <span className="font-medium text-right">{fmtIrr(irr)}</span>
                         <span className="text-muted-foreground">After-Tax IRR</span>
@@ -1006,6 +1010,7 @@ function TaxWaterfallResults({ projectId }: { projectId: string }) {
                 <CardTitle className="text-base">Period-by-Period Results</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1108,6 +1113,7 @@ function TaxWaterfallResults({ projectId }: { projectId: string }) {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}

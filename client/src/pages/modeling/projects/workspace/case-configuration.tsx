@@ -474,7 +474,7 @@ export default function CaseConfiguration({ projectId, onTabChange }: CaseConfig
                   <p className="text-xs text-muted-foreground">These values differentiate this scenario from others</p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="new-revenue-growth" className="text-sm">Revenue Growth (%)</Label>
                     <Input

@@ -732,7 +732,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                   <CardDescription>Configure seller financing parameters</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="salePrice">Sale Price ($)</Label>
                       <Input
@@ -1071,6 +1071,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                       </TableBody>
                     </Table>
                   ) : (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1115,6 +1116,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1352,7 +1354,7 @@ export default function ExitSellerFinancing({ projectId }: SellerFinancingProps)
                   <CardDescription>Expected value accounting for default risk</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 bg-muted rounded-lg">
                       <p className="text-sm text-muted-foreground">Collateral</p>
                       <div className="mt-1">{getCollateralBadge()}</div>

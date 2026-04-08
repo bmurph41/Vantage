@@ -122,7 +122,7 @@ export default function PortfolioReturns() {
     return (
       <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-64" />
@@ -283,6 +283,7 @@ export default function PortfolioReturns() {
                 <CardDescription>Properties ranked by gross gain</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -318,6 +319,7 @@ export default function PortfolioReturns() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

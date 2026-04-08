@@ -187,7 +187,7 @@ export function QuickBooksExportDialog({ open, onOpenChange }: QuickBooksExportD
             <CardHeader>
               <CardTitle className="text-base">Date Range</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start-date">Start Date</Label>
                 <Input
@@ -220,7 +220,7 @@ export function QuickBooksExportDialog({ open, onOpenChange }: QuickBooksExportD
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="diesel-account">Diesel Sales Account</Label>
                   <Input

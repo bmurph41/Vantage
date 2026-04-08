@@ -240,7 +240,7 @@ export function StressTesting({ projectId, onTabChange }: StressTestingProps) {
           {/* Custom Scenario */}
           <div className="mt-6 border-t pt-4">
             <h4 className="font-medium mb-3">Add Custom Scenario</h4>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="col-span-2">
                 <Label>Scenario Name</Label>
                 <Input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g., Severe Recession" />
@@ -302,6 +302,7 @@ export function StressTesting({ projectId, onTabChange }: StressTestingProps) {
             <CardTitle>Stress Test Results</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -364,13 +365,14 @@ export function StressTesting({ projectId, onTabChange }: StressTestingProps) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Charts */}
       {results && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* IRR Comparison */}
           <Card>
             <CardHeader>

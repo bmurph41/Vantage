@@ -293,6 +293,7 @@ export function UnifiedLeaseList({
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -392,6 +393,7 @@ export function UnifiedLeaseList({
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Pagination */}
               {total > PAGE_SIZE && (

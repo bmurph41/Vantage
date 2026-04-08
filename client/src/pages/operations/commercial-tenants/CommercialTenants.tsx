@@ -330,6 +330,7 @@ export default function CommercialTenants() {
               </div>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table data-tour="tenants-list">
               <TableHeader>
                 <TableRow>
@@ -402,6 +403,7 @@ export default function CommercialTenants() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -233,7 +233,7 @@ export function PipelineAnalyticsDashboard() {
       </div>
 
       {/* ── Second Row: Funnel + Win/Loss ─────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Conversion Funnel */}
         <Card>
           <CardHeader className="pb-2">
@@ -557,7 +557,7 @@ function WinLossAnalysis({ data }: { data: WinLossData }) {
   return (
     <div className="space-y-4">
       {/* Win/Loss Summary */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="border rounded-lg p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
           <div className="flex items-center gap-1.5 mb-1">
             <Trophy className="h-3.5 w-3.5 text-green-600" />

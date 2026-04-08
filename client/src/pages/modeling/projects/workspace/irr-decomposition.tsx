@@ -185,7 +185,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
           ))}
         </div>
         <Skeleton className="h-80" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
         </div>
@@ -388,6 +388,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -433,6 +434,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
                     })}
                   </TableBody>
                 </Table>
+                </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </CardContent>
@@ -514,6 +516,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
               {decomposition.annualCashOnCash.length > 0 && (
                 <div className="mt-6 border-t pt-4">
                   <ScrollArea className="w-full">
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -547,6 +550,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                     <ScrollBar orientation="horizontal" />
                   </ScrollArea>
                 </div>
@@ -566,6 +570,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -618,6 +623,7 @@ export default function IRRDecomposition({ projectId, onTabChange }: IRRDecompos
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </CardContent>

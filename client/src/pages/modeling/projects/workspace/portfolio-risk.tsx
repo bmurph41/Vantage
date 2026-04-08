@@ -303,7 +303,7 @@ function PortfolioRisk({ projectId, onTabChange }: PortfolioRiskProps) {
               <div className="flex items-center gap-2 text-sm font-medium mb-2">
                 <Info className="h-4 w-4" /> Diversification Analysis
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Undiversified VaR:</span> <span className="font-semibold">{undiversifiedVaR.toFixed(1)}%</span>
                 </div>
@@ -368,6 +368,7 @@ function PortfolioRisk({ projectId, onTabChange }: PortfolioRiskProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -397,6 +398,7 @@ function PortfolioRisk({ projectId, onTabChange }: PortfolioRiskProps) {
                   })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -409,6 +411,7 @@ function PortfolioRisk({ projectId, onTabChange }: PortfolioRiskProps) {
             <CardTitle className="text-lg">Top Risk Contributors</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -437,9 +440,10 @@ function PortfolioRisk({ projectId, onTabChange }: PortfolioRiskProps) {
                 ))}
               </TableBody>
             </Table>
+            </div>
             <div className="mt-4 p-3 bg-muted/50 rounded-lg text-sm">
               <div className="font-medium mb-1">Risk Budget Summary</div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <span className="text-muted-foreground">Total VaR Budget:</span>{' '}
                   <span className="font-semibold">{portfolioVaR.toFixed(1)}%</span>

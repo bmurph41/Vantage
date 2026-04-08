@@ -196,6 +196,7 @@ function StorageTypeTable({ breakdown }: { breakdown: AnalysisData['storageTypeB
         <CardDescription>Occupancy and revenue by storage category</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -226,6 +227,7 @@ function StorageTypeTable({ breakdown }: { breakdown: AnalysisData['storageTypeB
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -401,6 +403,7 @@ function DockBreakdownTable({ breakdown }: { breakdown: AnalysisData['dockBreakd
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -427,6 +430,7 @@ function DockBreakdownTable({ breakdown }: { breakdown: AnalysisData['dockBreakd
             ))}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -816,7 +820,7 @@ export default function RentRollAnalysis({ projectId, projectName, onTabChange }
                 <CardTitle className="text-lg">Quick Stats</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 rounded-lg bg-muted/50">
                     <p className="text-sm text-muted-foreground">Storage Types</p>
                     <p className="text-2xl font-bold">{Object.keys(data.storageTypeBreakdown).length}</p>

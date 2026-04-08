@@ -220,7 +220,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="acquisitionDate" className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
@@ -250,7 +250,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
@@ -306,7 +306,7 @@ export function MarinaModal({ open, onOpenChange, marina, mode }: MarinaModalPro
               <DollarSign className="h-4 w-4" />
               Financial Metrics
             </h4>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="currentValue">Current Value</Label>
                 <Input

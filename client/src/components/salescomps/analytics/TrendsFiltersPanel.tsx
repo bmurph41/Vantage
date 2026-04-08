@@ -170,7 +170,7 @@ export default function TrendsFiltersPanel({ filters, onFiltersChange }: TrendsF
                 {openSections.timeframe ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Start Year</Label>
                     <Input
@@ -264,7 +264,7 @@ export default function TrendsFiltersPanel({ filters, onFiltersChange }: TrendsF
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">States</Label>
                   <ScrollArea className="h-32 rounded-md border p-2">
-                    <div className="grid grid-cols-3 gap-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
                       {availableStates.map((state: string) => (
                         <div key={state} className="flex items-center space-x-2">
                           <Checkbox
@@ -313,7 +313,7 @@ export default function TrendsFiltersPanel({ filters, onFiltersChange }: TrendsF
                       {filters.wetSlipsMin || 0} - {filters.wetSlipsMax || '500+'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input
                       type="number"
                       placeholder="Min"
@@ -367,7 +367,7 @@ export default function TrendsFiltersPanel({ filters, onFiltersChange }: TrendsF
                       {filters.dryRacksMin || 0} - {filters.dryRacksMax || '500+'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input
                       type="number"
                       placeholder="Min"
@@ -427,7 +427,7 @@ export default function TrendsFiltersPanel({ filters, onFiltersChange }: TrendsF
                 {openSections.amenities ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {PROFIT_CENTER_OPTIONS.map((pc) => (
                     <div key={pc.id} className="flex items-center space-x-2">
                       <Checkbox

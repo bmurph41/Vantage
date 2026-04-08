@@ -152,6 +152,7 @@ export default function Permissions() {
               </div>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -223,6 +224,7 @@ export default function Permissions() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -402,7 +402,7 @@ export function RelationshipMap({ entityId, entityType }: RelationshipMapProps) 
         {data.connections.length > 0 && (
           <div className="mt-3 space-y-1">
             <div className="text-xs font-medium text-gray-500 mb-2">Connections</div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {data.connections.map((conn) => {
                 const colors = NODE_COLORS[conn.type] || NODE_COLORS.contact;
                 const Icon = NODE_ICONS[conn.type] || Users;

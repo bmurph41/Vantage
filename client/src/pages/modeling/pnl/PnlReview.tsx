@@ -409,6 +409,7 @@ export default function PnlReview() {
               <p>No unmapped items. Please review the ambiguous items above.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -476,6 +477,7 @@ export default function PnlReview() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -489,6 +491,7 @@ export default function PnlReview() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -512,6 +515,7 @@ export default function PnlReview() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -314,7 +314,7 @@ export function TaskOwnersView({ tasks, projectId }: TaskOwnersViewProps) {
                 </div>
 
                 {/* Status Breakdown */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
                   <div 
                     className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor('in_progress')}`}
                     onClick={() => handleStatusClick(owner.name, 'in_progress')}

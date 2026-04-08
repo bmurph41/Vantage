@@ -243,7 +243,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-sm font-medium">Median Age (years)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -271,7 +271,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
         
         <div className="space-y-2">
           <Label className="text-sm font-medium">Median Household Income ($)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -299,7 +299,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
         
         <div className="space-y-2">
           <Label className="text-sm font-medium">Population Density (per sq mi)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -327,7 +327,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
         
         <div className="space-y-2">
           <Label className="text-sm font-medium">Avg Household Size</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -357,7 +357,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
         
         <div className="space-y-2">
           <Label className="text-sm font-medium">Bachelor's Degree+ (%)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -385,7 +385,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
         
         <div className="space-y-2">
           <Label className="text-sm font-medium">Employment Rate (%)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -413,7 +413,7 @@ export default function TargetDemographicsForm({ projectId, onTargetsChange, com
 
         <div className="space-y-2">
           <Label className="text-sm font-medium">Median Home Value ($)</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input

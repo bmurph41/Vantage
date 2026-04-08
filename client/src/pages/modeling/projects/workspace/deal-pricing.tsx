@@ -1247,7 +1247,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
                     <CheckCircle2 className="h-4 w-4 text-indigo-600" />
                     <span className="font-medium text-sm text-indigo-800">Pro Forma-Based Price</span>
                   </div>
-                  <div className="grid grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                     <div>
                       <span className="text-xs text-muted-foreground">Solved Price</span>
                       <p className="font-bold text-indigo-700">{formatCurrency(proFormaSolveMutation.data.solvedPrice)}</p>
@@ -1427,7 +1427,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="flex flex-col gap-2 py-2.5 px-3 rounded-lg transition-all duration-150 border bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
@@ -1609,7 +1609,7 @@ export default function DealPricing({ projectId, onTabChange }: DealPricingProps
 
                 <div className="rounded-lg p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Data Sources</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Going-In Cap</span>
                       <span className="font-medium">{pricingData.goingInCapRate > 0 ? formatPercent(pricingData.goingInCapRate) : '—'}</span>

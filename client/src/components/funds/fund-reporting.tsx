@@ -65,7 +65,7 @@ function PMECard({ fundId }: { fundId: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <div className={`text-2xl font-bold font-mono ${outperformed ? 'text-emerald-600' : 'text-red-500'}`}>
               {fmtMultiple(data.ksPme)}
@@ -95,7 +95,7 @@ function PMECard({ fundId }: { fundId: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-sm border-t pt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm border-t pt-3">
           <div className="flex justify-between">
             <span className="text-gray-500">Total Contributions</span>
             <span className="font-mono font-medium">{fmtCurrency(data.summary.totalContributions)}</span>
@@ -171,7 +171,7 @@ function ReturnAttributionCard({ fundId }: { fundId: string }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <div className="text-xs font-semibold text-emerald-600 mb-2 flex items-center gap-1">
               <ArrowUp className="h-3 w-3" /> Top 5 Contributors

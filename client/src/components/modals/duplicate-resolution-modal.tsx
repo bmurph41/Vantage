@@ -110,7 +110,7 @@ function ComparisonRow({ label, existingValue, newValue }: ComparisonRowProps) {
 
 function ContactOverview({ pending }: { pending: PendingContact }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Card className="bg-blue-50/50 border-blue-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -144,7 +144,7 @@ function ContactOverview({ pending }: { pending: PendingContact }) {
 
 function CompanyOverview({ pending }: { pending: PendingCompany }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Card className="bg-purple-50/50 border-purple-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -180,7 +180,7 @@ function CompanyOverview({ pending }: { pending: PendingCompany }) {
 
 function PropertyOverview({ pending }: { pending: PendingProperty }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Card className="bg-teal-50/50 border-teal-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -356,7 +356,7 @@ export default function DuplicateResolutionModal({
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Source Information</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Source:</span>
                         <span className="ml-2 font-medium">{(pendingEntity as any).source || 'Import'}</span>
@@ -415,7 +415,7 @@ export default function DuplicateResolutionModal({
                     </CardContent>
                   </Card>
 
-                  <div className="grid grid-cols-4 gap-3 text-xs">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200">
                       <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                       <span className="text-green-700">Match</span>

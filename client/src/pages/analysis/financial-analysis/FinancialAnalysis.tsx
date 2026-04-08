@@ -412,7 +412,7 @@ export default function FinancialAnalysisDashboard() {
                     <EmptyState icon={DollarSign} title="No revenue data available"
                       sub="Add financial periods to your modeling projects to see revenue metrics." />
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {revenueByCategory.filter((r: any) => r.value > 0).slice(0, 6).map((m: any, i: number) => (
                         <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
                           <p className="text-[11px] text-slate-400 truncate">{m.name}</p>

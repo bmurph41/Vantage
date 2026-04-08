@@ -106,6 +106,7 @@ export default function RetailOfficeTenants() {
               <p className="text-sm mt-1">Try adjusting your search or filters.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -143,6 +144,7 @@ export default function RetailOfficeTenants() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

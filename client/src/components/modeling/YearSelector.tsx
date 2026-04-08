@@ -231,7 +231,7 @@ export default function YearSelector({
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4">
                 <Label htmlFor="periodType" className="text-right">
                   Type
                 </Label>
@@ -252,7 +252,7 @@ export default function YearSelector({
               </div>
 
               {newPeriodType !== 'trailing_12' && (
-                <div className="grid grid-cols-4 items-center gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4">
                   <Label htmlFor="periodYear" className="text-right">
                     Year
                   </Label>
@@ -269,7 +269,7 @@ export default function YearSelector({
                 </div>
               )}
 
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 items-center gap-4">
                 <Label htmlFor="periodLabel" className="text-right">
                   Label
                 </Label>

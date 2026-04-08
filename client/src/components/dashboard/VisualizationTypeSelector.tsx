@@ -103,7 +103,7 @@ export function VisualizationTypeSelector({ selectedType, onSelect }: Visualizat
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {VISUALIZATION_TYPES.map((option) => {
           const Icon = option.icon;
           const isSelected = selectedType === option.type;

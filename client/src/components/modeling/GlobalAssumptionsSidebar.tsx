@@ -362,10 +362,10 @@ export default function GlobalAssumptionsSidebar({ projectId, project: projectPr
       {/* Sidebar panel */}
       <div
         className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          collapsed ? 'w-0' : 'w-[220px]'
+          collapsed ? 'w-0' : 'w-full max-w-[220px]'
         }`}
       >
-        <div className="w-[220px] h-full bg-[#1B2A4A] flex flex-col border-r border-slate-700">
+        <div className="w-full max-w-[220px] h-full bg-[#1B2A4A] flex flex-col border-r border-slate-700">
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto px-3 py-3 custom-scrollbar">
             {isLoading ? (

@@ -328,6 +328,7 @@ export function DdFeesTracker({ projectId, compact = false }: DdFeesTrackerProps
             <p className="text-sm">Track legal, accounting, and other DD costs here.</p>
           </div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -424,6 +425,7 @@ export function DdFeesTracker({ projectId, compact = false }: DdFeesTrackerProps
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
 
         {summary?.byCategory && summary.byCategory.length > 0 && (
@@ -500,7 +502,7 @@ function FeeDialog({
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Select 
@@ -544,7 +546,7 @@ function FeeDialog({
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="dateIncurred">Date Incurred</Label>
               <Input

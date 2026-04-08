@@ -830,7 +830,7 @@ function FilterSidebar({
 
       {/* Asset Class */}
       <FilterSection title="Asset Class">
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           {ASSET_CLASSES.map(ac => (
             <button
               key={`${ac.type}-${ac.label}`}
@@ -889,7 +889,7 @@ function FilterSidebar({
 
       {/* Geography */}
       <FilterSection title="State / Region">
-        <div className="grid grid-cols-3 gap-1 max-h-44 overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 max-h-44 overflow-y-auto">
           {US_STATES.map(s => (
             <button
               key={s}
@@ -1170,7 +1170,7 @@ function ListingCard({
         </p>
 
         {/* Metrics grid */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
           <MetricCell label="Price" value={fmt$$(l.askingPrice)} highlight />
           <MetricCell label="Cap Rate" value={fmtPct(l.capRate)} />
           <MetricCell label="NOI" value={fmt$$(l.noi)} />
@@ -1476,7 +1476,7 @@ function ListingDetailPanel({
   const statusCfg = STATUS_CONFIG[l.status ?? "unknown"] ?? STATUS_CONFIG.unknown;
 
   return (
-    <div className="w-[480px] flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden">
+    <div className="w-full md:w-[480px] flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -1532,7 +1532,7 @@ function ListingDetailPanel({
               {/* Key metrics */}
               <div>
                 <SectionLabel>Financial Snapshot</SectionLabel>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <DetailMetric label="Asking Price" value={fmt$$(full.askingPrice)} size="lg" accent />
                   <DetailMetric label="Cap Rate" value={fmtPct(full.capRate)} size="lg" />
                   <DetailMetric label="NOI" value={fmt$$(full.noi)} />
@@ -1546,7 +1546,7 @@ function ListingDetailPanel({
               {(full.slips || full.dryRacks || full.waterfrontFeet || full.acreage) && (
                 <div>
                   <SectionLabel>Property Details</SectionLabel>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {full.slips != null && <DetailMetric label="Wet Slips" value={fmtNum(full.slips)} />}
                     {full.dryRacks != null && <DetailMetric label="Dry Racks" value={fmtNum(full.dryRacks)} />}
                     {full.waterfrontFeet != null && <DetailMetric label="Waterfront (ft)" value={fmtNum(full.waterfrontFeet)} />}
@@ -1855,7 +1855,7 @@ function LoadingState({ view }: { view: ViewMode }) {
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-3/4" />
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                 {[1,2,3,4].map(j => <Skeleton key={j} className="h-8" />)}
               </div>
             </div>

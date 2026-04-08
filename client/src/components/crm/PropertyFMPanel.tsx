@@ -193,7 +193,7 @@ export function PropertyFMPanel({ propertyId, dealId, className }: PropertyFMPan
                   </div>
 
                   {/* KPI grid */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                     <Metric icon={DollarSign} label="Going-In Cap" value={fmtPct(model.goingInCapRate)} highlight />
                     <Metric icon={TrendingUp} label="Proj. IRR" value={fmtPct(model.projectedIrr)} highlight />
                     <Metric icon={BarChart3} label="Equity Multiple" value={fmtMult(model.equityMultiple)} />

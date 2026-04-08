@@ -411,7 +411,7 @@ export default function ProjectDetails({ projectId, onClose, onEdit }: ProjectDe
           </div>
 
           {/* Tabs Selector */}
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="table" data-testid="tab-table">
               <TableIcon className="w-4 h-4 mr-2" />
               Table View

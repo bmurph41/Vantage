@@ -304,7 +304,7 @@ export function UnifiedLeaseForm({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="rent">Rent</TabsTrigger>
             <TabsTrigger value="escalation">Escalation</TabsTrigger>
@@ -313,7 +313,7 @@ export function UnifiedLeaseForm({
 
           {/* ── Tab 1: Basic Info ── */}
           <TabsContent value="basic" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tenant Name *</Label>
                 <Input
@@ -332,7 +332,7 @@ export function UnifiedLeaseForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Square Feet *</Label>
                 <Input
@@ -371,7 +371,7 @@ export function UnifiedLeaseForm({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Commencement Date *</Label>
                 <Input
@@ -411,7 +411,7 @@ export function UnifiedLeaseForm({
 
           {/* ── Tab 2: Base Rent ── */}
           <TabsContent value="rent" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Rent Unit</Label>
                 <Select
@@ -467,7 +467,7 @@ export function UnifiedLeaseForm({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Security Deposit ($)</Label>
                 <Input
@@ -502,7 +502,7 @@ export function UnifiedLeaseForm({
 
           {/* ── Tab 3: Escalation ── */}
           <TabsContent value="escalation" className="space-y-4 mt-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Escalation Type</Label>
                 <Select

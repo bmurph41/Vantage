@@ -42,7 +42,7 @@ export default function StressTestHeatmap({ projectId }: Props) {
         <CardDescription className="text-xs">Rate shocks × NOI compression</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div><Label className="text-xs">Base NOI</Label><Input type="text" value={baseNoi} onChange={e => setBaseNoi(e.target.value)} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Property Value</Label><Input type="text" value={propertyValue} onChange={e => setPropertyValue(e.target.value)} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">Min DSCR</Label><Input type="text" value={minDscr} onChange={e => setMinDscr(e.target.value)} className="h-8 text-xs" /></div>

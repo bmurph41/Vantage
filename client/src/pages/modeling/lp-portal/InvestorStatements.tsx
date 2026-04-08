@@ -246,6 +246,7 @@ export default function InvestorStatements({ fundId }: { fundId: string }) {
               <p>No statements available for the selected period</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -310,6 +311,7 @@ export default function InvestorStatements({ fundId }: { fundId: string }) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -351,11 +353,11 @@ export default function InvestorStatements({ fundId }: { fundId: string }) {
           </div>
 
           {k1Loading ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card className="bg-muted/50">
                 <CardContent className="pt-4">
                   <div className="text-xs text-muted-foreground uppercase">Ordinary Income</div>

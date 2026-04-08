@@ -402,7 +402,7 @@ export default function ProjectReport({ id: propId }: ProjectReportProps) {
                         })}
                       </TableBody>
                     </Table>
-                  </div>
+                    </div>
                 )}
               </CardContent>
             </Card>
@@ -458,7 +458,7 @@ export default function ProjectReport({ id: propId }: ProjectReportProps) {
                         })}
                       </TableBody>
                     </Table>
-                  </div>
+                    </div>
                 )}
               </CardContent>
             </Card>

@@ -571,6 +571,7 @@ export default function AdminCustomersPage() {
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-800 border rounded-lg shadow-sm overflow-hidden">
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -638,6 +639,7 @@ export default function AdminCustomersPage() {
             )}
           </TableBody>
         </Table>
+        </div>
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
@@ -688,7 +690,7 @@ export default function AdminCustomersPage() {
               {/* Profile */}
               <section>
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Profile</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <DetailField icon={<Users className="h-4 w-4" />} label="Name" value={customerDetail.name} />
                   <DetailField icon={<Mail className="h-4 w-4" />} label="Email" value={customerDetail.email} />
                   <DetailField icon={<Phone className="h-4 w-4" />} label="Phone" value={customerDetail.phone || "—"} />
@@ -758,7 +760,7 @@ export default function AdminCustomersPage() {
               {/* Usage & Engagement */}
               <section>
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Usage & Engagement</h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <UsageMetric icon={<Building className="h-4 w-4" />} count={customerDetail.usage?.models_count ?? 0} label="Models" />
                   <UsageMetric icon={<DollarSign className="h-4 w-4" />} count={customerDetail.usage?.deals_count ?? 0} label="Deals" />
                   <UsageMetric icon={<Tag className="h-4 w-4" />} count={customerDetail.usage?.sales_comps_count ?? 0} label="Sales Comps" />
@@ -773,7 +775,7 @@ export default function AdminCustomersPage() {
               {/* Subscription */}
               <section>
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Subscription</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <DetailField label="Plan" value={customerDetail.planName || "—"} />
                   <div>
                     <span className="text-xs text-muted-foreground">Sub Status</span>
@@ -852,7 +854,7 @@ export default function AdminCustomersPage() {
 
                     {showChangePlan && (
                       <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs text-muted-foreground">Plan Name</label>
                             <Input

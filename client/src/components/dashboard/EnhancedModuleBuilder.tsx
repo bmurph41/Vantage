@@ -143,7 +143,7 @@ export function EnhancedModuleBuilder({ onSave, onCancel }: EnhancedModuleBuilde
         <CardContent className="p-6">
           {currentStep === 1 && (
             <Tabs value={useTemplate ? 'templates' : 'custom'} onValueChange={(v) => setUseTemplate(v === 'templates')}>
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 mb-6">
                 <TabsTrigger value="templates" data-testid="tab-templates">
                   <Sparkles className="h-4 w-4 mr-2" />
                   Templates
@@ -171,7 +171,7 @@ export function EnhancedModuleBuilder({ onSave, onCancel }: EnhancedModuleBuilde
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 capitalize">
                           {category}
                         </h4>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {templates.map((template) => {
                             const Icon = template.icon;
                             return (

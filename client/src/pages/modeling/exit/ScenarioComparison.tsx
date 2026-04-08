@@ -317,7 +317,7 @@ export default function ExitScenarioComparison({ projectId }: ScenarioComparison
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             </CardContent>
           </Card>
 

@@ -229,7 +229,7 @@ export default function WorkspaceDetailPage() {
           </div>
         </div>
         <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
           </div>
         </div>
@@ -471,7 +471,7 @@ export default function WorkspaceDetailPage() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FolderOpen className="h-4 w-4 text-blue-600" />Data Room</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><div className="text-2xl font-bold">{stats.vdr.documents}</div><p className="text-sm text-muted-foreground">documents</p></div>
                   <div><div className="text-2xl font-bold">{stats.vdr.folders}</div><p className="text-sm text-muted-foreground">folders</p></div>
                 </div>
@@ -779,7 +779,7 @@ export default function WorkspaceDetailPage() {
               <Label>Email Address</Label>
               <Input placeholder="email@example.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Select value={inviteRole} onValueChange={setInviteRole}>

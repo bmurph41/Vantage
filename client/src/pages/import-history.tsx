@@ -137,7 +137,7 @@ export default function ImportHistory() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -233,7 +233,7 @@ export default function ImportHistory() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
 
             <div className="mt-6 p-4 bg-muted rounded-lg">
               <h4 className="font-medium mb-2 flex items-center gap-2">

@@ -440,7 +440,7 @@ export default function FundCashFlowDetail({ projectId, onTabChange }: FundCashF
           <div className="h-8 w-64 animate-pulse rounded bg-muted" />
           <div className="h-4 w-96 animate-pulse rounded bg-muted" />
         </div>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-28 animate-pulse rounded-lg bg-muted" />
           ))}
@@ -615,6 +615,7 @@ export default function FundCashFlowDetail({ projectId, onTabChange }: FundCashF
             </CardHeader>
             <CardContent>
               <div className="overflow-auto">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -661,6 +662,7 @@ export default function FundCashFlowDetail({ projectId, onTabChange }: FundCashF
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -83,7 +83,7 @@ export default function DaytimePopulationCard({ demographics, locationLabel }: D
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="text-center p-3 bg-muted/50 rounded-lg" data-testid="stat-residential-pop">
             <p className="text-xs text-muted-foreground">Residential Pop.</p>
             <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">

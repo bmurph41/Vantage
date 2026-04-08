@@ -333,7 +333,7 @@ export default function Plans() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Pay Type</Label>
                 <Select
@@ -387,7 +387,7 @@ export default function Plans() {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Hourly Rate ($)</Label>
                   <Input
@@ -515,6 +515,7 @@ function PlanCard({
       {isExpanded && (
         <CardContent className="pt-0">
           {plan.lines && plan.lines.length > 0 ? (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -561,6 +562,7 @@ function PlanCard({
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No lines yet. Click "Add Line" to add positions to this plan.

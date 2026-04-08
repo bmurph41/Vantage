@@ -246,7 +246,7 @@ export default function BoatSalesDashboard() {
                       <p className="text-sm text-muted-foreground">Used</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm text-muted-foreground">Avg Days on Lot</p>
                       <p className="text-xl font-bold">{(inventoryStats?.avgDaysOnLot || 0).toFixed(0)} days</p>

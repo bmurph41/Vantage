@@ -364,7 +364,7 @@ const SectionMediaCard: React.FC<SectionMediaCardProps> = ({
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="p-3 grid grid-cols-2 gap-3 border-t">
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t">
             {allMedia.map((req) => (
               <MediaDropzone
                 key={req.key}

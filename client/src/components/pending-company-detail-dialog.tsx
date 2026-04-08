@@ -319,7 +319,7 @@ export function PendingCompanyDetailDialog({
           </DialogHeader>
 
           <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="source">Source Info</TabsTrigger>
               <TabsTrigger value="duplicates">
@@ -433,7 +433,7 @@ export function PendingCompanyDetailDialog({
                           )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">City</Label>
                             {isEditing ? (
@@ -504,7 +504,7 @@ export function PendingCompanyDetailDialog({
                     <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                       <SectionHeader icon={BarChart3} title="Business Details" accent="amber" />
                       <div className="p-4 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Annual Revenue</Label>
                             {isEditing ? (
@@ -556,7 +556,7 @@ export function PendingCompanyDetailDialog({
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">Portfolio Count</Label>
                             {isEditing ? (
@@ -683,7 +683,7 @@ export function PendingCompanyDetailDialog({
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
                   <SectionHeader icon={FileText} title="Source Information" accent="slate" />
                   <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Source Type</Label>
                         <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm">

@@ -178,6 +178,7 @@ export default function UtilizationDrilldownDrawer({
                     </p>
                   ) : (
                     <div className="max-h-[320px] overflow-y-auto">
+                      <div className="overflow-x-auto w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -214,6 +215,7 @@ export default function UtilizationDrilldownDrawer({
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                       {events.length > 50 && (
                         <p className="text-xs text-muted-foreground text-center mt-2">
                           Showing 50 of {events.length} events

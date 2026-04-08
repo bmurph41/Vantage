@@ -350,6 +350,7 @@ export function DealComparison({ dealIds: initialDealIds }: DealComparisonProps)
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -438,6 +439,7 @@ export function DealComparison({ dealIds: initialDealIds }: DealComparisonProps)
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 

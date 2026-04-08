@@ -142,7 +142,7 @@ export function MultiSelectDropdown<TValue = string>({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className={cn("w-[300px] p-0", className)} 
+        className={cn("w-full max-w-[300px] p-0", className)} 
         align="start"
         style={{ maxHeight: maxHeight + 100 }}
       >

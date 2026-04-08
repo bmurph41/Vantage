@@ -858,7 +858,7 @@ function GpPartnerEconomics({ projectId, onTabChange }: GpPartnerEconomicsProps)
                 </TableRow>
               </TableBody>
             </Table>
-          </div>
+            </div>
         </CardContent>
       </Card>
 

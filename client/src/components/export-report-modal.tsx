@@ -762,7 +762,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-50 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 bg-gray-50 p-1 rounded-lg">
             <TabsTrigger value="select" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -784,7 +784,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
           </TabsList>
 
           <TabsContent value="select" className="space-y-8 mt-6">
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               {/* Task Selection */}
               <Card className="border-2 border-gray-100 hover:border-gray-200 transition-colors">
                 <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
@@ -974,7 +974,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
           </TabsContent>
 
           <TabsContent value="export" className="space-y-8 mt-6">
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               {/* Download */}
               <Card className="border-2 border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-200">
                 <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
@@ -1069,7 +1069,7 @@ export function ExportReportModal({ isOpen, onClose, tasks, project }: ExportRep
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-white p-4 rounded-lg border shadow-sm">
                     <div className="text-2xl font-bold text-blue-600">{filteredTasks.length}</div>
                     <div className="text-sm text-gray-600">Selected Tasks</div>

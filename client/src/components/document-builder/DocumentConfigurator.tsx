@@ -204,7 +204,7 @@ export const DocumentConfigurator: React.FC = () => {
           <Users className="w-4 h-4" />
           Target Audience
         </Label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {AUDIENCE_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -250,7 +250,7 @@ export const DocumentConfigurator: React.FC = () => {
           <Palette className="w-4 h-4" />
           Color Scheme
         </Label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {COLOR_SCHEMES.map((scheme) => (
             <button
               key={scheme.value}

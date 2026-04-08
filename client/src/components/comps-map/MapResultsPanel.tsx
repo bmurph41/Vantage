@@ -196,7 +196,7 @@ export function MapResultsPanel({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 mt-2">
                 {config.metricsConfig.card.slice(0, 4).map(field => {
                   const value = item.metrics[field];
                   if (value === undefined || value === null) return null;

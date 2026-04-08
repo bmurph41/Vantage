@@ -136,7 +136,7 @@ export default function FormEmbedModal({ open, onOpenChange, form }: FormEmbedMo
         </DialogHeader>
 
         <Tabs defaultValue="embed" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
             <TabsTrigger data-testid="tab-embed" value="embed">Embed Code</TabsTrigger>
             <TabsTrigger data-testid="tab-link" value="link">Direct Link</TabsTrigger>
             <TabsTrigger data-testid="tab-qr" value="qr">QR Code</TabsTrigger>

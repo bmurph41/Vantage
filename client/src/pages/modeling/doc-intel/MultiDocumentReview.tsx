@@ -653,7 +653,7 @@ export function MultiDocumentReview({
             {/* Document Stats */}
             <Card>
               <CardContent className="pt-4">
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-2xl font-bold">{getDocumentStats(upload.id).total}</p>
                     <p className="text-xs text-muted-foreground">Total Items</p>

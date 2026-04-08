@@ -186,7 +186,7 @@ export default function TasksView() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="bg-white border shadow-sm">
           <CardContent className="p-3 text-center">
             <p className="text-xs font-medium text-gray-500">Overdue</p>

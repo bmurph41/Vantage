@@ -262,6 +262,7 @@ export default function PendingProperties() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -375,6 +376,7 @@ export default function PendingProperties() {
                   ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

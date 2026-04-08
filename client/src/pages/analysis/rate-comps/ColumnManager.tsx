@@ -182,7 +182,7 @@ export default function ColumnManager({ onClose }: ColumnManagerProps) {
                 <CardTitle className="text-lg">Create New Column</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-">
                   <div>
                     <Label>Key *</Label>
                     <Input

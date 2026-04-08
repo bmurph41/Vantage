@@ -191,7 +191,7 @@ export default function LeaseCashFlowPage() {
     return (
       <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -408,6 +408,7 @@ export default function LeaseCashFlowPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -619,6 +620,7 @@ export default function LeaseCashFlowPage() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </CardContent>
@@ -633,7 +635,7 @@ export default function LeaseCashFlowPage() {
                 <CardTitle>Valuation Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Purchase Price</p>
                     <p className="text-lg font-semibold">{formatCurrency(metrics?.purchasePrice || 0)}</p>
@@ -675,7 +677,7 @@ export default function LeaseCashFlowPage() {
                 <CardTitle>Return Metrics</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Unlevered IRR</p>
                     <p className="text-2xl font-bold text-green-600">{formatPercent(metrics?.unleveredIRR || 0)}</p>
@@ -728,6 +730,7 @@ export default function LeaseCashFlowPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px]">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -774,6 +777,7 @@ export default function LeaseCashFlowPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </ScrollArea>
             </CardContent>
           </Card>
@@ -790,6 +794,7 @@ export default function LeaseCashFlowPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -841,6 +846,7 @@ export default function LeaseCashFlowPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -899,6 +905,7 @@ export default function LeaseCashFlowPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -940,6 +947,7 @@ export default function LeaseCashFlowPage() {
                     })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

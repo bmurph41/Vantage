@@ -49,7 +49,7 @@ export function ImportProgressStep({ progress, isProcessing }: ImportProgressSte
         <Progress value={percentage} className="h-3" />
       </div>
 
-      <div className="grid grid-cols-3 gap-6 w-full max-w-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-lg">
         <Card>
           <CardContent className="pt-4 text-center">
             <div className="flex justify-center mb-2">

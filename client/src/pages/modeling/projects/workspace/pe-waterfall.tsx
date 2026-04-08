@@ -329,6 +329,7 @@ function PEWaterfall({ projectId, onTabChange }: PEWaterfallProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -390,6 +391,7 @@ function PEWaterfall({ projectId, onTabChange }: PEWaterfallProps) {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -408,7 +410,7 @@ function PEWaterfall({ projectId, onTabChange }: PEWaterfallProps) {
                 <CardContent>
                   {result.lpMetrics && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-muted-foreground">Total Contribution</p>
                           <p className="text-lg font-semibold">{formatCurrency(result.lpMetrics.totalContribution)}</p>
@@ -464,7 +466,7 @@ function PEWaterfall({ projectId, onTabChange }: PEWaterfallProps) {
                 <CardContent>
                   {result.gpMetrics && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-muted-foreground">Total Contribution</p>
                           <p className="text-lg font-semibold">{formatCurrency(result.gpMetrics.totalContribution)}</p>

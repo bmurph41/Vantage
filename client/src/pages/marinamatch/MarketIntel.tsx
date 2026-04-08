@@ -1820,7 +1820,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                 Configure how to discover and extract listings across multiple pages on this site.
               </p>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Crawl Mode</Label>
                   <Select
@@ -1878,7 +1878,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Max Pages per Scan</Label>
                   <Input
@@ -2479,7 +2479,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
                 <Separator />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-medium mb-2">Location</h4>
                     <p className="text-muted-foreground">
@@ -2505,7 +2505,7 @@ export function MarketIntelTab({ onNavigateToBrokers }: MarketIntelTabProps = {}
 
                 <Separator />
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <h4 className="font-medium mb-1">Total Slips</h4>
                     <p className="text-lg">{selectedListing.totalSlips || "—"}</p>

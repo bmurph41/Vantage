@@ -288,7 +288,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
     return (
       <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -681,7 +681,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="text-center p-3 bg-muted/50 rounded-lg">
                         <p className="text-sm text-muted-foreground">Expected NPV</p>
                         <p className="text-lg font-bold">
@@ -860,6 +860,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
               </CardHeader>
               <CardContent>
                 <ScrollArea className="w-full">
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -902,6 +903,7 @@ export default function DCFCalculatorPage({ onTabChange }: DCFCalculatorPageProp
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                   <ScrollBar orientation="horizontal" />
                 </ScrollArea>
               </CardContent>

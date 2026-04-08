@@ -135,6 +135,7 @@ export function ActivitiesTable({
   }
   
   return (
+    <div className="overflow-x-auto w-full">
     <Table>
       <TableHeader>
         <TableRow>
@@ -222,5 +223,6 @@ export function ActivitiesTable({
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }

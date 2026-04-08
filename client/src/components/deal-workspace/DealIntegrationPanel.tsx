@@ -62,7 +62,7 @@ function SalesCompCard({ comp, linkMetadata, onUnlink }: {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 <span>{comp.state || "N/A"}</span>
@@ -131,7 +131,7 @@ function RateCompCard({ comp, linkMetadata, onUnlink }: {
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
                 <span>{comp.city}, {comp.state || "N/A"}</span>
@@ -635,7 +635,7 @@ export default function DealIntegrationPanel({ dealId, dealTitle, onConvertToDd 
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-3 mb-4">
+            <TabsList className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-4">
               <TabsTrigger value="sales-comps" className="text-xs" data-testid="tab-sales-comps">
                 <TrendingUp className="w-3 h-3 mr-1" />
                 Sales ({salesComps.length})

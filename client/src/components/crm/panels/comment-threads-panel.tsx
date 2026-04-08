@@ -363,7 +363,7 @@ export function CommentThreadsPanel({ entityType, entityId, entityName }: Commen
       </CardHeader>
       <CardContent className="pt-2">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="threads" data-testid="tab-threads">
               Active ({openThreads.length})
             </TabsTrigger>

@@ -1137,7 +1137,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
       </div>
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-xl">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-xl">
           <TabsTrigger value="capital-stack" className="gap-2">
             <Building2 className="h-4 w-4" />
             Capital Stack
@@ -1273,7 +1273,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                       <p className="text-sm text-muted-foreground">Define the total capital required for this deal</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label>Purchase Price *</Label>
                       <div className="relative">
@@ -1537,7 +1537,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           <Badge variant={partner.type === 'gp' ? 'default' : 'secondary'} className={partner.type === 'gp' ? 'bg-amber-600' : 'bg-green-600 text-white'}>
                             {partner.type === 'gp' ? 'GP' : 'LP'}
                           </Badge>
-                          <div className="flex-1 grid grid-cols-4 gap-3">
+                          <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-3">
                             <div>
                               <Label className="text-xs">Partner Name</Label>
                               <Input value={partner.name} onChange={(e) => updateStackPartner(partner.id, 'name', e.target.value)} placeholder="Partner name" className="h-8 text-sm" />
@@ -1610,7 +1610,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                       <Card key={tier.id} className="p-3 bg-white dark:bg-background border-purple-200 dark:border-purple-800">
                         <div className="flex items-center gap-3">
                           <Badge className="bg-purple-600 text-white">Tier {index + 1}</Badge>
-                          <div className="flex-1 grid grid-cols-3 gap-3">
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div>
                               <Label className="text-xs">IRR Hurdle (%)</Label>
                               <div className="relative">
@@ -1679,7 +1679,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                       <p className="text-sm text-muted-foreground">Define hold period and exit assumptions</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <Label>Hold Period (Years)</Label>
                       <Input type="number" value={wizardHoldPeriod} onChange={(e) => setWizardHoldPeriod(e.target.value)} placeholder="5" />
@@ -1702,7 +1702,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
                     <h5 className="text-sm font-medium mb-3 text-orange-700 dark:text-orange-300">Summary</h5>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Debt:</span>
                         <span className="font-medium">{formatCurrency(wizardLenders.reduce((sum, l) => sum + (parseFloat(l.principal) || 0), 0))}</span>
@@ -1863,7 +1863,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
               </div>
             ) : marketForwardRates?.forwardCurveAvailable ? (
               <>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <Card className="p-3">
                     <p className="text-[10px] uppercase text-muted-foreground font-medium">Current SOFR</p>
                     <p className="text-lg font-bold tabular-nums">{(marketForwardRates.yearlyRates[0]?.baseSofrRate * 100).toFixed(2)}%</p>
@@ -1886,6 +1886,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                   </Card>
                 </div>
                 
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -1906,6 +1907,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                     ))}
                   </TableBody>
                 </Table>
+                </div>
                 
                 <div className="flex items-center justify-between pt-2">
                   <p className="text-xs text-muted-foreground">Forward rates auto-applied to floating-rate tranche debt service in Pro Forma</p>
@@ -2070,7 +2072,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 <Layers className="h-4 w-4" />
                                 Template Preview: {tmpl.name}
                               </h5>
-                              <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                 {config.targetLtv && (
                                   <div><span className="text-muted-foreground">Target LTV:</span> <span className="font-medium">{config.targetLtv}%</span></div>
                                 )}
@@ -2283,7 +2285,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* ── KPI strip ── */}
-                    <div className="grid grid-cols-4 divide-x divide-border border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border border rounded-lg overflow-hidden">
                       {[
                         { label: 'Total Capitalization', value: formatCurrency(totalCap), accent: 'text-foreground' },
                         { label: 'Total Debt', value: formatCurrency(totalDebt), accent: 'text-blue-600 dark:text-blue-400' },
@@ -2430,7 +2432,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           </DialogHeader>
                           <Form {...debtForm}>
                             <form onSubmit={debtForm.handleSubmit(handleDebtSubmit)} className="space-y-6">
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <FormField control={debtForm.control} name="name" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Tranche Name *</FormLabel>
@@ -2471,7 +2473,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <Separator />
                               <h4 className="font-medium text-sm">Loan Terms</h4>
 
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <FormField control={debtForm.control} name="principal" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Principal Amount *</FormLabel>
@@ -2496,7 +2498,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 )} />
                               </div>
 
-                              <div className="grid grid-cols-3 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="interestRate" render={({ field }) => (
                                   <FormItem>
                                     <div className="flex items-center justify-between">
@@ -2542,7 +2544,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 />
                               )}
 
-                              <div className="grid grid-cols-3 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="termYears" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Loan Term (Years) *</FormLabel>
@@ -2568,7 +2570,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <Separator />
                               <h4 className="font-medium text-sm">Fees & Prepayment</h4>
 
-                              <div className="grid grid-cols-3 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="originationFeePct" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Origination Fee</FormLabel>
@@ -2594,7 +2596,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               <Separator />
                               <h4 className="font-medium text-sm">Covenants</h4>
 
-                              <div className="grid grid-cols-3 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <FormField control={debtForm.control} name="minDscr" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Min DSCR</FormLabel>
@@ -2634,6 +2636,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                         <p className="text-muted-foreground">No debt tranches configured</p>
                       </Card>
                     ) : (
+                      <div className="overflow-x-auto w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -2695,6 +2698,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </TabsContent>
 
@@ -2760,7 +2764,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                       <Briefcase className="h-4 w-4 text-slate-600" />
                                       Investor Information
                                     </h4>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                       <FormField control={equityForm.control} name="name" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Layer Name *</FormLabel>
@@ -2795,7 +2799,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
 
                                     <Separator className="my-4" />
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                       <FormField control={equityForm.control} name="investorName" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Investor / Entity Name</FormLabel>
@@ -2839,7 +2843,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                           <Info className="h-3.5 w-3.5 text-blue-500" />
                                           <span className="text-xs font-medium text-blue-700">Auto-Calculated from Capital Stack</span>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-4 text-sm">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                                           <div>
                                             <span className="text-muted-foreground text-xs">Purchase Price</span>
                                             <p className="font-semibold">${purchasePrice.toLocaleString()}</p>
@@ -2857,7 +2861,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                     )}
 
                                     {/* Total Equity + Ownership (always shown) */}
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                       <FormField control={equityForm.control} name="commitmentAmount" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>{layerType === 'solo' || layerType === 'partnership' ? 'Total Equity *' : 'Capital Commitment *'}</FormLabel>
@@ -2919,7 +2923,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
                                                 <span className="text-xs font-bold text-blue-700">{idx + 1}</span>
                                               </div>
-                                              <div className="flex-1 grid grid-cols-4 gap-3">
+                                              <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-3">
                                                 <div>
                                                   <Label className="text-xs">Name</Label>
                                                   <Input
@@ -3024,7 +3028,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                       <TrendingUp className="h-4 w-4 text-green-600" />
                                       Return Structure
                                     </h4>
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                       <FormField control={equityForm.control} name="preferredReturn" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Preferred Return Rate</FormLabel>
@@ -3115,7 +3119,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                                 <div className="text-xs text-muted-foreground mt-1">Above Tier {index}</div>
                                               )}
                                             </div>
-                                            <div className="flex-1 grid grid-cols-3 gap-4">
+                                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                               <div>
                                                 <Label className="text-xs font-medium">IRR Hurdle</Label>
                                                 <div className="relative mt-1">
@@ -3224,6 +3228,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                         <p className="text-muted-foreground">No equity layers configured</p>
                       </Card>
                     ) : (
+                      <div className="overflow-x-auto w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -3287,6 +3292,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           })}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                   </TabsContent>
 
@@ -3371,6 +3377,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
+                          <div className="overflow-x-auto w-full">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -3403,9 +3410,10 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               ))}
                             </TableBody>
                           </Table>
+                          </div>
 
                           {projections.length > 0 && projections[projections.length - 1].irr && (
-                            <div className="mt-6 grid grid-cols-4 gap-4">
+                            <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                               <Card className="bg-primary/5">
                                 <CardContent className="pt-4 text-center">
                                   <div className="text-3xl font-bold text-primary">
@@ -3559,6 +3567,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               Add Tier
                             </Button>
                           </div>
+                          <div className="overflow-x-auto w-full">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -3606,6 +3615,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               })()}
                             </TableBody>
                           </Table>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -3798,6 +3808,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                   <p>No partners added yet. Add equity layers to see partner returns.</p>
                                 </div>
                               ) : (
+                                <div className="overflow-x-auto w-full">
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
@@ -3863,6 +3874,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                     </TableRow>
                                   </tfoot>
                                 </Table>
+                                </div>
                               )}
                             </CardContent>
                           </Card>
@@ -3875,7 +3887,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               </CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <div className="grid grid-cols-4 gap-4 text-sm">
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                                 <div>
                                   <span className="text-muted-foreground block">Exit Value</span>
                                   <span className="font-semibold">{formatCurrency(exitValue)}</span>
@@ -3997,6 +4009,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                               {/* Waterfall Distribution */}
                               <div className="space-y-3">
                                 <h4 className="font-medium">Waterfall Distribution</h4>
+                                <div className="overflow-x-auto w-full">
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
@@ -4045,6 +4058,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                     </TableRow>
                                   </TableBody>
                                 </Table>
+                                </div>
                               </div>
 
                               {/* Per-Investor LP Report */}
@@ -4054,6 +4068,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                     <Users className="h-4 w-4" />
                                     Per-Investor Returns
                                   </h4>
+                                  <div className="overflow-x-auto w-full">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -4098,6 +4113,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                       })}
                                     </TableBody>
                                   </Table>
+                                  </div>
                                 </div>
                               )}
                             </>
@@ -4310,7 +4326,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 )}
 
                                 {/* Comparison Grid */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                   <Card className="bg-slate-50">
                                     <CardHeader className="pb-2">
                                       <CardTitle className="text-sm">Before Refi (Acquisition)</CardTitle>
@@ -4355,6 +4371,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 {/* Year-by-Year Cash Flow */}
                                 <div>
                                   <h5 className="text-sm font-medium mb-2">Year-by-Year Cash Flow Comparison</h5>
+                                  <div className="overflow-x-auto w-full">
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -4387,6 +4404,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                       })}
                                     </TableBody>
                                   </Table>
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -4407,11 +4425,12 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                         <CardDescription>Closing statement auto-balanced from capital stack</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                           <div>
                             <h4 className="font-semibold text-sm mb-3 text-green-700 flex items-center gap-2">
                               <DollarSign className="h-4 w-4" /> Sources
                             </h4>
+                            <div className="overflow-x-auto w-full">
                             <Table>
                               <TableBody>
                                 {debtTranches.map((t) => (
@@ -4432,11 +4451,13 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 </TableRow>
                               </TableBody>
                             </Table>
+                            </div>
                           </div>
                           <div>
                             <h4 className="font-semibold text-sm mb-3 text-blue-700 flex items-center gap-2">
                               <Building2 className="h-4 w-4" /> Uses
                             </h4>
+                            <div className="overflow-x-auto w-full">
                             <Table>
                               <TableBody>
                                 <TableRow>
@@ -4475,6 +4496,7 @@ export default function CapitalStackWorkspace({ projectId, onTabChange }: Capita
                                 })()}
                               </TableBody>
                             </Table>
+                            </div>
                           </div>
                         </div>
                         {(() => {

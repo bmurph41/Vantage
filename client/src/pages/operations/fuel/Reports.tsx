@@ -205,7 +205,7 @@ export default function Reports() {
           <AssetSelector 
             value={selectedAssetId} 
             onChange={setSelectedAssetId}
-            className="w-[280px]"
+            className="w-full max-w-[280px]"
           />
         </div>
       </div>
@@ -465,7 +465,7 @@ export default function Reports() {
 
             {reportType === "summary" && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 p-6 bg-muted/20 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6 bg-muted/20 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Revenue</p>
                     <p className="text-2xl font-bold">${totalRevenue.toLocaleString()}</p>

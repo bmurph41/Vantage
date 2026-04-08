@@ -464,6 +464,7 @@ export default function CuratedDataDashboard() {
                     <p className="text-sm">Promote listings from organization data or run scrape jobs.</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -533,6 +534,7 @@ export default function CuratedDataDashboard() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -638,6 +640,7 @@ export default function CuratedDataDashboard() {
                     <p className="text-sm">Add broker sites or listing platforms to start collecting data.</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -711,6 +714,7 @@ export default function CuratedDataDashboard() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -798,7 +802,7 @@ export default function CuratedDataDashboard() {
                             onChange={(e) => setNewStandard({ ...newStandard, name: e.target.value })}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="grid gap-2">
                             <Label>Category *</Label>
                             <Select 
@@ -832,7 +836,7 @@ export default function CuratedDataDashboard() {
                             </Select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="grid gap-2">
                             <Label>Value</Label>
                             <Input 
@@ -861,7 +865,7 @@ export default function CuratedDataDashboard() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="grid gap-2">
                             <Label>Unit</Label>
                             <Select 
@@ -890,7 +894,7 @@ export default function CuratedDataDashboard() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="grid gap-2">
                             <Label>Data Source</Label>
                             <Input 
@@ -937,6 +941,7 @@ export default function CuratedDataDashboard() {
                     <p className="text-sm">Add benchmarks to help users compare their marina performance.</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -984,6 +989,7 @@ export default function CuratedDataDashboard() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

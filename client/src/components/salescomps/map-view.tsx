@@ -222,7 +222,7 @@ export function MapView({
               ))}
             </GoogleMap>
 
-            <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="comp-marker-color">Comp Marker Color</Label>
                 <div className="flex gap-2 mt-1">

@@ -1472,7 +1472,7 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                 </div>
                 <div className="mt-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border">
                   <h4 className="text-sm font-medium mb-2">NOI Growth Over Hold Period</h4>
-                  <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
                     <div>
                       <div className="text-xs text-muted-foreground">Year 1</div>
                       <div className="font-medium">{formatCurrency(year1Summary.noi, { dash: true })}</div>

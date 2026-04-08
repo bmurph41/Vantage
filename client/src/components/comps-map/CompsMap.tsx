@@ -311,7 +311,7 @@ export function CompsMap({
                       {[selectedItem.city, selectedItem.state].filter(Boolean).join(', ')}
                     </p>
                   )}
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1">
                     {config.metricsConfig.popup.map(field => {
                       const value = selectedItem.metrics[field];
                       if (value === undefined || value === null) return null;

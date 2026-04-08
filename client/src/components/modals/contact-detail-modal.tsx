@@ -663,7 +663,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
             {/* Overview Tab */}
             <TabsContent value="overview" className="mt-0 space-y-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -725,7 +725,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
               </div>
 
               {/* Two Column Layout */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Left Column - Contact Details */}
                 <div className="col-span-2 space-y-6">
                   {/* Contact Information Card */}
@@ -737,7 +737,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">First Name</Label>
                           {isEditing ? (
@@ -756,7 +756,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
                             <Mail className="w-3 h-3" /> Email
@@ -785,7 +785,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
 
                       <Separator />
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
                             <Building className="w-3 h-3" /> Company
@@ -829,7 +829,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                           <MapPin className="w-3 h-3" /> Address
                         </Label>
                         {isEditing ? (
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="col-span-2">
                               <AddressInput
                                 value={form.watch('address') || ""}
@@ -1203,7 +1203,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {contactDeals.map((deal) => (
                     <Card key={deal.id} className="hover:shadow-md transition-shadow cursor-pointer">
                       <CardContent className="p-4">
@@ -1340,7 +1340,7 @@ export default function ContactDetailModal({ isOpen, onClose, contact, onCompany
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {files.map((file) => (
                     <Card key={file.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-3 flex items-center gap-3">

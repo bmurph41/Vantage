@@ -199,7 +199,7 @@ export default function CompSetDialog({ open, onOpenChange, compSet, subjects }:
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-">
               <FormField
                 control={form.control}
                 name="compType"

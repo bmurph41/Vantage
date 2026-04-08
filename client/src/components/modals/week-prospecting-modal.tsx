@@ -1529,7 +1529,7 @@ export default function WeekProspectingModal({
                 </div>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {weeklyGoals.map((goal, index) => (
                     <div key={goal.id} className="relative group">
                       <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
@@ -1766,7 +1766,7 @@ export default function WeekProspectingModal({
                 </div>
                 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-4 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-900">{weeklyStats.totalActivities}</div>
                     <p className="text-xs font-medium text-gray-600">Activities Complete</p>
@@ -2010,7 +2010,7 @@ export default function WeekProspectingModal({
         
           {/* Modal Content */}
           <div className="px-6 py-5 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium mb-2 block text-gray-700 dark:text-gray-300">Outreach Type *</Label>
               <Select 
@@ -2057,7 +2057,7 @@ export default function WeekProspectingModal({
             )}
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Link to Contact</Label>
               {showNewContactForm ? (
@@ -2078,7 +2078,7 @@ export default function WeekProspectingModal({
                       <X className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Input
                       placeholder="First name"
                       className="h-9 text-sm"
@@ -2289,7 +2289,7 @@ export default function WeekProspectingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium mb-2 block">Link to Company</Label>
               {showNewCompanyForm ? (

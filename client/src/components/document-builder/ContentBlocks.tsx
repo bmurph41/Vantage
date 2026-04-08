@@ -412,7 +412,7 @@ export function PropertyCard({
         )}
 
         {metrics && metrics.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t">
             {metrics.map((metric) => (
               <div key={metric.label}>
                 <p className="text-xs text-muted-foreground">{metric.label}</p>

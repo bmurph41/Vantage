@@ -176,7 +176,7 @@ export function WebhooksPanel({ webhooks, isLoading, showForm, onShowForm }: Web
 
             <div className="space-y-2">
               <Label>Events</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {EVENT_TYPES.map((event) => (
                   <div key={event.value} className="flex items-center gap-2">
                     <Checkbox

@@ -381,7 +381,7 @@ export default function AdminOrganizationsPage() {
             <div className="space-y-6 mt-6">
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">Details</h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Created</span>
                     <p className="font-medium text-gray-900 dark:text-white">{formatDate(orgDetail.createdAt)}</p>
@@ -407,7 +407,7 @@ export default function AdminOrganizationsPage() {
                 <>
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">Subscription</h3>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <div>
                         <span className="text-muted-foreground">Plan</span>
                         <p className="font-medium text-gray-900 dark:text-white">{orgDetail.subscription.planName || "—"}</p>

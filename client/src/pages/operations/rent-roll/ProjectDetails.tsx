@@ -395,6 +395,7 @@ function LeasesTab({ projectId, loading }: { projectId: string; loading: boolean
         </div>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -448,6 +449,7 @@ function LeasesTab({ projectId, loading }: { projectId: string; loading: boolean
             )}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -470,7 +472,7 @@ function SettingsTab({ project, loading }: { project?: ProjectDetails; loading: 
           <CardDescription>Basic details about this marina project</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <p className="text-sm text-muted-foreground">Project Code</p>
               <p className="font-medium">{project?.code || '-'}</p>
@@ -508,10 +510,10 @@ function SettingsTab({ project, loading }: { project?: ProjectDetails; loading: 
             <CardDescription>Configured operating seasons</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                 <h4 className="font-medium mb-2">Summer Season</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Start</p>
                     <p>{project.seasonStartDate ? new Date(project.seasonStartDate).toLocaleDateString() : '-'}</p>
@@ -524,7 +526,7 @@ function SettingsTab({ project, loading }: { project?: ProjectDetails; loading: 
               </div>
               <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-lg">
                 <h4 className="font-medium mb-2">Winter Season</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Start</p>
                     <p>{project.winterStartDate ? new Date(project.winterStartDate).toLocaleDateString() : '-'}</p>
@@ -546,7 +548,7 @@ function SettingsTab({ project, loading }: { project?: ProjectDetails; loading: 
           <CardDescription>Financial targets for the current budget year</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div>
               <p className="text-sm text-muted-foreground">Budgeted Revenue</p>
               <p className="text-xl font-bold">
@@ -642,7 +644,7 @@ function ModelingTab({ projectId, projectName, loading }: { projectId: string; p
         </CardHeader>
         <CardContent>
           {metricsLoading ? (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20" />)}
             </div>
           ) : metrics ? (

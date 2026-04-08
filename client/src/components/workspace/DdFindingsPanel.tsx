@@ -149,7 +149,7 @@ export default function DdFindingsPanel({ workspaceId, dealId }: Props) {
           <div className="space-y-3">
             <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Environmental Phase I flagged RECs" /></div>
             <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Category</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
@@ -175,7 +175,7 @@ export default function DdFindingsPanel({ workspaceId, dealId }: Props) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Financial Impact ($)</Label><Input type="number" value={form.estimatedFinancialImpact} onChange={(e) => setForm({ ...form, estimatedFinancialImpact: e.target.value })} placeholder="0" /></div>
               <div>
                 <Label>Recommended Action</Label>

@@ -268,7 +268,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -326,7 +326,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                 <DialogDescription>Record a boat rental transaction</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Rental Date *</Label>
                     <Input
@@ -346,7 +346,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Gross Sales *</Label>
                     <Input
@@ -438,6 +438,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
               <p className="text-sm">Add rentals manually or import from actuals</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -491,6 +492,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -518,7 +520,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
             });
           }}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Rental Date</Label>
                   <Input type="date" name="editRentalDate" defaultValue={editingRental?.rentalDate?.split('T')[0]} />
@@ -528,7 +530,7 @@ export default function ValuatorBoatRentalsTab({ projectId, projectName }: Valua
                   <Input type="number" step="0.5" name="editHours" defaultValue={editingRental?.hours} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Gross Sales</Label>
                   <Input type="number" step="0.01" name="editGrossSales" defaultValue={editingRental?.grossSales} />

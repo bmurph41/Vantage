@@ -230,7 +230,7 @@ export default function GLImport() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-end gap-4">
-            <div className="w-[300px]">
+            <div className="w-full sm:w-[300px]">
               <Label className="text-xs text-muted-foreground mb-1 block">
                 Target Asset / Marina *
               </Label>
@@ -346,6 +346,7 @@ export default function GLImport() {
           </CardHeader>
           <CardContent>
             <div className="max-h-[400px] overflow-auto">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -404,6 +405,7 @@ export default function GLImport() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
             {parsedRows.length > 100 && (
               <p className="text-xs text-muted-foreground mt-2">
@@ -470,6 +472,7 @@ export default function GLImport() {
               <p className="text-sm">No import history yet.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -496,6 +499,7 @@ export default function GLImport() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -231,7 +231,7 @@ export default function OmBuilderEditorPage() {
         {sidebarOpen.left && (
           <div className="w-64 border-r flex flex-col bg-background">
             <Tabs defaultValue="pages" className="flex-1 flex flex-col">
-              <TabsList className="w-full grid grid-cols-2 rounded-none border-b">
+              <TabsList className="w-full grid grid-cols-1 sm:grid-cols-2 rounded-none border-b">
                 <TabsTrigger value="pages" className="text-xs">Pages</TabsTrigger>
                 <TabsTrigger value="layers" className="text-xs">Layers</TabsTrigger>
               </TabsList>

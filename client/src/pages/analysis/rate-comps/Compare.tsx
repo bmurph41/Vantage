@@ -450,7 +450,7 @@ export default function Compare() {
                       </TableRow>
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
               </CardContent>
             </Card>
           </div>

@@ -99,7 +99,7 @@ function DealOverviewTab({ deal, workspace }: { deal: any; workspace: any }) {
   return (
     <div className="space-y-4">
       {/* Financial KPIs */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 p-4">
           <p className="text-xs text-blue-500 mb-1">Deal Value</p>
           <p className="text-2xl font-bold text-blue-700">{fmtCurrency(dealValue)}</p>
@@ -234,7 +234,7 @@ function DealOverviewTab({ deal, workspace }: { deal: any; workspace: any }) {
             <CardTitle className="text-sm flex items-center gap-2"><Anchor className="h-4 w-4" />Property Details</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               {Object.entries(deal.propertyDetails as any)
                 .filter(([, v]) => v != null && v !== '')
                 .slice(0, 16)
@@ -352,7 +352,7 @@ function DealModelsTab({ dealId }: { dealId: string }) {
                 <div><p className="text-sm font-semibold">{proj.name}</p><Badge className={`text-[10px] mt-0.5 ${statusCls}`}>{proj.status || 'draft'}</Badge></div>
                 <ArrowUpRight className="h-4 w-4 text-gray-400" />
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 {proj.purchasePrice != null && <div className="rounded-lg bg-gray-50 p-2 text-center"><p className="text-[10px] text-gray-400">Price</p><p className="text-xs font-bold text-gray-700">{fmtCurrency(proj.purchasePrice)}</p></div>}
                 {proj.goingInCapRate != null && <div className="rounded-lg bg-blue-50 p-2 text-center"><p className="text-[10px] text-blue-400">Cap Rate</p><p className="text-xs font-bold text-blue-700">{(proj.goingInCapRate * 100).toFixed(2)}%</p></div>}
                 {proj.projectedIrr != null && <div className="rounded-lg bg-emerald-50 p-2 text-center"><p className="text-[10px] text-emerald-400">IRR</p><p className="text-xs font-bold text-emerald-700">{(proj.projectedIrr * 100).toFixed(1)}%</p></div>}
@@ -394,7 +394,7 @@ function DealCompsTab({ state, city }: { state?: string | null; city?: string | 
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-center"><p className="text-xs text-blue-400">Avg Sale Price</p><p className="text-lg font-bold text-blue-700">{fmtCurrency(avgPrice)}</p></div>
         <div className="rounded-xl bg-emerald-50 p-3 text-center"><p className="text-xs text-emerald-400">Avg Cap Rate</p><p className="text-lg font-bold text-emerald-700">{avgCapRate ? `${avgCapRate.toFixed(2)}%` : '—'}</p></div>
         <div className="rounded-xl bg-purple-50 p-3 text-center"><p className="text-xs text-purple-400">Comps</p><p className="text-lg font-bold text-purple-700">{comps.length}</p></div>

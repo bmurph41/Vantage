@@ -464,6 +464,7 @@ export default function CoaMappingReview() {
               </p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -584,6 +585,7 @@ export default function CoaMappingReview() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t px-4 py-3">

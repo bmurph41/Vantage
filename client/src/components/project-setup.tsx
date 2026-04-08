@@ -507,7 +507,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -626,7 +626,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             {/* PSA Signed Date — manual entry or computed from LOI + N days */}
             <div>
               <Label htmlFor="psaSignedDate">PSA Signed Date</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DateInput
                   id="psaSignedDate"
                   value={projectForm.watch("psaSignedDate")}
@@ -656,7 +656,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             {/* DD Expiration Date */}
             <div>
               <Label htmlFor="ddExpirationDate">DD Expiration Date</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DateInput
                   id="ddExpirationDate"
                   value={projectForm.watch("ddExpirationDate")}
@@ -756,7 +756,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
             {/* Closing Date */}
             <div>
               <Label htmlFor="closingDate">Closing Date</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DateInput
                   id="closingDate"
                   value={projectForm.watch("closingDate")}
@@ -805,7 +805,7 @@ export function ProjectSetup({ project, settings, tasks }: ProjectSetupProps) {
                 <div className="space-y-3">
                   {customDeadlines.map((deadline, index) => (
                     <div key={index} className="p-3 bg-muted/50 rounded-lg space-y-3">
-                      <div className="grid grid-cols-2 gap-3 items-start">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                         <div className="space-y-2">
                           <Label htmlFor={`custom-deadline-label-${index}`} className="text-xs">Deadline Name</Label>
                           <Input

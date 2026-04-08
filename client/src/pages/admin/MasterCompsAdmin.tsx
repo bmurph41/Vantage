@@ -167,6 +167,7 @@ export default function MasterCompsAdminPage() {
               {isLoading ? (
                 <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -208,6 +209,7 @@ export default function MasterCompsAdminPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -224,6 +226,7 @@ export default function MasterCompsAdminPage() {
               {contributions.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">No pending contributions</p>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -259,6 +262,7 @@ export default function MasterCompsAdminPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

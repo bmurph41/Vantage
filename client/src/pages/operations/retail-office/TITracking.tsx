@@ -186,6 +186,7 @@ export default function RetailOfficeTITracking() {
               <p className="text-sm mt-1">Add tenant improvement allowances to start tracking draws and balances.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -226,6 +227,7 @@ export default function RetailOfficeTITracking() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -222,7 +222,7 @@ export default function PnlKeywordBank() {
                       data-testid="input-keyword"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Department</Label>
                       <Select value={newDepartment} onValueChange={setNewDepartment}>
@@ -250,7 +250,7 @@ export default function PnlKeywordBank() {
                       </Select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Match Type</Label>
                       <Select value={newMatchType} onValueChange={setNewMatchType}>
@@ -436,7 +436,7 @@ export default function PnlKeywordBank() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             )}
           </CardContent>
         </Card>
@@ -453,7 +453,7 @@ export default function PnlKeywordBank() {
                   <Label>Keyword</Label>
                   <Input value={editingRule.keyword} disabled className="bg-muted" data-testid="input-edit-keyword" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Department</Label>
                     <Select 
@@ -487,7 +487,7 @@ export default function PnlKeywordBank() {
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Match Type</Label>
                     <Select 

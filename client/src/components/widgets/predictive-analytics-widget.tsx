@@ -115,7 +115,7 @@ export default function PredictiveAnalyticsWidget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -176,7 +176,7 @@ export default function PredictiveAnalyticsWidget() {
         </div>
         
         {/* Key Metrics */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div className="text-center">
             <div className={`text-lg font-bold ${trendColors[predictiveData.revenue.trend]} flex items-center justify-center gap-1`}>
               <TrendIcon className="w-4 h-4" />
@@ -195,7 +195,7 @@ export default function PredictiveAnalyticsWidget() {
       
       <CardContent className="pt-0">
         <Tabs defaultValue="forecast" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <TabsTrigger value="forecast">Forecast</TabsTrigger>
             <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
@@ -244,7 +244,7 @@ export default function PredictiveAnalyticsWidget() {
               </div>
               
               {/* Pipeline Metrics */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center gap-2 mb-1">
                     <Target className="w-4 h-4 text-blue-600" />

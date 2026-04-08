@@ -88,6 +88,7 @@ export default function SelfStorageRateManagement() {
               <p className="text-sm mt-1">Add units to automatically populate the rate sheet.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -125,6 +126,7 @@ export default function SelfStorageRateManagement() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -147,6 +149,7 @@ export default function SelfStorageRateManagement() {
               <p className="text-sm mt-1">Competitor rate tracking will populate as data becomes available.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -167,6 +170,7 @@ export default function SelfStorageRateManagement() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

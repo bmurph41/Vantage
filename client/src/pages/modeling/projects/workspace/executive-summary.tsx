@@ -198,7 +198,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
                       </Badge>
                       <span className="text-sm text-muted-foreground">{scenarios[type].description}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Revenue Growth (%)</Label>
                         <Input
@@ -415,6 +415,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
           <CardTitle>NOI Projection & Cash-on-Cash Returns</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -452,6 +453,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
               </TableRow>
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -461,6 +463,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
           <CardDescription>Side-by-side comparison of all scenarios</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -515,6 +518,7 @@ export default function WorkspaceExecutiveSummary({ projectId, onTabChange }: Wo
               </TableRow>
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

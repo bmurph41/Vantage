@@ -290,7 +290,7 @@ function LeaseFormDrawer({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="leaseType"
@@ -348,7 +348,7 @@ function LeaseFormDrawer({
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-muted-foreground">Lease Terms</h3>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="startDate"
@@ -378,7 +378,7 @@ function LeaseFormDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="baseRent"
@@ -425,7 +425,7 @@ function LeaseFormDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="discountType"
@@ -475,7 +475,7 @@ function LeaseFormDrawer({
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-muted-foreground">Vessel Information</h3>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="vesselName"
@@ -517,7 +517,7 @@ function LeaseFormDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="vesselLength"
@@ -647,7 +647,7 @@ function LeasesTable({
   };
 
   return (
-    <div className="border rounded-lg" data-tour="rentroll-units">
+    <div className="border rounded-lg overflow-x-auto w-full" data-tour="rentroll-units">
       <Table>
         <TableHeader>
           <TableRow>
@@ -774,7 +774,7 @@ function LeasesTable({
           )}
         </TableBody>
       </Table>
-    </div>
+      </div>
   );
 }
 

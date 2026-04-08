@@ -259,7 +259,7 @@ export default function MarketTargets() {
                 <CardContent className="p-4">
                   <Skeleton className="h-5 w-3/4 mb-2" />
                   <Skeleton className="h-4 w-1/2 mb-4" />
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <Skeleton className="h-10" />
                     <Skeleton className="h-10" />
                   </div>
@@ -295,7 +295,7 @@ export default function MarketTargets() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
                     <div>
                       <p className="text-xs text-gray-500">Total</p>
                       <p className="text-lg font-semibold text-gray-900">{market.totalMarinas || 0}</p>
@@ -366,7 +366,7 @@ export default function MarketTargets() {
               <Label htmlFor="states">States (comma-separated)</Label>
               <Input id="states" value={formData.states} onChange={(e) => setFormData(prev => ({ ...prev, states: e.target.value }))} placeholder="e.g., FL, GA, SC" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Priority</Label>
                 <Select value={formData.priority} onValueChange={(val) => setFormData(prev => ({ ...prev, priority: val }))}>

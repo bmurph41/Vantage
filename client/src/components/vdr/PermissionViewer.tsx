@@ -225,6 +225,7 @@ export function PermissionViewer({ resourceType, resourceId, projectId }: Permis
             </Button>
           </div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -267,6 +268,7 @@ export function PermissionViewer({ resourceType, resourceId, projectId }: Permis
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
     </Card>

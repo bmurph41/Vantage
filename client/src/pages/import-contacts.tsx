@@ -445,6 +445,7 @@ export default function ImportContacts() {
         </div>
 
         <div className="border rounded-lg overflow-auto max-h-96">
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -493,6 +494,7 @@ export default function ImportContacts() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         <div className="space-y-3 pt-4">
@@ -561,7 +563,7 @@ export default function ImportContacts() {
           <Progress value={importJob?.progress || 0} data-testid="progress-import" />
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="text-center p-4 border rounded-lg">
             <p className="text-2xl font-bold" data-testid="text-total-rows">{importJob?.totalRows || 0}</p>
             <p className="text-sm text-muted-foreground">Total Rows</p>

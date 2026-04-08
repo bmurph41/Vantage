@@ -178,7 +178,7 @@ export default function AnalyticsFiltersPanel({
         {/* Capacity Range */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Slip Capacity</Label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input
@@ -213,7 +213,7 @@ export default function AnalyticsFiltersPanel({
         {/* Price Per Slip Range */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Price Per Slip</Label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min</Label>
               <Input

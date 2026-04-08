@@ -172,7 +172,7 @@ export function ShareProjectDialog({ open, onOpenChange, project }: ShareProject
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Create New Share Link</h3>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="access-level">Access Level</Label>
                 <Select value={accessLevel} onValueChange={(value: "view" | "comment") => setAccessLevel(value)}>

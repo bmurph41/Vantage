@@ -555,6 +555,7 @@ export default function UnifiedAnalytics() {
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -630,6 +631,7 @@ export default function UnifiedAnalytics() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1256,6 +1258,7 @@ export default function UnifiedAnalytics() {
                       {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
                     </div>
                   ) : schedules.length > 0 ? (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1329,6 +1332,7 @@ export default function UnifiedAnalytics() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   ) : (
                     <div className="text-center py-12">
                       <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -1362,7 +1366,7 @@ export default function UnifiedAnalytics() {
                 <div className="space-y-4 p-4">
                   <Skeleton className="h-8 w-1/2" />
                   <Skeleton className="h-4 w-3/4" />
-                  <div className="grid grid-cols-2 gap-4 mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                     <Skeleton className="h-24" />
                     <Skeleton className="h-24" />
                   </div>
@@ -1377,7 +1381,7 @@ export default function UnifiedAnalytics() {
                     </p>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
@@ -1396,7 +1400,7 @@ export default function UnifiedAnalytics() {
                     </Card>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm">Deals by Stage</CardTitle>

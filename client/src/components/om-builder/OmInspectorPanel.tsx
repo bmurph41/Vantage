@@ -57,7 +57,7 @@ export function OmInspectorPanel() {
 
       <ScrollArea className="flex-1">
         <Tabs defaultValue="style" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <TabsTrigger value="style" className="text-xs">Style</TabsTrigger>
             <TabsTrigger value="content" className="text-xs">Content</TabsTrigger>
             <TabsTrigger value="position" className="text-xs">Position</TabsTrigger>
@@ -360,7 +360,7 @@ export function OmInspectorPanel() {
           </TabsContent>
 
           <TabsContent value="position" className="p-3 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-xs">X</Label>
                 <Input

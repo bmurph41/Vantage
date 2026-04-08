@@ -64,7 +64,7 @@ export default function CoverPageDesigner({
   const theme = COLOR_THEMES.find((t) => t.id === config.colorTheme) || COLOR_THEMES[0];
 
   return (
-    <div className="grid grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
       {/* Controls */}
       <div className="space-y-6">
         <Card>

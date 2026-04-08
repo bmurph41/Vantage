@@ -418,6 +418,7 @@ export default function OperationsIntegrations() {
           </DialogHeader>
           <div className="py-4">
             {historyData?.history && historyData.history.length > 0 ? (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -448,6 +449,7 @@ export default function OperationsIntegrations() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 No sync history found.

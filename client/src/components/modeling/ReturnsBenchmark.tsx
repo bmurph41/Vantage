@@ -210,7 +210,7 @@ export function ReturnsBenchmark({
               <Skeleton className="h-16 w-full" />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-4">
               <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
                 <div className="text-sm font-medium text-muted-foreground">
                   Deal IRR
@@ -349,7 +349,7 @@ export function ReturnsBenchmark({
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           </CardContent>
         </Card>
       )}
@@ -448,7 +448,7 @@ export function ReturnsBenchmark({
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
         </CardContent>
       </Card>
     </div>

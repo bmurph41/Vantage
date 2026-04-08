@@ -268,6 +268,7 @@ function BenchmarkOverlay({ projectId, onTabChange }: BenchmarkOverlayProps) {
             <CardTitle className="text-lg">Spread Analysis</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -296,6 +297,7 @@ function BenchmarkOverlay({ projectId, onTabChange }: BenchmarkOverlayProps) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -472,7 +472,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-96" />
@@ -714,6 +714,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
@@ -734,9 +735,10 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="p-3 bg-muted/50 rounded-lg text-center">
                         <p className="text-lg font-bold tabular-nums">{(forwardCurveData.yearlyRates.reduce((s, r) => s + r.allInRateCapped, 0) / forwardCurveData.yearlyRates.length * 100).toFixed(2)}%</p>
                         <p className="text-[10px] uppercase text-muted-foreground">Avg All-In Rate</p>
@@ -883,7 +885,7 @@ export default function WorkspaceDebtScenarios({ projectId, onTabChange }: Works
               <CardTitle className="text-base">Term Structure</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Loan Term (Years)</Label>
                   <Select value={inputs.loanTermYears} onValueChange={(v) => updateInput('loanTermYears', v)}>

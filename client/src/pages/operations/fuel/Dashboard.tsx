@@ -229,7 +229,7 @@ export default function Dashboard() {
           <AssetSelector 
             value={selectedAssetId} 
             onChange={setSelectedAssetId}
-            className="w-[280px]"
+            className="w-full max-w-[280px]"
           />
         </div>
       </div>
@@ -307,7 +307,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="daily" className="w-full">
-              <TabsList className="grid w-full max-w-[400px] grid-cols-3">
+              <TabsList className="grid w-full max-w-[400px] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <TabsTrigger value="daily">Daily</TabsTrigger>
                 <TabsTrigger value="weekly">Weekly</TabsTrigger>
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>

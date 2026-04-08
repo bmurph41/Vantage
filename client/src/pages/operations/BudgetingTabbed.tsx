@@ -1783,7 +1783,7 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
   };
 
   return (
-    <div className="w-[340px] flex-shrink-0 border rounded-lg overflow-auto max-h-[75vh]">
+    <div className="w-full md:w-[340px] flex-shrink-0 border rounded-lg overflow-auto max-h-[75vh]">
       <div className="p-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
           <BrainCircuit className="h-4 w-4 text-primary" />
@@ -1995,7 +1995,7 @@ function AiBudgetAssistant({ versionId, childRows, onRefresh }: {
               </Button>
               {whatIfResult && (
                 <div className="text-xs space-y-2 border-t pt-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="border rounded p-2">
                       <div className="text-muted-foreground">Baseline NOI</div>
                       <div className="font-bold text-base">{formatCurrency(whatIfResult.baseline.noi)}</div>

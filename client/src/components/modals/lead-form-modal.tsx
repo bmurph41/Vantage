@@ -426,7 +426,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
           <TabsContent value="manual" className="space-y-4">
             <Form {...form}>
               <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="firstName"
@@ -456,7 +456,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="email"
@@ -486,7 +486,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="company"
@@ -516,7 +516,7 @@ export default function LeadFormModal({ isOpen, onClose, lead, onCompanyCreated,
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="leadStatus"

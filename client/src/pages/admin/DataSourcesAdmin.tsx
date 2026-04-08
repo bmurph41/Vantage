@@ -328,7 +328,7 @@ export default function DataSourcesAdmin() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-muted-foreground">Records:</span>
                         <span className="ml-1 font-medium">{(source.totalRecordsSynced || 0).toLocaleString()}</span>
@@ -535,6 +535,7 @@ export default function DataSourcesAdmin() {
           ) : logs.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No sync history yet.</p>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -578,6 +579,7 @@ export default function DataSourcesAdmin() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </DialogContent>
       </Dialog>

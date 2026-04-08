@@ -111,6 +111,7 @@ export function EnrollmentList() {
         </Button>
       </div>
 
+      <div className="overflow-x-auto w-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -162,6 +163,7 @@ export function EnrollmentList() {
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <EnrollmentFormModal
         open={enrollModalOpen}

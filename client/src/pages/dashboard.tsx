@@ -94,9 +94,9 @@ function SortableModule({
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card className="h-full hover:shadow-lg transition-all group">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Icon className="h-4 w-4 text-blue-600" />
-            {module.title}
+          <CardTitle className="text-base font-semibold flex items-center gap-2 min-w-0">
+            <Icon className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <span className="truncate">{module.title}</span>
           </CardTitle>
           <div className="flex items-center gap-1">
             <Button 

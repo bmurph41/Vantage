@@ -216,7 +216,7 @@ export default function Inventory() {
           <AssetSelector 
             value={selectedAssetId} 
             onChange={setSelectedAssetId}
-            className="w-[280px]"
+            className="w-full max-w-[280px]"
           />
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -281,7 +281,7 @@ export default function Inventory() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="price"
@@ -549,7 +549,7 @@ export default function Inventory() {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
                   name="price"
@@ -577,7 +577,7 @@ export default function Inventory() {
                   )}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
                   name="stock"

@@ -237,7 +237,7 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="recipientType"
@@ -305,7 +305,7 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
                   render={() => (
                     <FormItem>
                       <FormLabel>Notification Channels</FormLabel>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {channels.map((channel) => (
                           <FormField
                             key={channel.value}
@@ -394,7 +394,7 @@ export function SubscriptionManager({ projectId, contacts, subscriptions, isLoad
                   render={() => (
                     <FormItem>
                       <FormLabel>Lead Times</FormLabel>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {leadTimes.map((leadTime) => (
                           <FormField
                             key={leadTime.value}

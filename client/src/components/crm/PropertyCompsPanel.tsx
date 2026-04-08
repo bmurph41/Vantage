@@ -170,7 +170,7 @@ export function PropertyCompsPanel({
         <TabsContent value="sales" className="mt-0 space-y-2">
           {/* Market medians */}
           {(medCapRate != null || medPrice != null) && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {medCapRate != null && (
                 <div className="rounded-md bg-muted/60 px-3 py-2">
                   <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Market Median Cap</p>

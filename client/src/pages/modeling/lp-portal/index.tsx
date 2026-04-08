@@ -98,7 +98,7 @@ function LPPortalContent() {
     return (
       <div className="space-y-6 p-6">
         <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
@@ -279,7 +279,7 @@ function LPPortalContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-4">
                       <h4 className="font-semibold text-sm uppercase text-muted-foreground">Commitments</h4>
                       <div className="space-y-3">
@@ -349,7 +349,7 @@ function LPPortalContent() {
                     </div>
                   </div>
                   <Separator className="my-6" />
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <Card className="bg-muted/50">
                       <CardContent className="pt-4">
                         <div className="text-xs text-muted-foreground uppercase">TVPI</div>
@@ -419,6 +419,7 @@ function LPPortalContent() {
                       No investors found for this fund
                     </div>
                   ) : (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -459,6 +460,7 @@ function LPPortalContent() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -478,6 +480,7 @@ function LPPortalContent() {
                       No capital movements recorded yet
                     </div>
                   ) : (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -521,6 +524,7 @@ function LPPortalContent() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -540,6 +544,7 @@ function LPPortalContent() {
                       No portfolio investments yet
                     </div>
                   ) : (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -594,6 +599,7 @@ function LPPortalContent() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

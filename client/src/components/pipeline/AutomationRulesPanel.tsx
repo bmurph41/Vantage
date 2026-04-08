@@ -267,6 +267,7 @@ export default function AutomationRulesPanel() {
             <p className="text-xs">Create rules to automate pipeline actions like stage transitions and notifications.</p>
           </div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -327,6 +328,7 @@ export default function AutomationRulesPanel() {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </CardContent>
 
@@ -347,7 +349,7 @@ export default function AutomationRulesPanel() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm">Trigger Type</Label>
                 <Select value={form.triggerType} onValueChange={(v) => setForm({ ...form, triggerType: v, triggerConfig: {} })}>
@@ -386,7 +388,7 @@ export default function AutomationRulesPanel() {
               </div>
             )}
             {form.triggerType === "stage_change" && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm">From Stage (optional)</Label>
                   <Input
@@ -408,7 +410,7 @@ export default function AutomationRulesPanel() {
               </div>
             )}
             {form.triggerType === "field_update" && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm">Field Name</Label>
                   <Input
@@ -465,7 +467,7 @@ export default function AutomationRulesPanel() {
               </div>
             )}
             {form.actionType === "update_field" && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm">Field Name</Label>
                   <Input

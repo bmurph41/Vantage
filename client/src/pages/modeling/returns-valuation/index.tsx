@@ -231,7 +231,7 @@ function DealAnalyticsPanel({ project }: { project: ReturnsProject }) {
             <CardTitle className="text-sm font-medium">Returns Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {returnsMetrics.map((m) => (
                 <div key={m.label} className="flex justify-between py-1 border-b border-dashed">
                   <span className="text-muted-foreground">{m.label}</span>
@@ -930,7 +930,7 @@ export default function ReturnsValuationPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
         </CardContent>
       </Card>

@@ -392,7 +392,7 @@ function PipelineColumn({ stage, deals, onDealClick, followUps }: PipelineColumn
 
   return (
     <div
-      className="flex-shrink-0 w-[300px] bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col"
+      className="flex-shrink-0 w-full sm:w-[300px] bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col"
       data-testid={`pipeline-column-${stage.name.replace(/\s+/g, "-").toLowerCase()}`}
     >
       {/* Column Header */}
@@ -943,7 +943,7 @@ export default function Pipeline() {
                   {/* Commission Range */}
                   <div className="space-y-2">
                     <Label className="text-xs font-medium">Commission Amount</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label className="text-[10px] text-gray-500">Min</Label>
                         <Input type="number" placeholder="$0" value={filters.commissionMin}

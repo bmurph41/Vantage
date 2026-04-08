@@ -169,7 +169,7 @@ export default function PnlKeywordBankManager() {
                         onChange={(e) => setNewRule((prev) => ({ ...prev, keyword: e.target.value }))}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Department</Label>
                         <Select
@@ -374,7 +374,7 @@ export default function PnlKeywordBankManager() {
               <DialogDescription>Modify the department mapping for "{editingRule.keyword}"</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Department</Label>
                   <Select

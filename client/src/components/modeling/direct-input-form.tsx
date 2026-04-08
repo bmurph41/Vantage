@@ -312,7 +312,7 @@ export function DirectInputForm({ project, onFinancialsComputed }: DirectInputFo
       {/* Live P&L Summary */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="py-3 px-4">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Revenue</p>
               <p className="text-lg font-bold text-emerald-600 tabular-nums">{formatCurrency(totalRevenue)}</p>

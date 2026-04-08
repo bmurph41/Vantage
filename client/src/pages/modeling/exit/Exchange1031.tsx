@@ -400,6 +400,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -479,9 +480,10 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               <div className="mt-4 p-4 bg-muted rounded-lg">
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Total Replacement Value</p>
                     <p className="num font-bold text-lg">${totalReplacementValue.toLocaleString()}</p>
@@ -512,7 +514,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <h4 className="font-medium text-sm">Relinquished Property (Sold)</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="relinquishedValue">Sale Price ($)</Label>
                     <Input
@@ -555,7 +557,7 @@ export default function Exit1031Exchange({ projectId }: Exchange1031Props) {
                 <Separator />
                 <h4 className="font-medium text-sm">Timeline</h4>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="daysIdentified">Days to Identification</Label>
                     <Input

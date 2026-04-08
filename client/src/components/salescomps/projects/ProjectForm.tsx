@@ -337,7 +337,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Target NOI */}
                   <FormField
                     control={form.control}
@@ -381,7 +381,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Price Range */}
                   <FormField
                     control={form.control}
@@ -483,7 +483,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Target Regions</FormLabel>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                           {US_REGIONS.map((region) => (
                             <div key={region} className="flex items-center space-x-2">
                               <Checkbox
@@ -551,7 +551,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Must Have Profit Centers</FormLabel>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                         {PROFIT_CENTERS.map((profitCenter) => (
                           <div key={profitCenter} className="flex items-center space-x-2">
                             <Checkbox
@@ -589,7 +589,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nice to Have Profit Centers</FormLabel>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                         {PROFIT_CENTERS.map((profitCenter) => (
                           <div key={profitCenter} className="flex items-center space-x-2">
                             <Checkbox
@@ -634,7 +634,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="capacityWeight"
@@ -674,7 +674,7 @@ export default function ProjectForm({ open, onClose, onSubmit, project, isLoadin
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="profitCentersWeight"

@@ -93,7 +93,7 @@ export default function CommissionDealsModal({
         onClick: () => onOpenChange(false),
       }}
     >
-      <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="text-center">
           <p className="text-sm text-gray-600">Total Deals</p>
           <p className="text-2xl font-bold text-gray-900">{filteredDeals.length}</p>
@@ -134,7 +134,7 @@ export default function CommissionDealsModal({
                         <ExternalLink className="w-4 h-4 text-gray-400" />
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4" />
                           <span>Value: {formatCurrency(dealValue)}</span>

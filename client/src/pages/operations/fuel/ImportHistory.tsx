@@ -405,7 +405,7 @@ export default function ImportHistory() {
           {selectedLog && (
             <div className="space-y-6">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Source</label>
                   <p className="text-sm" data-testid="detail-source">{selectedLog.source}</p>
@@ -431,7 +431,7 @@ export default function ImportHistory() {
               </div>
 
               {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Started At</label>
                   <p className="text-sm" data-testid="detail-started">

@@ -132,6 +132,7 @@ export default function SelfStorageUnits() {
               <p className="text-sm mt-1">Try adjusting your search or filters.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -165,6 +166,7 @@ export default function SelfStorageUnits() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

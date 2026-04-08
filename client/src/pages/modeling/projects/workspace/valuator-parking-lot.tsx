@@ -342,7 +342,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -407,7 +407,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <Label className="text-xs">Total Spaces</Label>
                       <Input
@@ -598,7 +598,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
                     <div>
                       <Label className="text-xs">Turnovers/Day (Wkday)</Label>
                       <Input
@@ -751,7 +751,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                   <CardTitle className="text-base">Key Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3 bg-muted/50 rounded-lg">
                       <div className="text-xs text-muted-foreground">Revenue/Space/Year</div>
                       <div className="font-semibold tabular-nums">{formatCurrency(revenue.revenuePerSpace)}</div>
@@ -778,6 +778,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                   <CardDescription>{scenario.annualGrowthRate}% annual growth</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -798,6 +799,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -884,6 +886,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
           ) : (
             <Card>
               <CardContent className="pt-4">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -948,6 +951,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -963,7 +967,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
             <DialogDescription>Record a parking lot revenue entry</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Date</Label>
                 <Input
@@ -988,7 +992,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Day Type</Label>
                 <Select value={formData.dayType} onValueChange={(v) => setFormData({ ...formData, dayType: v })}>
@@ -1013,7 +1017,7 @@ export default function ValuatorParkingLotTab({ projectId, projectName }: Valuat
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Hours (optional)</Label>
                 <Input

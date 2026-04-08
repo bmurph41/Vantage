@@ -116,7 +116,7 @@ export default function NotificationSettingsPage({ projectId: propProjectId }: N
       <div className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <div className="flex justify-center">
-            <TabsList className="grid grid-cols-4 w-fit bg-muted/50 p-1 rounded-lg" data-testid="tabs-list">
+            <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-fit bg-muted/50 p-1 rounded-lg" data-testid="tabs-list">
               <TabsTrigger 
                 value="contacts" 
                 className="flex items-center space-x-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm" 

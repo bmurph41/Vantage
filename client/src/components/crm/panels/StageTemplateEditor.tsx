@@ -91,7 +91,7 @@ export function StageTemplateEditor({ stageId, stageName, onClose }: StageTempla
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -154,7 +154,7 @@ export function StageTemplateEditor({ stageId, stageName, onClose }: StageTempla
                       data-testid="input-template-description"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Priority</Label>
                       <Select

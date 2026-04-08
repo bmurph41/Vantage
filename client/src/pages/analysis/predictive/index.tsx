@@ -131,6 +131,7 @@ export default function PredictiveAnalyticsPage() {
               {closureLoading ? (
                 <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : (
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -162,6 +163,7 @@ export default function PredictiveAnalyticsPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -178,7 +180,7 @@ export default function PredictiveAnalyticsPage() {
                 <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : (
                 <>
-                  <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div className="text-center p-3 bg-red-50 rounded-lg">
                       <p className="text-2xl font-bold text-red-600">{riskData?.critical || 0}</p>
                       <p className="text-xs text-muted-foreground">Critical</p>
@@ -197,6 +199,7 @@ export default function PredictiveAnalyticsPage() {
                     </div>
                   </div>
                   {(riskData?.alerts || []).length > 0 && (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -217,6 +220,7 @@ export default function PredictiveAnalyticsPage() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                   {(riskData?.alerts || []).length === 0 && (
                     <p className="text-center text-muted-foreground py-8">No risk alerts. Run asset risk assessments on individual deals to populate this view.</p>
@@ -238,7 +242,7 @@ export default function PredictiveAnalyticsPage() {
                 <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div className="text-center p-3 bg-green-50 rounded-lg">
                       <p className="text-2xl font-bold text-green-600">{holdSellData?.holdCount || 0}</p>
                       <p className="text-xs text-muted-foreground">Hold</p>
@@ -252,6 +256,7 @@ export default function PredictiveAnalyticsPage() {
                       <p className="text-xs text-muted-foreground">Refinance</p>
                     </div>
                   </div>
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -279,6 +284,7 @@ export default function PredictiveAnalyticsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </>
               )}
             </CardContent>

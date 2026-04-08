@@ -236,7 +236,7 @@ export default function NormalizationStatusPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
         </CardContent>
       </Card>

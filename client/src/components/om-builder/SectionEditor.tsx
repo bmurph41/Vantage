@@ -133,7 +133,7 @@ function SectionBlock({
 
   if (isPreview) {
     return (
-      <div className={`mb-6 ${section.layout === 'two-column' ? 'grid grid-cols-2 gap-6' : section.layout === 'sidebar' ? 'grid grid-cols-3 gap-6' : ''}`}>
+      <div className={`mb-6 ${section.layout === 'two-column' ? 'grid grid-cols-1 sm:grid-cols-2 gap-6' : section.layout === 'sidebar' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : ''}`}>
         <div className={section.layout === 'sidebar' ? 'col-span-2' : ''}>
           <h3 className="text-xl font-bold mb-3">{section.title}</h3>
           <div
@@ -215,7 +215,7 @@ function SectionBlock({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className={`${section.layout === 'two-column' ? 'grid grid-cols-2 gap-4' : section.layout === 'sidebar' ? 'grid grid-cols-3 gap-4' : ''}`}>
+        <div className={`${section.layout === 'two-column' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : section.layout === 'sidebar' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : ''}`}>
           <div className={`border rounded-lg overflow-hidden ${section.layout === 'sidebar' ? 'col-span-2' : ''}`}>
             <RichTextToolbar editorRef={editorRef} />
             <div

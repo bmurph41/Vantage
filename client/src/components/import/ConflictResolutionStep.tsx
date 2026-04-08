@@ -142,7 +142,7 @@ export function ConflictResolutionStep({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <CardContent className="pt-0">
-                    <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-sm font-medium mb-2">Your Data (New)</p>
                         <div className="p-3 bg-muted rounded-lg text-sm space-y-1">

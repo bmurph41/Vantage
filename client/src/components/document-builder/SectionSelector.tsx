@@ -462,7 +462,7 @@ export const SectionSelector: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
       {/* Selected Sections */}
       <div>
         <div className="flex items-center justify-between mb-4">

@@ -119,6 +119,7 @@ export function RentRollEntriesTable({ entries, isLoading, rentRollId }: RentRol
 
   return (
     <>
+      <div className="overflow-x-auto w-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -167,6 +168,7 @@ export function RentRollEntriesTable({ entries, isLoading, rentRollId }: RentRol
           ))}
         </TableBody>
       </Table>
+      </div>
 
       {editingEntry && (
         <RentRollEntryDialog

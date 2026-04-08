@@ -578,6 +578,7 @@ export default function CapExBudget({ projectId, onTabChange }: CapExBudgetProps
                 <CardTitle className="text-base">Category Summary</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -608,6 +609,7 @@ export default function CapExBudget({ projectId, onTabChange }: CapExBudgetProps
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -638,7 +640,7 @@ export default function CapExBudget({ projectId, onTabChange }: CapExBudgetProps
             </div>
 
             {/* Category + Priority */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Category</Label>
                 <Select
@@ -670,7 +672,7 @@ export default function CapExBudget({ projectId, onTabChange }: CapExBudgetProps
             </div>
 
             {/* Estimated Cost + Year Planned */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="capex-cost">Estimated Cost ($)</Label>
                 <Input
@@ -698,7 +700,7 @@ export default function CapExBudget({ projectId, onTabChange }: CapExBudgetProps
             </div>
 
             {/* NOI Impact + Completion Months */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="capex-noi">Annual NOI Impact ($)</Label>
                 <Input

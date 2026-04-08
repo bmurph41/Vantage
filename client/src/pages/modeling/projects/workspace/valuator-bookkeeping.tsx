@@ -231,7 +231,7 @@ export default function ValuatorBookkeepingTab({ projectId, projectName }: Valua
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -269,7 +269,7 @@ export default function ValuatorBookkeepingTab({ projectId, projectName }: Valua
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -331,6 +331,7 @@ export default function ValuatorBookkeepingTab({ projectId, projectName }: Valua
             <CardTitle className="text-sm">GL Summary by Period</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -379,6 +380,7 @@ export default function ValuatorBookkeepingTab({ projectId, projectName }: Valua
                 })}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

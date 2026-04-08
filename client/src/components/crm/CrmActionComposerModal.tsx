@@ -294,7 +294,7 @@ export function CrmActionComposerModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Due Date</Label>
                   <Popover>
@@ -363,7 +363,7 @@ export function CrmActionComposerModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Schedule for</Label>
                   <Popover>
@@ -432,7 +432,7 @@ export function CrmActionComposerModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Follow up on</Label>
                   <Popover>
@@ -519,7 +519,7 @@ export function CrmActionComposerModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Remind on *</Label>
                   <Popover>
@@ -589,7 +589,7 @@ export function CrmActionComposerModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Date *</Label>
                   <Popover>

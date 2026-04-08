@@ -151,7 +151,7 @@ function WhatIfCard({
       <CardContent className="p-4">
         <h4 className="text-sm font-semibold mb-1">{title}</h4>
         <p className="text-xs text-muted-foreground mb-3">{description}</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">IRR Impact</p>
             <DeltaBadge value={irrDelta} suffix="%" />

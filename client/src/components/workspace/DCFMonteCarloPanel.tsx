@@ -114,13 +114,13 @@ export function DCFMonteCarloPanel({ projectId }: { projectId: string }) {
       </div>
 
       {result && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatsCard label="IRR Distribution" stats={result.stats.irr} suffix="%" />
           <StatsCard label="Equity Multiple" stats={result.stats.equityMultiple} suffix="x" />
 
           <div className="col-span-2 bg-gray-50 rounded p-3">
             <h4 className="text-sm font-medium mb-2">Risk Metrics</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div>P(IRR &lt; hurdle): <span className="font-medium">{(result.risks.probIrrBelowHurdle * 100).toFixed(1)}%</span></div>
               <div>P(Loss): <span className="font-medium">{(result.risks.probMultipleBelow1 * 100).toFixed(1)}%</span></div>
               <div>Expected shortfall (P10 IRR): <span className="font-medium">{result.risks.expectedShortfallIrrP10.toFixed(2)}%</span></div>
@@ -137,7 +137,7 @@ function StatsCard({ label, stats, suffix }: { label: string; stats: Distributio
   return (
     <div className="bg-gray-50 rounded p-3">
       <h4 className="text-sm font-medium mb-2">{label}</h4>
-      <div className="grid grid-cols-3 gap-1 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 text-sm">
         <div className="text-center">
           <div className="text-gray-500 text-xs">P10</div>
           <div className="font-medium">{stats.p10.toFixed(1)}{suffix}</div>

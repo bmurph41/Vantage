@@ -116,7 +116,7 @@ export default function RentRollPage() {
         <div className="w-64">
           <label className="text-sm font-medium mb-2 block">Context</label>
           <Tabs value={selectedContext} onValueChange={(v) => setSelectedContext(v as typeof selectedContext)}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
               <TabsTrigger value="operational" data-testid="tab-operational">
                 Operational
               </TabsTrigger>

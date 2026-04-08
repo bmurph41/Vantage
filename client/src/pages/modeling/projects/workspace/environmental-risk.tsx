@@ -266,7 +266,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="environmental" className="gap-1">
             <Leaf className="h-4 w-4" />
             Environmental
@@ -296,7 +296,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               <CardDescription>Track the status of environmental site assessments</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Assessment Status</Label>
                   <Select value={phaseStatus} onValueChange={(v) => setPhaseStatus(v as PhaseStatus)}>
@@ -345,6 +345,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               <CardDescription>Identify known environmental concerns and estimate remediation costs</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -394,6 +395,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <Separator className="my-4" />
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">
@@ -419,6 +421,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               <CardDescription>Model annual insurance premiums across all policy lines</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -472,10 +475,11 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Annual Premium</CardDescription>
@@ -513,7 +517,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
 
         {/* Climate Risk Tab */}
         <TabsContent value="climate" className="space-y-6 mt-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -586,6 +590,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               <CardDescription>Estimate property impact under different sea-level rise scenarios</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -634,6 +639,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
                   })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -645,7 +651,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Maximum Expected Storm Surge (ft)</Label>
                   <Input
@@ -677,7 +683,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
 
         {/* Summary Tab */}
         <TabsContent value="summary" className="space-y-6 mt-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Environmental Cost</CardDescription>
@@ -753,6 +759,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
               <CardTitle>Cost Impact on NOI</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableBody>
                   <TableRow>
@@ -777,6 +784,7 @@ export function EnvironmentalRisk({ projectId, onTabChange }: EnvironmentalRiskP
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

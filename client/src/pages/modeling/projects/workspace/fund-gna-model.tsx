@@ -584,6 +584,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
 
               {/* Quarterly table */}
               <div className="mt-4 max-h-[400px] overflow-auto">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -606,6 +607,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -619,6 +621,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
             </CardHeader>
             <CardContent>
               <div className="max-h-[500px] overflow-auto">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -643,6 +646,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -665,6 +669,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
           </div>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -722,6 +727,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -736,6 +742,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
           </div>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -804,6 +811,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -818,6 +826,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
           </div>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -892,6 +901,7 @@ export default function FundGnAModel({ projectId, onTabChange }: { projectId: st
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

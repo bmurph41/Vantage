@@ -609,6 +609,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <CardDescription>Compare sponsor fee structures across DST options</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -685,9 +686,10 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                     })}
                   </TableBody>
                 </Table>
+                </div>
 
                 <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Fees (All DSTs)</p>
                       <p className="num text-xl font-bold text-red-500">${portfolioSummary.totalFees.toLocaleString()}</p>
@@ -716,6 +718,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 <CardDescription>Your ownership position in each DST property</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -753,8 +756,9 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                     })}
                   </TableBody>
                 </Table>
+                </div>
 
-                <div className="mt-6 grid grid-cols-3 gap-4">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">Total Annual Distributions</p>
                     <p className="num text-xl font-bold text-green-600">
@@ -899,6 +903,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
               </div>
             </div>
 
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -941,6 +946,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                 })}
               </TableBody>
             </Table>
+            </div>
 
             <div className="p-4 border rounded-lg">
               <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -1109,6 +1115,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                     </div>
                   </div>
 
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1164,6 +1171,7 @@ export default function ExitDSTAnalysis({ projectId }: DSTAnalysisProps) {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
 
                   <div className="p-4 border rounded-lg">
                     <h4 className="font-medium mb-2 flex items-center gap-2">

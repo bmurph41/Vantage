@@ -338,7 +338,7 @@ ${enabledSections.has("forecast") ? `
 
         <div className="space-y-4 py-2">
           {/* Report Settings */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Report Title</Label>
               <Input value={reportTitle} onChange={(e) => setReportTitle(e.target.value)} />

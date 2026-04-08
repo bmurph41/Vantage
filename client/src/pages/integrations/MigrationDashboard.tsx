@@ -130,7 +130,7 @@ export default function MigrationDashboard() {
               </div>
               <Progress value={totalProgress} className="h-3" />
               
-              <div className="grid grid-cols-4 gap-2 mt-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-6">
                 {MIGRATION_PHASES.map((phase, idx) => (
                   <div
                     key={phase.id}

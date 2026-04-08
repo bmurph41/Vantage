@@ -587,7 +587,7 @@ function FileTable({
           </p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 dark:bg-gray-800/50">
@@ -681,7 +681,7 @@ function FileTable({
               ))}
             </TableBody>
           </Table>
-        </div>
+          </div>
       )}
       <div className="flex items-center justify-between text-xs text-gray-500 px-1">
         <span>
@@ -988,7 +988,7 @@ export default function ProjectVDR() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-800 border-blue-100 dark:border-blue-800">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">

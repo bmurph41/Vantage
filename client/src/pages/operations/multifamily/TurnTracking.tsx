@@ -133,6 +133,7 @@ export default function MultifamilyTurnTracking() {
               <p className="text-sm mt-1">Turn tracking will appear when units are vacated and being prepared for new tenants.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -175,6 +176,7 @@ export default function MultifamilyTurnTracking() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

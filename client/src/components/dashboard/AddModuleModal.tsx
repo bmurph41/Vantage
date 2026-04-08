@@ -222,7 +222,7 @@ export function AddModuleModal({
           <ScrollArea className="h-[400px] mt-4">
             {Object.entries(modulesByCategory).map(([category, modules]) => (
               <TabsContent key={category} value={category} className="mt-0">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {modules.map((module) => {
                     const isSelected = selectedModules.includes(module.id);
                     const Icon = module.icon;

@@ -326,7 +326,7 @@ export function DataImportWizard({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">.csv</Badge>
                       <span className="text-sm text-muted-foreground">Comma-separated values</span>

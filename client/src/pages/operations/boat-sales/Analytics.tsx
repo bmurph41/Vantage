@@ -80,7 +80,7 @@ export default function BoatSalesAnalytics() {
   return (
     <div className="space-y-6 p-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -149,7 +149,7 @@ export default function BoatSalesAnalytics() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Revenue by Boat Type */}
         <Card>
           <CardHeader>
@@ -202,6 +202,7 @@ export default function BoatSalesAnalytics() {
           <CardDescription>Best sellers by unit volume and revenue</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -228,6 +229,7 @@ export default function BoatSalesAnalytics() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -185,6 +185,7 @@ export function ConnectDialog({
             </p>
           </div>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -260,6 +261,7 @@ export function ConnectDialog({
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
 
         <DialogFooter>

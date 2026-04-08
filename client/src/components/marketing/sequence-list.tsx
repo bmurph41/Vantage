@@ -112,6 +112,7 @@ export function SequenceList({ sequences, isLoading, onEdit }: SequenceListProps
 
   return (
     <>
+      <div className="overflow-x-auto w-full">
       <Table>
         <TableHeader>
           <TableRow>
@@ -188,6 +189,7 @@ export function SequenceList({ sequences, isLoading, onEdit }: SequenceListProps
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

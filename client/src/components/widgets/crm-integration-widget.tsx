@@ -120,7 +120,7 @@ export default function CrmIntegrationWidget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[...Array(2)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -191,7 +191,7 @@ export default function CrmIntegrationWidget() {
         </div>
         
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div className="text-center">
             <div className="text-lg font-bold text-blue-600">
               {crmData.summary.totalRecordsSynced.toLocaleString()}
@@ -246,7 +246,7 @@ export default function CrmIntegrationWidget() {
                   </div>
                   
                   {/* Sync Statistics */}
-                  <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2 text-xs">
                     <div className="text-center">
                       <div className="font-medium text-gray-900">
                         {connection.syncStatus.contacts.synced}

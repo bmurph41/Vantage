@@ -155,7 +155,7 @@ function ContactCard({
 
       {!isCollapsed && (
         <>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">First Name</Label>
               <Input placeholder="First Name" value={contact.firstName}
@@ -167,7 +167,7 @@ function ContactCard({
                 onChange={(e) => onUpdate("lastName", e.target.value)} className="h-8 text-xs bg-white" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Company</Label>
               <Input placeholder="Company" value={contact.company}
@@ -179,7 +179,7 @@ function ContactCard({
                 onChange={(e) => onUpdate("titleRole", e.target.value)} className="h-8 text-xs bg-white" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 <Phone className="w-3 h-3 inline mr-0.5" /> Phone

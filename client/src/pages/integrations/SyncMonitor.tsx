@@ -323,6 +323,7 @@ export default function SyncMonitor() {
               <CardDescription>Real-time status of all marina management system connections</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -408,6 +409,7 @@ export default function SyncMonitor() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -419,6 +421,7 @@ export default function SyncMonitor() {
               <CardDescription>Recent synchronization activity across all integrations</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -453,6 +456,7 @@ export default function SyncMonitor() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

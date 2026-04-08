@@ -371,7 +371,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
             <CardDescription>Inputs for the monthly pro forma projection</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Monthly NOI ($)</Label>
                 <Input type="number" value={opAssumptions.monthlyNOI} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyNOI: Number(e.target.value) })} />
@@ -381,7 +381,7 @@ export default function ExitEarnout({ projectId }: EarnoutProps) {
                 <Input type="number" step="0.1" value={opAssumptions.noiGrowthRate} onChange={(e) => setOpAssumptions({ ...opAssumptions, noiGrowthRate: Number(e.target.value) })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Debt Service ($/mo)</Label>
                 <Input type="number" value={opAssumptions.monthlyDebtService} onChange={(e) => setOpAssumptions({ ...opAssumptions, monthlyDebtService: Number(e.target.value) })} />

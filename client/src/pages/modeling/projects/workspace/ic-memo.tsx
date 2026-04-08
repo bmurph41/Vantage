@@ -494,7 +494,7 @@ export function ICMemo({ projectId, onTabChange }: ICMemoProps) {
                 <h1 className="text-3xl font-bold tracking-tight">INVESTMENT COMMITTEE MEMORANDUM</h1>
                 <Separator className="my-4" />
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Property:</span>{' '}
                   <span className="font-semibold">{projectName}</span>

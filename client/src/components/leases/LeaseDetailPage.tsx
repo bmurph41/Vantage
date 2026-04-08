@@ -173,7 +173,7 @@ function SummaryTab({ detail, cashflows }: { detail: any; cashflows: LeaseMonthl
       </div>
       <div className="bg-white border rounded-lg p-4 space-y-2">
         <h3 className="font-medium text-gray-900">Lease Details</h3>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-sm">
           <p><span className="text-gray-500">Commencement:</span> {fmtDate(detail.commencementDate)}</p>
           <p><span className="text-gray-500">Expiration:</span> {fmtDate(detail.expirationDate)}</p>
           <p><span className="text-gray-500">Rent Commencement:</span> {fmtDate(detail.rentCommencementDate)}</p>

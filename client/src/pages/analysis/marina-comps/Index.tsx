@@ -234,6 +234,7 @@ export default function MarinaCompsIndex() {
                     <p className="text-sm mt-2">Create a subject marina to start building comp sets</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -289,6 +290,7 @@ export default function MarinaCompsIndex() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -310,6 +312,7 @@ export default function MarinaCompsIndex() {
                     <p className="text-sm mt-2">Create a comp set to start analyzing comparables</p>
                   </div>
                 ) : (
+                  <div className="overflow-x-auto w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -390,6 +393,7 @@ export default function MarinaCompsIndex() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

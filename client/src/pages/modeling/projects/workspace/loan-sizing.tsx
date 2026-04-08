@@ -342,6 +342,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                 <CardTitle className="text-base">LTV Sensitivity</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -365,6 +366,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -373,6 +375,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                 <CardTitle className="text-base">DSCR Sensitivity</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -396,6 +399,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -404,6 +408,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                 <CardTitle className="text-base">Debt Yield Sensitivity</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -427,6 +432,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -459,6 +465,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
               <CardTitle>DSCR at Various Interest Rates and LTV Levels</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -485,6 +492,7 @@ export function LoanSizing({ projectId, onTabChange }: { projectId: string; onTa
                   ))}
                 </TableBody>
               </Table>
+              </div>
               <p className="text-sm text-muted-foreground mt-4">
                 Red values indicate the DSCR falls below the minimum threshold of {inputs.minDSCR.toFixed(2)}x. Current scenario highlighted.
               </p>

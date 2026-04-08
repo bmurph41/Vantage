@@ -778,7 +778,7 @@ export default function ModelingAnalytics() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 No broker performance data available

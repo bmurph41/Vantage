@@ -64,7 +64,7 @@ export function ResumeDraftModal<T extends Record<string, any>>({
               <span className="font-medium">{projectName}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Current Step</span>
                 <p className="font-medium">{currentStepLabel}</p>

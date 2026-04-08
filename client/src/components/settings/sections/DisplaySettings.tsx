@@ -83,7 +83,7 @@ export function DisplaySettings({
             onValueChange={(value: 'comfortable' | 'compact') =>
               onChange({ density: value })
             }
-            className="grid grid-cols-2 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
           >
             <div>
               <RadioGroupItem

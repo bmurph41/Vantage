@@ -1027,11 +1027,11 @@ export default function DocumentStudioHub() {
                       <span className="text-sm font-medium text-primary">Data that will auto-populate</span>
                     </div>
                     {previewLoading ? (
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8" />)}
                       </div>
                     ) : projectPreview && Object.values(projectPreview).some(Boolean) ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                         {projectPreview.propertyName && (
                           <><span className="text-muted-foreground">Property</span><span className="font-medium truncate">{projectPreview.propertyName}</span></>
                         )}

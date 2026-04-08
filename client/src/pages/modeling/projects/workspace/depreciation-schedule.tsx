@@ -178,7 +178,7 @@ export function DepreciationSchedule({ projectId, onTabChange }: DepreciationSch
           <CardTitle>Purchase & Allocation Inputs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label>Purchase Price ($)</Label>
               <Input type="number" value={purchasePrice} onChange={e => setPurchasePrice(parseFloat(e.target.value) || 0)} />
@@ -273,7 +273,7 @@ export function DepreciationSchedule({ projectId, onTabChange }: DepreciationSch
 
       {/* Charts */}
       {results && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Annual Depreciation by Asset Class</CardTitle>
@@ -330,6 +330,7 @@ export function DepreciationSchedule({ projectId, onTabChange }: DepreciationSch
             <CardTitle>Year-by-Year Depreciation Schedule</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -358,6 +359,7 @@ export function DepreciationSchedule({ projectId, onTabChange }: DepreciationSch
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -372,7 +374,7 @@ export function DepreciationSchedule({ projectId, onTabChange }: DepreciationSch
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <p className="text-sm text-muted-foreground">Deferred Gain</p>
                 <p className="text-xl font-bold">{formatCurrency(results.exchange1031.deferredGain)}</p>

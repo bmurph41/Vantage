@@ -529,7 +529,7 @@ export default function SalesPipeline({ showFullView = false }: SalesPipelinePro
             </div>
 
             {/* Pipeline Statistics Cards */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="bg-gradient-to-br from-white to-green-50/30 border border-green-200/50 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">

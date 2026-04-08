@@ -458,7 +458,7 @@ export default function MarinaMapEmbed({
                         </div>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs border-t pt-2 mt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-xs border-t pt-2 mt-1">
                       {selectedLocation.price && (
                         <div>
                           <span className="text-gray-500">Price: </span>
@@ -537,7 +537,7 @@ export default function MarinaMapEmbed({
         </div>
 
         {viewMode === 'split' && showListPanel && (
-          <div className="w-[360px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
+          <div className="w-full sm:w-[360px] border-l bg-white dark:bg-slate-900 flex flex-col overflow-hidden flex-shrink-0">
             <div className="px-3 py-2.5 border-b flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -638,7 +638,7 @@ export default function MarinaMapEmbed({
 
             {stats && (
               <div className="border-t px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50">
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-muted-foreground">With Coordinates</span>
                     <p className="font-medium">{stats.withCoordinates} / {stats.total}</p>

@@ -324,7 +324,7 @@ export default function DockitDashboard() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="active" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <TabsTrigger value="active" className="flex items-center gap-2">
                   <Timer className="h-4 w-4" />
                   Active ({queuedLaunches.length})

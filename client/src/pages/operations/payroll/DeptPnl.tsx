@@ -134,6 +134,7 @@ export default function DeptPnl() {
           {/* Department P&L Table */}
           <Card>
             <CardContent className="pt-6 overflow-x-auto">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -256,6 +257,7 @@ export default function DeptPnl() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </>

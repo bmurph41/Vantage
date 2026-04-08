@@ -113,7 +113,7 @@ export default function DealScoringWidget() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -155,7 +155,7 @@ export default function DealScoringWidget() {
         </div>
         
         {scoreMetrics && (
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             {scoreMetrics.map((metric, index) => (
               <div key={index} className="text-center">
                 <div className="flex items-center justify-center mb-1">
@@ -175,7 +175,7 @@ export default function DealScoringWidget() {
       
       <CardContent className="pt-0">
         <Tabs defaultValue="top-deals" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
             <TabsTrigger value="top-deals">Top Deals</TabsTrigger>
             <TabsTrigger value="distribution">Distribution</TabsTrigger>
           </TabsList>
@@ -220,7 +220,7 @@ export default function DealScoringWidget() {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <div className="flex items-center gap-1">
                           <TrendingUp className="w-3 h-3 text-green-600" />
                           <span className="text-xs">Probability: {Math.round(deal.probabilityScore)}%</span>

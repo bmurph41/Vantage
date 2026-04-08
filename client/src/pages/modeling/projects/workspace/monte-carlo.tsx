@@ -339,7 +339,7 @@ export default function MonteCarloPage() {
     return (
       <div className="space-y-4 p-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-32" />)}
         </div>
         <Skeleton className="h-96" />
@@ -496,7 +496,7 @@ export default function MonteCarloPage() {
                       </Select>
                     </div>
                     {v.enabled && (
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {(v.distribution.type === 'triangular' || v.distribution.type === 'uniform') && (
                           <>
                             <div>

@@ -76,6 +76,7 @@ export default function Checkout() {
               <p>Add items from the Ship Store to get started</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -108,6 +109,7 @@ export default function Checkout() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
 
           {cartItems.length > 0 && (

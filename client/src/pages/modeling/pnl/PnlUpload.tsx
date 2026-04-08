@@ -177,7 +177,7 @@ export default function PnlUpload() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="yearHint">Fiscal Year (optional)</Label>
               <Select value={yearHint} onValueChange={setYearHint}>
@@ -271,7 +271,7 @@ export default function PnlUpload() {
               <Progress value={progress} data-testid="progress-bar" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Job ID:</span>
                 <p className="font-mono text-xs truncate" data-testid="text-job-id">{jobId}</p>

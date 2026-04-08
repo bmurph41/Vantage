@@ -753,7 +753,7 @@ function CreateProfileForm({
             </TabsContent>
 
             <TabsContent value="financial" className="space-y-4 pr-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Asking Price</Label>
                   <CurrencyInput
@@ -774,7 +774,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Gross Revenue</Label>
                   <CurrencyInput
@@ -795,7 +795,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min NOI</Label>
                   <CurrencyInput
@@ -816,7 +816,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Cap Rate</Label>
                   <PercentageInput
@@ -837,7 +837,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Price Per Slip</Label>
                   <CurrencyInput
@@ -860,7 +860,7 @@ function CreateProfileForm({
             </TabsContent>
 
             <TabsContent value="size" className="space-y-4 pr-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Total Slips</Label>
                   <Input
@@ -883,7 +883,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Wet Slips</Label>
                   <Input
@@ -906,7 +906,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Acreage</Label>
                   <Input
@@ -943,7 +943,7 @@ function CreateProfileForm({
 
               <div className="space-y-3 pt-2">
                 <Label className="text-sm font-medium">Required Amenities</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     { key: "requireFuelDock", label: "Fuel Dock" },
                     { key: "requireShipStore", label: "Ship Store" },
@@ -964,7 +964,7 @@ function CreateProfileForm({
             </TabsContent>
 
             <TabsContent value="capital" className="space-y-4 pr-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Total Capital Available</Label>
                   <CurrencyInput
@@ -985,7 +985,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Target LTV Ratio</Label>
                   <PercentageInput
@@ -1007,7 +1007,7 @@ function CreateProfileForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Min Cash-on-Cash Return</Label>
                   <PercentageInput
@@ -1099,7 +1099,7 @@ function CreateProfileForm({
                   <p className="text-xs text-muted-foreground mb-3">
                     Select which departments count toward "storage revenue"
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {STORAGE_DEPARTMENTS.map((dept) => (
                       <div key={dept} className="flex items-center gap-2">
                         <Switch
@@ -1164,7 +1164,7 @@ function CreateProfileForm({
                   <p className="text-xs text-muted-foreground mb-3">
                     Listings with significant revenue from these will be penalized/rejected
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ALL_DEPARTMENTS.map((dept) => (
                       <div key={`exclude-${dept}`} className="flex items-center gap-2">
                         <Switch
@@ -1195,7 +1195,7 @@ function CreateProfileForm({
                   <p className="text-xs text-muted-foreground mb-3">
                     Listings with these departments get bonus points
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {ALL_DEPARTMENTS.map((dept) => (
                       <div key={`prefer-${dept}`} className="flex items-center gap-2">
                         <Switch

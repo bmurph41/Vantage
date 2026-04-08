@@ -497,6 +497,7 @@ export function DocumentList({
             </div>
           </Card>
         ) : (
+          <div className="overflow-x-auto w-full">
           <Table>
             <TableHeader>
               <TableRow>
@@ -573,6 +574,7 @@ export function DocumentList({
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </div>
 

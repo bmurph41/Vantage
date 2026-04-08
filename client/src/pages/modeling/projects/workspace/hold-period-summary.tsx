@@ -229,6 +229,7 @@ function HoldPeriodSummary({ projectId, onTabChange }: HoldPeriodSummaryProps) {
         <TabsContent value="table" className="mt-4">
           <Card>
             <CardContent className="pt-4 overflow-x-auto">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -287,6 +288,7 @@ function HoldPeriodSummary({ projectId, onTabChange }: HoldPeriodSummaryProps) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

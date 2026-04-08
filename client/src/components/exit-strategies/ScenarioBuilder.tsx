@@ -131,7 +131,7 @@ export function ScenarioBuilder({ scenarioInput, onResultChange }: ScenarioBuild
           </div>
 
           <Tabs defaultValue="summary" className="w-full">
-            <TabsList className="grid grid-cols-4 w-full">
+            <TabsList className="grid grid-cols-2 lg:grid-cols-4 w-full">
               <TabsTrigger value="summary">Summary</TabsTrigger>
               <TabsTrigger value="tax">Tax Detail</TabsTrigger>
               <TabsTrigger value="warnings" className="gap-1">
@@ -191,7 +191,7 @@ export function ScenarioBuilder({ scenarioInput, onResultChange }: ScenarioBuild
                   <CardTitle className="text-sm">Return Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Total Equity Invested</span>
                       <p className="font-medium">{formatCurrency(String(Math.round(result.returns.totalEquityInvested)))}</p>

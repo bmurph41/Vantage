@@ -87,6 +87,7 @@ export default function UtilizationByTypeTable({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="overflow-x-auto w-full">
         <Table>
           <TableHeader>
             <TableRow>
@@ -154,6 +155,7 @@ export default function UtilizationByTypeTable({
             })}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );

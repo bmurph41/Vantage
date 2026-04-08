@@ -144,7 +144,7 @@ export default function PositionLibrary() {
                   onChange={(e) => setPosForm((prev) => ({ ...prev, title: e.target.value }))}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Role Group</Label>
                   <Select
@@ -270,6 +270,7 @@ export default function PositionLibrary() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -292,6 +293,7 @@ export default function PositionLibrary() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           ))

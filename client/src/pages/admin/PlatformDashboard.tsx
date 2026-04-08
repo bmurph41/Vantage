@@ -57,7 +57,7 @@ export default function PlatformDashboardPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
       ) : (
         <>
           {/* Top-line KPIs */}
@@ -160,6 +160,7 @@ export default function PlatformDashboardPage() {
               )}
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -184,6 +185,7 @@ export default function PlatformDashboardPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -200,6 +202,7 @@ export default function PlatformDashboardPage() {
               )}
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -224,6 +227,7 @@ export default function PlatformDashboardPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -235,6 +239,7 @@ export default function PlatformDashboardPage() {
               <CardTitle>Active Sessions ({sessions?.total || 0})</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -259,6 +264,7 @@ export default function PlatformDashboardPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

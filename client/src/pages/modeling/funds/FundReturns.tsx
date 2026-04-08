@@ -349,6 +349,7 @@ export default function FundReturns({ fundId }: { fundId: string }) {
             <CardDescription>Individual deal performance within the fund</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -371,6 +372,7 @@ export default function FundReturns({ fundId }: { fundId: string }) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -383,6 +385,7 @@ export default function FundReturns({ fundId }: { fundId: string }) {
             <CardDescription>Total cash flows categorized by type</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -401,6 +404,7 @@ export default function FundReturns({ fundId }: { fundId: string }) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

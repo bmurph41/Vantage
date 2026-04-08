@@ -65,7 +65,7 @@ export default function AddNewModal({ isOpen, onClose }: AddNewModalProps) {
         size="sm"
         showProgressBar={true}
       >
-        <div className="grid grid-cols-2 gap-4" data-testid="add-new-modal">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-testid="add-new-modal">
           {options.map((option) => (
             <Button
               key={option.id}

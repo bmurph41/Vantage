@@ -352,7 +352,7 @@ export function DealTrackerTab() {
               </DialogHeader>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-muted-foreground">Asking Price</Label>
                     <p className="font-semibold text-lg">{formatCurrencyValue(selectedDeal.askingPrice)}</p>
@@ -367,7 +367,7 @@ export function DealTrackerTab() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
                     <Label className="text-muted-foreground">Total Slips</Label>
                     <p className="font-medium">{selectedDeal.totalSlips || "—"}</p>

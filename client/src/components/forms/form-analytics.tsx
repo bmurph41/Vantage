@@ -126,7 +126,7 @@ export default function FormAnalytics({ form, onClose }: FormAnalyticsProps) {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger data-testid="tab-overview" value="overview">Overview</TabsTrigger>
           <TabsTrigger data-testid="tab-funnel" value="funnel">Conversion Funnel</TabsTrigger>
           <TabsTrigger data-testid="tab-fields" value="fields">Field Analysis</TabsTrigger>
@@ -398,7 +398,7 @@ export default function FormAnalytics({ form, onClose }: FormAnalyticsProps) {
                       </Badge>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500 dark:text-gray-400">Drop-off Rate</p>
                         <div className="flex items-center">

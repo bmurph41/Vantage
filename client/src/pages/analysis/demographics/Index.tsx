@@ -356,7 +356,7 @@ function LocationDemographicsCard({ data, onRemove, label }: {
               <PieChart className="h-4 w-4" />
               Race & Ethnicity
             </h4>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               {Object.entries(data.raceEthnicity)
                 .sort(([,a], [,b]) => b - a)
                 .slice(0, 6)
@@ -1213,7 +1213,7 @@ function LocationAnalysisSection() {
           <div className="space-y-3">
             <Label className="text-sm font-medium">Default Trade Area Settings (for new locations)</Label>
             <Tabs value={defaultAnalysisMode} onValueChange={(v) => setDefaultAnalysisMode(v as 'distance' | 'drivetime')}>
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 max-w-md">
                 <TabsTrigger value="distance" className="flex items-center gap-2" data-testid="tab-distance">
                   <Ruler className="h-4 w-4" />
                   Distance Rings
@@ -1315,7 +1315,7 @@ function LocationAnalysisSection() {
 
       {selectedLocations.length > 0 && (
         <Tabs value={mainViewTab} onValueChange={(v) => setMainViewTab(v as 'overview' | 'comparison')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 max-w-md">
             <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
               <MapPin className="h-4 w-4" />
               Overview
@@ -1446,7 +1446,7 @@ function LocationAnalysisSection() {
                                         analysisMode: v as 'distance' | 'drivetime' 
                                       })}
                                     >
-                                      <TabsList className="grid w-full grid-cols-2">
+                                      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
                                         <TabsTrigger value="distance" className="text-xs">
                                           <Ruler className="h-3 w-3 mr-1" />
                                           Distance
@@ -1460,7 +1460,7 @@ function LocationAnalysisSection() {
                                       <TabsContent value="distance" className="mt-3">
                                         <div className="space-y-2">
                                           <Label className="text-xs">Distance Rings</Label>
-                                          <div className="grid grid-cols-2 gap-2">
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {DISTANCE_RINGS.map(ring => {
                                               const isSelected = activeLoc.config.distanceRings.includes(ring.value);
                                               return (
@@ -1495,7 +1495,7 @@ function LocationAnalysisSection() {
                                       <TabsContent value="drivetime" className="mt-3">
                                         <div className="space-y-2">
                                           <Label className="text-xs">Drive Times</Label>
-                                          <div className="grid grid-cols-2 gap-2">
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {DRIVE_TIMES.map(time => {
                                               const isSelected = activeLoc.config.driveTimes.includes(time.value);
                                               const isDisabled = !isSelected && activeLoc.config.driveTimes.length >= 3;

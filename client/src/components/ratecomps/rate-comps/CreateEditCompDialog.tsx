@@ -838,7 +838,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                   <TabsContent key={tab.id} value={tab.id} className="mt-4">
                     <Form {...form}>
                       <form className="space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                           {/* Left Column */}
                           <div className="space-y-6">
                             {/* Identity Section */}
@@ -891,7 +891,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         <CardTitle className="text-base">Rate Classification</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="rateType"
@@ -943,7 +943,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="boatLengthMin"
@@ -984,7 +984,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="storageTypes"
@@ -1347,7 +1347,7 @@ export default function CreateEditCompDialog({ open, onClose, comp, projectId, p
                         )}
                       />
                       
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <FormField
                           control={form.control}
                           name="city"

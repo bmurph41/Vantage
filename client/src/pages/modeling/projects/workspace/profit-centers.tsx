@@ -432,6 +432,7 @@ export default function ProfitCentersPage() {
               <CardTitle>Detailed Revenue Breakdown - Year {selectedYear + 1}</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -484,6 +485,7 @@ export default function ProfitCentersPage() {
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -520,6 +522,7 @@ export default function ProfitCentersPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="w-full">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -613,6 +616,7 @@ export default function ProfitCentersPage() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </CardContent>

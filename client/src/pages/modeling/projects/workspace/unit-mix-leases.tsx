@@ -188,7 +188,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="p-3">
           <p className="text-xs text-muted-foreground">{config.terms.totalUnitsLabel}</p>
           <p className="text-xl font-bold">{totalUnits.toLocaleString()}</p>
@@ -329,7 +329,7 @@ export default function UnitMixLeases({ project }: UnitMixLeasesProps) {
             </p>
             <div className="space-y-2">
               {enabledRows.filter(r => unitMixConfig.types.find(t => t.id === r.typeId)?.hasSeasons).map(row => (
-                <div key={row.typeId} className="grid grid-cols-3 gap-3 items-center">
+                <div key={row.typeId} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-center">
                   <span className="text-sm">{row.name}</span>
                   <div className="space-y-0.5">
                     <Label className="text-xs text-muted-foreground">{config.seasonConfig.seasonLabel} Rate</Label>

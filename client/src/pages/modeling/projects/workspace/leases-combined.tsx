@@ -464,7 +464,7 @@ export default function LeasesCombined({ projectId, projectName }: LeasesCombine
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 max-w-2xl">
           <TabsTrigger value="overview" className="gap-1">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -748,6 +748,7 @@ export default function LeasesCombined({ projectId, projectName }: LeasesCombine
                       <p className="text-sm text-muted-foreground">No leases expiring in the next 90 days</p>
                     </div>
                   ) : (
+                    <div className="overflow-x-auto w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -789,6 +790,7 @@ export default function LeasesCombined({ projectId, projectName }: LeasesCombine
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

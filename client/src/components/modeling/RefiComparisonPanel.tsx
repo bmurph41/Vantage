@@ -40,7 +40,7 @@ export default function RefiComparisonPanel({ projectId, loanId, loanName }: Pro
         <CardDescription className="text-xs">Rate-and-term or cash-out refinance</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div><Label className="text-xs">Refi Month</Label><Input type="number" value={triggerMonth} onChange={e => setTriggerMonth(e.target.value)} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">New Rate %</Label><Input type="number" step="0.25" value={newRate} onChange={e => setNewRate(e.target.value)} className="h-8 text-xs" /></div>
           <div><Label className="text-xs">New Term (mo)</Label><Input type="number" value={newTerm} onChange={e => setNewTerm(e.target.value)} className="h-8 text-xs" /></div>
@@ -58,7 +58,7 @@ export default function RefiComparisonPanel({ projectId, loanId, loanName }: Pro
             {plan.refiCashflow.netCashOut !== 0 && <p className="font-medium text-blue-600">Net Cash {plan.refiCashflow.netCashOut > 0 ? 'Out' : 'In'}: {formatCurrency(Math.abs(plan.refiCashflow.netCashOut))}</p>}
           </div>
           <Separator />
-          <div className="grid grid-cols-3 gap-1 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 text-xs">
             <span></span><span className="text-center font-medium">Hold</span><span className="text-center font-medium">Refi</span>
             <span className="text-muted-foreground">Interest</span><span className="text-center font-mono">{formatCurrency(comp.holdToMaturity.totalInterest)}</span><span className="text-center font-mono">{formatCurrency(comp.withRefi.totalInterest)}</span>
             <span className="text-muted-foreground">DS</span><span className="text-center font-mono">{formatCurrency(comp.holdToMaturity.totalDebtService)}</span><span className="text-center font-mono">{formatCurrency(comp.withRefi.totalDebtService)}</span>
@@ -71,7 +71,8 @@ export default function RefiComparisonPanel({ projectId, loanId, loanName }: Pro
             {comp.savings.breakEvenMonths != null && <Badge variant="outline" className="text-xs"><Clock className="h-3 w-3 mr-1" />{comp.savings.breakEvenMonths}mo break-even</Badge>}
           </div>
           {plan.warnings.length > 0 && <div className="text-xs text-amber-600 space-y-0.5">{plan.warnings.map((w: string, i: number) => <div key={i}>⚠ {w}</div>)}</div>}
-        </div>)}
+        </div>
+        )}
       </CardContent>
     </Card>
   );

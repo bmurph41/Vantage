@@ -149,7 +149,7 @@ export default function InvestmentCriteria() {
               <CardDescription>Minimum financial performance for deals to match your buy-box</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min Going-In Cap Rate (%)</Label>
                   <Input type="number" step="0.1" value={fin.minCapRate || ''} onChange={e => setFin({...fin, minCapRate: e.target.value})} placeholder="6.0" className="mt-1" />
@@ -161,7 +161,7 @@ export default function InvestmentCriteria() {
                 </div>
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min NOI ($)</Label>
                   <Input type="number" value={fin.minNoi || ''} onChange={e => setFin({...fin, minNoi: e.target.value})} placeholder="500000" className="mt-1" />
@@ -171,7 +171,7 @@ export default function InvestmentCriteria() {
                   <Input type="number" value={fin.minEbitda || ''} onChange={e => setFin({...fin, minEbitda: e.target.value})} placeholder="400000" className="mt-1" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min Operating Margin (%)</Label>
                   <Input type="number" step="1" value={fin.minOperatingMargin ? (parseFloat(fin.minOperatingMargin) * 100).toFixed(0) : ''} onChange={e => setFin({...fin, minOperatingMargin: String(parseFloat(e.target.value) / 100)})} placeholder="25" className="mt-1" />
@@ -194,7 +194,7 @@ export default function InvestmentCriteria() {
               <CardDescription>Target returns and capital deployment limits</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Target IRR (%)</Label>
                   <Input type="number" step="0.5" value={cap.minIrrTarget || ''} onChange={e => setCap({...cap, minIrrTarget: e.target.value})} placeholder="15" className="mt-1" />
@@ -206,7 +206,7 @@ export default function InvestmentCriteria() {
                 </div>
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Max Equity per Deal ($)</Label>
                   <Input type="number" value={cap.maxEquityPerDeal || ''} onChange={e => setCap({...cap, maxEquityPerDeal: e.target.value})} placeholder="5000000" className="mt-1" />
@@ -217,7 +217,7 @@ export default function InvestmentCriteria() {
                   <Input type="number" step="1" value={cap.targetLtvRatio || ''} onChange={e => setCap({...cap, targetLtvRatio: e.target.value})} placeholder="65" className="mt-1" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Target Hold Period (years)</Label>
                   <Input type="number" value={cap.targetHoldPeriod || ''} onChange={e => setCap({...cap, targetHoldPeriod: e.target.value})} placeholder="5" className="mt-1" />
@@ -262,7 +262,7 @@ export default function InvestmentCriteria() {
                 )}
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
                     <Label>Prefer ICW Access</Label>
@@ -297,7 +297,7 @@ export default function InvestmentCriteria() {
               <Separator />
               <div>
                 <Label className="mb-3 block">Required Amenities</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
                     { key: 'requireFuelDock', label: 'Fuel Dock' },
                     { key: 'requireShipStore', label: 'Ship Store' },
@@ -325,7 +325,7 @@ export default function InvestmentCriteria() {
               <CardDescription>Minimum and maximum property size</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min Total Slips</Label>
                   <Input type="number" value={sz.minTotalSlips || ''} onChange={e => setSz({...sz, minTotalSlips: e.target.value})} placeholder="50" className="mt-1" />
@@ -335,7 +335,7 @@ export default function InvestmentCriteria() {
                   <Input type="number" value={sz.maxTotalSlips || ''} onChange={e => setSz({...sz, maxTotalSlips: e.target.value})} placeholder="500" className="mt-1" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min Acreage</Label>
                   <Input type="number" step="0.1" value={sz.minAcreage || ''} onChange={e => setSz({...sz, minAcreage: e.target.value})} placeholder="5" className="mt-1" />
@@ -345,7 +345,7 @@ export default function InvestmentCriteria() {
                   <Input type="number" step="0.1" value={sz.maxAcreage || ''} onChange={e => setSz({...sz, maxAcreage: e.target.value})} placeholder="100" className="mt-1" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
                   <Label>Min Water Frontage (ft)</Label>
                   <Input type="number" value={sz.minWaterFrontage || ''} onChange={e => setSz({...sz, minWaterFrontage: e.target.value})} placeholder="500" className="mt-1" />
@@ -369,7 +369,7 @@ export default function InvestmentCriteria() {
             <CardContent className="space-y-6">
               <div>
                 <Label className="mb-3 block">Involvement Level</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {INVOLVEMENT_LEVELS.map(level => (
                     <div
                       key={level.value}
@@ -412,7 +412,7 @@ export default function InvestmentCriteria() {
           <CardDescription>How much each category matters in the overall deal score (must total 100)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { key: 'financialWeight', label: 'Financial', icon: DollarSign },
               { key: 'capitalWeight', label: 'Returns', icon: TrendingUp },

@@ -556,7 +556,7 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground flex items-center">
                       Reassess Month
@@ -627,6 +627,7 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
         </CardHeader>
         <CardContent className="pt-0 px-4 pb-4">
           <div className="rounded-md border">
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -653,6 +654,7 @@ export default function PropertyTaxTab({ projectId, onTabChange }: { projectId: 
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">
             Total property tax over {holdPeriod} years: <span className="font-semibold">{formatCurrencyVal(taxProjections.reduce((sum, p) => sum + p.tax, 0))}</span>

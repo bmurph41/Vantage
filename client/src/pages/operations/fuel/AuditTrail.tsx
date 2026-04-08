@@ -260,7 +260,7 @@ export default function AuditTrail() {
             </div>
           ) : (
             <>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -308,7 +308,7 @@ export default function AuditTrail() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
 
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
@@ -355,7 +355,7 @@ export default function AuditTrail() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Timestamp</div>
                   <div className="font-mono">

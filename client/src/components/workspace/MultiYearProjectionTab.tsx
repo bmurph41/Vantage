@@ -112,7 +112,7 @@ function YearRow({ projYear, isLast }: { projYear: ProjectionYear; isLast: boole
       {open && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={7} className="px-4 pb-4 pt-0 bg-muted/20">
-            <div className="grid grid-cols-2 gap-4 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Revenue Lines</p>
                 <div className="space-y-0.5">
@@ -344,6 +344,7 @@ export default function MultiYearProjectionTab({ projectId, initialConfig }: Mul
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 pb-0 px-0">
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -369,6 +370,7 @@ export default function MultiYearProjectionTab({ projectId, initialConfig }: Mul
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
           {result.exit && <ExitCard exit={result.exit} holdPeriod={config.holdPeriod} />}

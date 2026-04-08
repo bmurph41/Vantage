@@ -267,7 +267,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                   <p className="text-xs text-muted-foreground mt-1">
                     Version {scenario.version} • Updated {new Date(scenario.updatedAt).toLocaleDateString()}
                   </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-muted-foreground">Rev Growth:</span>
                       <span className="ml-1 font-medium">{formatPercent(parseFloat(scenario.revenueGrowthRate || '0'), { dash: true })}</span>
@@ -294,6 +294,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -436,6 +437,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                   </TableRow>
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -448,6 +450,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
             </CardHeader>
             <CardContent>
               <ScrollArea className="max-h-[400px]">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -493,6 +496,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </ScrollArea>
             </CardContent>
           </Card>
@@ -506,6 +510,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
             </CardHeader>
             <CardContent>
               <ScrollArea className="max-h-[400px]">
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -551,6 +556,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </ScrollArea>
             </CardContent>
           </Card>
@@ -563,6 +569,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -619,6 +626,7 @@ export default function ScenarioComparison({ projectId }: ScenarioComparisonProp
                   })}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </>

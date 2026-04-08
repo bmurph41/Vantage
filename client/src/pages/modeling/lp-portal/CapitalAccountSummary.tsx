@@ -110,7 +110,7 @@ export default function CapitalAccountSummary({ fundId }: { fundId: string }) {
   if (accountLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
         <Skeleton className="h-80" />
@@ -181,7 +181,7 @@ export default function CapitalAccountSummary({ fundId }: { fundId: string }) {
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-center">
               <div className="text-xs text-muted-foreground uppercase">Commitment</div>
               <div className="text-lg font-bold">{formatCurrency(acct.totalCommitment)}</div>
@@ -218,6 +218,7 @@ export default function CapitalAccountSummary({ fundId }: { fundId: string }) {
               No transactions recorded yet
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -255,6 +256,7 @@ export default function CapitalAccountSummary({ fundId }: { fundId: string }) {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

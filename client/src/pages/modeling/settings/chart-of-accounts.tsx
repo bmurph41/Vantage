@@ -313,7 +313,7 @@ export default function ChartOfAccounts() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
         </CardContent>
       </Card>

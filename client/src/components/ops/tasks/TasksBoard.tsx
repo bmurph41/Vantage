@@ -108,7 +108,7 @@ export function TasksBoard({ tasks, searchQuery, viewMode }: TasksBoardProps) {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {COLUMNS.map((column) => {
         const columnTasks = filteredTasks.filter((t) => t.status === column.id);
         return (

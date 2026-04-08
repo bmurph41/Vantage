@@ -157,10 +157,10 @@ export default function VDRDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
-                  <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
                     <ProjectStats projectId={project.id} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Link href={`/vdr/projects/${project.id}`}>
                       <Button className="w-full" data-testid={`button-open-vdr-${project.id}`}>
                         <FolderLock className="h-4 w-4 mr-2" />
@@ -199,10 +199,10 @@ export default function VDRDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col flex-1 justify-between space-y-4">
-                  <div className="grid grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2 px-3 bg-gray-50 rounded-md border border-gray-100">
                     <ProjectStats projectId={project.id} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Link href={`/vdr/projects/${project.id}`}>
                       <Button variant="outline" className="w-full" data-testid={`button-open-vdr-${project.id}`}>
                         <FolderLock className="h-4 w-4 mr-2" />

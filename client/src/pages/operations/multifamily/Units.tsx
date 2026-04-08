@@ -153,7 +153,7 @@ export default function MultifamilyUnits() {
                 <Label htmlFor="sqFt">Square Feet</Label>
                 <Input id="sqFt" type="number" placeholder="e.g., 750" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="currentRent">Current Rent</Label>
                   <Input id="currentRent" type="number" placeholder="e.g., 1500" />
@@ -187,6 +187,7 @@ export default function MultifamilyUnits() {
               <p className="text-sm mt-1">Try adjusting your search or filters.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -225,6 +226,7 @@ export default function MultifamilyUnits() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

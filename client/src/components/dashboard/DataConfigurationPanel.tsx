@@ -243,7 +243,7 @@ export function DataConfigurationPanel({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Field</Label>
                     <Select
@@ -337,7 +337,7 @@ export function DataConfigurationPanel({
           </Select>
 
           {showCustomDates && (
-            <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div className="space-y-1">
                 <Label className="text-xs">Start Date</Label>
                 <Popover>
@@ -393,7 +393,7 @@ export function DataConfigurationPanel({
         )}
 
         {needsXYAxis && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>X-Axis Label</Label>
               <Input

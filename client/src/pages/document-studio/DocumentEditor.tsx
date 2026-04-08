@@ -271,7 +271,7 @@ function BlockRenderer({
           </div>
         )}
         {block.type === 'metric_grid' && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {(block.content.metrics || [{ value: '', label: '' }, { value: '', label: '' }, { value: '', label: '' }]).map(
               (m: { value: string; label: string }, i: number) => (
                 <div key={i} className="text-center p-3 bg-muted/50 rounded-md">
@@ -377,7 +377,7 @@ function AddBlockButton({ onAdd }: { onAdd: (type: ContentBlock['type']) => void
         <Plus className="w-3 h-3 mr-1" /> Add Block
       </Button>
       {open && (
-        <Card className="absolute top-8 z-50 w-64 p-2 grid grid-cols-2 gap-1 shadow-lg">
+        <Card className="absolute top-8 z-50 w-64 p-2 grid grid-cols-1 sm:grid-cols-2 gap-1 shadow-lg">
           {BLOCK_TYPES.map((bt) => {
             const Icon = bt.icon;
             return (
@@ -1084,9 +1084,9 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
           {/* Left Sidebar                                                     */}
           {/* -------------------------------------------------------------- */}
           {leftSidebarOpen && (
-            <aside className="w-[280px] border-r bg-muted/20 flex flex-col shrink-0">
+            <aside className="w-full max-w-[280px] border-r bg-muted/20 flex flex-col shrink-0">
               <Tabs value={leftTab} onValueChange={(v) => setLeftTab(v as typeof leftTab)} className="flex flex-col flex-1">
-                <TabsList className="mx-3 mt-3 grid grid-cols-2">
+                <TabsList className="mx-3 mt-3 grid grid-cols-1 sm:grid-cols-2">
                   <TabsTrigger value="sections" className="text-xs">Sections</TabsTrigger>
                   <TabsTrigger value="blocks" className="text-xs">Blocks</TabsTrigger>
                 </TabsList>
@@ -1244,9 +1244,9 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
           {/* Right Sidebar                                                    */}
           {/* -------------------------------------------------------------- */}
           {rightSidebarOpen && (
-            <aside className="w-[320px] border-l bg-muted/20 flex flex-col shrink-0">
+            <aside className="w-full md:w-[320px] border-l bg-muted/20 flex flex-col shrink-0">
               <Tabs value={rightTab} onValueChange={(v) => setRightTab(v as typeof rightTab)} className="flex flex-col flex-1">
-                <TabsList className="mx-3 mt-3 grid grid-cols-4">
+                <TabsList className="mx-3 mt-3 grid grid-cols-2 lg:grid-cols-4">
                   <TabsTrigger value="properties" className="text-xs">Properties</TabsTrigger>
                   <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
                   <TabsTrigger value="project" className="text-xs">Project</TabsTrigger>

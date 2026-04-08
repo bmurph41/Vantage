@@ -124,7 +124,7 @@ export default function Analytics() {
           <AssetSelector 
             value={selectedAssetId} 
             onChange={setSelectedAssetId}
-            className="w-[280px]"
+            className="w-full max-w-[280px]"
           />
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-48" data-testid="date-range-filter">

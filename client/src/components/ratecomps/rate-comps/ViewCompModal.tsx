@@ -578,7 +578,7 @@ export default function ViewCompModal({ open, onClose, comp, onEdit, onRateAdded
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Wet Slips</p>
                         <p className="text-lg font-semibold">{formatValue(comp.wetSlips)}</p>
@@ -777,7 +777,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="storageType">Storage Type</Label>
               <Select value={formData.storageType} onValueChange={(v) => updateField('storageType', v)}>
@@ -822,7 +822,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="loaMin">Min LOA (ft)</Label>
               <Input
@@ -849,7 +849,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
 
           <Separator />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amountDollars">Rate Amount ($)</Label>
               <Input
@@ -894,7 +894,7 @@ function AddRateDialog({ open, onClose, rateCompId, marinaName, formData, setFor
 
           <Separator />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="electricIncluded">Electric Included</Label>
               <Switch

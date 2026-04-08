@@ -328,7 +328,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName" className="font-semibold">First Name</Label>
                       {isEditing ? (
@@ -364,7 +364,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="email" className="font-semibold flex items-center gap-2">
                         <Mail className="w-4 h-4 text-gray-500" />
@@ -404,7 +404,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="company" className="font-semibold flex items-center gap-2">
                         <Building className="w-4 h-4 text-gray-500" />
@@ -503,7 +503,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="leadStatus" className="font-semibold">Status</Label>
                       {isEditing ? (
@@ -563,7 +563,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="leadSource" className="font-semibold">Source</Label>
                       {isEditing ? (
@@ -621,7 +621,7 @@ export default function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailMod
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Created</div>
                       <div className="font-medium flex items-center gap-2 px-3 py-2">

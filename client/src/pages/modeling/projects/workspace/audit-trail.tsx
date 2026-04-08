@@ -340,7 +340,7 @@ export default function AuditTrailViewer({ projectId }: AuditTrailViewerProps) {
                                 )}
                                 
                                 {(entry.previousValue || entry.newValue) && (
-                                  <div className="grid grid-cols-2 gap-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                       <h4 className="font-medium mb-2 text-muted-foreground">Previous Value</h4>
                                       <pre className="bg-muted p-3 rounded-lg text-xs overflow-auto max-h-[300px]">
@@ -377,7 +377,7 @@ export default function AuditTrailViewer({ projectId }: AuditTrailViewerProps) {
                               </div>
                             </div>
                           )}
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <h5 className="text-sm font-medium mb-2 text-muted-foreground">Before</h5>
                               <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[200px]">

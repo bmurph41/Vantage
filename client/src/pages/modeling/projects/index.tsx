@@ -365,6 +365,7 @@ export default function ModelingProjectsPage() {
               </div>
             ) : (
               <div>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -481,7 +482,7 @@ export default function ModelingProjectsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-center pb-0" rowSpan={2} onClick={(e) => e.stopPropagation()}>
-                            <div className="grid grid-cols-2 gap-0.5 justify-items-center w-fit mx-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5 justify-items-center w-fit mx-auto">
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setLocation(`/modeling/projects/${project.id}/doc-intel`)} title="Document Intelligence" data-testid={`button-doc-intel-${project.id}`}>
                                 <FileSpreadsheet className="h-3.5 w-3.5" />
                               </Button>
@@ -527,6 +528,7 @@ export default function ModelingProjectsPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             )}
           </Card>

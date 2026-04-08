@@ -194,7 +194,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -244,7 +244,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                 <DialogDescription>Record a service department transaction</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Open Date *</Label>
                     <Input
@@ -262,7 +262,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Labor Revenue *</Label>
                     <Input
@@ -284,7 +284,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>COGS</Label>
                     <Input
@@ -373,6 +373,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
               <p className="text-sm">Add work orders manually or import from actuals</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -431,6 +432,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -459,7 +461,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
             });
           }}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Open Date</Label>
                   <Input type="date" name="editOpenDate" defaultValue={editingOrder?.openDate?.split('T')[0]} />
@@ -469,7 +471,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                   <Input type="date" name="editCloseDate" defaultValue={editingOrder?.closeDate?.split('T')[0] || ''} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Labor Revenue</Label>
                   <Input type="number" step="0.01" name="editLaborRevenue" defaultValue={editingOrder?.laborRevenue} />
@@ -479,7 +481,7 @@ export default function ValuatorServiceDeptTab({ projectId, projectName }: Valua
                   <Input type="number" step="0.01" name="editPartsRevenue" defaultValue={editingOrder?.partsRevenue} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>COGS</Label>
                   <Input type="number" step="0.01" name="editCogs" defaultValue={editingOrder?.cogs} />

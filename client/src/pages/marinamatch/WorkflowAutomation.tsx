@@ -1029,7 +1029,7 @@ function TriggerConfigFields({
 }) {
   if (type === "deal_stage_changed") {
     return (
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">From Stage (optional)</Label>
           <Select value={config.fromStage ?? ""} onValueChange={v => onChange({ ...config, fromStage: v || undefined })}>
@@ -1245,7 +1245,7 @@ function ActionConfigFields({ action, onChange }: { action: Action; onChange: (c
       );
     case "assign_to":
       return (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <Label className="text-xs">Assignee Name</Label>
             <Input className="mt-1 h-8 text-xs" placeholder="Jane Smith" value={c.assigneeName ?? ""} onChange={e => set({ assigneeName: e.target.value })} />
@@ -1270,7 +1270,7 @@ function ActionConfigFields({ action, onChange }: { action: Action; onChange: (c
             <Label className="text-xs">Task Title *</Label>
             <Input className="mt-1 h-8 text-xs" placeholder="Review {{deal.propertyName}}" value={c.title ?? ""} onChange={e => set({ title: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Label className="text-xs">Assignee Name</Label>
               <Input className="mt-1 h-8 text-xs" value={c.assigneeName ?? ""} onChange={e => set({ assigneeName: e.target.value })} />

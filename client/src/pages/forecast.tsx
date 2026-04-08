@@ -560,7 +560,7 @@ export default function Forecast() {
                           <span className="font-semibold text-gray-900">{month.month}</span>
                           <span className="text-sm text-gray-500">{month.wonCount}/{month.dealCount} won</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                           <div>
                             <div className="text-gray-500">Revenue</div>
                             <div className="font-semibold text-gray-900">{formatCurrency(month.revenue)}</div>
@@ -619,7 +619,7 @@ export default function Forecast() {
                     </div>
 
                     <div className="pt-3 border-t border-gray-200">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <div className="text-sm text-gray-600 mb-1">Pipeline Value</div>
                           <div className="text-xl font-bold text-gray-900">{formatCurrency(metrics.pipelineValue)}</div>
@@ -633,7 +633,7 @@ export default function Forecast() {
 
                     <div className="pt-3 border-t border-gray-200">
                       <div className="text-sm text-gray-600 mb-2">Commission Pipeline</div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="bg-green-50 rounded-lg p-3">
                           <div className="text-xs text-gray-500">Earned</div>
                           <div className="text-lg font-bold text-green-600">{formatCurrency(metrics.totalCommission)}</div>

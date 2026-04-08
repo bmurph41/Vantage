@@ -415,7 +415,7 @@ export default function FuelSales() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
         </CardContent>
       </Card>

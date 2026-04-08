@@ -106,7 +106,7 @@ export function OccupancyModal({
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Total Slips</p>
@@ -206,7 +206,7 @@ export function RevenueModal({
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Scheduled</p>
@@ -450,7 +450,7 @@ export function StorageTypesModal({
           {isLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>

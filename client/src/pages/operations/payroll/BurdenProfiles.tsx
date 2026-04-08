@@ -81,6 +81,7 @@ export default function BurdenProfiles() {
                 </div>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -150,6 +151,7 @@ export default function BurdenProfiles() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </div>
 
                 <div className="mt-4 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
                   Example: A $50,000 salary with this burden profile results in{" "}

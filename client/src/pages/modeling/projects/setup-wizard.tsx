@@ -321,7 +321,7 @@ function WelcomeSlide() {
         Let's set up your modeling project. We'll walk you through the key
         inputs to get your valuation started.
       </p>
-      <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-lg mx-auto text-sm">
         <div className="p-3 bg-muted rounded-lg">
           <Building2 className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
           <span className="text-muted-foreground">Property Details</span>
@@ -368,7 +368,7 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2 md:col-span-1">
               <Label htmlFor="name">
                 Project Name <span className="text-destructive">*</span>
@@ -452,7 +452,7 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
               className="mt-1.5"
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="city">City</Label>
               <Input
@@ -495,7 +495,7 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="targetClosingDate">Target Closing Date</Label>
               <Input
@@ -576,7 +576,7 @@ function DealDetailsSlide({ payload, updatePayload, updateNestedPayload }: Slide
           {payload.acquisition.purchasePrice && payload.acquisition.ltv && (
             <div className="mt-3 p-3 bg-muted/50 rounded-lg">
               <div className="text-sm font-medium mb-2">Capital Structure Summary</div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Debt Amount:</span>
                   <span className="font-medium">${parseInt(computedDebt).toLocaleString()}</span>
@@ -726,7 +726,7 @@ function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideP
               {payload.storageMix.items.map((item) => {
                 const mode = item.occupancyInputMode || 'percentage';
                 return (
-                <div key={item.storageType} className="grid grid-cols-4 gap-3 items-end">
+                <div key={item.storageType} className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                   <div className="font-medium text-sm">
                     {STORAGE_TYPES.find((t) => t.value === item.storageType)?.label}
                   </div>
@@ -903,7 +903,7 @@ function StorageMixSlide({ payload, updatePayload, updateNestedPayload }: SlideP
           </div>
 
           {payload.seasonality.profile !== "YEAR_ROUND" && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Season Start</Label>
                 <Select
@@ -1053,7 +1053,7 @@ function ProfitCentersSlide({ payload, updateNestedPayload }: SlideProps) {
                 </div>
 
                 {config.enabled && (
-                  <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+                  <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {pc.fields.map((field) => (
                       <div key={field.key}>
                         <Label className="text-sm">{field.label}</Label>
@@ -1141,7 +1141,7 @@ function FinancialScopeSlide({ payload, updateNestedPayload }: SlideProps) {
 
           <Separator />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Fiscal Year End Month</Label>
               <Select

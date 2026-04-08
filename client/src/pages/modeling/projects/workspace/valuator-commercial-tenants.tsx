@@ -277,7 +277,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((kpi, i) => (
           <Card key={i}>
             <CardContent className="pt-4">
@@ -339,6 +339,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
               </Button>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -444,6 +445,7 @@ export default function ValuatorCommercialTenantsTab({ projectId, projectName }:
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

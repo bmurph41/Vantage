@@ -638,7 +638,7 @@ export default function CapitalMarketsPage() {
                       </BarChart>
                     </ResponsiveContainer>
 
-                    <div className="rounded-md border">
+                    <div className="rounded-md border overflow-x-auto w-full">
                       <Table>
                         <TableHeader>
                           <TableRow>

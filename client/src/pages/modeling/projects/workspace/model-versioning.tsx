@@ -391,7 +391,8 @@ function ModelVersioning({ projectId, onTabChange }: ModelVersioningProps) {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              
+           </Table>
             </div>
           )}
         </CardContent>
@@ -421,7 +422,7 @@ function ModelVersioning({ projectId, onTabChange }: ModelVersioningProps) {
           </CardHeader>
           <CardContent>
             {/* Summary metrics side by side */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div className="p-4 rounded-lg border">
                 <p className="text-sm text-muted-foreground mb-2">
                   {leftSnap.version} - {formatDate(leftSnap.createdAt)}
@@ -464,6 +465,7 @@ function ModelVersioning({ projectId, onTabChange }: ModelVersioningProps) {
 
             {/* Delta table */}
             {comparisonDeltas.length > 0 ? (
+              <div className="overflow-x-auto w-full">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -495,7 +497,9 @@ function ModelVersioning({ projectId, onTabChange }: ModelVersioningProps) {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              
+            </Table>
+            </div>
             ) : (
               <div className="text-center py-4 text-muted-foreground text-sm">
                 <CheckCircle className="h-5 w-5 mx-auto mb-2 text-green-500" />

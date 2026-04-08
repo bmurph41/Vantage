@@ -455,7 +455,7 @@ function DealTimelineCard({ deal, onNavigate }: { deal: DDDeal; onNavigate: (pat
         {hasTimeline && (
           <div className="space-y-2">
             <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DD Timeline</h5>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
               <TimelineRow label="PSA Signed" value={fmtDate(deal.psaSignedDate)} />
               <TimelineRow label="DD Period" value={deal.ddPeriodDays ? `${deal.ddPeriodDays} days` : "—"} />
               <TimelineRow

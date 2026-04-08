@@ -120,7 +120,7 @@ function AddAccountDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Account Code</Label>
               <Input
@@ -458,6 +458,7 @@ export default function BookkeepingChartOfAccounts() {
               </p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -553,6 +554,7 @@ export default function BookkeepingChartOfAccounts() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

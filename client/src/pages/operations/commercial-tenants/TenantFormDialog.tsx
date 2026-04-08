@@ -204,7 +204,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="financial">Financial</TabsTrigger>
                 <TabsTrigger value="expenses">NNN/CAM</TabsTrigger>
@@ -212,7 +212,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
               </TabsList>
 
               <TabsContent value="basic" className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="tenantName"
@@ -241,7 +241,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="suiteNumber"
@@ -283,7 +283,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="leaseCommencementDate"
@@ -325,7 +325,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="leaseType"
@@ -414,7 +414,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
               </TabsContent>
 
               <TabsContent value="financial" className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="currentBaseRent"
@@ -456,7 +456,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="escalationType"
@@ -509,7 +509,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="percentageRentRate"
@@ -540,7 +540,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
               </TabsContent>
 
               <TabsContent value="expenses" className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="estimatedCamPerSF"
@@ -584,7 +584,7 @@ export function TenantFormDialog({ open, onOpenChange, tenant }: TenantFormDialo
               </TabsContent>
 
               <TabsContent value="options" className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="renewalOptions"

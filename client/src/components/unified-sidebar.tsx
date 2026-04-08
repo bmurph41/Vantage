@@ -443,7 +443,7 @@ export default function UnifiedSidebar() {
         onClick={handleNavClick}
         style={!sidebarCollapsed && depth > 0 ? { paddingLeft: `${16 + depth * 24}px` } : undefined}
         className={cn(
-          "flex items-center transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "flex items-center min-w-0 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           depth === 0 && "text-[13px] text-sidebar-foreground",
           depth === 1 && "text-[12px] text-sidebar-foreground/60",
           depth >= 2 && "text-[11px] text-sidebar-foreground/50 italic",
