@@ -4240,9 +4240,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/dd/subscriptions/:id", authenticateUser, async (req: any, res) => {
     try {
-      // Get existing subscription to verify access
-      const existingSubscription = await storage.getSubscriptionsByProject("dummy");
-      // Note: This is a simplified check - in production, we'd need a more efficient way to verify subscription ownership
+      const existingSubscription = await storage.getSubscription(req.params.id);
+      if (!existingSubscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      const isDirectRecipient = existingSubscription.recipientId === req.user.id;
+      let isOrgMember = false;
+      if (!isDirectRecipient && existingSubscription.projectId) {
+        const project = await storage.getProject(existingSubscription.projectId);
+        if (!project) {
+          return res.status(404).json({ error: "Associated project not found" });
+        }
+        isOrgMember = project.orgId === req.user.orgId;
+      }
+
+      if (!isDirectRecipient && !isOrgMember) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
 
       const updates = insertNotificationSubscriptionSchema.partial().parse(req.body);
       const updatedSubscription = await storage.updateSubscription(req.params.id, updates);

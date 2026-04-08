@@ -204,6 +204,7 @@ export interface IStorage {
 
   // Notification Subscription Management
   createSubscription(subscription: InsertNotificationSubscription): Promise<NotificationSubscription>;
+  getSubscription(id: string): Promise<NotificationSubscription | undefined>;
   getSubscriptionsByProject(projectId: string): Promise<NotificationSubscription[]>;
   getSubscriptionsByTask(taskId: string): Promise<NotificationSubscription[]>;
   getSubscriptionsByRecipient(recipientType: "user" | "contact", recipientId: string): Promise<NotificationSubscription[]>;
@@ -1636,6 +1637,12 @@ export class DatabaseStorage implements IStorage {
   async createSubscription(subscription: InsertNotificationSubscription): Promise<NotificationSubscription> {
     const [created] = await db.insert(notificationSubscriptions).values(subscription).returning();
     return created;
+  }
+
+  async getSubscription(id: string): Promise<NotificationSubscription | undefined> {
+    const [subscription] = await db.select().from(notificationSubscriptions)
+      .where(eq(notificationSubscriptions.id, id));
+    return subscription;
   }
 
   async getSubscriptionsByProject(projectId: string): Promise<NotificationSubscription[]> {

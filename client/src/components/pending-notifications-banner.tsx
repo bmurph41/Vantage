@@ -41,33 +41,38 @@ export default function PendingNotificationsBanner() {
   const [dismissedNotifications, setDismissedNotifications] = useState<Set<string>>(loadDismissed);
 
   // Fetch all pending items - use longer stale time to reduce unnecessary refetches
-  const { data: pendingProperties = [] } = useQuery<PendingItem[]>({
+  const { data: pendingPropertiesRaw } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-properties'],
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
     refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes instead of 30 seconds
     refetchOnWindowFocus: false,
   });
 
-  const { data: pendingContacts = [] } = useQuery<PendingItem[]>({
+  const { data: pendingContactsRaw } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-contacts'],
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  const { data: pendingCompanies = [] } = useQuery<PendingItem[]>({
+  const { data: pendingCompaniesRaw } = useQuery<PendingItem[]>({
     queryKey: ['/api/crm/pending-companies'],
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  const { data: pendingProfiles = [] } = useQuery<PendingPropertyProfile[]>({
+  const { data: pendingProfilesRaw } = useQuery<PendingPropertyProfile[]>({
     queryKey: ['/api/sales-comps/pending-property-profiles'],
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  const pendingProperties = pendingPropertiesRaw ?? [];
+  const pendingContacts = pendingContactsRaw ?? [];
+  const pendingCompanies = pendingCompaniesRaw ?? [];
+  const pendingProfiles = pendingProfilesRaw ?? [];
 
   // Calculate counts
   const pendingPropertiesCount = pendingProperties.filter(p => p.status === 'pending').length;
