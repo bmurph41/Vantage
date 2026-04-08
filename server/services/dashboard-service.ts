@@ -7,6 +7,20 @@ import {
   dashboardSavedLayouts,
   dashboardWidgetTemplates,
   salesComps,
+  rateComps,
+  demographicsCache,
+  docketDeals,
+  vdrDocuments,
+  vdrFolders,
+  fuelSales,
+  shipStoreTransactions,
+  rentRolls,
+  rentRollEntries,
+  modelingProjects,
+  projects,
+  crmContacts,
+  crmCompanies,
+  crmDeals,
 } from '@shared/schema';
 import { eq, and, inArray, gte, lte, isNull, sql as drizzleSql, desc, asc, between } from 'drizzle-orm';
 import type {
@@ -2153,8 +2167,37 @@ export class DashboardService {
     switch (moduleKey) {
       case 'sales_comps':
         return this.executeSalesCompsQuery(orgId, metricKey, filters, yearFilter, yearRange, groupBy, enableComparison, comparisonType);
-      
-      // Add more module adapters as needed
+
+      case 'rate_comps':
+        return this.executeRateCompsQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'demographics':
+        return this.executeDemographicsQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'docket':
+        return this.executeDocketQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'vdr':
+        return this.executeVdrQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'fuel':
+        return this.executeFuelQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'ship_store':
+        return this.executeShipStoreQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'rent_roll':
+        return this.executeRentRollQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'modeling':
+        return this.executeModelingQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'due_diligence':
+        return this.executeDueDiligenceQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
+      case 'crm':
+        return this.executeCrmQuery(orgId, metricKey, filters, yearFilter, yearRange, enableComparison, comparisonType);
+
       default:
         return { value: 0 };
     }
@@ -2372,6 +2415,737 @@ export class DashboardService {
           label: String(r.label),
           value: Number(r.value),
         }));
+    }
+
+    return result;
+  }
+
+  /**
+   * Builds a YoY trend value from current and previous results.
+   */
+  private calcTrend(current: number, previous: number): number {
+    return previous > 0 ? ((current - previous) / previous) * 100 : (current > 0 ? 100 : 0);
+  }
+
+  /**
+   * Rate Comps query adapter
+   * Mirrors the sales_comps pattern: org-scoped, state-filtered, year/year-range filtered, YoY comparison.
+   */
+  private async executeRateCompsQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const baseConditions: any[] = [
+      eq(rateComps.orgId, orgId),
+      isNull(rateComps.deletedAt),
+    ];
+
+    if (filters.states && filters.states.length > 0) {
+      baseConditions.push(inArray(rateComps.state, filters.states));
+    }
+
+    const conditions: any[] = [...baseConditions];
+    if (yearFilter) {
+      conditions.push(eq(rateComps.saleYear, yearFilter));
+    } else if (yearRange) {
+      conditions.push(between(rateComps.saleYear, yearRange.start, yearRange.end));
+    }
+
+    const prevConditions = [...baseConditions];
+    if (yearFilter) {
+      prevConditions.push(eq(rateComps.saleYear, yearFilter - 1));
+    }
+
+    const whereCondition = and(...conditions);
+    const prevWhereCondition = and(...prevConditions);
+
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_count': {
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(rateComps).where(whereCondition);
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(rateComps).where(prevWhereCondition);
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'avg_rate_per_foot': {
+        // Average of rateAmount ($/linear foot) across records that have a valid rateAmount
+        const [row] = await db
+          .select({ avg: drizzleSql<number>`AVG(NULLIF(${rateComps.rateAmount}, 0))` })
+          .from(rateComps)
+          .where(whereCondition);
+        result.value = Number(row?.avg) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db
+            .select({ avg: drizzleSql<number>`AVG(NULLIF(${rateComps.rateAmount}, 0))` })
+            .from(rateComps)
+            .where(prevWhereCondition);
+          result.previousValue = Number(prev?.avg) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Demographics query adapter
+   * Org-scoped; optional year filter applied to latestDate (year of latest data point).
+   * locations_analyzed counts distinct (stateCode, county) pairs. YoY comparison supported.
+   */
+  private async executeDemographicsQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const buildConds = (yf: number | null, yr: { start: number; end: number } | null): any[] => {
+      const conds: any[] = [eq(demographicsCache.orgId, orgId)];
+      if (yf) conds.push(drizzleSql`EXTRACT(YEAR FROM ${demographicsCache.latestDate}) = ${yf}`);
+      else if (yr) conds.push(drizzleSql`EXTRACT(YEAR FROM ${demographicsCache.latestDate}) BETWEEN ${yr.start} AND ${yr.end}`);
+      return conds;
+    };
+
+    const baseConds = buildConds(yearFilter, yearRange);
+    const prevConds = yearFilter ? buildConds(yearFilter - 1, null) : null;
+
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'locations_analyzed': {
+        // Count distinct geographic locations identified by (stateCode, county) pairs
+        const [row] = await db
+          .select({ count: drizzleSql<number>`COUNT(DISTINCT (${demographicsCache.stateCode}, COALESCE(${demographicsCache.county}, '')))` })
+          .from(demographicsCache)
+          .where(and(...baseConds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && prevConds) {
+          const [prev] = await db
+            .select({ count: drizzleSql<number>`COUNT(DISTINCT (${demographicsCache.stateCode}, COALESCE(${demographicsCache.county}, '')))` })
+            .from(demographicsCache)
+            .where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'avg_population': {
+        const [row] = await db
+          .select({ avg: drizzleSql<number>`AVG(${demographicsCache.latestValue})` })
+          .from(demographicsCache)
+          .where(and(...baseConds, eq(demographicsCache.category, 'population')));
+        result.value = Number(row?.avg) || 0;
+        if (enableComparison && comparisonType === 'yoy' && prevConds) {
+          const [prev] = await db
+            .select({ avg: drizzleSql<number>`AVG(${demographicsCache.latestValue})` })
+            .from(demographicsCache)
+            .where(and(...prevConds, eq(demographicsCache.category, 'population')));
+          result.previousValue = Number(prev?.avg) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'avg_median_income': {
+        const [row] = await db
+          .select({ avg: drizzleSql<number>`AVG(${demographicsCache.latestValue})` })
+          .from(demographicsCache)
+          .where(and(...baseConds, eq(demographicsCache.category, 'income')));
+        result.value = Number(row?.avg) || 0;
+        if (enableComparison && comparisonType === 'yoy' && prevConds) {
+          const [prev] = await db
+            .select({ avg: drizzleSql<number>`AVG(${demographicsCache.latestValue})` })
+            .from(demographicsCache)
+            .where(and(...prevConds, eq(demographicsCache.category, 'income')));
+          result.previousValue = Number(prev?.avg) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Docket query adapter
+   * total_deals counts ACTIVE deals only: dealStatus IN ('Announced', 'Pending'). These are
+   * in-progress deals that have not yet closed or terminated. Year filter applied via dealDate.
+   * articles_today counts deals announced today using announcedDate = CURRENT_DATE.
+   */
+  private async executeDocketQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    // Active-deal filter: Announced + Pending represent in-progress deals (Closed/Terminated are historical)
+    const activeDealStatus = drizzleSql`${docketDeals.dealStatus} IN ('Announced', 'Pending')`;
+    const baseConditions: any[] = [eq(docketDeals.orgId, orgId), isNull(docketDeals.deletedAt)];
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_deals': {
+        const conditions = [...baseConditions, activeDealStatus];
+        if (yearFilter) {
+          conditions.push(drizzleSql`EXTRACT(YEAR FROM ${docketDeals.dealDate}) = ${yearFilter}`);
+        } else if (yearRange) {
+          conditions.push(drizzleSql`EXTRACT(YEAR FROM ${docketDeals.dealDate}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const prevConditions = [...baseConditions, activeDealStatus];
+        if (yearFilter) {
+          prevConditions.push(drizzleSql`EXTRACT(YEAR FROM ${docketDeals.dealDate}) = ${yearFilter - 1}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(docketDeals).where(and(...conditions));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(docketDeals).where(and(...prevConditions));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'articles_today': {
+        // Count deals announced today using the announcedDate date column
+        const [row] = await db
+          .select({ count: drizzleSql<number>`COUNT(*)` })
+          .from(docketDeals)
+          .where(and(...baseConditions, drizzleSql`${docketDeals.announcedDate} = CURRENT_DATE`));
+        result.value = Number(row?.count) || 0;
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * VDR query adapter
+   * active_rooms = non-deleted root-level folders (parentFolderId IS NULL), optionally year-filtered by createdAt.
+   * total_documents = current non-deleted documents, optionally year-filtered by createdAt. YoY supported.
+   */
+  private async executeVdrQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_documents': {
+        const baseDocConds: any[] = [eq(vdrDocuments.orgId, orgId), isNull(vdrDocuments.deletedAt), eq(vdrDocuments.isCurrentVersion, true)];
+        const docConds = [...baseDocConds];
+        const prevDocConds = [...baseDocConds];
+        if (yearFilter) {
+          docConds.push(drizzleSql`EXTRACT(YEAR FROM ${vdrDocuments.createdAt}) = ${yearFilter}`);
+          prevDocConds.push(drizzleSql`EXTRACT(YEAR FROM ${vdrDocuments.createdAt}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          docConds.push(drizzleSql`EXTRACT(YEAR FROM ${vdrDocuments.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(vdrDocuments).where(and(...docConds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(vdrDocuments).where(and(...prevDocConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'active_rooms': {
+        // Root-level folders (parentFolderId IS NULL) represent top-level data rooms; optionally year-filtered
+        const roomConds: any[] = [eq(vdrFolders.orgId, orgId), isNull(vdrFolders.deletedAt), drizzleSql`${vdrFolders.parentFolderId} IS NULL`];
+        if (yearFilter) {
+          roomConds.push(drizzleSql`EXTRACT(YEAR FROM ${vdrFolders.createdAt}) = ${yearFilter}`);
+        } else if (yearRange) {
+          roomConds.push(drizzleSql`EXTRACT(YEAR FROM ${vdrFolders.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(vdrFolders).where(and(...roomConds));
+        result.value = Number(row?.count) || 0;
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Fuel query adapter
+   * Filters applied: fuelType/fuel_type (validated enum), year/year-range, month (all via transactionDate).
+   * marina filter is not applicable — fuelSales has no marinaId column in the current schema.
+   * YoY comparison applied to total_gallons and total_revenue.
+   */
+  private async executeFuelQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const validFuelTypes = ['diesel', 'regular_gas', 'premium_gas', 'ethanol_free'] as const;
+    type FuelType = typeof validFuelTypes[number];
+
+    const baseConditions: any[] = [eq(fuelSales.orgId, orgId)];
+
+    // Handle both camelCase (fuelType) and snake_case (fuel_type) filter keys
+    const rawFilters = filters as Record<string, unknown>;
+    const fuelTypeValue = (
+      typeof rawFilters.fuelType === 'string' ? rawFilters.fuelType :
+      typeof rawFilters.fuel_type === 'string' ? rawFilters.fuel_type : null
+    );
+    if (fuelTypeValue && (validFuelTypes as readonly string[]).includes(fuelTypeValue)) {
+      baseConditions.push(eq(fuelSales.fuelType, fuelTypeValue as FuelType));
+    }
+
+    // Optional month filter (1–12); handle both key variants
+    const monthValue = (
+      typeof rawFilters.month === 'number' ? rawFilters.month :
+      typeof rawFilters.month === 'string' ? parseInt(rawFilters.month, 10) : null
+    );
+    if (monthValue && monthValue >= 1 && monthValue <= 12) {
+      baseConditions.push(drizzleSql`EXTRACT(MONTH FROM ${fuelSales.transactionDate}) = ${monthValue}`);
+    }
+
+    const buildYearCond = (conditions: any[], yf: number | null, yr: { start: number; end: number } | null) => {
+      if (yf) {
+        conditions.push(drizzleSql`EXTRACT(YEAR FROM ${fuelSales.transactionDate}) = ${yf}`);
+      } else if (yr) {
+        conditions.push(drizzleSql`EXTRACT(YEAR FROM ${fuelSales.transactionDate}) BETWEEN ${yr.start} AND ${yr.end}`);
+      }
+    };
+
+    const conditions = [...baseConditions];
+    buildYearCond(conditions, yearFilter, yearRange);
+
+    const prevConditions = [...baseConditions];
+    if (yearFilter) buildYearCond(prevConditions, yearFilter - 1, null);
+
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_gallons': {
+        const [row] = await db.select({ sum: drizzleSql<number>`SUM(${fuelSales.quantityGallons})` }).from(fuelSales).where(and(...conditions));
+        result.value = Number(row?.sum) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ sum: drizzleSql<number>`SUM(${fuelSales.quantityGallons})` }).from(fuelSales).where(and(...prevConditions));
+          result.previousValue = Number(prev?.sum) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_revenue': {
+        const [row] = await db.select({ sum: drizzleSql<number>`SUM(${fuelSales.totalAmount})` }).from(fuelSales).where(and(...conditions));
+        result.value = Number(row?.sum) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ sum: drizzleSql<number>`SUM(${fuelSales.totalAmount})` }).from(fuelSales).where(and(...prevConditions));
+          result.previousValue = Number(prev?.sum) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Ship Store query adapter
+   * Filters: year/year-range and optional month (via createdAt).
+   * category and marina filters are not applicable — shipStoreTransactions has no such columns in the schema.
+   * YoY comparison applied to both metrics.
+   */
+  private async executeShipStoreQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const baseConditions: any[] = [eq(shipStoreTransactions.orgId, orgId)];
+
+    const rawFilters = filters as Record<string, unknown>;
+    const monthValue = (
+      typeof rawFilters.month === 'number' ? rawFilters.month :
+      typeof rawFilters.month === 'string' ? parseInt(rawFilters.month, 10) : null
+    );
+    if (monthValue && monthValue >= 1 && monthValue <= 12) {
+      baseConditions.push(drizzleSql`EXTRACT(MONTH FROM ${shipStoreTransactions.createdAt}) = ${monthValue}`);
+    }
+
+    const buildYearCond = (conditions: any[], yf: number | null, yr: { start: number; end: number } | null) => {
+      if (yf) {
+        conditions.push(drizzleSql`EXTRACT(YEAR FROM ${shipStoreTransactions.createdAt}) = ${yf}`);
+      } else if (yr) {
+        conditions.push(drizzleSql`EXTRACT(YEAR FROM ${shipStoreTransactions.createdAt}) BETWEEN ${yr.start} AND ${yr.end}`);
+      }
+    };
+
+    const conditions = [...baseConditions];
+    buildYearCond(conditions, yearFilter, yearRange);
+
+    const prevConditions = [...baseConditions];
+    if (yearFilter) buildYearCond(prevConditions, yearFilter - 1, null);
+
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_transactions': {
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(shipStoreTransactions).where(and(...conditions));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(shipStoreTransactions).where(and(...prevConditions));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_revenue': {
+        const [row] = await db.select({ sum: drizzleSql<number>`SUM(${shipStoreTransactions.total})` }).from(shipStoreTransactions).where(and(...conditions));
+        result.value = Number(row?.sum) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ sum: drizzleSql<number>`SUM(${shipStoreTransactions.total})` }).from(shipStoreTransactions).where(and(...prevConditions));
+          result.previousValue = Number(prev?.sum) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Rent Roll query adapter
+   * active_count = count of rent_rolls filtered by effectiveDate year. The rentRolls table has no deletedAt.
+   * occupancy_rate = active entries / total entries as a percentage, filtered by startDate year.
+   * monthly_revenue = sum of monthlyRate for active entries, filtered by startDate year. YoY supported.
+   */
+  private async executeRentRollQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'active_count': {
+        // rent_rolls filtered by effectiveDate year
+        const rollConds: any[] = [eq(rentRolls.orgId, orgId)];
+        const prevRollConds: any[] = [eq(rentRolls.orgId, orgId)];
+        if (yearFilter) {
+          rollConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRolls.effectiveDate}) = ${yearFilter}`);
+          prevRollConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRolls.effectiveDate}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          rollConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRolls.effectiveDate}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(rentRolls).where(and(...rollConds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(rentRolls).where(and(...prevRollConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'occupancy_rate': {
+        // Occupancy from entry-level status, optionally filtered by startDate year
+        const entryConds: any[] = [eq(rentRollEntries.orgId, orgId)];
+        if (yearFilter) {
+          entryConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRollEntries.startDate}) = ${yearFilter}`);
+        } else if (yearRange) {
+          entryConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRollEntries.startDate}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [agg] = await db
+          .select({
+            total: drizzleSql<number>`COUNT(*)`,
+            active: drizzleSql<number>`COUNT(*) FILTER (WHERE ${rentRollEntries.status} = 'active')`,
+          })
+          .from(rentRollEntries)
+          .where(and(...entryConds));
+        const totalCount = Number(agg?.total) || 0;
+        const activeCount = Number(agg?.active) || 0;
+        result.value = totalCount > 0 ? (activeCount / totalCount) * 100 : 0;
+        break;
+      }
+      case 'monthly_revenue': {
+        const entryConds: any[] = [eq(rentRollEntries.orgId, orgId), eq(rentRollEntries.status, 'active')];
+        const prevEntryConds: any[] = [eq(rentRollEntries.orgId, orgId), eq(rentRollEntries.status, 'active')];
+        if (yearFilter) {
+          entryConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRollEntries.startDate}) = ${yearFilter}`);
+          prevEntryConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRollEntries.startDate}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          entryConds.push(drizzleSql`EXTRACT(YEAR FROM ${rentRollEntries.startDate}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ sum: drizzleSql<number>`SUM(${rentRollEntries.monthlyRate})` }).from(rentRollEntries).where(and(...entryConds));
+        result.value = Number(row?.sum) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ sum: drizzleSql<number>`SUM(${rentRollEntries.monthlyRate})` }).from(rentRollEntries).where(and(...prevEntryConds));
+          result.previousValue = Number(prev?.sum) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Modeling query adapter
+   * active_projects = dealOutcome='active', optionally year-filtered by createdAt. YoY supported.
+   * total_projects = all projects, year-filtered. total_aum = SUM(purchasePrice) for active projects.
+   */
+  private async executeModelingQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    const buildYearCond = (conds: any[], yf: number | null, yr: { start: number; end: number } | null) => {
+      if (yf) conds.push(drizzleSql`EXTRACT(YEAR FROM ${modelingProjects.createdAt}) = ${yf}`);
+      else if (yr) conds.push(drizzleSql`EXTRACT(YEAR FROM ${modelingProjects.createdAt}) BETWEEN ${yr.start} AND ${yr.end}`);
+    };
+
+    switch (metricKey) {
+      case 'active_projects': {
+        // Include 'active' and 'under_review' outcomes — both represent in-progress deals
+        // (dealOutcomeEnum: 'won','lost','passed','under_review','active'; no 'in_progress' value)
+        const activeOutcomeSql = drizzleSql`${modelingProjects.dealOutcome} IN ('active', 'under_review')`;
+        const conds: any[] = [eq(modelingProjects.orgId, orgId), activeOutcomeSql];
+        const prevConds: any[] = [eq(modelingProjects.orgId, orgId), activeOutcomeSql];
+        buildYearCond(conds, yearFilter, yearRange);
+        if (yearFilter) buildYearCond(prevConds, yearFilter - 1, null);
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(modelingProjects).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(modelingProjects).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_projects': {
+        const conds: any[] = [eq(modelingProjects.orgId, orgId)];
+        const prevConds: any[] = [eq(modelingProjects.orgId, orgId)];
+        buildYearCond(conds, yearFilter, yearRange);
+        if (yearFilter) buildYearCond(prevConds, yearFilter - 1, null);
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(modelingProjects).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(modelingProjects).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_aum': {
+        const conds: any[] = [eq(modelingProjects.orgId, orgId), eq(modelingProjects.dealOutcome, 'active')];
+        buildYearCond(conds, yearFilter, yearRange);
+        const [row] = await db.select({ sum: drizzleSql<number>`SUM(${modelingProjects.purchasePrice})` }).from(modelingProjects).where(and(...conds));
+        result.value = Number(row?.sum) || 0;
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Due Diligence query adapter
+   * The `projects` table backs the DD module. projectTypeEnum has only 'single' | 'portfolio';
+   * there is no 'due_diligence' enum value in the schema. 'single' projects ARE the individual
+   * DD deals — 'portfolio' projects are container records that group single projects.
+   * Scoping to projectType='single' is the canonical DD discriminator per the schema definition.
+   * Year filter applied to createdAt. YoY comparison supported.
+   */
+  private async executeDueDiligenceQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    // projectType='single' IS the due-diligence discriminator (schema has only 'single'|'portfolio')
+    const ddBase: any[] = [eq(projects.orgId, orgId), eq(projects.projectType, 'single')];
+
+    const buildYearCond = (conds: any[], yf: number | null, yr: { start: number; end: number } | null) => {
+      if (yf) conds.push(drizzleSql`EXTRACT(YEAR FROM ${projects.createdAt}) = ${yf}`);
+      else if (yr) conds.push(drizzleSql`EXTRACT(YEAR FROM ${projects.createdAt}) BETWEEN ${yr.start} AND ${yr.end}`);
+    };
+
+    switch (metricKey) {
+      case 'active_projects':
+      case 'total_tasks': {
+        const conds = [...ddBase, eq(projects.status, 'active')];
+        const prevConds = [...ddBase, eq(projects.status, 'active')];
+        buildYearCond(conds, yearFilter, yearRange);
+        if (yearFilter) buildYearCond(prevConds, yearFilter - 1, null);
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(projects).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(projects).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_projects': {
+        const conds = [...ddBase];
+        const prevConds = [...ddBase];
+        buildYearCond(conds, yearFilter, yearRange);
+        if (yearFilter) buildYearCond(prevConds, yearFilter - 1, null);
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(projects).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(projects).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'completion_rate': {
+        const conds = [...ddBase];
+        buildYearCond(conds, yearFilter, yearRange);
+        const [agg] = await db
+          .select({
+            total: drizzleSql<number>`COUNT(*)`,
+            completed: drizzleSql<number>`COUNT(*) FILTER (WHERE ${projects.status} = 'completed')`,
+          })
+          .from(projects)
+          .where(and(...conds));
+        const totalCount = Number(agg?.total) || 0;
+        const completedCount = Number(agg?.completed) || 0;
+        result.value = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * CRM query adapter
+   * active_deals / open_deals = isClosed=false, year-filtered by createdAt. YoY supported.
+   * total_contacts and total_companies are year-filtered by createdAt.
+   * pipeline_value sums deal value for open deals.
+   */
+  private async executeCrmQuery(
+    orgId: string,
+    metricKey: string,
+    filters: WidgetFilters,
+    yearFilter: number | null,
+    yearRange: { start: number; end: number } | null,
+    enableComparison?: boolean,
+    comparisonType?: string
+  ): Promise<{ value: number; previousValue?: number; trend?: number }> {
+    const result: { value: number; previousValue?: number; trend?: number } = { value: 0 };
+
+    switch (metricKey) {
+      case 'total_contacts': {
+        const conds: any[] = [eq(crmContacts.orgId, orgId)];
+        const prevConds: any[] = [eq(crmContacts.orgId, orgId)];
+        if (yearFilter) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmContacts.createdAt}) = ${yearFilter}`);
+          prevConds.push(drizzleSql`EXTRACT(YEAR FROM ${crmContacts.createdAt}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmContacts.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmContacts).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmContacts).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'total_companies': {
+        const conds: any[] = [eq(crmCompanies.orgId, orgId)];
+        const prevConds: any[] = [eq(crmCompanies.orgId, orgId)];
+        if (yearFilter) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmCompanies.createdAt}) = ${yearFilter}`);
+          prevConds.push(drizzleSql`EXTRACT(YEAR FROM ${crmCompanies.createdAt}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmCompanies.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmCompanies).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmCompanies).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'active_deals':
+      case 'open_deals': {
+        const conds: any[] = [eq(crmDeals.orgId, orgId), eq(crmDeals.isClosed, false)];
+        const prevConds: any[] = [eq(crmDeals.orgId, orgId), eq(crmDeals.isClosed, false)];
+        if (yearFilter) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmDeals.createdAt}) = ${yearFilter}`);
+          prevConds.push(drizzleSql`EXTRACT(YEAR FROM ${crmDeals.createdAt}) = ${yearFilter - 1}`);
+        } else if (yearRange) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmDeals.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmDeals).where(and(...conds));
+        result.value = Number(row?.count) || 0;
+        if (enableComparison && comparisonType === 'yoy' && yearFilter) {
+          const [prev] = await db.select({ count: drizzleSql<number>`COUNT(*)` }).from(crmDeals).where(and(...prevConds));
+          result.previousValue = Number(prev?.count) || 0;
+          result.trend = this.calcTrend(result.value, result.previousValue);
+        }
+        break;
+      }
+      case 'pipeline_value': {
+        const conds: any[] = [eq(crmDeals.orgId, orgId), eq(crmDeals.isClosed, false)];
+        if (yearFilter) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmDeals.createdAt}) = ${yearFilter}`);
+        } else if (yearRange) {
+          conds.push(drizzleSql`EXTRACT(YEAR FROM ${crmDeals.createdAt}) BETWEEN ${yearRange.start} AND ${yearRange.end}`);
+        }
+        const [row] = await db
+          .select({ sum: drizzleSql<number>`SUM(COALESCE(${crmDeals.value}::numeric, ${crmDeals.amount}::numeric, 0))` })
+          .from(crmDeals)
+          .where(and(...conds));
+        result.value = Number(row?.sum) || 0;
+        break;
+      }
     }
 
     return result;
