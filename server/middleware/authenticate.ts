@@ -7,6 +7,10 @@ import { Request, Response, NextFunction } from 'express';
 import { enterpriseAuthService } from '../services/enterprise-auth-service';
 import { setTenantContext, clearTenantContext } from './tenant-context';
 
+if (process.env.ALLOW_DEMO_AUTH === 'true') {
+  console.warn('[AUTH] ⚠️  Demo auth is ENABLED. Disable ALLOW_DEMO_AUTH for production.');
+}
+
 // Public paths that don't require authentication
 const PUBLIC_PATHS = ['/api/auth/', '/api/health', '/api/stripe/webhook', '/api/legal/'];
 

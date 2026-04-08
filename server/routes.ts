@@ -8044,6 +8044,7 @@ Current context: Project ${req.params.projectId}`;
         ownerId: req.user.id
       };
       const contact = await storage.createCrmContact(contactData);
+      evaluateAutomations('contact.created', 'contact', contact.id, req.user.orgId, contact).catch(() => {});
       res.json(contact);
     } catch (error: any) {
       console.error("Failed to create contact:", error);

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useMutation } from '@tanstack/react-query';
-import { Upload, FileText, Table2, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Table2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   projectId?: string;
@@ -116,6 +116,13 @@ export function DocumentUploader({ projectId, onJobCreated }: Props) {
           </div>
         )}
       </div>
+
+      {uploadMutation.isSuccess && (
+        <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+          <p className="text-emerald-600 dark:text-emerald-400 text-sm">Document uploaded — extraction in progress</p>
+        </div>
+      )}
 
       {uploadMutation.isError && (
         <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">

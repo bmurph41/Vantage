@@ -72,7 +72,7 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
     queryKey: ['extraction-fields', jobId],
     queryFn: () =>
       fetch(`/api/v1/document-extraction/${jobId}/fields`, { credentials: 'include' }).then(r => r.json()),
-    refetchInterval: 3000
+    refetchInterval: false
   });
   const fields = fieldsData?.fields ?? [];
   const warnings = fieldsData?.warnings ?? [];
@@ -391,7 +391,13 @@ function FieldRow({
         </div>
       )}
 
-      <span className={`text-xs font-medium w-8 text-right tabular-nums ${confidenceColor}`}>
+      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full tabular-nums ${
+        field.confidence_level === 'high'
+          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+          : field.confidence_level === 'medium'
+          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+      }`}>
         {Math.round((field.confidence_score ?? 0) * 100)}%
       </span>
 

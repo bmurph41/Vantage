@@ -9,6 +9,9 @@ import { BROKER_SOURCES, getActiveBrokerSources, getBrokerSourcesByType, getBrok
 
 const router = Router();
 
+const scrapeRateLimit = new Map<string, number>();
+const SCRAPE_COOLDOWN_MS = 60000; // 1 minute between scrape runs per org
+
 function checkLiv2Enabled(req: Request, res: Response, next: () => void) {
   if (!isLiv2Enabled()) {
     return res.status(503).json({ 
@@ -27,6 +30,13 @@ const scrapeRequestSchema = z.object({
 
 router.post('/scrape', checkLiv2Enabled, async (req, res) => {
   try {
+    const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId || 'anonymous';
+    const lastScrape = scrapeRateLimit.get(orgId);
+    if (lastScrape && Date.now() - lastScrape < SCRAPE_COOLDOWN_MS) {
+      return res.status(429).json({ error: 'Please wait 1 minute between scrape runs.' });
+    }
+    scrapeRateLimit.set(orgId, Date.now());
+
     const { sourceId, urls, validateDomain } = scrapeRequestSchema.parse(req.body);
     
     const source = await liv2Repo.getSourceById(sourceId);

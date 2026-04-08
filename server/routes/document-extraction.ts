@@ -303,6 +303,17 @@ router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
   const isRentRoll = job.document_class === 'rent_roll';
   const actualsMap = isRentRoll ? RENT_ROLL_TO_ACTUALS_MAP : EXTRACTION_TO_ACTUALS_MAP;
 
+  // Check if the target period is locked
+  const lockCheck = await pool.query(
+    `SELECT id FROM fund_period_locks
+     WHERE org_id=$1 AND is_locked=true
+     AND lock_start_date <= $2 AND lock_end_date >= $2`,
+    [orgId, `${fiscalYear}-12-31`]
+  );
+  if (lockCheck.rows.length > 0) {
+    return res.status(409).json({ error: `Fiscal year ${fiscalYear} is locked. Unlock the period before populating.` });
+  }
+
   // Clear previous extraction actuals for this project+year+source
   await pool.query(`
     DELETE FROM modeling_actuals

@@ -3,8 +3,16 @@
  */
 
 import OpenAI from 'openai';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
+
+// Ensure pgvector extension and index exist (idempotent)
+pool.query('CREATE EXTENSION IF NOT EXISTS vector').catch(() => {});
+pool.query(`
+  CREATE INDEX IF NOT EXISTS vector_chunks_embedding_idx
+  ON vector_chunks USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100)
+`).catch(() => {});
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
@@ -203,7 +211,7 @@ export async function getRAGContext(
     const queryEmbedding = await embed(query);
     if (!queryEmbedding.length) return { context: '', chunkIds: [] };
 
-    const [orgChunks, globalChunks] = await Promise.all([
+    const [orgChunks, globalChunks, vectorChunks] = await Promise.all([
       db.execute(sql`
         SELECT id, content, embedding FROM ai_knowledge_chunks
         WHERE org_id = ${orgId} AND embedding IS NOT NULL
@@ -214,6 +222,13 @@ export async function getRAGContext(
         WHERE embedding IS NOT NULL
         ORDER BY quality_score DESC, use_count DESC LIMIT 100
       `),
+      db.execute(sql`
+        SELECT id, content_text as content, embedding, metadata FROM vector_chunks
+        WHERE project_id IN (
+          SELECT id FROM projects WHERE org_id = ${orgId}
+        ) AND embedding IS NOT NULL
+        ORDER BY created_at DESC LIMIT 100
+      `).catch(() => ({ rows: [] })),
     ]);
 
     const allChunks = [
@@ -226,6 +241,11 @@ export async function getRAGContext(
         id: r.id, source: 'global',
         content: r.question ? `Q: ${r.question}\nA: ${r.content}` : r.content,
         embedding: typeof r.embedding === 'string' ? JSON.parse(r.embedding) : r.embedding,
+      })),
+      ...(vectorChunks.rows as any[]).map(r => ({
+        id: r.id, source: 'document',
+        content: r.content,
+        embedding: typeof r.embedding === 'string' ? JSON.parse(r.embedding) : (Array.isArray(r.embedding) ? r.embedding : []),
       })),
     ];
 

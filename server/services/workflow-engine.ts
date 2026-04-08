@@ -202,6 +202,60 @@ async function executeAction(
         break;
       }
 
+      case 'webhook.send': {
+        const url = action.params.url;
+        if (!url || typeof url !== 'string' || !url.startsWith('https://')) {
+          result.success = false;
+          result.detail = 'Webhook URL must be a valid HTTPS URL';
+          break;
+        }
+        try {
+          const payload = {
+            trigger: eventData,
+            entity,
+            automation_action: action.type,
+            timestamp: new Date().toISOString(),
+          };
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(10000),
+          });
+          result.detail = `Webhook sent to ${url} — ${resp.status}`;
+          if (!resp.ok) result.success = false;
+        } catch (err: any) {
+          result.success = false;
+          result.detail = `Webhook failed: ${err.message?.slice(0, 100)}`;
+        }
+        break;
+      }
+
+      case 'contact.create_task': {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + (action.params.dueDaysFromNow || 3));
+        const assigneeId = action.params.assignTo || automationCreatedBy;
+        if (!assigneeId) {
+          result.success = false;
+          result.detail = 'No assignee for contact task';
+          break;
+        }
+        await db.insert(crmTasks).values({
+          title: interpolateTemplate(action.params.title, entity, eventData),
+          description: interpolateTemplate(action.params.description || '', entity, eventData),
+          type: 'task',
+          priority: action.params.priority || 'medium',
+          status: 'pending',
+          dueDate,
+          completed: false,
+          contactId: entity.id,
+          assigneeId,
+          orgId,
+        });
+        result.detail = `Contact task "${action.params.title}" created`;
+        break;
+      }
+
       default:
         result.detail = `Unknown action type: ${action.type}`;
         result.success = false;
