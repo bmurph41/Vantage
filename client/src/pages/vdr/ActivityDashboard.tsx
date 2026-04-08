@@ -29,11 +29,10 @@ import {
   Users,
   Activity,
   TrendingUp,
-  AlertTriangle,
   Filter,
   Calendar
 } from 'lucide-react';
-import { formatDistanceToNow, format, subDays, subHours } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -42,8 +41,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
@@ -51,7 +48,7 @@ import {
 
 interface ActivityItem {
   id: string;
-  action: 'view' | 'download' | 'upload' | 'share' | 'create_folder' | 'delete' | 'edit' | 'permission_change' | 'user_added';
+  action: 'view' | 'download' | 'upload' | 'document_uploaded' | 'share' | 'create_folder' | 'delete' | 'edit' | 'permission_change' | 'user_added';
   userId: string;
   userName: string;
   userEmail: string;
@@ -61,155 +58,56 @@ interface ActivityItem {
   projectId: string;
   projectName: string;
   ipAddress: string;
-  timestamp: Date;
+  timestamp: string;
   details?: string;
 }
 
-const SAMPLE_ACTIVITIES: ActivityItem[] = [
-  {
-    id: '1',
-    action: 'download',
-    userId: 'u1',
-    userName: 'John Smith',
-    userEmail: 'john@investor.com',
-    userType: 'external',
-    resourceType: 'document',
-    resourceName: 'Financial Statements 2025.pdf',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '192.168.1.100',
-    timestamp: new Date(Date.now() - 300000),
-    details: 'Downloaded via secure link',
-  },
-  {
-    id: '2',
-    action: 'view',
-    userId: 'u2',
-    userName: 'Sarah Johnson',
-    userEmail: 'sarah@bank.com',
-    userType: 'external',
-    resourceType: 'document',
-    resourceName: 'Rent Roll Summary.xlsx',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '10.0.0.45',
-    timestamp: new Date(Date.now() - 900000),
-  },
-  {
-    id: '3',
-    action: 'upload',
-    userId: 'u3',
-    userName: 'Mike Wilson',
-    userEmail: 'mike@company.com',
-    userType: 'internal',
-    resourceType: 'document',
-    resourceName: 'Environmental Assessment.pdf',
-    projectId: 'p2',
-    projectName: 'Harbor Point DD',
-    ipAddress: '172.16.0.22',
-    timestamp: new Date(Date.now() - 1800000),
-  },
-  {
-    id: '4',
-    action: 'permission_change',
-    userId: 'u3',
-    userName: 'Mike Wilson',
-    userEmail: 'mike@company.com',
-    userType: 'internal',
-    resourceType: 'folder',
-    resourceName: 'Financial Documents',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '172.16.0.22',
-    timestamp: new Date(Date.now() - 3600000),
-    details: 'Changed access level from View to Download',
-  },
-  {
-    id: '5',
-    action: 'user_added',
-    userId: 'u4',
-    userName: 'Admin User',
-    userEmail: 'admin@company.com',
-    userType: 'internal',
-    resourceType: 'folder',
-    resourceName: 'Due Diligence',
-    projectId: 'p2',
-    projectName: 'Harbor Point DD',
-    ipAddress: '172.16.0.1',
-    timestamp: new Date(Date.now() - 7200000),
-    details: 'Added external user: lender@bank.com',
-  },
-  {
-    id: '6',
-    action: 'share',
-    userId: 'u3',
-    userName: 'Mike Wilson',
-    userEmail: 'mike@company.com',
-    userType: 'internal',
-    resourceType: 'document',
-    resourceName: 'Appraisal Report.pdf',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '172.16.0.22',
-    timestamp: subHours(new Date(), 5),
-  },
-  {
-    id: '7',
-    action: 'view',
-    userId: 'u5',
-    userName: 'External Viewer',
-    userEmail: 'viewer@lender.com',
-    userType: 'external',
-    resourceType: 'document',
-    resourceName: 'Insurance Certificates.pdf',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '203.0.113.50',
-    timestamp: subHours(new Date(), 8),
-  },
-  {
-    id: '8',
-    action: 'download',
-    userId: 'u2',
-    userName: 'Sarah Johnson',
-    userEmail: 'sarah@bank.com',
-    userType: 'external',
-    resourceType: 'document',
-    resourceName: 'Tax Returns 2024.pdf',
-    projectId: 'p1',
-    projectName: 'Marina Bay Acquisition',
-    ipAddress: '10.0.0.45',
-    timestamp: subDays(new Date(), 1),
-  },
-];
+interface MetricsData {
+  views: number;
+  downloads: number;
+  externalAccess: number;
+  securityEvents: number;
+}
 
-const ACTIVITY_CHART_DATA = [
-  { name: 'Mon', views: 45, downloads: 12, uploads: 5 },
-  { name: 'Tue', views: 52, downloads: 18, uploads: 8 },
-  { name: 'Wed', views: 38, downloads: 15, uploads: 3 },
-  { name: 'Thu', views: 65, downloads: 22, uploads: 10 },
-  { name: 'Fri', views: 48, downloads: 14, uploads: 6 },
-  { name: 'Sat', views: 12, downloads: 3, uploads: 0 },
-  { name: 'Sun', views: 8, downloads: 2, uploads: 1 },
-];
+interface ChartDataPoint {
+  name: string;
+  views: number;
+  downloads: number;
+  uploads: number;
+}
 
-const USER_TYPE_DATA = [
-  { name: 'Internal', value: 35, color: '#3b82f6' },
-  { name: 'External', value: 65, color: '#10b981' },
-];
+interface UserSummaryItem {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userType: 'internal' | 'external';
+  views: number;
+  downloads: number;
+  uploads: number;
+  lastActive: string;
+}
 
-const ACTION_DISTRIBUTION = [
-  { name: 'Views', value: 156, color: '#6366f1' },
-  { name: 'Downloads', value: 86, color: '#22c55e' },
-  { name: 'Uploads', value: 33, color: '#f59e0b' },
-  { name: 'Shares', value: 12, color: '#ec4899' },
-];
+interface DocumentSummaryItem {
+  documentId: string;
+  documentName: string;
+  projectName: string;
+  views: number;
+  downloads: number;
+  uniqueUsers: number;
+  lastAccessed: string;
+}
+
+const USER_TYPE_COLORS = {
+  internal: '#3b82f6',
+  external: '#10b981',
+};
 
 function getActionIcon(action: ActivityItem['action']) {
   const icons: Record<ActivityItem['action'], JSX.Element> = {
     view: <Eye className="h-4 w-4 text-blue-600" />,
     download: <Download className="h-4 w-4 text-green-600" />,
     upload: <Upload className="h-4 w-4 text-amber-600" />,
+    document_uploaded: <Upload className="h-4 w-4 text-amber-600" />,
     share: <Share2 className="h-4 w-4 text-pink-600" />,
     create_folder: <FolderPlus className="h-4 w-4 text-indigo-600" />,
     delete: <Trash2 className="h-4 w-4 text-red-600" />,
@@ -217,7 +115,7 @@ function getActionIcon(action: ActivityItem['action']) {
     permission_change: <ShieldCheck className="h-4 w-4 text-purple-600" />,
     user_added: <UserPlus className="h-4 w-4 text-teal-600" />,
   };
-  return icons[action];
+  return icons[action] ?? <Activity className="h-4 w-4 text-muted-foreground" />;
 }
 
 function getActionLabel(action: ActivityItem['action']) {
@@ -225,6 +123,7 @@ function getActionLabel(action: ActivityItem['action']) {
     view: 'Viewed',
     download: 'Downloaded',
     upload: 'Uploaded',
+    document_uploaded: 'Uploaded',
     share: 'Shared',
     create_folder: 'Created folder',
     delete: 'Deleted',
@@ -232,35 +131,59 @@ function getActionLabel(action: ActivityItem['action']) {
     permission_change: 'Changed permissions',
     user_added: 'Added user',
   };
-  return labels[action];
+  return labels[action] ?? action;
 }
 
 export default function VDRActivityDashboard() {
   const [timeRange, setTimeRange] = useState('7d');
   const [activeTab, setActiveTab] = useState('timeline');
-  const [filterProject, setFilterProject] = useState('all');
   const [filterUserType, setFilterUserType] = useState('all');
 
-  const { data: activities, isLoading } = useQuery<ActivityItem[]>({
+  async function fetchJson(url: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+    return res.json();
+  }
+
+  const { data: activities, isLoading: activitiesLoading } = useQuery<ActivityItem[]>({
     queryKey: ['/api/vdr/activity', timeRange, filterUserType],
+    queryFn: () => fetchJson(`/api/vdr/activity?timeRange=${timeRange}&userType=${filterUserType}`),
   });
 
-  const { data: metrics } = useQuery<{views: number; downloads: number; externalAccess: number; securityEvents: number}>({
+  const { data: metrics, isLoading: metricsLoading } = useQuery<MetricsData>({
     queryKey: ['/api/vdr/activity/metrics', timeRange],
+    queryFn: () => fetchJson(`/api/vdr/activity/metrics?timeRange=${timeRange}`),
   });
 
-  const filteredActivities = activities?.filter(a => {
-    if (filterProject !== 'all' && a.projectId !== filterProject) return false;
-    if (filterUserType !== 'all' && a.userType !== filterUserType) return false;
-    return true;
+  const { data: chartData, isLoading: chartLoading } = useQuery<ChartDataPoint[]>({
+    queryKey: ['/api/vdr/activity/chart', timeRange],
+    queryFn: () => fetchJson(`/api/vdr/activity/chart?timeRange=${timeRange}`),
   });
 
-  const viewCount = metrics?.views || activities?.filter(a => a.action === 'view').length || 0;
-  const downloadCount = metrics?.downloads || activities?.filter(a => a.action === 'download').length || 0;
-  const externalAccessCount = metrics?.externalAccess || activities?.filter(a => a.userType === 'external').length || 0;
-  const securityEventCount = metrics?.securityEvents || activities?.filter(a => ['permission_change', 'user_added', 'share'].includes(a.action)).length || 0;
+  const { data: userSummary, isLoading: userSummaryLoading } = useQuery<UserSummaryItem[]>({
+    queryKey: ['/api/vdr/activity/user-summary', timeRange],
+    queryFn: () => fetchJson(`/api/vdr/activity/user-summary?timeRange=${timeRange}`),
+  });
 
-  if (isLoading) {
+  const { data: documentSummary, isLoading: documentSummaryLoading } = useQuery<DocumentSummaryItem[]>({
+    queryKey: ['/api/vdr/activity/document-summary', timeRange],
+    queryFn: () => fetchJson(`/api/vdr/activity/document-summary?timeRange=${timeRange}`),
+  });
+
+  const internalCount = activities?.filter(a => a.userType === 'internal').length ?? 0;
+  const externalCount = activities?.filter(a => a.userType === 'external').length ?? 0;
+  const total = internalCount + externalCount;
+
+  const userTypePieData = total > 0
+    ? [
+        { name: 'Internal', value: Math.round((internalCount / total) * 100), color: USER_TYPE_COLORS.internal },
+        { name: 'External', value: Math.round((externalCount / total) * 100), color: USER_TYPE_COLORS.external },
+      ]
+    : [];
+
+  const isPageLoading = activitiesLoading || metricsLoading;
+
+  if (isPageLoading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-10 w-64" />
@@ -312,10 +235,13 @@ export default function VDRActivityDashboard() {
           <CardContent>
             <div className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-blue-600" />
-              <span className="text-2xl font-bold">{viewCount}</span>
+              {metricsLoading
+                ? <Skeleton className="h-8 w-12" />
+                : <span className="text-2xl font-bold">{metrics?.views ?? 0}</span>
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              <TrendingUp className="h-3 w-3 inline text-green-600" /> +12% from last period
+              <TrendingUp className="h-3 w-3 inline text-green-600" /> Total in period
             </p>
           </CardContent>
         </Card>
@@ -327,10 +253,13 @@ export default function VDRActivityDashboard() {
           <CardContent>
             <div className="flex items-center gap-2">
               <Download className="h-5 w-5 text-green-600" />
-              <span className="text-2xl font-bold">{downloadCount}</span>
+              {metricsLoading
+                ? <Skeleton className="h-8 w-12" />
+                : <span className="text-2xl font-bold">{metrics?.downloads ?? 0}</span>
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              <TrendingUp className="h-3 w-3 inline text-green-600" /> +8% from last period
+              <TrendingUp className="h-3 w-3 inline text-green-600" /> Total in period
             </p>
           </CardContent>
         </Card>
@@ -342,10 +271,13 @@ export default function VDRActivityDashboard() {
           <CardContent>
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-amber-600" />
-              <span className="text-2xl font-bold">{externalAccessCount}</span>
+              {metricsLoading
+                ? <Skeleton className="h-8 w-12" />
+                : <span className="text-2xl font-bold">{metrics?.externalAccess ?? 0}</span>
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              By {new Set(activities?.filter(a => a.userType === 'external').map(a => a.userId)).size} unique users
+              External user events in period
             </p>
           </CardContent>
         </Card>
@@ -357,10 +289,13 @@ export default function VDRActivityDashboard() {
           <CardContent>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-purple-600" />
-              <span className="text-2xl font-bold">{securityEventCount}</span>
+              {metricsLoading
+                ? <Skeleton className="h-8 w-12" />
+                : <span className="text-2xl font-bold">{metrics?.securityEvents ?? 0}</span>
+              }
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Permission changes & shares
+              Permission changes &amp; shares
             </p>
           </CardContent>
         </Card>
@@ -373,17 +308,25 @@ export default function VDRActivityDashboard() {
             <CardDescription>Document interactions by type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={ACTIVITY_CHART_DATA}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="views" fill="#6366f1" name="Views" />
-                <Bar dataKey="downloads" fill="#22c55e" name="Downloads" />
-                <Bar dataKey="uploads" fill="#f59e0b" name="Uploads" />
-              </BarChart>
-            </ResponsiveContainer>
+            {chartLoading ? (
+              <Skeleton className="h-[250px] w-full" />
+            ) : chartData && chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="views" fill="#6366f1" name="Views" />
+                  <Bar dataKey="downloads" fill="#22c55e" name="Downloads" />
+                  <Bar dataKey="uploads" fill="#f59e0b" name="Uploads" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+                No chart data available for this period
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -393,32 +336,42 @@ export default function VDRActivityDashboard() {
             <CardDescription>Internal vs External</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={USER_TYPE_DATA}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {USER_TYPE_DATA.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+            {activitiesLoading ? (
+              <Skeleton className="h-[200px] w-full" />
+            ) : userTypePieData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={userTypePieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {userTypePieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-6 mt-2">
+                  {userTypePieData.map(item => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm">{item.name}: {item.value}%</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex justify-center gap-6 mt-2">
-              {USER_TYPE_DATA.map(item => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm">{item.name}: {item.value}%</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                No activity data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -452,61 +405,73 @@ export default function VDRActivityDashboard() {
               <CardDescription>Complete audit trail of document interactions</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Action</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Resource</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>IP Address</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredActivities?.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getActionIcon(activity.action)}
-                          <span className="font-medium">{getActionLabel(activity.action)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{activity.userName}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            {activity.userEmail}
-                            <Badge variant={activity.userType === 'external' ? 'secondary' : 'outline'} className="ml-1 text-xs">
-                              {activity.userType}
-                            </Badge>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span>{activity.resourceName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{activity.projectName}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                          {activity.ipAddress}
-                        </code>
-                      </TableCell>
+              {activitiesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : !activities || activities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Activity className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium text-muted-foreground">No VDR activity recorded yet.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Share documents with counterparties to begin tracking access.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Action</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>IP Address</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {activities.map((activity) => (
+                      <TableRow key={activity.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getActionIcon(activity.action)}
+                            <span className="font-medium">{getActionLabel(activity.action)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{activity.userName}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              {activity.userEmail}
+                              <Badge variant={activity.userType === 'external' ? 'secondary' : 'outline'} className="ml-1 text-xs">
+                                {activity.userType}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span>{activity.resourceName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{activity.projectName}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                            {activity.ipAddress}
+                          </code>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -518,59 +483,53 @@ export default function VDRActivityDashboard() {
               <CardDescription>Activity breakdown by user</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-center">Views</TableHead>
-                    <TableHead className="text-center">Downloads</TableHead>
-                    <TableHead className="text-center">Uploads</TableHead>
-                    <TableHead>Last Active</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">John Smith</div>
-                        <div className="text-xs text-muted-foreground">john@investor.com</div>
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge variant="secondary">External</Badge></TableCell>
-                    <TableCell className="text-center">24</TableCell>
-                    <TableCell className="text-center">8</TableCell>
-                    <TableCell className="text-center">0</TableCell>
-                    <TableCell>5 minutes ago</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">Sarah Johnson</div>
-                        <div className="text-xs text-muted-foreground">sarah@bank.com</div>
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge variant="secondary">External</Badge></TableCell>
-                    <TableCell className="text-center">45</TableCell>
-                    <TableCell className="text-center">12</TableCell>
-                    <TableCell className="text-center">0</TableCell>
-                    <TableCell>15 minutes ago</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">Mike Wilson</div>
-                        <div className="text-xs text-muted-foreground">mike@company.com</div>
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge variant="outline">Internal</Badge></TableCell>
-                    <TableCell className="text-center">12</TableCell>
-                    <TableCell className="text-center">5</TableCell>
-                    <TableCell className="text-center">15</TableCell>
-                    <TableCell>30 minutes ago</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              {userSummaryLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : !userSummary || userSummary.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium text-muted-foreground">No user activity recorded yet.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Invite counterparties and track their engagement here.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-center">Views</TableHead>
+                      <TableHead className="text-center">Downloads</TableHead>
+                      <TableHead className="text-center">Uploads</TableHead>
+                      <TableHead>Last Active</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userSummary.map((user) => (
+                      <TableRow key={user.userId}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{user.userName}</div>
+                            <div className="text-xs text-muted-foreground">{user.userEmail}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.userType === 'external' ? 'secondary' : 'outline'}>
+                            {user.userType === 'external' ? 'External' : 'Internal'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">{user.views}</TableCell>
+                        <TableCell className="text-center">{user.downloads}</TableCell>
+                        <TableCell className="text-center">{user.uploads}</TableCell>
+                        <TableCell>
+                          {formatDistanceToNow(new Date(user.lastActive), { addSuffix: true })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -582,72 +541,49 @@ export default function VDRActivityDashboard() {
               <CardDescription>Documents with highest engagement</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead className="text-center">Views</TableHead>
-                    <TableHead className="text-center">Downloads</TableHead>
-                    <TableHead className="text-center">Unique Users</TableHead>
-                    <TableHead>Last Accessed</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-red-600" />
-                        <span className="font-medium">Financial Statements 2025.pdf</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Marina Bay Acquisition</TableCell>
-                    <TableCell className="text-center">89</TableCell>
-                    <TableCell className="text-center">34</TableCell>
-                    <TableCell className="text-center">12</TableCell>
-                    <TableCell>5 minutes ago</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">Rent Roll Summary.xlsx</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Marina Bay Acquisition</TableCell>
-                    <TableCell className="text-center">67</TableCell>
-                    <TableCell className="text-center">28</TableCell>
-                    <TableCell className="text-center">9</TableCell>
-                    <TableCell>15 minutes ago</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <span className="font-medium">Environmental Assessment.pdf</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Harbor Point DD</TableCell>
-                    <TableCell className="text-center">45</TableCell>
-                    <TableCell className="text-center">15</TableCell>
-                    <TableCell className="text-center">6</TableCell>
-                    <TableCell>30 minutes ago</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-amber-600" />
-                        <span className="font-medium">Appraisal Report.pdf</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>Marina Bay Acquisition</TableCell>
-                    <TableCell className="text-center">38</TableCell>
-                    <TableCell className="text-center">22</TableCell>
-                    <TableCell className="text-center">8</TableCell>
-                    <TableCell>5 hours ago</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              {documentSummaryLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : !documentSummary || documentSummary.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium text-muted-foreground">No documents have been accessed yet.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Share documents with investors to start tracking access.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Document</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead className="text-center">Views</TableHead>
+                      <TableHead className="text-center">Downloads</TableHead>
+                      <TableHead className="text-center">Unique Users</TableHead>
+                      <TableHead>Last Accessed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {documentSummary.map((doc) => (
+                      <TableRow key={doc.documentId}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{doc.documentName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{doc.projectName}</TableCell>
+                        <TableCell className="text-center">{doc.views}</TableCell>
+                        <TableCell className="text-center">{doc.downloads}</TableCell>
+                        <TableCell className="text-center">{doc.uniqueUsers}</TableCell>
+                        <TableCell>
+                          {formatDistanceToNow(new Date(doc.lastAccessed), { addSuffix: true })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
