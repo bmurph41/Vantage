@@ -275,7 +275,10 @@ const ExitSensitivity = lazy(() => import("@/pages/modeling/exit/Sensitivity"));
 const ExitAIInsights = lazy(() => import("@/pages/modeling/exit/AIInsights"));
 const ExitScenarioComparison = lazy(() => import("@/pages/modeling/exit/ScenarioComparison"));
 
-// Document Intelligence
+// Document Intelligence v2 — Claude extraction pipeline
+const DocumentIntelligenceV2 = lazy(() => import("@/pages/document-intelligence/index"));
+
+// Document Intelligence (legacy OpenAI pipeline)
 const DocumentIntelligence = lazy(() => import("@/pages/modeling/doc-intel/DocumentIntelligence"));
 const CoaMappingReview = lazy(() => import("@/pages/modeling/doc-intel/CoaMappingReview"));
 const DepartmentalPL = lazy(() => import("@/pages/modeling/doc-intel/DepartmentalPL"));
@@ -2323,7 +2326,16 @@ function Router() {
         )}
       </Route>
       
-      {/* Document Intelligence Route */}
+      {/* Document Intelligence v2 — Claude extraction pipeline */}
+      <Route path="/document-intelligence">
+        {() => (
+          <GatedLayout pack="modeling_tools">
+            <DocumentIntelligenceV2 />
+          </GatedLayout>
+        )}
+      </Route>
+
+      {/* Document Intelligence Route (legacy) */}
       <Route path="/modeling/projects/:projectId/doc-intel">
         {(params) => (
           <GatedLayout pack="modeling_tools">

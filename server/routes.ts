@@ -85,6 +85,7 @@ import marinamatchRouter from "./marinamatch/routes";
 import omRouter from "./om/routes";
 import omBuilderRouter from "./routes/om-builder-routes";
 import documentBuilderRouter from "./routes/document-builder-routes";
+import documentExtractionRouter from "./routes/document-extraction";
 import scraperV2Routes from "./docket/scraper_v2/routes";
 import { liv2Routes } from "./listings/ingestion_v2";
 import marketplaceRoutes from "./routes/marketplace-routes";
@@ -994,6 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/om", authenticateUser, omRouter);
   app.use(authenticateUser, omBuilderRouter);
   app.use("/api/document-builder", authenticateUser, documentBuilderRouter);
+  app.use("/api/v1/document-extraction", authenticateUser, documentExtractionRouter);
   app.use(authenticateUser, coaRoutes);
   app.use(authenticateUser, coaTaxonomyRoutes);
 

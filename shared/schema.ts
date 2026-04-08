@@ -28920,3 +28920,94 @@ export const acquisitionProperties = pgTable("acquisition_properties", {
 }));
 export type AcquisitionProperty = typeof acquisitionProperties.$inferSelect;
 export type InsertAcquisitionProperty = typeof acquisitionProperties.$inferInsert;
+
+// ─── DOCUMENT INTELLIGENCE v2 — Claude Extraction Pipeline ────────────────────
+
+export const documentExtractionJobStatusEnum = pgEnum("doc_extraction_job_status", [
+  "pending", "parsing", "extracting", "review_required", "confirmed", "failed"
+]);
+export const documentExtractionDocClassEnum = pgEnum("doc_extraction_doc_class", [
+  "pl", "rent_roll", "om", "t12", "unknown"
+]);
+export const documentExtractionFileTypeEnum = pgEnum("doc_extraction_file_type", [
+  "pdf", "xlsx", "xls", "csv"
+]);
+
+export const documentExtractionJobs = pgTable("document_extraction_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id"),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id").notNull(),
+  originalFilename: text("original_filename").notNull(),
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  fileType: text("file_type").notNull(),
+  documentClass: text("document_class").notNull().default("unknown"),
+  storagePath: text("storage_path").notNull(),
+  status: text("status").notNull().default("pending"),
+  errorMessage: text("error_message"),
+  rawTextExtracted: text("raw_text_extracted"),
+  pageCount: integer("page_count"),
+  sheetNames: text("sheet_names").array(),
+  targetScenarioId: varchar("target_scenario_id"),
+  populationCompletedAt: timestamp("population_completed_at"),
+  parsingStartedAt: timestamp("parsing_started_at"),
+  extractionCompletedAt: timestamp("extraction_completed_at"),
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("doc_extraction_jobs_project_idx").on(table.projectId),
+  statusIdx: index("doc_extraction_jobs_status_idx").on(table.status),
+  orgIdx: index("doc_extraction_jobs_org_idx").on(table.orgId),
+}));
+export type DocumentExtractionJob = typeof documentExtractionJobs.$inferSelect;
+export type InsertDocumentExtractionJob = typeof documentExtractionJobs.$inferInsert;
+
+export const extractionFields = pgTable("extraction_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => documentExtractionJobs.id, { onDelete: "cascade" }),
+  schemaKey: text("schema_key").notNull(),
+  displayLabel: text("display_label").notNull(),
+  fieldGroup: text("field_group").notNull(),
+  rawValue: text("raw_value"),
+  normalizedValue: numeric("normalized_value"),
+  valueType: text("value_type"),
+  periodLabel: text("period_label"),
+  confidenceScore: numeric("confidence_score", { precision: 4, scale: 3 }),
+  confidenceLevel: text("confidence_level"),
+  sourcePage: integer("source_page"),
+  sourceSheet: text("source_sheet"),
+  sourceRow: integer("source_row"),
+  sourceCol: text("source_col"),
+  sourceSnippet: text("source_snippet"),
+  isConfirmed: boolean("is_confirmed").default(false),
+  isManuallyOverridden: boolean("is_manually_overridden").default(false),
+  overrideValue: numeric("override_value"),
+  overrideNote: text("override_note"),
+  confirmedAt: timestamp("confirmed_at"),
+  proformaFieldKey: text("proforma_field_key"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("extraction_fields_job_idx").on(table.jobId),
+  schemaKeyIdx: index("extraction_fields_schema_key_idx").on(table.schemaKey),
+}));
+export type ExtractionField = typeof extractionFields.$inferSelect;
+export type InsertExtractionField = typeof extractionFields.$inferInsert;
+
+export const extractionTemplates = pgTable("extraction_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  documentClass: text("document_class").notNull(),
+  description: text("description"),
+  fieldHints: jsonb("field_hints"),
+  columnMappings: jsonb("column_mappings"),
+  skipPatterns: text("skip_patterns").array(),
+  useCount: integer("use_count").default(0),
+  avgConfidence: numeric("avg_confidence", { precision: 4, scale: 3 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgIdx: index("extraction_templates_org_idx").on(table.orgId),
+}));
+export type ExtractionTemplate = typeof extractionTemplates.$inferSelect;
+export type InsertExtractionTemplate = typeof extractionTemplates.$inferInsert;

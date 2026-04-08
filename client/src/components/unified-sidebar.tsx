@@ -113,6 +113,7 @@ const analysisNav = [
   { name: "Portfolio Returns", href: "/modeling/portfolio/returns" },
   { name: "Debt Scenarios", href: "/modeling/scenarios" },
   { name: "Exit Strategies", href: "/modeling/exit-strategies" },
+  { name: "Document Intelligence", href: "/document-intelligence" },
   { name: "Model Settings", href: "/modeling/settings" },
 ];
 
@@ -327,7 +328,7 @@ export default function UnifiedSidebar() {
     // Deal Workspace: consolidated DD, VDR pages (workspaces, DD projects, data room)
     const isDealWorkspacePage = location.startsWith('/workspaces') || location.startsWith('/projects') || location === '/progress-report' || location.startsWith('/vdr') || location.startsWith('/dd/');
     // Analysis: Modeling Projects (Financial Model), Debt Scenarios, Exit Strategies, P&L Parser, OM Builder, Modeling Settings
-    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings');
+    const isUnderwritingToolsPage = location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings') || location.startsWith('/document-intelligence');
     const isOmBuilderPage = location.startsWith('/om');
     // Investor Services: Fund Management, LP Portal (GP only)
     const isInvestorServicesPage = location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal');
@@ -946,7 +947,7 @@ export default function UnifiedSidebar() {
               icon={Calculator}
               expanded={analysisExpanded}
               onToggle={() => setAnalysisExpanded(!analysisExpanded)}
-              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings')}
+              isActive={location.startsWith('/modeling/projects') || location.startsWith('/modeling/returns-valuation') || location.startsWith('/modeling/portfolio/returns') || location.startsWith('/modeling/scenarios') || location.startsWith('/modeling/debt-scenarios') || location.startsWith('/modeling/exit') || location.startsWith('/modeling/pnl') || location.startsWith('/modeling/settings') || location.startsWith('/document-intelligence')}
             />
             {analysisExpanded && (
               <div className="border-l-2 border-blue-500/40 ml-2 mr-1 bg-white/[0.04] rounded-br-sm pb-1 mb-2">
