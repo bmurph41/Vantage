@@ -12,6 +12,7 @@ type DocClass = 'pl' | 'rent_roll' | 'unknown';
 
 export function DocumentUploader({ projectId, onJobCreated }: Props) {
   const [documentClass, setDocumentClass] = useState<DocClass>('unknown');
+  const [fiscalYear, setFiscalYear] = useState<string>(String(new Date().getFullYear()));
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -19,6 +20,7 @@ export function DocumentUploader({ projectId, onJobCreated }: Props) {
       formData.append('document', file);
       formData.append('document_class', documentClass);
       if (projectId) formData.append('project_id', projectId);
+      if (fiscalYear) formData.append('fiscal_year', fiscalYear);
 
       const res = await fetch('/api/v1/document-extraction/upload', {
         method: 'POST',
@@ -74,6 +76,18 @@ export function DocumentUploader({ projectId, onJobCreated }: Props) {
             <span className="text-center leading-tight">{label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Fiscal Year:</label>
+        <input
+          type="number"
+          value={fiscalYear}
+          onChange={e => setFiscalYear(e.target.value)}
+          className="w-24 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+          min={2000} max={2050}
+        />
+        <span className="text-xs text-slate-400">Claude will refine from document if detected</span>
       </div>
 
       <div

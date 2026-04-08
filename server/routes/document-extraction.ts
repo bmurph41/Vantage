@@ -6,6 +6,7 @@ import { extractPDF } from '../services/document-parser/pdf-extractor.js';
 import { extractExcel } from '../services/document-parser/excel-extractor.js';
 import { extractPL, extractRentRoll, classifyDocument } from '../services/document-parser/claude-extractor.js';
 import { flattenExtractionResult } from '../services/document-parser/flatten-extraction.js';
+import { EXTRACTION_TO_ACTUALS_MAP, RENT_ROLL_TO_ACTUALS_MAP, type ActualsMapping } from '../services/document-parser/proforma-mapper.js';
 import { pool } from '../db.js';
 
 const router = express.Router();
@@ -26,6 +27,31 @@ pool.query(`
     updated_at TIMESTAMP DEFAULT NOW()
   )
 `).catch(() => {});
+
+// Add fiscal year columns to extraction jobs (idempotent)
+pool.query(`
+  ALTER TABLE document_extraction_jobs
+    ADD COLUMN IF NOT EXISTS fiscal_year INTEGER,
+    ADD COLUMN IF NOT EXISTS period_start TEXT,
+    ADD COLUMN IF NOT EXISTS period_end TEXT,
+    ADD COLUMN IF NOT EXISTS reporting_period TEXT
+`).catch(() => {});
+
+// Verify required tables exist on startup
+pool.query(`
+  SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='document_extraction_jobs') AS jobs_exist,
+         EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='extraction_fields') AS fields_exist,
+         EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='modeling_actuals') AS actuals_exist
+`).then(r => {
+  const { jobs_exist, fields_exist, actuals_exist } = r.rows[0];
+  if (!jobs_exist || !fields_exist) {
+    console.error('[Document Extraction] CRITICAL: Required tables missing. document_extraction_jobs:', jobs_exist, 'extraction_fields:', fields_exist);
+    console.error('[Document Extraction] Run database migrations to create these tables.');
+  }
+  if (!actuals_exist) {
+    console.error('[Document Extraction] WARNING: modeling_actuals table missing. Populate Pro Forma will fail.');
+  }
+}).catch(() => {});
 
 async function getOrgThresholds(orgId: string): Promise<{ high: number; medium: number }> {
   const result = await pool.query(
@@ -79,7 +105,7 @@ router.post('/upload', upload.single('document'), async (req: any, res: any) => 
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'No file provided' });
 
-  const { project_id, document_class: hintClass } = req.body;
+  const { project_id, document_class: hintClass, fiscal_year } = req.body;
   const user = req.user || req.resolvedUser;
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -96,17 +122,19 @@ router.post('/upload', upload.single('document'), async (req: any, res: any) => 
 
   try {
     const fileType = detectFileType(file.originalname);
+    const parsedFiscalYear = fiscal_year ? parseInt(fiscal_year, 10) : null;
     const jobResult = await pool.query(`
-      INSERT INTO document_extraction_jobs 
-        (project_id, user_id, org_id, original_filename, file_size_bytes, file_type, document_class, storage_path, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+      INSERT INTO document_extraction_jobs
+        (project_id, user_id, org_id, original_filename, file_size_bytes, file_type, document_class, storage_path, status, fiscal_year)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
       RETURNING id
     `, [
       project_id || null, userId, orgId,
       file.originalname, file.size,
       fileType,
       hintClass || 'unknown',
-      file.path
+      file.path,
+      parsedFiscalYear
     ]);
 
     const jobId = jobResult.rows[0].id;
@@ -138,7 +166,8 @@ router.get('/:jobId/status', async (req: any, res: any) => {
 
   const result = await pool.query(
     `SELECT id, status, original_filename, document_class, page_count, sheet_names,
-            error_message, extraction_completed_at, created_at
+            error_message, extraction_completed_at, created_at,
+            fiscal_year, period_start, period_end, reporting_period
      FROM document_extraction_jobs WHERE id=$1 AND org_id=$2`,
     [jobId, orgId]
   );
@@ -226,63 +255,196 @@ router.post('/:jobId/confirm-all', async (req: any, res: any) => {
 });
 
 // ─── POST /:jobId/populate-proforma ─────────────────────────────────────────
+// Writes confirmed extraction fields into modeling_actuals as historical data.
+// The Pro Forma engine reads actuals to build baseline projections.
 router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
   const user = req.user || req.resolvedUser;
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const { jobId } = req.params;
-  const { scenario_id } = req.body;
+  const { fiscal_year: overrideFiscalYear } = req.body;
   const orgId = user.orgId || user.org_id;
 
-  if (!scenario_id) return res.status(400).json({ error: 'scenario_id is required' });
-
-  // Verify job belongs to this org
-  const job = await pool.query(
-    'SELECT id FROM document_extraction_jobs WHERE id=$1 AND org_id=$2',
+  // Load job with project and fiscal year context
+  const jobResult = await pool.query(
+    `SELECT id, project_id, fiscal_year, document_class
+     FROM document_extraction_jobs WHERE id=$1 AND org_id=$2`,
     [jobId, orgId]
   );
-  if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+  if (jobResult.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
 
-  // Verify scenario belongs to this org
-  const scenario = await pool.query(
-    'SELECT id FROM modeling_scenario_versions WHERE id=$1 AND org_id=$2',
-    [scenario_id, orgId]
-  );
-  if (scenario.rows.length === 0) return res.status(404).json({ error: 'Scenario not found or access denied' });
+  const job = jobResult.rows[0];
+  const projectId = job.project_id;
+  if (!projectId) return res.status(400).json({ error: 'Job is not linked to a project. Upload from a project workspace.' });
 
+  // Determine fiscal year: user override > job.fiscal_year > current year
+  const fiscalYear = overrideFiscalYear
+    ? parseInt(overrideFiscalYear, 10)
+    : (job.fiscal_year || new Date().getFullYear());
+
+  if (!fiscalYear || isNaN(fiscalYear)) {
+    return res.status(400).json({ error: 'Could not determine fiscal year. Specify fiscal_year in request.' });
+  }
+
+  // Load confirmed fields
   const fields = await pool.query(`
-    SELECT schema_key,
+    SELECT schema_key, field_group,
            COALESCE(override_value, normalized_value) as final_value,
-           proforma_field_key
+           display_label, period_label
     FROM extraction_fields
-    WHERE job_id=$1 AND is_confirmed=true AND proforma_field_key IS NOT NULL
+    WHERE job_id=$1 AND is_confirmed=true
   `, [jobId]);
 
-  const populationMap: Record<string, number> = {};
+  if (fields.rows.length === 0) {
+    return res.status(400).json({ error: 'No confirmed fields to populate' });
+  }
+
+  // Determine which mapping to use
+  const isRentRoll = job.document_class === 'rent_roll';
+  const actualsMap = isRentRoll ? RENT_ROLL_TO_ACTUALS_MAP : EXTRACTION_TO_ACTUALS_MAP;
+
+  // Clear previous extraction actuals for this project+year+source
+  await pool.query(`
+    DELETE FROM modeling_actuals
+    WHERE modeling_project_id=$1 AND org_id=$2 AND data_source='doc_intel'
+      AND source_record_type='extraction_job' AND source_record_id=$3
+  `, [projectId, orgId, jobId]);
+
+  let inserted = 0;
+  let skippedTotals = 0;
+  const errors: string[] = [];
+
+  // Process top-level annual fields
   for (const row of fields.rows) {
-    if (row.proforma_field_key && row.final_value !== null) {
-      const parsed = parseFloat(row.final_value);
-      if (!isNaN(parsed) && isFinite(parsed)) {
-        populationMap[row.proforma_field_key] = parsed;
+    const key = row.schema_key;
+    const value = parseFloat(row.final_value);
+    if (isNaN(value) || !isFinite(value)) continue;
+
+    // Skip monthly breakdown fields (handled separately below)
+    if (key.startsWith('monthly.') || key.startsWith('unit.')) continue;
+
+    const mapping: ActualsMapping | undefined = actualsMap[key];
+    if (!mapping) continue;
+
+    // Skip computed totals — the engine recomputes these from line items
+    if (mapping.isTotal) {
+      skippedTotals++;
+      continue;
+    }
+
+    // For annual P&L data: spread evenly across 12 months
+    const monthlyAmount = value / 12;
+
+    for (let month = 1; month <= 12; month++) {
+      try {
+        await pool.query(`
+          INSERT INTO modeling_actuals
+            (org_id, modeling_project_id, year, month, category, subcategory, department,
+             line_item_description, amount, data_source, source_record_id, source_record_type)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'doc_intel', $10, 'extraction_job')
+          ON CONFLICT (modeling_project_id, year, month, category, subcategory, line_item_description)
+          DO UPDATE SET amount = EXCLUDED.amount, department = EXCLUDED.department,
+                        data_source = EXCLUDED.data_source, source_record_id = EXCLUDED.source_record_id,
+                        updated_at = NOW()
+        `, [
+          orgId, projectId, fiscalYear, month,
+          mapping.category, mapping.subcategory, mapping.department || 'Operating Expenses',
+          `${mapping.department || 'Operating Expenses'}: ${mapping.subcategory}`,
+          monthlyAmount.toFixed(2),
+          jobId
+        ]);
+        inserted++;
+      } catch (err: any) {
+        errors.push(`${key} month ${month}: ${err.message?.slice(0, 100)}`);
       }
     }
   }
 
-  // Merge into scenario config (org already verified above)
-  await pool.query(`
-    UPDATE modeling_scenario_versions
-    SET config = config || $1::jsonb,
-        updated_at = NOW()
-    WHERE id = $2 AND org_id = $3
-  `, [JSON.stringify({ extracted_data: populationMap, extraction_job_id: jobId }), scenario_id, orgId]);
+  // Process monthly breakdown fields (T-12 format)
+  for (const row of fields.rows) {
+    const key = row.schema_key;
+    if (!key.startsWith('monthly.')) continue;
 
+    const value = parseFloat(row.final_value);
+    if (isNaN(value) || !isFinite(value)) continue;
+
+    // Parse: monthly.{period}.{field_key}
+    const parts = key.split('.');
+    if (parts.length < 3) continue;
+
+    const periodStr = parts[1]; // e.g., "january_2024" or "jan"
+    const fieldKey = parts.slice(2).join('.');
+
+    const mapping = actualsMap[fieldKey];
+    if (!mapping || mapping.isTotal) continue;
+
+    // Try to extract month number from period string
+    const monthNum = parseMonthFromPeriod(periodStr, row.period_label);
+    if (!monthNum) continue;
+
+    try {
+      await pool.query(`
+        INSERT INTO modeling_actuals
+          (org_id, modeling_project_id, year, month, category, subcategory, department,
+           line_item_description, amount, data_source, source_record_id, source_record_type)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'doc_intel', $10, 'extraction_job')
+        ON CONFLICT (modeling_project_id, year, month, category, subcategory, line_item_description)
+        DO UPDATE SET amount = EXCLUDED.amount, department = EXCLUDED.department,
+                      data_source = EXCLUDED.data_source, source_record_id = EXCLUDED.source_record_id,
+                      updated_at = NOW()
+      `, [
+        orgId, projectId, fiscalYear, monthNum,
+        mapping.category, mapping.subcategory, mapping.department || 'Operating Expenses',
+        `${mapping.department || 'Operating Expenses'}: ${mapping.subcategory}`,
+        value.toFixed(2),
+        jobId
+      ]);
+      inserted++;
+    } catch (err: any) {
+      errors.push(`${key}: ${err.message?.slice(0, 100)}`);
+    }
+  }
+
+  // For rent roll: annualize monthly rent and spread across 12 months
+  if (isRentRoll) {
+    for (const row of fields.rows) {
+      if (row.schema_key !== 'total_actual_rent') continue;
+      const monthlyRent = parseFloat(row.final_value);
+      if (isNaN(monthlyRent) || !isFinite(monthlyRent)) continue;
+
+      for (let month = 1; month <= 12; month++) {
+        try {
+          await pool.query(`
+            INSERT INTO modeling_actuals
+              (org_id, modeling_project_id, year, month, category, subcategory, department,
+               line_item_description, amount, data_source, source_record_id, source_record_type)
+            VALUES ($1, $2, $3, $4, 'Revenue', 'Gross Potential Rent', 'Revenue',
+                    'Revenue: Gross Potential Rent', $5, 'doc_intel', $6, 'extraction_job')
+            ON CONFLICT (modeling_project_id, year, month, category, subcategory, line_item_description)
+            DO UPDATE SET amount = EXCLUDED.amount, updated_at = NOW()
+          `, [orgId, projectId, fiscalYear, month, monthlyRent.toFixed(2), jobId]);
+          inserted++;
+        } catch (err: any) {
+          errors.push(`rent_roll month ${month}: ${err.message?.slice(0, 100)}`);
+        }
+      }
+    }
+  }
+
+  // Mark job as confirmed
   await pool.query(`
     UPDATE document_extraction_jobs
-    SET target_scenario_id=$1, population_completed_at=NOW(), status='confirmed'
-    WHERE id=$2 AND org_id=$3
-  `, [scenario_id, jobId, orgId]);
+    SET population_completed_at=NOW(), status='confirmed', fiscal_year=$2
+    WHERE id=$1 AND org_id=$3
+  `, [jobId, fiscalYear, orgId]);
 
-  res.json({ success: true, fieldsPopulated: fields.rows.length });
+  res.json({
+    success: true,
+    actualsInserted: inserted,
+    totalsSkipped: skippedTotals,
+    fiscalYear,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 });
 
 // ─── GET /history — list past jobs for org ───────────────────────────────────
@@ -397,6 +559,34 @@ router.get('/scenarios/:projectId', async (req: any, res: any) => {
 
   res.json(result.rows);
 });
+
+// ─── MONTH PARSING UTILITY ───────────────────────────────────────────────────
+
+const MONTH_NAMES: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+  apr: 4, april: 4, may: 5, jun: 6, june: 6,
+  jul: 7, july: 7, aug: 8, august: 8, sep: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+function parseMonthFromPeriod(periodKey: string, periodLabel?: string | null): number | null {
+  // Try period label first (e.g., "January 2024", "Jan", "1/2024")
+  const label = (periodLabel || periodKey || '').toLowerCase().trim();
+
+  // Match month name at start
+  for (const [name, num] of Object.entries(MONTH_NAMES)) {
+    if (label.startsWith(name)) return num;
+  }
+
+  // Match numeric month (e.g., "1_2024", "01", "1/2024")
+  const numMatch = label.match(/^(\d{1,2})/);
+  if (numMatch) {
+    const m = parseInt(numMatch[1], 10);
+    if (m >= 1 && m <= 12) return m;
+  }
+
+  return null;
+}
 
 // ─── BUSINESS RULE VALIDATION ────────────────────────────────────────────────
 
@@ -586,12 +776,31 @@ async function processDocument(
     await saveExtractionFields(jobId, extractionResult, 'rent_roll', thresholds);
   }
 
-  await pool.query(
-    `UPDATE document_extraction_jobs 
-     SET status='review_required', extraction_completed_at=NOW()
-     WHERE id=$1`,
-    [jobId]
-  );
+  // Save Claude-detected period info and infer fiscal year if not already set
+  const data = extractionResult?.data || {};
+  const periodStart = data.period_start || data.roll_date || null;
+  const periodEnd = data.period_end || null;
+  const reportingPeriod = data.reporting_period || null;
+
+  // Infer fiscal year from period info if user didn't specify
+  let inferredYear: number | null = null;
+  if (periodEnd) {
+    const parsed = new Date(periodEnd);
+    if (!isNaN(parsed.getTime())) inferredYear = parsed.getFullYear();
+  } else if (periodStart) {
+    const parsed = new Date(periodStart);
+    if (!isNaN(parsed.getTime())) inferredYear = parsed.getFullYear();
+  }
+
+  await pool.query(`
+    UPDATE document_extraction_jobs
+    SET status='review_required', extraction_completed_at=NOW(),
+        period_start=COALESCE($2, period_start),
+        period_end=COALESCE($3, period_end),
+        reporting_period=COALESCE($4, reporting_period),
+        fiscal_year=COALESCE(fiscal_year, $5)
+    WHERE id=$1
+  `, [jobId, periodStart, periodEnd, reportingPeriod, inferredYear]);
 }
 
 async function saveExtractionFields(

@@ -80,6 +80,65 @@ export const FIELD_DISPLAY_LABELS: Record<string, string> = {
   total_potential_rent: 'Total Potential Rent',
 };
 
+// ─── Extraction → modeling_actuals mapping ───────────────────────────────────
+// Maps extraction schema_key to the actuals table format.
+// `category` must be 'Revenue', 'COGS', or 'Expenses' (matches normalizeCategory).
+// `subcategory` becomes the line item key in the Pro Forma engine.
+// `isTotal` marks computed totals that should NOT be inserted as actuals
+//   (the engine recomputes them from line items).
+
+export interface ActualsMapping {
+  category: string;
+  subcategory: string;
+  department?: string;
+  isTotal?: boolean;
+}
+
+export const EXTRACTION_TO_ACTUALS_MAP: Record<string, ActualsMapping> = {
+  // Revenue line items
+  gross_potential_rent: { category: 'Revenue', subcategory: 'Gross Potential Rent', department: 'Revenue' },
+  vacancy_loss: { category: 'Revenue', subcategory: 'Vacancy Loss', department: 'Revenue' },
+  concessions: { category: 'Revenue', subcategory: 'Concessions', department: 'Revenue' },
+  bad_debt: { category: 'Revenue', subcategory: 'Bad Debt', department: 'Revenue' },
+  parking_income: { category: 'Revenue', subcategory: 'Parking Income', department: 'Revenue' },
+  laundry_income: { category: 'Revenue', subcategory: 'Laundry Income', department: 'Revenue' },
+  late_fees: { category: 'Revenue', subcategory: 'Late Fees', department: 'Revenue' },
+  pet_fees: { category: 'Revenue', subcategory: 'Pet Fees', department: 'Revenue' },
+  storage_income: { category: 'Revenue', subcategory: 'Storage Income', department: 'Revenue' },
+  utility_reimbursements: { category: 'Revenue', subcategory: 'Utility Reimbursements', department: 'Revenue' },
+
+  // Expense line items
+  management_fees: { category: 'Expenses', subcategory: 'Management Fees', department: 'Operating Expenses' },
+  payroll: { category: 'Expenses', subcategory: 'Payroll & Benefits', department: 'Operating Expenses' },
+  repairs_maintenance: { category: 'Expenses', subcategory: 'Repairs & Maintenance', department: 'Operating Expenses' },
+  contract_services: { category: 'Expenses', subcategory: 'Contract Services', department: 'Operating Expenses' },
+  utilities: { category: 'Expenses', subcategory: 'Utilities', department: 'Operating Expenses' },
+  insurance: { category: 'Expenses', subcategory: 'Insurance', department: 'Operating Expenses' },
+  real_estate_taxes: { category: 'Expenses', subcategory: 'Real Estate Taxes', department: 'Operating Expenses' },
+  landscaping: { category: 'Expenses', subcategory: 'Landscaping', department: 'Operating Expenses' },
+  administrative: { category: 'Expenses', subcategory: 'Administrative', department: 'Operating Expenses' },
+  advertising_marketing: { category: 'Expenses', subcategory: 'Advertising & Marketing', department: 'Operating Expenses' },
+  reserves: { category: 'Expenses', subcategory: 'Reserves', department: 'Operating Expenses' },
+
+  // Computed totals — DO NOT insert as actuals (engine recomputes from line items)
+  effective_gross_income: { category: 'Revenue', subcategory: 'Effective Gross Income', isTotal: true },
+  total_other_income: { category: 'Revenue', subcategory: 'Total Other Income', isTotal: true },
+  total_revenue: { category: 'Revenue', subcategory: 'Total Revenue', isTotal: true },
+  total_operating_expenses: { category: 'Expenses', subcategory: 'Total Operating Expenses', isTotal: true },
+  net_operating_income: { category: 'Revenue', subcategory: 'Net Operating Income', isTotal: true },
+  net_cash_flow: { category: 'Revenue', subcategory: 'Net Cash Flow', isTotal: true },
+
+  // Debt (below-the-line) — stored for reference but not used in projections
+  mortgage_payment: { category: 'Expenses', subcategory: 'Mortgage Payment', department: 'Debt Service', isTotal: true },
+  interest_expense: { category: 'Expenses', subcategory: 'Interest Expense', department: 'Debt Service', isTotal: true },
+  principal_payment: { category: 'Expenses', subcategory: 'Principal Payment', department: 'Debt Service', isTotal: true },
+};
+
+// Rent Roll fields that map to actuals (monthly rent → annualized revenue)
+export const RENT_ROLL_TO_ACTUALS_MAP: Record<string, ActualsMapping> = {
+  total_actual_rent: { category: 'Revenue', subcategory: 'Gross Potential Rent', department: 'Revenue' },
+};
+
 export const FIELD_GROUPS: Record<string, string> = {
   gross_potential_rent: 'income',
   vacancy_loss: 'income',

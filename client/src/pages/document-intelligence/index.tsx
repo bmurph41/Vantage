@@ -93,7 +93,7 @@ export default function DocumentIntelligencePage({ projectId }: Props) {
               <ExtractionReview
                 jobId={jobId}
                 projectId={projectId}
-                onPopulate={(scenarioId) => {
+                onPopulate={() => {
                   const target = projectId
                     ? `/modeling/projects/${projectId}/workspace?tab=pro-forma&from_extraction=${jobId}`
                     : `/document-intelligence`;

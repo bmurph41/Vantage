@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, AlertCircle, HelpCircle, Edit2, ChevronDown, ChevronRight, Download, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -22,22 +22,21 @@ interface ExtractionField {
   proforma_field_key: string | null;
 }
 
-interface Scenario {
-  id: string;
-  name: string;
-  scenario_type: string;
-}
-
 interface ValidationWarning {
   rule: string;
   message: string;
   severity: 'warning' | 'error';
 }
 
+interface JobStatus {
+  fiscal_year: number | null;
+  reporting_period: string | null;
+}
+
 interface Props {
   jobId: string;
   projectId?: string;
-  onPopulate?: (scenarioId: string) => void;
+  onPopulate?: () => void;
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -57,28 +56,17 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
   const { toast } = useToast();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['income', 'expenses', 'summary']));
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
-  const [showScenarioPicker, setShowScenarioPicker] = useState(false);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
-  const scenarioPickerRef = useRef<HTMLDivElement>(null);
+  const [fiscalYearOverride, setFiscalYearOverride] = useState<string>('');
 
-  useEffect(() => {
-    if (!showScenarioPicker) return;
-    const handler = (e: MouseEvent) => {
-      if (scenarioPickerRef.current && !scenarioPickerRef.current.contains(e.target as Node)) {
-        setShowScenarioPicker(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showScenarioPicker]);
-
-  const { data: scenarios = [] } = useQuery<Scenario[]>({
-    queryKey: ['scenarios-for-extraction', projectId],
+  // Fetch job status to get fiscal year info
+  const { data: jobStatus } = useQuery<JobStatus>({
+    queryKey: ['extraction-job-status', jobId],
     queryFn: () =>
-      fetch(`/api/v1/document-extraction/scenarios/${projectId}`, { credentials: 'include' })
-        .then(r => r.ok ? r.json() : []),
-    enabled: !!projectId,
+      fetch(`/api/v1/document-extraction/${jobId}/status`, { credentials: 'include' }).then(r => r.json()),
   });
+
+  const detectedFiscalYear = jobStatus?.fiscal_year || new Date().getFullYear();
+  const effectiveFiscalYear = fiscalYearOverride ? parseInt(fiscalYearOverride, 10) : detectedFiscalYear;
 
   const { data: fieldsData, isLoading } = useQuery<{ fields: ExtractionField[]; warnings: ValidationWarning[] }>({
     queryKey: ['extraction-fields', jobId],
@@ -113,12 +101,12 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
   });
 
   const populateProforma = useMutation({
-    mutationFn: async (scenarioId: string) => {
+    mutationFn: async () => {
       const res = await fetch(`/api/v1/document-extraction/${jobId}/populate-proforma`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ scenario_id: scenarioId })
+        body: JSON.stringify({ fiscal_year: effectiveFiscalYear })
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Failed to populate' }));
@@ -127,9 +115,8 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: `Populated ${data.fieldsPopulated} fields into Pro Forma` });
-      setShowScenarioPicker(false);
-      onPopulate?.(selectedScenarioId!);
+      toast({ title: `Inserted ${data.actualsInserted} actuals into FY ${data.fiscalYear}` });
+      onPopulate?.();
     },
     onError: (err: Error) => {
       toast({ title: 'Population failed', description: err.message, variant: 'destructive' });
@@ -219,50 +206,38 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
           >
             Accept All High Confidence
           </button>
-          {onPopulate && confirmedCount > 0 && (
-            <div className="relative" ref={scenarioPickerRef}>
+          {confirmedCount > 0 && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">FY:</label>
+                <input
+                  type="number"
+                  value={fiscalYearOverride || effectiveFiscalYear}
+                  onChange={e => setFiscalYearOverride(e.target.value)}
+                  className="w-20 px-2 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                  min={2000} max={2050}
+                />
+                {jobStatus?.reporting_period && (
+                  <span className="text-xs text-slate-400" title="Detected from document">
+                    ({jobStatus.reporting_period})
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => {
                   if (!projectId) {
                     toast({ title: 'No project linked', description: 'Navigate to Document Intelligence from a project to populate Pro Forma.', variant: 'destructive' });
                     return;
                   }
-                  setShowScenarioPicker(prev => !prev);
+                  populateProforma.mutate();
                 }}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                disabled={populateProforma.isPending}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 <Database className="w-3.5 h-3.5" />
-                Populate Pro Forma ({confirmedCount} fields)
+                {populateProforma.isPending ? 'Populating...' : `Populate Pro Forma (${confirmedCount} fields)`}
               </button>
-              {showScenarioPicker && scenarios.length > 0 && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-3 space-y-2">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Select target scenario</p>
-                  {scenarios.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => {
-                        setSelectedScenarioId(s.id);
-                        populateProforma.mutate(s.id);
-                      }}
-                      disabled={populateProforma.isPending}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedScenarioId === s.id && populateProforma.isPending
-                          ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <span className="font-medium">{s.name}</span>
-                      <span className="ml-2 text-xs text-slate-400">{s.scenario_type}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {showScenarioPicker && scenarios.length === 0 && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-4 text-center">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No scenarios found for this project.</p>
-                </div>
-              )}
-            </div>
+            </>
           )}
         </div>
       </div>
