@@ -661,15 +661,20 @@ export class BillingService {
 
   /**
    * Create a Stripe billing portal session for managing payment methods, invoices, etc.
+   * Returns { url } on success, or throws an Error with a user-friendly message.
    */
-  async createPortalSession(orgId: string, returnUrl: string) {
+  async createPortalSession(orgId: string, returnUrl: string): Promise<{ url: string }> {
     if (!stripe) {
-      throw new Error('Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.');
+      const err = new Error('Billing not configured — contact support to enable payments');
+      (err as any).statusCode = 503;
+      throw err;
     }
 
     const sub = await this.getSubscription(orgId);
     if (!sub?.stripeCustomerId) {
-      throw new Error('No Stripe customer found for this organization');
+      const err = new Error('No billing account found. Subscribe to a plan first.');
+      (err as any).statusCode = 400;
+      throw err;
     }
 
     const session = await stripe.billingPortal.sessions.create({
@@ -677,7 +682,7 @@ export class BillingService {
       return_url: returnUrl,
     });
 
-    return session;
+    return { url: session.url };
   }
 
   /**

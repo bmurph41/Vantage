@@ -1,19 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 
-interface StripeStatus {
-  configured: boolean;
-  message: string;
+interface AppConfig {
+  stripePublishableKey: string | null;
+  stripeConfigured: boolean;
+  featureFlags?: Record<string, boolean>;
 }
 
 export function useStripeStatus() {
-  const { data, isLoading } = useQuery<StripeStatus>({
-    queryKey: ["/api/stripe/status"],
-    staleTime: 5 * 60 * 1000, // cache for 5 minutes
+  const { data, isLoading } = useQuery<AppConfig>({
+    queryKey: ["/api/config"],
+    staleTime: 5 * 60 * 1000,
   });
 
   return {
-    isStripeConfigured: data?.configured ?? false,
-    message: data?.message ?? "Checking payment status...",
+    isStripeConfigured: data?.stripeConfigured ?? false,
+    message: data?.stripeConfigured ? "Stripe is configured" : "Stripe is not configured",
+    publishableKey: data?.stripePublishableKey ?? null,
     isLoading,
   };
 }

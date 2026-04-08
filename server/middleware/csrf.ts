@@ -48,7 +48,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  if (isExemptPath(req.path)) {
+  if (isExemptPath(req.path) || isExemptPath(req.originalUrl.split('?')[0])) {
     return next();
   }
 

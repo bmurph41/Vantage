@@ -1056,7 +1056,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Feature flags config endpoint (public for frontend gating)
   app.get("/api/config", (req, res) => {
     res.json({
-      featureFlags: getPublicFeatureFlags()
+      featureFlags: getPublicFeatureFlags(),
+      stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
+      stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY),
     });
   });
 
@@ -2535,7 +2537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-      if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+      if (!stripe) return res.status(503).json({ error: "Billing not configured — contact support to enable payments" });
 
       const orgId = req.user?.orgId || req.tenantId;
       const userId = req.user?.id;
@@ -2561,6 +2563,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { orgId, userId },
         });
         customerId = customer.id;
+        // Persist the new Stripe customer ID so the billing portal can resolve it later
+        if (existingSub) {
+          await db.update(subscriptions)
+            .set({ providerCustomerId: customerId, updatedAt: new Date() })
+            .where(eq(subscriptions.orgId, orgId));
+        } else {
+          await db.insert(subscriptions).values({
+            userId,
+            orgId,
+            provider: "stripe",
+            planKey: packType,
+            planName: pack.name || packType,
+            status: "trialing",
+            providerCustomerId: customerId,
+          }).onConflictDoNothing();
+        }
       }
 
       const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -2593,12 +2611,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/stripe/portal — open Stripe Customer Portal for subscription management
+  // GET /api/stripe/billing-portal — alias for billing portal (matches billing-service task requirement)
+  app.get("/api/stripe/billing-portal", authenticateUser, async (req: any, res) => {
+    try {
+      const Stripe = (await import("stripe")).default;
+      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+      if (!stripe) return res.status(503).json({ error: "Billing not configured — contact support to enable payments" });
+
+      const orgId = req.user?.orgId || req.tenantId;
+      const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, orgId)).limit(1);
+
+      if (!existingSub?.providerCustomerId) {
+        return res.status(400).json({ error: "No Stripe customer found. Subscribe to a plan first." });
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const session = await stripe.billingPortal.sessions.create({
+        customer: existingSub.providerCustomerId,
+        return_url: (req as any).query?.returnUrl as string || `${baseUrl}/settings/billing`,
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Stripe billing portal error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+    // POST /api/stripe/portal — open Stripe Customer Portal for subscription management
   app.post("/api/stripe/portal", authenticateUser, async (req: any, res) => {
     try {
       const Stripe = (await import("stripe")).default;
       const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-      if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+      if (!stripe) return res.status(503).json({ error: "Billing not configured — contact support to enable payments" });
 
       const orgId = req.user?.orgId || req.tenantId;
       const [existingSub] = await db.select().from(subscriptions).where(eq(subscriptions.orgId, orgId)).limit(1);
@@ -2714,87 +2759,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/stripe/webhook — handle Stripe webhooks for subscription lifecycle
-  app.post("/api/stripe/webhook", async (req: any, res) => {
-    try {
-      const Stripe = (await import("stripe")).default;
-      const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-      if (!stripe) return res.status(200).json({ received: true });
-
-      const sig = req.headers["stripe-signature"] as string;
-      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-      if (!webhookSecret || !sig) return res.status(200).json({ received: true });
-
-      let event: any;
-      try {
-        const rawBody = req.rawBody || req.body;
-        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-      } catch {
-        return res.status(400).json({ error: "Invalid signature" });
-      }
-
-      const data = event.data.object;
-      const orgId = data.metadata?.orgId || data.subscription_details?.metadata?.orgId;
-
-      switch (event.type) {
-        case "checkout.session.completed": {
-          const packType = data.metadata?.packType;
-          if (orgId && packType) {
-            // Activate the pack
-            await db.insert(organizationPacks).values({
-              orgId,
-              packType,
-              status: "active",
-              purchasedAt: new Date(),
-              stripeSubscriptionId: data.subscription,
-              stripeCustomerId: data.customer,
-              billingCycle: data.metadata?.billingCycle || "monthly",
-              purchasedBy: data.metadata?.userId,
-            }).onConflictDoUpdate({
-              target: [organizationPacks.orgId, organizationPacks.packType],
-              set: {
-                status: "active",
-                stripeSubscriptionId: data.subscription,
-                stripeCustomerId: data.customer,
-                purchasedAt: new Date(),
-              },
-            });
-          }
-          break;
-        }
-        case "customer.subscription.updated": {
-          if (orgId) {
-            const status = data.cancel_at_period_end ? "cancelled" : data.status === "active" ? "active" : data.status;
-            await db.update(organizationPacks)
-              .set({ status, currentPeriodEnd: data.current_period_end ? new Date(data.current_period_end * 1000) : undefined })
-              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.id)));
-          }
-          break;
-        }
-        case "customer.subscription.deleted": {
-          if (data.id) {
-            await db.update(organizationPacks)
-              .set({ status: "cancelled" })
-              .where(eq(organizationPacks.stripeSubscriptionId, data.id));
-          }
-          break;
-        }
-        case "invoice.payment_failed": {
-          if (orgId) {
-            await db.update(organizationPacks)
-              .set({ status: "past_due" })
-              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.subscription)));
-          }
-          break;
-        }
-      }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      console.error("Stripe webhook error:", error);
-      res.status(200).json({ received: true, error: error.message });
-    }
-  });
+  // NOTE: POST /api/stripe/webhook is handled in server/index.ts BEFORE express.json()
+  // to preserve the raw request body required for Stripe signature verification.
+  // Do not re-register this route here — the handler in index.ts is authoritative.
 
   const httpServer = createServer(app);
 

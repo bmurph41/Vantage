@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -272,21 +272,16 @@ interface PaywallModalProps {
 export function PaywallModal({ open, onOpenChange, packType, featureName }: PaywallModalProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isStripeConfigured } = useStripeStatus();
+  const { isStripeConfigured, publishableKey } = useStripeStatus();
   const [view, setView] = useState<ModalView>('info');
 
   // Determine the minimum tier needed for this pack
   const recommendedTier = getMinimumTierForPack(packType);
   const TierIcon = recommendedTier.icon;
 
-  // Fetch publishable key for Stripe Elements
-  const { data: stripeKeyData } = useQuery<{ publishableKey: string | null }>({
-    queryKey: ['/api/stripe/publishable-key'],
-    enabled: open && isStripeConfigured,
-  });
-
-  const stripePromise = stripeKeyData?.publishableKey
-    ? loadStripe(stripeKeyData.publishableKey)
+  // Use publishable key from the shared Stripe status hook for Stripe Elements
+  const stripePromise = isStripeConfigured && publishableKey
+    ? loadStripe(publishableKey)
     : null;
 
   // Subscribe to tier (activates all packs at once)

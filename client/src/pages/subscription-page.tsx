@@ -45,7 +45,7 @@ export function SubscriptionPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   const { subscription, upgradeToPackage, addModule } = useEntitlements();
-  const { isStripeConfigured } = useStripeStatus();
+  const { isStripeConfigured, isLoading } = useStripeStatus();
   const { toast } = useToast();
 
   const checkoutMutation = useMutation({
@@ -112,6 +112,15 @@ export function SubscriptionPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* Billing not configured warning */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {!isStripeConfigured && !isLoading && (
+        <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+          <strong>Billing is not configured.</strong> Paid subscriptions are unavailable — contact support to enable billing. Free trials are available in the meantime.
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────── */}
       {/* Header */}
       {/* ─────────────────────────────────────────────────────── */}

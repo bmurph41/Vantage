@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,11 @@ export default function BillingSettingsPage() {
     queryKey: ["/api/billing/subscription"],
   });
 
-  const { data: stripeStatus } = useQuery<any>({
-    queryKey: ["/api/stripe/status"],
+  const { data: appConfig } = useQuery<any>({
+    queryKey: ["/api/config"],
+    staleTime: 5 * 60 * 1000,
   });
+  const stripeStatus = { configured: appConfig?.stripeConfigured ?? false };
 
   const checkout = useMutation({
     mutationFn: async ({ packType, billingCycle }: { packType: string; billingCycle: string }) => {
@@ -60,6 +62,17 @@ export default function BillingSettingsPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const success = urlParams.get("success");
   const canceled = urlParams.get("canceled");
+
+  // Invalidate subscription and entitlement queries on successful checkout return
+  useEffect(() => {
+    if (success === "true") {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/config"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/current-tier"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packs"] });
+    }
+  }, [success]);
 
   return (
     <div className="space-y-6 p-6">

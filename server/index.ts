@@ -89,12 +89,269 @@ configureSecurityMiddleware(app);
 // Enhanced security headers (CSP hardening, Permissions-Policy, etc.)
 configureEnhancedSecurityHeaders(app);
 
-// Stripe webhook route placeholder (payment integration coming soon)
+// Stripe webhook route — must be registered BEFORE express.json() so raw body is preserved
 app.post(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),
-  async (_req, res) => {
-    res.status(503).json({ message: 'Payment webhooks coming soon' });
+  async (req: any, res) => {
+    try {
+      const stripeKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeKey) {
+        return res.status(200).json({ received: true });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(stripeKey);
+
+      const sig = req.headers['stripe-signature'] as string;
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      let event: any;
+      if (webhookSecret) {
+        if (!sig) {
+          console.error('[Stripe Webhook] Missing Stripe-Signature header');
+          return res.status(400).json({ error: 'Missing Stripe-Signature header' });
+        }
+        try {
+          event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        } catch (err: any) {
+          console.error('[Stripe Webhook] Signature verification failed:', err.message);
+          return res.status(400).json({ error: 'Invalid signature' });
+        }
+      } else if (isProduction) {
+        // In production, reject webhook if STRIPE_WEBHOOK_SECRET is not configured
+        console.error('[Stripe Webhook] STRIPE_WEBHOOK_SECRET not set in production — rejecting webhook');
+        return res.status(503).json({ error: 'Webhook secret not configured' });
+      } else {
+        // Development mode only: parse without signature verification (explicit dev bypass)
+        console.warn('[Stripe Webhook] DEV MODE: No STRIPE_WEBHOOK_SECRET — processing without signature verification');
+        try {
+          event = typeof req.body === 'string' ? JSON.parse(req.body) : JSON.parse(req.body.toString());
+        } catch {
+          return res.status(400).json({ error: 'Invalid JSON body' });
+        }
+      }
+
+      const data = event.data.object;
+      const orgId = data.metadata?.orgId || data.subscription_details?.metadata?.orgId;
+
+      const { db } = await import('./db');
+      const { organizationPacks, billingSubscriptions } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      // Map Stripe subscription statuses to organizationPacks enum values:
+      // packStatusEnum = "active" | "trial" | "expired" | "cancelled"
+      function toPackStatus(stripeStatus: string, cancelAtPeriodEnd?: boolean): 'active' | 'trial' | 'expired' | 'cancelled' {
+        if (cancelAtPeriodEnd) return 'cancelled';
+        switch (stripeStatus) {
+          case 'active': return 'active';
+          case 'trialing': return 'trial';
+          case 'canceled': case 'cancelled': case 'unpaid': return 'cancelled';
+          case 'past_due': case 'incomplete': case 'incomplete_expired': case 'paused': return 'expired';
+          default: return 'active';
+        }
+      }
+
+      // Map Stripe statuses to billing_subscriptions varchar status column
+      // Valid values: trialing | active | past_due | canceled | paused | incomplete
+      function toBillingStatus(stripeStatus: string, cancelAtPeriodEnd?: boolean): string {
+        if (cancelAtPeriodEnd) return 'canceled';
+        const allowed = ['trialing', 'active', 'past_due', 'canceled', 'paused', 'incomplete'];
+        return allowed.includes(stripeStatus) ? stripeStatus : 'active';
+      }
+
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const packType = data.metadata?.packType;
+          const billingCycle = (data.metadata?.billingCycle as string) || 'monthly';
+          if (orgId && packType) {
+            // Update organizationPacks (pack-level entitlements)
+            await db.insert(organizationPacks).values({
+              orgId,
+              packType,
+              status: 'active',
+              purchasedAt: new Date(),
+              stripeSubscriptionId: data.subscription,
+              stripeCustomerId: data.customer,
+              billingCycle,
+              purchasedBy: data.metadata?.userId,
+            }).onConflictDoUpdate({
+              target: [organizationPacks.orgId, organizationPacks.packType],
+              set: {
+                status: 'active',
+                stripeSubscriptionId: data.subscription,
+                stripeCustomerId: data.customer,
+                purchasedAt: new Date(),
+              },
+            });
+
+            // Upsert billing_subscriptions tier/status — guarantees activation even for net-new orgs
+            await db.insert(billingSubscriptions).values({
+              orgId,
+              tier: packType,
+              status: 'active',
+              stripeSubscriptionId: data.subscription,
+              stripeCustomerId: data.customer,
+              billingCycle,
+            }).onConflictDoUpdate({
+              target: [billingSubscriptions.orgId],
+              set: {
+                status: 'active',
+                tier: packType,
+                stripeSubscriptionId: data.subscription,
+                stripeCustomerId: data.customer,
+                billingCycle,
+                updatedAt: new Date(),
+              },
+            });
+
+            // Also persist providerCustomerId to subscriptions table so billing portal can resolve customer
+            const { subscriptions } = await import('@shared/schema');
+            await db.update(subscriptions)
+              .set({ providerCustomerId: data.customer, providerSubscriptionId: data.subscription, status: 'active', updatedAt: new Date() })
+              .where(eq(subscriptions.orgId, orgId));
+
+            console.log(`[Stripe Webhook] checkout.session.completed: activated pack '${packType}' for org '${orgId}'`);
+          }
+          break;
+        }
+        case 'customer.subscription.updated': {
+          const packStatus = toPackStatus(data.status, data.cancel_at_period_end);
+          const billingStatus = toBillingStatus(data.status, data.cancel_at_period_end);
+          const periodStart = data.current_period_start ? new Date(data.current_period_start * 1000) : undefined;
+          const periodEnd = data.current_period_end ? new Date(data.current_period_end * 1000) : undefined;
+          const cancelAt = data.cancel_at ? new Date(data.cancel_at * 1000) : null;
+
+          // Resolve orgId: prefer subscription metadata; fall back to customer ID lookup
+          let resolvedOrgId = orgId;
+          if (!resolvedOrgId && data.customer) {
+            const { subscriptions } = await import('@shared/schema');
+            const [sub] = await db.select({ orgId: subscriptions.orgId })
+              .from(subscriptions)
+              .where(eq(subscriptions.providerCustomerId, data.customer as string))
+              .limit(1);
+            resolvedOrgId = sub?.orgId;
+          }
+
+          if (resolvedOrgId) {
+            // Derive the new tier/packType from the subscription's price ID — handles upgrades/downgrades
+            type PackTypeEnumValue = typeof organizationPacks.packType.enumValues[number];
+            const { packCatalog } = await import('@shared/schema');
+            const { or } = await import('drizzle-orm');
+            let newPackType: PackTypeEnumValue | undefined;
+            let newBillingCycle: string | undefined;
+            let newPriceId: string | undefined;
+            const priceId = data.items?.data?.[0]?.price?.id as string | undefined;
+            if (priceId) {
+              newPriceId = priceId;
+              const [matchedPack] = await db.select().from(packCatalog)
+                .where(or(
+                  eq(packCatalog.stripePriceIdMonthly, priceId),
+                  eq(packCatalog.stripePriceIdYearly, priceId),
+                )).limit(1);
+              if (matchedPack) {
+                newPackType = matchedPack.packType as PackTypeEnumValue;
+                newBillingCycle = matchedPack.stripePriceIdYearly === priceId ? 'yearly' : 'monthly';
+              }
+            }
+
+            // Update organizationPacks (enum-safe status) — match by subscription ID
+            await db.update(organizationPacks)
+              .set({
+                status: packStatus,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
+                ...(newPackType ? { packType: newPackType } : {}),
+                ...(newBillingCycle ? { billingCycle: newBillingCycle } : {}),
+                updatedAt: new Date(),
+              })
+              .where(and(eq(organizationPacks.orgId, resolvedOrgId), eq(organizationPacks.stripeSubscriptionId, data.id)));
+
+            // Update billing_subscriptions (varchar status) — include tier change if detected
+            await db.update(billingSubscriptions)
+              .set({
+                status: billingStatus,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAt,
+                ...(newPackType ? { tier: newPackType } : {}),
+                ...(newBillingCycle ? { billingCycle: newBillingCycle } : {}),
+                ...(newPriceId ? { stripePriceId: newPriceId } : {}),
+                updatedAt: new Date(),
+              })
+              .where(eq(billingSubscriptions.orgId, resolvedOrgId));
+
+            console.log(`[Stripe Webhook] customer.subscription.updated: org='${resolvedOrgId}' tier='${newPackType ?? 'unchanged'}' status='${billingStatus}'`);
+          } else {
+            console.warn(`[Stripe Webhook] customer.subscription.updated: could not resolve orgId for subscription '${data.id}'`);
+          }
+          break;
+        }
+        case 'customer.subscription.deleted': {
+          if (data.id) {
+            // Cancel organizationPacks associated with this subscription
+            await db.update(organizationPacks)
+              .set({ status: 'cancelled', updatedAt: new Date() })
+              .where(eq(organizationPacks.stripeSubscriptionId, data.id));
+            // Downgrade billing_subscriptions to free tier and mark canceled
+            // orgId is available from subscription metadata
+            if (orgId) {
+              await db.update(billingSubscriptions)
+                .set({
+                  status: 'canceled',
+                  tier: 'starter', // Downgrade to free/starter tier on cancellation
+                  canceledAt: new Date(),
+                  stripeSubscriptionId: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(billingSubscriptions.orgId, orgId));
+            } else {
+              // Fall back to matching by subscription ID if orgId not in metadata
+              await db.update(billingSubscriptions)
+                .set({ status: 'canceled', canceledAt: new Date(), updatedAt: new Date() })
+                .where(eq(billingSubscriptions.stripeSubscriptionId, data.id));
+            }
+            console.log(`[Stripe Webhook] customer.subscription.deleted: subscription '${data.id}' cancelled, org='${orgId ?? 'unknown'}' downgraded to starter`);
+          }
+          break;
+        }
+        case 'invoice.payment_succeeded': {
+          if (orgId) {
+            await db.update(organizationPacks)
+              .set({ status: 'active', updatedAt: new Date() })
+              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.subscription)));
+            await db.update(billingSubscriptions)
+              .set({ status: 'active', updatedAt: new Date() })
+              .where(eq(billingSubscriptions.orgId, orgId));
+            console.log(`[Stripe Webhook] invoice.payment_succeeded: org '${orgId}' subscription activated`);
+          }
+          break;
+        }
+        case 'invoice.payment_failed': {
+          if (orgId) {
+            // past_due is not in packStatusEnum; mark as expired to block entitlement access
+            await db.update(organizationPacks)
+              .set({ status: 'expired', updatedAt: new Date() })
+              .where(and(eq(organizationPacks.orgId, orgId), eq(organizationPacks.stripeSubscriptionId, data.subscription)));
+            await db.update(billingSubscriptions)
+              .set({ status: 'past_due', updatedAt: new Date() })
+              .where(eq(billingSubscriptions.orgId, orgId));
+            console.log(`[Stripe Webhook] invoice.payment_failed: org '${orgId}' subscription past_due/expired`);
+          }
+          break;
+        }
+        default:
+          console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      // Return 500 so Stripe retries the webhook delivery; log full error server-side
+      console.error('[Stripe Webhook] Processing error:', error.message, error.stack);
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
   }
 );
 
