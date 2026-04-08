@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import {
   Bell,
   Mail,
@@ -159,11 +158,9 @@ export function NotificationSettings({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline">Coming Soon</Badge>
               <Switch
                 checked={prefs.channels.sms}
                 onCheckedChange={(checked) => updateChannels('sms', checked)}
-                disabled
               />
             </div>
           </div>

@@ -122,7 +122,7 @@ function TaxSettingsPanel({ projectId }: { projectId: string }) {
               <SelectContent>
                 <SelectItem value="flat">Flat Effective Rate</SelectItem>
                 <SelectItem value="split">Split Buckets</SelectItem>
-                <SelectItem value="advanced" disabled>Advanced (Coming Soon)</SelectItem>
+                <SelectItem value="advanced">Advanced</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -147,7 +147,7 @@ function TaxSettingsPanel({ projectId }: { projectId: string }) {
               <SelectContent>
                 <SelectItem value="annual">Annual</SelectItem>
                 <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="quarterly" disabled>Quarterly (Coming Soon)</SelectItem>
+                <SelectItem value="quarterly">Quarterly</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -582,7 +582,7 @@ const TIER_TYPES = [
 const TEMPLATES = [
   { value: 'straight_split', label: 'Straight Split', desc: '90/10 LP/GP split' },
   { value: 'pref_catchup', label: 'Pref + Catch-Up', desc: '8% pref, GP catch-up, 80/20 split' },
-  { value: 'irr_hurdles', label: 'IRR Hurdles', desc: 'Scaffold only (coming soon)' },
+  { value: 'irr_hurdles', label: 'IRR Hurdles', desc: 'Tiered waterfall with IRR and equity multiple hurdles' },
 ];
 
 function WaterfallConfigurator({ projectId }: { projectId: string }) {
@@ -593,7 +593,10 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
   const activeConfig = (waterfalls ?? []).find((w: any) => w.isActive) ?? (waterfalls ?? [])[0];
 
   const createConfigMutation = useMutation({
-    mutationFn: (body: any) => apiRequest('POST', `${BASE}/projects/${projectId}/waterfall`, body),
+    mutationFn: async (body: any) => {
+      const res = await apiRequest('POST', `${BASE}/projects/${projectId}/waterfall`, body);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [BASE, 'waterfall', projectId] });
       toast({ title: 'Waterfall created' });
@@ -602,9 +605,10 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
   });
 
   const saveTiersMutation = useMutation({
-    mutationFn: (tiers: any[]) => {
-      if (!activeConfig) throw new Error('No config');
-      return apiRequest('PUT', `${BASE}/projects/${projectId}/waterfall/${activeConfig.id}/tiers`, tiers);
+    mutationFn: ({ tiers, configId }: { tiers: any[]; configId?: string }) => {
+      const id = configId ?? activeConfig?.id;
+      if (!id) throw new Error('No config');
+      return apiRequest('PUT', `${BASE}/projects/${projectId}/waterfall/${id}/tiers`, tiers);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [BASE, 'waterfall', projectId] });
@@ -614,12 +618,23 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
     onError: (e: any) => toast({ title: 'Error', description: String(e?.message ?? 'Failed to save tiers'), variant: 'destructive' }),
   });
 
+  const IRR_HURDLE_TIERS = [
+    { tierOrder: 1, tierType: 'return_of_capital', prefRate: null, catchUpTargetGpShare: null, irrHurdle: null, equityMultipleHurdle: null, lpSplit: null, gpSplit: null, notes: 'Return of contributed capital' },
+    { tierOrder: 2, tierType: 'preferred_return', prefRate: '0.08', catchUpTargetGpShare: null, irrHurdle: '0.08', equityMultipleHurdle: '1.0', lpSplit: '100', gpSplit: '0', notes: '8% IRR hurdle — LP preferred return' },
+    { tierOrder: 3, tierType: 'split', prefRate: null, catchUpTargetGpShare: null, irrHurdle: '0.12', equityMultipleHurdle: '1.5', lpSplit: '80', gpSplit: '20', notes: '12% IRR hurdle — 80/20 split' },
+    { tierOrder: 4, tierType: 'split', prefRate: null, catchUpTargetGpShare: null, irrHurdle: '0.18', equityMultipleHurdle: '2.0', lpSplit: '70', gpSplit: '30', notes: '18% IRR hurdle — 70/30 split' },
+    { tierOrder: 5, tierType: 'split', prefRate: null, catchUpTargetGpShare: null, irrHurdle: null, equityMultipleHurdle: null, lpSplit: '60', gpSplit: '40', notes: 'Above 18% IRR — 60/40 split' },
+  ];
+
   const handleTemplateSelect = (templateType: string) => {
-    if (templateType === 'irr_hurdles') {
-      toast({ title: 'Coming Soon', description: 'IRR hurdle tiers are scaffold-only' });
-      return;
-    }
-    createConfigMutation.mutate({ name: TEMPLATES.find(t => t.value === templateType)?.label ?? 'Custom', templateType, isActive: true });
+    const name = TEMPLATES.find(t => t.value === templateType)?.label ?? 'Custom';
+    createConfigMutation.mutate({ name, templateType, isActive: true }, {
+      onSuccess: (data: any) => {
+        if (templateType === 'irr_hurdles' && data?.id) {
+          saveTiersMutation.mutate({ tiers: IRR_HURDLE_TIERS, configId: data.id });
+        }
+      },
+    });
   };
 
   const updateTier = (idx: number, field: string, value: any) => {
@@ -650,7 +665,7 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
   };
 
   const handleSaveTiers = () => {
-    saveTiersMutation.mutate(localTiers.map(t => ({
+    saveTiersMutation.mutate({ tiers: localTiers.map(t => ({
       tierOrder: t.tierOrder,
       tierType: t.tierType,
       prefRate: t.prefRate || null,
@@ -660,7 +675,7 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
       lpSplit: t.lpSplit || null,
       gpSplit: t.gpSplit || null,
       notes: t.notes || null,
-    })));
+    })) });
   };
 
   if (isLoading) return <Skeleton className="h-48 w-full" />;
@@ -678,7 +693,7 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {TEMPLATES.map(t => (
-              <Card key={t.value} className={`cursor-pointer hover:border-primary transition-colors ${t.value === 'irr_hurdles' ? 'opacity-50' : ''}`} onClick={() => handleTemplateSelect(t.value)}>
+              <Card key={t.value} className={`cursor-pointer hover:border-primary transition-colors`} onClick={() => handleTemplateSelect(t.value)}>
                 <CardContent className="pt-4 pb-4">
                   <p className="font-medium text-sm">{t.label}</p>
                   <p className="text-xs text-muted-foreground mt-1">{t.desc}</p>
@@ -764,6 +779,18 @@ function WaterfallConfigurator({ projectId }: { projectId: string }) {
                   )}
                   {tier.tierType === 'return_of_capital' && (
                     <div className="col-span-2 flex items-center text-xs text-muted-foreground pt-5">Returns contributed capital first</div>
+                  )}
+                  {(activeConfig?.templateType === 'irr_hurdles' || tier.irrHurdle || tier.equityMultipleHurdle) && tier.tierType !== 'return_of_capital' && tier.tierType !== 'tax_distribution' && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs">IRR Hurdle</Label>
+                        <Input className="h-8 text-xs" type="number" step="0.01" value={tier.irrHurdle ?? ''} onChange={(e) => updateTier(idx, 'irrHurdle', e.target.value)} placeholder="0.12" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Equity Multiple</Label>
+                        <Input className="h-8 text-xs" type="number" step="0.1" value={tier.equityMultipleHurdle ?? ''} onChange={(e) => updateTier(idx, 'equityMultipleHurdle', e.target.value)} placeholder="1.5" />
+                      </div>
+                    </>
                   )}
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive mt-4" onClick={() => removeTier(idx)}><Trash2 className="h-4 w-4" /></Button>

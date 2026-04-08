@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import {
-  opsHotelRooms, opsHotelReservations, opsMarinas,
+  opsHotelRooms, opsHotelReservations, opsMarinas, opsHotelCompetitorRates,
 } from '@shared/schema';
 import { eq, and, sql, gte, lte, ilike, or } from 'drizzle-orm';
 import { z } from 'zod';
@@ -345,6 +345,64 @@ router.get('/rates', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Hotel rates error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// GET /competitor-rates — List competitor rates
+// ============================================================================
+router.get('/competitor-rates', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const marinaId = req.query.marinaId as string | undefined;
+    let conditions: any[] = [eq(opsHotelCompetitorRates.orgId, orgId)];
+    if (marinaId) conditions.push(eq(opsHotelCompetitorRates.marinaId, marinaId));
+    const rows = await db.select().from(opsHotelCompetitorRates).where(and(...conditions));
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// POST /competitor-rates — Create competitor rate entry
+// ============================================================================
+const competitorRateSchema = z.object({
+  marinaId: z.string().optional().nullable(),
+  competitorName: z.string().min(1),
+  slipType: z.string().default('standard'),
+  dailyRate: z.string().or(z.number()).optional().nullable().transform(v => v != null ? String(v) : null),
+  weeklyRate: z.string().or(z.number()).optional().nullable().transform(v => v != null ? String(v) : null),
+  monthlyRate: z.string().or(z.number()).optional().nullable().transform(v => v != null ? String(v) : null),
+  notes: z.string().optional().nullable(),
+});
+
+router.post('/competitor-rates', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const parsed = competitorRateSchema.parse(req.body);
+    const [row] = await db.insert(opsHotelCompetitorRates).values({ orgId, ...parsed }).returning();
+    res.status(201).json(row);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: err.errors });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// DELETE /competitor-rates/:id — Delete competitor rate entry
+// ============================================================================
+router.delete('/competitor-rates/:id', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id } = req.params;
+    const [deleted] = await db.delete(opsHotelCompetitorRates)
+      .where(and(eq(opsHotelCompetitorRates.id, id), eq(opsHotelCompetitorRates.orgId, orgId)))
+      .returning();
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

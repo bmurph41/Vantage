@@ -23976,6 +23976,25 @@ export const insertOpsHotelReservationSchema = createInsertSchema(opsHotelReserv
 export type OpsHotelReservation = typeof opsHotelReservations.$inferSelect;
 export type InsertOpsHotelReservation = z.infer<typeof insertOpsHotelReservationSchema>;
 
+export const opsHotelCompetitorRates = pgTable("ops_hotel_competitor_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id),
+  marinaId: varchar("marina_id"),
+  competitorName: text("competitor_name").notNull(),
+  slipType: text("slip_type").notNull().default("standard"),
+  dailyRate: decimal("daily_rate", { precision: 10, scale: 2 }),
+  weeklyRate: decimal("weekly_rate", { precision: 10, scale: 2 }),
+  monthlyRate: decimal("monthly_rate", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export const insertOpsHotelCompetitorRateSchema = createInsertSchema(opsHotelCompetitorRates).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type OpsHotelCompetitorRate = typeof opsHotelCompetitorRates.$inferSelect;
+export type InsertOpsHotelCompetitorRate = z.infer<typeof insertOpsHotelCompetitorRateSchema>;
+
 // ============================================================================
 // MULTIFAMILY OPERATIONS
 // ============================================================================

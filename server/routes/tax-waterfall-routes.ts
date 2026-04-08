@@ -526,10 +526,10 @@ router.post("/projects/:projectId/calculate", async (req: Request, res: Response
       notes: t.notes,
     }));
 
-    const timeframe = taxSettingsData.taxTiming === 'monthly' ? 'monthly' : 'annual';
-    const periodsPerYear = timeframe === 'monthly' ? 12 : 1;
+    const cashflowTimeframe: 'annual' | 'monthly' | 'quarterly' = taxSettingsData.taxTiming === 'monthly' ? 'monthly' : taxSettingsData.taxTiming === 'quarterly' ? 'quarterly' : 'annual';
+    const periodsPerYear = cashflowTimeframe === 'monthly' ? 12 : cashflowTimeframe === 'quarterly' ? 4 : 1;
 
-    const cashflowTimeline = await getProjectCashflowTimeline(projectId, { timeframe });
+    const cashflowTimeline = await getProjectCashflowTimeline(projectId, { timeframe: cashflowTimeframe });
 
     const result = runCoordinator(
       cashflowTimeline,

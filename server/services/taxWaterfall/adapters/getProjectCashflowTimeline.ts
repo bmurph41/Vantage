@@ -5,7 +5,7 @@ import { CashflowPeriod, SaleEvent } from '../types';
 import { toCents, ZERO } from '../money';
 
 export interface CashflowTimelineOptions {
-  timeframe: 'annual' | 'monthly';
+  timeframe: 'annual' | 'monthly' | 'quarterly';
   holdYears?: number;
 }
 
@@ -79,11 +79,12 @@ export async function getProjectCashflowTimeline(
 
   const noiGrowthRate = 0.03;
 
-  const numPeriods = options.timeframe === 'annual' ? holdYears : holdYears * 12;
-  const periodsPerYear = options.timeframe === 'annual' ? 1 : 12;
+  const tf = options.timeframe;
+  const periodsPerYear = tf === 'monthly' ? 12 : tf === 'quarterly' ? 4 : 1;
+  const numPeriods = holdYears * periodsPerYear;
 
   for (let i = 0; i < numPeriods; i++) {
-    const yearIndex = options.timeframe === 'annual' ? i : Math.floor(i / 12);
+    const yearIndex = tf === 'annual' ? i : Math.floor(i / periodsPerYear);
     const growthFactor = Math.pow(1 + noiGrowthRate, yearIndex);
 
     const periodNoi = (baseNoi * growthFactor) / periodsPerYear;
@@ -94,13 +95,22 @@ export async function getProjectCashflowTimeline(
 
     const cashAvailable = Math.max(0, periodNoi - periodDebtService - periodCapex - periodReserves);
 
-    const periodStart = new Date(2025, options.timeframe === 'annual' ? 0 : i % 12, 1);
-    periodStart.setFullYear(2025 + (options.timeframe === 'annual' ? i : Math.floor(i / 12)));
-    const periodEnd = new Date(periodStart);
-    if (options.timeframe === 'annual') {
-      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      periodEnd.setDate(periodEnd.getDate() - 1);
+    let periodStart: Date;
+    let periodEnd: Date;
+
+    if (tf === 'annual') {
+      periodStart = new Date(2025 + i, 0, 1);
+      periodEnd = new Date(2025 + i, 11, 31);
+    } else if (tf === 'quarterly') {
+      const quarterInYear = i % 4;
+      const startMonth = quarterInYear * 3;
+      periodStart = new Date(2025 + yearIndex, startMonth, 1);
+      periodEnd = new Date(2025 + yearIndex, startMonth + 3, 0);
     } else {
+      // monthly
+      periodStart = new Date(2025, i % 12, 1);
+      periodStart.setFullYear(2025 + Math.floor(i / 12));
+      periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 1);
       periodEnd.setDate(periodEnd.getDate() - 1);
     }
@@ -133,7 +143,7 @@ export async function getProjectCashflowTimeline(
       reservesCents: toCents(periodReserves),
       cashAvailableCents: toCents(cashAvailable),
       saleEvent,
-      warnings: i === 0 ? periodWarnings : [],
+      warnings: periodWarnings,
     });
   }
 

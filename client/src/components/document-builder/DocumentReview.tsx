@@ -197,13 +197,13 @@ const ExportCard: React.FC<ExportCardProps> = ({
   return (
     <button
       onClick={onSelect}
-      disabled={disabled || !option.available}
+      disabled={disabled}
       className={cn(
         'flex items-center gap-3 p-4 rounded-lg border transition-all text-left',
         selected
           ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
           : 'border-muted hover:border-muted-foreground/50',
-        (disabled || !option.available) && 'opacity-50 cursor-not-allowed'
+        disabled && 'opacity-50 cursor-not-allowed'
       )}
     >
       <div
@@ -217,11 +217,6 @@ const ExportCard: React.FC<ExportCardProps> = ({
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium">{option.label}</span>
-          {!option.available && (
-            <Badge variant="outline" className="text-xs">
-              Coming Soon
-            </Badge>
-          )}
         </div>
         <span className="text-sm text-muted-foreground">
           {option.description}
