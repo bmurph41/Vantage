@@ -2078,6 +2078,13 @@ function Router() {
           </GatedLayout>
         )}
       </Route>
+      <Route path="/analysis/projects/:id/report">
+        {(params) => (
+          <GatedLayout pack="analysis">
+            <ScProjectsReport {...params} />
+          </GatedLayout>
+        )}
+      </Route>
       <Route path="/analysis/projects/:id">
         {(params) => (
           <GatedLayout pack="analysis">
