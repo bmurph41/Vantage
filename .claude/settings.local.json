@@ -173,7 +173,8 @@
       "Bash(pkill -f 'node.*server')",
       "Bash(kill 14438)",
       "Bash(disown echo:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git -C /home/runner/workspace log --oneline --all)"
     ]
   }
 }

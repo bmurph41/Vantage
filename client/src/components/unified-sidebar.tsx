@@ -639,10 +639,12 @@ export default function UnifiedSidebar() {
         )}
 
         {/* Sidebar */}
-        <div 
+        <div
           className={cn(
             "bg-sidebar text-sidebar-foreground shadow-lg flex-shrink-0 flex flex-col h-screen",
-            "fixed md:static top-0 left-0 z-50",
+            // md:relative + md:z-[70] lifts the whole sidebar above the dialog overlay (z-50)
+            // so it stays readable when the upgrade modal is open
+            "fixed md:relative top-0 left-0 z-50 md:z-[70]",
             "transition-all duration-300 ease-in-out",
             "md:translate-x-0",
             mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
@@ -718,7 +720,7 @@ export default function UnifiedSidebar() {
       {/* Scrollable Navigation */}
       <nav className="flex-1 overflow-y-auto py-4" data-testid="sidebar-navigation" data-tour="sidebar-nav">
         {/* Dashboard Link */}
-        <div className="mb-4">
+        <div className={cn("mb-4", highlightActive && "sidebar-section-dimmed")}>
           <NavLink item={{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }} />
         </div>
         

@@ -195,9 +195,9 @@ export function SubscriptionPage() {
             </div>
           </div>
 
-          {/* Package cards */}
+          {/* Package cards — skip free Explorer tier, show only paid plans */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {SUBSCRIPTION_PACKAGES.map((pkg) => (
+            {SUBSCRIPTION_PACKAGES.filter(p => p.priceMonthly > 0).map((pkg) => (
               <PackageCard
                 key={pkg.id}
                 package={pkg}

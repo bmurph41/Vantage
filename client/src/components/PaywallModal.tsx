@@ -6,13 +6,14 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check, Sparkles, Lock, CreditCard, ArrowLeft, Shield, TrendingUp, Handshake, Anchor, Building2, Crown } from "lucide-react";
+import { Loader2, Check, Sparkles, Lock, CreditCard, ArrowLeft, Shield, TrendingUp, Handshake, Building2, Crown, Compass } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useStripeStatus } from "@/hooks/useStripeStatus";
 import { formatCurrency } from "@/lib/utils";
 import { ProvisioningAnimation } from "@/components/subscription/ProvisioningAnimation";
 import { useSidebarHighlight } from "@/contexts/SidebarHighlightContext";
 import { getNewlyUnlockedSectionIds } from "@/lib/tierSectionMap";
+import { cn } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════════════
 // TIER DEFINITIONS (mirrors server-side SUBSCRIPTION_TIERS)
@@ -21,9 +22,15 @@ import { getNewlyUnlockedSectionIds } from "@/lib/tierSectionMap";
 interface TierDef {
   slug: string;
   name: string;
+  tagline: string;
   description: string;
   monthlyPriceCents: number;
+  annualPriceCents: number; // per-year total
   icon: typeof TrendingUp;
+  accentClass: string;      // tailwind color class prefix
+  accentBg: string;         // bg for icon circle
+  accentText: string;       // text color for accent elements
+  accentBorder: string;     // border color
   packs: string[];
   features: string[];
   popular?: boolean;
@@ -33,49 +40,79 @@ interface TierDef {
 const TIERS: TierDef[] = [
   {
     slug: 'starter',
-    name: 'Starter',
-    description: 'Explore the platform with market news and sample analytics.',
+    name: 'Explorer',
+    tagline: 'Look around',
+    description: 'Get oriented with market news, sample analytics, and a taste of what Vantage can do.',
     monthlyPriceCents: 0,
-    icon: Sparkles,
+    annualPriceCents: 0,
+    icon: Compass,
+    accentClass: 'slate',
+    accentBg: 'bg-slate-100 dark:bg-slate-800',
+    accentText: 'text-slate-600 dark:text-slate-300',
+    accentBorder: 'border-slate-200 dark:border-slate-700',
     packs: [],
     features: ['Dashboard', 'The Docket', 'Marketplace (browse)', '3 sample comps', 'Demographics preview'],
   },
   {
     slug: 'investor',
-    name: 'Investor',
-    description: 'Full analysis and modeling tools for evaluating acquisitions.',
-    monthlyPriceCents: 9900,
+    name: 'Analyst',
+    tagline: 'Underwrite with confidence',
+    description: 'Institutional-grade modeling, comps, and market data to evaluate any deal.',
+    monthlyPriceCents: 8900,
+    annualPriceCents: 89000, // $890/yr = $74.17/mo effective (save $178)
     icon: TrendingUp,
+    accentClass: 'emerald',
+    accentBg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    accentText: 'text-emerald-600 dark:text-emerald-400',
+    accentBorder: 'border-emerald-200 dark:border-emerald-800',
     packs: ['modeling_tools', 'analysis', 'investor'],
-    features: ['Unlimited deal workspaces', 'Financial modeling (Pro Forma, DCF, Monte Carlo)', 'Exit Strategy Suite', 'Sales & Rate Comps (full)', 'Demographics & Capital Markets', 'Secure Data Room'],
+    features: ['Unlimited deal workspaces', 'Pro Forma, DCF & Monte Carlo', 'Exit Strategy Suite', 'Sales & Rate Comps (full)', 'Demographics & Capital Markets', 'Secure Data Room'],
   },
   {
     slug: 'broker',
     name: 'Broker',
-    description: 'Complete deal management toolkit for brokers and advisors.',
-    monthlyPriceCents: 19900,
+    tagline: 'Close more deals',
+    description: 'Win listings and manage your pipeline with CRM, prospecting, and marketing tools.',
+    monthlyPriceCents: 17900,
+    annualPriceCents: 179000, // $1,790/yr = $149.17/mo effective (save $358)
     icon: Handshake,
+    accentClass: 'blue',
+    accentBg: 'bg-blue-50 dark:bg-blue-950/40',
+    accentText: 'text-blue-600 dark:text-blue-400',
+    accentBorder: 'border-blue-200 dark:border-blue-800',
     packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'investor', 'broker'],
-    features: ['Everything in Investor', 'Full CRM & Deal Pipeline', 'Tasks, Follow-ups & Forecasting', 'Prospecting & Marketing', 'OM Builder & Investment Materials'],
+    features: ['Everything in Analyst', 'Full CRM — contacts, companies, properties', 'Deal Pipeline & Kanban board', 'Tasks, Follow-ups & Forecasting', 'Prospecting & Marketing suite', 'OM Builder & Due Diligence'],
     popular: true,
   },
   {
     slug: 'owner-operator',
-    name: 'Owner / Operator',
-    description: 'End-to-end marina management — deals, operations, and financials.',
-    monthlyPriceCents: 24900,
-    icon: Anchor,
+    name: 'Owner',
+    tagline: 'Run your assets',
+    description: 'End-to-end asset management — deals, tenants, operations, and financials.',
+    monthlyPriceCents: 26900,
+    annualPriceCents: 269000, // $2,690/yr = $224.17/mo effective (save $538)
+    icon: Building2,
+    accentClass: 'amber',
+    accentBg: 'bg-amber-50 dark:bg-amber-950/40',
+    accentText: 'text-amber-600 dark:text-amber-400',
+    accentBorder: 'border-amber-200 dark:border-amber-800',
     packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'operations', 'investor', 'broker', 'owner'],
-    features: ['Everything in Broker', 'Full Operations suite', 'Rent Roll management', 'Bookkeeping & Payroll', 'Portfolio Analytics'],
+    features: ['Everything in Broker', 'Full Operations suite', 'Tenant & Rent Roll management', 'Bookkeeping & Payroll', 'Portfolio Analytics', 'Revenue center tracking'],
   },
   {
     slug: 'institutional',
     name: 'Institutional',
-    description: 'Enterprise-grade platform for PE firms and institutional investors.',
-    monthlyPriceCents: 49900,
+    tagline: 'Manage the fund',
+    description: 'Enterprise-grade platform for PE firms, family offices, and fund managers.',
+    monthlyPriceCents: 44900,
+    annualPriceCents: 449000, // $4,490/yr = $374.17/mo effective (save $898)
     icon: Crown,
+    accentClass: 'violet',
+    accentBg: 'bg-violet-50 dark:bg-violet-950/40',
+    accentText: 'text-violet-600 dark:text-violet-400',
+    accentBorder: 'border-violet-200 dark:border-violet-800',
     packs: ['modeling_tools', 'analysis', 'crm_pipeline', 'prospecting', 'operations', 'fund_management', 'lp_portal', 'analytics_pro', 'investor', 'broker', 'owner'],
-    features: ['Everything in Owner / Operator', 'Fund Management', 'LP Portal', 'Analytics Pro', 'API access', 'Priority support'],
+    features: ['Everything in Owner', 'Fund Management — capital calls, distributions, NAV', 'LP Portal with investor statements', 'Analytics Pro — predictive & benchmarking', 'API access', 'Priority support & onboarding'],
     recommended: true,
   },
 ];
@@ -112,6 +149,14 @@ function formatPrice(cents: number): string {
   return formatCurrency(cents / 100);
 }
 
+function getAnnualMonthlyPrice(tier: TierDef): number {
+  return Math.round(tier.annualPriceCents / 12);
+}
+
+function getAnnualSavings(tier: TierDef): number {
+  return (tier.monthlyPriceCents * 12) - tier.annualPriceCents;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CARD ELEMENT STYLES
 // ═══════════════════════════════════════════════════════════════
@@ -134,17 +179,22 @@ interface InlinePaymentFormProps {
   tierSlug: string;
   tierName: string;
   priceCents: number;
+  billingCycle: 'monthly' | 'annual';
   onSuccess: () => void;
   onBack: () => void;
 }
 
-function InlinePaymentForm({ tierSlug, tierName, priceCents, onSuccess, onBack }: InlinePaymentFormProps) {
+function InlinePaymentForm({ tierSlug, tierName, priceCents, billingCycle, onSuccess, onBack }: InlinePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const [cardComplete, setCardComplete] = useState(false);
+
+  const displayPrice = billingCycle === 'annual'
+    ? formatPrice(Math.round(priceCents / 12))
+    : formatPrice(priceCents);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +222,7 @@ function InlinePaymentForm({ tierSlug, tierName, priceCents, onSuccess, onBack }
       const res = await apiRequest('POST', '/api/stripe/subscribe-pack', {
         packType: tierSlug, // The subscribe-pack endpoint handles tier lookup
         paymentMethodId: paymentMethod.id,
-        billingCycle: 'monthly',
+        billingCycle,
       });
 
       const data = await res.json();
@@ -207,9 +257,13 @@ function InlinePaymentForm({ tierSlug, tierName, priceCents, onSuccess, onBack }
       <div className="bg-muted/50 rounded-lg p-4">
         <div className="flex items-center justify-between mb-1">
           <span className="font-medium">{tierName}</span>
-          <span className="font-semibold">{formatPrice(priceCents)}/mo</span>
+          <span className="font-semibold">{displayPrice}/mo</span>
         </div>
-        <p className="text-xs text-muted-foreground">Billed monthly. Cancel anytime.</p>
+        <p className="text-xs text-muted-foreground">
+          {billingCycle === 'annual'
+            ? `Billed annually (${formatPrice(priceCents)}/year). Cancel anytime.`
+            : 'Billed monthly. Cancel anytime.'}
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -251,7 +305,7 @@ function InlinePaymentForm({ tierSlug, tierName, priceCents, onSuccess, onBack }
             Processing...
           </>
         ) : (
-          <>Subscribe for {formatPrice(priceCents)}/mo</>
+          <>Subscribe for {displayPrice}/mo</>
         )}
       </Button>
     </form>
@@ -276,6 +330,7 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
   const { toast } = useToast();
   const { isStripeConfigured, publishableKey } = useStripeStatus();
   const [view, setView] = useState<ModalView>('info');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const { setHighlight, clearHighlight } = useSidebarHighlight();
 
   // Determine the minimum tier needed for this pack
@@ -294,7 +349,6 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
   );
 
   // Trigger sidebar glow highlight when modal opens — only newly unlocked sections
-  // Uses the user's actual active pack types to compute what they already have access to.
   useEffect(() => {
     if (open) {
       const newIds = getNewlyUnlockedSectionIds(recommendedTier.slug, currentActivePacks);
@@ -366,134 +420,211 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
     onOpenChange(isOpen);
   };
 
-  const priceCents = recommendedTier.monthlyPriceCents;
-  const priceStr = priceCents > 0 ? formatPrice(priceCents) : 'Free';
+  // Price calculations
+  const monthlyPriceCents = recommendedTier.monthlyPriceCents;
+  const annualPriceCents = recommendedTier.annualPriceCents;
+  const effectiveMonthlyCents = billingCycle === 'annual'
+    ? getAnnualMonthlyPrice(recommendedTier)
+    : monthlyPriceCents;
+  const savingsCents = getAnnualSavings(recommendedTier);
+  const isPaid = monthlyPriceCents > 0;
+
+  // For payment form
+  const paymentPriceCents = billingCycle === 'annual' ? annualPriceCents : monthlyPriceCents;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-md"
+        className="sm:max-w-md p-0 overflow-hidden"
         data-testid="dialog-paywall"
         onInteractOutside={(e) => view === 'provisioning' && e.preventDefault()}
       >
         {/* ── INFO VIEW ── */}
         {view === 'info' && (
-          <>
-            <DialogHeader className="text-center">
-              <div className="mx-auto mb-4 p-4 rounded-full bg-primary/10">
-                <TierIcon className="h-8 w-8 text-primary" />
-              </div>
-              <DialogTitle className="text-xl" data-testid="text-paywall-title">
-                {featureName
-                  ? `Upgrade to unlock ${featureName}`
-                  : `Upgrade to ${recommendedTier.name}`}
-              </DialogTitle>
-              <DialogDescription data-testid="text-paywall-description">
-                {recommendedTier.description}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              {/* Price */}
-              {priceCents > 0 && (
-                <div className="text-center">
-                  <span className="text-4xl font-bold">{priceStr}</span>
-                  <span className="text-muted-foreground">/month</span>
+          <div className="flex flex-col">
+            {/* Role-colored header band */}
+            <div className={cn(
+              "px-6 pt-6 pb-5",
+              recommendedTier.accentBg,
+            )}>
+              <div className="flex items-start gap-4">
+                <div className={cn(
+                  "p-3 rounded-xl border",
+                  recommendedTier.accentBorder,
+                  "bg-white/80 dark:bg-white/10"
+                )}>
+                  <TierIcon className={cn("h-6 w-6", recommendedTier.accentText)} />
                 </div>
-              )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="text-lg font-bold" data-testid="text-paywall-title">
+                      {recommendedTier.name}
+                    </h2>
+                    {recommendedTier.popular && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500 text-white uppercase tracking-wider">
+                        Popular
+                      </span>
+                    )}
+                    {recommendedTier.recommended && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-500 text-white uppercase tracking-wider">
+                        Best Value
+                      </span>
+                    )}
+                  </div>
+                  <p className={cn("text-xs font-medium mb-1", recommendedTier.accentText)}>
+                    {recommendedTier.tagline}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-paywall-description">
+                    {featureName
+                      ? `Upgrade to ${recommendedTier.name} to unlock ${featureName} and more.`
+                      : recommendedTier.description}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-              {/* Tier badge */}
-              {recommendedTier.popular && (
-                <div className="flex justify-center">
-                  <span className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    <Sparkles className="h-3 w-3" />
-                    Most Popular
-                  </span>
+            <div className="px-6 py-5 space-y-5">
+              {/* Billing cycle toggle + price */}
+              {isPaid && (
+                <div className="space-y-3">
+                  {/* Toggle */}
+                  <div className="flex items-center justify-center">
+                    <div className="inline-flex items-center bg-muted rounded-lg p-0.5 text-sm">
+                      <button
+                        onClick={() => setBillingCycle('monthly')}
+                        className={cn(
+                          "px-3.5 py-1.5 rounded-md font-medium transition-all text-xs",
+                          billingCycle === 'monthly'
+                            ? "bg-background shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        onClick={() => setBillingCycle('annual')}
+                        className={cn(
+                          "px-3.5 py-1.5 rounded-md font-medium transition-all text-xs flex items-center gap-1.5",
+                          billingCycle === 'annual'
+                            ? "bg-background shadow-sm text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Annual
+                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                          Save {formatPrice(savingsCents / 100)}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Price display */}
+                  <div className="text-center">
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold tracking-tight">
+                        {formatPrice(effectiveMonthlyCents / 100)}
+                      </span>
+                      <span className="text-muted-foreground text-sm">/month</span>
+                    </div>
+                    {billingCycle === 'annual' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Billed as {formatPrice(annualPriceCents / 100)}/year
+                        <span className="mx-1.5">·</span>
+                        <span className="line-through opacity-60">{formatPrice(monthlyPriceCents / 100)}/mo</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Features */}
               <div className="space-y-2">
-                <h4 className="font-medium text-sm text-muted-foreground">What you'll get:</h4>
-                <ul className="space-y-2">
+                <h4 className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Included</h4>
+                <ul className="space-y-1.5">
                   {recommendedTier.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <li key={idx} className="flex items-start gap-2.5 text-sm">
+                      <Check className={cn("h-4 w-4 mt-0.5 flex-shrink-0", recommendedTier.accentText)} />
                       <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              {/* Primary CTA */}
-              {isStripeConfigured && stripePromise && priceCents > 0 ? (
+              {/* CTAs */}
+              <div className="flex flex-col gap-2 pt-1">
+                {/* Primary CTA */}
+                {isStripeConfigured && stripePromise && isPaid ? (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => setView('payment')}
+                    data-testid="button-subscribe"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Subscribe — {formatPrice(effectiveMonthlyCents / 100)}/mo
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={handleSubscribe}
+                    disabled={subscribeMutation.isPending}
+                    data-testid="button-subscribe"
+                  >
+                    {subscribeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Activate {recommendedTier.name}
+                  </Button>
+                )}
+
+                {/* Trial */}
                 <Button
+                  variant="outline"
                   className="w-full"
-                  size="lg"
-                  onClick={() => setView('payment')}
-                  data-testid="button-subscribe"
-                >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Subscribe to {recommendedTier.name} — {priceStr}/mo
-                </Button>
-              ) : (
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={handleSubscribe}
+                  onClick={handleStartTrial}
                   disabled={subscribeMutation.isPending}
-                  data-testid="button-subscribe"
+                  data-testid="button-trial"
                 >
-                  {subscribeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Activate {recommendedTier.name}
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Start 14-Day Free Trial
                 </Button>
-              )}
 
-              {/* Trial */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleStartTrial}
-                disabled={subscribeMutation.isPending}
-                data-testid="button-trial"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Start 14-Day Free Trial
-              </Button>
-
-              {/* View all plans */}
-              <Button
-                variant="ghost"
-                className="w-full text-xs"
-                onClick={() => { setLocation('/pricing'); onOpenChange(false); }}
-              >
-                Compare all plans
-              </Button>
+                {/* View all plans */}
+                <Button
+                  variant="ghost"
+                  className="w-full text-xs"
+                  onClick={() => { setLocation('/pricing'); onOpenChange(false); }}
+                >
+                  Compare all plans
+                </Button>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* ── PAYMENT VIEW ── */}
         {view === 'payment' && stripePromise && (
-          <Elements stripe={stripePromise}>
-            <InlinePaymentForm
-              tierSlug={recommendedTier.slug}
-              tierName={recommendedTier.name}
-              priceCents={priceCents}
-              onSuccess={handlePaymentSuccess}
-              onBack={() => setView('info')}
-            />
-          </Elements>
+          <div className="p-6">
+            <Elements stripe={stripePromise}>
+              <InlinePaymentForm
+                tierSlug={recommendedTier.slug}
+                tierName={recommendedTier.name}
+                priceCents={paymentPriceCents}
+                billingCycle={billingCycle}
+                onSuccess={handlePaymentSuccess}
+                onBack={() => setView('info')}
+              />
+            </Elements>
+          </div>
         )}
 
         {/* ── PROVISIONING VIEW ── */}
         {view === 'provisioning' && (
-          <ProvisioningAnimation
-            packName={recommendedTier.name}
-            onComplete={handleProvisioningComplete}
-          />
+          <div className="p-6">
+            <ProvisioningAnimation
+              packName={recommendedTier.name}
+              onComplete={handleProvisioningComplete}
+            />
+          </div>
         )}
       </DialogContent>
     </Dialog>
