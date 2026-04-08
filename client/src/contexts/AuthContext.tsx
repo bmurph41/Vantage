@@ -93,6 +93,7 @@ interface User {
   role: Role;
   orgId: string;
   orgName?: string;
+  ssoProvider?: string | null;
 }
 
 interface AuthContextValue {

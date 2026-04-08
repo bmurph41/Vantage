@@ -33,6 +33,8 @@ interface UserMenuProps {
     name: string;
     email: string;
     avatarUrl?: string;
+    orgId?: string;
+    ssoProvider?: string | null;
   };
 }
 
@@ -53,6 +55,11 @@ export function UserMenu({ user }: UserMenuProps) {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
+      if (user.ssoProvider && user.orgId) {
+        window.location.href = `/api/auth/saml/${user.orgId}/logout`;
+        return;
+      }
+
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
@@ -62,7 +69,6 @@ export function UserMenu({ user }: UserMenuProps) {
         throw new Error('Sign out failed');
       }
 
-      // Redirect to login
       window.location.href = '/login';
     } catch (error) {
       toast({

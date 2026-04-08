@@ -1301,6 +1301,8 @@ export default function UnifiedSidebar() {
                   name: user.name || user.email?.split('@')[0] || 'User',
                   email: user.email || '',
                   avatarUrl: user.avatarUrl,
+                  orgId: user.orgId,
+                  ssoProvider: user.ssoProvider,
                 }}
               />
             )}

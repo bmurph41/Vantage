@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
+import type { RequestWithUser, AuthenticateOptions } from '@node-saml/passport-saml';
 import { enterpriseAuthService, type DeviceInfo } from '../services/enterprise-auth-service';
 import { samlPassportService } from '../services/saml-passport-service';
 import { db } from '../db';
@@ -599,6 +600,7 @@ router.get('/me', async (req: Request, res: Response) => {
             role: user.role,
             orgId: user.orgId,
             orgName: org?.name || 'Unknown Organization',
+            ssoProvider: user.ssoProvider || null,
           });
         }
       }
@@ -770,6 +772,75 @@ router.post('/saml/callback/:orgId',
     res.redirect('/');
   }
 );
+
+router.get('/saml/:orgId/logout', requireSession, async (req: Request, res: Response, next: NextFunction) => {
+  const { orgId } = req.params;
+
+  if (req.user!.orgId !== orgId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const strategy = await samlPassportService.getOrInitializeStrategy(orgId);
+  if (!strategy) {
+    return res.status(400).json({ error: 'SSO not configured for this organization' });
+  }
+
+  const userRecord = await db.query.users.findFirst({
+    where: eq(users.id, req.user!.id),
+  });
+
+  if (!userRecord?.ssoSubjectId) {
+    res.clearCookie('sessionToken', { httpOnly: true, sameSite: 'lax', path: '/' });
+    return res.redirect('/login?loggedOut=true');
+  }
+
+  const samlUser = {
+    nameID: userRecord.ssoSubjectId,
+    nameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+  };
+
+  const reqWithSamlUser = Object.assign(req, { user: samlUser }) as RequestWithUser;
+
+  strategy.logout(reqWithSamlUser, (err, requestUrl) => {
+    if (err || !requestUrl) {
+      logger.error({ err, orgId }, 'Failed to generate SAML logout request — falling back to local logout');
+      res.clearCookie('sessionToken', { httpOnly: true, sameSite: 'lax', path: '/' });
+      return res.redirect('/login?loggedOut=true');
+    }
+    res.clearCookie('sessionToken', { httpOnly: true, sameSite: 'lax', path: '/' });
+    return res.redirect(requestUrl);
+  });
+});
+
+async function handleSloCallback(req: Request, res: Response, next: NextFunction) {
+  const { orgId } = req.params;
+
+  const strategy = await samlPassportService.getOrInitializeStrategy(orgId);
+  if (!strategy) {
+    return res.redirect('/login?error=sso_not_configured');
+  }
+
+  const authOptions: AuthenticateOptions = {
+    samlFallback: 'logout-request',
+    failureRedirect: '/login?error=slo_failed',
+  };
+
+  passport.authenticate(`saml-${orgId}`, authOptions)(req, res, (err: Error | null) => {
+    if (err) {
+      logger.error({ err, orgId }, 'SAML SLO callback error');
+    }
+    res.clearCookie('sessionToken', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production' || !!process.env.REPLIT_DEV_DOMAIN,
+      path: '/',
+    });
+    return res.redirect('/login?loggedOut=true');
+  });
+}
+
+router.post('/saml/:orgId/slo', handleSloCallback);
+router.get('/saml/:orgId/slo', handleSloCallback);
 
 router.get('/saml/metadata/:orgId', async (req: Request, res: Response) => {
   const { orgId } = req.params;

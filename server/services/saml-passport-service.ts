@@ -1,7 +1,7 @@
 import passport from 'passport';
 import { Strategy as SamlStrategy, Profile, VerifiedCallback } from '@node-saml/passport-saml';
 import { db } from '../db';
-import { ssoConfigurations, organizations } from '@shared/schema';
+import { ssoConfigurations, organizations, userSessions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { enterpriseAuthService, type DeviceInfo } from './enterprise-auth-service';
 import { logger } from '../lib/logger';
@@ -66,6 +66,8 @@ export class SamlPassportService {
           wantAssertionsSigned: samlConfig.wantAssertionsSigned,
           signatureAlgorithm: samlConfig.signatureAlgorithm,
           passReqToCallback: true,
+          logoutUrl: config.sloUrl ?? undefined,
+          logoutCallbackUrl: `${this.baseCallbackUrl}/api/auth/saml/${orgId}/slo`,
         },
         async (req: Request, profile: Profile | null, done: VerifiedCallback) => {
           try {
@@ -131,7 +133,23 @@ export class SamlPassportService {
           }
         },
         async (profile: Profile | null, done: VerifiedCallback) => {
-          done(new Error('Logout callback not implemented'));
+          try {
+            if (!profile || !profile.nameID) {
+              return done(null, {});
+            }
+            const nameId = profile.nameID;
+            const userRecord = await db.query.users.findFirst({
+              where: (u, { eq: eqFn }) => eqFn(u.ssoSubjectId, nameId)
+            });
+            if (userRecord) {
+              await db.delete(userSessions).where(eq(userSessions.userId, userRecord.id));
+              logger.info({ userId: userRecord.id, nameId }, 'SAML SLO: invalidated all sessions for user');
+            }
+            return done(null, profile);
+          } catch (error) {
+            logger.error({ error }, 'SAML logout callback error');
+            return done(error as Error);
+          }
         }
       );
 
