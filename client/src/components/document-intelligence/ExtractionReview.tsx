@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, AlertCircle, HelpCircle, Edit2, ChevronDown, ChevronRight, Download, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,12 @@ interface Scenario {
   scenario_type: string;
 }
 
+interface ValidationWarning {
+  rule: string;
+  message: string;
+  severity: 'warning' | 'error';
+}
+
 interface Props {
   jobId: string;
   projectId?: string;
@@ -53,6 +59,18 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [showScenarioPicker, setShowScenarioPicker] = useState(false);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+  const scenarioPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showScenarioPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (scenarioPickerRef.current && !scenarioPickerRef.current.contains(e.target as Node)) {
+        setShowScenarioPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showScenarioPicker]);
 
   const { data: scenarios = [] } = useQuery<Scenario[]>({
     queryKey: ['scenarios-for-extraction', projectId],
@@ -62,12 +80,14 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
     enabled: !!projectId,
   });
 
-  const { data: fields = [], isLoading } = useQuery<ExtractionField[]>({
+  const { data: fieldsData, isLoading } = useQuery<{ fields: ExtractionField[]; warnings: ValidationWarning[] }>({
     queryKey: ['extraction-fields', jobId],
     queryFn: () =>
       fetch(`/api/v1/document-extraction/${jobId}/fields`, { credentials: 'include' }).then(r => r.json()),
     refetchInterval: 3000
   });
+  const fields = fieldsData?.fields ?? [];
+  const warnings = fieldsData?.warnings ?? [];
 
   const updateField = useMutation({
     mutationFn: async ({ fieldId, ...body }: { fieldId: string; override_value?: number; is_confirmed?: boolean }) => {
@@ -200,7 +220,7 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
             Accept All High Confidence
           </button>
           {onPopulate && confirmedCount > 0 && (
-            <div className="relative">
+            <div className="relative" ref={scenarioPickerRef}>
               <button
                 onClick={() => {
                   if (!projectId) {
@@ -246,6 +266,21 @@ export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
           )}
         </div>
       </div>
+
+      {/* Validation warnings */}
+      {warnings.length > 0 && (
+        <div className="px-6 py-3 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1.5">Validation Warnings</p>
+          <ul className="space-y-1">
+            {warnings.map((w) => (
+              <li key={w.rule} className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Field groups */}
       <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">

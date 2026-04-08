@@ -52,7 +52,8 @@ import {
   MoreHorizontal,
   FolderInput,
   EyeOff,
-  Undo2
+  Undo2,
+  Brain
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -993,6 +994,12 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
           <Button variant="outline" size="sm" onClick={exportProForma}>
             <Download className="h-4 w-4 mr-2" />
             Export
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/document-intelligence/${projectId}`}>
+              <Brain className="h-4 w-4 mr-2" />
+              Extract Document
+            </a>
           </Button>
           <ExportPdfButton contentRef={pdfRef} filename="pro-forma-projections" title="Pro Forma Projections" />
         </div>

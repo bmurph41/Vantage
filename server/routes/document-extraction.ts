@@ -14,6 +14,31 @@ async function cleanupFile(filePath: string) {
   try { await fs.unlink(filePath); } catch {}
 }
 
+// Default confidence thresholds — can be overridden per org
+const DEFAULT_CONFIDENCE_THRESHOLDS = { high: 0.85, medium: 0.65 };
+
+// Ensure org config table exists (idempotent)
+pool.query(`
+  CREATE TABLE IF NOT EXISTS extraction_org_config (
+    org_id VARCHAR PRIMARY KEY,
+    confidence_high NUMERIC NOT NULL DEFAULT 0.85,
+    confidence_medium NUMERIC NOT NULL DEFAULT 0.65,
+    updated_at TIMESTAMP DEFAULT NOW()
+  )
+`).catch(() => {});
+
+async function getOrgThresholds(orgId: string): Promise<{ high: number; medium: number }> {
+  const result = await pool.query(
+    'SELECT confidence_high, confidence_medium FROM extraction_org_config WHERE org_id=$1',
+    [orgId]
+  );
+  if (result.rows.length === 0) return DEFAULT_CONFIDENCE_THRESHOLDS;
+  return {
+    high: parseFloat(result.rows[0].confidence_high),
+    medium: parseFloat(result.rows[0].confidence_medium),
+  };
+}
+
 // ─── Entitlement limits by tier ─────────────────────────────────────────────
 const MONTHLY_UPLOAD_LIMITS: Record<string, number> = {
   analyst: 0,
@@ -86,7 +111,7 @@ router.post('/upload', upload.single('document'), async (req: any, res: any) => 
 
     const jobId = jobResult.rows[0].id;
 
-    processDocument(jobId, file.path, file.originalname, hintClass)
+    processDocument(jobId, file.path, file.originalname, hintClass, orgId)
       .then(() => cleanupFile(file.path))
       .catch(err => {
         cleanupFile(file.path);
@@ -146,7 +171,8 @@ router.get('/:jobId/fields', async (req: any, res: any) => {
     ORDER BY field_group, schema_key
   `, [jobId]);
 
-  res.json(fields.rows);
+  const warnings = validateExtractionFields(fields.rows);
+  res.json({ fields: fields.rows, warnings });
 });
 
 // ─── PATCH /:jobId/fields/:fieldId ──────────────────────────────────────────
@@ -281,6 +307,40 @@ router.get('/history', async (req: any, res: any) => {
   res.json(result.rows);
 });
 
+// ─── GET /config — get org extraction config ────────────────────────────────
+router.get('/config', async (req: any, res: any) => {
+  const user = req.user || req.resolvedUser;
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const orgId = user.orgId || user.org_id;
+  const thresholds = await getOrgThresholds(orgId);
+  res.json({ confidence_thresholds: thresholds });
+});
+
+// ─── PUT /config — update org extraction config ─────────────────────────────
+router.put('/config', async (req: any, res: any) => {
+  const user = req.user || req.resolvedUser;
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const orgId = user.orgId || user.org_id;
+  const { confidence_high, confidence_medium } = req.body;
+
+  const high = parseFloat(confidence_high);
+  const medium = parseFloat(confidence_medium);
+
+  if (isNaN(high) || isNaN(medium) || high <= medium || high > 1 || medium < 0) {
+    return res.status(400).json({ error: 'Invalid thresholds. high must be > medium, both between 0 and 1.' });
+  }
+
+  await pool.query(`
+    INSERT INTO extraction_org_config (org_id, confidence_high, confidence_medium, updated_at)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (org_id) DO UPDATE SET confidence_high=$2, confidence_medium=$3, updated_at=NOW()
+  `, [orgId, high, medium]);
+
+  res.json({ success: true, confidence_thresholds: { high, medium } });
+});
+
 // ─── POST /:jobId/rerun — re-run Claude on same document ────────────────────
 router.post('/:jobId/rerun', async (req: any, res: any) => {
   const user = req.user || req.resolvedUser;
@@ -306,7 +366,7 @@ router.post('/:jobId/rerun', async (req: any, res: any) => {
   `, [jobId]);
   await pool.query('DELETE FROM extraction_fields WHERE job_id=$1', [jobId]);
 
-  processDocument(jobId, j.storage_path, j.original_filename, j.document_class)
+  processDocument(jobId, j.storage_path, j.original_filename, j.document_class, orgId)
     .then(() => cleanupFile(j.storage_path))
     .catch(err => {
       cleanupFile(j.storage_path);
@@ -338,13 +398,140 @@ router.get('/scenarios/:projectId', async (req: any, res: any) => {
   res.json(result.rows);
 });
 
+// ─── BUSINESS RULE VALIDATION ────────────────────────────────────────────────
+
+interface ValidationWarning {
+  rule: string;
+  message: string;
+  expected: number | null;
+  actual: number | null;
+  severity: 'warning' | 'error';
+}
+
+function validateExtractionFields(fields: any[]): ValidationWarning[] {
+  const warnings: ValidationWarning[] = [];
+  const val = (key: string): number | null => {
+    const f = fields.find((r: any) => r.schema_key === key);
+    if (!f) return null;
+    const v = f.override_value ?? f.normalized_value;
+    return v !== null && v !== undefined ? parseFloat(v) : null;
+  };
+
+  const TOLERANCE = 0.02; // 2% tolerance for rounding
+
+  function checkSum(totalKey: string, totalLabel: string, componentKeys: string[], componentLabel: string) {
+    const total = val(totalKey);
+    if (total === null) return;
+    const components = componentKeys.map(val).filter((v): v is number => v !== null);
+    if (components.length < 2) return;
+    const sum = components.reduce((a, b) => a + b, 0);
+    if (Math.abs(total) > 0 && Math.abs(total - sum) / Math.abs(total) > TOLERANCE) {
+      warnings.push({
+        rule: `${totalKey}_sum_check`,
+        message: `${totalLabel} ($${total.toLocaleString()}) differs from sum of ${componentLabel} ($${sum.toLocaleString()}) by more than 2%`,
+        expected: total,
+        actual: sum,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Total Revenue = EGI + Total Other Income
+  checkSum('total_revenue', 'Total Revenue',
+    ['effective_gross_income', 'total_other_income'], 'EGI + Other Income');
+
+  // EGI = GPR - Vacancy - Concessions - Bad Debt
+  const gpr = val('gross_potential_rent');
+  const vacancy = val('vacancy_loss');
+  const concessions = val('concessions');
+  const badDebt = val('bad_debt');
+  const egi = val('effective_gross_income');
+  if (gpr !== null && egi !== null) {
+    const computed = gpr - Math.abs(vacancy || 0) - Math.abs(concessions || 0) - Math.abs(badDebt || 0);
+    if (Math.abs(egi) > 0 && Math.abs(egi - computed) / Math.abs(egi) > TOLERANCE) {
+      warnings.push({
+        rule: 'egi_calculation_check',
+        message: `EGI ($${egi.toLocaleString()}) differs from GPR minus deductions ($${computed.toLocaleString()})`,
+        expected: egi,
+        actual: computed,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // NOI = Total Revenue - Total OpEx
+  checkSum('net_operating_income', 'NOI',
+    ['total_revenue', 'total_operating_expenses'], 'Revenue - OpEx');
+  // For NOI, it's revenue minus expenses, so override the generic sum check
+  const totalRev = val('total_revenue');
+  const totalOpex = val('total_operating_expenses');
+  const noi = val('net_operating_income');
+  if (totalRev !== null && totalOpex !== null && noi !== null) {
+    // Remove the generic sum check we just added and replace with subtraction
+    const idx = warnings.findIndex(w => w.rule === 'net_operating_income_sum_check');
+    if (idx >= 0) warnings.splice(idx, 1);
+    const computed = totalRev - Math.abs(totalOpex);
+    if (Math.abs(noi) > 0 && Math.abs(noi - computed) / Math.abs(noi) > TOLERANCE) {
+      warnings.push({
+        rule: 'noi_calculation_check',
+        message: `NOI ($${noi.toLocaleString()}) differs from Revenue minus OpEx ($${computed.toLocaleString()})`,
+        expected: noi,
+        actual: computed,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Total OpEx = sum of expense line items
+  checkSum('total_operating_expenses', 'Total Operating Expenses',
+    ['management_fees', 'payroll', 'repairs_maintenance', 'contract_services',
+     'utilities', 'insurance', 'real_estate_taxes', 'landscaping',
+     'administrative', 'advertising_marketing', 'reserves'],
+    'expense line items');
+
+  // Rent Roll: occupied + vacant = total
+  const totalUnits = val('total_units');
+  const occupied = val('occupied_units');
+  const vacant = val('vacant_units');
+  if (totalUnits !== null && occupied !== null && vacant !== null) {
+    if (Math.abs(totalUnits - (occupied + vacant)) > 0.5) {
+      warnings.push({
+        rule: 'unit_count_check',
+        message: `Total units (${totalUnits}) does not equal occupied (${occupied}) + vacant (${vacant})`,
+        expected: totalUnits,
+        actual: occupied + vacant,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Occupancy rate cross-check
+  const occRate = val('occupancy_rate');
+  if (occRate !== null && totalUnits !== null && occupied !== null && totalUnits > 0) {
+    const computed = (occupied / totalUnits) * 100;
+    const rateNormalized = occRate > 1 ? occRate : occRate * 100;
+    if (Math.abs(rateNormalized - computed) > 2) {
+      warnings.push({
+        rule: 'occupancy_rate_check',
+        message: `Occupancy rate (${rateNormalized.toFixed(1)}%) doesn't match occupied/total (${computed.toFixed(1)}%)`,
+        expected: rateNormalized,
+        actual: computed,
+        severity: 'warning',
+      });
+    }
+  }
+
+  return warnings;
+}
+
 // ─── ASYNC PROCESSING PIPELINE ───────────────────────────────────────────────
 
 async function processDocument(
   jobId: string,
   filePath: string,
   filename: string,
-  hintClass?: string
+  hintClass?: string,
+  orgId?: string
 ) {
   await pool.query(
     `UPDATE document_extraction_jobs SET status='parsing', parsing_started_at=NOW() WHERE id=$1`,
@@ -388,13 +575,15 @@ async function processDocument(
     [docClass, jobId]
   );
 
+  const thresholds = orgId ? await getOrgThresholds(orgId) : DEFAULT_CONFIDENCE_THRESHOLDS;
+
   let extractionResult: any;
   if (docClass === 'pl' || docClass === 't12') {
     extractionResult = await extractPL(fullText, tablesFormatted, filename);
-    await saveExtractionFields(jobId, extractionResult, 'pl');
+    await saveExtractionFields(jobId, extractionResult, 'pl', thresholds);
   } else if (docClass === 'rent_roll') {
     extractionResult = await extractRentRoll(fullText, tablesFormatted, filename);
-    await saveExtractionFields(jobId, extractionResult, 'rent_roll');
+    await saveExtractionFields(jobId, extractionResult, 'rent_roll', thresholds);
   }
 
   await pool.query(
@@ -405,7 +594,13 @@ async function processDocument(
   );
 }
 
-async function saveExtractionFields(jobId: string, result: any, docType: 'pl' | 'rent_roll') {
+async function saveExtractionFields(
+  jobId: string,
+  result: any,
+  docType: 'pl' | 'rent_roll',
+  orgConfidenceThresholds?: { high: number; medium: number }
+) {
+  const thresholds = orgConfidenceThresholds || { high: 0.85, medium: 0.65 };
   const fields = flattenExtractionResult(
     result.data || {},
     result.confidence_scores || {},
@@ -413,26 +608,40 @@ async function saveExtractionFields(jobId: string, result: any, docType: 'pl' | 
     docType
   );
 
-  for (const field of fields) {
+  if (fields.length === 0) return;
+
+  // Batch insert — build a single multi-row INSERT
+  const COLS = 14;
+  const values: any[] = [];
+  const placeholders: string[] = [];
+
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
     const confidenceLevel =
-      field.confidence_score >= 0.85 ? 'high'
-      : field.confidence_score >= 0.65 ? 'medium'
+      field.confidence_score >= thresholds.high ? 'high'
+      : field.confidence_score >= thresholds.medium ? 'medium'
       : 'low';
 
-    await pool.query(`
-      INSERT INTO extraction_fields 
-        (job_id, schema_key, display_label, field_group, raw_value, normalized_value,
-         value_type, confidence_score, confidence_level, source_page, source_sheet,
-         source_row, source_snippet, proforma_field_key)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-    `, [
+    const offset = i * COLS;
+    placeholders.push(
+      `($${offset+1},$${offset+2},$${offset+3},$${offset+4},$${offset+5},$${offset+6},$${offset+7},$${offset+8},$${offset+9},$${offset+10},$${offset+11},$${offset+12},$${offset+13},$${offset+14})`
+    );
+    values.push(
       jobId, field.schema_key, field.display_label, field.field_group,
       field.raw_value, field.normalized_value, field.value_type,
       field.confidence_score, confidenceLevel,
       field.source_page, field.source_sheet, field.source_row,
       field.source_snippet, field.proforma_field_key
-    ]);
+    );
   }
+
+  await pool.query(`
+    INSERT INTO extraction_fields
+      (job_id, schema_key, display_label, field_group, raw_value, normalized_value,
+       value_type, confidence_score, confidence_level, source_page, source_sheet,
+       source_row, source_snippet, proforma_field_key)
+    VALUES ${placeholders.join(',\n           ')}
+  `, values);
 }
 
 export default router;

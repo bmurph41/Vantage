@@ -136,13 +136,17 @@ export default function DocumentIntelligencePage({ projectId }: Props) {
           </div>
         </div>
       ) : (
-        <ExtractionHistory projectId={projectId} />
+        <ExtractionHistory projectId={projectId} onSelectJob={(id, status) => {
+          setJobId(id);
+          setJobStatus(status);
+          setView('upload');
+        }} />
       )}
     </div>
   );
 }
 
-function ExtractionHistory({ projectId }: { projectId?: string }) {
+function ExtractionHistory({ projectId, onSelectJob }: { projectId?: string; onSelectJob: (jobId: string, status: string) => void }) {
   const qs = projectId ? `?project_id=${projectId}` : '';
   const { data: jobs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/v1/document-extraction/history', projectId],
@@ -182,7 +186,11 @@ function ExtractionHistory({ projectId }: { projectId?: string }) {
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-3xl mx-auto space-y-2">
         {jobs.map((job: any) => (
-          <div key={job.id} className="flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div
+            key={job.id}
+            onClick={() => onSelectJob(job.id, job.status)}
+            className="flex items-center gap-4 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer"
+          >
             <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
               {job.document_class === 'rent_roll' ? (
                 <Table2 className="w-4 h-4 text-slate-500" />
