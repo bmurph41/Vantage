@@ -24158,6 +24158,121 @@ Current context: Project ${req.params.projectId}`;
     }
   });
 
+  // ─── Manual Actuals CRUD (ad-hoc line items in Pro Forma) ──────────────
+
+  // Create a manual actuals line item (spread evenly across 12 months)
+  app.post('/api/modeling/projects/:projectId/actuals/manual', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { category, subcategory, department, annualAmount, year } = req.body;
+
+      if (!category || !subcategory || annualAmount === undefined || !year) {
+        return res.status(400).json({ error: 'category, subcategory, annualAmount, and year are required' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const monthlyAmount = (parseFloat(annualAmount) / 12).toFixed(2);
+      const { inferDepartment } = await import('./utils/department-mapping');
+      const dept = department || inferDepartment(subcategory, category);
+      const lineDesc = `${dept}: ${subcategory}`;
+      const inserted: string[] = [];
+
+      for (let month = 1; month <= 12; month++) {
+        const result = await pool.query(`
+          INSERT INTO modeling_actuals
+            (id, org_id, modeling_project_id, year, month, category, subcategory, department,
+             line_item_description, amount, data_source, source_record_type, created_at, updated_at, synced_at)
+          VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, 'manual_entry', 'ad_hoc', NOW(), NOW(), NOW())
+          ON CONFLICT (modeling_project_id, year, month, category, subcategory, line_item_description)
+          DO UPDATE SET amount = EXCLUDED.amount, department = EXCLUDED.department, updated_at = NOW()
+          RETURNING id
+        `, [orgId, projectId, year, month, category, subcategory, dept, lineDesc, monthlyAmount]);
+        if (result.rows[0]) inserted.push(result.rows[0].id);
+      }
+
+      res.json({ success: true, inserted: inserted.length, subcategory, category, department: dept, year });
+    } catch (error: any) {
+      console.error('Failed to create manual actuals:', error);
+      res.status(500).json({ error: 'Failed to create manual line item' });
+    }
+  });
+
+  // Update a manual actuals line item amount (updates all 12 months)
+  app.put('/api/modeling/projects/:projectId/actuals/manual', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { category, subcategory, annualAmount, year, monthlyAmounts } = req.body;
+
+      if (!category || !subcategory || !year) {
+        return res.status(400).json({ error: 'category, subcategory, and year are required' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      if (monthlyAmounts && typeof monthlyAmounts === 'object') {
+        // Update individual months
+        for (const [monthStr, amount] of Object.entries(monthlyAmounts)) {
+          const month = parseInt(monthStr, 10);
+          if (month < 1 || month > 12) continue;
+          await pool.query(`
+            UPDATE modeling_actuals SET amount = $1, updated_at = NOW()
+            WHERE modeling_project_id = $2 AND org_id = $3
+              AND year = $4 AND month = $5
+              AND category = $6 AND subcategory = $7
+              AND data_source = 'manual_entry'
+          `, [parseFloat(amount as string).toFixed(2), projectId, orgId, year, month, category, subcategory]);
+        }
+      } else if (annualAmount !== undefined) {
+        // Spread annual amount evenly across 12 months
+        const monthlyAmount = (parseFloat(annualAmount) / 12).toFixed(2);
+        await pool.query(`
+          UPDATE modeling_actuals SET amount = $1, updated_at = NOW()
+          WHERE modeling_project_id = $2 AND org_id = $3
+            AND year = $4 AND category = $5 AND subcategory = $6
+            AND data_source = 'manual_entry'
+        `, [monthlyAmount, projectId, orgId, year, category, subcategory]);
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to update manual actuals:', error);
+      res.status(500).json({ error: 'Failed to update manual line item' });
+    }
+  });
+
+  // Delete a manual actuals line item (all 12 months)
+  app.delete('/api/modeling/projects/:projectId/actuals/manual', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const { projectId } = req.params;
+      const { category, subcategory, year } = req.body;
+
+      if (!category || !subcategory || !year) {
+        return res.status(400).json({ error: 'category, subcategory, and year are required' });
+      }
+
+      const project = await storage.getModelingProject(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const result = await pool.query(`
+        DELETE FROM modeling_actuals
+        WHERE modeling_project_id = $1 AND org_id = $2
+          AND year = $3 AND category = $4 AND subcategory = $5
+          AND data_source = 'manual_entry'
+      `, [projectId, orgId, year, category, subcategory]);
+
+      res.json({ success: true, deleted: result.rowCount });
+    } catch (error: any) {
+      console.error('Failed to delete manual actuals:', error);
+      res.status(500).json({ error: 'Failed to delete manual line item' });
+    }
+  });
+
   // Get available years for actuals data
   app.get('/api/modeling/projects/:projectId/actuals/years', authenticateUser, async (req: any, res) => {
     try {

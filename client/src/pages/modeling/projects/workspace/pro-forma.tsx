@@ -53,7 +53,11 @@ import {
   FolderInput,
   EyeOff,
   Undo2,
-  Brain
+  Brain,
+  Plus,
+  Trash2,
+  Check,
+  X
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -309,6 +313,13 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
   const [editingDepartment, setEditingDepartment] = useState<{ department: string; category: 'Revenue' | 'COGS' | 'Expenses' } | null>(null);
   const { toast } = useToast();
 
+  // ─── Ad-hoc line item state ─────────────────────────────────────────
+  const [addingLineItem, setAddingLineItem] = useState<{ category: string; department: string } | null>(null);
+  const [newLineName, setNewLineName] = useState('');
+  const [newLineAmount, setNewLineAmount] = useState('');
+  const [editingCell, setEditingCell] = useState<{ category: string; item: string; year: number } | null>(null);
+  const [editCellValue, setEditCellValue] = useState('');
+
   const {
     moveToDepartment,
     excludeLineItem,
@@ -353,6 +364,57 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
     queryKey: ['/api/modeling/projects', projectId, 'actuals', 'multi-year', { years: availableActualsYears.join(',') }],
     queryFn: () => fetch(`/api/modeling/projects/${projectId}/actuals/multi-year?years=${availableActualsYears.join(',')}`, { credentials: 'include' }).then(r => r.json()),
     enabled: availableActualsYears.length > 0,
+  });
+
+  // ─── Ad-hoc line item mutations ──────────────────────────────────────
+  const latestYear = availableActualsYears.length > 0
+    ? availableActualsYears[availableActualsYears.length - 1]
+    : new Date().getFullYear() - 1;
+
+  const addLineItemMutation = useMutation({
+    mutationFn: async (data: { category: string; subcategory: string; department: string; annualAmount: number }) =>
+      apiRequest('POST', `/api/modeling/projects/${projectId}/actuals/manual`, {
+        ...data,
+        year: latestYear,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      setAddingLineItem(null);
+      setNewLineName('');
+      setNewLineAmount('');
+      toast({ title: 'Line item added' });
+    },
+    onError: (err: Error) => toast({ title: 'Failed to add line item', description: err.message, variant: 'destructive' }),
+  });
+
+  const updateLineItemMutation = useMutation({
+    mutationFn: async (data: { category: string; subcategory: string; annualAmount: number }) =>
+      apiRequest('PUT', `/api/modeling/projects/${projectId}/actuals/manual`, {
+        ...data,
+        year: editingCell?.year ?? latestYear,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      setEditingCell(null);
+      setEditCellValue('');
+    },
+  });
+
+  const deleteLineItemMutation = useMutation({
+    mutationFn: async (data: { category: string; subcategory: string }) =>
+      fetch(`/api/modeling/projects/${projectId}/actuals/manual`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ...data, year: latestYear }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'pro-forma'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'actuals'] });
+      toast({ title: 'Line item removed' });
+    },
   });
 
   // Fetch scenarios for inline growth rate editing
@@ -1700,6 +1762,24 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                     <ChevronRight className="h-3.5 w-3.5" />
                                   )}
                                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{department}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAddingLineItem({ category, department });
+                                      setNewLineName('');
+                                      setNewLineAmount('');
+                                      // Expand department to show the form
+                                      setExpandedDepartments(prev => {
+                                        const next = new Set(prev);
+                                        next.add(`${category}-${department}`);
+                                        return next;
+                                      });
+                                    }}
+                                    className="h-5 w-5 p-0 rounded hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Add custom line item"
+                                  >
+                                    <Plus className="h-3 w-3 text-muted-foreground" />
+                                  </button>
                                   {editMode && viewMode === 'annual' && (
                                     <Popover
                                       open={editingDepartment?.department === department && editingDepartment?.category === category}
@@ -1838,6 +1918,14 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                             <EyeOff className="h-3.5 w-3.5 mr-2" />
                                             Exclude from P&L
                                           </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => deleteLineItemMutation.mutate({ category, subcategory: itemName })}
+                                            disabled={deleteLineItemMutation.isPending}
+                                            className="text-red-600 focus:text-red-600"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                            Delete Custom Row
+                                          </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     </div>
@@ -1890,6 +1978,85 @@ export default function WorkspaceProForma({ projectId, onTabChange }: WorkspaceP
                                 </TableRow>
                               );
                             })}
+
+                            {/* Inline add-row form */}
+                            {addingLineItem?.category === category && addingLineItem?.department === department && (
+                              <TableRow className="bg-blue-50/40 dark:bg-blue-950/20">
+                                <TableCell className="pl-10 sticky left-0 bg-blue-50/40 dark:bg-blue-950/20 z-10">
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      value={newLineName}
+                                      onChange={e => setNewLineName(e.target.value)}
+                                      placeholder="Line item name..."
+                                      className="w-36 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      autoFocus
+                                      onKeyDown={e => {
+                                        if (e.key === 'Escape') setAddingLineItem(null);
+                                        if (e.key === 'Enter' && newLineName.trim() && newLineAmount.trim()) {
+                                          addLineItemMutation.mutate({
+                                            category,
+                                            subcategory: newLineName.trim(),
+                                            department,
+                                            annualAmount: parseFloat(newLineAmount),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                    <input
+                                      type="number"
+                                      value={newLineAmount}
+                                      onChange={e => setNewLineAmount(e.target.value)}
+                                      placeholder="Annual $"
+                                      className="w-24 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      onKeyDown={e => {
+                                        if (e.key === 'Escape') setAddingLineItem(null);
+                                        if (e.key === 'Enter' && newLineName.trim() && newLineAmount.trim()) {
+                                          addLineItemMutation.mutate({
+                                            category,
+                                            subcategory: newLineName.trim(),
+                                            department,
+                                            annualAmount: parseFloat(newLineAmount),
+                                          });
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        if (newLineName.trim() && newLineAmount.trim()) {
+                                          addLineItemMutation.mutate({
+                                            category,
+                                            subcategory: newLineName.trim(),
+                                            department,
+                                            annualAmount: parseFloat(newLineAmount),
+                                          });
+                                        }
+                                      }}
+                                      disabled={!newLineName.trim() || !newLineAmount.trim() || addLineItemMutation.isPending}
+                                      className="h-5 w-5 p-0 rounded hover:bg-emerald-200 dark:hover:bg-emerald-800 flex items-center justify-center disabled:opacity-40"
+                                    >
+                                      <Check className="h-3 w-3 text-emerald-600" />
+                                    </button>
+                                    <button
+                                      onClick={() => setAddingLineItem(null)}
+                                      className="h-5 w-5 p-0 rounded hover:bg-red-200 dark:hover:bg-red-800 flex items-center justify-center"
+                                    >
+                                      <X className="h-3 w-3 text-red-500" />
+                                    </button>
+                                  </div>
+                                </TableCell>
+                                {/* Fill remaining columns */}
+                                {showHistorical && priorPeriods.map(p => (
+                                  <TableCell key={p.id} className="bg-blue-50/40 dark:bg-blue-950/20" />
+                                ))}
+                                <TableCell className="bg-blue-50/40 dark:bg-blue-950/20" />
+                                {viewMode === 'monthly'
+                                  ? months.map((_, i) => <TableCell key={i} className="bg-blue-50/40 dark:bg-blue-950/20" />)
+                                  : years.map((_, i) => <TableCell key={i} className="bg-blue-50/40 dark:bg-blue-950/20" />)
+                                }
+                                <TableCell className="bg-blue-50/40 dark:bg-blue-950/20" />
+                              </TableRow>
+                            )}
                           </Fragment>
                         );
                         });
