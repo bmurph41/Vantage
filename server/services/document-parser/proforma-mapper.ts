@@ -35,6 +35,9 @@ export const RENT_ROLL_TO_PROFORMA_MAP: Record<string, string> = {
   'occupancy_rate': 'property.current_occupancy',
   'total_actual_rent': 'income.gross_potential_rent',
   'total_potential_rent': 'income.potential_gross_rent',
+  'total_sqft': 'property.total_sqft',
+  'occupied_units': 'property.occupied_units',
+  'vacant_units': 'property.vacant_units',
 };
 
 export const FIELD_DISPLAY_LABELS: Record<string, string> = {
@@ -68,6 +71,13 @@ export const FIELD_DISPLAY_LABELS: Record<string, string> = {
   interest_expense: 'Interest Expense',
   principal_payment: 'Principal Payment',
   net_cash_flow: 'Net Cash Flow',
+  total_units: 'Total Units',
+  total_sqft: 'Total Square Footage',
+  occupancy_rate: 'Occupancy Rate',
+  occupied_units: 'Occupied Units',
+  vacant_units: 'Vacant Units',
+  total_actual_rent: 'Total Actual Rent',
+  total_potential_rent: 'Total Potential Rent',
 };
 
 export const FIELD_GROUPS: Record<string, string> = {
@@ -101,4 +111,11 @@ export const FIELD_GROUPS: Record<string, string> = {
   interest_expense: 'debt',
   principal_payment: 'debt',
   net_cash_flow: 'summary',
+  total_units: 'summary',
+  total_sqft: 'summary',
+  occupancy_rate: 'summary',
+  occupied_units: 'summary',
+  vacant_units: 'summary',
+  total_actual_rent: 'income',
+  total_potential_rent: 'income',
 };

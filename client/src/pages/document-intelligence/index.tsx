@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { DocumentUploader } from '@/components/document-intelligence/DocumentUploader';
 import { ExtractionReview } from '@/components/document-intelligence/ExtractionReview';
 import { ExtractionStatusPoller } from '@/components/document-intelligence/ExtractionStatusPoller';
@@ -7,7 +8,12 @@ import { Brain, History, ChevronRight, FileText, Table2, Clock } from 'lucide-re
 
 type View = 'upload' | 'history';
 
-export default function DocumentIntelligencePage() {
+interface Props {
+  projectId?: string;
+}
+
+export default function DocumentIntelligencePage({ projectId }: Props) {
+  const [, navigate] = useLocation();
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string>('pending');
   const [view, setView] = useState<View>('upload');
@@ -50,7 +56,7 @@ export default function DocumentIntelligencePage() {
           <div className="w-96 border-r border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-5 overflow-y-auto">
             <div>
               <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Upload Document</h2>
-              <DocumentUploader onJobCreated={(id) => { setJobId(id); setJobStatus('pending'); }} />
+              <DocumentUploader onJobCreated={(id) => { setJobId(id); setJobStatus('pending'); }} projectId={projectId} />
             </div>
 
             {jobId && (
@@ -86,8 +92,12 @@ export default function DocumentIntelligencePage() {
             {jobId && jobStatus === 'review_required' ? (
               <ExtractionReview
                 jobId={jobId}
+                projectId={projectId}
                 onPopulate={(scenarioId) => {
-                  window.location.href = `/projects/current/pro-forma?from_extraction=${jobId}`;
+                  const target = projectId
+                    ? `/modeling/projects/${projectId}/workspace?tab=pro-forma&from_extraction=${jobId}`
+                    : `/document-intelligence`;
+                  navigate(target);
                 }}
               />
             ) : jobId && !['failed'].includes(jobStatus) ? (
@@ -126,17 +136,18 @@ export default function DocumentIntelligencePage() {
           </div>
         </div>
       ) : (
-        <ExtractionHistory />
+        <ExtractionHistory projectId={projectId} />
       )}
     </div>
   );
 }
 
-function ExtractionHistory() {
+function ExtractionHistory({ projectId }: { projectId?: string }) {
+  const qs = projectId ? `?project_id=${projectId}` : '';
   const { data: jobs = [], isLoading } = useQuery<any[]>({
-    queryKey: ['/api/v1/document-extraction/history'],
+    queryKey: ['/api/v1/document-extraction/history', projectId],
     queryFn: () =>
-      fetch('/api/v1/document-extraction/history', { credentials: 'include' }).then(r => r.json()),
+      fetch(`/api/v1/document-extraction/history${qs}`, { credentials: 'include' }).then(r => r.json()),
   });
 
   const statusColors: Record<string, string> = {

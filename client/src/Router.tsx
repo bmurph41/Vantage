@@ -2327,10 +2327,10 @@ function Router() {
       </Route>
       
       {/* Document Intelligence v2 — Claude extraction pipeline */}
-      <Route path="/document-intelligence">
-        {() => (
+      <Route path="/document-intelligence/:projectId?">
+        {(params) => (
           <GatedLayout pack="modeling_tools">
-            <DocumentIntelligenceV2 />
+            <DocumentIntelligenceV2 projectId={params?.projectId} />
           </GatedLayout>
         )}
       </Route>

@@ -10,6 +10,10 @@ import { pool } from '../db.js';
 
 const router = express.Router();
 
+async function cleanupFile(filePath: string) {
+  try { await fs.unlink(filePath); } catch {}
+}
+
 // ─── Entitlement limits by tier ─────────────────────────────────────────────
 const MONTHLY_UPLOAD_LIMITS: Record<string, number> = {
   analyst: 0,
@@ -82,12 +86,16 @@ router.post('/upload', upload.single('document'), async (req: any, res: any) => 
 
     const jobId = jobResult.rows[0].id;
 
-    processDocument(jobId, file.path, file.originalname, hintClass).catch(err => {
-      pool.query(
-        `UPDATE document_extraction_jobs SET status='failed', error_message=$1 WHERE id=$2`,
-        [err.message, jobId]
-      ).catch(() => {});
-    });
+    processDocument(jobId, file.path, file.originalname, hintClass)
+      .then(() => cleanupFile(file.path))
+      .catch(err => {
+        cleanupFile(file.path);
+        const safeMessage = (err.message || 'Unknown extraction error').slice(0, 500);
+        pool.query(
+          `UPDATE document_extraction_jobs SET status='failed', error_message=$1 WHERE id=$2`,
+          [safeMessage, jobId]
+        ).catch(() => {});
+      });
 
     res.json({ jobId, status: 'pending' });
   } catch (err: any) {
@@ -146,16 +154,24 @@ router.patch('/:jobId/fields/:fieldId', async (req: any, res: any) => {
   const user = req.user || req.resolvedUser;
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { fieldId } = req.params;
+  const { jobId, fieldId } = req.params;
+  const orgId = user.orgId || user.org_id;
   const { override_value, override_note, is_confirmed } = req.body;
 
+  // Verify job belongs to this org
+  const job = await pool.query(
+    'SELECT id FROM document_extraction_jobs WHERE id=$1 AND org_id=$2',
+    [jobId, orgId]
+  );
+  if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+
   await pool.query(`
-    UPDATE extraction_fields 
+    UPDATE extraction_fields
     SET override_value=$1, override_note=$2, is_confirmed=$3,
         is_manually_overridden=($1 IS NOT NULL),
         confirmed_at=CASE WHEN $3=true THEN NOW() ELSE NULL END
-    WHERE id=$4
-  `, [override_value ?? null, override_note ?? null, is_confirmed ?? false, fieldId]);
+    WHERE id=$4 AND job_id=$5
+  `, [override_value ?? null, override_note ?? null, is_confirmed ?? false, fieldId, jobId]);
 
   res.json({ success: true });
 });
@@ -166,6 +182,15 @@ router.post('/:jobId/confirm-all', async (req: any, res: any) => {
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const { jobId } = req.params;
+  const orgId = user.orgId || user.org_id;
+
+  // Verify job belongs to this org
+  const job = await pool.query(
+    'SELECT id FROM document_extraction_jobs WHERE id=$1 AND org_id=$2',
+    [jobId, orgId]
+  );
+  if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+
   await pool.query(`
     UPDATE extraction_fields SET is_confirmed=true, confirmed_at=NOW()
     WHERE job_id=$1 AND confidence_level IN ('high', 'medium')
@@ -181,11 +206,26 @@ router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
 
   const { jobId } = req.params;
   const { scenario_id } = req.body;
+  const orgId = user.orgId || user.org_id;
 
   if (!scenario_id) return res.status(400).json({ error: 'scenario_id is required' });
 
+  // Verify job belongs to this org
+  const job = await pool.query(
+    'SELECT id FROM document_extraction_jobs WHERE id=$1 AND org_id=$2',
+    [jobId, orgId]
+  );
+  if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+
+  // Verify scenario belongs to this org
+  const scenario = await pool.query(
+    'SELECT id FROM modeling_scenario_versions WHERE id=$1 AND org_id=$2',
+    [scenario_id, orgId]
+  );
+  if (scenario.rows.length === 0) return res.status(404).json({ error: 'Scenario not found or access denied' });
+
   const fields = await pool.query(`
-    SELECT schema_key, 
+    SELECT schema_key,
            COALESCE(override_value, normalized_value) as final_value,
            proforma_field_key
     FROM extraction_fields
@@ -195,23 +235,26 @@ router.post('/:jobId/populate-proforma', async (req: any, res: any) => {
   const populationMap: Record<string, number> = {};
   for (const row of fields.rows) {
     if (row.proforma_field_key && row.final_value !== null) {
-      populationMap[row.proforma_field_key] = parseFloat(row.final_value);
+      const parsed = parseFloat(row.final_value);
+      if (!isNaN(parsed) && isFinite(parsed)) {
+        populationMap[row.proforma_field_key] = parsed;
+      }
     }
   }
 
-  // Merge into scenario config
+  // Merge into scenario config (org already verified above)
   await pool.query(`
     UPDATE modeling_scenario_versions
     SET config = config || $1::jsonb,
         updated_at = NOW()
-    WHERE id = $2
-  `, [JSON.stringify({ extracted_data: populationMap, extraction_job_id: jobId }), scenario_id]);
+    WHERE id = $2 AND org_id = $3
+  `, [JSON.stringify({ extracted_data: populationMap, extraction_job_id: jobId }), scenario_id, orgId]);
 
   await pool.query(`
-    UPDATE document_extraction_jobs 
+    UPDATE document_extraction_jobs
     SET target_scenario_id=$1, population_completed_at=NOW(), status='confirmed'
-    WHERE id=$2
-  `, [scenario_id, jobId]);
+    WHERE id=$2 AND org_id=$3
+  `, [scenario_id, jobId, orgId]);
 
   res.json({ success: true, fieldsPopulated: fields.rows.length });
 });
@@ -263,14 +306,36 @@ router.post('/:jobId/rerun', async (req: any, res: any) => {
   `, [jobId]);
   await pool.query('DELETE FROM extraction_fields WHERE job_id=$1', [jobId]);
 
-  processDocument(jobId, j.storage_path, j.original_filename, j.document_class).catch(err => {
-    pool.query(
-      'UPDATE document_extraction_jobs SET status=\'failed\', error_message=$1 WHERE id=$2',
-      [err.message, jobId]
-    ).catch(() => {});
-  });
+  processDocument(jobId, j.storage_path, j.original_filename, j.document_class)
+    .then(() => cleanupFile(j.storage_path))
+    .catch(err => {
+      cleanupFile(j.storage_path);
+      const safeMessage = (err.message || 'Unknown extraction error').slice(0, 500);
+      pool.query(
+        `UPDATE document_extraction_jobs SET status='failed', error_message=$1 WHERE id=$2`,
+        [safeMessage, jobId]
+      ).catch(() => {});
+    });
 
   res.json({ jobId, status: 'pending' });
+});
+
+// ─── GET /scenarios/:projectId — list scenarios for scenario picker ──────────
+router.get('/scenarios/:projectId', async (req: any, res: any) => {
+  const user = req.user || req.resolvedUser;
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const orgId = user.orgId || user.org_id;
+  const { projectId } = req.params;
+
+  const result = await pool.query(`
+    SELECT id, name, scenario_type, is_current_version, version, created_at
+    FROM modeling_scenario_versions
+    WHERE modeling_project_id=$1 AND org_id=$2 AND is_current_version=true
+    ORDER BY scenario_type ASC, created_at DESC
+  `, [projectId, orgId]);
+
+  res.json(result.rows);
 });
 
 // ─── ASYNC PROCESSING PIPELINE ───────────────────────────────────────────────

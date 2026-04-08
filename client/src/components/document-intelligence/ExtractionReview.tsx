@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, AlertCircle, HelpCircle, Edit2, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { CheckCircle2, AlertCircle, HelpCircle, Edit2, ChevronDown, ChevronRight, Download, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExtractionField {
@@ -22,8 +22,15 @@ interface ExtractionField {
   proforma_field_key: string | null;
 }
 
+interface Scenario {
+  id: string;
+  name: string;
+  scenario_type: string;
+}
+
 interface Props {
   jobId: string;
+  projectId?: string;
   onPopulate?: (scenarioId: string) => void;
 }
 
@@ -39,11 +46,21 @@ const GROUP_LABELS: Record<string, string> = {
   monthly_summary: 'Monthly Summary',
 };
 
-export function ExtractionReview({ jobId, onPopulate }: Props) {
+export function ExtractionReview({ jobId, projectId, onPopulate }: Props) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['income', 'expenses', 'summary']));
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [showScenarioPicker, setShowScenarioPicker] = useState(false);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
+
+  const { data: scenarios = [] } = useQuery<Scenario[]>({
+    queryKey: ['scenarios-for-extraction', projectId],
+    queryFn: () =>
+      fetch(`/api/v1/document-extraction/scenarios/${projectId}`, { credentials: 'include' })
+        .then(r => r.ok ? r.json() : []),
+    enabled: !!projectId,
+  });
 
   const { data: fields = [], isLoading } = useQuery<ExtractionField[]>({
     queryKey: ['extraction-fields', jobId],
@@ -72,6 +89,30 @@ export function ExtractionReview({ jobId, onPopulate }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['extraction-fields', jobId] });
       toast({ title: 'High & medium confidence fields confirmed' });
+    }
+  });
+
+  const populateProforma = useMutation({
+    mutationFn: async (scenarioId: string) => {
+      const res = await fetch(`/api/v1/document-extraction/${jobId}/populate-proforma`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ scenario_id: scenarioId })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to populate' }));
+        throw new Error(err.error || 'Failed to populate');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: `Populated ${data.fieldsPopulated} fields into Pro Forma` });
+      setShowScenarioPicker(false);
+      onPopulate?.(selectedScenarioId!);
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Population failed', description: err.message, variant: 'destructive' });
     }
   });
 
@@ -159,12 +200,49 @@ export function ExtractionReview({ jobId, onPopulate }: Props) {
             Accept All High Confidence
           </button>
           {onPopulate && confirmedCount > 0 && (
-            <button
-              onClick={() => onPopulate('current-scenario-id')}
-              className="px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              Populate Pro Forma ({confirmedCount} fields)
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  if (!projectId) {
+                    toast({ title: 'No project linked', description: 'Navigate to Document Intelligence from a project to populate Pro Forma.', variant: 'destructive' });
+                    return;
+                  }
+                  setShowScenarioPicker(prev => !prev);
+                }}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <Database className="w-3.5 h-3.5" />
+                Populate Pro Forma ({confirmedCount} fields)
+              </button>
+              {showScenarioPicker && scenarios.length > 0 && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Select target scenario</p>
+                  {scenarios.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedScenarioId(s.id);
+                        populateProforma.mutate(s.id);
+                      }}
+                      disabled={populateProforma.isPending}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                        selectedScenarioId === s.id && populateProforma.isPending
+                          ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="font-medium">{s.name}</span>
+                      <span className="ml-2 text-xs text-slate-400">{s.scenario_type}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showScenarioPicker && scenarios.length === 0 && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-4 text-center">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No scenarios found for this project.</p>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
