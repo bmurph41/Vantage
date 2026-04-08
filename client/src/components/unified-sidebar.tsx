@@ -5,7 +5,7 @@ import {
   BarChart3, Users, Building, Handshake, Calendar, 
   Bot, Bell, Mail, PieChart, TrendingUp, Settings, Activity,
   LayoutDashboard, Layers, UserCheck, Building2, FileText, Target, Home, Tag, Package, Webhook, GitMerge, ChevronDown, ChevronRight, ChevronLeft,
-  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen, Lock
+  Briefcase, ListTodo, ClipboardList, Calculator, Anchor, Upload, History, Send, Menu, X, AlertCircle, Fuel, CreditCard, Box, Shield, MessageSquare, LayoutList, Megaphone, DollarSign, Link2, FolderLock, Receipt, RefreshCcw, Percent, Search, Wrench, Ship, ShoppingCart, PanelLeftClose, PanelLeft, Plug, BookOpen, Lock, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPS_MODULE_SUBCATEGORY, OPS_SUBCATEGORY_META, type OpsSubcategory } from '@shared/asset-class-ops-modules';
@@ -513,6 +513,7 @@ export default function UnifiedSidebar() {
     isActive = false,
     icon,
     locked = false,
+    highlighted = false,
     onLockedClick,
   }: {
     title: string;
@@ -521,9 +522,11 @@ export default function UnifiedSidebar() {
     isActive?: boolean;
     icon?: any;
     locked?: boolean;
+    highlighted?: boolean;
     onLockedClick?: () => void;
   }) => {
     const IconComponent = icon;
+    const dimmed = locked && !highlighted;
 
     if (sidebarCollapsed) {
       return (
@@ -533,7 +536,7 @@ export default function UnifiedSidebar() {
               className={cn(
                 "flex items-center justify-center py-2.5 px-2 cursor-pointer hover:bg-sidebar-accent transition-colors relative",
                 isActive && "bg-sidebar-accent",
-                locked && "opacity-60"
+                dimmed && "opacity-60"
               )}
               onClick={() => {
                 if (locked && onLockedClick) {
@@ -544,13 +547,13 @@ export default function UnifiedSidebar() {
               }}
             >
               {IconComponent && <IconComponent className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "text-sidebar-foreground/50")} />}
-              {locked && (
+              {locked && !highlighted && (
                 <Lock className="w-2.5 h-2.5 absolute bottom-1 right-1 text-amber-500" />
               )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10}>
-            <p>{title}{locked ? ' (Locked)' : ''}</p>
+            <p>{title}{locked && !highlighted ? ' (Locked)' : ''}</p>
           </TooltipContent>
         </Tooltip>
       );
@@ -561,11 +564,13 @@ export default function UnifiedSidebar() {
         onClick={locked && onLockedClick ? onLockedClick : onToggle}
         className={cn(
           "flex items-center justify-between w-full px-4 py-2.5 text-sm font-medium transition-colors",
-          locked
+          dimmed
             ? "text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70"
-            : expanded
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            : highlighted && locked
+              ? "text-sidebar-foreground hover:bg-sidebar-accent/60"
+              : expanded
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
         data-testid={`toggle-${title.toLowerCase()}`}
       >
@@ -573,10 +578,15 @@ export default function UnifiedSidebar() {
           {IconComponent && <IconComponent className="w-4 h-4" />}
           <span>{title}</span>
         </div>
-        {locked ? (
+        {locked && !highlighted ? (
           <div className="flex items-center gap-1.5">
             <Lock className="w-3 h-3 text-amber-500" />
             <span className="text-[10px] font-normal text-amber-500 uppercase tracking-wide">Upgrade</span>
+          </div>
+        ) : locked && highlighted ? (
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-blue-500" />
+            <span className="text-[10px] font-normal text-blue-500 uppercase tracking-wide">Included</span>
           </div>
         ) : (
           expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />
@@ -721,6 +731,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setOperationsExpanded(!operationsExpanded)}
               isActive={location.startsWith('/operations/')}
               locked={!hasPack('operations')}
+              highlighted={isHighlighted('operations')}
               onLockedClick={() => showPaywall('operations', 'Operations')}
             />
             {operationsExpanded && hasPack('operations') && (
@@ -810,6 +821,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setCrmExpanded(!crmExpanded)}
               isActive={['/crm', '/crm/contacts', '/crm/companies', '/crm/properties', '/crm/pending-contacts', '/crm/pending-companies', '/crm/pending-properties'].includes(location)}
               locked={!hasPack('crm_pipeline')}
+              highlighted={isHighlighted('crm')}
               onLockedClick={() => showPaywall('crm_pipeline', 'CRM')}
             />
             {crmExpanded && hasPack('crm_pipeline') && (
@@ -859,6 +871,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setProspectingExpanded(!prospectingExpanded)}
               isActive={location === '/prospecting' || (location.startsWith('/prospecting/') && !location.startsWith('/prospecting/marketing') && !location.startsWith('/prospecting/campaigns'))}
               locked={!hasPack('prospecting')}
+              highlighted={isHighlighted('prospecting')}
               onLockedClick={() => showPaywall('prospecting', 'Prospecting')}
             />
             {prospectingExpanded && hasPack('prospecting') && (
@@ -881,6 +894,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setMarketingExpanded(!marketingExpanded)}
               isActive={location.startsWith('/marketing') || location.startsWith('/prospecting/marketing') || location.startsWith('/prospecting/campaigns')}
               locked={!hasPack('prospecting')}
+              highlighted={isHighlighted('marketing')}
               onLockedClick={() => showPaywall('prospecting', 'Marketing')}
             />
             {marketingExpanded && hasPack('prospecting') && (
@@ -903,6 +917,7 @@ export default function UnifiedSidebar() {
               onToggle={() => setPipelineExpanded(!pipelineExpanded)}
               isActive={['/deal-workspace', '/crm/activity', '/crm/tasks', '/crm/forecast', '/pipeline/deal-board', '/pipeline/activity-log', '/pipeline/follow-ups', '/pipeline/forecast'].includes(location) || location.startsWith('/deal-workspace') || location.startsWith('/pipeline/')}
               locked={!hasPack('crm_pipeline')}
+              highlighted={isHighlighted('pipeline')}
               onLockedClick={() => showPaywall('crm_pipeline', 'Pipeline')}
             />
             {pipelineExpanded && hasPack('crm_pipeline') && (
@@ -1017,6 +1032,7 @@ export default function UnifiedSidebar() {
             onToggle={() => setInvestorServicesExpanded(!investorServicesExpanded)}
             isActive={location.startsWith('/modeling/funds') || location.startsWith('/modeling/lp-portal')}
             locked={!hasPack('fund_management') && !hasPack('lp_portal')}
+            highlighted={isHighlighted('fund-management') || isHighlighted('lp-portal')}
             onLockedClick={() => showPaywall('fund_management', 'Fund Management')}
           />
           {investorServicesExpanded && (hasPack('fund_management') || hasPack('lp_portal')) && (

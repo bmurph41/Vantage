@@ -281,6 +281,15 @@
   border-radius: 0 6px 6px 0;
 }
 
+/* Paywall modal — shift to right on desktop so sidebar stays visible */
+@media (min-width: 768px) {
+  [data-testid="dialog-paywall"] {
+    left: auto !important;
+    right: 2rem !important;
+    transform: translateY(-50%) !important;
+  }
+}
+
 @keyframes miniSidebarFadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
