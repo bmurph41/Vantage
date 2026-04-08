@@ -584,9 +584,10 @@ export default function UnifiedSidebar() {
             <span className="text-[10px] font-normal text-amber-500 uppercase tracking-wide">Upgrade</span>
           </div>
         ) : locked && highlighted ? (
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-blue-500" />
-            <span className="text-[10px] font-normal text-blue-500 uppercase tracking-wide">Included</span>
+          <div className="flex items-center gap-1 bg-blue-500 text-white rounded px-1.5 py-0.5">
+            <Sparkles className="w-2.5 h-2.5" />
+            <span className="text-[9px] font-semibold uppercase tracking-wide">Unlocks</span>
+            <ChevronRight className="w-3 h-3" />
           </div>
         ) : (
           expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />
