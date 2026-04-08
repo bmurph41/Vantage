@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, Users, Palette, Shield, UserPlus, Pencil, Trash2, ArrowRightLeft } from "lucide-react";
+import { Building2, Users, Palette, Shield, UserPlus, Pencil, Trash2, Layers, Save } from "lucide-react";
+import { AssetClassPicker, ASSET_CLASS_LIST } from "@/components/AssetClassPicker";
 
 export default function OrganizationSettingsPage() {
   const { toast } = useToast();
@@ -21,6 +22,8 @@ export default function OrganizationSettingsPage() {
   const [inviteForm, setInviteForm] = useState({ email: "", name: "", role: "editor" });
   const [editingOrg, setEditingOrg] = useState(false);
   const [orgName, setOrgName] = useState("");
+  const [localAssetClasses, setLocalAssetClasses] = useState<string[]>([]);
+  const [assetClassesDirty, setAssetClassesDirty] = useState(false);
 
   const { data: org, isLoading } = useQuery<any>({
     queryKey: ["/api/org-settings"],
@@ -29,6 +32,12 @@ export default function OrganizationSettingsPage() {
       return res.json();
     },
   });
+
+  useEffect(() => {
+    if (org?.assetClasses) {
+      setLocalAssetClasses(org.assetClasses);
+    }
+  }, [org?.assetClasses]);
 
   const { data: team = [] } = useQuery<any[]>({
     queryKey: ["/api/org-settings/team"],
@@ -46,8 +55,10 @@ export default function OrganizationSettingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/org-settings"] });
       setEditingOrg(false);
+      setAssetClassesDirty(false);
       toast({ title: "Organization updated" });
     },
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const inviteMember = useMutation({
@@ -87,6 +98,15 @@ export default function OrganizationSettingsPage() {
 
   if (isLoading) return <div className="p-6 space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
 
+  const handleAssetClassChange = (keys: string[]) => {
+    setLocalAssetClasses(keys);
+    setAssetClassesDirty(true);
+  };
+
+  const saveAssetClasses = () => {
+    updateOrg.mutate({ assetClasses: localAssetClasses });
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div>
@@ -95,8 +115,9 @@ export default function OrganizationSettingsPage() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="profile"><Building2 className="h-4 w-4 mr-1" />Profile</TabsTrigger>
+          <TabsTrigger value="asset-focus"><Layers className="h-4 w-4 mr-1" />Asset Focus</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-1" />Team ({team.length})</TabsTrigger>
           <TabsTrigger value="branding"><Palette className="h-4 w-4 mr-1" />Branding</TabsTrigger>
           <TabsTrigger value="security"><Shield className="h-4 w-4 mr-1" />Security</TabsTrigger>
@@ -116,6 +137,21 @@ export default function OrganizationSettingsPage() {
             <CardContent className="space-y-3">
               <div><Label className="text-muted-foreground">Name</Label><p className="font-medium">{org?.name || "—"}</p></div>
               <div><Label className="text-muted-foreground">Members</Label><p>{org?.memberCount || 0}</p></div>
+              <div>
+                <Label className="text-muted-foreground">Asset Focus</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(org?.assetClasses || []).length === 0
+                    ? <span className="text-sm text-muted-foreground">Not configured — visit the Asset Focus tab</span>
+                    : (org?.assetClasses || []).map((key: string) => {
+                        const entry = ASSET_CLASS_LIST.find((a) => a.key === key);
+                        return (
+                          <Badge key={key} variant="secondary" style={{ borderLeft: `3px solid ${entry?.color || "#94a3b8"}` }}>
+                            {entry?.icon} {entry?.label || key}
+                          </Badge>
+                        );
+                      })}
+                </div>
+              </div>
               <div><Label className="text-muted-foreground">Active Packs</Label>
                 <div className="flex gap-1 mt-1">{(org?.activePacks || []).map((p: any) => <Badge key={p.packType} variant="secondary">{p.packType}</Badge>)}</div>
               </div>
@@ -130,11 +166,68 @@ export default function OrganizationSettingsPage() {
                 <div><Label>Name</Label><Input value={orgName} onChange={(e) => setOrgName(e.target.value)} /></div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setEditingOrg(false)}>Cancel</Button>
-                  <Button onClick={() => updateOrg.mutate({ name: orgName })}>Save</Button>
+                  <Button onClick={() => updateOrg.mutate({ name: orgName })} disabled={updateOrg.isPending}>Save</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           )}
+        </TabsContent>
+
+        {/* Asset Focus */}
+        <TabsContent value="asset-focus">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Layers className="h-5 w-5" />Asset Class Focus</CardTitle>
+                  <CardDescription className="mt-1">
+                    Select the asset classes your organization focuses on. This tailors your platform experience,
+                    data views, benchmarks, and default settings to your investment strategy.
+                  </CardDescription>
+                </div>
+                {assetClassesDirty && (
+                  <Button onClick={saveAssetClasses} disabled={updateOrg.isPending} size="sm">
+                    <Save className="h-4 w-4 mr-1" />
+                    {updateOrg.isPending ? "Saving…" : "Save Changes"}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {localAssetClasses.length === 0 && (
+                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  No asset classes selected. Choose the types of assets your organization invests in below.
+                </div>
+              )}
+              <AssetClassPicker
+                selected={localAssetClasses}
+                onChange={handleAssetClassChange}
+              />
+              <div className="flex items-center justify-between pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {localAssetClasses.length} asset {localAssetClasses.length === 1 ? "class" : "classes"} selected
+                </p>
+                <div className="flex gap-2">
+                  {assetClassesDirty && (
+                    <Button variant="outline" size="sm" onClick={() => {
+                      setLocalAssetClasses(org?.assetClasses || []);
+                      setAssetClassesDirty(false);
+                    }}>
+                      Discard
+                    </Button>
+                  )}
+                  <Button
+                    onClick={saveAssetClasses}
+                    disabled={updateOrg.isPending || !assetClassesDirty}
+                    size="sm"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    {updateOrg.isPending ? "Saving…" : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Team */}

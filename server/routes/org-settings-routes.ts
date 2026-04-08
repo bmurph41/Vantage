@@ -58,13 +58,14 @@ orgSettingsRouter.get("/", async (req: Request, res: Response) => {
 orgSettingsRouter.put("/", async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user.orgId;
-    const { name, sessionTimeoutMinutes, mfaRequired, allowedEmailDomains } = req.body;
+    const { name, sessionTimeoutMinutes, mfaRequired, allowedEmailDomains, assetClasses } = req.body;
 
     const updateData: Record<string, any> = {};
     if (name) updateData.name = name;
     if (sessionTimeoutMinutes !== undefined) updateData.sessionTimeoutMinutes = sessionTimeoutMinutes;
     if (mfaRequired !== undefined) updateData.mfaRequired = mfaRequired;
     if (allowedEmailDomains !== undefined) updateData.allowedEmailDomains = allowedEmailDomains;
+    if (assetClasses !== undefined) updateData.assetClasses = assetClasses;
 
     const [updated] = await db
       .update(organizations)

@@ -136,11 +136,15 @@ onboardingRouter.post("/setup-org", async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user.orgId;
     const userId = (req as any).user.id;
-    const { name, industry, assetClassFocus, teamSize } = req.body;
+    const { name, industry, assetClassFocus, assetClasses, teamSize } = req.body;
+
+    const setData: Record<string, any> = {};
+    if (name) setData.name = name;
+    if (assetClasses !== undefined) setData.assetClasses = assetClasses;
 
     const [updated] = await db
       .update(organizations)
-      .set({ name: name || undefined })
+      .set(setData)
       .where(eq(organizations.id, orgId))
       .returning();
 
@@ -161,6 +165,45 @@ onboardingRouter.post("/setup-org", async (req: Request, res: Response) => {
     }
 
     res.json({ org: updated, step: "org_profile" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /set-asset-classes — save the org's target asset classes and mark step complete
+onboardingRouter.post("/set-asset-classes", async (req: Request, res: Response) => {
+  try {
+    const orgId = (req as any).user.orgId;
+    const userId = (req as any).user.id;
+    const { assetClasses } = req.body;
+
+    if (!Array.isArray(assetClasses)) {
+      return res.status(400).json({ error: "assetClasses must be an array" });
+    }
+
+    const [updated] = await db
+      .update(organizations)
+      .set({ assetClasses })
+      .where(eq(organizations.id, orgId))
+      .returning();
+
+    // Mark step complete
+    const [onboarding] = await db
+      .select()
+      .from(userOnboarding)
+      .where(eq(userOnboarding.userId, userId));
+
+    if (onboarding) {
+      const steps = (onboarding.completedSteps || []) as string[];
+      if (!steps.includes("asset_classes")) {
+        steps.push("asset_classes");
+        await db.update(userOnboarding)
+          .set({ completedSteps: steps, updatedAt: new Date() })
+          .where(eq(userOnboarding.id, onboarding.id));
+      }
+    }
+
+    res.json({ org: updated, step: "asset_classes" });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

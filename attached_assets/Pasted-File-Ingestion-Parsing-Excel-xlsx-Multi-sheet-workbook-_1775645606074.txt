@@ -1,0 +1,66 @@
+File Ingestion & Parsing
+Excel (.xlsx)
+
+Multi-sheet workbook reading via pandas (pd.read_excel, sheet_name=None to get all sheets as a dict)
+Raw header-less parsing (header=None) to handle non-standard broker/accounting layouts
+Handles merged cells, sparse data, irregular row structures — reads everything as-is and lets you clean programmatically
+Can target specific sheets by name or index
+
+What this means for Vantage/StayMate: Any uploaded financial document — P&L, rent roll, operating statement, lease abstract — can be ingested and parsed into structured data, even if it's messy broker formatting.
+
+Data Extraction & Normalization
+
+Pattern-matched row extraction from irregular layouts (e.g., finding "GROSS SALES", "COST OF SALES", specific expense line items by label)
+Cross-year reconciliation — aligned four differently-structured P&Ls into a single comparable data model
+Add-back identification and categorization (owner compensation, depreciation, personal expenses, EBITDA adjustments)
+Anomaly detection from raw numbers (e.g., flagging the $22K → $37 licenses drop, the 27.8% payroll tax rate, the COGS reclassification across years)
+
+What this means for Vantage: This is essentially the P&L Parser v2 logic extended — geometry-free, label-based extraction that can handle real-world broker and accountant documents without assuming clean column structure.
+
+Financial Modeling & Output Generation
+Excel model construction via openpyxl:
+
+Multi-sheet workbooks with distinct analytical layers
+Full color-coding system (NAVY headers, LTBLUE data, YELLOW flags, GREEN positives, RED risks)
+Excel formula writing (not hardcoded Python values) — =AVERAGE(B3:E3), =D5/D3, etc.
+Number formatting: currency #,##0;(#,##0);"-", percentages 0.0%, multiples 0.00"x"
+Dynamic row referencing for percentage calculations tied to revenue rows
+Merged cells, column widths, row heights, borders
+Formula recalculation via LibreOffice headless (scripts/recalc.py) with zero-error verification
+
+Analytical outputs produced:
+
+4-year side-by-side P&L with YoY growth, margin rows, add-back detail
+Buyer normalization layer with deduction-by-deduction adjustments
+Valuation scenario table (5 scenarios, color-coded by viability)
+Red flag registry embedded in the model
+Deal structure recommendation table
+
+
+The Full Stack Pattern (Reusable)
+Upload messy source file (Excel, PDF, CSV)
+        ↓
+pandas ingestion — raw, no assumed structure
+        ↓
+Label-based row extraction + value capture
+        ↓
+Cross-period normalization + anomaly detection
+        ↓
+openpyxl model build — formulas, formatting, color coding
+        ↓
+LibreOffice recalc → zero formula errors verified
+        ↓
+Present to user as downloadable file
+
+What to Tell Claude Code
+Drop this into your Replit session:
+
+"Claude.ai's computer use can ingest uploaded Excel files using pandas with header=None to handle irregular layouts, extract line items by label matching, normalize across multiple periods, and produce a fully formatted output workbook via openpyxl with Excel formulas (not hardcoded values), color coding, and LibreOffice recalculation. The pattern is: raw ingest → label-based extraction → normalization logic → openpyxl build → recalc.py verification → file output. Apply this same pattern here for [your use case]."
+
+
+Immediate Vantage Applications
+Given where Vantage is right now, the most direct applications:
+P&L Parser enhancement — the label-based extraction approach here handles broker-formatted statements that the geometry-based pdfjs parser struggles with. Could be a fallback or secondary parsing mode for Excel uploads specifically.
+Pro Forma population from uploaded actuals — user uploads a historical operating statement, system extracts revenue, expense categories, and margin data, maps to Pro Forma line items, pre-populates the model. Same pattern exactly.
+Deal comparison in workspace — this is literally what the model does across four years. The multi-period normalization logic maps directly to the Deal Comparison feature in your CRM priority queue (#3).
+Document Studio output — the openpyxl output pattern (color coding, formula writing, multi-sheet structure) is the same approach you'd use for any Excel-based deliverable in Document Studio.

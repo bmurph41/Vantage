@@ -237,6 +237,8 @@ export const sessionStatusEnum = pgEnum("session_status", ["active", "expired", 
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  // Asset class focus: list of asset class keys the org operates in
+  assetClasses: text("asset_classes").array().default(sql`'{}'`),
   // SSO settings
   ssoEnabled: boolean("sso_enabled").notNull().default(false),
   ssoEnforced: boolean("sso_enforced").notNull().default(false), // Require SSO for all users
