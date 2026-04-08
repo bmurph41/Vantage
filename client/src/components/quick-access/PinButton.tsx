@@ -43,9 +43,10 @@ export function PinButton({
   const { toast } = useToast();
   const [isPinned, setIsPinned] = useState(false);
 
-  const { data: pinnedItems = [] } = useQuery<UserPinnedItem[]>({
+  const { data: _pinnedItems } = useQuery<UserPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned'],
   });
+  const pinnedItems: UserPinnedItem[] = _pinnedItems ?? [];
 
   const existingPin = pinnedItems.find(
     p => p.itemType === itemType && p.itemId === itemId && p.link === link
@@ -135,9 +136,10 @@ export function QuickPinMenu({
 }: QuickPinMenuProps) {
   const { toast } = useToast();
 
-  const { data: pinnedItems = [] } = useQuery<UserPinnedItem[]>({
+  const { data: _pinnedItems } = useQuery<UserPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned'],
   });
+  const pinnedItems: UserPinnedItem[] = _pinnedItems ?? [];
 
   const existingPin = pinnedItems.find(
     p => p.itemType === itemType && p.itemId === itemId && p.link === link

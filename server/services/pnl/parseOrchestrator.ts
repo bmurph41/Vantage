@@ -16,8 +16,9 @@ import { normalizeLabel } from './mapping';
 import { extractPdfTables, type PdfRow as ExtractedPdfRow, type PdfCell } from './pdfTableExtractor';
 import { detectHeaderAndPeriods, type PeriodCell } from './periodDetect';
 import { validateParsedStatement, type ValidationResult, type ValidationStatus } from './validate';
+import { detectAnomalies } from './anomaly-detector';
 import * as XLSX from 'xlsx';
-import { extractExcelPnl } from './excel-extractor';
+import { extractExcelPnl, rawScanExtract } from './excel-extractor';
 import fs from 'fs/promises';
 import { pnlFileStorage } from './pnl-file-storage';
 
@@ -398,7 +399,17 @@ async function parseDocumentToStatement(
       // ─── XLSX / CSV parsing — Phase 2 smart extractor ───────────────
       const fileBuffer = await fs.readFile(storagePath);
       const filename = storagePath ? storagePath.split('/').pop() : undefined;
-      const result = extractExcelPnl(fileBuffer, yearHint ?? null, filename);
+      let result = extractExcelPnl(fileBuffer, yearHint ?? null, filename);
+
+      // ── Raw-scan fallback for messy / header-less broker workbooks ────
+      if (result.rows.length === 0 || result.confidence < 0.4) {
+        console.log(`[P&L Parser][Excel] Low confidence (${result.confidence.toFixed(2)}) / ${result.rows.length} rows — trying rawScanExtract fallback`);
+        const rawResult = rawScanExtract(fileBuffer, filename);
+        if (rawResult && rawResult.rows.length > result.rows.length) {
+          console.log(`[P&L Parser][Excel] rawScan recovered ${rawResult.rows.length} rows from ${rawResult.periods.length} periods`);
+          result = rawResult;
+        }
+      }
 
       periods.push(...result.periods);
       rows.push(...result.rows);
@@ -470,10 +481,27 @@ export async function processPnlJob(jobId: string): Promise<void> {
     const metrics = (parsed as any)._metrics;
     const rawExtraction = (parsed as any)._rawExtraction;
 
+    // ─── Anomaly Detection ───────────────────────────────────────────────
+    let anomalyResult;
+    try {
+      anomalyResult = detectAnomalies(parsed.rows, parsed.periods);
+      log(jobId, `Anomaly detection: ${anomalyResult.anomalies.length} anomalies, ${anomalyResult.addBackCandidates.length} add-back candidates, quality score ${anomalyResult.dataQualityScore}`);
+      if (anomalyResult.hasRedFlags) {
+        log(jobId, `RED FLAGS detected: ${anomalyResult.anomalies.filter(a => a.severity === 'critical').map(a => a.type).join(', ')}`);
+      }
+    } catch (anomalyErr) {
+      log(jobId, 'Warning: anomaly detection failed (non-fatal):', anomalyErr);
+      anomalyResult = null;
+    }
+
     // Store raw extraction trace in parsedJson for debugging
     const parsedJsonToStore: any = {
       ...parsed,
       rawExtraction: rawExtraction ?? null,
+      anomalies: anomalyResult?.anomalies ?? [],
+      addBackCandidates: anomalyResult?.addBackCandidates ?? [],
+      dataQualityScore: anomalyResult?.dataQualityScore ?? null,
+      hasRedFlags: anomalyResult?.hasRedFlags ?? false,
     };
     // Remove internal underscore fields
     delete parsedJsonToStore._metrics;

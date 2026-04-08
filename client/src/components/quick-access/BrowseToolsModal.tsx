@@ -306,10 +306,11 @@ export function BrowseToolsModal({ open, onOpenChange }: BrowseToolsModalProps) 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const { data: pinnedItems = [] } = useQuery<UserPinnedItem[]>({
+  const { data: _pinnedItems } = useQuery<UserPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned'],
     enabled: open,
   });
+  const pinnedItems: UserPinnedItem[] = _pinnedItems ?? [];
 
   const addMutation = useMutation({
     mutationFn: (tool: ToolItem) =>

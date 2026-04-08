@@ -203,11 +203,21 @@ router.get('/jobs/:jobId/review', async (req: any, res) => {
       where: and(eq(pnlJobs.id, jobId), eq(pnlJobs.orgId, orgId)),
     });
 
+    // Also surface anomalies from the parsed statement
+    const parsed = await db.query.pnlParsedStatements.findFirst({
+      where: and(eq(pnlParsedStatements.jobId, jobId), eq(pnlParsedStatements.orgId, orgId)),
+    });
+    const pj = parsed?.parsedJson as any;
+
     res.json({
       items,
       validationStatus: (job as any)?.validationStatus ?? null,
       validationJson: (job as any)?.validationJson ?? null,
       parseMetricsJson: (job as any)?.parseMetricsJson ?? null,
+      anomalies: pj?.anomalies ?? [],
+      addBackCandidates: pj?.addBackCandidates ?? [],
+      dataQualityScore: pj?.dataQualityScore ?? null,
+      hasRedFlags: pj?.hasRedFlags ?? false,
     });
   } catch (error: any) {
     console.error('Get review items error:', error);
@@ -1304,6 +1314,48 @@ router.get('/projects/:modelingProjectId/summary', async (req: any, res) => {
   } catch (err: any) {
     console.error('[PNL Summary] Error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Excel export: Professional P&L Workbook ─────────────────────────────────
+router.get('/jobs/:jobId/export-excel', async (req: any, res) => {
+  try {
+    const { orgId } = getAuthContext(req);
+    const { jobId } = req.params;
+
+    const job = await db.query.pnlJobs.findFirst({
+      where: and(eq(pnlJobs.id, jobId), eq(pnlJobs.orgId, orgId)),
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const parsed = await db.query.pnlParsedStatements.findFirst({
+      where: and(eq(pnlParsedStatements.jobId, jobId), eq(pnlParsedStatements.orgId, orgId)),
+    });
+    if (!parsed?.parsedJson) return res.status(404).json({ error: 'No parsed data found for this job' });
+
+    const pj = parsed.parsedJson as any;
+    const { generatePnlExcelWorkbook } = await import('./pnl-excel-export');
+
+    const buffer = generatePnlExcelWorkbook({
+      rows: pj.rows ?? [],
+      periods: pj.periods ?? [],
+      anomalies: pj.anomalies ?? [],
+      addBackCandidates: pj.addBackCandidates ?? [],
+      dataQualityScore: pj.dataQualityScore ?? null,
+      hasRedFlags: pj.hasRedFlags ?? false,
+      documentName: (job as any).fileName ?? 'PnL Analysis',
+    });
+
+    const safeFileName = ((job as any).fileName ?? 'pnl-analysis')
+      .replace(/[^a-z0-9_\-]/gi, '-')
+      .toLowerCase();
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}-analysis.xlsx"`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('[PNL Excel Export]', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

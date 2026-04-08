@@ -56,8 +56,27 @@ interface CanonicalLineItem {
   section: string;
 }
 
+interface PnlAnomaly {
+  type: string;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  rowLabel?: string;
+  periodLabel?: string;
+  value?: number;
+}
+
+interface AddBackCandidate {
+  rowLabel: string;
+  reason: string;
+  byPeriod: { periodIndex: number; periodLabel: string; value: number }[];
+}
+
 interface ReviewResponse {
   items: ReviewItem[];
+  anomalies?: PnlAnomaly[];
+  addBackCandidates?: AddBackCandidate[];
+  dataQualityScore?: number | null;
+  hasRedFlags?: boolean;
 }
 
 interface CanonicalItemsResponse {
@@ -134,6 +153,13 @@ export default function PnlReview() {
   const needsReview = items.filter((i) => i.status === "needs_review" && !i.suggestionJson?.isAmbiguous);
   const approved = items.filter((i) => i.status === "approved");
   const canonicalItems = canonicalQuery.data?.items ?? [];
+
+  const anomalies = reviewQuery.data?.anomalies ?? [];
+  const addBackCandidates = reviewQuery.data?.addBackCandidates ?? [];
+  const dataQualityScore = reviewQuery.data?.dataQualityScore ?? null;
+  const hasRedFlags = reviewQuery.data?.hasRedFlags ?? false;
+  const criticalAnomalies = anomalies.filter(a => a.severity === 'critical');
+  const warningAnomalies = anomalies.filter(a => a.severity === 'warning');
 
   const groupedCanonical = canonicalItems.reduce((acc, item) => {
     const section = item.section;
@@ -231,6 +257,24 @@ export default function PnlReview() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {hasRedFlags && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {criticalAnomalies.length} Red Flag{criticalAnomalies.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          {dataQualityScore !== null && (
+            <Badge
+              variant="outline"
+              className={dataQualityScore >= 70
+                ? "border-green-500 text-green-700 dark:text-green-400"
+                : dataQualityScore >= 50
+                  ? "border-amber-500 text-amber-600"
+                  : "border-red-500 text-red-600"}
+            >
+              Quality: {dataQualityScore}/100
+            </Badge>
+          )}
           {ambiguousItems.length > 0 && (
             <Badge variant="outline" className="border-amber-500 text-amber-600">
               <AlertTriangle className="mr-1 h-3 w-3" />
@@ -243,8 +287,100 @@ export default function PnlReview() {
           <Badge variant="secondary">
             {approved.length} approved
           </Badge>
+          {jobId && (
+            <a
+              href={`/api/pnl/jobs/${jobId}/export-excel`}
+              download
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export Analysis
+            </a>
+          )}
         </div>
       </div>
+
+      {/* ── Intelligence Panel ───────────────────────────────────────────── */}
+      {(anomalies.length > 0 || addBackCandidates.length > 0) && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Red Flags */}
+          {anomalies.length > 0 && (
+            <Card className={hasRedFlags
+              ? "border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"
+              : "border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10"
+            }>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className={`h-4 w-4 ${hasRedFlags ? "text-red-600" : "text-amber-600"}`} />
+                  <CardTitle className={`text-sm font-semibold ${hasRedFlags ? "text-red-900 dark:text-red-100" : "text-amber-900 dark:text-amber-100"}`}>
+                    Anomaly Intelligence — {anomalies.length} flag{anomalies.length !== 1 ? 's' : ''} detected
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0 max-h-72 overflow-y-auto">
+                {criticalAnomalies.map((a, i) => (
+                  <div key={i} className="flex gap-2 p-2 rounded bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-red-600" />
+                    <div>
+                      <p className="text-xs font-semibold text-red-800 dark:text-red-200 uppercase tracking-wide">
+                        {a.type.replace(/_/g, ' ')}
+                        {a.rowLabel ? ` — ${a.rowLabel}` : ''}
+                      </p>
+                      <p className="text-xs text-red-700 dark:text-red-300">{a.message}</p>
+                    </div>
+                  </div>
+                ))}
+                {warningAnomalies.map((a, i) => (
+                  <div key={i} className="flex gap-2 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-amber-600" />
+                    <div>
+                      <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                        {a.type.replace(/_/g, ' ')}
+                        {a.rowLabel ? ` — ${a.rowLabel}` : ''}
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">{a.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Add-Back Candidates */}
+          {addBackCandidates.length > 0 && (
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/10">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                  <CardTitle className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Add-Back Candidates — {addBackCandidates.length} item{addBackCandidates.length !== 1 ? 's' : ''}
+                  </CardTitle>
+                </div>
+                <CardDescription className="text-xs text-blue-700 dark:text-blue-300">
+                  Buyer may add these back to compute normalized NOI/EBITDA
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0 max-h-72 overflow-y-auto">
+                {addBackCandidates.map((ab, i) => {
+                  const total = ab.byPeriod.reduce((s, p) => s + p.value, 0);
+                  const avg = ab.byPeriod.length > 0 ? total / ab.byPeriod.length : 0;
+                  return (
+                    <div key={i} className="flex items-start justify-between gap-2 p-2 rounded bg-blue-100/60 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100 truncate">{ab.rowLabel}</p>
+                        <p className="text-xs text-blue-600 dark:text-blue-300 italic">{ab.reason}</p>
+                      </div>
+                      <div className="text-xs font-semibold text-blue-800 dark:text-blue-200 whitespace-nowrap">
+                        ~{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Math.abs(avg))}/yr
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {ambiguousItems.length > 0 && (
         <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">

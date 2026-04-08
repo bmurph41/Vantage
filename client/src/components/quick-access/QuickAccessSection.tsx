@@ -1,3 +1,4 @@
+// @refresh reset
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -258,19 +259,17 @@ export function QuickAccessSection() {
   const [isValidating, setIsValidating] = useState(false);
   const [isBrowseToolsOpen, setIsBrowseToolsOpen] = useState(false);
   
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const sensors = useSensors(pointerSensor);
 
-  const { data: pinnedItems = [], isLoading: pinnedLoading, refetch: refetchPinned } = useQuery<ValidatedPinnedItem[]>({
+  const { data: _pinnedItems, isLoading: pinnedLoading, refetch: refetchPinned } = useQuery<ValidatedPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned'],
   });
+  const pinnedItems: ValidatedPinnedItem[] = _pinnedItems ?? [];
 
-  const { data: validatedPinnedItems = [], refetch: refetchValidated } = useQuery<ValidatedPinnedItem[]>({
+  const { data: _validatedPinnedItems, refetch: refetchValidated } = useQuery<ValidatedPinnedItem[]>({
     queryKey: ['/api/quick-access/pinned', 'validated'],
     queryFn: async () => {
       const response = await fetch('/api/quick-access/pinned?validate=true');
@@ -279,17 +278,20 @@ export function QuickAccessSection() {
     },
     enabled: false,
   });
+  const validatedPinnedItems: ValidatedPinnedItem[] = _validatedPinnedItems ?? [];
 
-  const { data: recentItems = [], isLoading: recentLoading } = useQuery<UserRecentItem[]>({
+  const { data: _recentItems, isLoading: recentLoading } = useQuery<UserRecentItem[]>({
     queryKey: ['/api/quick-access/recent'],
   });
+  const recentItems: UserRecentItem[] = _recentItems ?? [];
 
-  const { data: favorites = [], isLoading: favoritesLoading } = useQuery<UserFavorite[]>({
+  const { data: _favorites, isLoading: favoritesLoading } = useQuery<UserFavorite[]>({
     queryKey: ['/api/quick-access/favorites'],
   });
+  const favorites: UserFavorite[] = _favorites ?? [];
 
-  const displayPinnedItems = validatedPinnedItems.length > 0 ? validatedPinnedItems : pinnedItems;
-  const staleItems = displayPinnedItems.filter(item => item.isValid === false);
+  const displayPinnedItems = (validatedPinnedItems ?? []).length > 0 ? (validatedPinnedItems ?? []) : (pinnedItems ?? []);
+  const staleItems = (displayPinnedItems ?? []).filter(item => item.isValid === false);
 
   const removePinMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/quick-access/pinned/${id}`),

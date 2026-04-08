@@ -389,3 +389,195 @@ export function extractExcelPnl(
 
   return { periods, rows, vendorHint, confidence, sheetUsed: sheetName, headerRowIndex, labelColIndex, yearInferred: yearHint };
 }
+
+// ─── Raw-Scan Fallback ────────────────────────────────────────────────────────
+/**
+ * rawScanExtract — last-resort extraction for header-less / highly irregular broker workbooks.
+ *
+ * Strategy:
+ * 1. Scan every row. Any row with ≥1 text cell followed by ≥1 numeric cell is a candidate.
+ * 2. Detect "year-like" text patterns in the first 20 rows to build a period list.
+ * 3. Identify the most common column pattern and build rows from it.
+ * 4. Returns lower confidence so the orchestrator ranks it below structured extraction.
+ *
+ * This function is invoked by parseOrchestrator ONLY when extractExcelPnl returns
+ * confidence < 0.4 or 0 rows.
+ */
+export interface RawScanResult extends ExcelExtractResult {
+  rawScan: true;
+}
+
+const YEAR_PATTERN = /\b(20\d{2}|19\d{2})\b/;
+
+function isProbablyLabel(v: any): boolean {
+  if (typeof v !== 'string' && typeof v !== 'number') return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  if (typeof v === 'number') return false;
+  return s.length > 1 && isNaN(Number(s.replace(/[$,%]/g, '')));
+}
+
+function detectPeriodsFromSheet(jsonData: any[][]): { cols: number[]; periods: ParsedPeriod[] } {
+  const colPeriods: Map<number, { col: number; label: string; year: number }> = new Map();
+
+  for (let r = 0; r < Math.min(20, jsonData.length); r++) {
+    const row = jsonData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const cell = String(row[c] ?? '').trim();
+      if (!cell) continue;
+      const yearM = cell.match(YEAR_PATTERN);
+      if (!yearM) continue;
+      const year = parseInt(yearM[1], 10);
+      if (!colPeriods.has(c)) {
+        let label = cell;
+        const qm = cell.match(/Q([1-4])/i);
+        if (qm) label = `Q${qm[1]} ${year}`;
+        colPeriods.set(c, { col: c, label, year });
+      }
+    }
+  }
+
+  // Sort by column index, assign periodIndex
+  const sorted = [...colPeriods.values()].sort((a, b) => a.col - b.col);
+  const cols = sorted.map(x => x.col);
+  const periods: ParsedPeriod[] = sorted.map((x, i) => ({
+    label: x.label,
+    year: x.year,
+    start: `${x.year}-01-01`,
+    end: `${x.year}-12-31`,
+    type: 'annual' as const,
+    periodNo: i + 1,
+  }));
+  return { cols, periods };
+}
+
+export function rawScanExtract(buffer: Buffer, fileName?: string): RawScanResult | null {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false, raw: false, dense: false });
+    if (!workbook.SheetNames.length) return null;
+
+    const sheetName = selectBestSheet(workbook);
+    const ws = workbook.Sheets[sheetName];
+    if (!ws) return null;
+
+    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false });
+    if (!jsonData.length) return null;
+
+    let vendorHint: string | null = null;
+    for (const sn of workbook.SheetNames) {
+      for (const vp of VENDOR_PATTERNS) {
+        if (vp.pattern.test(sn)) { vendorHint = vp.hint; break; }
+      }
+      if (vendorHint) break;
+    }
+    if (!vendorHint && fileName) {
+      for (const vp of VENDOR_PATTERNS) { if (vp.pattern.test(fileName)) { vendorHint = vp.hint; break; } }
+    }
+    const yearHint = fileName ? inferYearFromText(fileName) : null;
+
+    // Step 1: detect period columns
+    let { cols: periodCols, periods } = detectPeriodsFromSheet(jsonData);
+
+    // If no period detection, try to use rightmost numeric-heavy columns
+    if (periods.length === 0) {
+      // Heuristic: find columns that have >30% numeric content
+      const colNumericCount: number[] = [];
+      for (const row of jsonData) {
+        if (!row) continue;
+        row.forEach((cell, c) => {
+          colNumericCount[c] = (colNumericCount[c] ?? 0) + (parseMoney(cell) !== null ? 1 : 0);
+        });
+      }
+      const totalRows = jsonData.filter(Boolean).length;
+      const numericCols = colNumericCount
+        .map((cnt, c) => ({ c, pct: cnt / Math.max(totalRows, 1) }))
+        .filter(x => x.pct > 0.3)
+        .sort((a, b) => a.c - b.c)
+        .map(x => x.c);
+
+      if (numericCols.length === 0) return null;
+
+      // Assign synthetic period labels
+      periodCols = numericCols.slice(0, 5); // max 5 periods in raw scan
+      const baseYear = yearHint ?? new Date().getFullYear() - periodCols.length + 1;
+      periods = periodCols.map((c, i) => ({
+        label: String(baseYear + i),
+        year: baseYear + i,
+        start: `${baseYear + i}-01-01`,
+        end: `${baseYear + i}-12-31`,
+        type: 'annual' as const,
+        periodNo: i + 1,
+      }));
+    }
+
+    // Step 2: scan all rows for label + value pattern
+    const rows: ExcelParsedRow[] = [];
+    const seenLabels = new Set<string>();
+    const sheetPageNum = workbook.SheetNames.indexOf(sheetName) + 1;
+
+    for (let r = 0; r < jsonData.length; r++) {
+      const row = jsonData[r];
+      if (!row) continue;
+
+      // Find label column: first text cell in row
+      let labelCol = -1;
+      let label = '';
+      for (let c = 0; c < row.length; c++) {
+        if (isProbablyLabel(row[c])) {
+          const s = String(row[c]).trim();
+          if (s.length > 1) { labelCol = c; label = s; break; }
+        }
+      }
+      if (labelCol < 0 || !label) continue;
+      if (seenLabels.has(label.toLowerCase())) continue;
+
+      // Extract values at detected period columns
+      const values: ExcelParsedValue[] = [];
+      for (let pi = 0; pi < periodCols.length; pi++) {
+        const colIdx = periodCols[pi];
+        const rawValue = colIdx < row.length ? row[colIdx] : null;
+        const money = parseMoney(rawValue);
+        values.push({
+          periodIndex: pi,
+          value: money,
+          trace: { page: sheetPageNum, row: r + 1, col: colIdx + 1, raw: String(rawValue ?? '') },
+        });
+      }
+
+      if (!values.some(v => v.value !== null)) continue;
+
+      // Skip pure-period-header rows
+      if (YEAR_PATTERN.test(label)) continue;
+
+      seenLabels.add(label.toLowerCase());
+      const normalizedLabel = normalizeLabel(label);
+      rows.push({
+        label,
+        normalizedLabel,
+        values,
+        sectionHint: null,
+        trace: { page: sheetPageNum, row: r + 1 },
+      });
+    }
+
+    if (rows.length === 0) return null;
+
+    const confidence = Math.min(0.55, 0.15 + rows.length * 0.03); // cap at 0.55 — signals raw scan
+
+    return {
+      periods,
+      rows,
+      vendorHint,
+      confidence,
+      sheetUsed: sheetName,
+      headerRowIndex: -1,
+      labelColIndex: 0,
+      yearInferred: yearHint,
+      rawScan: true,
+    };
+  } catch (err) {
+    console.warn('[rawScanExtract] Failed:', (err as Error).message);
+    return null;
+  }
+}
