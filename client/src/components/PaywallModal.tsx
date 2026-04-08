@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useStripeStatus } from "@/hooks/useStripeStatus";
 import { formatCurrency } from "@/lib/utils";
 import { ProvisioningAnimation } from "@/components/subscription/ProvisioningAnimation";
+import { useSidebarHighlight } from "@/contexts/SidebarHighlightContext";
+import { getNewlyUnlockedSectionIds } from "@/lib/tierSectionMap";
 
 // ═══════════════════════════════════════════════════════════════
 // TIER DEFINITIONS (mirrors server-side SUBSCRIPTION_TIERS)
@@ -274,10 +276,38 @@ export function PaywallModal({ open, onOpenChange, packType, featureName }: Payw
   const { toast } = useToast();
   const { isStripeConfigured, publishableKey } = useStripeStatus();
   const [view, setView] = useState<ModalView>('info');
+  const { setHighlight, clearHighlight } = useSidebarHighlight();
 
   // Determine the minimum tier needed for this pack
   const recommendedTier = getMinimumTierForPack(packType);
   const TierIcon = recommendedTier.icon;
+
+  // Fetch the user's current active packs so we can highlight only NEWLY unlocked sections
+  const { data: bootstrapData } = useQuery<{ activePacks?: string[] }>({
+    queryKey: ['/api/bootstrap'],
+    staleTime: 60_000,
+  });
+
+  const currentActivePacks: string[] = useMemo(
+    () => bootstrapData?.activePacks || [],
+    [bootstrapData],
+  );
+
+  // Trigger sidebar glow highlight when modal opens — only newly unlocked sections
+  // Uses the user's actual active pack types to compute what they already have access to.
+  useEffect(() => {
+    if (open) {
+      const newIds = getNewlyUnlockedSectionIds(recommendedTier.slug, currentActivePacks);
+      if (newIds.length > 0) {
+        setHighlight(newIds);
+      }
+    } else {
+      clearHighlight();
+    }
+    return () => {
+      clearHighlight();
+    };
+  }, [open, recommendedTier.slug, currentActivePacks, setHighlight, clearHighlight]);
 
   // Use publishable key from the shared Stripe status hook for Stripe Elements
   const stripePromise = isStripeConfigured && publishableKey

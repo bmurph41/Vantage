@@ -259,6 +259,30 @@
   100% { left: 100%; }
 }
 
+@keyframes sidebarGlow {
+  0%   { box-shadow: 0 0 0 0 transparent; border-left-color: transparent; opacity: 1; }
+  20%  { box-shadow: 0 0 0 3px hsl(221 83% 35% / 0.35), 0 0 12px 2px hsl(221 83% 35% / 0.2); border-left-color: hsl(221 83% 35%); opacity: 1; }
+  50%  { box-shadow: 0 0 0 2px hsl(221 83% 35% / 0.25), 0 0 8px 1px hsl(221 83% 35% / 0.15); border-left-color: hsl(221 83% 45%); opacity: 1; }
+  80%  { box-shadow: 0 0 0 3px hsl(221 83% 35% / 0.35), 0 0 12px 2px hsl(221 83% 35% / 0.2); border-left-color: hsl(221 83% 35%); opacity: 1; }
+  100% { box-shadow: 0 0 0 0 transparent; border-left-color: transparent; opacity: 1; }
+}
+
+.sidebar-glow {
+  animation: sidebarGlow 1.3s ease-in-out 3;
+  border-left: 3px solid hsl(221 83% 35%);
+  background-color: hsl(221 83% 35% / 0.07) !important;
+  border-radius: 0 4px 4px 0;
+}
+
+.dark .sidebar-glow {
+  background-color: hsl(221 83% 35% / 0.15) !important;
+}
+
+@keyframes miniSidebarFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes progress-remaining {
   0% { background-position: 0 0; }
   100% { background-position: 24px 0; }

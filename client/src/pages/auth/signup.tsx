@@ -19,9 +19,11 @@ import {
   LineChart, Home, Warehouse, Hotel, Truck, Building2, Store, ShoppingBag, Factory,
   ChevronRight, Sparkles, Lock, Globe, Zap, ArrowRight, ArrowLeft, ChevronDown, ChevronUp,
   Fuel, Car, ShowerHead, Utensils, GraduationCap, Landmark, HeartPulse, ParkingCircle,
-  TreePine, Tent, Bed, Coffee, Scissors, Shirt, Dog, Dumbbell, Database,
+  TreePine, Tent, Bed, Coffee, Scissors, Shirt, Dog, Dumbbell, Database, LayoutGrid, Package,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { MiniSidebar } from "@/components/MiniSidebar";
+import { getAllTiers, TIER_PACK_MAP } from "@/lib/tierSectionMap";
 
 // --- Existing types (unchanged) ---
 type CorePackType = 'crm_pipeline' | 'modeling_tools' | 'analysis' | 'operations';
@@ -380,6 +382,9 @@ export default function SignupPage() {
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['marine_outdoor']);
+  const [packViewMode, setPackViewMode] = useState<'pack' | 'plan'>('pack');
+  const [hoveredTier, setHoveredTier] = useState<string | null>(null);
+  const allTiers = getAllTiers();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -490,6 +495,11 @@ export default function SignupPage() {
 
   const corePacks = availablePacks.filter(p => p.info.isCore);
   const addonPacks = availablePacks.filter(p => !p.info.isCore);
+
+  const getTierPackList = (tierSlug: string): PackType[] => {
+    const canonicalPacks = TIER_PACK_MAP[tierSlug] ?? [];
+    return canonicalPacks.filter((p) => availablePacks.some((ap) => ap.packType === p)) as PackType[];
+  };
 
   const totalMonthly = selectedPacks.reduce((sum, packType) => {
     const pack = availablePacks.find(p => p.packType === packType);
@@ -945,13 +955,148 @@ export default function SignupPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-1" data-testid="text-packs-title">Choose Your Tools</h2>
-          <p className="text-slate-500" data-testid="text-packs-description">
-            Start with a 7-day free trial on all packs. Your card won't be charged until the trial ends.
-          </p>
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800 mb-1" data-testid="text-packs-title">Choose Your Tools</h2>
+              <p className="text-slate-500" data-testid="text-packs-description">
+                Start with a 7-day free trial on all packs. Your card won't be charged until the trial ends.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg shrink-0">
+              <button
+                onClick={() => setPackViewMode('pack')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  packViewMode === 'pack'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Package className="h-3.5 w-3.5" />
+                Browse by Pack
+              </button>
+              <button
+                onClick={() => setPackViewMode('plan')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  packViewMode === 'plan'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Browse by Plan
+              </button>
+            </div>
+          </div>
         </div>
 
-        {recommendedPacks.length > 0 && (
+        {/* ─── PLAN MODE: Animated Tier Comparison Grid ─── */}
+        {packViewMode === 'plan' && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">Select a plan and we'll pre-select the right packs for you.</p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {allTiers.map((tier) => {
+                const isHovered = hoveredTier === tier.slug;
+                const isSelected =
+                  tier.slug === 'starter'
+                    ? selectedPacks.length === 0
+                    : (tier.slug === 'investor' && selectedPacks.includes('investor' as PackType) && !selectedPacks.includes('broker' as PackType)) ||
+                      (tier.slug === 'broker' && selectedPacks.includes('broker' as PackType) && !selectedPacks.includes('owner' as PackType)) ||
+                      (tier.slug === 'owner-operator' && selectedPacks.includes('owner' as PackType) && !selectedPacks.includes('fund_management' as PackType)) ||
+                      (tier.slug === 'institutional' && selectedPacks.includes('fund_management' as PackType));
+                return (
+                  <div
+                    key={tier.slug}
+                    role="button"
+                    tabIndex={0}
+                    className={`relative rounded-xl border-2 p-4 cursor-pointer transition-all duration-150 ease-out flex flex-col gap-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                      isHovered
+                        ? 'scale-[1.04] border-primary shadow-lg shadow-primary/20 ring-2 ring-primary/30 bg-white z-10'
+                        : isSelected
+                          ? 'border-cyan-400 bg-cyan-50/50'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                    } ${!isHovered && hoveredTier ? 'opacity-60' : 'opacity-100'}`}
+                    onMouseEnter={() => setHoveredTier(tier.slug)}
+                    onMouseLeave={() => setHoveredTier(null)}
+                    onFocus={() => setHoveredTier(tier.slug)}
+                    onBlur={() => setHoveredTier(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (!accountData) return;
+                        const packsForTier = getTierPackList(tier.slug);
+                        setSelectedPacks(packsForTier);
+                        registerMutation.mutate({
+                          ...accountData,
+                          packs: packsForTier,
+                          role: selectedRole,
+                          assetClassInterests: selectedAssets,
+                        });
+                      }
+                    }}
+                  >
+                    {tier.popular && (
+                      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                        <Badge className="bg-blue-600 text-white text-[10px] px-2.5 py-0.5 shadow-sm">
+                          <Sparkles className="h-2.5 w-2.5 mr-1" />
+                          Most Popular
+                        </Badge>
+                      </div>
+                    )}
+                    {tier.recommended && (
+                      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                        <Badge className="bg-primary text-white text-[10px] px-2.5 py-0.5 shadow-sm">
+                          <Crown className="h-2.5 w-2.5 mr-1" />
+                          Enterprise
+                        </Badge>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{tier.name}</p>
+                      <p className="text-lg font-extrabold text-primary mt-0.5">
+                        {tier.priceMonthly === 0 ? 'Free' : `$${tier.priceMonthly}/mo`}
+                      </p>
+                    </div>
+
+                    <MiniSidebar
+                      tierSlug={tier.slug}
+                      animate={isHovered}
+                      className="flex-1"
+                    />
+
+                    <Button
+                      size="sm"
+                      variant={isHovered ? 'default' : 'outline'}
+                      className={`w-full text-xs transition-all duration-150 ${
+                        isHovered ? 'bg-primary text-white shadow-md' : ''
+                      }`}
+                      disabled={registerMutation.isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!accountData) return;
+                        const packsForTier = getTierPackList(tier.slug);
+                        setSelectedPacks(packsForTier);
+                        registerMutation.mutate({
+                          ...accountData,
+                          packs: packsForTier,
+                          role: selectedRole,
+                          assetClassInterests: selectedAssets,
+                        });
+                      }}
+                    >
+                      {registerMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : null}
+                      {tier.slug === 'starter' ? 'Start Free' : 'Select this plan'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {packViewMode === 'pack' && recommendedPacks.length > 0 && (
           <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4 text-cyan-600" />
@@ -991,7 +1136,7 @@ export default function SignupPage() {
           </div>
         )}
 
-        <div className="space-y-8">
+        {packViewMode === 'pack' && <div className="space-y-8">
           {/* Core Packs */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -1111,7 +1256,7 @@ export default function SignupPage() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         <Separator />
 

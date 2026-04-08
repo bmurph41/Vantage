@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { ProspectingActivityProvider } from "@/contexts/ProspectingActivityContext";
+import { SidebarHighlightProvider } from "@/contexts/SidebarHighlightContext";
 import { GoogleMapsProvider } from "@/lib/google-maps-provider";
 import Router from "./Router";
 
@@ -52,13 +53,15 @@ function App() {
             <SettingsProvider>
               <AuthProvider>
                 <ProspectingActivityProvider>
-                  <TooltipProvider>
-                    <Toaster />
-                    <GlobalQueryErrorHandler />
-                    <Suspense fallback={<PageLoader />}>
-                      <Router />
-                    </Suspense>
-                  </TooltipProvider>
+                  <SidebarHighlightProvider>
+                    <TooltipProvider>
+                      <Toaster />
+                      <GlobalQueryErrorHandler />
+                      <Suspense fallback={<PageLoader />}>
+                        <Router />
+                      </Suspense>
+                    </TooltipProvider>
+                  </SidebarHighlightProvider>
                 </ProspectingActivityProvider>
               </AuthProvider>
             </SettingsProvider>

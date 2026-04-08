@@ -19,6 +19,7 @@ import { useDisplayMode } from "@/stores/display-mode-store";
 import { PaywallModal } from "@/components/PaywallModal";
 import { SupportContactModal } from "@/components/support/SupportContactModal";
 import { HeadphonesIcon } from "lucide-react";
+import { useSidebarHighlight } from "@/contexts/SidebarHighlightContext";
 
 // CRM Navigation (Core Entity Management only)
 const crmNav = [
@@ -234,6 +235,9 @@ export default function UnifiedSidebar() {
     setPaywallFeatureName(featureName);
     setPaywallOpen(true);
   };
+
+  const { highlightedIds, active: highlightActive } = useSidebarHighlight();
+  const isHighlighted = (id: string) => highlightActive && highlightedIds.includes(id);
 
   // Helper function to check if user has access to a pack
   const hasPack = (packType: PackType): boolean => {
@@ -709,7 +713,7 @@ export default function UnifiedSidebar() {
         
         {/* Operations Section - Flattened navigation with in-page tabs */}
         {canViewSection('operations') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('operations') && "sidebar-glow")}>
             <SectionHeader
               title="Operations"
               icon={Building2}
@@ -798,7 +802,7 @@ export default function UnifiedSidebar() {
         
         {/* CRM Section - Contacts, Companies, Properties */}
         {canViewSection('crm') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('crm') && "sidebar-glow")}>
             <SectionHeader
               title="CRM"
               icon={Users}
@@ -847,7 +851,7 @@ export default function UnifiedSidebar() {
 
         {/* Prospecting Section - Overview and Workroom */}
         {canViewSection('prospecting') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('prospecting') && "sidebar-glow")}>
             <SectionHeader
               title="Prospecting"
               icon={Search}
@@ -869,7 +873,7 @@ export default function UnifiedSidebar() {
 
         {/* Marketing Section */}
         {canViewSection('prospecting') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('marketing') && "sidebar-glow")}>
             <SectionHeader
               title="Marketing"
               icon={Megaphone}
@@ -891,7 +895,7 @@ export default function UnifiedSidebar() {
         
         {/* Pipeline Section - Deal Board, Activity Log, Follow-Ups, Forecast */}
         {canViewSection('crm') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('pipeline') && "sidebar-glow")}>
             <SectionHeader
               title="Pipeline"
               icon={Handshake}
@@ -913,7 +917,7 @@ export default function UnifiedSidebar() {
         
         {/* Deal Workspace Section - Consolidated DD, VDR, and Modeling */}
         {canViewSection('deal_workspace') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('deal-room') && "sidebar-glow")}>
             <SectionHeader 
               title="Deal Workspace" 
               icon={Briefcase}
@@ -941,7 +945,7 @@ export default function UnifiedSidebar() {
         
         {/* Analysis Section - Modeling Projects, Debt Scenarios, Exit Strategies, OM Builder (all users) */}
         {canViewSection('modeling_tools') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('underwriting') && "sidebar-glow")}>
             <SectionHeader
               title="Analysis"
               icon={Calculator}
@@ -1005,7 +1009,7 @@ export default function UnifiedSidebar() {
         </div>
         
         {/* Investor Services Section - Fund Management, LP Portal */}
-        <div className="mb-2">
+        <div className={cn("mb-2", (isHighlighted('fund-management') || isHighlighted('lp-portal')) && "sidebar-glow")}>
           <SectionHeader
             title="Fund Management"
             icon={DollarSign}
@@ -1105,7 +1109,7 @@ export default function UnifiedSidebar() {
         
         {/* Market Intelligence Section — always visible (free users see preview items) */}
         {canViewSection('market_intelligence') && (
-          <div className="mb-2">
+          <div className={cn("mb-2", isHighlighted('marinalytics') && "sidebar-glow")}>
             <SectionHeader
               title="Market Intelligence"
               icon={BarChart3}
