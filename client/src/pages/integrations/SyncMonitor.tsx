@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,124 +61,16 @@ interface SyncHistoryItem {
   message: string;
 }
 
-const SAMPLE_INTEGRATIONS: IntegrationSync[] = [
-  {
-    id: '1',
-    name: 'DockMaster',
-    type: 'marina_management',
-    provider: 'DockMaster Systems',
-    status: 'connected',
-    lastSync: new Date(Date.now() - 1800000),
-    nextSync: new Date(Date.now() + 3600000),
-    recordsImported: 1245,
-    recordsExported: 89,
-    errorCount: 0,
-    healthScore: 100,
-  },
-  {
-    id: '2',
-    name: 'Dockwa',
-    type: 'marina_management',
-    provider: 'Dockwa Inc',
-    status: 'syncing',
-    lastSync: new Date(Date.now() - 900000),
-    nextSync: null,
-    recordsImported: 892,
-    recordsExported: 45,
-    errorCount: 2,
-    healthScore: 95,
-  },
-  {
-    id: '3',
-    name: 'QuickBooks Online',
-    type: 'accounting',
-    provider: 'Intuit',
-    status: 'connected',
-    lastSync: new Date(Date.now() - 7200000),
-    nextSync: new Date(Date.now() + 1800000),
-    recordsImported: 3420,
-    recordsExported: 156,
-    errorCount: 0,
-    healthScore: 100,
-  },
-  {
-    id: '4',
-    name: 'Storable Marine',
-    type: 'marina_management',
-    provider: 'Storable',
-    status: 'error',
-    lastSync: new Date(Date.now() - 86400000),
-    nextSync: null,
-    recordsImported: 567,
-    recordsExported: 0,
-    errorCount: 5,
-    healthScore: 45,
-  },
-  {
-    id: '5',
-    name: 'Marina Office',
-    type: 'marina_management',
-    provider: 'Marina Office LLC',
-    status: 'pending',
-    lastSync: null,
-    nextSync: null,
-    recordsImported: 0,
-    recordsExported: 0,
-    errorCount: 0,
-    healthScore: 0,
-  },
-];
+interface IntegrationSyncRaw extends Omit<IntegrationSync, 'lastSync' | 'nextSync'> {
+  lastSync: string | null;
+  nextSync: string | null;
+}
 
-const SAMPLE_HISTORY: SyncHistoryItem[] = [
-  {
-    id: '1',
-    integrationId: '1',
-    integrationName: 'DockMaster',
-    type: 'full_sync',
-    status: 'success',
-    startTime: new Date(Date.now() - 1800000),
-    endTime: new Date(Date.now() - 1740000),
-    recordsProcessed: 245,
-    errors: 0,
-    message: 'Full sync completed successfully',
-  },
-  {
-    id: '2',
-    integrationId: '2',
-    integrationName: 'Dockwa',
-    type: 'import',
-    status: 'partial',
-    startTime: new Date(Date.now() - 900000),
-    endTime: new Date(Date.now() - 840000),
-    recordsProcessed: 156,
-    errors: 2,
-    message: '2 records skipped due to validation errors',
-  },
-  {
-    id: '3',
-    integrationId: '3',
-    integrationName: 'QuickBooks Online',
-    type: 'export',
-    status: 'success',
-    startTime: new Date(Date.now() - 7200000),
-    endTime: new Date(Date.now() - 7140000),
-    recordsProcessed: 89,
-    errors: 0,
-    message: 'Invoice export completed',
-  },
-  {
-    id: '4',
-    integrationId: '4',
-    integrationName: 'Storable Marine',
-    type: 'import',
-    status: 'failed',
-    startTime: new Date(Date.now() - 86400000),
-    endTime: new Date(Date.now() - 86340000),
-    recordsProcessed: 0,
-    errors: 5,
-    message: 'Authentication failed - API token expired',
-  },
-];
+interface SyncHistoryItemRaw extends Omit<SyncHistoryItem, 'startTime' | 'endTime'> {
+  startTime: string;
+  endTime: string;
+}
+
 
 function getStatusIcon(status: IntegrationSync['status']) {
   switch (status) {
@@ -239,12 +132,24 @@ export default function SyncMonitor() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: integrations, isLoading } = useQuery<IntegrationSync[]>({
+  const { data: integrations, isLoading } = useQuery<IntegrationSyncRaw[], Error, IntegrationSync[], string[]>({
     queryKey: ['/api/integrations/sync-status'],
+    select: (data: IntegrationSyncRaw[]): IntegrationSync[] =>
+      data.map((item) => ({
+        ...item,
+        lastSync: item.lastSync ? new Date(item.lastSync) : null,
+        nextSync: item.nextSync ? new Date(item.nextSync) : null,
+      })),
   });
 
-  const { data: history } = useQuery<SyncHistoryItem[]>({
+  const { data: history } = useQuery<SyncHistoryItemRaw[], Error, SyncHistoryItem[], string[]>({
     queryKey: ['/api/integrations/sync-history'],
+    select: (data: SyncHistoryItemRaw[]): SyncHistoryItem[] =>
+      data.map((item) => ({
+        ...item,
+        startTime: new Date(item.startTime),
+        endTime: new Date(item.endTime),
+      })),
   });
 
   const syncMutation = useMutation({
@@ -256,6 +161,7 @@ export default function SyncMonitor() {
     onSuccess: () => {
       toast({ title: "Sync Started", description: "Integration sync has been initiated." });
       queryClient.invalidateQueries({ queryKey: ['/api/integrations/sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/integrations/sync-history'] });
     },
     onError: () => {
       toast({ title: "Sync Failed", description: "Unable to start sync. Please try again.", variant: "destructive" });
@@ -264,8 +170,8 @@ export default function SyncMonitor() {
 
   const syncAllMutation = useMutation({
     mutationFn: async () => {
-      const connected = integrations?.filter(i => i.status === 'connected') || [];
-      await Promise.all(connected.map(i => 
+      const syncable = integrations?.filter(i => i.status === 'connected' || i.status === 'error') || [];
+      await Promise.all(syncable.map(i => 
         fetch(`/api/integrations/${i.id}/sync`, { method: 'POST' })
       ));
       return { success: true };
@@ -273,6 +179,7 @@ export default function SyncMonitor() {
     onSuccess: () => {
       toast({ title: "Sync All Started", description: "All integrations are being synced." });
       queryClient.invalidateQueries({ queryKey: ['/api/integrations/sync-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/integrations/sync-history'] });
     },
   });
 
@@ -291,6 +198,34 @@ export default function SyncMonitor() {
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (integrations && integrations.length === 0) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Activity className="h-6 w-6 text-primary" />
+            Integration Sync Monitor
+          </h1>
+          <p className="text-muted-foreground">
+            Monitor and manage data synchronization across all connected systems
+          </p>
+        </div>
+        <Card className="max-w-lg mx-auto mt-16">
+          <CardContent className="pt-12 pb-12 text-center">
+            <Wifi className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No integrations connected yet</h3>
+            <p className="text-muted-foreground mb-6">
+              Visit the Integrations Marketplace to connect QuickBooks, Dockwa, DockMaster, and other data sources.
+            </p>
+            <Link href="/integrations">
+              <Button>Browse Integrations</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }

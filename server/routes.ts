@@ -66,6 +66,7 @@ import { modelingEnhancementsRouter } from "./routes/modeling-enhancements-route
 import { onboardingRouter } from "./routes/onboarding-routes";
 import { orgSettingsRouter } from "./routes/org-settings-routes";
 import { integrationsMarketplaceRouter } from "./routes/integrations-marketplace-routes";
+import { integrationsSyncRouter } from "./routes/integrations-sync-routes";
 import { startPlatformCronJobs } from "./jobs/platform-cron";
 import { evaluateAutomations } from "./services/workflow-engine";
 import { vdrActivityRouter } from "./routes/vdr-activity-routes";
@@ -605,6 +606,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/org-settings", authenticateUser, enforceTenant, orgSettingsRouter);
   // Integrations Marketplace
   app.use("/api/integrations-marketplace", authenticateUser, enforceTenant, integrationsMarketplaceRouter);
+  // Integrations Sync Monitor
+  app.use("/api/integrations", authenticateUser, enforceTenant, integrationsSyncRouter);
 
   // Start background jobs (non-blocking)
   try { startPlatformCronJobs(); } catch (e) { console.error("Failed to start cron jobs:", e); }
