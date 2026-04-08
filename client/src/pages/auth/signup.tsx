@@ -385,6 +385,8 @@ export default function SignupPage() {
   const [packViewMode, setPackViewMode] = useState<'pack' | 'plan'>('pack');
   const [hoveredTier, setHoveredTier] = useState<string | null>(null);
   const allTiers = getAllTiers();
+  const [referralSource, setReferralSource] = useState<string>('');
+  const [referralSourceOther, setReferralSourceOther] = useState<string>('');
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -407,7 +409,7 @@ export default function SignupPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (values: SignupFormValues & { packs?: PackType[]; role?: RoleType | null; assetClassInterests?: string[] }) => {
+    mutationFn: async (values: SignupFormValues & { packs?: PackType[]; role?: RoleType | null; assetClassInterests?: string[]; referralSource?: string; referralSourceOther?: string }) => {
       const response = await apiRequest("POST", "/api/auth/register", {
         name: values.name,
         email: values.email,
@@ -416,6 +418,8 @@ export default function SignupPage() {
         dataBenchmarkingConsent: values.dataBenchmarkingConsent,
         role: values.role,
         assetClassInterests: values.assetClassInterests,
+        referralSource: values.referralSource || undefined,
+        referralSourceOther: values.referralSourceOther || undefined,
       });
       return response.json();
     },
@@ -466,6 +470,8 @@ export default function SignupPage() {
       packs: selectedPacks,
       role: selectedRole,
       assetClassInterests: selectedAssets,
+      referralSource: referralSource || undefined,
+      referralSourceOther: referralSourceOther || undefined,
     });
   };
 
@@ -696,6 +702,47 @@ export default function SignupPage() {
                         </FormItem>
                       )}
                     />
+
+                    {/* How did you find us? */}
+                    <div className="space-y-2 pt-1">
+                      <p className="text-sm font-medium text-slate-700">How did you find Vantage? <span className="text-slate-400 font-normal">(optional)</span></p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: 'google_search', label: 'Google / Search' },
+                          { value: 'linkedin', label: 'LinkedIn' },
+                          { value: 'word_of_mouth', label: 'Word of mouth' },
+                          { value: 'conference_event', label: 'Conference or event' },
+                          { value: 'broker_advisor', label: 'Broker or advisor' },
+                          { value: 'social_media', label: 'Social media' },
+                          { value: 'article_blog', label: 'Article or blog' },
+                          { value: 'listing_platform', label: 'Marina listing site' },
+                          { value: 'email_newsletter', label: 'Email / Newsletter' },
+                          { value: 'other', label: 'Other' },
+                        ].map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setReferralSource(referralSource === value ? '' : value)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                              referralSource === value
+                                ? 'bg-cyan-500 border-cyan-500 text-white shadow-sm'
+                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-cyan-400 hover:text-cyan-700'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      {referralSource === 'other' && (
+                        <Input
+                          value={referralSourceOther}
+                          onChange={(e) => setReferralSourceOther(e.target.value)}
+                          placeholder="Tell us how you found us..."
+                          className="h-9 text-sm border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 bg-slate-50/50 mt-1"
+                          data-testid="input-referral-other"
+                        />
+                      )}
+                    </div>
                   </CardContent>
                   <CardFooter className="flex flex-col space-y-4 pt-2">
                     <div className="w-full space-y-2 p-4 bg-slate-50/50 rounded-lg border border-slate-200">
@@ -1030,6 +1077,8 @@ export default function SignupPage() {
                           packs: packsForTier,
                           role: selectedRole,
                           assetClassInterests: selectedAssets,
+                          referralSource: referralSource || undefined,
+                          referralSourceOther: referralSourceOther || undefined,
                         });
                       }
                     }}
@@ -1081,6 +1130,8 @@ export default function SignupPage() {
                           packs: packsForTier,
                           role: selectedRole,
                           assetClassInterests: selectedAssets,
+                          referralSource: referralSource || undefined,
+                          referralSourceOther: referralSourceOther || undefined,
                         });
                       }}
                     >

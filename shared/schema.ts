@@ -425,6 +425,9 @@ export const users = pgTable("users", {
   phoneVerified: boolean("phone_verified").notNull().default(false),
   phoneVerificationCode: text("phone_verification_code"),
   phoneVerificationExpires: timestamp("phone_verification_expires"),
+  // Platform discovery
+  referralSource: text("referral_source"), // How they found Vantage
+  referralSourceOther: text("referral_source_other"), // Free text when source = "other"
 });
 
 // User Sessions - Track active sessions with device info

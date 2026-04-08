@@ -75,6 +75,8 @@ const registerSchema = z.object({
   orgId: z.string().optional(),
   orgName: z.string().optional(),
   dataBenchmarkingConsent: z.boolean(),
+  referralSource: z.string().optional(),
+  referralSourceOther: z.string().optional(),
 });
 
 function getDeviceInfo(req: Request): DeviceInfo {
@@ -301,7 +303,7 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid request', details: parsed.error.errors });
     }
 
-    const { email, password, name, orgId, orgName, dataBenchmarkingConsent } = parsed.data;
+    const { email, password, name, orgId, orgName, dataBenchmarkingConsent, referralSource, referralSourceOther } = parsed.data;
 
     // Validate consent - required for account creation
     if (!dataBenchmarkingConsent) {
@@ -343,6 +345,8 @@ router.post('/register', async (req: Request, res: Response) => {
         consentVersion: CONSENT_VERSION,
         benchmarkingOptOut: false,
         optOutTimestamp: null,
+        referralSource: referralSource || null,
+        referralSourceOther: referralSource === 'other' ? (referralSourceOther || null) : null,
       })
       .returning();
 
