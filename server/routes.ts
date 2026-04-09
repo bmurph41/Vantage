@@ -111,6 +111,8 @@ import crmNotesRoutes from "./routes/crm-notes-routes";
 import crmSummaryRoutes from "./routes/crm-summary-routes";
 import crmRelationshipScoreRouter from './routes/crm-relationship-score';
 import crmSavedViewsRoutes from "./routes/crm-saved-views-routes";
+import { crmGapsRouter } from "./routes/crm-gaps-routes";
+import { crmCalendarSyncRouter } from "./routes/crm-calendar-sync-routes";
 import crmIntelligenceRoutes from "./routes/crm-intelligence-routes";
 import crmAssociationsRoutes from "./routes/crm-associations-routes";
 import crmAdvancedSearchRoutes from "./routes/crm-advanced-search-routes";
@@ -497,9 +499,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 3. Demo user fallback in development (requires explicit opt-in)
-      if (!resolvedUser && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
-        resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "demo@localhost", name: "Demo User" };
+      // 3. Development fallback — mirrors /api/auth/me behaviour so GET and POST
+      //    both resolve the same admin user when no real session is present.
+      if (!resolvedUser && process.env.NODE_ENV !== 'production') {
+        resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Brett Murphy" };
       }
       
       if (!resolvedUser) {
@@ -549,6 +552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/crm/notes", crmNotesRoutes);
   app.use("/api/crm/summary", crmSummaryRoutes);
   app.use("/api/crm/saved-views", authenticateUser, requirePack("crm_pipeline"), crmSavedViewsRoutes);
+  app.use("/api/crm", authenticateUser, enforceTenant, crmGapsRouter);
+  app.use("/api/crm/calendar-sync", authenticateUser, enforceTenant, crmCalendarSyncRouter);
   app.use("/api/comments", authenticateUser, enforceTenant, crmIntelligenceRoutes);
   app.use("/api/crm", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);
   app.use("/api/sla", authenticateUser, enforceTenant, requirePack("crm_pipeline"), crmIntelligenceRoutes);

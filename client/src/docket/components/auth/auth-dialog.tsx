@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { LoginForm } from "./login-form";
 import { SignupForm } from "./signup-form";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,6 +39,9 @@ export function AuthDialog({ children, defaultMode = "login", onClose }: AuthDia
         {children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md p-0 bg-transparent border-none shadow-none">
+        <DialogTitle className="sr-only">
+          {mode === "login" ? "Sign In" : "Create Account"}
+        </DialogTitle>
         {mode === "login" ? (
           <LoginForm
             onSuccess={handleSuccess}

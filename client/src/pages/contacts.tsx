@@ -18,6 +18,7 @@ import { ImportResultsModal, type ImportResult } from "@/components/import-resul
 import { CrmPageShell } from "@/components/crm/CrmPageShell";
 import { CrmTopBar } from "@/components/crm/CrmTopBar";
 import { CrmDataTable, type CrmColumn } from "@/components/crm/CrmDataTable";
+import { CsvExportButton } from "@/components/crm/csv-export-button";
 import { DetailDrawer } from "@/components/crm/detail-drawer";
 import { SavedViewsSidebar } from '@/components/crm/SavedViewsSidebar';
 import { RelationshipScoreBadge } from '@/components/crm/RelationshipScoreBadge';
@@ -402,6 +403,7 @@ export default function Contacts() {
         subtitle={`${filteredContacts.length} contacts`}
         actions={
           <>
+            <CsvExportButton entityType="contacts" />
             <Button variant="outline" size="sm" onClick={() => setShowFileUpload(!showFileUpload)}>
               <Upload className="w-4 h-4 mr-1.5" />Import
             </Button>

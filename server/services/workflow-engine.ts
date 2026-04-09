@@ -1,4 +1,5 @@
 import { db } from '../db';
+import { pool } from '../db';
 import { storage } from '../storage';
 import {
   workflowAutomations,
@@ -12,6 +13,7 @@ import {
 } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { logger } from '../lib/logger';
+import { sendEmail, wrapEmailTemplate } from './email-service';
 
 // ── Trigger types ──────────────────────────────────────────────────────
 
@@ -253,6 +255,54 @@ async function executeAction(
           orgId,
         });
         result.detail = `Contact task "${action.params.title}" created`;
+        break;
+      }
+
+      case 'email.send': {
+        const toEmail = action.params.to
+          ? interpolateTemplate(action.params.to, entity, eventData)
+          : entity.email;
+        if (!toEmail) {
+          result.success = false;
+          result.detail = 'No recipient email address';
+          break;
+        }
+        const subject = interpolateTemplate(action.params.subject || '', entity, eventData);
+        const bodyHtml = interpolateTemplate(action.params.body || '', entity, eventData);
+        const wrappedHtml = wrapEmailTemplate(bodyHtml);
+        const sent = await sendEmail({
+          to: toEmail,
+          subject,
+          text: bodyHtml.replace(/<[^>]*>/g, ''),
+          html: wrappedHtml,
+          from: action.params.fromName
+            ? { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com', name: action.params.fromName }
+            : undefined,
+        });
+        if (sent) {
+          // Log to workflow_email_log
+          try {
+            await pool.query(
+              `INSERT INTO workflow_email_log (id, org_id, to_email, subject, body_html, status, sent_at, deal_id, contact_id, rule_name)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, 'sent', NOW(), $5, $6, $7)`,
+              [orgId, toEmail, subject, bodyHtml, entity.id || null, entity.contactId || null, action.params.ruleName || null]
+            );
+          } catch (_logErr) { /* non-fatal */ }
+          // Log CRM activity
+          await storage.createCrmActivity({
+            type: 'email',
+            subject: `Automated email: ${subject}`,
+            description: `Email sent to ${toEmail} via workflow automation`,
+            direction: 'outbound',
+            entityType: entity.contactId ? 'contact' : 'deal',
+            entityId: entity.contactId || entity.id,
+            orgId,
+          });
+          result.detail = `Email sent to ${toEmail}: "${subject}"`;
+        } else {
+          result.success = false;
+          result.detail = `Email send failed to ${toEmail}`;
+        }
         break;
       }
 

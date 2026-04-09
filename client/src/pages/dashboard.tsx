@@ -632,7 +632,7 @@ export default function Dashboard() {
           avgPricePerSlipTotalCount: pricePerSlipResult.totalCount,
         };
       } catch (error) {
-        console.error('Failed to fetch sales comps metrics:', error);
+        console.error('Failed to fetch sales comps metrics:', error instanceof Error ? error.message : error);
         return defaultResult;
       }
     },

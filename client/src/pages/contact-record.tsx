@@ -31,6 +31,7 @@ import {
 import { ContactTimeline } from '@/components/crm/ContactTimeline';
 import { RelationshipMap } from '@/components/crm/RelationshipMap';
 import { useProspectingActivity } from '@/contexts/ProspectingActivityContext';
+import { Shield, AlertTriangle as ShieldAlert } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────
@@ -87,6 +88,12 @@ interface ContactRecord {
   investmentNotes?: string | null;
   relationshipScore?: number | null;
   nextFollowupDate?: string | null;
+  doNotContact?: boolean;
+  gdprConsent?: boolean;
+  gdprConsentDate?: string | null;
+  emailOptOut?: boolean;
+  smsOptOut?: boolean;
+  mailOptOut?: boolean;
   ndaOnFile?: boolean;
   emailConsent?: boolean;
 }
@@ -481,6 +488,33 @@ function ContactAboutSidebar({ contact }: { contact: ContactRecord }) {
           </div>
         </RecordFieldGroup>
       )}
+
+      {/* Consent & Privacy */}
+      <RecordFieldGroup title="Consent & Privacy" icon={Shield} collapsible defaultOpen={false}>
+        {contact.doNotContact && (
+          <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950 rounded text-red-700 dark:text-red-300 text-xs font-medium">
+            <ShieldAlert className="h-3.5 w-3.5" /> Do Not Contact
+          </div>
+        )}
+        <RecordField label="GDPR Consent" value={
+          <Badge variant={contact.gdprConsent ? "default" : "outline"} className="text-xs">
+            {contact.gdprConsent ? 'Granted' : 'Not Granted'}
+          </Badge>
+        } />
+        {contact.gdprConsentDate && (
+          <RecordField label="Consent Date" value={fmtDate(contact.gdprConsentDate)} icon={Calendar} />
+        )}
+        <RecordField label="Email" value={
+          <Badge variant={contact.emailOptOut ? "destructive" : "secondary"} className="text-xs">
+            {contact.emailOptOut ? 'Opted Out' : 'Subscribed'}
+          </Badge>
+        } />
+        <RecordField label="SMS" value={
+          <Badge variant={contact.smsOptOut ? "destructive" : "secondary"} className="text-xs">
+            {contact.smsOptOut ? 'Opted Out' : 'Subscribed'}
+          </Badge>
+        } />
+      </RecordFieldGroup>
 
       {/* Metadata */}
       <RecordFieldGroup title="Record" icon={FileText} collapsible defaultOpen={false}>

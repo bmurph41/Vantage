@@ -12,8 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings, Plus, Trash2, GripVertical, Users, Layers, Tag, Shield } from "lucide-react";
+import { Settings, Plus, Trash2, GripVertical, Users, Layers, Tag, Shield, Webhook } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { lazy, Suspense } from "react";
+const WebhookManager = lazy(() => import("@/components/crm/webhook-manager").then(m => ({ default: m.WebhookManager })));
+const CustomFieldDefinitionsManager = lazy(() => import("@/components/crm/custom-field-definitions-manager").then(m => ({ default: m.CustomFieldDefinitionsManager })));
+
 
 // Custom Fields Management
 function CustomFieldsTab() {

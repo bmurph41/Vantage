@@ -47,6 +47,7 @@ import { useDisplayMode } from "@/stores/display-mode-store";
 import SimpleDealTracker from "@/components/pipeline/SimpleDealTracker";
 import MarinaMapEmbed from "@/components/marina-map/MarinaMapEmbed";
 import AutomationRulesPanel from "@/components/pipeline/AutomationRulesPanel";
+import { CsvExportButton } from "@/components/crm/csv-export-button";
 import { PipelineNudges } from "@/components/pipeline/PipelineNudges";
 import DealGanttView from "@/components/crm/deal-gantt-view";
 import { ForecastChart } from "@/components/pipeline/ForecastChart";
@@ -1046,6 +1047,8 @@ export default function Pipeline() {
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setIsSettingsOpen(true)}>
               <Settings2 className="w-3.5 h-3.5 mr-1" /> Stages
             </Button>
+
+            <CsvExportButton entityType="deals" />
 
             <Link href="/marinalytics/marina-map?source=pipeline">
               <Button variant="outline" size="sm" className="h-8 text-xs">

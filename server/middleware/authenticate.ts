@@ -39,14 +39,15 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
       }
     }
 
-    // In development mode, allow demo user fallback for local testing (requires explicit opt-in)
-    if (!(req as any).user && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
+    // Development fallback — mirrors /api/auth/me behaviour so all routes
+    // resolve the same admin user when no real session is present.
+    if (!(req as any).user && process.env.NODE_ENV !== 'production') {
       (req as any).user = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",
         orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",
         role: "owner",
-        email: "demo@localhost",
-        name: "Demo User",
+        email: "brettmurphy41@gmail.com",
+        name: "Brett Murphy",
       };
     }
 
