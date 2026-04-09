@@ -63,6 +63,7 @@ import {
   insertOutreachTemplateSchema,
   marinaListings,
   modelingProjectConfig,
+  modelingProjects,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,

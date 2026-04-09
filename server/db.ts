@@ -22,4 +22,11 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000, // Timeout connection attempts after 10s
 });
 
+// Absorb pool-level errors (e.g. transient WebSocket failures from the Neon
+// serverless driver) so they don't bubble up as uncaught exceptions and crash
+// the process before the HTTP server has started.
+pool.on('error', (err) => {
+  console.error('[DB] Pool error (non-fatal):', err.message);
+});
+
 export const db = drizzle({ client: pool, schema });
