@@ -9183,7 +9183,10 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       if (!projectRow) return res.status(404).json({ error: 'Project not found' });
 
-      // Read authorization: owner, org-owner, or listed collaborator
+      // Read authorization: owner, org-owner, or listed collaborator.
+      // Historical actors (users who appear in activity but haven't been seeded
+      // yet) are also granted access and seeded inline so they are not locked out
+      // before any owner first triggers the backfill.
       const isProjectOwner = projectRow.createdBy === userId;
       const isOrgOwner     = userRole === 'owner';
 
@@ -9198,14 +9201,32 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           .limit(1);
 
         if (!memberRow) {
-          return res.status(403).json({ error: 'You do not have access to this project' });
+          // Check whether this user has any historical activity on the project.
+          // If they do, they are a historical actor and should be granted access
+          // and seeded as editor immediately so they are not blocked.
+          const [activityRow] = await db
+            .select({ id: modelingProjectActivity.id })
+            .from(modelingProjectActivity)
+            .where(and(
+              eq(modelingProjectActivity.projectId, projectId),
+              eq(modelingProjectActivity.userId, userId),
+            ))
+            .limit(1);
+
+          if (!activityRow) {
+            return res.status(403).json({ error: 'You do not have access to this project' });
+          }
+
+          // Seed the historical actor now so subsequent calls pass membership check
+          await db
+            .insert(modelingProjectCollaborators)
+            .values({ projectId, userId, role: 'editor', addedBy: projectRow.createdBy ?? undefined })
+            .onConflictDoNothing();
         }
       }
 
-      // Backfill: seed project creator + historical activity actors as collaborators.
-      // Runs after auth so unauthenticated callers never trigger a write side-effect.
-      // Creator check is separate so historical actors are always caught up regardless
-      // of whether the creator was already seeded on a previous request.
+      // Backfill: seed project creator + all historical activity actors as collaborators.
+      // Runs after auth; uses onConflictDoNothing so safe on every authorized GET.
       const actorIds = new Set<string>();
       if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
       if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
