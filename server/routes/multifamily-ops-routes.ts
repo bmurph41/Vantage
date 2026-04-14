@@ -395,4 +395,123 @@ router.put('/turns/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// GET /rent-collection — Rent payment status by unit (derived from unit status)
+// ============================================================================
+router.get('/rent-collection', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const marinaId = req.query.marinaId as string | undefined;
+
+    let conditions: any[] = [eq(opsMultifamilyUnits.orgId, orgId)];
+    if (marinaId) conditions.push(eq(opsMultifamilyUnits.marinaId, marinaId as string));
+
+    const units = await db.select().from(opsMultifamilyUnits).where(and(...conditions));
+
+    const statusToPayment = (status: string): { paymentStatus: string; paymentLabel: string } => {
+      switch (status) {
+        case 'occupied':        return { paymentStatus: 'paid',        paymentLabel: 'Paid' };
+        case 'delinquent':      return { paymentStatus: 'delinquent',  paymentLabel: 'Delinquent' };
+        case 'on_notice':       return { paymentStatus: 'at_risk',     paymentLabel: 'At Risk' };
+        case 'down_for_turn':   return { paymentStatus: 'vacant',      paymentLabel: 'Vacant' };
+        case 'vacant':          return { paymentStatus: 'vacant',      paymentLabel: 'Vacant' };
+        default:                return { paymentStatus: 'unknown',     paymentLabel: 'Unknown' };
+      }
+    };
+
+    const records = units
+      .filter(u => u.status !== 'vacant' && u.status !== 'down_for_turn')
+      .map(u => {
+        const { paymentStatus, paymentLabel } = statusToPayment(u.status);
+        return {
+          id: u.id,
+          unitNumber: u.unitNumber,
+          unitType: u.unitType,
+          tenantName: u.tenantName || '—',
+          currentRent: parseFloat(u.currentRent || '0'),
+          paymentStatus,
+          paymentLabel,
+        };
+      })
+      .sort((a, b) => {
+        const order: Record<string, number> = { delinquent: 0, at_risk: 1, paid: 2, vacant: 3, unknown: 4 };
+        return (order[a.paymentStatus] || 9) - (order[b.paymentStatus] || 9);
+      });
+
+    const summary = {
+      paid: records.filter(r => r.paymentStatus === 'paid').length,
+      delinquent: records.filter(r => r.paymentStatus === 'delinquent').length,
+      atRisk: records.filter(r => r.paymentStatus === 'at_risk').length,
+      totalCollectable: records.filter(r => r.paymentStatus === 'paid').reduce((s, r) => s + r.currentRent, 0),
+      totalDelinquent: records.filter(r => r.paymentStatus === 'delinquent').reduce((s, r) => s + r.currentRent, 0),
+    };
+
+    res.json({ summary, records });
+  } catch (err: any) {
+    console.error('Multifamily rent-collection error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// GET /maintenance — Maintenance request queue (derived from turns + unit status)
+// ============================================================================
+router.get('/maintenance', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const marinaId = req.query.marinaId as string | undefined;
+
+    let unitConds: any[] = [eq(opsMultifamilyUnits.orgId, orgId)];
+    let turnConds: any[] = [eq(opsMultifamilyTurns.orgId, orgId)];
+    if (marinaId) {
+      unitConds.push(eq(opsMultifamilyUnits.marinaId, marinaId as string));
+      turnConds.push(eq(opsMultifamilyTurns.marinaId, marinaId as string));
+    }
+
+    const [units, turns] = await Promise.all([
+      db.select().from(opsMultifamilyUnits).where(and(...unitConds)),
+      db.select().from(opsMultifamilyTurns).where(and(...turnConds)).orderBy(desc(opsMultifamilyTurns.createdAt)),
+    ]);
+
+    // Derive priority from turn scope
+    const scopePriority = (scope: string): 'high' | 'medium' | 'low' => {
+      switch (scope) {
+        case 'flooring':
+        case 'full_rehab':
+          return 'high';
+        case 'paint':
+        case 'deep_clean':
+          return 'medium';
+        default:
+          return 'low';
+      }
+    };
+
+    const activeTurns = turns.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+    const requests = activeTurns.map(t => ({
+      id: t.id,
+      unitNumber: t.unitNumber,
+      type: t.scope.replace(/_/g, ' '),
+      priority: scopePriority(t.scope),
+      status: t.status,
+      requestedDate: t.moveOutDate,
+      estimatedCost: parseFloat(t.estimatedCost || '0'),
+    })).sort((a, b) => {
+      const p: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      return (p[a.priority] || 9) - (p[b.priority] || 9);
+    });
+
+    const priorityCounts = {
+      high: requests.filter(r => r.priority === 'high').length,
+      medium: requests.filter(r => r.priority === 'medium').length,
+      low: requests.filter(r => r.priority === 'low').length,
+    };
+
+    res.json({ priorityCounts, requests });
+  } catch (err: any) {
+    console.error('Multifamily maintenance error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

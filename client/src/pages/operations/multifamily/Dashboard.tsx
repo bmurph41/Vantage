@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Building2, Percent, DollarSign, AlertTriangle, Wrench } from "lucide-react";
+import { Building2, Percent, DollarSign, AlertTriangle, Wrench, CheckCircle, XCircle, Clock } from "lucide-react";
 
 interface MultifamilyStats {
   totalUnits: number;
@@ -52,12 +52,55 @@ interface MultifamilyTurn {
   estimatedCost: string | null;
 }
 
+interface RentCollectionRecord {
+  id: string;
+  unitNumber: string;
+  unitType: string;
+  tenantName: string;
+  currentRent: number;
+  paymentStatus: string;
+  paymentLabel: string;
+}
+
+interface RentCollectionData {
+  summary: { paid: number; delinquent: number; atRisk: number; totalCollectable: number; totalDelinquent: number };
+  records: RentCollectionRecord[];
+}
+
+interface MaintenanceRequest {
+  id: string;
+  unitNumber: string;
+  type: string;
+  priority: "high" | "medium" | "low";
+  status: string;
+  requestedDate: string;
+  estimatedCost: number;
+}
+
+interface MaintenanceData {
+  priorityCounts: { high: number; medium: number; low: number };
+  requests: MaintenanceRequest[];
+}
+
 const STATUS_COLORS: Record<string, string> = {
   occupied: "hsl(var(--primary))",
   vacant: "#ef4444",
   "on notice": "#f59e0b",
   "down for turn": "#6b7280",
   delinquent: "#dc2626",
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+  high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  low: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+};
+
+const PAYMENT_COLORS: Record<string, string> = {
+  paid: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  delinquent: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  at_risk: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  vacant: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
 function KpiCard({
@@ -142,6 +185,16 @@ export default function MultifamilyDashboard() {
     retry: false,
   });
 
+  const { data: rentCollection, isLoading: rentLoading } = useQuery<RentCollectionData>({
+    queryKey: ["/api/multifamily-ops/rent-collection"],
+    retry: false,
+  });
+
+  const { data: maintenanceData, isLoading: maintLoading } = useQuery<MaintenanceData>({
+    queryKey: ["/api/multifamily-ops/maintenance"],
+    retry: false,
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -173,6 +226,11 @@ export default function MultifamilyDashboard() {
     .sort((a, b) => (a.leaseEnd! > b.leaseEnd! ? 1 : -1));
 
   const activeTurns = turns.filter(t => t.status !== "completed" && t.status !== "cancelled");
+
+  const rentRecords = rentCollection?.records || [];
+  const rentSummary = rentCollection?.summary;
+  const maintRequests = maintenanceData?.requests || [];
+  const priorityCounts = maintenanceData?.priorityCounts || { high: 0, medium: 0, low: 0 };
 
   return (
     <div className="p-6 space-y-6">
@@ -264,6 +322,158 @@ export default function MultifamilyDashboard() {
 
       <Card>
         <CardHeader>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-primary" />
+            <CardTitle>Rent Collection Status</CardTitle>
+          </div>
+          <CardDescription>Current month payment status by unit</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {rentLoading ? (
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+          ) : (
+            <>
+              {rentSummary && (
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/30">
+                    <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Paid</p>
+                      <p className="text-xl font-bold text-green-600">{rentSummary.paid}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
+                    <XCircle className="h-5 w-5 text-red-600 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Delinquent</p>
+                      <p className="text-xl font-bold text-red-600">{rentSummary.delinquent}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30">
+                    <Clock className="h-5 w-5 text-yellow-600 shrink-0" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">At Risk</p>
+                      <p className="text-xl font-bold text-yellow-600">{rentSummary.atRisk}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {rentRecords.length === 0 ? (
+                <div className="flex items-center justify-center h-24 text-muted-foreground">
+                  No occupied units yet. Add units with tenants to track rent collection.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground">
+                        <th className="text-left py-2 pr-4 font-medium">Unit</th>
+                        <th className="text-left py-2 pr-4 font-medium">Type</th>
+                        <th className="text-left py-2 pr-4 font-medium">Tenant</th>
+                        <th className="text-left py-2 pr-4 font-medium">Rent</th>
+                        <th className="text-left py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rentRecords.slice(0, 10).map((r) => (
+                        <tr key={r.id} className="border-b last:border-0 hover:bg-muted/50">
+                          <td className="py-2 pr-4 font-medium">{r.unitNumber}</td>
+                          <td className="py-2 pr-4">{r.unitType}</td>
+                          <td className="py-2 pr-4">{r.tenantName}</td>
+                          <td className="py-2 pr-4">${r.currentRent.toFixed(0)}</td>
+                          <td className="py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[r.paymentStatus] || PAYMENT_COLORS.vacant}`}>
+                              {r.paymentLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-primary" />
+              <CardTitle>Maintenance Request Queue</CardTitle>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              {priorityCounts.high > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-medium dark:bg-red-900 dark:text-red-200">
+                  {priorityCounts.high} High
+                </span>
+              )}
+              {priorityCounts.medium > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium dark:bg-yellow-900 dark:text-yellow-200">
+                  {priorityCounts.medium} Medium
+                </span>
+              )}
+              {priorityCounts.low > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 font-medium dark:bg-gray-800 dark:text-gray-200">
+                  {priorityCounts.low} Low
+                </span>
+              )}
+            </div>
+          </div>
+          <CardDescription>Active work orders sorted by priority</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {maintLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+          ) : maintRequests.length === 0 ? (
+            <div className="flex items-center justify-center h-24 text-muted-foreground">
+              No active maintenance requests. Work orders will appear when unit turns are logged.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Unit</th>
+                    <th className="text-left py-2 pr-4 font-medium">Work Type</th>
+                    <th className="text-left py-2 pr-4 font-medium">Priority</th>
+                    <th className="text-left py-2 pr-4 font-medium">Status</th>
+                    <th className="text-left py-2 pr-4 font-medium">Requested</th>
+                    <th className="text-left py-2 font-medium">Est. Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintRequests.map((req) => (
+                    <tr key={req.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-2 pr-4 font-medium">{req.unitNumber}</td>
+                      <td className="py-2 pr-4 capitalize">{req.type}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${PRIORITY_COLORS[req.priority]}`}>
+                          {req.priority}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${turnStatusCls(req.status)}`}>
+                          {req.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">{req.requestedDate}</td>
+                      <td className="py-2">
+                        {req.estimatedCost > 0 ? `$${req.estimatedCost.toLocaleString()}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Lease Expiration — Next 90 Days</CardTitle>
           <CardDescription>Tenants with leases expiring in the next 90 days</CardDescription>
         </CardHeader>
@@ -302,60 +512,6 @@ export default function MultifamilyDashboard() {
                       <td className="py-2">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${unitStatusCls(unit.status)}`}>
                           {unit.status.replace(/_/g, " ")}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-primary" />
-            <CardTitle>Active Unit Turns</CardTitle>
-          </div>
-          <CardDescription>Unit turnover work in progress</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {turnsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
-            </div>
-          ) : activeTurns.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-muted-foreground">
-              No active unit turns. Turns will appear when move-outs are recorded.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-medium">Unit</th>
-                    <th className="text-left py-2 pr-4 font-medium">Move-out</th>
-                    <th className="text-left py-2 pr-4 font-medium">Target Move-in</th>
-                    <th className="text-left py-2 pr-4 font-medium">Scope</th>
-                    <th className="text-left py-2 pr-4 font-medium">Est. Cost</th>
-                    <th className="text-left py-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeTurns.map((turn) => (
-                    <tr key={turn.id} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-2 pr-4 font-medium">{turn.unitNumber}</td>
-                      <td className="py-2 pr-4">{turn.moveOutDate}</td>
-                      <td className="py-2 pr-4">{turn.targetMoveIn || "—"}</td>
-                      <td className="py-2 pr-4 capitalize">{turn.scope.replace(/_/g, " ")}</td>
-                      <td className="py-2 pr-4">
-                        {turn.estimatedCost ? `$${parseFloat(turn.estimatedCost).toLocaleString()}` : "—"}
-                      </td>
-                      <td className="py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${turnStatusCls(turn.status)}`}>
-                          {turn.status.replace(/_/g, " ")}
                         </span>
                       </td>
                     </tr>

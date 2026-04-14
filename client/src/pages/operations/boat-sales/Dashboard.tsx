@@ -84,8 +84,22 @@ export default function BoatSalesDashboard() {
   });
 
   const availableInventory = inventory.filter(i => i.status === 'available').slice(0, 6);
+  const activeInventoryTable = inventory.filter(i => i.status === 'available' || i.status === 'pending').slice(0, 10);
   const recentSales = transactions.slice(0, 5);
   const pendingTradeIns = (tradeIns as any[]).filter(t => t.status === 'pending_evaluation');
+
+  // Pipeline counts
+  const listingsCount = inventoryStats?.availableUnits || 0;
+  const underContractCount = inventoryStats?.pendingUnits || 0;
+  const now = new Date();
+  const mtdStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const closedMtd = transactions.filter(t => t.saleDate >= mtdStart).length;
+  const closedMtdRevenue = transactions
+    .filter(t => t.saleDate >= mtdStart)
+    .reduce((sum, t) => sum + parseFloat(t.salePrice), 0);
+
+  // Buyer activity feed (recent transactions as lead activity)
+  const buyerActivity = transactions.slice(0, 8);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
@@ -157,6 +171,51 @@ export default function BoatSalesDashboard() {
           </div>
 
           <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Active Listings</p>
+                      <p className="text-3xl font-bold mt-1 text-blue-600">{listingsCount}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Available for sale</p>
+                    </div>
+                    <div className="h-14 w-14 rounded-full bg-blue-500/10 flex items-center justify-center">
+                      <Package className="h-7 w-7 text-blue-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-yellow-500">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Under Contract</p>
+                      <p className="text-3xl font-bold mt-1 text-yellow-600">{underContractCount}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Pending delivery</p>
+                    </div>
+                    <div className="h-14 w-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                      <Clock className="h-7 w-7 text-yellow-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-green-500">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Closed MTD</p>
+                      <p className="text-3xl font-bold mt-1 text-green-600">{closedMtd}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{closedMtdRevenue > 0 ? formatCurrency(closedMtdRevenue) : "No sales yet"}</p>
+                    </div>
+                    <div className="h-14 w-14 rounded-full bg-green-500/10 flex items-center justify-center">
+                      <TrendingUp className="h-7 w-7 text-green-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="pt-6">
@@ -352,6 +411,101 @@ export default function BoatSalesDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Inventory</CardTitle>
+                <CardDescription>Available and pending units in stock</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activeInventoryTable.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No active inventory. Add boats to begin selling.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-muted-foreground">
+                          <th className="text-left py-2 pr-4 font-medium">Stock #</th>
+                          <th className="text-left py-2 pr-4 font-medium">Year</th>
+                          <th className="text-left py-2 pr-4 font-medium">Make / Model</th>
+                          <th className="text-left py-2 pr-4 font-medium">Condition</th>
+                          <th className="text-left py-2 pr-4 font-medium">List Price</th>
+                          <th className="text-left py-2 pr-4 font-medium">Days on Lot</th>
+                          <th className="text-left py-2 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeInventoryTable.map((item) => (
+                          <tr key={item.id} className="border-b last:border-0 hover:bg-muted/50">
+                            <td className="py-2 pr-4 font-medium text-primary">{item.stockNumber}</td>
+                            <td className="py-2 pr-4">{item.year}</td>
+                            <td className="py-2 pr-4">{item.make} {item.model}</td>
+                            <td className="py-2 pr-4">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getConditionColor(item.condition)}`}>
+                                {item.condition}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-4 font-semibold">{formatCurrency(parseFloat(item.listPrice))}</td>
+                            <td className="py-2 pr-4">{item.daysOnLot !== undefined ? `${item.daysOnLot}d` : "—"}</td>
+                            <td className="py-2">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {inventory.length > 10 && (
+                  <div className="mt-4">
+                    <Link href="/operations/boat-sales/inventory">
+                      <Button variant="outline" className="w-full">
+                        View All {inventory.length} Units
+                        <ArrowUpRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Buyer Activity Feed</CardTitle>
+                <CardDescription>Recent buyer inquiries and transactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {buyerActivity.length === 0 ? (
+                  <div className="flex items-center justify-center h-24 text-muted-foreground">
+                    No buyer activity yet. Sales will appear here as they are recorded.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {buyerActivity.map((sale) => (
+                      <div key={sale.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Ship className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{sale.buyerName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {sale.transactionNumber} · {formatDate(sale.saleDate)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-sm">{formatCurrency(parseFloat(sale.salePrice))}</p>
+                          <p className={`text-xs ${sale.isDelivered ? "text-green-600" : "text-yellow-600"}`}>
+                            {sale.isDelivered ? "Delivered" : "Pending delivery"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="inventory">

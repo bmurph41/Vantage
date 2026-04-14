@@ -2,8 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
   XAxis,
@@ -15,6 +13,16 @@ import {
 } from "recharts";
 import { Warehouse, Percent, DollarSign, Box, AlertTriangle } from "lucide-react";
 
+interface OccupancyGridEntry {
+  size: string;
+  occupied: number;
+  available: number;
+  delinquent: number;
+  reserved: number;
+  maintenance: number;
+  total: number;
+}
+
 interface SelfStorageStats {
   totalUnits: number;
   occupancyPct: number;
@@ -24,6 +32,7 @@ interface SelfStorageStats {
   averageUnitRate: number;
   rateChange: number;
   unitSizeMix: Array<{ size: string; count: number }>;
+  unitOccupancyGrid: OccupancyGridEntry[];
   moveInOutTrend: Array<{ month: string; moveIns: number; moveOuts: number }>;
 }
 
@@ -123,15 +132,21 @@ export default function SelfStorageDashboard() {
     );
   }
 
-  const unitSizeMix = stats?.unitSizeMix || [];
+  const occupancyGrid = stats?.unitOccupancyGrid || [];
   const moveInOutTrend = stats?.moveInOutTrend || [];
   const hasData = !isError && stats;
 
   const delinquentUnits = units.filter(u => u.status === "delinquent");
-  const recentMoveIns = units
-    .filter(u => u.moveInDate)
-    .sort((a, b) => (b.moveInDate! > a.moveInDate! ? 1 : -1))
-    .slice(0, 8);
+
+  // This month's move-ins
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+  const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+  const thisMonthMoveIns = units
+    .filter(u => u.moveInDate && u.moveInDate >= thisMonthStart && u.moveInDate <= thisMonthEnd)
+    .sort((a, b) => (b.moveInDate! > a.moveInDate! ? 1 : -1));
+
+  const monthLabel = now.toLocaleString("default", { month: "long", year: "numeric" });
 
   return (
     <div className="p-6 space-y-6">
@@ -176,35 +191,61 @@ export default function SelfStorageDashboard() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Unit Occupancy Grid</CardTitle>
+          <CardDescription>Occupied vs. available by unit size</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!hasData || occupancyGrid.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No unit data yet. Add units to see the occupancy grid.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Size</th>
+                    <th className="text-center py-2 pr-4 font-medium text-blue-600">Occupied</th>
+                    <th className="text-center py-2 pr-4 font-medium text-green-600">Available</th>
+                    <th className="text-center py-2 pr-4 font-medium text-red-600">Delinquent</th>
+                    <th className="text-center py-2 pr-4 font-medium text-yellow-600">Reserved</th>
+                    <th className="text-center py-2 pr-4 font-medium">Total</th>
+                    <th className="text-center py-2 font-medium">Occ %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {occupancyGrid.map((row) => {
+                    const occPct = row.total > 0 ? Math.round(((row.occupied + row.delinquent) / row.total) * 100) : 0;
+                    return (
+                      <tr key={row.size} className="border-b last:border-0 hover:bg-muted/50">
+                        <td className="py-2 pr-4 font-medium">{row.size}</td>
+                        <td className="py-2 pr-4 text-center font-semibold text-blue-600">{row.occupied}</td>
+                        <td className="py-2 pr-4 text-center font-semibold text-green-600">{row.available}</td>
+                        <td className="py-2 pr-4 text-center font-semibold text-red-600">{row.delinquent}</td>
+                        <td className="py-2 pr-4 text-center font-semibold text-yellow-600">{row.reserved}</td>
+                        <td className="py-2 pr-4 text-center">{row.total}</td>
+                        <td className="py-2 text-center">
+                          <span className={`font-medium ${occPct >= 90 ? "text-green-600" : occPct >= 70 ? "text-yellow-600" : "text-red-600"}`}>
+                            {occPct}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Unit Size Mix</CardTitle>
-            <CardDescription>Distribution of units by size category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!hasData || unitSizeMix.length === 0 ? (
-              <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No unit data yet. Add units to see the size distribution.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={unitSizeMix}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="size" tick={{ fontSize: 12 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="count" name="Units" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Move-in / Move-out Trend</CardTitle>
-            <CardDescription>Monthly move activity</CardDescription>
+            <CardDescription>Monthly move activity (last 6 months)</CardDescription>
           </CardHeader>
           <CardContent>
             {!hasData || moveInOutTrend.length === 0 ? (
@@ -226,58 +267,52 @@ export default function SelfStorageDashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Move-ins</CardTitle>
-          <CardDescription>Most recent tenant move-ins by move-in date</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {unitsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
-            </div>
-          ) : recentMoveIns.length === 0 ? (
-            <div className="flex items-center justify-center h-24 text-muted-foreground">
-              No move-in records. Add tenants to track move-in history.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-medium">Unit</th>
-                    <th className="text-left py-2 pr-4 font-medium">Size</th>
-                    <th className="text-left py-2 pr-4 font-medium">Tenant</th>
-                    <th className="text-left py-2 pr-4 font-medium">Move-in Date</th>
-                    <th className="text-left py-2 pr-4 font-medium">Rate / Mo</th>
-                    <th className="text-left py-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentMoveIns.map((unit) => (
-                    <tr key={unit.id} className="border-b last:border-0 hover:bg-muted/50">
-                      <td className="py-2 pr-4 font-medium">{unit.unitNumber}</td>
-                      <td className="py-2 pr-4">{unit.size}</td>
-                      <td className="py-2 pr-4">{unit.tenantName || "—"}</td>
-                      <td className="py-2 pr-4">{unit.moveInDate || "—"}</td>
-                      <td className="py-2 pr-4">
-                        {unit.monthlyRate ? `$${parseFloat(unit.monthlyRate).toFixed(0)}` : "—"}
-                      </td>
-                      <td className="py-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${unitStatusCls(unit.status)}`}>
-                          {unit.status}
-                        </span>
-                      </td>
+        <Card>
+          <CardHeader>
+            <CardTitle>Move-in Log — {monthLabel}</CardTitle>
+            <CardDescription>Tenants who moved in this month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {unitsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+              </div>
+            ) : thisMonthMoveIns.length === 0 ? (
+              <div className="flex items-center justify-center h-48 text-muted-foreground">
+                No move-ins recorded for {monthLabel}.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="text-left py-2 pr-4 font-medium">Unit</th>
+                      <th className="text-left py-2 pr-4 font-medium">Size</th>
+                      <th className="text-left py-2 pr-4 font-medium">Tenant</th>
+                      <th className="text-left py-2 pr-4 font-medium">Move-in</th>
+                      <th className="text-left py-2 font-medium">Rate/Mo</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody>
+                    {thisMonthMoveIns.map((unit) => (
+                      <tr key={unit.id} className="border-b last:border-0 hover:bg-muted/50">
+                        <td className="py-2 pr-4 font-medium">{unit.unitNumber}</td>
+                        <td className="py-2 pr-4">{unit.size}</td>
+                        <td className="py-2 pr-4">{unit.tenantName || "—"}</td>
+                        <td className="py-2 pr-4">{unit.moveInDate || "—"}</td>
+                        <td className="py-2">
+                          {unit.monthlyRate ? `$${parseFloat(unit.monthlyRate).toFixed(0)}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {delinquentUnits.length > 0 && (
         <Card>

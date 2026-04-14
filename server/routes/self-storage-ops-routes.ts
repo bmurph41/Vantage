@@ -88,12 +88,26 @@ router.get('/stats', async (req: Request, res: Response) => {
       .reduce((sum, u) => sum + sizeToSqFt(u.size), 0);
     const revenuePerSF = totalSF > 0 ? totalRevenue / totalSF : 0;
 
-    // Unit size mix
-    const sizeCounts: Record<string, number> = {};
+    // Unit occupancy grid: size × status breakdown
+    const sizeGrid: Record<string, { occupied: number; available: number; delinquent: number; reserved: number; maintenance: number }> = {};
     for (const u of units) {
-      sizeCounts[u.size] = (sizeCounts[u.size] || 0) + 1;
+      if (!sizeGrid[u.size]) sizeGrid[u.size] = { occupied: 0, available: 0, delinquent: 0, reserved: 0, maintenance: 0 };
+      const s = u.status as string;
+      if (s === 'occupied') sizeGrid[u.size].occupied++;
+      else if (s === 'available') sizeGrid[u.size].available++;
+      else if (s === 'delinquent') sizeGrid[u.size].delinquent++;
+      else if (s === 'reserved') sizeGrid[u.size].reserved++;
+      else if (s === 'maintenance') sizeGrid[u.size].maintenance++;
     }
-    const unitSizeMix = Object.entries(sizeCounts).map(([size, count]) => ({ size, count }));
+    const unitOccupancyGrid = Object.entries(sizeGrid)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([size, counts]) => ({
+        size,
+        ...counts,
+        total: counts.occupied + counts.available + counts.delinquent + counts.reserved + counts.maintenance,
+      }));
+    // Legacy unitSizeMix for backwards compat
+    const unitSizeMix = unitOccupancyGrid.map(g => ({ size: g.size, count: g.total }));
 
     // Move-in/out trend (last 6 months from moveInDate data)
     const now = new Date();
@@ -119,6 +133,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       averageUnitRate: Math.round(averageUnitRate * 100) / 100,
       rateChange: 0,
       unitSizeMix,
+      unitOccupancyGrid,
       moveInOutTrend,
     });
   } catch (err: any) {

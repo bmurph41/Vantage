@@ -24,7 +24,7 @@ interface HotelStats {
   totalRoomRevenueMtd: number;
   revenueChange: number;
   occupancyTrend: Array<{ date: string; occupancy: number }>;
-  revenueByDepartment: Array<{ department: string; revenue: number }>;
+  revenueByRoomType: Array<{ roomType: string; revenue: number }>;
 }
 
 interface HotelRoom {
@@ -145,7 +145,7 @@ export default function HotelDashboard() {
   }
 
   const occupancyTrend = stats?.occupancyTrend || [];
-  const revenueByDepartment = stats?.revenueByDepartment || [];
+  const revenueByRoomType = stats?.revenueByRoomType || [];
   const hasData = !isError && stats;
 
   return (
@@ -215,19 +215,19 @@ export default function HotelDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Revenue by Department</CardTitle>
-            <CardDescription>Monthly revenue breakdown</CardDescription>
+            <CardTitle>Revenue by Room Type</CardTitle>
+            <CardDescription>MTD revenue breakdown by room category</CardDescription>
           </CardHeader>
           <CardContent>
-            {!hasData || revenueByDepartment.length === 0 ? (
+            {!hasData || revenueByRoomType.length === 0 ? (
               <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No revenue data yet. Data will appear once transactions are recorded.
+                No revenue data yet. Add rooms and reservations to see the breakdown.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={revenueByDepartment}>
+                <BarChart data={revenueByRoomType}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="department" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="roomType" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]} />
                   <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

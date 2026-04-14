@@ -125,10 +125,31 @@ router.get('/stats', async (req: Request, res: Response) => {
       });
     }
 
-    // Revenue by department (simplified)
-    const revenueByDepartment = [
-      { department: 'Rooms', revenue: totalRevenue },
-    ];
+    // Revenue by room type (join reservations to rooms via roomId)
+    const roomTypeMap: Record<string, string> = {};
+    for (const r of rooms) {
+      roomTypeMap[r.id] = r.roomType;
+    }
+    const revenueByRoomTypeAgg: Record<string, number> = {};
+    for (const r of mtdReservations) {
+      const roomType = r.roomId ? (roomTypeMap[r.roomId] || 'Other') : 'Other';
+      const nights = Math.max(1, Math.ceil((new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime()) / 86400000));
+      const amount = parseFloat(r.totalAmount || '0') || (parseFloat(r.nightlyRate || '0') * nights);
+      revenueByRoomTypeAgg[roomType] = (revenueByRoomTypeAgg[roomType] || 0) + amount;
+    }
+    // If no reservations linked to rooms, show all rooms' base rates as potential revenue
+    if (Object.keys(revenueByRoomTypeAgg).length === 0) {
+      const roomTypeBaseRevenue: Record<string, number> = {};
+      for (const r of rooms) {
+        roomTypeBaseRevenue[r.roomType] = (roomTypeBaseRevenue[r.roomType] || 0) + parseFloat(r.baseRate || '0');
+      }
+      for (const [rt, rev] of Object.entries(roomTypeBaseRevenue)) {
+        revenueByRoomTypeAgg[rt] = rev;
+      }
+    }
+    const revenueByRoomType = Object.entries(revenueByRoomTypeAgg)
+      .map(([roomType, revenue]) => ({ roomType: roomType.replace(/_/g, ' '), revenue: Math.round(revenue * 100) / 100 }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     res.json({
       adr: Math.round(adr * 100) / 100,
@@ -140,7 +161,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       totalRoomRevenueMtd: Math.round(totalRevenue * 100) / 100,
       revenueChange: 0,
       occupancyTrend,
-      revenueByDepartment,
+      revenueByRoomType,
     });
   } catch (err: any) {
     console.error('Hotel stats error:', err);
