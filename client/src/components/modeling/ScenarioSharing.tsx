@@ -206,7 +206,7 @@ export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
                 </div>
               ) : collaborators.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-6 text-center">
-                  No collaborators yet — share this scenario to get started.
+                  Invite teammates to collaborate on this scenario.
                 </div>
               ) : (
                 collaborators.map((c) => (

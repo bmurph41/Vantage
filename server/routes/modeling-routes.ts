@@ -9169,11 +9169,67 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId;
+      const orgId = req.user.orgId as string;
 
-      const project = await verifyProjectAccess(projectId, orgId);
-      if (!project) return res.status(404).json({ error: 'Project not found' });
+      // Fetch the project, which includes createdBy and updatedBy
+      const [projectRow] = await db
+        .select({
+          id: modelingProjects.id,
+          createdBy: modelingProjects.createdBy,
+          updatedBy: modelingProjects.updatedBy,
+        })
+        .from(modelingProjects)
+        .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
+        .limit(1);
 
+      if (!projectRow) return res.status(404).json({ error: 'Project not found' });
+
+      // ── Seeding: on first access, backfill the project creator + recent actors ──
+      // Collect user IDs who have "touched" the project: creator + anyone who left
+      // an activity entry.  We seed them into modeling_project_collaborators so that
+      // the list is populated on first view, not just empty until someone manually
+      // shares it.
+      const existingRows = await db
+        .select({ userId: modelingProjectCollaborators.userId })
+        .from(modelingProjectCollaborators)
+        .where(eq(modelingProjectCollaborators.projectId, projectId));
+
+      if (existingRows.length === 0) {
+        // Gather distinct user IDs from createdBy, updatedBy, and activity log
+        const actorIds = new Set<string>();
+        if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
+        if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
+
+        const activityActors = await db
+          .selectDistinct({ userId: modelingProjectActivity.userId })
+          .from(modelingProjectActivity)
+          .where(and(
+            eq(modelingProjectActivity.projectId, projectId),
+            sql`${modelingProjectActivity.userId} IS NOT NULL`,
+          ));
+
+        for (const a of activityActors) {
+          if (a.userId) actorIds.add(a.userId);
+        }
+
+        // Validate actors exist in the org
+        const validActors = actorIds.size > 0
+          ? await db
+              .select({ id: users.id })
+              .from(users)
+              .where(and(inArray(users.id, [...actorIds]), eq(users.orgId, orgId)))
+          : [];
+
+        for (const actor of validActors) {
+          const role: CollabRole = actor.id === projectRow.createdBy ? 'owner' : 'editor';
+          await db
+            .insert(modelingProjectCollaborators)
+            .values({ projectId, userId: actor.id, role, addedBy: projectRow.createdBy ?? undefined })
+            .onConflictDoNothing();
+        }
+      }
+
+      // ── Fetch the (now-seeded) collaborator list ──────────────────────────────
       const collaborators = await db
         .select({
           id: modelingProjectCollaborators.id,
@@ -9194,8 +9250,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         name: c.name,
         email: c.email,
         initials: initials(c.name),
-        permission: c.role === 'owner' ? 'full-access' : c.role === 'editor' ? 'can-edit' : 'view-only',
-        role: c.role,
+        permission: (c.role === 'owner' ? 'full-access' : c.role === 'editor' ? 'can-edit' : 'view-only') as 'full-access' | 'can-edit' | 'view-only',
+        role: c.role as CollabRole,
         addedAt: c.addedAt,
         colorIndex: i % 8,
       }));

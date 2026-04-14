@@ -64,6 +64,7 @@ import {
   marinaListings,
   modelingProjectConfig,
   modelingProjects,
+  modelingProjectActivity,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,
@@ -13430,7 +13431,15 @@ export function registerCRMRoutes(
       if (!project) {
         return res.status(404).json({ error: 'Modeling project not found' });
       }
-      
+
+      // Log to activity feed (fire-and-forget — never blocks the response)
+      void db.insert(modelingProjectActivity).values({
+        projectId: req.params.id,
+        userId,
+        action: 'updated project assumptions',
+        metadata: { changedKeys: Object.keys(data).filter(k => k !== 'updatedBy') },
+      }).catch((e: unknown) => console.warn('[activity] Failed to log project update:', e instanceof Error ? e.message : e));
+
       // Create child projects for portfolio properties
       const childProjects: any[] = [];
       if (req.body.projectType === "portfolio" && Array.isArray(req.body.portfolioProperties)) {
@@ -15847,6 +15856,14 @@ export function registerCRMRoutes(
       }
 
       const updated = await storage.updateModelingProject(projectId, updates, orgId);
+
+      void db.insert(modelingProjectActivity).values({
+        projectId,
+        userId,
+        action: 'updated deal pricing assumptions',
+        metadata: { pricingDriver: pricingDriver ?? null },
+      }).catch((e: unknown) => console.warn('[activity] Failed to log deal pricing update:', e instanceof Error ? e.message : e));
+
       res.json({ success: true });
     } catch (error: any) {
       console.error('Failed to save deal pricing inputs:', error);
@@ -15864,6 +15881,14 @@ export function registerCRMRoutes(
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
+
+      void db.insert(modelingProjectActivity).values({
+        projectId,
+        userId,
+        action: 'saved project',
+        metadata: {},
+      }).catch((e: unknown) => console.warn('[activity] Failed to log project save:', e instanceof Error ? e.message : e));
+
       res.json({ success: true, updatedAt: project.updatedAt });
     } catch (error: any) {
       console.error('Failed to save project:', error);
