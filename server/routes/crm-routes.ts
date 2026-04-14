@@ -67,6 +67,8 @@ import {
   modelingProjectConfig,
   modelingProjects,
   modelingProjectActivity,
+  marketTargets,
+  insertMarketTargetSchema,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,
