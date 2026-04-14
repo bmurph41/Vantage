@@ -1,26 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ShoppingBag, LayoutDashboard, Package, UserPlus, TrendingUp, CreditCard, ArrowLeftRight, Handshake, FileCheck, BarChart3, LineChart as LineChartIcon } from "lucide-react";
 import BoatSalesAnalytics from "./boat-sales/Analytics";
+import BoatSalesDashboard from "./boat-sales/Dashboard";
 import { TabbedModuleLayout, TabDefinition, PlaceholderTab } from "@/components/layout/TabbedModuleLayout";
-
-function SalesDashboard() {
-  return (
-    <PlaceholderTab
-      title="Boat Sales Dashboard"
-      description="Overview of sales pipeline, inventory, and revenue performance."
-      icon={LayoutDashboard}
-      features={[
-        "Active deals and pipeline value",
-        "Inventory aging and status",
-        "Sales performance by rep",
-        "Revenue and margin tracking",
-        "Lead conversion metrics",
-        "Financing approval rates",
-      ]}
-      integrationReady
-    />
-  );
-}
 
 function SalesInventory() {
   return (
@@ -217,7 +199,7 @@ export default function BoatSalesTabbed() {
       id: "dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
-      component: SalesDashboard,
+      component: BoatSalesDashboard,
       description: "Sales overview",
     },
     {

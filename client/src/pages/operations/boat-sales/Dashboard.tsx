@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,11 +131,6 @@ export default function BoatSalesDashboard() {
 
   return (
     <div className="space-y-6">
-      <Header 
-        title="Boat Sales" 
-        subtitle="Inventory management, sales transactions, and trade-ins"
-      />
-
       <div className="flex justify-between items-center">
         <Tabs defaultValue="overview" className="w-full">
           <div className="flex justify-between items-center mb-4">

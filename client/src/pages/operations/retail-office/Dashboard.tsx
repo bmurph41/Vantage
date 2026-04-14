@@ -14,7 +14,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { Building2, Percent, DollarSign, Calendar } from "lucide-react";
+import { Building2, Percent, DollarSign, Calendar, AlertCircle } from "lucide-react";
 
 interface RetailOfficeStats {
   occupiedSF: number;
@@ -26,6 +26,19 @@ interface RetailOfficeStats {
   noiChange: number;
   tenantDiversification: Array<{ tenant: string; revenuePct: number }>;
   leaseRollover: Array<{ year: string; sf: number }>;
+}
+
+interface CommercialLease {
+  id: string;
+  tenant: string;
+  suite: string;
+  sf: number;
+  leaseStart: string;
+  leaseEnd: string;
+  baseRent: number;
+  cam: number;
+  totalRent: number;
+  status: string;
 }
 
 const PIE_COLORS = [
@@ -86,9 +99,24 @@ function KpiCard({
   );
 }
 
+function leaseStatusCls(status: string) {
+  const map: Record<string, string> = {
+    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    expiring: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    expired: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    terminated: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+  };
+  return map[status] ?? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+}
+
 export default function RetailOfficeDashboard() {
   const { data: stats, isLoading, isError } = useQuery<RetailOfficeStats>({
     queryKey: ["/api/retail-office-ops/stats"],
+    retry: false,
+  });
+
+  const { data: leases = [], isLoading: leasesLoading } = useQuery<CommercialLease[]>({
+    queryKey: ["/api/retail-office-ops/tenants"],
     retry: false,
   });
 
@@ -111,6 +139,18 @@ export default function RetailOfficeDashboard() {
   const tenantDiversification = stats?.tenantDiversification || [];
   const leaseRollover = stats?.leaseRollover || [];
   const hasData = !isError && stats;
+
+  const now = new Date();
+  const in180Days = new Date(now.getTime() + 180 * 86400000).toISOString().split("T")[0];
+  const todayStr = now.toISOString().split("T")[0];
+
+  const activeLeases = leases.filter(l => l.status === "active" || l.status === "expiring");
+  const upcomingRenewals = leases
+    .filter(l => (l.status === "active" || l.status === "expiring") && l.leaseEnd && l.leaseEnd >= todayStr && l.leaseEnd <= in180Days)
+    .sort((a, b) => (a.leaseEnd > b.leaseEnd ? 1 : -1));
+
+  const totalCAM = activeLeases.reduce((sum, l) => sum + l.cam, 0);
+  const totalBaseRent = activeLeases.reduce((sum, l) => sum + l.baseRent, 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -137,6 +177,39 @@ export default function RetailOfficeDashboard() {
           icon={DollarSign}
           format="currency"
         />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Total Monthly Base Rent</p>
+            <p className="text-2xl font-bold mt-1">
+              ${totalBaseRent.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{activeLeases.length} active leases</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Total Monthly CAM</p>
+            <p className="text-2xl font-bold mt-1">
+              ${totalCAM.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Common area maintenance charges</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              <p className="text-sm font-medium text-muted-foreground">Renewals Next 180 Days</p>
+            </div>
+            <p className="text-2xl font-bold mt-1">{upcomingRenewals.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {upcomingRenewals.reduce((sum, l) => sum + l.sf, 0).toLocaleString()} SF rolling
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -199,6 +272,99 @@ export default function RetailOfficeDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Suite Occupancy</CardTitle>
+          <CardDescription>All tenant suites with lease details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {leasesLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+            </div>
+          ) : leases.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground">
+              No leases yet. Add commercial tenants to track suite occupancy.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Tenant</th>
+                    <th className="text-left py-2 pr-4 font-medium">Suite</th>
+                    <th className="text-left py-2 pr-4 font-medium">SF</th>
+                    <th className="text-left py-2 pr-4 font-medium">Base Rent/Mo</th>
+                    <th className="text-left py-2 pr-4 font-medium">CAM/Mo</th>
+                    <th className="text-left py-2 pr-4 font-medium">Lease End</th>
+                    <th className="text-left py-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leases.map((lease) => (
+                    <tr key={lease.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-2 pr-4 font-medium">{lease.tenant}</td>
+                      <td className="py-2 pr-4">{lease.suite || "—"}</td>
+                      <td className="py-2 pr-4">{lease.sf ? lease.sf.toLocaleString() : "—"}</td>
+                      <td className="py-2 pr-4">${lease.baseRent.toFixed(0)}</td>
+                      <td className="py-2 pr-4">
+                        {lease.cam ? `$${lease.cam.toFixed(0)}` : "—"}
+                      </td>
+                      <td className={`py-2 pr-4 ${lease.leaseEnd && lease.leaseEnd <= in180Days && (lease.status === "active" || lease.status === "expiring") ? "text-orange-600 font-medium" : ""}`}>
+                        {lease.leaseEnd || "—"}
+                      </td>
+                      <td className="py-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${leaseStatusCls(lease.status)}`}>
+                          {lease.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {upcomingRenewals.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              <CardTitle>Upcoming Renewals</CardTitle>
+            </div>
+            <CardDescription>Leases expiring within the next 180 days requiring renewal decisions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2 pr-4 font-medium">Tenant</th>
+                    <th className="text-left py-2 pr-4 font-medium">Suite</th>
+                    <th className="text-left py-2 pr-4 font-medium">SF</th>
+                    <th className="text-left py-2 pr-4 font-medium">Monthly Rent</th>
+                    <th className="text-left py-2 font-medium">Expiration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcomingRenewals.map((lease) => (
+                    <tr key={lease.id} className="border-b last:border-0 bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 dark:hover:bg-orange-950/50">
+                      <td className="py-2 pr-4 font-medium">{lease.tenant}</td>
+                      <td className="py-2 pr-4">{lease.suite || "—"}</td>
+                      <td className="py-2 pr-4">{lease.sf ? lease.sf.toLocaleString() : "—"}</td>
+                      <td className="py-2 pr-4">${lease.baseRent.toFixed(0)}</td>
+                      <td className="py-2 text-orange-600 font-medium">{lease.leaseEnd}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
