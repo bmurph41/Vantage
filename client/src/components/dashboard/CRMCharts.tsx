@@ -12,10 +12,12 @@ interface CRMChartsProps {
 export function CRMCharts({ timeRange }: CRMChartsProps) {
   const { data: trendData, isLoading: trendLoading } = useQuery({
     queryKey: ['/api/dashboards/trends/crm', timeRange],
+    queryFn: () => fetch(`/api/dashboards/trends/crm?timeRange=${timeRange}`).then(res => res.json()),
   });
 
   const { data: distributionData, isLoading: distLoading } = useQuery({
     queryKey: ['/api/dashboards/distribution/crm-stages', timeRange],
+    queryFn: () => fetch(`/api/dashboards/distribution/crm-stages?timeRange=${timeRange}`).then(res => res.json()),
   });
 
   if (trendLoading || distLoading) {
