@@ -9169,9 +9169,11 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId as string;
+      const orgId  = req.user.orgId as string;
+      const userId = req.user.id as string;
+      const userRole = req.user.role as string;
 
-      // Fetch the project, which includes createdBy and updatedBy
+      // Fetch the project (validates org membership)
       const [projectRow] = await db
         .select({
           id: modelingProjects.id,
@@ -9184,18 +9186,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       if (!projectRow) return res.status(404).json({ error: 'Project not found' });
 
-      // ── Seeding: on first access, backfill the project creator + recent actors ──
-      // Collect user IDs who have "touched" the project: creator + anyone who left
-      // an activity entry.  We seed them into modeling_project_collaborators so that
-      // the list is populated on first view, not just empty until someone manually
-      // shares it.
-      const existingRows = await db
+      // ── Seeding: backfill creator + historical actors as collaborators ─────────
+      // Run unconditionally checking creator presence so that adding a collaborator
+      // via POST before the first GET does not prevent creator seeding.
+      const [creatorRow] = await db
         .select({ userId: modelingProjectCollaborators.userId })
         .from(modelingProjectCollaborators)
-        .where(eq(modelingProjectCollaborators.projectId, projectId));
+        .where(and(
+          eq(modelingProjectCollaborators.projectId, projectId),
+          projectRow.createdBy ? eq(modelingProjectCollaborators.userId, projectRow.createdBy) : sql`false`,
+        ))
+        .limit(1);
 
-      if (existingRows.length === 0) {
-        // Gather distinct user IDs from createdBy, updatedBy, and activity log
+      if (!creatorRow) {
+        // Creator not yet seeded — backfill creator + updatedBy + activity actors
         const actorIds = new Set<string>();
         if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
         if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
@@ -9226,6 +9230,27 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
             .insert(modelingProjectCollaborators)
             .values({ projectId, userId: actor.id, role, addedBy: projectRow.createdBy ?? undefined })
             .onConflictDoNothing();
+        }
+      }
+
+      // ── Read authorization ────────────────────────────────────────────────────
+      // Only project owners, org-level owners, and users explicitly in the
+      // collaborator list may view who has access to a project.
+      const isProjectOwner = projectRow.createdBy === userId;
+      const isOrgOwner     = userRole === 'owner';
+
+      if (!isProjectOwner && !isOrgOwner) {
+        const [memberRow] = await db
+          .select({ userId: modelingProjectCollaborators.userId })
+          .from(modelingProjectCollaborators)
+          .where(and(
+            eq(modelingProjectCollaborators.projectId, projectId),
+            eq(modelingProjectCollaborators.userId, userId),
+          ))
+          .limit(1);
+
+        if (!memberRow) {
+          return res.status(403).json({ error: 'You do not have access to this project' });
         }
       }
 
@@ -9376,16 +9401,71 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // ── Activity Log ─────────────────────────────────────────────────────────
-
-  // GET /api/modeling/projects/:projectId/activity
-  app.get('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
+  // DELETE /api/modeling/projects/:projectId/collaborators  (alias — removes by userId in body)
+  // This variant satisfies the API contract where userId is passed in the request body.
+  // Owner-only, same access rules as the ID-based DELETE.
+  app.delete('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId as string;
+      const orgId  = req.user.orgId as string;
+      const userId = req.user.id as string;
+      const { userId: targetUserId } = req.body as { userId?: string };
+
+      if (!targetUserId) return res.status(400).json({ error: 'userId is required in request body' });
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      if (!canManageCollaborators(project, userId, req.user.role as string)) {
+        return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
+      }
+
+      await db
+        .delete(modelingProjectCollaborators)
+        .where(and(
+          eq(modelingProjectCollaborators.projectId, projectId),
+          eq(modelingProjectCollaborators.userId, targetUserId),
+        ));
+
+      await logProjectActivity(projectId, userId, 'removed a collaborator', { targetUserId });
+
+      res.json({ success: true });
+    } catch (error: unknown) {
+      console.error('Failed to remove collaborator by userId:', error instanceof Error ? error.message : error);
+      res.status(500).json({ error: 'Failed to remove collaborator' });
+    }
+  });
+
+  // ── Activity Log ─────────────────────────────────────────────────────────
+
+  // GET /api/modeling/projects/:projectId/activity
+  // Only project members (owner, collaborators) or org-owners may view activity.
+  app.get('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const orgId     = req.user.orgId as string;
+      const userId    = req.user.id as string;
+      const userRole  = req.user.role as string;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      // Enforce project-level read access
+      const isProjectOwner = project.createdBy === userId;
+      const isOrgOwner     = userRole === 'owner';
+      if (!isProjectOwner && !isOrgOwner) {
+        const [memberRow] = await db
+          .select({ userId: modelingProjectCollaborators.userId })
+          .from(modelingProjectCollaborators)
+          .where(and(
+            eq(modelingProjectCollaborators.projectId, projectId),
+            eq(modelingProjectCollaborators.userId, userId),
+          ))
+          .limit(1);
+        if (!memberRow) {
+          return res.status(403).json({ error: 'You do not have access to this project' });
+        }
+      }
 
       const entries = await db
         .select({
