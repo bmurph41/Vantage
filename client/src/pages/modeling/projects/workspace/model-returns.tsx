@@ -731,6 +731,457 @@ function PortfolioSimulationTab({ projectId, projectName }: { projectId: string;
   );
 }
 
+// ============================================================================
+// TAX ANALYSIS PANEL
+// Computes pre-tax vs after-tax IRR, equity multiple, CoC, NPV.
+// Covers ordinary income tax, depreciation shield, Section 1250 recapture,
+// LTCG, NIIT, and state/local rates at both asset and portfolio level.
+// ============================================================================
+
+interface TaxInputs {
+  purchasePrice: number;
+  landValue: number;
+  equityInvested: number;
+  loanAmount: number;
+  interestRate: number;
+  amortizationYears: number;
+  holdPeriodYears: number;
+  year1NOI: number;
+  noiGrowthRate: number;
+  exitCapRate: number;
+  sellingCostsPct: number;
+  ordinaryRate: number;
+  ltcgRate: number;
+  recaptureRate: number;
+  niitRate: number;
+  stateLocalRate: number;
+  depreciableLifeYears: number;
+  bonusDepreciationPct: number;
+  targetDiscountRate: number;
+}
+
+function pct(v: number) { return `${(v * 100).toFixed(2)}%`; }
+
+function TaxAnalysisPanel({ projectId, pf }: { projectId: string; pf: any }) {
+  const purchasePrice = pf?.purchasePrice || 0;
+  const loanAmt = pf?.metrics?.debtSchedule?.totalDebtAtClose || pf?.metrics?.totalDebt || 0;
+  const equity = purchasePrice - loanAmt;
+  const holdPeriod = pf?.holdPeriod || pf?.metrics?.holdPeriodYears || 5;
+  const y1noi = pf?.yearOne?.noi || pf?.metrics?.year1NOI || 0;
+  const exitCapRateRaw = pf?.metrics?.exitCapRate ?? 6.5;
+
+  const [inputs, setInputs] = useState<TaxInputs>({
+    purchasePrice,
+    landValue: Math.round(purchasePrice * 0.2),
+    equityInvested: equity > 0 ? equity : purchasePrice,
+    loanAmount: loanAmt,
+    interestRate: 0.065,
+    amortizationYears: 30,
+    holdPeriodYears: holdPeriod,
+    year1NOI: y1noi,
+    noiGrowthRate: 0.03,
+    exitCapRate: (exitCapRateRaw > 1 ? exitCapRateRaw / 100 : exitCapRateRaw) || 0.065,
+    sellingCostsPct: 0.02,
+    ordinaryRate: 0.37,
+    ltcgRate: 0.20,
+    recaptureRate: 0.25,
+    niitRate: 0.038,
+    stateLocalRate: 0.05,
+    depreciableLifeYears: 39,
+    bonusDepreciationPct: 0,
+    targetDiscountRate: 0.08,
+  });
+
+  const [result, setResult] = useState<any>(null);
+
+  const mutation = useMutation({
+    mutationFn: async (payload: TaxInputs) => {
+      const res = await fetch('/api/returns/after-tax-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Calculation failed');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setResult(data);
+    },
+    onError: (err: any) => {
+      toast({ title: 'Calculation Error', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  function field(key: keyof TaxInputs, label: string, suffix: string = '', step: string = '0.01', pctMode = false) {
+    const rawVal = inputs[key] as number;
+    const displayVal = pctMode ? (rawVal * 100).toFixed(2) : rawVal;
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <div className="relative">
+          <Input
+            type="number"
+            step={step}
+            value={displayVal}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value) || 0;
+              setInputs(prev => ({ ...prev, [key]: pctMode ? v / 100 : v }));
+              setResult(null);
+            }}
+            className="h-8 text-sm pr-8"
+          />
+          {suffix && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{suffix}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const taxChartData = result ? [
+    { name: 'Ordinary Income Tax', value: result.taxComponents.totalOrdinaryTaxPaid },
+    { name: 'Dep. Shield Benefit', value: -result.taxComponents.totalDepShieldBenefit },
+    { name: 'Recapture Tax', value: result.taxComponents.recaptureTax },
+    { name: 'LTCG Tax', value: result.taxComponents.ltcgTax },
+    { name: 'NIIT', value: result.taxComponents.niitTax },
+  ].filter(d => Math.abs(d.value) > 0) : [];
+
+  const yearlyChartData = result?.yearlyBreakdown?.map((r: any) => ({
+    year: `Y${r.year}`,
+    preTax: r.preTaxLeveredCF,
+    afterTax: r.afterTaxLeveredCF,
+    taxImpact: r.afterTaxLeveredCF - r.preTaxLeveredCF,
+  })) || [];
+
+  const hasResult = !!result;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Scale className="h-4 w-4 text-primary" />
+            Tax Assumption Inputs
+          </CardTitle>
+          <CardDescription>Configure asset and tax parameters. Pre-populated from your pro forma where available.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Asset Inputs</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {field('purchasePrice', 'Purchase Price', '$', '1000')}
+              {field('landValue', 'Land Value', '$', '1000')}
+              {field('equityInvested', 'Equity Invested', '$', '1000')}
+              {field('loanAmount', 'Loan Amount', '$', '1000')}
+              {field('interestRate', 'Interest Rate', '%', '0.01', true)}
+              {field('amortizationYears', 'Amort. Years', 'yr', '1')}
+            </div>
+          </div>
+          <Separator />
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">NOI & Exit</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {field('year1NOI', 'Year 1 NOI', '$', '100')}
+              {field('noiGrowthRate', 'NOI Growth', '%', '0.1', true)}
+              {field('holdPeriodYears', 'Hold Period', 'yr', '1')}
+              {field('exitCapRate', 'Exit Cap Rate', '%', '0.1', true)}
+              {field('sellingCostsPct', 'Selling Costs', '%', '0.1', true)}
+              {field('targetDiscountRate', 'Discount Rate', '%', '0.1', true)}
+            </div>
+          </div>
+          <Separator />
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Tax Rates</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {field('ordinaryRate', 'Ordinary Income', '%', '0.1', true)}
+              {field('ltcgRate', 'Long-Term Cap Gain', '%', '0.1', true)}
+              {field('recaptureRate', 'Dep. Recapture', '%', '0.1', true)}
+              {field('niitRate', 'NIIT Surcharge', '%', '0.1', true)}
+              {field('stateLocalRate', 'State + Local', '%', '0.1', true)}
+            </div>
+          </div>
+          <Separator />
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Depreciation</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {field('depreciableLifeYears', 'Depreciable Life', 'yr', '1')}
+              {field('bonusDepreciationPct', 'Bonus Dep. (Yr 1)', '%', '1', true)}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => mutation.mutate(inputs)}
+              disabled={mutation.isPending || inputs.year1NOI <= 0 || inputs.equityInvested <= 0}
+            >
+              {mutation.isPending ? 'Computing...' : 'Run After-Tax Analysis'}
+            </Button>
+            {hasResult && (
+              <span className="text-xs text-muted-foreground">
+                Analysis computed — adjust inputs and re-run to update.
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {mutation.isPending && (
+        <div className="space-y-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-64" />
+        </div>
+      )}
+
+      {hasResult && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'Pre-Tax IRR', value: formatPercent(result.preTax.irr), sub: 'Levered', color: 'text-emerald-600 dark:text-emerald-400' },
+              { label: 'After-Tax IRR', value: formatPercent(result.afterTax.irr), sub: 'Levered', color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'IRR Tax Drag', value: formatPercent(result.irrDrag), sub: 'Pre − After', color: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Pre-Tax EM', value: formatMultiple(result.preTax.equityMultiple), sub: 'Equity Multiple', color: '' },
+              { label: 'After-Tax EM', value: formatMultiple(result.afterTax.equityMultiple), sub: 'Equity Multiple', color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Total Tax Burden', value: formatCurrencyCompact(result.taxComponents.totalTaxBurden), sub: 'All taxes', color: 'text-red-500' },
+            ].map((kpi, i) => (
+              <Card key={i} className="bg-muted/30">
+                <CardContent className="p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{kpi.label}</p>
+                  <p className={`text-lg font-bold ${kpi.color}`}>{kpi.value}</p>
+                  <p className="text-[10px] text-muted-foreground">{kpi.sub}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Pre-Tax vs After-Tax Returns</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Metric</TableHead>
+                        <TableHead className="text-right">Pre-Tax</TableHead>
+                        <TableHead className="text-right">After-Tax</TableHead>
+                        <TableHead className="text-right">Tax Drag</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium">IRR (Levered)</TableCell>
+                        <TableCell className="text-right font-mono">{formatPercent(result.preTax.irr)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatPercent(result.afterTax.irr)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">-{formatPercent(result.irrDrag)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Equity Multiple</TableCell>
+                        <TableCell className="text-right font-mono">{formatMultiple(result.preTax.equityMultiple)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatMultiple(result.afterTax.equityMultiple)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">-{result.emDrag?.toFixed(2)}x</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Cash-on-Cash Y1</TableCell>
+                        <TableCell className="text-right font-mono">{formatPercent(result.preTax.cashOnCashY1)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatPercent(result.afterTax.cashOnCashY1)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">-{formatPercent(result.preTax.cashOnCashY1 - result.afterTax.cashOnCashY1)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">NPV @ {pct(inputs.targetDiscountRate)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.preTax.npv)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatCurrencyCompact(result.afterTax.npv)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">{formatCurrencyCompact(result.afterTax.npv - result.preTax.npv)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Total Return</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.preTax.totalReturn)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatCurrencyCompact(result.afterTax.totalReturn)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">{formatCurrencyCompact(result.afterTax.totalReturn - result.preTax.totalReturn)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">Net Exit Proceeds</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.preTax.netExitProceeds)}</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatCurrencyCompact(result.afterTax.netExitProceeds)}</TableCell>
+                        <TableCell className="text-right font-mono text-amber-600">{formatCurrencyCompact(result.afterTax.netExitProceeds - result.preTax.netExitProceeds)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Tax Component Breakdown</CardTitle>
+                <CardDescription>Sources of tax burden and shelters over the hold period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={taxChartData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis type="number" fontSize={10} tickFormatter={(v) => formatCurrencyCompact(v)} />
+                    <YAxis type="category" dataKey="name" fontSize={9} width={130} />
+                    <Tooltip formatter={(v: number) => formatCurrencyCompact(v)} />
+                    <Bar dataKey="value" name="Amount">
+                      {taxChartData.map((d, i) => (
+                        <Cell key={i} fill={d.value < 0 ? '#10b981' : '#ef4444'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-2 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Dep. Shield Benefit</span>
+                    <span className="text-emerald-600 font-medium">{formatCurrencyCompact(result.taxComponents.totalDepShieldBenefit)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Net Tax Savings from Depreciation</span>
+                    <span className="font-medium">{formatCurrencyCompact(result.taxComponents.netTaxSavingsFromDepreciation)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Annual Pre-Tax vs After-Tax Cash Flows</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={yearlyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="year" fontSize={10} />
+                  <YAxis fontSize={10} tickFormatter={(v) => formatCurrencyCompact(v)} />
+                  <Tooltip formatter={(v: number) => formatCurrencyCompact(v)} />
+                  <Legend />
+                  <Bar dataKey="preTax" name="Pre-Tax CF" fill="#10b981" fillOpacity={0.8} />
+                  <Bar dataKey="afterTax" name="After-Tax CF" fill="#3b82f6" fillOpacity={0.8} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Year-by-Year Tax Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Year</TableHead>
+                      <TableHead className="text-right">NOI</TableHead>
+                      <TableHead className="text-right">Debt Service</TableHead>
+                      <TableHead className="text-right">Interest</TableHead>
+                      <TableHead className="text-right">Depreciation</TableHead>
+                      <TableHead className="text-right">Taxable Income</TableHead>
+                      <TableHead className="text-right">Ordinary Tax</TableHead>
+                      <TableHead className="text-right">Dep. Shield</TableHead>
+                      <TableHead className="text-right">Pre-Tax CF</TableHead>
+                      <TableHead className="text-right text-blue-600">After-Tax CF</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.yearlyBreakdown.map((row: any) => (
+                      <TableRow key={row.year}>
+                        <TableCell className="font-medium">Y{row.year}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrencyCompact(row.noi)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrencyCompact(row.totalDebtService)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrencyCompact(row.interest)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrencyCompact(row.depreciation)}</TableCell>
+                        <TableCell className={`text-right font-mono text-xs ${row.taxableIncome < 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{formatCurrencyCompact(row.taxableIncome)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-red-500">{row.ordinaryTax > 0 ? formatCurrencyCompact(-row.ordinaryTax) : '—'}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-emerald-600">{row.depShieldBenefit > 0 ? formatCurrencyCompact(row.depShieldBenefit) : '—'}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrencyCompact(row.preTaxLeveredCF)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold">{formatCurrencyCompact(row.afterTaxLeveredCF)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Exit Tax Analysis</CardTitle>
+              <CardDescription>Section 1250 recapture, LTCG, NIIT, and net after-tax exit proceeds</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium text-sm">Gross Exit Value</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(result.exitBreakdown.exitValue)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-muted-foreground text-sm">Selling Costs ({pct(inputs.sellingCostsPct)})</TableCell>
+                        <TableCell className="text-right font-mono text-red-500">({formatCurrencyCompact(result.exitBreakdown.sellingCosts)})</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-muted-foreground text-sm">Loan Payoff</TableCell>
+                        <TableCell className="text-right font-mono text-red-500">({formatCurrencyCompact(result.exitBreakdown.loanPayoff)})</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium text-sm border-t">Pre-Tax Net Proceeds</TableCell>
+                        <TableCell className="text-right font-mono border-t">{formatCurrencyCompact(result.exitBreakdown.preTaxNetExitProceeds)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium text-sm">Adjusted Basis</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.exitBreakdown.adjustedBasis)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-sm">Total Gain on Sale</TableCell>
+                        <TableCell className="text-right font-mono text-emerald-600">{formatCurrencyCompact(result.exitBreakdown.totalGain)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-muted-foreground text-sm">Sec. 1250 Recapture</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.exitBreakdown.depreciationRecapture)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-muted-foreground text-sm">Long-Term Capital Gain</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrencyCompact(result.exitBreakdown.capitalGain)}</TableCell>
+                      </TableRow>
+                      <TableRow className="border-t">
+                        <TableCell className="text-red-500 text-sm">Recapture Tax ({pct(Math.min(inputs.ordinaryRate, inputs.recaptureRate))} + {pct(inputs.stateLocalRate)})</TableCell>
+                        <TableCell className="text-right font-mono text-red-500">({formatCurrencyCompact(result.exitBreakdown.recaptureTax)})</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-red-500 text-sm">LTCG Tax ({pct(inputs.ltcgRate)} + {pct(inputs.stateLocalRate)})</TableCell>
+                        <TableCell className="text-right font-mono text-red-500">({formatCurrencyCompact(result.exitBreakdown.ltcgTax)})</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="text-red-500 text-sm">NIIT ({pct(inputs.niitRate)})</TableCell>
+                        <TableCell className="text-right font-mono text-red-500">({formatCurrencyCompact(result.exitBreakdown.niitTax)})</TableCell>
+                      </TableRow>
+                      <TableRow className="border-t font-bold">
+                        <TableCell className="text-sm">Net After-Tax Exit Proceeds</TableCell>
+                        <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatCurrencyCompact(result.exitBreakdown.netAfterTaxExitProceeds)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ModelReturns({ projectId, projectName }: ModelReturnsProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'levered' | 'unlevered'>('levered');
@@ -966,6 +1417,9 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
           </TabsTrigger>
           <TabsTrigger value="portfolio">
             <Layers className="h-3.5 w-3.5 mr-1" /> Portfolio Sim
+          </TabsTrigger>
+          <TabsTrigger value="tax-analysis">
+            <Scale className="h-3.5 w-3.5 mr-1" /> Tax Analysis
           </TabsTrigger>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
         </TabsList>
@@ -1278,6 +1732,10 @@ export default function ModelReturns({ projectId, projectName }: ModelReturnsPro
 
         <TabsContent value="portfolio" className="space-y-6 mt-4">
           <PortfolioSimulationTab projectId={projectId} projectName={projectName} />
+        </TabsContent>
+
+        <TabsContent value="tax-analysis" className="space-y-6 mt-4">
+          <TaxAnalysisPanel projectId={projectId} pf={proFormaData} />
         </TabsContent>
 
         <TabsContent value="ledger" className="space-y-4 mt-4">

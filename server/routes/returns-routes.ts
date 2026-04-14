@@ -13,6 +13,7 @@ import {
 } from "@shared/schema";
 import { AuthenticatedRequest } from "../middleware/auth-resolver";
 import { computeModelReturns, computePortfolioReturns, computeFundReturns, ReturnView } from "../services/returns-service";
+import { calculateXIRR, calculateNPV, DatedCashFlow } from "../../shared/finance/xirr";
 
 const router = Router();
 
@@ -555,6 +556,278 @@ router.post("/portfolio-simulation", async (req: Request, res: Response, next: N
         assetCount: assetDetails.filter(a => !a.error).length,
       },
       assets: assetDetails,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// AFTER-TAX RETURN ANALYSIS
+// Computes pre-tax and after-tax IRR, equity multiple, CoC, NPV for an asset.
+// Covers: ordinary income tax on operations, depreciation shield, Section 1250
+// recapture, LTCG, NIIT (3.8%), and state/local rates.
+// Handles both asset-level and portfolio-level output.
+// ============================================================================
+
+function buildAmortizationSchedule(
+  principal: number,
+  annualRate: number,
+  termYears: number,
+  holdPeriodYears: number,
+): { interest: number; principalPaid: number; balance: number }[] {
+  if (principal <= 0 || annualRate <= 0 || termYears <= 0) {
+    return Array.from({ length: holdPeriodYears }, () => ({ interest: 0, principalPaid: 0, balance: 0 }));
+  }
+  const monthlyRate = annualRate / 12;
+  const n = termYears * 12;
+  const monthlyPayment = monthlyRate > 0
+    ? principal * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1)
+    : principal / n;
+
+  const years: { interest: number; principalPaid: number; balance: number }[] = [];
+  let balance = principal;
+
+  for (let y = 0; y < holdPeriodYears; y++) {
+    let yearInterest = 0;
+    let yearPrincipal = 0;
+    for (let m = 0; m < 12; m++) {
+      if (balance <= 0) break;
+      const intPayment = balance * monthlyRate;
+      const prinPayment = Math.min(monthlyPayment - intPayment, balance);
+      yearInterest += intPayment;
+      yearPrincipal += prinPayment;
+      balance = Math.max(0, balance - prinPayment);
+    }
+    years.push({ interest: yearInterest, principalPaid: yearPrincipal, balance });
+  }
+  return years;
+}
+
+router.post('/after-tax-analysis', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const body = z.object({
+      purchasePrice: z.number().positive(),
+      landValue: z.number().min(0).default(0),
+      equityInvested: z.number().positive(),
+      loanAmount: z.number().min(0).default(0),
+      interestRate: z.number().min(0).max(1).default(0),
+      amortizationYears: z.number().int().positive().default(30),
+      holdPeriodYears: z.number().int().min(1).max(30),
+      year1NOI: z.number(),
+      noiGrowthRate: z.number().default(0.03),
+      exitCapRate: z.number().positive().default(0.065),
+      sellingCostsPct: z.number().min(0).max(0.1).default(0.02),
+      // Tax inputs
+      ordinaryRate: z.number().min(0).max(1).default(0.37),
+      ltcgRate: z.number().min(0).max(1).default(0.20),
+      recaptureRate: z.number().min(0).max(1).default(0.25),
+      niitRate: z.number().min(0).max(1).default(0.038),
+      stateLocalRate: z.number().min(0).max(1).default(0),
+      // Depreciation
+      depreciableLifeYears: z.number().int().positive().default(39),
+      bonusDepreciationPct: z.number().min(0).max(1).default(0),
+      // NPV discount rate
+      targetDiscountRate: z.number().min(0).max(1).default(0.08),
+    }).parse(req.body);
+
+    const p = body;
+    const improvementsBasis = p.purchasePrice - p.landValue;
+    const annualSLDepreciation = improvementsBasis > 0 ? improvementsBasis / p.depreciableLifeYears : 0;
+
+    // Bonus depreciation (e.g. cost seg) accelerates first-year deduction
+    const bonusAmount = improvementsBasis * p.bonusDepreciationPct;
+    const remainingBasisForSL = improvementsBasis - bonusAmount;
+    const annualSLAfterBonus = remainingBasisForSL > 0 ? remainingBasisForSL / p.depreciableLifeYears : 0;
+
+    // Build annual NOI schedule
+    const noi: number[] = [];
+    for (let y = 0; y < p.holdPeriodYears; y++) {
+      noi.push(p.year1NOI * Math.pow(1 + p.noiGrowthRate, y));
+    }
+
+    // Build amortization schedule (annual interest / principal / balance)
+    const amort = buildAmortizationSchedule(p.loanAmount, p.interestRate, p.amortizationYears, p.holdPeriodYears);
+    const loanBalanceAtExit = amort[p.holdPeriodYears - 1]?.balance ?? 0;
+
+    // Exit value: terminal NOI / exit cap rate
+    const terminalNOI = noi[p.holdPeriodYears - 1] * (1 + p.noiGrowthRate);
+    const exitValue = terminalNOI / p.exitCapRate;
+    const sellingCosts = exitValue * p.sellingCostsPct;
+    const preTaxNetExitProceeds = exitValue - sellingCosts - loanBalanceAtExit;
+
+    // ── Year-by-year computations ─────────────────────────────────────────
+    const effectiveOrdinaryRate = p.ordinaryRate + p.stateLocalRate;
+
+    const yearly: Array<{
+      year: number;
+      noi: number;
+      totalDebtService: number;
+      interest: number;
+      depreciation: number;
+      taxableIncome: number;
+      ordinaryTax: number;
+      depShieldBenefit: number;
+      preTaxLeveredCF: number;
+      afterTaxLeveredCF: number;
+      cumulativeDepreciation: number;
+    }> = [];
+
+    let cumDep = 0;
+
+    for (let y = 0; y < p.holdPeriodYears; y++) {
+      const yearNOI = noi[y];
+      const interest = amort[y]?.interest ?? 0;
+      const principal = amort[y]?.principalPaid ?? 0;
+      const totalDS = interest + principal;
+      const preTaxCF = yearNOI - totalDS;
+
+      // Depreciation for this year (bonus in year 1, then straight-line)
+      const dep = y === 0 ? bonusAmount + annualSLAfterBonus : annualSLAfterBonus;
+      cumDep += dep;
+
+      // Taxable ordinary income = NOI - interest (only) - depreciation
+      const taxableIncome = yearNOI - interest - dep;
+
+      let ordinaryTax = 0;
+      let depShieldBenefit = 0;
+
+      if (taxableIncome > 0) {
+        ordinaryTax = taxableIncome * effectiveOrdinaryRate;
+      } else {
+        // Passive loss creates a tax shield (offset against other income)
+        depShieldBenefit = Math.abs(taxableIncome) * effectiveOrdinaryRate;
+      }
+
+      const afterTaxCF = preTaxCF - ordinaryTax + depShieldBenefit;
+
+      yearly.push({
+        year: y + 1,
+        noi: yearNOI,
+        totalDebtService: totalDS,
+        interest,
+        depreciation: dep,
+        taxableIncome,
+        ordinaryTax,
+        depShieldBenefit,
+        preTaxLeveredCF: preTaxCF,
+        afterTaxLeveredCF: afterTaxCF,
+        cumulativeDepreciation: cumDep,
+      });
+    }
+
+    // ── Exit tax calculation ──────────────────────────────────────────────
+    const totalAccumDep = cumDep;
+    const adjustedBasis = p.purchasePrice - totalAccumDep;
+    const totalGain = exitValue - sellingCosts - adjustedBasis;
+    const depRecapture = Math.max(0, Math.min(totalAccumDep, totalGain));
+    const capitalGain = Math.max(0, totalGain - depRecapture);
+
+    const effectiveRecaptureRate = Math.min(p.ordinaryRate, p.recaptureRate) + p.stateLocalRate;
+    const recaptureTax = depRecapture * effectiveRecaptureRate;
+    const ltcgTax = capitalGain * (p.ltcgRate + p.stateLocalRate);
+    const niitTax = (depRecapture + capitalGain) * p.niitRate;
+    const totalExitTax = recaptureTax + ltcgTax + niitTax;
+
+    const netAfterTaxExitProceeds = preTaxNetExitProceeds - totalExitTax;
+
+    // ── Build dated cash flow series for IRR ─────────────────────────────
+    const acquisitionDate = new Date();
+    acquisitionDate.setMonth(acquisitionDate.getMonth() - p.holdPeriodYears * 12); // assume starting in past for illustration
+    const startYear = new Date().getFullYear() - p.holdPeriodYears;
+
+    const preTaxFlows: DatedCashFlow[] = [
+      { date: `${startYear}-01-01`, amount: -p.equityInvested },
+      ...yearly.map((row, i) => ({
+        date: `${startYear + i + 1}-01-01`,
+        amount: row.preTaxLeveredCF + (i === p.holdPeriodYears - 1 ? preTaxNetExitProceeds : 0),
+      })),
+    ];
+
+    const afterTaxFlows: DatedCashFlow[] = [
+      { date: `${startYear}-01-01`, amount: -p.equityInvested },
+      ...yearly.map((row, i) => ({
+        date: `${startYear + i + 1}-01-01`,
+        amount: row.afterTaxLeveredCF + (i === p.holdPeriodYears - 1 ? netAfterTaxExitProceeds : 0),
+      })),
+    ];
+
+    const preTaxIRR = calculateXIRR(preTaxFlows);
+    const afterTaxIRR = calculateXIRR(afterTaxFlows);
+
+    // Equity multiples
+    const preTaxTotalReturn = yearly.reduce((s, r) => s + r.preTaxLeveredCF, 0) + preTaxNetExitProceeds;
+    const afterTaxTotalReturn = yearly.reduce((s, r) => s + r.afterTaxLeveredCF, 0) + netAfterTaxExitProceeds;
+    const preTaxEM = preTaxTotalReturn / p.equityInvested;
+    const afterTaxEM = afterTaxTotalReturn / p.equityInvested;
+
+    // NPV
+    const preTaxNPV = calculateNPV(preTaxFlows, p.targetDiscountRate * 100);
+    const afterTaxNPV = calculateNPV(afterTaxFlows, p.targetDiscountRate * 100);
+
+    // Cash-on-cash Y1
+    const preTaxCoCY1 = yearly[0] ? (yearly[0].preTaxLeveredCF / p.equityInvested) * 100 : 0;
+    const afterTaxCoCY1 = yearly[0] ? (yearly[0].afterTaxLeveredCF / p.equityInvested) * 100 : 0;
+
+    // Total tax shield (depreciation benefit over hold period)
+    const totalDepShieldBenefit = yearly.reduce((s, r) => s + r.depShieldBenefit, 0);
+    const totalOrdinaryTaxPaid = yearly.reduce((s, r) => s + r.ordinaryTax, 0);
+
+    res.json({
+      preTax: {
+        irr: preTaxIRR.irr,
+        equityMultiple: preTaxEM,
+        npv: preTaxNPV,
+        cashOnCashY1: preTaxCoCY1,
+        totalReturn: preTaxTotalReturn,
+        netExitProceeds: preTaxNetExitProceeds,
+      },
+      afterTax: {
+        irr: afterTaxIRR.irr,
+        equityMultiple: afterTaxEM,
+        npv: afterTaxNPV,
+        cashOnCashY1: afterTaxCoCY1,
+        totalReturn: afterTaxTotalReturn,
+        netExitProceeds: netAfterTaxExitProceeds,
+      },
+      irrDrag: preTaxIRR.irr - afterTaxIRR.irr,
+      emDrag: preTaxEM - afterTaxEM,
+      exitBreakdown: {
+        exitValue,
+        sellingCosts,
+        loanPayoff: loanBalanceAtExit,
+        adjustedBasis,
+        totalGain,
+        depreciationRecapture: depRecapture,
+        capitalGain,
+        recaptureTax,
+        ltcgTax,
+        niitTax,
+        totalExitTax,
+        preTaxNetExitProceeds,
+        netAfterTaxExitProceeds,
+      },
+      taxComponents: {
+        totalOrdinaryTaxPaid,
+        totalDepShieldBenefit,
+        recaptureTax,
+        ltcgTax,
+        niitTax,
+        stateTaxEstimate: (totalOrdinaryTaxPaid + recaptureTax + ltcgTax) * (p.stateLocalRate / Math.max(effectiveOrdinaryRate, 0.01)),
+        totalTaxBurden: totalOrdinaryTaxPaid - totalDepShieldBenefit + totalExitTax,
+        netTaxSavingsFromDepreciation: totalDepShieldBenefit - (depRecapture * Math.max(0, effectiveRecaptureRate - p.ltcgRate - p.stateLocalRate)),
+      },
+      yearlyBreakdown: yearly,
+      exitValue,
+      totalAccumulatedDepreciation: totalAccumDep,
+      inputs: {
+        purchasePrice: p.purchasePrice,
+        equityInvested: p.equityInvested,
+        loanAmount: p.loanAmount,
+        holdPeriodYears: p.holdPeriodYears,
+        year1NOI: p.year1NOI,
+        exitCapRate: p.exitCapRate,
+      },
     });
   } catch (err) {
     next(err);
