@@ -9204,39 +9204,29 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       // Backfill: seed project creator + historical activity actors as collaborators.
       // Runs after auth so unauthenticated callers never trigger a write side-effect.
-      // Uses onConflictDoNothing so it is safe to call on every authorized GET.
-      const [creatorRow] = await db
-        .select({ userId: modelingProjectCollaborators.userId })
-        .from(modelingProjectCollaborators)
+      // Creator check is separate so historical actors are always caught up regardless
+      // of whether the creator was already seeded on a previous request.
+      const actorIds = new Set<string>();
+      if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
+      if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
+
+      const activityActors = await db
+        .selectDistinct({ userId: modelingProjectActivity.userId })
+        .from(modelingProjectActivity)
         .where(and(
-          eq(modelingProjectCollaborators.projectId, projectId),
-          projectRow.createdBy ? eq(modelingProjectCollaborators.userId, projectRow.createdBy) : sql`false`,
-        ))
-        .limit(1);
+          eq(modelingProjectActivity.projectId, projectId),
+          sql`${modelingProjectActivity.userId} IS NOT NULL`,
+        ));
 
-      if (!creatorRow) {
-        const actorIds = new Set<string>();
-        if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
-        if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
+      for (const a of activityActors) {
+        if (a.userId) actorIds.add(a.userId);
+      }
 
-        const activityActors = await db
-          .selectDistinct({ userId: modelingProjectActivity.userId })
-          .from(modelingProjectActivity)
-          .where(and(
-            eq(modelingProjectActivity.projectId, projectId),
-            sql`${modelingProjectActivity.userId} IS NOT NULL`,
-          ));
-
-        for (const a of activityActors) {
-          if (a.userId) actorIds.add(a.userId);
-        }
-
-        const validActors = actorIds.size > 0
-          ? await db
-              .select({ id: users.id })
-              .from(users)
-              .where(and(inArray(users.id, [...actorIds]), eq(users.orgId, orgId)))
-          : [];
+      if (actorIds.size > 0) {
+        const validActors = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(inArray(users.id, [...actorIds]), eq(users.orgId, orgId)));
 
         for (const actor of validActors) {
           const role: CollabRole = actor.id === projectRow.createdBy ? 'owner' : 'editor';

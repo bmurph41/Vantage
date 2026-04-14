@@ -113,6 +113,7 @@ export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
       apiRequest('PATCH', `/api/modeling/projects/${projectId}/collaborators/${collaboratorId}`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'collaborators'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'activity'] });
     },
   });
 
