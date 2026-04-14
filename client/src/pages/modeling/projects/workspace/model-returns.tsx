@@ -796,15 +796,7 @@ function TaxAnalysisPanel({ projectId, pf }: { projectId: string; pf: any }) {
 
   const mutation = useMutation({
     mutationFn: async (payload: TaxInputs) => {
-      const res = await fetch('/api/returns/after-tax-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Calculation failed');
-      }
+      const res = await apiRequest('POST', '/api/returns/after-tax-analysis', payload);
       return res.json();
     },
     onSuccess: (data) => {
