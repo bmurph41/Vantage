@@ -108,7 +108,9 @@ const marinaConfig: AssetClassConfig = {
   fieldGroups: [
     { key: "financials", label: "Deal Financials", icon: DollarSign, defaultOpen: true },
     { key: "capacity", label: "Marina Capacity", icon: Ship, defaultOpen: true },
+    { key: "operations", label: "Operations", icon: TrendingUp, defaultOpen: false },
     { key: "revenue", label: "Revenue Streams", icon: Fuel, defaultOpen: false },
+    { key: "physical", label: "Physical Details", icon: MapPin, defaultOpen: false },
     { key: "property", label: "Property Details", icon: MapPin, defaultOpen: false },
     { key: "location", label: "Location", icon: MapPin, defaultOpen: false },
   ],
@@ -116,12 +118,26 @@ const marinaConfig: AssetClassConfig = {
     ...sharedFields,
     // Capacity
     { key: "wetSlips", label: "Wet Slips", type: "number", group: "capacity", icon: Anchor, required: true },
-    { key: "drySlips", label: "Dry Storage", type: "number", group: "capacity", icon: Warehouse },
+    { key: "drySlips", label: "Dry Storage Units", type: "number", group: "capacity", icon: Warehouse },
     { key: "moorings", label: "Moorings", type: "number", group: "capacity", icon: Anchor },
+    { key: "transientSlips", label: "Transient Slips", type: "number", group: "capacity", icon: Ship, tooltip: "Slips reserved for transient/short-term guests" },
+    { key: "liveaboardSlips", label: "Liveaboard Slips", type: "number", group: "capacity", icon: Anchor, tooltip: "Slips designated for liveaboards" },
+    { key: "coveredSlips", label: "Covered Slips", type: "number", group: "capacity", icon: Warehouse },
+    { key: "endTieSlips", label: "End-Tie Slips", type: "number", group: "capacity", icon: Anchor },
     { key: "totalCapacity", label: "Total Capacity", type: "number", group: "capacity", icon: Ship },
+    { key: "waitlistCount", label: "Waitlist Slots", type: "number", group: "capacity", icon: Users, tooltip: "Number of boaters on the waiting list" },
     { key: "maxBoatLength", label: "Max LOA (ft)", type: "number", group: "capacity", icon: Ruler, suffix: "ft" },
     { key: "maxDraft", label: "Max Draft (ft)", type: "number", group: "capacity", icon: Droplets, suffix: "ft" },
-    { key: "occupancyRate", label: "Occupancy Rate", type: "percent", group: "capacity", icon: BarChart3 },
+    { key: "maxBeam", label: "Max Beam (ft)", type: "number", group: "capacity", icon: Ruler, suffix: "ft" },
+    // Operations
+    { key: "occupancyRate", label: "Occupancy Rate", type: "percent", group: "operations", icon: BarChart3 },
+    { key: "avgMonthlySlipRate", label: "Avg Monthly Slip Rate", type: "currency", group: "operations", icon: DollarSign, suffix: "/mo", tooltip: "Average monthly rental rate per slip" },
+    { key: "peakOccupancy", label: "Peak Season Occupancy", type: "percent", group: "operations", icon: TrendingUp },
+    { key: "offSeasonOccupancy", label: "Off-Season Occupancy", type: "percent", group: "operations", icon: TrendingUp },
+    { key: "annualContractPct", label: "Annual Contract %", type: "percent", group: "operations", tooltip: "% of slips on annual contracts vs. transient" },
+    { key: "noi", label: "NOI", type: "currency", group: "operations", icon: DollarSign, tooltip: "Net Operating Income" },
+    { key: "ebitda", label: "EBITDA", type: "currency", group: "operations", icon: DollarSign },
+    { key: "opexRatio", label: "OpEx Ratio", type: "percent", group: "operations", icon: BarChart3, tooltip: "Operating Expenses / EGI" },
     // Revenue Streams
     { key: "slipRevenue", label: "Slip Revenue", type: "currency", group: "revenue", icon: DollarSign },
     { key: "fuelRevenue", label: "Fuel Revenue", type: "currency", group: "revenue", icon: Fuel },
@@ -130,7 +146,27 @@ const marinaConfig: AssetClassConfig = {
     { key: "storageRevenue", label: "Storage Revenue", type: "currency", group: "revenue", icon: Box },
     { key: "otherRevenue", label: "Other Revenue", type: "currency", group: "revenue", icon: DollarSign },
     { key: "hasFuelDock", label: "Fuel Dock", type: "select", group: "revenue", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
+    { key: "fuelType", label: "Fuel Types", type: "select", group: "revenue", options: [
+      { value: "gas_diesel", label: "Gas & Diesel" }, { value: "gas_only", label: "Gas Only" },
+      { value: "diesel_only", label: "Diesel Only" }, { value: "none", label: "None" },
+    ]},
     { key: "hasBoatyard", label: "Boatyard/Haul-out", type: "select", group: "revenue", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
+    { key: "hasShipStore", label: "Ship Store", type: "select", group: "revenue", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
+    { key: "hasRestaurant", label: "Restaurant / Bar", type: "select", group: "revenue", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
+    // Physical Details
+    { key: "acreage", label: "Acreage", type: "number", group: "physical", icon: MapPin, suffix: "ac" },
+    { key: "waterFrontageFt", label: "Water Frontage (ft)", type: "number", group: "physical", icon: Droplets, suffix: "ft" },
+    { key: "buildingSqFt", label: "Building SF", type: "number", group: "physical", icon: Warehouse, suffix: "SF" },
+    { key: "bathrooms", label: "Restrooms / Showers", type: "number", group: "physical", icon: Anchor },
+    { key: "parkingSpaces", label: "Parking Spaces", type: "number", group: "physical" },
+    { key: "dockMaterial", label: "Dock Material", type: "select", group: "physical", options: [
+      { value: "concrete", label: "Concrete" }, { value: "wood", label: "Wood" },
+      { value: "aluminum", label: "Aluminum" }, { value: "composite", label: "Composite" },
+      { value: "floating_concrete", label: "Floating Concrete" }, { value: "mixed", label: "Mixed" },
+    ]},
+    { key: "hasPhaseI", label: "Phase I ESA", type: "select", group: "physical", options: [{ value: "yes", label: "Completed" }, { value: "no", label: "Not Done" }, { value: "pending", label: "In Progress" }], tooltip: "Phase I Environmental Site Assessment" },
+    { key: "inFloodZone", label: "Flood Zone", type: "select", group: "physical", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
+    { key: "hasWetlands", label: "Wetlands Present", type: "select", group: "physical", options: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }] },
   ],
   kpis: [
     ...sharedKPIs,
@@ -148,12 +184,36 @@ const marinaConfig: AssetClassConfig = {
       tooltip: "Total Revenue / Total Slips"
     },
     {
+      key: "pricePerSlip",
+      label: "Price / Slip",
+      format: "currency",
+      icon: Ship,
+      color: "text-blue-700",
+      compute: (e) => {
+        const totalSlips = (e.wetSlips || 0) + (e.drySlips || 0) + (e.moorings || 0);
+        return totalSlips > 0 && e.askingPrice ? e.askingPrice / totalSlips : null;
+      },
+      tooltip: "Asking Price / Total Slips"
+    },
+    {
       key: "occupancyRate",
       label: "Occupancy",
       format: "percent",
       icon: Ship,
       color: "text-indigo-600",
       compute: (e) => e.occupancyRate ?? null
+    },
+    {
+      key: "noiPerSlip",
+      label: "NOI / Slip",
+      format: "currency",
+      icon: DollarSign,
+      color: "text-emerald-600",
+      compute: (e) => {
+        const totalSlips = (e.wetSlips || 0) + (e.drySlips || 0);
+        return totalSlips > 0 && e.noi ? e.noi / totalSlips : null;
+      },
+      tooltip: "NOI / Total Slips"
     },
   ],
 };

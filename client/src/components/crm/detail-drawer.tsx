@@ -59,6 +59,17 @@ import {
   Target,
   Hash,
   Ship,
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  XCircle,
+  Banknote,
+  Scale,
+  Landmark,
+  Info,
+  Droplets,
+  Wrench,
+  Flag,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -787,6 +798,94 @@ export function DetailDrawer({
                             />
                           </div>
                         </CollapsibleSection>
+
+                        <CollapsibleSection title="Investment Profile" icon={<Landmark className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Target Asset Classes" isEditing={isEditing}
+                              value={<span data-testid="text-targetAssetClasses">{Array.isArray(entity?.targetAssetClasses) ? entity.targetAssetClasses.join(', ') : entity?.targetAssetClasses || "-"}</span>}
+                              editComponent={<Input value={editData.targetAssetClasses || ""} onChange={(e) => setEditData({ ...editData, targetAssetClasses: e.target.value })} placeholder="marina, dry_storage, mixed_use" data-testid="input-targetAssetClasses" />}
+                            />
+                            <EditableFieldRow label="Target Geographies" isEditing={isEditing}
+                              value={<span data-testid="text-targetGeographies">{Array.isArray(entity?.targetGeographies) ? entity.targetGeographies.join(', ') : entity?.targetGeographies || "-"}</span>}
+                              editComponent={<Input value={editData.targetGeographies || ""} onChange={(e) => setEditData({ ...editData, targetGeographies: e.target.value })} placeholder="Southeast, Gulf Coast, Mid-Atlantic" data-testid="input-targetGeographies" />}
+                            />
+                            <EditableFieldRow label="Min Deal Size" isEditing={isEditing}
+                              value={<span data-testid="text-dealSizeMin">{entity?.dealSizeMin ? `$${Number(entity.dealSizeMin).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.dealSizeMin || ""} onChange={(e) => setEditData({ ...editData, dealSizeMin: e.target.value })} placeholder="0" data-testid="input-dealSizeMin" />}
+                            />
+                            <EditableFieldRow label="Max Deal Size" isEditing={isEditing}
+                              value={<span data-testid="text-dealSizeMax">{entity?.dealSizeMax ? `$${Number(entity.dealSizeMax).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.dealSizeMax || ""} onChange={(e) => setEditData({ ...editData, dealSizeMax: e.target.value })} placeholder="0" data-testid="input-dealSizeMax" />}
+                            />
+                            <EditableFieldRow label="Min Return Hurdle" isEditing={isEditing}
+                              value={<span data-testid="text-returnCriteriaMin">{entity?.returnCriteriaMin ? `${entity.returnCriteriaMin}%` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.returnCriteriaMin || ""} onChange={(e) => setEditData({ ...editData, returnCriteriaMin: e.target.value })} placeholder="e.g. 12" data-testid="input-returnCriteriaMin" />}
+                            />
+                            <EditableFieldRow label="Investment Notes" isEditing={isEditing}
+                              value={<span data-testid="text-investmentNotes" className="text-xs">{entity?.investmentNotes || "-"}</span>}
+                              editComponent={<Textarea value={editData.investmentNotes || ""} onChange={(e) => setEditData({ ...editData, investmentNotes: e.target.value })} rows={3} placeholder="Capital available, strategy, preferences..." data-testid="input-investmentNotes" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Relationship & Compliance" icon={<Scale className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Relationship Score" isEditing={isEditing}
+                              value={
+                                <div className="flex items-center gap-1" data-testid="text-relationshipScore">
+                                  {entity?.relationshipScore ? (
+                                    <>
+                                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                        entity.relationshipScore >= 80 ? 'bg-green-100 text-green-700' :
+                                        entity.relationshipScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700'
+                                      }`}>{entity.relationshipScore}/100</span>
+                                    </>
+                                  ) : <span>-</span>}
+                                </div>
+                              }
+                              editComponent={<Input type="number" min="0" max="100" value={editData.relationshipScore || ""} onChange={(e) => setEditData({ ...editData, relationshipScore: parseInt(e.target.value) || null })} placeholder="0–100" data-testid="input-relationshipScore" />}
+                            />
+                            <EditableFieldRow label="Last Contacted" isEditing={isEditing}
+                              value={<span data-testid="text-lastContactedAt">{entity?.lastContactedAt ? new Date(entity.lastContactedAt).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.lastContactedAt?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, lastContactedAt: e.target.value })} data-testid="input-lastContactedAt" />}
+                            />
+                            <EditableFieldRow label="Next Follow-up" isEditing={isEditing}
+                              value={<span data-testid="text-nextFollowupDate">{entity?.nextFollowupDate ? new Date(entity.nextFollowupDate).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.nextFollowupDate?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, nextFollowupDate: e.target.value })} data-testid="input-nextFollowupDate" />}
+                            />
+                            <FieldRow label="NDA on File" value={
+                              <div className="flex items-center gap-1.5" data-testid="text-ndaOnFile">
+                                {entity?.ndaOnFile
+                                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /><span className="text-green-700 text-xs font-medium">Yes</span></>
+                                  : <><XCircle className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">No</span></>}
+                                {isEditing && (
+                                  <input type="checkbox" className="ml-2" checked={!!editData.ndaOnFile} onChange={(e) => setEditData({ ...editData, ndaOnFile: e.target.checked })} data-testid="input-ndaOnFile" />
+                                )}
+                              </div>
+                            } />
+                            <FieldRow label="Do Not Contact" value={
+                              <div className="flex items-center gap-1.5" data-testid="text-doNotContact">
+                                {entity?.doNotContact
+                                  ? <><AlertTriangle className="h-3.5 w-3.5 text-red-500" /><span className="text-red-600 text-xs font-medium">Yes</span></>
+                                  : <><CheckCircle2 className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">No</span></>}
+                                {isEditing && (
+                                  <input type="checkbox" className="ml-2" checked={!!editData.doNotContact} onChange={(e) => setEditData({ ...editData, doNotContact: e.target.checked })} data-testid="input-doNotContact" />
+                                )}
+                              </div>
+                            } />
+                            <FieldRow label="Email Opt-Out" value={
+                              <div className="flex items-center gap-1.5" data-testid="text-emailOptOut">
+                                {entity?.emailOptOut
+                                  ? <><Flag className="h-3.5 w-3.5 text-orange-500" /><span className="text-orange-600 text-xs font-medium">Opted Out</span></>
+                                  : <><CheckCircle2 className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">Subscribed</span></>}
+                                {isEditing && (
+                                  <input type="checkbox" className="ml-2" checked={!!editData.emailOptOut} onChange={(e) => setEditData({ ...editData, emailOptOut: e.target.checked })} data-testid="input-emailOptOut" />
+                                )}
+                              </div>
+                            } />
+                          </div>
+                        </CollapsibleSection>
                       </div>
                     )}
 
@@ -821,6 +920,31 @@ export function DetailDrawer({
                               value={<span data-testid="text-size" className="capitalize">{entity?.size || "-"}</span>}
                               editComponent={<Input value={editData.size || ""} onChange={(e) => setEditData({ ...editData, size: e.target.value })} placeholder="startup, small, medium, large, enterprise" data-testid="input-size" />}
                             />
+                            <EditableFieldRow label="Entity Type" isEditing={isEditing}
+                              value={<span data-testid="text-companyType" className="capitalize">{entity?.companyType?.replace(/_/g, ' ') || "-"}</span>}
+                              editComponent={
+                                <Select value={editData.companyType || ""} onValueChange={(v) => setEditData({ ...editData, companyType: v })}>
+                                  <SelectTrigger data-testid="select-companyType"><SelectValue placeholder="Select entity type" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="llc">LLC</SelectItem>
+                                    <SelectItem value="lp">LP</SelectItem>
+                                    <SelectItem value="c_corp">C-Corp</SelectItem>
+                                    <SelectItem value="s_corp">S-Corp</SelectItem>
+                                    <SelectItem value="reit">REIT</SelectItem>
+                                    <SelectItem value="family_office">Family Office</SelectItem>
+                                    <SelectItem value="pe_fund">PE Fund</SelectItem>
+                                    <SelectItem value="operator">Operator</SelectItem>
+                                    <SelectItem value="broker">Broker</SelectItem>
+                                    <SelectItem value="lender">Lender</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <EditableFieldRow label="Employee Count" isEditing={isEditing}
+                              value={<span data-testid="text-employeeCount">{entity?.employeeCount ? entity.employeeCount.toLocaleString() : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.employeeCount || ""} onChange={(e) => setEditData({ ...editData, employeeCount: parseInt(e.target.value) || null })} placeholder="0" data-testid="input-employeeCount" />}
+                            />
                           </div>
                         </CollapsibleSection>
 
@@ -830,9 +954,37 @@ export function DetailDrawer({
                               value={<span data-testid="text-annualRevenue">{entity?.annualRevenue ? `$${Number(entity.annualRevenue).toLocaleString()}` : "-"}</span>}
                               editComponent={<Input type="number" value={editData.annualRevenue || ""} onChange={(e) => setEditData({ ...editData, annualRevenue: e.target.value })} placeholder="$0" data-testid="input-annualRevenue" />}
                             />
+                            <EditableFieldRow label="AUM (Approx)" isEditing={isEditing}
+                              value={<span data-testid="text-aumApprox">{entity?.aumApprox ? `$${Number(entity.aumApprox).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.aumApprox || ""} onChange={(e) => setEditData({ ...editData, aumApprox: e.target.value })} placeholder="$0" data-testid="input-aumApprox" />}
+                            />
+                            <EditableFieldRow label="AUM Range" isEditing={isEditing}
+                              value={<span data-testid="text-aumRange" className="capitalize">{entity?.aumRange?.replace(/_/g, ' ') || "-"}</span>}
+                              editComponent={
+                                <Select value={editData.aumRange || ""} onValueChange={(v) => setEditData({ ...editData, aumRange: v })}>
+                                  <SelectTrigger data-testid="select-aumRange"><SelectValue placeholder="Select AUM range" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="under_10m">Under $10M</SelectItem>
+                                    <SelectItem value="10m_50m">$10M – $50M</SelectItem>
+                                    <SelectItem value="50m_100m">$50M – $100M</SelectItem>
+                                    <SelectItem value="100m_500m">$100M – $500M</SelectItem>
+                                    <SelectItem value="500m_1b">$500M – $1B</SelectItem>
+                                    <SelectItem value="over_1b">Over $1B</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
                             <EditableFieldRow label="Marina Spend" isEditing={isEditing}
                               value={<span data-testid="text-annualMarinaSpend">{entity?.annualMarinaSpend ? `$${Number(entity.annualMarinaSpend).toLocaleString()}` : "-"}</span>}
                               editComponent={<Input type="number" value={editData.annualMarinaSpend || ""} onChange={(e) => setEditData({ ...editData, annualMarinaSpend: e.target.value })} placeholder="$0" data-testid="input-annualMarinaSpend" />}
+                            />
+                            <EditableFieldRow label="Investment Mandate" isEditing={isEditing}
+                              value={<span data-testid="text-investmentMandate" className="text-xs">{entity?.investmentMandate || "-"}</span>}
+                              editComponent={<Textarea value={editData.investmentMandate || ""} onChange={(e) => setEditData({ ...editData, investmentMandate: e.target.value })} rows={3} placeholder="Strategy, fund type, return targets..." data-testid="input-investmentMandate" />}
+                            />
+                            <EditableFieldRow label="NDA Expiry" isEditing={isEditing}
+                              value={<span data-testid="text-ndaExpiryDate">{entity?.ndaExpiryDate ? new Date(entity.ndaExpiryDate).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.ndaExpiryDate?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, ndaExpiryDate: e.target.value })} data-testid="input-ndaExpiryDate" />}
                             />
                           </div>
                         </CollapsibleSection>
@@ -854,6 +1006,56 @@ export function DetailDrawer({
                               editComponent={<Input type="number" value={editData.portfolioCount || ""} onChange={(e) => setEditData({ ...editData, portfolioCount: parseInt(e.target.value) || 0 })} placeholder="0" data-testid="input-portfolioCount" />}
                             />
                             <FieldRow label="Number of Marinas" value={<span data-testid="text-numberOfMarinas" className="font-medium">{companyProperties?.length || 0}</span>} />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Office Location" icon={<MapPin className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Address" isEditing={isEditing}
+                              value={<span data-testid="text-address">{entity?.address || "-"}</span>}
+                              editComponent={<Input value={editData.address || ""} onChange={(e) => setEditData({ ...editData, address: e.target.value })} data-testid="input-address" />}
+                            />
+                            <EditableFieldRow label="City" isEditing={isEditing}
+                              value={<span data-testid="text-city">{entity?.city || "-"}</span>}
+                              editComponent={<Input value={editData.city || ""} onChange={(e) => setEditData({ ...editData, city: e.target.value })} data-testid="input-city" />}
+                            />
+                            <EditableFieldRow label="State" isEditing={isEditing}
+                              value={<span data-testid="text-state">{entity?.state || "-"}</span>}
+                              editComponent={<Input value={editData.state || ""} onChange={(e) => setEditData({ ...editData, state: e.target.value })} data-testid="input-state" />}
+                            />
+                            <EditableFieldRow label="Zip Code" isEditing={isEditing}
+                              value={<span data-testid="text-zipCode">{entity?.zipCode || "-"}</span>}
+                              editComponent={<Input value={editData.zipCode || ""} onChange={(e) => setEditData({ ...editData, zipCode: e.target.value })} data-testid="input-zipCode" />}
+                            />
+                            <EditableFieldRow label="Country" isEditing={isEditing}
+                              value={<span data-testid="text-country">{entity?.country || "-"}</span>}
+                              editComponent={<Input value={editData.country || ""} onChange={(e) => setEditData({ ...editData, country: e.target.value })} placeholder="US" data-testid="input-country" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Digital Presence" icon={<Globe className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="LinkedIn" isEditing={isEditing}
+                              value={
+                                entity?.linkedinUrl ? (
+                                  <a href={entity.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1" data-testid="text-linkedinUrl">
+                                    View Profile <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : <span data-testid="text-linkedinUrl">-</span>
+                              }
+                              editComponent={<Input value={editData.linkedinUrl || ""} onChange={(e) => setEditData({ ...editData, linkedinUrl: e.target.value })} placeholder="https://linkedin.com/company/..." data-testid="input-linkedinUrl" />}
+                            />
+                            <EditableFieldRow label="Twitter/X" isEditing={isEditing}
+                              value={
+                                entity?.twitterHandle ? (
+                                  <a href={`https://twitter.com/${entity.twitterHandle.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1" data-testid="text-twitterHandle">
+                                    @{entity.twitterHandle.replace('@', '')} <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : <span data-testid="text-twitterHandle">-</span>
+                              }
+                              editComponent={<Input value={editData.twitterHandle || ""} onChange={(e) => setEditData({ ...editData, twitterHandle: e.target.value })} placeholder="@handle" data-testid="input-twitterHandle" />}
+                            />
                           </div>
                         </CollapsibleSection>
                       </div>
@@ -1017,6 +1219,151 @@ export function DetailDrawer({
                               value={<span data-testid="text-noiEstimate">{entity?.noiEstimate ? `$${Number(entity.noiEstimate).toLocaleString()}` : "-"}</span>}
                               editComponent={<Input type="number" value={editData.noiEstimate || ""} onChange={(e) => setEditData({ ...editData, noiEstimate: e.target.value })} data-testid="input-noiEstimate" />}
                             />
+                            <EditableFieldRow label="Asking Price" isEditing={isEditing}
+                              value={<span data-testid="text-askingPrice" className="font-medium text-green-600">{entity?.askingPrice ? `$${Number(entity.askingPrice).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.askingPrice || ""} onChange={(e) => setEditData({ ...editData, askingPrice: e.target.value })} data-testid="input-askingPrice" />}
+                            />
+                            <EditableFieldRow label="List Price" isEditing={isEditing}
+                              value={<span data-testid="text-listPrice">{entity?.listPrice ? `$${Number(entity.listPrice).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.listPrice || ""} onChange={(e) => setEditData({ ...editData, listPrice: e.target.value })} data-testid="input-listPrice" />}
+                            />
+                            <EditableFieldRow label="List Cap Rate" isEditing={isEditing}
+                              value={<span data-testid="text-listCapRate">{entity?.listCapRate ? `${entity.listCapRate}%` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.listCapRate || ""} onChange={(e) => setEditData({ ...editData, listCapRate: e.target.value })} placeholder="e.g. 6.5" data-testid="input-listCapRate" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Marina Features" icon={<Anchor className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Total Slips" isEditing={isEditing}
+                              value={<span data-testid="text-totalSlips">{entity?.totalSlips || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.totalSlips || ""} onChange={(e) => setEditData({ ...editData, totalSlips: parseInt(e.target.value) || null })} data-testid="input-totalSlips" />}
+                            />
+                            <EditableFieldRow label="Water Depth (ft)" isEditing={isEditing}
+                              value={<span data-testid="text-waterDepthFt">{entity?.waterDepthFt ? `${entity.waterDepthFt} ft` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.waterDepthFt || ""} onChange={(e) => setEditData({ ...editData, waterDepthFt: e.target.value })} placeholder="e.g. 8.5" data-testid="input-waterDepthFt" />}
+                            />
+                            <EditableFieldRow label="Dock Material" isEditing={isEditing}
+                              value={<span data-testid="text-dockMaterial" className="capitalize">{entity?.dockMaterial?.replace(/_/g, ' ') || "-"}</span>}
+                              editComponent={
+                                <Select value={editData.dockMaterial || ""} onValueChange={(v) => setEditData({ ...editData, dockMaterial: v })}>
+                                  <SelectTrigger data-testid="select-dockMaterial"><SelectValue placeholder="Select material" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="concrete">Concrete</SelectItem>
+                                    <SelectItem value="wood">Wood</SelectItem>
+                                    <SelectItem value="aluminum">Aluminum</SelectItem>
+                                    <SelectItem value="composite">Composite</SelectItem>
+                                    <SelectItem value="floating_concrete">Floating Concrete</SelectItem>
+                                    <SelectItem value="floating_aluminum">Floating Aluminum</SelectItem>
+                                    <SelectItem value="mixed">Mixed</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <EditableFieldRow label="Year Built" isEditing={isEditing}
+                              value={<span data-testid="text-yearBuilt">{entity?.yearBuilt || "-"}</span>}
+                              editComponent={<Input type="number" value={editData.yearBuilt || ""} onChange={(e) => setEditData({ ...editData, yearBuilt: parseInt(e.target.value) || null })} placeholder="e.g. 1985" data-testid="input-yearBuilt" />}
+                            />
+                            <FieldRow label="Fuel Dock" value={
+                              <div className="flex items-center gap-1.5" data-testid="text-hasFuelDock">
+                                {entity?.hasFuelDock
+                                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /><span className="text-green-700 text-xs font-medium">Yes</span></>
+                                  : <><XCircle className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">No</span></>}
+                                {isEditing && (
+                                  <input type="checkbox" className="ml-2" checked={!!editData.hasFuelDock} onChange={(e) => setEditData({ ...editData, hasFuelDock: e.target.checked })} data-testid="input-hasFuelDock" />
+                                )}
+                              </div>
+                            } />
+                            <FieldRow label="Repair Yard" value={
+                              <div className="flex items-center gap-1.5" data-testid="text-hasRepairYard">
+                                {entity?.hasRepairYard
+                                  ? <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /><span className="text-green-700 text-xs font-medium">Yes</span></>
+                                  : <><XCircle className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">No</span></>}
+                                {isEditing && (
+                                  <input type="checkbox" className="ml-2" checked={!!editData.hasRepairYard} onChange={(e) => setEditData({ ...editData, hasRepairYard: e.target.checked })} data-testid="input-hasRepairYard" />
+                                )}
+                              </div>
+                            } />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Transaction Details" icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Listing Status" isEditing={isEditing}
+                              value={<span data-testid="text-listingStatus" className="capitalize">{entity?.listingStatus?.replace(/_/g, ' ') || "-"}</span>}
+                              editComponent={
+                                <Select value={editData.listingStatus || ""} onValueChange={(v) => setEditData({ ...editData, listingStatus: v })}>
+                                  <SelectTrigger data-testid="select-listingStatus"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="off_market">Off Market</SelectItem>
+                                    <SelectItem value="on_market">On Market</SelectItem>
+                                    <SelectItem value="under_loi">Under LOI</SelectItem>
+                                    <SelectItem value="under_contract">Under Contract</SelectItem>
+                                    <SelectItem value="closed">Closed</SelectItem>
+                                    <SelectItem value="watchlist">Watchlist</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              }
+                            />
+                            <EditableFieldRow label="Broker Name" isEditing={isEditing}
+                              value={<span data-testid="text-brokerName">{entity?.brokerName || "-"}</span>}
+                              editComponent={<Input value={editData.brokerName || ""} onChange={(e) => setEditData({ ...editData, brokerName: e.target.value })} placeholder="Broker name" data-testid="input-brokerName" />}
+                            />
+                            <EditableFieldRow label="Listing Date" isEditing={isEditing}
+                              value={<span data-testid="text-listingDate">{entity?.listingDate ? new Date(entity.listingDate).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.listingDate?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, listingDate: e.target.value })} data-testid="input-listingDate" />}
+                            />
+                            <EditableFieldRow label="Listing URL" isEditing={isEditing}
+                              value={
+                                entity?.listingUrl ? (
+                                  <a href={entity.listingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 text-xs" data-testid="text-listingUrl">
+                                    View Listing <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                ) : <span data-testid="text-listingUrl">-</span>
+                              }
+                              editComponent={<Input value={editData.listingUrl || ""} onChange={(e) => setEditData({ ...editData, listingUrl: e.target.value })} placeholder="https://..." data-testid="input-listingUrl" />}
+                            />
+                            <EditableFieldRow label="Listing Notes" isEditing={isEditing}
+                              value={<span data-testid="text-listingNotes" className="text-xs">{entity?.listingNotes || "-"}</span>}
+                              editComponent={<Textarea value={editData.listingNotes || ""} onChange={(e) => setEditData({ ...editData, listingNotes: e.target.value })} rows={2} data-testid="input-listingNotes" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Sale History" icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-0.5">
+                            <EditableFieldRow label="Last Sale Date" isEditing={isEditing}
+                              value={<span data-testid="text-lastSaleDate">{entity?.lastSaleDate ? new Date(entity.lastSaleDate).toLocaleDateString() : "-"}</span>}
+                              editComponent={<Input type="date" value={editData.lastSaleDate?.split('T')[0] || ""} onChange={(e) => setEditData({ ...editData, lastSaleDate: e.target.value })} data-testid="input-lastSaleDate" />}
+                            />
+                            <EditableFieldRow label="Last Sale Price" isEditing={isEditing}
+                              value={<span data-testid="text-lastSalePrice">{entity?.lastSalePrice ? `$${Number(entity.lastSalePrice).toLocaleString()}` : "-"}</span>}
+                              editComponent={<Input type="number" value={editData.lastSalePrice || ""} onChange={(e) => setEditData({ ...editData, lastSalePrice: e.target.value })} data-testid="input-lastSalePrice" />}
+                            />
+                          </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection title="Due Diligence Flags" icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />} defaultOpen={false}>
+                          <div className="space-y-1 pt-1">
+                            {[
+                              { key: 'hasEnvIssues', label: 'Environmental Issues', editKey: 'hasEnvIssues' },
+                              { key: 'hasTitleIssues', label: 'Title Issues', editKey: 'hasTitleIssues' },
+                              { key: 'inFloodZone', label: 'In Flood Zone', editKey: 'inFloodZone' },
+                              { key: 'hasWetlands', label: 'Has Wetlands', editKey: 'hasWetlands' },
+                            ].map(({ key, label, editKey }) => (
+                              <div key={key} className="flex items-center justify-between py-1 px-2 rounded-md hover:bg-muted/30">
+                                <span className="text-xs text-muted-foreground">{label}</span>
+                                <div className="flex items-center gap-1.5" data-testid={`text-${key}`}>
+                                  {entity?.[key]
+                                    ? <><AlertTriangle className="h-3.5 w-3.5 text-amber-500" /><span className="text-amber-600 text-xs font-medium">Flagged</span></>
+                                    : <><CheckCircle2 className="h-3.5 w-3.5 text-gray-400" /><span className="text-gray-500 text-xs">Clear</span></>}
+                                  {isEditing && (
+                                    <input type="checkbox" className="ml-1" checked={!!editData[editKey]} onChange={(e) => setEditData({ ...editData, [editKey]: e.target.checked })} data-testid={`input-${key}`} />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </CollapsibleSection>
                       </div>
