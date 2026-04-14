@@ -35,11 +35,10 @@ import { Plus, Search } from "lucide-react";
 interface Room {
   id: string;
   roomNumber: string;
-  type: string;
+  roomType: string;
   status: "available" | "occupied" | "maintenance" | "out_of_order";
-  rate: number;
-  floor: number;
-  tenant?: string;
+  currentRate: string | null;
+  floor: number | null;
 }
 
 const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string; className: string }> = {
@@ -64,7 +63,7 @@ export default function HotelRooms() {
   const filteredRooms = (rooms || []).filter((room) => {
     const matchesSearch =
       room.roomNumber.toLowerCase().includes(search.toLowerCase()) ||
-      room.type.toLowerCase().includes(search.toLowerCase());
+      room.roomType.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || room.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -178,7 +177,6 @@ export default function HotelRooms() {
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
                   <TableHead>Floor</TableHead>
-                  <TableHead>Guest</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -187,19 +185,16 @@ export default function HotelRooms() {
                   return (
                     <TableRow key={room.id}>
                       <TableCell className="font-medium">{room.roomNumber}</TableCell>
-                      <TableCell>{room.type}</TableCell>
+                      <TableCell>{room.roomType}</TableCell>
                       <TableCell>
                         <Badge variant={badge.variant} className={badge.className}>
                           {badge.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        ${room.rate.toFixed(2)}
+                        {room.currentRate ? `$${parseFloat(room.currentRate).toFixed(2)}` : "--"}
                       </TableCell>
-                      <TableCell>{room.floor}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {room.tenant || "--"}
-                      </TableCell>
+                      <TableCell>{room.floor ?? "--"}</TableCell>
                     </TableRow>
                   );
                 })}

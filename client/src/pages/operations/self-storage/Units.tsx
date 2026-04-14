@@ -25,10 +25,10 @@ interface StorageUnit {
   id: string;
   unitNumber: string;
   size: string;
-  type: string;
-  status: "available" | "occupied" | "reserved" | "maintenance";
-  rate: number;
-  tenant?: string;
+  unitType: string;
+  status: "available" | "occupied" | "reserved" | "maintenance" | "delinquent";
+  monthlyRate: string | null;
+  tenantName: string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -55,9 +55,9 @@ export default function SelfStorageUnits() {
   const filteredUnits = (units || []).filter((unit) => {
     const matchesSearch =
       unit.unitNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (unit.tenant || "").toLowerCase().includes(search.toLowerCase());
+      (unit.tenantName || "").toLowerCase().includes(search.toLowerCase());
     const matchesSize = sizeFilter === "all" || unit.size === sizeFilter;
-    const matchesType = typeFilter === "all" || unit.type === typeFilter;
+    const matchesType = typeFilter === "all" || unit.unitType === typeFilter;
     const matchesStatus = statusFilter === "all" || unit.status === statusFilter;
     return matchesSearch && matchesSize && matchesType && matchesStatus;
   });
@@ -151,15 +151,17 @@ export default function SelfStorageUnits() {
                     <TableRow key={unit.id}>
                       <TableCell className="font-medium">{unit.unitNumber}</TableCell>
                       <TableCell>{unit.size}</TableCell>
-                      <TableCell>{unit.type}</TableCell>
+                      <TableCell>{unit.unitType}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={badge.className}>
                           {badge.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">${unit.rate.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        {unit.monthlyRate ? `$${parseFloat(unit.monthlyRate).toFixed(2)}` : "--"}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {unit.tenant || "--"}
+                        {unit.tenantName || "--"}
                       </TableCell>
                     </TableRow>
                   );

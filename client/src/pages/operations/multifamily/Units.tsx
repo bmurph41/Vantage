@@ -35,12 +35,12 @@ import { Plus, Search } from "lucide-react";
 interface Unit {
   id: string;
   unitNumber: string;
-  type: string;
-  sqFt: number;
+  unitType: string;
+  sqft: number | null;
   status: "occupied" | "vacant" | "on_notice" | "down_for_turn";
-  currentRent: number;
-  marketRent: number;
-  tenant?: string;
+  currentRent: string | null;
+  marketRent: string | null;
+  tenantName: string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -66,9 +66,9 @@ export default function MultifamilyUnits() {
   const filteredUnits = (units || []).filter((unit) => {
     const matchesSearch =
       unit.unitNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (unit.tenant || "").toLowerCase().includes(search.toLowerCase());
+      (unit.tenantName || "").toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || unit.status === statusFilter;
-    const matchesType = typeFilter === "all" || unit.type === typeFilter;
+    const matchesType = typeFilter === "all" || unit.unitType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
 
@@ -203,23 +203,27 @@ export default function MultifamilyUnits() {
               <TableBody>
                 {filteredUnits.map((unit) => {
                   const badge = STATUS_BADGE[unit.status] || STATUS_BADGE.vacant;
-                  const variance = unit.marketRent > 0
-                    ? ((unit.marketRent - unit.currentRent) / unit.marketRent * 100)
-                    : 0;
+                  const mktRent = parseFloat(unit.marketRent || '0');
+                  const curRent = parseFloat(unit.currentRent || '0');
+                  const variance = mktRent > 0 ? ((mktRent - curRent) / mktRent * 100) : 0;
                   return (
                     <TableRow key={unit.id}>
                       <TableCell className="font-medium">{unit.unitNumber}</TableCell>
-                      <TableCell>{unit.type}</TableCell>
-                      <TableCell className="text-right">{unit.sqFt.toLocaleString()}</TableCell>
+                      <TableCell>{unit.unitType}</TableCell>
+                      <TableCell className="text-right">{unit.sqft?.toLocaleString() ?? "--"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={badge.className}>
                           {badge.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">${unit.currentRent.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">${unit.marketRent.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        {unit.currentRent ? `$${curRent.toLocaleString()}` : "--"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {unit.marketRent ? `$${mktRent.toLocaleString()}` : "--"}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {unit.tenant || "--"}
+                        {unit.tenantName || "--"}
                       </TableCell>
                     </TableRow>
                   );
