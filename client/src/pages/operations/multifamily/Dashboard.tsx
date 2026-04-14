@@ -42,15 +42,6 @@ interface MultifamilyUnit {
   leaseEnd: string | null;
 }
 
-interface MultifamilyTurn {
-  id: string;
-  unitNumber: string;
-  moveOutDate: string;
-  targetMoveIn: string | null;
-  scope: string;
-  status: string;
-  estimatedCost: string | null;
-}
 
 interface RentCollectionRecord {
   id: string;
@@ -180,11 +171,6 @@ export default function MultifamilyDashboard() {
     retry: false,
   });
 
-  const { data: turns = [], isLoading: turnsLoading } = useQuery<MultifamilyTurn[]>({
-    queryKey: ["/api/multifamily-ops/turns"],
-    retry: false,
-  });
-
   const { data: rentCollection, isLoading: rentLoading } = useQuery<RentCollectionData>({
     queryKey: ["/api/multifamily-ops/rent-collection"],
     retry: false,
@@ -224,8 +210,6 @@ export default function MultifamilyDashboard() {
   const expiringUnits = units
     .filter(u => u.leaseEnd && u.leaseEnd >= todayStr && u.leaseEnd <= in90Days)
     .sort((a, b) => (a.leaseEnd! > b.leaseEnd! ? 1 : -1));
-
-  const activeTurns = turns.filter(t => t.status !== "completed" && t.status !== "cancelled");
 
   const rentRecords = rentCollection?.records || [];
   const rentSummary = rentCollection?.summary;

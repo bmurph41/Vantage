@@ -196,11 +196,10 @@ router.get('/rooms', async (req: Request, res: Response) => {
     const mapped = rooms.map(r => ({
       id: r.id,
       roomNumber: r.roomNumber,
-      type: r.roomType,
+      roomType: r.roomType,
       status: r.status,
-      rate: parseFloat(r.currentRate || r.baseRate || '0'),
-      floor: r.floor || 1,
-      tenant: null, // would come from active reservation
+      currentRate: r.currentRate || r.baseRate || null,
+      floor: r.floor ?? null,
     }));
 
     res.json(mapped);

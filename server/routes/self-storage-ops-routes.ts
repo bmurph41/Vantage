@@ -170,10 +170,13 @@ router.get('/units', async (req: Request, res: Response) => {
       id: u.id,
       unitNumber: u.unitNumber,
       size: u.size,
-      type: u.unitType,
+      unitType: u.unitType,
       status: u.status,
-      rate: parseFloat(u.monthlyRate || '0'),
-      tenant: u.tenantName || null,
+      monthlyRate: u.monthlyRate || null,
+      tenantName: u.tenantName || null,
+      moveInDate: u.moveInDate || null,
+      autopayEnabled: u.autopayEnabled ?? false,
+      insuranceActive: u.insuranceActive ?? false,
     }));
 
     res.json(mapped);
