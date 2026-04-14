@@ -473,8 +473,8 @@ export default function BoatSalesDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Buyer Activity Feed</CardTitle>
-                <CardDescription>Recent buyer inquiries and transactions</CardDescription>
+                <CardTitle>Recent Sales Activity</CardTitle>
+                <CardDescription>Closed transactions and buyer details</CardDescription>
               </CardHeader>
               <CardContent>
                 {buyerActivity.length === 0 ? (

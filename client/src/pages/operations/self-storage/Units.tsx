@@ -36,6 +36,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   occupied: { label: "Occupied", className: "border-blue-500 text-blue-700 bg-blue-50" },
   reserved: { label: "Reserved", className: "border-purple-500 text-purple-700 bg-purple-50" },
   maintenance: { label: "Maintenance", className: "border-yellow-500 text-yellow-700 bg-yellow-50" },
+  delinquent: { label: "Delinquent", className: "border-red-500 text-red-700 bg-red-50" },
 };
 
 const UNIT_SIZES = ["5x5", "5x10", "10x10", "10x15", "10x20", "10x30"];
@@ -115,6 +116,7 @@ export default function SelfStorageUnits() {
             <SelectItem value="occupied">Occupied</SelectItem>
             <SelectItem value="reserved">Reserved</SelectItem>
             <SelectItem value="maintenance">Maintenance</SelectItem>
+            <SelectItem value="delinquent">Delinquent</SelectItem>
           </SelectContent>
         </Select>
       </div>

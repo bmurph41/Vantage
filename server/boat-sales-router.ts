@@ -559,4 +559,67 @@ router.get('/analytics/summary', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// GET /dashboard — Aggregated dashboard data (inventory + transaction stats)
+// ============================================================================
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user?.orgId) return res.status(401).json({ message: 'Authentication required' });
+
+    const [inventory, transactions] = await Promise.all([
+      db.select().from(boatSalesInventory).where(eq(boatSalesInventory.orgId, user.orgId)),
+      db.select().from(boatSalesTransactions).where(eq(boatSalesTransactions.orgId, user.orgId))
+        .orderBy(desc(boatSalesTransactions.saleDate)),
+    ]);
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const activeListings = inventory.filter(b => b.status === 'available' || b.status === 'consignment');
+    const underContract = inventory.filter(b => b.status === 'pending');
+    const closedMtd = transactions.filter(t => t.saleDate && new Date(t.saleDate) >= monthStart);
+    const revenueMtd = closedMtd.reduce((sum, t) => sum + Number(t.salePrice || 0), 0);
+    const grossProfitMtd = closedMtd.reduce((sum, t) => sum + Number(t.grossProfit || 0), 0);
+
+    const recentTransactions = transactions.slice(0, 10).map(t => ({
+      id: t.id,
+      stockNumber: t.stockNumber,
+      buyerName: t.buyerName,
+      salePrice: Number(t.salePrice || 0),
+      grossProfit: Number(t.grossProfit || 0),
+      saleDate: t.saleDate,
+      saleType: t.saleType,
+    }));
+
+    const activeInventory = activeListings.slice(0, 20).map(b => ({
+      id: b.id,
+      stockNumber: b.stockNumber,
+      year: b.year,
+      make: b.make,
+      model: b.model,
+      condition: b.condition,
+      listPrice: Number(b.listPrice || 0),
+      status: b.status,
+      daysInInventory: b.createdAt
+        ? Math.floor((now.getTime() - new Date(b.createdAt).getTime()) / 86400000)
+        : null,
+    }));
+
+    res.json({
+      pipeline: {
+        activeListings: activeListings.length,
+        underContract: underContract.length,
+        closedMtd: closedMtd.length,
+      },
+      revenue: { mtd: Math.round(revenueMtd * 100) / 100, grossProfitMtd: Math.round(grossProfitMtd * 100) / 100 },
+      activeInventory,
+      recentTransactions,
+    });
+  } catch (error) {
+    console.error('Boat sales dashboard error:', error);
+    res.status(500).json({ message: 'Error fetching boat sales dashboard' });
+  }
+});
+
 export default router;

@@ -294,4 +294,64 @@ router.put('/ti-allowances/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// GET /dashboard — Aggregated dashboard data (stats + active tenants)
+// ============================================================================
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const orgId = getOrgId(req);
+    const marinaId = req.query.marinaId as string | undefined;
+
+    let leaseConds: any[] = [eq(opsCommercialLeases.orgId, orgId)];
+    if (marinaId) leaseConds.push(eq(opsCommercialLeases.marinaId, marinaId as string));
+
+    const leases = await db.select().from(opsCommercialLeases).where(and(...leaseConds));
+    const activeLeases = leases.filter(l => l.status === 'active');
+    const totalSF = leases.reduce((sum, l) => sum + (l.leasedSF || 0), 0);
+    const occupiedSF = activeLeases.reduce((sum, l) => sum + (l.leasedSF || 0), 0);
+    const vacantSF = totalSF - occupiedSF;
+    const occupancyPct = totalSF > 0 ? (occupiedSF / totalSF) * 100 : 0;
+
+    const totalBaseRent = activeLeases.reduce((sum, l) => sum + parseFloat(l.baseRent || '0'), 0);
+    const totalCAM = activeLeases.reduce((sum, l) => sum + parseFloat(l.camCharges || '0'), 0);
+    const totalNOI = totalBaseRent + totalCAM;
+    const noiPerSF = occupiedSF > 0 ? totalNOI / occupiedSF : 0;
+
+    const now = new Date();
+    const in180Days = new Date(now.getTime() + 180 * 86400000).toISOString().split('T')[0];
+    const todayStr = now.toISOString().split('T')[0];
+    const upcomingRenewals = activeLeases
+      .filter(l => l.leaseEnd && l.leaseEnd >= todayStr && l.leaseEnd <= in180Days)
+      .sort((a, b) => (a.leaseEnd! > b.leaseEnd! ? 1 : -1))
+      .slice(0, 10)
+      .map(l => ({ id: l.id, tenant: l.tenantName, suite: l.suiteNumber, sf: l.leasedSF, leaseEnd: l.leaseEnd, baseRent: l.baseRent }));
+
+    const tenants = activeLeases.slice(0, 20).map(l => ({
+      id: l.id,
+      tenant: l.tenantName,
+      suite: l.suiteNumber,
+      sf: l.leasedSF,
+      leaseStart: l.leaseStart,
+      leaseEnd: l.leaseEnd,
+      baseRent: parseFloat(l.baseRent || '0'),
+      cam: parseFloat(l.camCharges || '0'),
+      totalRent: parseFloat(l.baseRent || '0') + parseFloat(l.camCharges || '0'),
+      status: l.status,
+    }));
+
+    res.json({
+      occupiedSF,
+      vacantSF,
+      occupancyPct: Math.round(occupancyPct * 10) / 10,
+      noiPerSF: Math.round(noiPerSF * 100) / 100,
+      totalMonthlyRevenue: Math.round(totalNOI * 100) / 100,
+      upcomingRenewals,
+      tenants,
+    });
+  } catch (err: any) {
+    console.error('Retail/office dashboard error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
