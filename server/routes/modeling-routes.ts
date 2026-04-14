@@ -3,12 +3,24 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { eq, and, or, desc, asc, sql, inArray, isNull } from "drizzle-orm";
 import { requirePermission } from "../middleware/rbac";
+import { parsePagination, paginatedResponse } from "../utils/pagination";
 import { debtScenarioService } from "../debt-scenario-service";
 import { docIntelService } from "../services/doc-intel-service";
 import { dashboardService } from "../services/dashboard-service";
 import { personaService } from "../services/persona-service";
 import { calculateAll, type TransactionClosingData } from "../services/transactionClosingEngine";
 import { z } from "zod";
+import {
+  createCapitalCallSchema,
+  processDistributionSchema,
+  createInvestorSchema,
+  periodLockSchema,
+  fundCreateSchema,
+  fundUpdateSchema,
+  capitalMovementSchema,
+  distributionDraftSchema,
+  unlockPeriodSchema,
+} from "../validators/fund-validators";
 import multer from "multer";
 import { validateFileUpload } from "../middleware/file-upload-security";
 import path from "path";
@@ -71,7 +83,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { sensitivityMatrixService } = await import('./services/sensitivity-matrix-service');
+      const { sensitivityMatrixService } = await import('../services/sensitivity-matrix-service');
       const result = await sensitivityMatrixService.generateMatrix(projectId, orgId, scenarioType, config);
 
       if (save) {
@@ -99,13 +111,13 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { sensitivityMatrixService } = await import('./services/sensitivity-matrix-service');
+      const { sensitivityMatrixService } = await import('../services/sensitivity-matrix-service');
       const matrices = await sensitivityMatrixService.getMatrices(projectId, orgId);
 
       res.json(matrices);
     } catch (error: any) {
-      console.error('Failed to fetch sensitivity matrices:', error);
-      res.status(500).json({ error: 'Failed to fetch sensitivity matrices' });
+      req.log?.error(error, 'Failed to fetch sensitivity matrices') || console.error('Failed to fetch sensitivity matrices:', error);
+      res.status(500).json({ error: { code: 'SENSITIVITY_MATRICES_FETCH_FAILED', message: 'Failed to fetch sensitivity matrices' } });
     }
   });
 
@@ -123,7 +135,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { benchmarkComparisonService } = await import('./services/benchmark-comparison-service');
+      const { benchmarkComparisonService } = await import('../services/benchmark-comparison-service');
       const benchmarks = await benchmarkComparisonService.compareToBenchmarks(projectId, orgId, {
         region: region as string,
         state: state as string,
@@ -139,8 +151,8 @@ export function registerModelingRoutes(
 
       res.json(benchmarks);
     } catch (error: any) {
-      console.error('Failed to get benchmark comparison:', error);
-      res.status(500).json({ error: 'Failed to get benchmark comparison' });
+      req.log?.error(error, 'Failed to get benchmark comparison') || console.error('Failed to get benchmark comparison:', error);
+      res.status(500).json({ error: { code: 'BENCHMARK_COMPARISON_FAILED', message: 'Failed to get benchmark comparison' } });
     }
   });
 
@@ -149,13 +161,13 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       
-      const { benchmarkComparisonService } = await import('./services/benchmark-comparison-service');
+      const { benchmarkComparisonService } = await import('../services/benchmark-comparison-service');
       const riskMetrics = await benchmarkComparisonService.getPortfolioRiskMetrics(orgId);
 
       res.json(riskMetrics);
     } catch (error: any) {
-      console.error('Failed to get portfolio risk metrics:', error);
-      res.status(500).json({ error: 'Failed to get portfolio risk metrics' });
+      req.log?.error(error, 'Failed to get portfolio risk metrics') || console.error('Failed to get portfolio risk metrics:', error);
+      res.status(500).json({ error: { code: 'PORTFOLIO_RISK_METRICS_FAILED', message: 'Failed to get portfolio risk metrics' } });
     }
   });
 
@@ -174,7 +186,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { multiApproverService } = await import('./services/multi-approver-service');
+      const { multiApproverService } = await import('../services/multi-approver-service');
       const requestId = await multiApproverService.createApprovalRequest(projectId, orgId, userId, {
         scenarioVersionId,
         title,
@@ -186,8 +198,8 @@ export function registerModelingRoutes(
 
       res.json({ id: requestId, message: 'Approval request created successfully' });
     } catch (error: any) {
-      console.error('Failed to create approval request:', error);
-      res.status(500).json({ error: 'Failed to create approval request' });
+      req.log?.error(error, 'Failed to create approval request') || console.error('Failed to create approval request:', error);
+      res.status(500).json({ error: { code: 'APPROVAL_REQUEST_CREATE_FAILED', message: 'Failed to create approval request' } });
     }
   });
 
@@ -202,13 +214,13 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { multiApproverService } = await import('./services/multi-approver-service');
+      const { multiApproverService } = await import('../services/multi-approver-service');
       const requests = await multiApproverService.getProjectApprovalRequests(projectId, orgId);
 
       res.json(requests);
     } catch (error: any) {
-      console.error('Failed to get approval requests:', error);
-      res.status(500).json({ error: 'Failed to get approval requests' });
+      req.log?.error(error, 'Failed to get approval requests') || console.error('Failed to get approval requests:', error);
+      res.status(500).json({ error: { code: 'APPROVAL_REQUESTS_FETCH_FAILED', message: 'Failed to get approval requests' } });
     }
   });
 
@@ -218,13 +230,13 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const userId = req.user.id;
       
-      const { multiApproverService } = await import('./services/multi-approver-service');
+      const { multiApproverService } = await import('../services/multi-approver-service');
       const pendingApprovals = await multiApproverService.getPendingApprovalsForUser(userId, orgId);
 
       res.json(pendingApprovals);
     } catch (error: any) {
-      console.error('Failed to get pending approvals:', error);
-      res.status(500).json({ error: 'Failed to get pending approvals' });
+      req.log?.error(error, 'Failed to get pending approvals') || console.error('Failed to get pending approvals:', error);
+      res.status(500).json({ error: { code: 'PENDING_APPROVALS_FETCH_FAILED', message: 'Failed to get pending approvals' } });
     }
   });
 
@@ -240,7 +252,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Decision must be "approved" or "rejected"' });
       }
 
-      const { multiApproverService } = await import('./services/multi-approver-service');
+      const { multiApproverService } = await import('../services/multi-approver-service');
       const result = await multiApproverService.submitDecision(orgId, userId, {
         approvalRequestId: requestId,
         decision,
@@ -253,8 +265,8 @@ export function registerModelingRoutes(
         isComplete: result.isComplete
       });
     } catch (error: any) {
-      console.error('Failed to submit decision:', error);
-      res.status(400).json({ error: error.message || 'Failed to submit decision' });
+      req.log?.error(error, 'Failed to submit approval decision') || console.error('Failed to submit decision:', error);
+      res.status(400).json({ error: { code: 'APPROVAL_DECISION_FAILED', message: error.message || 'Failed to submit approval decision' } });
     }
   });
 
@@ -264,7 +276,7 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { requestId } = req.params;
       
-      const { multiApproverService } = await import('./services/multi-approver-service');
+      const { multiApproverService } = await import('../services/multi-approver-service');
       const request = await multiApproverService.getApprovalRequest(requestId, orgId);
 
       if (!request) {
@@ -273,8 +285,8 @@ export function registerModelingRoutes(
 
       res.json(request);
     } catch (error: any) {
-      console.error('Failed to get approval request:', error);
-      res.status(500).json({ error: 'Failed to get approval request' });
+      req.log?.error(error, 'Failed to get approval request') || console.error('Failed to get approval request:', error);
+      res.status(500).json({ error: { code: 'APPROVAL_REQUEST_FETCH_FAILED', message: 'Failed to get approval request' } });
     }
   });
 
@@ -296,7 +308,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'documentType must be "p&l" or "rent_roll"' });
       }
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       const jobId = await documentIntelligenceService.createJobFromVdrDocument(
         orgId,
         userId,
@@ -307,8 +319,8 @@ export function registerModelingRoutes(
 
       res.json({ jobId, message: 'Document intelligence job created' });
     } catch (error: any) {
-      console.error('Failed to create document intelligence job:', error);
-      res.status(400).json({ error: error.message || 'Failed to create document intelligence job' });
+      req.log?.error(error, 'Failed to create document intelligence job') || console.error('Failed to create document intelligence job:', error);
+      res.status(400).json({ error: { code: 'DOC_INTELLIGENCE_JOB_CREATE_FAILED', message: error.message || 'Failed to create document intelligence job' } });
     }
   });
 
@@ -318,16 +330,16 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { projectId } = req.params;
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       const jobs = await documentIntelligenceService.getProjectJobs(projectId, orgId);
 
       res.json(jobs);
     } catch (error: any) {
-      console.error('Failed to get document intelligence jobs:', error);
+      req.log?.error(error, 'Failed to get document intelligence jobs') || console.error('Failed to get document intelligence jobs:', error);
       if (error.message?.includes('not found') || error.message?.includes('access denied')) {
-        return res.status(404).json({ error: error.message });
+        return res.status(404).json({ error: { code: 'DOC_INTELLIGENCE_JOB_NOT_FOUND', message: error.message } });
       }
-      res.status(500).json({ error: 'Failed to get document intelligence jobs' });
+      res.status(500).json({ error: { code: 'DOC_INTELLIGENCE_JOBS_FETCH_FAILED', message: 'Failed to get document intelligence jobs' } });
     }
   });
 
@@ -337,7 +349,7 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { jobId } = req.params;
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       const job = await documentIntelligenceService.getJob(jobId, orgId);
 
       if (!job) {
@@ -350,8 +362,8 @@ export function registerModelingRoutes(
 
       res.json({ job, result });
     } catch (error: any) {
-      console.error('Failed to get document intelligence job:', error);
-      res.status(500).json({ error: 'Failed to get document intelligence job' });
+      req.log?.error(error, 'Failed to get document intelligence job') || console.error('Failed to get document intelligence job:', error);
+      res.status(500).json({ error: { code: 'DOC_INTELLIGENCE_JOB_FETCH_FAILED', message: 'Failed to get document intelligence job' } });
     }
   });
 
@@ -363,13 +375,13 @@ export function registerModelingRoutes(
       const { resultId } = req.params;
       const { modifications } = req.body;
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       await documentIntelligenceService.approveResult(resultId, orgId, userId, modifications);
 
       res.json({ message: 'Result approved' });
     } catch (error: any) {
-      console.error('Failed to approve result:', error);
-      res.status(500).json({ error: 'Failed to approve result' });
+      req.log?.error(error, 'Failed to approve document intelligence result') || console.error('Failed to approve result:', error);
+      res.status(500).json({ error: { code: 'DOC_INTELLIGENCE_APPROVE_FAILED', message: 'Failed to approve result' } });
     }
   });
 
@@ -385,13 +397,13 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Rejection reason is required' });
       }
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       await documentIntelligenceService.rejectResult(resultId, orgId, userId, reason);
 
       res.json({ message: 'Result rejected' });
     } catch (error: any) {
-      console.error('Failed to reject result:', error);
-      res.status(500).json({ error: 'Failed to reject result' });
+      req.log?.error(error, 'Failed to reject document intelligence result') || console.error('Failed to reject result:', error);
+      res.status(500).json({ error: { code: 'DOC_INTELLIGENCE_REJECT_FAILED', message: 'Failed to reject result' } });
     }
   });
 
@@ -407,7 +419,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Year is required' });
       }
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       const result = await documentIntelligenceService.importToModelingActuals(resultId, orgId, userId, {
         year,
         month,
@@ -420,8 +432,8 @@ export function registerModelingRoutes(
         skipped: result.skipped
       });
     } catch (error: any) {
-      console.error('Failed to import to actuals:', error);
-      res.status(400).json({ error: error.message || 'Failed to import to actuals' });
+      req.log?.error(error, 'Failed to import to actuals') || console.error('Failed to import to actuals:', error);
+      res.status(400).json({ error: { code: 'ACTUALS_IMPORT_FAILED', message: error.message || 'Failed to import to actuals' } });
     }
   });
 
@@ -430,13 +442,13 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { resultId } = req.params;
 
-      const { documentIntelligenceService } = await import('./services/document-intelligence-service');
+      const { documentIntelligenceService } = await import('../services/document-intelligence-service');
       const data = await documentIntelligenceService.getStructuredPLData(resultId, orgId);
 
       res.json(data);
     } catch (error: any) {
-      console.error('Failed to get structured P&L data:', error);
-      res.status(400).json({ error: error.message || 'Failed to get structured P&L data' });
+      req.log?.error(error, 'Failed to get structured P&L data') || console.error('Failed to get structured P&L data:', error);
+      res.status(400).json({ error: { code: 'STRUCTURED_PL_FETCH_FAILED', message: error.message || 'Failed to get structured P&L data' } });
     }
   });
 
@@ -459,7 +471,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'targetType and initialComment are required' });
       }
 
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       const threadId = await commentThreadsService.createThread(projectId, orgId, userId, {
         scenarioVersionId,
         targetType,
@@ -470,8 +482,8 @@ export function registerModelingRoutes(
 
       res.json({ id: threadId, message: 'Thread created successfully' });
     } catch (error: any) {
-      console.error('Failed to create comment thread:', error);
-      res.status(500).json({ error: 'Failed to create comment thread' });
+      req.log?.error(error, 'Failed to create comment thread') || console.error('Failed to create comment thread:', error);
+      res.status(500).json({ error: { code: 'COMMENT_THREAD_CREATE_FAILED', message: 'Failed to create comment thread' } });
     }
   });
 
@@ -487,7 +499,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       const threads = await commentThreadsService.getProjectThreads(projectId, orgId, {
         scenarioVersionId: scenarioVersionId as string,
         status: status as 'open' | 'resolved' | 'archived',
@@ -496,8 +508,8 @@ export function registerModelingRoutes(
 
       res.json(threads);
     } catch (error: any) {
-      console.error('Failed to get comment threads:', error);
-      res.status(500).json({ error: 'Failed to get comment threads' });
+      req.log?.error(error, 'Failed to get comment threads') || console.error('Failed to get comment threads:', error);
+      res.status(500).json({ error: { code: 'COMMENT_THREADS_FETCH_FAILED', message: 'Failed to get comment threads' } });
     }
   });
 
@@ -507,13 +519,13 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { projectId } = req.params;
       
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       const count = await commentThreadsService.getUnresolvedCount(projectId, orgId);
 
       res.json(count);
     } catch (error: any) {
-      console.error('Failed to get unresolved count:', error);
-      res.status(500).json({ error: 'Failed to get unresolved count' });
+      req.log?.error(error, 'Failed to get unresolved thread count') || console.error('Failed to get unresolved count:', error);
+      res.status(500).json({ error: { code: 'UNRESOLVED_COUNT_FETCH_FAILED', message: 'Failed to get unresolved thread count' } });
     }
   });
 
@@ -523,7 +535,7 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const { threadId } = req.params;
       
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       const thread = await commentThreadsService.getThread(threadId, orgId);
 
       if (!thread) {
@@ -532,8 +544,8 @@ export function registerModelingRoutes(
 
       res.json(thread);
     } catch (error: any) {
-      console.error('Failed to get thread:', error);
-      res.status(500).json({ error: 'Failed to get thread' });
+      req.log?.error(error, 'Failed to get thread') || console.error('Failed to get thread:', error);
+      res.status(500).json({ error: { code: 'THREAD_FETCH_FAILED', message: 'Failed to get thread' } });
     }
   });
 
@@ -549,7 +561,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Comment content is required' });
       }
 
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       const commentId = await commentThreadsService.addComment(orgId, userId, {
         threadId,
         content,
@@ -558,8 +570,8 @@ export function registerModelingRoutes(
 
       res.json({ id: commentId, message: 'Comment added successfully' });
     } catch (error: any) {
-      console.error('Failed to add comment:', error);
-      res.status(400).json({ error: error.message || 'Failed to add comment' });
+      req.log?.error(error, 'Failed to add comment') || console.error('Failed to add comment:', error);
+      res.status(400).json({ error: { code: 'COMMENT_ADD_FAILED', message: error.message || 'Failed to add comment' } });
     }
   });
 
@@ -575,13 +587,13 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Comment content is required' });
       }
 
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       await commentThreadsService.editComment(commentId, orgId, userId, content);
 
       res.json({ message: 'Comment updated successfully' });
     } catch (error: any) {
-      console.error('Failed to edit comment:', error);
-      res.status(400).json({ error: error.message || 'Failed to edit comment' });
+      req.log?.error(error, 'Failed to edit comment') || console.error('Failed to edit comment:', error);
+      res.status(400).json({ error: { code: 'COMMENT_EDIT_FAILED', message: error.message || 'Failed to edit comment' } });
     }
   });
 
@@ -592,13 +604,13 @@ export function registerModelingRoutes(
       const userId = req.user.id;
       const { threadId } = req.params;
       
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       await commentThreadsService.resolveThread(threadId, orgId, userId);
 
       res.json({ message: 'Thread resolved successfully' });
     } catch (error: any) {
-      console.error('Failed to resolve thread:', error);
-      res.status(400).json({ error: error.message || 'Failed to resolve thread' });
+      req.log?.error(error, 'Failed to resolve thread') || console.error('Failed to resolve thread:', error);
+      res.status(400).json({ error: { code: 'THREAD_RESOLVE_FAILED', message: error.message || 'Failed to resolve thread' } });
     }
   });
 
@@ -609,13 +621,13 @@ export function registerModelingRoutes(
       const userId = req.user.id;
       const { threadId } = req.params;
       
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       await commentThreadsService.reopenThread(threadId, orgId, userId);
 
       res.json({ message: 'Thread reopened successfully' });
     } catch (error: any) {
-      console.error('Failed to reopen thread:', error);
-      res.status(400).json({ error: error.message || 'Failed to reopen thread' });
+      req.log?.error(error, 'Failed to reopen thread') || console.error('Failed to reopen thread:', error);
+      res.status(400).json({ error: { code: 'THREAD_REOPEN_FAILED', message: error.message || 'Failed to reopen thread' } });
     }
   });
 
@@ -626,13 +638,13 @@ export function registerModelingRoutes(
       const userId = req.user.id;
       const { threadId } = req.params;
       
-      const { commentThreadsService } = await import('./services/comment-threads-service');
+      const { commentThreadsService } = await import('../services/comment-threads-service');
       await commentThreadsService.archiveThread(threadId, orgId, userId);
 
       res.json({ message: 'Thread archived successfully' });
     } catch (error: any) {
-      console.error('Failed to archive thread:', error);
-      res.status(400).json({ error: error.message || 'Failed to archive thread' });
+      req.log?.error(error, 'Failed to archive thread') || console.error('Failed to archive thread:', error);
+      res.status(400).json({ error: { code: 'THREAD_ARCHIVE_FAILED', message: error.message || 'Failed to archive thread' } });
     }
   });
 
@@ -651,7 +663,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { vdrModelingIntegrationService } = await import('./services/vdr-modeling-integration-service');
+      const { vdrModelingIntegrationService } = await import('../services/vdr-modeling-integration-service');
       const result = await vdrModelingIntegrationService.exportToVDR(projectId, orgId, userId, {
         includeICMemo,
         includeProForma,
@@ -665,8 +677,8 @@ export function registerModelingRoutes(
         ...result
       });
     } catch (error: any) {
-      console.error('Failed to export to VDR:', error);
-      res.status(400).json({ error: error.message || 'Failed to export to VDR' });
+      req.log?.error(error, 'Failed to export to VDR') || console.error('Failed to export to VDR:', error);
+      res.status(400).json({ error: { code: 'VDR_EXPORT_FAILED', message: error.message || 'Failed to export to VDR' } });
     }
   });
 
@@ -681,13 +693,13 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { vdrModelingIntegrationService } = await import('./services/vdr-modeling-integration-service');
+      const { vdrModelingIntegrationService } = await import('../services/vdr-modeling-integration-service');
       const history = await vdrModelingIntegrationService.getVDRExportHistory(projectId, orgId);
 
       res.json(history);
     } catch (error: any) {
-      console.error('Failed to get VDR export history:', error);
-      res.status(500).json({ error: 'Failed to get VDR export history' });
+      req.log?.error(error, 'Failed to get VDR export history') || console.error('Failed to get VDR export history:', error);
+      res.status(500).json({ error: { code: 'VDR_EXPORT_HISTORY_FETCH_FAILED', message: 'Failed to get VDR export history' } });
     }
   });
 
@@ -735,8 +747,8 @@ export function registerModelingRoutes(
 
       res.json(documents);
     } catch (error: any) {
-      console.error('Failed to fetch VDR documents:', error);
-      res.status(500).json({ error: 'Failed to fetch VDR documents' });
+      req.log?.error(error, 'Failed to fetch VDR documents') || console.error('Failed to fetch VDR documents:', error);
+      res.status(500).json({ error: { code: 'VDR_DOCUMENTS_FETCH_FAILED', message: 'Failed to fetch VDR documents' } });
     }
   });
 
@@ -834,8 +846,8 @@ export function registerModelingRoutes(
         }
       });
     } catch (error: any) {
-      console.error('Failed to import VDR document:', error);
-      res.status(500).json({ error: 'Failed to import VDR document' });
+      req.log?.error(error, 'Failed to import VDR document') || console.error('Failed to import VDR document:', error);
+      res.status(500).json({ error: { code: 'VDR_DOCUMENT_IMPORT_FAILED', message: 'Failed to import VDR document' } });
     }
   });
 
@@ -848,7 +860,7 @@ export function registerModelingRoutes(
       const { projectId } = req.params;
       const { caseId, includeAllCases, includeAddbacks, includeLeaseUp } = req.query;
       
-      const { exportModelingProjectToExcel } = await import('./services/modeling-export');
+      const { exportModelingProjectToExcel } = await import('../services/modeling-export');
       
       const buffer = await exportModelingProjectToExcel(projectId, orgId, {
         caseId: caseId as string | undefined,
@@ -864,8 +876,8 @@ export function registerModelingRoutes(
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
     } catch (error: any) {
-      console.error('Failed to export modeling project to Excel:', error);
-      res.status(500).json({ error: 'Failed to export modeling project' });
+      req.log?.error(error, 'Failed to export modeling project to Excel') || console.error('Failed to export modeling project to Excel:', error);
+      res.status(500).json({ error: { code: 'EXCEL_EXPORT_FAILED', message: 'Failed to export modeling project to Excel' } });
     }
   });
 
@@ -880,7 +892,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'At least 2 case IDs required for comparison' });
       }
 
-      const { exportCaseComparisonToExcel } = await import('./services/modeling-export');
+      const { exportCaseComparisonToExcel } = await import('../services/modeling-export');
       
       const buffer = await exportCaseComparisonToExcel(projectId, orgId, caseIds);
 
@@ -891,8 +903,8 @@ export function registerModelingRoutes(
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.send(buffer);
     } catch (error: any) {
-      console.error('Failed to export case comparison to Excel:', error);
-      res.status(500).json({ error: 'Failed to export case comparison' });
+      req.log?.error(error, 'Failed to export case comparison to Excel') || console.error('Failed to export case comparison to Excel:', error);
+      res.status(500).json({ error: { code: 'CASE_COMPARISON_EXPORT_FAILED', message: 'Failed to export case comparison to Excel' } });
     }
   });
 
@@ -915,7 +927,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'scenarioVersionId and purchasePrice are required' });
       }
 
-      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      const { debtSensitivityService } = await import('../services/debt-sensitivity-service');
       
       let structures = lenderStructures;
       if (!structures || structures.length === 0) {
@@ -944,13 +956,13 @@ export function registerModelingRoutes(
       const { purchasePrice } = req.query;
       const price = parseFloat(purchasePrice as string) || 10000000;
 
-      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      const { debtSensitivityService } = await import('../services/debt-sensitivity-service');
       const structures = await debtSensitivityService.getStandardLenderStructures(price);
 
       res.json(structures);
     } catch (error: any) {
-      console.error('Failed to get lender templates:', error);
-      res.status(500).json({ error: 'Failed to get lender templates' });
+      req.log?.error(error, 'Failed to get lender templates') || console.error('Failed to get lender templates:', error);
+      res.status(500).json({ error: { code: 'LENDER_TEMPLATES_FETCH_FAILED', message: 'Failed to get lender templates' } });
     }
   });
 
@@ -966,7 +978,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { debtSensitivityService } = await import('./services/debt-sensitivity-service');
+      const { debtSensitivityService } = await import('../services/debt-sensitivity-service');
       const comparison = await debtSensitivityService.compareMultipleLenders(
         projectId,
         orgId,
@@ -1001,7 +1013,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'scenarioVersionId and totalInvestment are required' });
       }
 
-      const { waterfallService } = await import('./services/waterfall-service');
+      const { waterfallService } = await import('../services/waterfall-service');
       const result = await waterfallService.calculateWaterfall(projectId, orgId, userId, input);
 
       res.json(result);
@@ -1014,13 +1026,13 @@ export function registerModelingRoutes(
   // Get standard waterfall configurations
   app.get('/api/modeling/waterfall/templates', authenticateUser, async (req: any, res) => {
     try {
-      const { waterfallService } = await import('./services/waterfall-service');
+      const { waterfallService } = await import('../services/waterfall-service');
       const configs = await waterfallService.getStandardWaterfallConfigs();
 
       res.json(configs);
     } catch (error: any) {
-      console.error('Failed to get waterfall templates:', error);
-      res.status(500).json({ error: 'Failed to get waterfall templates' });
+      req.log?.error(error, 'Failed to get waterfall templates') || console.error('Failed to get waterfall templates:', error);
+      res.status(500).json({ error: { code: 'WATERFALL_TEMPLATES_FETCH_FAILED', message: 'Failed to get waterfall templates' } });
     }
   });
 
@@ -1036,7 +1048,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { waterfallService } = await import('./services/waterfall-service');
+      const { waterfallService } = await import('../services/waterfall-service');
       const comparison = await waterfallService.compareWaterfallStructures(
         projectId,
         orgId,
@@ -1066,7 +1078,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { externalAPIService } = await import('./services/external-api-service');
+      const { externalAPIService } = await import('../services/external-api-service');
       const exportData = await externalAPIService.exportProject(
         projectId, 
         orgId, 
@@ -1098,7 +1110,7 @@ export function registerModelingRoutes(
       const userId = req.user.id;
       const { status, region, outcome, minValue, maxValue } = req.query;
 
-      const { externalAPIService } = await import('./services/external-api-service');
+      const { externalAPIService } = await import('../services/external-api-service');
       const exportData = await externalAPIService.exportPortfolio(orgId, userId, {
         status: status as string,
         region: region as string,
@@ -1126,7 +1138,7 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { externalAPIService } = await import('./services/external-api-service');
+      const { externalAPIService } = await import('../services/external-api-service');
       const payload = await externalAPIService.getWebhookPayload(
         projectId,
         orgId,
@@ -1196,8 +1208,8 @@ export function registerModelingRoutes(
 
       res.json(docs);
     } catch (error: any) {
-      console.error('Failed to get API docs:', error);
-      res.status(500).json({ error: 'Failed to get API docs' });
+      req.log?.error(error, 'Failed to get API docs') || console.error('Failed to get API docs:', error);
+      res.status(500).json({ error: { code: 'API_DOCS_FETCH_FAILED', message: 'Failed to get API docs' } });
     }
   });
 
@@ -1222,8 +1234,8 @@ export function registerModelingRoutes(
       const analytics = await storage.getModelingAnalytics(orgId, filters);
       res.json(analytics);
     } catch (error: any) {
-      console.error('Failed to fetch modeling analytics:', error);
-      res.status(500).json({ error: 'Failed to fetch modeling analytics' });
+      req.log?.error(error, 'Failed to fetch modeling analytics') || console.error('Failed to fetch modeling analytics:', error);
+      res.status(500).json({ error: { code: 'MODELING_ANALYTICS_FETCH_FAILED', message: 'Failed to fetch modeling analytics' } });
     }
   });
 
@@ -1235,12 +1247,12 @@ export function registerModelingRoutes(
   app.get('/api/approvals/pending', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       const pendingApprovals = await approvalNotificationService.getPendingApprovals(orgId);
       res.json(pendingApprovals);
     } catch (error: any) {
-      console.error('Failed to get pending approvals:', error);
-      res.status(500).json({ error: 'Failed to get pending approvals' });
+      req.log?.error(error, 'Failed to get pending approvals') || console.error('Failed to get pending approvals:', error);
+      res.status(500).json({ error: { code: 'PENDING_APPROVALS_FETCH_FAILED', message: 'Failed to get pending approvals' } });
     }
   });
 
@@ -1248,12 +1260,12 @@ export function registerModelingRoutes(
   app.get('/api/approvals/stats', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       const stats = await approvalNotificationService.getApprovalStats(orgId);
       res.json(stats);
     } catch (error: any) {
-      console.error('Failed to get approval stats:', error);
-      res.status(500).json({ error: 'Failed to get approval statistics' });
+      req.log?.error(error, 'Failed to get approval stats') || console.error('Failed to get approval stats:', error);
+      res.status(500).json({ error: { code: 'APPROVAL_STATS_FETCH_FAILED', message: 'Failed to get approval statistics' } });
     }
   });
 
@@ -1261,12 +1273,12 @@ export function registerModelingRoutes(
   app.get('/api/approvals/approvers', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       const approvers = await approvalNotificationService.getOrgApprovers(orgId);
       res.json(approvers);
     } catch (error: any) {
-      console.error('Failed to get approvers:', error);
-      res.status(500).json({ error: 'Failed to get approvers' });
+      req.log?.error(error, 'Failed to get approvers') || console.error('Failed to get approvers:', error);
+      res.status(500).json({ error: { code: 'APPROVERS_FETCH_FAILED', message: 'Failed to get approvers' } });
     }
   });
 
@@ -1276,12 +1288,15 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const unreadOnly = req.query.unreadOnly === 'true';
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
-      const notifications = await approvalNotificationService.getUserNotifications(orgId, userId, unreadOnly);
-      res.json(notifications);
+      const pag = parsePagination(req.query, { pageSize: 25 });
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
+      const allNotifications = await approvalNotificationService.getUserNotifications(orgId, userId, unreadOnly);
+      const total = allNotifications.length;
+      const paged = allNotifications.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
-      console.error('Failed to get notifications:', error);
-      res.status(500).json({ error: 'Failed to get notifications' });
+      req.log?.error(error, 'Failed to get notifications') || console.error('Failed to get notifications:', error);
+      res.status(500).json({ error: { code: 'NOTIFICATIONS_FETCH_FAILED', message: 'Failed to get notifications' } });
     }
   });
 
@@ -1290,12 +1305,12 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       const count = await approvalNotificationService.getUnreadCount(orgId, userId);
       res.json({ count });
     } catch (error: any) {
-      console.error('Failed to get unread count:', error);
-      res.status(500).json({ error: 'Failed to get unread count' });
+      req.log?.error(error, 'Failed to get unread notification count') || console.error('Failed to get unread count:', error);
+      res.status(500).json({ error: { code: 'UNREAD_COUNT_FETCH_FAILED', message: 'Failed to get unread notification count' } });
     }
   });
 
@@ -1304,7 +1319,7 @@ export function registerModelingRoutes(
     try {
       const userId = req.user.id;
       const { notificationId } = req.params;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       await approvalNotificationService.markNotificationRead(notificationId, userId);
       res.json({ success: true });
     } catch (error: any) {
@@ -1318,7 +1333,7 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       await approvalNotificationService.markAllNotificationsRead(orgId, userId);
       res.json({ success: true });
     } catch (error: any) {
@@ -1340,8 +1355,8 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       
       const updated = await scenarioVersioningService.submitForApproval(scenarioId, userId);
 
@@ -1375,8 +1390,8 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       
       const updated = await scenarioVersioningService.approveScenario(scenarioId, userId, notes);
       await approvalNotificationService.notifyApprovalDecision(scenarioId, 'approved', userId, notes);
@@ -1401,8 +1416,8 @@ export function registerModelingRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
-      const { approvalNotificationService } = await import('./services/approval-notification-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
+      const { approvalNotificationService } = await import('../services/approval-notification-service');
       
       const updated = await scenarioVersioningService.rejectScenario(scenarioId, userId, notes);
       await approvalNotificationService.notifyApprovalDecision(scenarioId, 'rejected', userId, notes);
@@ -1422,7 +1437,7 @@ export function registerModelingRoutes(
   app.get('/api/quickbooks/status', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const status = await quickBooksService.getConnectionStatus(orgId);
       res.json(status);
     } catch (error: any) {
@@ -1435,7 +1450,7 @@ export function registerModelingRoutes(
   app.get('/api/quickbooks/auth-url', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const authUrl = quickBooksService.getAuthorizationUrl(orgId);
       res.json({ authUrl });
     } catch (error: any) {
@@ -1458,7 +1473,7 @@ export function registerModelingRoutes(
         return res.redirect('/settings/integrations?qb_error=missing_params');
       }
 
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       await quickBooksService.handleCallback(
         code as string,
         realmId as string,
@@ -1476,7 +1491,7 @@ export function registerModelingRoutes(
   app.post('/api/quickbooks/disconnect', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       await quickBooksService.disconnect(orgId);
       res.json({ success: true });
     } catch (error: any) {
@@ -1489,7 +1504,7 @@ export function registerModelingRoutes(
   app.get('/api/quickbooks/company', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const companyInfo = await quickBooksService.getCompanyInfo(orgId);
       res.json(companyInfo);
     } catch (error: any) {
@@ -1502,7 +1517,7 @@ export function registerModelingRoutes(
   app.get('/api/quickbooks/accounts', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const accounts = await quickBooksService.getChartOfAccounts(orgId);
       res.json(accounts);
     } catch (error: any) {
@@ -1521,7 +1536,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Start date and end date are required' });
       }
 
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const report = await quickBooksService.getProfitAndLoss(
         orgId,
         startDate as string,
@@ -1550,7 +1565,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Start date and end date are required' });
       }
 
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const result = await quickBooksService.syncProfitAndLossToActuals(
         orgId,
         projectId,
@@ -1569,7 +1584,7 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       const limit = parseInt(req.query.limit as string) || 20;
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       const history = await quickBooksService.getSyncHistory(orgId, limit);
       res.json(history);
     } catch (error: any) {
@@ -1588,7 +1603,7 @@ export function registerModelingRoutes(
         return res.status(400).json({ error: 'Mapping data is required' });
       }
 
-      const { quickBooksService } = await import('./services/quickbooks-service');
+      const { quickBooksService } = await import('../services/quickbooks-service');
       await quickBooksService.updateAccountMapping(orgId, mapping);
       res.json({ success: true });
     } catch (error: any) {
@@ -1606,7 +1621,7 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       const projectIds = req.query.projectIds ? (req.query.projectIds as string).split(',') : undefined;
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const summary = await portfolioRollupService.getPortfolioSummary(orgId, projectIds);
       res.json(summary);
     } catch (error: any) {
@@ -1626,7 +1641,7 @@ export function registerModelingRoutes(
       if (req.query.minValue) filters.minValue = parseFloat(req.query.minValue as string);
       if (req.query.maxValue) filters.maxValue = parseFloat(req.query.maxValue as string);
       
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const projects = await portfolioRollupService.getProjectRollups(orgId, filters);
       res.json(projects);
     } catch (error: any) {
@@ -1639,7 +1654,7 @@ export function registerModelingRoutes(
   app.get('/api/portfolio/breakdown', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const breakdown = await portfolioRollupService.getPortfolioBreakdown(orgId);
       res.json(breakdown);
     } catch (error: any) {
@@ -1655,7 +1670,7 @@ export function registerModelingRoutes(
       const projectIds = req.query.projectIds ? (req.query.projectIds as string).split(',') : undefined;
       const yearsToProject = parseInt(req.query.years as string) || 5;
       
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const projections = await portfolioRollupService.getPortfolioProjections(orgId, projectIds, yearsToProject);
       res.json(projections);
     } catch (error: any) {
@@ -1670,7 +1685,7 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const limit = parseInt(req.query.limit as string) || 10;
       
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const topPerformers = await portfolioRollupService.getTopPerformingProjects(orgId, limit);
       res.json(topPerformers);
     } catch (error: any) {
@@ -1685,7 +1700,7 @@ export function registerModelingRoutes(
       const orgId = req.user.orgId;
       const occupancyThreshold = parseFloat(req.query.threshold as string) || 70;
       
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const underperformers = await portfolioRollupService.getUnderperformingProjects(orgId, occupancyThreshold);
       res.json(underperformers);
     } catch (error: any) {
@@ -1699,7 +1714,7 @@ export function registerModelingRoutes(
     try {
       const orgId = req.user.orgId;
       
-      const { portfolioRollupService } = await import('./services/portfolio-rollup-service');
+      const { portfolioRollupService } = await import('../services/portfolio-rollup-service');
       const report = await portfolioRollupService.exportPortfolioReport(orgId);
       res.json(report);
     } catch (error: any) {
@@ -2195,7 +2210,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const purgeEntirely = req.query.purge === 'true';
 
       if (purgeEntirely) {
-        const { purgeDocIntelUpload } = await import('./services/pnl/pnl-document-purge');
+        const { purgeDocIntelUpload } = await import('../services/pnl/pnl-document-purge');
         const result = await purgeDocIntelUpload(uploadId, orgId, projectId);
 
         // Audit trail
@@ -2983,7 +2998,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       // Also run P&L pipeline promote (covers the other upload path)
       let pnlPromoted = 0;
       try {
-        const { promoteToActuals } = await import('./services/pnl/promote-to-actuals');
+        const { promoteToActuals } = await import('../services/pnl/promote-to-actuals');
         const promoteResult = await promoteToActuals(projectId, orgId);
         pnlPromoted = promoteResult?.promoted || 0;
       } catch (pnlErr) {
@@ -3997,15 +4012,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Create fund
   app.post('/api/exit/funds', authenticateUser, async (req: any, res) => {
     try {
+      const validated = fundCreateSchema.parse(req.body);
       const orgId = req.user.orgId;
-      
+
       const fund = await storage.createExitFund({
-        ...req.body,
+        ...validated,
         orgId
       });
-      
+
       res.status(201).json(fund);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to create fund:', error);
       res.status(500).json({ error: 'Failed to create fund' });
     }
@@ -4014,16 +4033,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Update fund
   app.patch('/api/exit/funds/:fundId', authenticateUser, async (req: any, res) => {
     try {
+      const validated = fundUpdateSchema.parse(req.body);
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      
-      const fund = await storage.updateExitFund(fundId, req.body, orgId);
+
+      const fund = await storage.updateExitFund(fundId, validated, orgId);
       if (!fund) {
         return res.status(404).json({ error: 'Fund not found' });
       }
-      
+
       res.json(fund);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to update fund:', error);
       res.status(500).json({ error: 'Failed to update fund' });
     }
@@ -4147,22 +4170,26 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Create investor
   app.post('/api/exit/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
     try {
+      const validated = createInvestorSchema.parse(req.body);
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      
+
       const fund = await storage.getExitFund(fundId, orgId);
       if (!fund) {
         return res.status(404).json({ error: 'Fund not found' });
       }
-      
+
       const investor = await storage.createExitInvestor({
-        ...req.body,
+        ...validated,
         fundId,
         orgId
       });
-      
+
       res.status(201).json(investor);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to create investor:', error);
       res.status(500).json({ error: 'Failed to create investor' });
     }
@@ -4171,16 +4198,20 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // Update investor
   app.patch('/api/exit/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
     try {
+      const validated = createInvestorSchema.partial().parse(req.body);
       const orgId = req.user.orgId;
       const { investorId } = req.params;
-      
-      const investor = await storage.updateExitInvestor(investorId, req.body, orgId);
+
+      const investor = await storage.updateExitInvestor(investorId, validated, orgId);
       if (!investor) {
         return res.status(404).json({ error: 'Investor not found' });
       }
-      
+
       res.json(investor);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to update investor:', error);
       res.status(500).json({ error: 'Failed to update investor' });
     }
@@ -4460,7 +4491,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const stacks = await capitalStackService.getCapitalStacksByProject(orgId, projectId);
       res.json(stacks);
     } catch (error: any) {
@@ -4474,7 +4505,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const stack = await capitalStackService.getCapitalStackWithDetails(orgId, id);
       if (!stack) {
         return res.status(404).json({ error: 'Capital stack not found' });
@@ -4493,7 +4524,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const userId = req.user.id;
       const { projectId } = req.params;
       const { debtTranches: debtTrancheData, ...stackData } = req.body;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const stack = await capitalStackService.createCapitalStack(orgId, userId, {
         ...stackData,
         modelingProjectId: projectId,
@@ -4524,7 +4555,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const stack = await capitalStackService.updateCapitalStack(orgId, id, req.body);
       if (!stack) {
         return res.status(404).json({ error: 'Capital stack not found' });
@@ -4541,7 +4572,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const success = await capitalStackService.deleteCapitalStack(orgId, id);
       if (!success) {
         return res.status(404).json({ error: 'Capital stack not found' });
@@ -4558,7 +4589,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stackId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const tranches = await capitalStackService.getDebtTranches(orgId, stackId);
       res.json(tranches);
     } catch (error: any) {
@@ -4571,7 +4602,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stackId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const tranche = await capitalStackService.createDebtTranche(orgId, {
         ...req.body,
         capitalStackId: stackId,
@@ -4587,7 +4618,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const tranche = await capitalStackService.updateDebtTranche(orgId, id, req.body);
       if (!tranche) {
         return res.status(404).json({ error: 'Debt tranche not found' });
@@ -4603,7 +4634,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const success = await capitalStackService.deleteDebtTranche(orgId, id);
       if (!success) {
         return res.status(404).json({ error: 'Debt tranche not found' });
@@ -4620,7 +4651,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stackId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const layers = await capitalStackService.getEquityLayers(orgId, stackId);
       res.json(layers);
     } catch (error: any) {
@@ -4633,7 +4664,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stackId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const layer = await capitalStackService.createEquityLayer(orgId, {
         ...req.body,
         capitalStackId: stackId,
@@ -4649,7 +4680,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const layer = await capitalStackService.updateEquityLayer(orgId, id, req.body);
       if (!layer) {
         return res.status(404).json({ error: 'Equity layer not found' });
@@ -4665,7 +4696,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const success = await capitalStackService.deleteEquityLayer(orgId, id);
       if (!success) {
         return res.status(404).json({ error: 'Equity layer not found' });
@@ -4682,7 +4713,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stackId } = req.params;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const projections = await capitalStackService.getProjections(orgId, stackId);
       res.json(projections);
     } catch (error: any) {
@@ -4696,7 +4727,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const orgId = req.user.orgId;
       const { stackId } = req.params;
       const { noi } = req.body;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const projections = await capitalStackService.generateProjections(orgId, stackId, parseFloat(noi));
       res.json(projections);
     } catch (error: any) {
@@ -4711,7 +4742,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const orgId = req.user.orgId;
       const { stackId } = req.params;
       const noi = parseFloat(req.query.noi as string) || 0;
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const metrics = await capitalStackService.getCapitalStackMetrics(orgId, stackId, noi);
       res.json(metrics);
     } catch (error: any) {
@@ -4728,7 +4759,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/funds', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const funds = await fundService.getFundsByOrg(orgId);
       res.json(funds);
     } catch (error: any) {
@@ -4741,7 +4772,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const fund = await fundService.getFundWithDetails(orgId, id);
       if (!fund) {
         return res.status(404).json({ error: 'Fund not found' });
@@ -4755,10 +4786,11 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   app.post('/api/funds', authenticateUser, async (req: any, res) => {
     try {
+      const validated = fundCreateSchema.parse(req.body);
       const orgId = req.user.orgId;
       const userId = req.user.id;
-      const { fundService } = await import('./services/fund-service');
-      const fund = await fundService.createFund(orgId, userId, req.body);
+      const { fundService } = await import('../services/fund-service');
+      const fund = await fundService.createFund(orgId, userId, validated);
       res.status(201).json(fund);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -4771,15 +4803,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   app.patch('/api/funds/:id', authenticateUser, async (req: any, res) => {
     try {
+      const validated = fundUpdateSchema.parse(req.body);
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { fundService } = await import('./services/fund-service');
-      const fund = await fundService.updateFund(orgId, id, req.body);
+      const { fundService } = await import('../services/fund-service');
+      const fund = await fundService.updateFund(orgId, id, validated);
       if (!fund) {
         return res.status(404).json({ error: 'Fund not found' });
       }
       res.json(fund);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to update fund:', error);
       res.status(500).json({ error: 'Failed to update fund' });
     }
@@ -4789,7 +4825,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { id } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const success = await fundService.deleteFund(orgId, id);
       if (!success) {
         return res.status(404).json({ error: 'Fund not found' });
@@ -4806,7 +4842,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const metrics = await fundService.calculateFundMetrics(orgId, fundId);
       res.json(metrics);
     } catch (error: any) {
@@ -4819,7 +4855,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       await fundService.recalculateFundMetrics(orgId, fundId);
       const fund = await fundService.getFundWithDetails(orgId, fundId);
       res.json(fund);
@@ -4834,7 +4870,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const investors = await fundService.getInvestorsByFund(orgId, fundId);
       res.json(investors);
     } catch (error: any) {
@@ -4847,7 +4883,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { investorId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const investor = await fundService.getInvestor(orgId, investorId);
       if (!investor) {
         return res.status(404).json({ error: 'Investor not found' });
@@ -4861,11 +4897,12 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   app.post('/api/funds/:fundId/investors', authenticateUser, async (req: any, res) => {
     try {
+      const validated = createInvestorSchema.parse(req.body);
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const investor = await fundService.createInvestor(orgId, {
-        ...req.body,
+        ...validated,
         fundId,
       });
       res.status(201).json(investor);
@@ -4880,15 +4917,19 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   app.patch('/api/funds/:fundId/investors/:investorId', authenticateUser, async (req: any, res) => {
     try {
+      const validated = createInvestorSchema.partial().parse(req.body);
       const orgId = req.user.orgId;
       const { investorId } = req.params;
-      const { fundService } = await import('./services/fund-service');
-      const investor = await fundService.updateInvestor(orgId, investorId, req.body);
+      const { fundService } = await import('../services/fund-service');
+      const investor = await fundService.updateInvestor(orgId, investorId, validated);
       if (!investor) {
         return res.status(404).json({ error: 'Investor not found' });
       }
       res.json(investor);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to update investor:', error);
       res.status(500).json({ error: 'Failed to update investor' });
     }
@@ -4898,7 +4939,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { investorId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const success = await fundService.deleteInvestor(orgId, investorId);
       if (!success) {
         return res.status(404).json({ error: 'Investor not found' });
@@ -4915,7 +4956,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const accounts = await fundService.getInvestorCapitalAccounts(orgId, fundId);
       res.json(accounts);
     } catch (error: any) {
@@ -4929,7 +4970,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocations = await fundService.getAllocationsByFund(orgId, fundId);
       res.json(allocations);
     } catch (error: any) {
@@ -4942,7 +4983,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocations = await fundService.getAllocationsByProject(orgId, projectId);
       res.json(allocations);
     } catch (error: any) {
@@ -4955,7 +4996,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { allocationId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocation = await fundService.getDealAllocation(orgId, allocationId);
       if (!allocation) {
         return res.status(404).json({ error: 'Deal allocation not found' });
@@ -4971,7 +5012,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocation = await fundService.createDealAllocation(orgId, {
         ...req.body,
         fundId,
@@ -4990,7 +5031,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { allocationId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocation = await fundService.updateDealAllocation(orgId, allocationId, req.body);
       if (!allocation) {
         return res.status(404).json({ error: 'Deal allocation not found' });
@@ -5006,7 +5047,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { allocationId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const success = await fundService.deleteDealAllocation(orgId, allocationId);
       if (!success) {
         return res.status(404).json({ error: 'Deal allocation not found' });
@@ -5023,7 +5064,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
       res.json(movements);
     } catch (error: any) {
@@ -5036,7 +5077,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { movementId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const movement = await fundService.getCapitalMovement(orgId, movementId);
       if (!movement) {
         return res.status(404).json({ error: 'Capital movement not found' });
@@ -5050,12 +5091,13 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   app.post('/api/funds/:fundId/capital-movements', authenticateUser, async (req: any, res) => {
     try {
+      const validated = capitalMovementSchema.parse(req.body);
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const movement = await fundService.createCapitalMovement(orgId, userId, {
-        ...req.body,
+        ...validated,
         fundId,
       });
       res.status(201).json(movement);
@@ -5076,8 +5118,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { fundId, movementId } = req.params;
 
       // Check period lock before allowing modification
-      const { periodLockService } = await import('./services/period-lock-service');
-      const { fundService } = await import('./services/fund-service');
+      const { periodLockService } = await import('../services/period-lock-service');
+      const { fundService } = await import('../services/fund-service');
 
       const movement = await fundService.getCapitalMovement(orgId, movementId);
       if (!movement) return res.status(404).json({ error: 'Capital movement not found' });
@@ -5118,7 +5160,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { movementId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const success = await fundService.deleteCapitalMovement(orgId, movementId);
       if (!success) {
         return res.status(404).json({ error: 'Capital movement not found' });
@@ -5135,7 +5177,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const cashFlows = await fundService.getCashFlowsByFund(orgId, fundId);
       res.json(cashFlows);
     } catch (error: any) {
@@ -5148,7 +5190,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const cashFlow = await fundService.createCashFlow(orgId, {
         ...req.body,
         fundId,
@@ -5170,7 +5212,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const { fundId } = req.params;
       const { quarter, year, marketCommentary, sectionOverrides } = req.body;
 
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const fund = await fundService.getFund(orgId, fundId);
       if (!fund) {
         return res.status(404).json({ error: 'Fund not found' });
@@ -5267,7 +5309,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const templates = await fundService.getTemplatesByFund(orgId, fundId);
       res.json(templates);
     } catch (error: any) {
@@ -5280,7 +5322,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { templateId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const template = await fundService.getCapitalStackTemplate(orgId, templateId);
       if (!template) {
         return res.status(404).json({ error: 'Template not found' });
@@ -5297,7 +5339,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const template = await fundService.createCapitalStackTemplate(orgId, userId, {
         ...req.body,
         fundId,
@@ -5316,7 +5358,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { templateId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const template = await fundService.updateCapitalStackTemplate(orgId, templateId, req.body);
       if (!template) {
         return res.status(404).json({ error: 'Template not found' });
@@ -5332,7 +5374,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { templateId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const success = await fundService.deleteCapitalStackTemplate(orgId, templateId);
       if (!success) {
         return res.status(404).json({ error: 'Template not found' });
@@ -5349,7 +5391,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const waterfall = await fundService.getLatestWaterfallCalculation(orgId, fundId);
       res.json(waterfall);
     } catch (error: any) {
@@ -5362,7 +5404,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const history = await fundService.getWaterfallHistory(orgId, fundId);
       res.json(history);
     } catch (error: any) {
@@ -5375,7 +5417,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       
       const fund = await fundService.getFund(orgId, fundId);
       if (!fund) {
@@ -5412,11 +5454,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   // === Distribution Approval Workflow (Institutional) ===
   app.post('/api/funds/:fundId/distribution-drafts', authenticateUser, async (req: any, res) => {
     try {
+      const validated = distributionDraftSchema.parse(req.body);
       const { fundId } = req.params;
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
-      const draft = await distributionApprovalService.createDraft(req, fundId, req.body);
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
+      const draft = await distributionApprovalService.createDraft(req, fundId, validated);
       res.status(201).json(draft);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       res.status(400).json({ error: error.message });
     }
   });
@@ -5424,7 +5470,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/funds/:fundId/distribution-drafts', authenticateUser, async (req: any, res) => {
     try {
       const { fundId } = req.params;
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       const drafts = await distributionApprovalService.listDrafts(req.user.orgId, fundId, req.query.status);
       res.json(drafts);
     } catch (error: any) {
@@ -5435,7 +5481,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.post('/api/funds/:fundId/distribution-drafts/:draftId/submit', authenticateUser, async (req: any, res) => {
     try {
       const { draftId } = req.params;
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       const draft = await distributionApprovalService.submitForApproval(req, draftId);
       res.json(draft);
     } catch (error: any) {
@@ -5452,7 +5498,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!['owner', 'admin'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions: fund:distribution:approve required' });
       }
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       const draft = await distributionApprovalService.approve(req, draftId, req.body.notes);
       res.json(draft);
     } catch (error: any) {
@@ -5464,7 +5510,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.post('/api/funds/:fundId/distribution-drafts/:draftId/reject', authenticateUser, async (req: any, res) => {
     try {
       const { draftId } = req.params;
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       const draft = await distributionApprovalService.reject(req, draftId, req.body.reason);
       res.json(draft);
     } catch (error: any) {
@@ -5479,7 +5525,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!['owner', 'admin'].includes(userRole)) {
         return res.status(403).json({ error: 'Insufficient permissions: only owner/admin can execute distributions' });
       }
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       const result = await distributionApprovalService.execute(req, draftId);
       res.json(result);
     } catch (error: any) {
@@ -5496,14 +5542,14 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!['owner', 'admin'].includes(userRole)) {
         return res.status(403).json({ error: 'Only owner/admin can lock periods' });
       }
-      const { periodLockService } = await import('./services/period-lock-service');
-      const { periodLabel, periodStart, periodEnd } = req.body;
-      if (!periodLabel || !periodStart || !periodEnd) {
-        return res.status(400).json({ error: 'periodLabel, periodStart, and periodEnd are required' });
-      }
-      const lock = await periodLockService.lockPeriod(req, fundId, periodLabel, new Date(periodStart), new Date(periodEnd));
+      const validated = periodLockSchema.parse(req.body);
+      const { periodLockService } = await import('../services/period-lock-service');
+      const lock = await periodLockService.lockPeriod(req, fundId, validated.periodLabel, new Date(validated.periodStart), new Date(validated.periodEnd));
       res.status(201).json(lock);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
@@ -5511,7 +5557,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/funds/:fundId/period-locks', authenticateUser, async (req: any, res) => {
     try {
       const { fundId } = req.params;
-      const { periodLockService } = await import('./services/period-lock-service');
+      const { periodLockService } = await import('../services/period-lock-service');
       const locks = await periodLockService.listPeriodLocks(req.user.orgId, fundId);
       res.json(locks);
     } catch (error: any) {
@@ -5526,10 +5572,14 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (userRole !== 'owner') {
         return res.status(403).json({ error: 'Only owner can unlock periods (audit control)' });
       }
-      const { periodLockService } = await import('./services/period-lock-service');
-      const lock = await periodLockService.unlockPeriod(req, lockId, req.body.reason);
+      const validated = unlockPeriodSchema.parse(req.body);
+      const { periodLockService } = await import('../services/period-lock-service');
+      const lock = await periodLockService.unlockPeriod(req, lockId, validated.reason);
       res.json(lock);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       res.status(400).json({ error: error.message });
     }
   });
@@ -5542,7 +5592,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!['owner', 'admin', 'auditor'].includes(userRole)) {
         return res.status(403).json({ error: 'Audit trail access requires owner, admin, or auditor role' });
       }
-      const { financialAuditService } = await import('./services/financial-audit-service');
+      const { financialAuditService } = await import('../services/financial-audit-service');
       const { eventType, fromDate, toDate, investorId, limit, offset } = req.query;
       const result = await financialAuditService.getAuditTrail(req.user.orgId, {
         fundId,
@@ -5573,40 +5623,39 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       }
 
       // Period lock check
-      const { periodLockService } = await import('./services/period-lock-service');
+      const { periodLockService } = await import('../services/period-lock-service');
       await periodLockService.enforcePeriodLock(orgId, fundId, new Date());
 
       // Compliance: check investor accreditation before calling capital
-      const { distributionApprovalService } = await import('./services/distribution-approval-service');
+      const { distributionApprovalService } = await import('../services/distribution-approval-service');
       await distributionApprovalService.runComplianceChecks(orgId, fundId);
 
-      const { fundService } = await import('./services/fund-service');
-      const { totalAmount, purpose, dueDate, callNumber, notes, dealAllocationId } = req.body;
-
-      if (!totalAmount || !purpose || !dueDate) {
-        return res.status(400).json({ error: 'totalAmount, purpose, and dueDate are required' });
-      }
+      const validated = createCapitalCallSchema.parse(req.body);
+      const { fundService } = await import('../services/fund-service');
 
       const result = await fundService.createFundCapitalCall(orgId, userId, fundId, {
-        totalAmount: parseFloat(totalAmount),
-        purpose,
-        dueDate,
-        callNumber,
-        notes,
-        dealAllocationId,
+        totalAmount: validated.totalAmount,
+        purpose: validated.purpose,
+        dueDate: validated.dueDate,
+        callNumber: validated.callNumber,
+        notes: validated.notes,
+        dealAllocationId: validated.dealAllocationId,
       });
 
       // Audit log
-      const { financialAuditService } = await import('./services/financial-audit-service');
+      const { financialAuditService } = await import('../services/financial-audit-service');
       await financialAuditService.logFromRequest(req, {
         fundId,
         eventType: 'capital_call.created',
-        amount: parseFloat(totalAmount),
+        amount: validated.totalAmount,
         afterState: { callNumber: result.capitalCall.callNumber, investorCount: result.investorLineItems.length, totalAllocated: result.totalAllocated },
       });
 
       res.status(201).json(result);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to create fund capital call:', error);
       const status = error.message?.includes('exceeds') ? 400 : error.message?.includes('locked') ? 409 : error.message?.includes('Compliance') ? 409 : 500;
       res.status(status).json({ error: error.message || 'Failed to create capital call' });
@@ -5617,7 +5666,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
       const calls = movements.filter(m => m.movementType === 'call' && !m.fundInvestorId);
@@ -5651,7 +5700,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId, callNumber } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const result = await fundService.completeFundCapitalCall(orgId, fundId, parseInt(callNumber));
       res.json(result);
@@ -5667,24 +5716,23 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
-      const { totalProceeds, distributionType, dealAllocationId, notes, yearsHeld } = req.body;
-
-      if (!totalProceeds || !distributionType) {
-        return res.status(400).json({ error: 'totalProceeds and distributionType are required' });
-      }
+      const validated = processDistributionSchema.parse(req.body);
 
       const result = await fundService.processFundDistribution(orgId, userId, fundId, {
-        totalProceeds: parseFloat(totalProceeds),
-        distributionType,
-        dealAllocationId,
-        notes,
-        yearsHeld: yearsHeld ? parseFloat(yearsHeld) : undefined,
+        totalProceeds: validated.totalProceeds,
+        distributionType: validated.distributionType,
+        dealAllocationId: validated.dealAllocationId,
+        notes: validated.notes,
+        yearsHeld: validated.yearsHeld,
       });
 
       res.status(201).json(result);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation failed', details: error.errors });
+      }
       console.error('Failed to process fund distribution:', error);
       res.status(500).json({ error: error.message || 'Failed to process distribution' });
     }
@@ -5694,7 +5742,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const movements = await fundService.getCapitalMovementsByFund(orgId, fundId);
       const distributions = movements.filter(m =>
@@ -5713,7 +5761,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const { compoundingMethod, periodMonths, asOfDate } = req.body;
 
@@ -5734,7 +5782,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const fund = await fundService.getFund(orgId, fundId);
       if (!fund) return res.status(404).json({ error: 'Fund not found' });
@@ -5778,7 +5826,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const { cashOnHand, outstandingLiabilities, asOfDate } = req.body;
 
@@ -5800,7 +5848,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const result = await fundService.syncDealReturns(orgId, fundId);
       res.json(result);
@@ -5815,7 +5863,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId, investorId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       const { periodStart, periodEnd, asOfDate } = req.query as Record<string, string>;
 
@@ -5837,8 +5885,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { fundId, investorId } = req.params;
-      const { fundService } = await import('./services/fund-service');
-      const { generateStatementPDF } = await import('./services/lp-statement-pdf');
+      const { fundService } = await import('../services/fund-service');
+      const { generateStatementPDF } = await import('../services/lp-statement-pdf');
 
       const { periodStart, periodEnd, asOfDate } = req.query as Record<string, string>;
       const asOf = asOfDate ? new Date(asOfDate) : undefined;
@@ -5868,7 +5916,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
 
       // Find fund allocation for this project
       const allocation = await fundService.getAllocationByProject(orgId, projectId);
@@ -6021,7 +6069,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocation = await fundService.getAllocationByProject(orgId, projectId);
       if (!allocation) {
         return res.status(404).json({ error: 'No fund allocation found for this project' });
@@ -6038,7 +6086,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const userId = req.user.id;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const allocation = await fundService.createDealAllocation(orgId, {
         ...req.body,
         orgId,
@@ -6055,7 +6103,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { allocationId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const updated = await fundService.updateDealAllocation(orgId, allocationId, req.body);
       if (!updated) {
         return res.status(404).json({ error: 'Allocation not found' });
@@ -6072,7 +6120,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { allocationId } = req.params;
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       await fundService.deleteDealAllocation(orgId, allocationId);
       res.status(204).send();
     } catch (error: any) {
@@ -6093,7 +6141,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Template ID is required' });
       }
       
-      const { fundService } = await import('./services/fund-service');
+      const { fundService } = await import('../services/fund-service');
       const template = await fundService.getCapitalStackTemplate(orgId, templateId);
       
       if (!template) {
@@ -6419,7 +6467,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       let annualNoi: number | undefined;
       let noiTimeline: { year: number; noi: number }[] = [];
       try {
-        const { proFormaEngineService } = await import("./services/pro-forma-engine-service");
+        const { proFormaEngineService } = await import("../services/pro-forma-engine-service");
         const proForma = await proFormaEngineService.generateProForma(projectId, orgId, "base");
         if (proForma?.annualProjections?.length > 0) {
           annualNoi = proForma.annualProjections[0]?.noi ?? proForma.annualProjections[0]?.netOperatingIncome;
@@ -7238,7 +7286,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       };
       
       if (personaType === 'pe_investor') {
-        const { fundService } = await import('./services/fund-service');
+        const { fundService } = await import('../services/fund-service');
         const funds = await fundService.getFundsByOrg(orgId);
         const activeFund = funds.find(f => f.status === 'investing') || funds[0];
         
@@ -8286,7 +8334,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       `;
 
       // Import email service
-      const { sendDashboardReportEmail } = await import('./services/dashboard-email-service');
+      const { sendDashboardReportEmail } = await import('../services/dashboard-email-service');
       const success = await sendDashboardReportEmail(recipientEmail, emailHtml, dashboardData);
 
       if (!success) {
@@ -8395,7 +8443,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stateCode } = req.params;
-      const { demographicsService } = await import('./services/demographics-service');
+      const { demographicsService } = await import('../services/demographics-service');
       
       const overview = await demographicsService.getDemographicsOverview(orgId, stateCode);
       res.json(overview);
@@ -8410,7 +8458,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stateCode } = req.params;
-      const { demographicsService } = await import('./services/demographics-service');
+      const { demographicsService } = await import('../services/demographics-service');
       
       const indicators = await demographicsService.getEconomicIndicators(orgId, stateCode);
       res.json(indicators);
@@ -8425,7 +8473,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     try {
       const orgId = req.user.orgId;
       const { stateCode } = req.params;
-      const { demographicsService } = await import('./services/demographics-service');
+      const { demographicsService } = await import('../services/demographics-service');
       
       const stats = await demographicsService.getRegionalMarketStats(orgId, stateCode);
       res.json(stats);
@@ -8439,7 +8487,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/demographics/states', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { demographicsService } = await import('./services/demographics-service');
+      const { demographicsService } = await import('../services/demographics-service');
       
       const states = await demographicsService.getAvailableStates(orgId);
       res.json(states);
@@ -8453,7 +8501,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   app.get('/api/demographics/national', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { demographicsService } = await import('./services/demographics-service');
+      const { demographicsService } = await import('../services/demographics-service');
       
       const overview = await demographicsService.getNationalOverview(orgId);
       res.json(overview);
@@ -8472,7 +8520,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'latitude, longitude, and targetMinutes are required' });
       }
 
-      const { driveTimeService } = await import('./services/drivetime-service');
+      const { driveTimeService } = await import('../services/drivetime-service');
       const isochrone = await driveTimeService.generateIsochrone(
         parseFloat(latitude), parseFloat(longitude), parseInt(targetMinutes)
       );
@@ -8494,7 +8542,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Latitude and longitude are required' });
       }
 
-      const { CensusService } = await import('./services/census-service');
+      const { CensusService } = await import('../services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
 
@@ -8507,7 +8555,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       if (polygonBoundary && Array.isArray(polygonBoundary) && polygonBoundary.length >= 3) {
         // Drive-time isochrone polygon aggregation
-        const { computePolygonAreaSqMiles } = await import('./services/drivetime-service');
+        const { computePolygonAreaSqMiles } = await import('../services/drivetime-service');
         const area = computePolygonAreaSqMiles(polygonBoundary, lat);
         demographics = await censusService.getDemographicsForPolygon(polygonBoundary, area);
         dataSource = 'polygon_aggregated';
@@ -8539,7 +8587,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Latitude and longitude are required' });
       }
 
-      const { CensusService } = await import('./services/census-service');
+      const { CensusService } = await import('../services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
 
@@ -8570,7 +8618,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Latitude and longitude are required' });
       }
 
-      const { CensusService } = await import('./services/census-service');
+      const { CensusService } = await import('../services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
 
@@ -8607,7 +8655,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Latitude, longitude, and targetMinutes are required' });
       }
       
-      const { driveTimeService } = await import('./services/drivetime-service');
+      const { driveTimeService } = await import('../services/drivetime-service');
       
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
@@ -8638,7 +8686,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Latitude, longitude, proposedMiles, and targetMinutes are required' });
       }
       
-      const { driveTimeService } = await import('./services/drivetime-service');
+      const { driveTimeService } = await import('../services/drivetime-service');
       
       const validation = await driveTimeService.validateDriveTimeRadius(
         parseFloat(latitude),
@@ -8680,7 +8728,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Property does not have coordinates' });
       }
       
-      const { CensusService } = await import('./services/census-service');
+      const { CensusService } = await import('../services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
       
@@ -8722,7 +8770,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(400).json({ error: 'Maximum 5 locations can be compared' });
       }
       
-      const { CensusService } = await import('./services/census-service');
+      const { CensusService } = await import('../services/census-service');
       const censusApiKey = process.env.CENSUS_API_KEY;
       const censusService = new CensusService(censusApiKey);
       

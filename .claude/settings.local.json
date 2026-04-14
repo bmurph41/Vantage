@@ -174,7 +174,18 @@
       "Bash(kill 14438)",
       "Bash(disown echo:*)",
       "Bash(find:*)",
-      "Bash(git -C /home/runner/workspace log --oneline --all)"
+      "Bash(git -C /home/runner/workspace log --oneline --all)",
+      "Bash(pkill -9 -f 'tsx')",
+      "Bash(kill -9 4334)",
+      "Bash(pkill -9 -f tsx)",
+      "Bash(pkill -9 -f 'node.*server')",
+      "Bash(awk -F: '$2 > 0')",
+      "Bash(awk -F: '{sum+=$2} END {print sum}')",
+      "Bash(awk '$1 > 1500')",
+      "Bash(awk '$1 > 1000')",
+      "Bash(ALLOW_DEMO_AUTH=true npm run dev)",
+      "Bash(pkill -9 -f node)",
+      "Bash(echo \"PID: $!\" sleep 15 cat /tmp/srv.log)"
     ]
   }
 }

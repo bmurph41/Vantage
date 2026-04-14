@@ -21,6 +21,9 @@ import { eq, and } from 'drizzle-orm';
 import { financialAuditService } from './financial-audit-service';
 import Decimal from 'decimal.js';
 
+/** Transaction-aware DB handle — either the root `db` or a `tx` from db.transaction() */
+type DbOrTx = typeof db;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type DistributionStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'executed';
@@ -228,49 +231,52 @@ class DistributionApprovalService {
    * and marks as executed. This is the only path to actually move money.
    */
   async execute(req: any, draftId: string): Promise<{ draft: DistributionDraft; result: any }> {
-    const draft = await this.getDraft(req.user.orgId, draftId);
-    if (!draft) throw new Error('Distribution draft not found');
-    if (draft.status !== 'approved') throw new Error(`Cannot execute: distribution is ${draft.status}, must be approved`);
+    return await db.transaction(async (tx) => {
+      const draft = await this.getDraft(req.user.orgId, draftId, tx);
+      if (!draft) throw new Error('Distribution draft not found');
+      if (draft.status !== 'approved') throw new Error(`Cannot execute: distribution is ${draft.status}, must be approved`);
 
-    // Run compliance checks before execution
-    await this.runComplianceChecks(req.user.orgId, draft.fundId);
+      // Run compliance checks before execution
+      await this.runComplianceChecks(req.user.orgId, draft.fundId);
 
-    // Execute via fund service
-    const { fundService } = await import('./fund-service');
-    const result = await fundService.processFundDistribution(
-      req.user.orgId,
-      req.user.id,
-      draft.fundId,
-      {
-        totalProceeds: parseFloat(draft.totalProceeds),
-        distributionType: draft.distributionType as any,
-        dealAllocationId: draft.dealAllocationId,
-        notes: draft.notes,
-        yearsHeld: draft.yearsHeld,
-      }
-    );
+      // Execute via fund service (processFundDistribution has its own internal transaction;
+      // since Neon/pg nested transactions are not supported, the inner tx will share this connection)
+      const { fundService } = await import('./fund-service');
+      const result = await fundService.processFundDistribution(
+        req.user.orgId,
+        req.user.id,
+        draft.fundId,
+        {
+          totalProceeds: parseFloat(draft.totalProceeds),
+          distributionType: draft.distributionType as any,
+          dealAllocationId: draft.dealAllocationId,
+          notes: draft.notes,
+          yearsHeld: draft.yearsHeld,
+        }
+      );
 
-    draft.status = 'executed';
-    draft.executedAt = new Date();
-    draft.executedBy = req.user.id;
-    draft.waterfallResult = result.waterfallResult;
-    draft.investorAllocations = result.investorDistributions;
+      draft.status = 'executed';
+      draft.executedAt = new Date();
+      draft.executedBy = req.user.id;
+      draft.waterfallResult = result.waterfallResult;
+      draft.investorAllocations = result.investorDistributions;
 
-    await this.updateDraft(draft);
+      await this.updateDraft(draft, tx);
 
-    await financialAuditService.logFromRequest(req, {
-      fundId: draft.fundId,
-      eventType: 'distribution.executed',
-      amount: parseFloat(draft.totalProceeds),
-      afterState: {
-        draftId,
-        totalDistributed: result.totalDistributed,
-        gpCarry: result.gpCarry,
-        investorCount: result.investorDistributions.length,
-      },
+      await financialAuditService.logFromRequest(req, {
+        fundId: draft.fundId,
+        eventType: 'distribution.executed',
+        amount: parseFloat(draft.totalProceeds),
+        afterState: {
+          draftId,
+          totalDistributed: result.totalDistributed,
+          gpCarry: result.gpCarry,
+          investorCount: result.investorDistributions.length,
+        },
+      });
+
+      return { draft, result };
     });
-
-    return { draft, result };
   }
 
   /**
@@ -326,8 +332,9 @@ class DistributionApprovalService {
 
   // ─── Internal helpers ───────────────────────────────────────────────────
 
-  private async getDraft(orgId: string, draftId: string): Promise<DistributionDraft | null> {
-    const result = await db.execute(
+  private async getDraft(orgId: string, draftId: string, txn?: DbOrTx): Promise<DistributionDraft | null> {
+    const d = txn || db;
+    const result = await d.execute(
       `SELECT * FROM distribution_approvals WHERE id = '${draftId}' AND org_id = '${orgId}' LIMIT 1` as any
     );
     const row = (result.rows as any)?.[0];
@@ -359,8 +366,9 @@ class DistributionApprovalService {
     };
   }
 
-  private async updateDraft(draft: DistributionDraft): Promise<void> {
-    await db.execute(
+  private async updateDraft(draft: DistributionDraft, txn?: DbOrTx): Promise<void> {
+    const d = txn || db;
+    await d.execute(
       `UPDATE distribution_approvals SET
         status = '${draft.status}',
         submitted_for_approval_at = ${draft.submittedForApprovalAt ? `'${draft.submittedForApprovalAt.toISOString()}'` : 'NULL'},

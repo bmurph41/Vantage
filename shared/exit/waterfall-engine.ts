@@ -1,5 +1,8 @@
+import { calculateXIRR, type DatedCashFlow } from '../finance/xirr';
+
 export type WaterfallStructureType = 'american' | 'european';
 export type CompoundingType = 'annual' | 'quarterly' | 'continuous';
+export type PrefReturnAccrualPeriod = 'annual' | 'quarterly' | 'monthly' | 'at_exit';
 
 export interface WaterfallTier {
   name: string;
@@ -22,6 +25,9 @@ export interface WaterfallInput {
   lpSplit: number;
   gpSplit: number;
   customTiers?: WaterfallTier[];
+  gpCommitmentPct?: number;
+  prefReturnAccrualPeriod?: PrefReturnAccrualPeriod;
+  investmentDate?: string; // ISO date for IRR calculation, defaults to today
 }
 
 export interface WaterfallDistribution {
@@ -51,8 +57,28 @@ export function calculatePreferredReturn(
   principal: number,
   rate: number,
   years: number,
-  compounding: CompoundingType
+  compounding: CompoundingType,
+  accrualPeriod?: PrefReturnAccrualPeriod
 ): number {
+  // If an accrual period is specified (not 'at_exit'), use it for compounding
+  if (accrualPeriod && accrualPeriod !== 'at_exit') {
+    switch (accrualPeriod) {
+      case 'monthly': {
+        const periods = years * 12;
+        const periodicRate = rate / 12;
+        return principal * Math.pow(1 + periodicRate, periods) - principal;
+      }
+      case 'quarterly': {
+        const periods = years * 4;
+        const periodicRate = rate / 4;
+        return principal * Math.pow(1 + periodicRate, periods) - principal;
+      }
+      case 'annual':
+        return principal * Math.pow(1 + rate, years) - principal;
+    }
+  }
+
+  // Default: use the compounding type (backward-compatible 'at_exit' behavior)
   switch (compounding) {
     case 'annual':
       return principal * Math.pow(1 + rate, years) - principal;
@@ -75,7 +101,8 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     input.totalCapitalContributed,
     input.preferredReturn,
     input.holdingPeriodYears,
-    input.preferredReturnCompounding
+    input.preferredReturnCompounding,
+    input.prefReturnAccrualPeriod
   );
 
   const returnOfCapital = Math.min(remainingProceeds, input.totalCapitalContributed);
@@ -176,7 +203,7 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     : 0;
   
   // GP contribution: configurable percentage, defaults to 2% if not specified
-  const gpCommitmentPct = (input as any).gpCommitmentPercent ?? 0.02;
+  const gpCommitmentPct = input.gpCommitmentPct ?? 0.02;
   const gpContribution = input.totalCapitalContributed * gpCommitmentPct;
   const gpMoic = gpContribution > 0
     ? cumulativeGp / gpContribution
@@ -202,6 +229,41 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     }
   }
 
+  // --- LP/GP IRR Calculations ---
+  // Build dated cash flow series for XIRR
+  const investmentDate = input.investmentDate ?? new Date().toISOString().split('T')[0];
+  const investmentDateMs = new Date(investmentDate + 'T00:00:00Z').getTime();
+  const exitDateMs = investmentDateMs + input.holdingPeriodYears * 365.25 * 86400000;
+  const exitDate = new Date(exitDateMs).toISOString().split('T')[0];
+
+  // LP contribution is (1 - gpCommitmentPct) of total capital; GP is the rest
+  const lpContribution = input.totalCapitalContributed * (1 - gpCommitmentPct);
+
+  // LP cash flows: negative outflow at investment, positive distributions at exit
+  const lpCashFlows: DatedCashFlow[] = [
+    { date: investmentDate, amount: -lpContribution },
+    { date: exitDate, amount: cumulativeLp },
+  ];
+
+  // GP cash flows: negative outflow at investment, positive distributions at exit
+  const gpCashFlows: DatedCashFlow[] = [
+    { date: investmentDate, amount: -gpContribution },
+    { date: exitDate, amount: cumulativeGp },
+  ];
+
+  let lpIrr: number | null = null;
+  let gpIrr: number | null = null;
+
+  if (lpContribution > 0 && cumulativeLp > 0 && input.holdingPeriodYears > 0) {
+    const lpResult = calculateXIRR(lpCashFlows);
+    lpIrr = lpResult.converged && isFinite(lpResult.irr) ? lpResult.irr : null;
+  }
+
+  if (gpContribution > 0 && cumulativeGp > 0 && input.holdingPeriodYears > 0) {
+    const gpResult = calculateXIRR(gpCashFlows);
+    gpIrr = gpResult.converged && isFinite(gpResult.irr) ? gpResult.irr : null;
+  }
+
   return {
     distributions,
     lpTotalDistribution: cumulativeLp,
@@ -211,8 +273,8 @@ export function calculateWaterfall(input: WaterfallInput): WaterfallResult {
     carriedInterestPaid,
     lpMoic,
     gpMoic,
-    lpIrr: null,
-    gpIrr: null,
+    lpIrr,
+    gpIrr,
     gpClawbackAmount: gpClawback,
   };
 }

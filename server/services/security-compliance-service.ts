@@ -485,17 +485,17 @@ class SecurityComplianceService {
       paramIdx++;
     }
 
-    // Use raw SQL with parameterized template for dynamic filtering
+    // Use parameterized Drizzle sql template for dynamic filtering
     const whereClause = conditions.join(' AND ');
     const result = await db.execute(sql`
       SELECT id, org_id, user_id, event_type, ip_address, user_agent,
              metadata, severity, created_at
       FROM security_audit_log
       WHERE org_id = ${orgId}
-        AND (${sql.raw(filters.eventType ? `event_type = '${filters.eventType}'` : 'TRUE')})
-        AND (${sql.raw(filters.severity ? `severity = '${filters.severity}'` : 'TRUE')})
-        AND (${sql.raw(filters.startDate ? `created_at >= '${filters.startDate.toISOString()}'` : 'TRUE')})
-        AND (${sql.raw(filters.endDate ? `created_at <= '${filters.endDate.toISOString()}'` : 'TRUE')})
+        AND (${filters.eventType ? sql`event_type = ${filters.eventType}` : sql`TRUE`})
+        AND (${filters.severity ? sql`severity = ${filters.severity}` : sql`TRUE`})
+        AND (${filters.startDate ? sql`created_at >= ${filters.startDate.toISOString()}` : sql`TRUE`})
+        AND (${filters.endDate ? sql`created_at <= ${filters.endDate.toISOString()}` : sql`TRUE`})
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `);

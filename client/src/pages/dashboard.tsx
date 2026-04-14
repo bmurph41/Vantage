@@ -39,7 +39,7 @@ import { CRMCharts } from "@/components/dashboard/CRMCharts";
 import { RevenueCharts } from "@/components/dashboard/RevenueCharts";
 import { AddModuleModal } from "@/components/dashboard/AddModuleModal";
 import { SavedLayoutsPanel } from "@/components/dashboard/SavedLayoutsPanel";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary, SectionErrorBoundary } from "@/components/ErrorBoundary";
 import { DetailPanel } from "@/components/dashboard/DetailPanel";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
 import { EnhancedDataTable } from "@/components/dashboard/EnhancedDataTable";
@@ -1722,13 +1722,14 @@ export default function Dashboard() {
           <SortableContext items={extendedModuleOrder} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-tour="dashboard-pipeline">
               {orderedModules.map((module) => (
-                <SortableModule 
-                  key={module.id} 
-                  module={module} 
-                  isCollapsed={collapsedModules.has(module.id)}
-                  onToggleCollapse={() => toggleModuleCollapse(module.id)}
-                  onRemove={() => handleRemoveModule(module.id)}
-                />
+                <SectionErrorBoundary key={module.id} sectionName={module.title}>
+                  <SortableModule
+                    module={module}
+                    isCollapsed={collapsedModules.has(module.id)}
+                    onToggleCollapse={() => toggleModuleCollapse(module.id)}
+                    onRemove={() => handleRemoveModule(module.id)}
+                  />
+                </SectionErrorBoundary>
               ))}
             </div>
           </SortableContext>

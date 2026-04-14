@@ -6112,7 +6112,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(inArray(rateComps.state, filters.states));
     }
     if (filters.storageTypes && filters.storageTypes.length > 0) {
-      conditions.push(sql`${rateComps.storageTypes} && ARRAY[${sql.raw(filters.storageTypes.map((t: string) => `'${t}'`).join(','))}]::text[]`);
+      conditions.push(sql`${rateComps.storageTypes} && ${filters.storageTypes}::text[]`);
     }
     if (filters.rateTypes && filters.rateTypes.length > 0) {
       conditions.push(inArray(rateComps.rateType, filters.rateTypes));

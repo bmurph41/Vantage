@@ -16,6 +16,7 @@ import {
   taxDocuments,
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { encryptPiiFields, processInvestorPii } from "../services/encryption-service";
 
 export const investorPortalRouter = Router();
 
@@ -26,6 +27,10 @@ function getOrgId(req: Request): string | null {
 function getUserId(req: Request): string | null {
   const user = (req as any).user;
   return user?.id || user?.claims?.sub || null;
+}
+
+function getUserRole(req: Request): string | undefined {
+  return (req as any).user?.role;
 }
 
 // ============================================================================
@@ -44,7 +49,8 @@ investorPortalRouter.get("/", async (req: Request, res: Response) => {
       .where(eq(investors.orgId, orgId))
       .orderBy(desc(investors.createdAt));
 
-    res.json(result);
+    const userRole = getUserRole(req);
+    res.json(result.map((inv) => processInvestorPii(inv, userRole)));
   } catch (error) {
     console.error("Error listing investors:", error);
     res.status(500).json({ error: "Failed to list investors" });
@@ -57,12 +63,16 @@ investorPortalRouter.post("/", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    const body = { ...req.body };
+    encryptPiiFields(body);
+
     const [created] = await db
       .insert(investors)
-      .values({ ...req.body, orgId })
+      .values({ ...body, orgId })
       .returning();
 
-    res.status(201).json(created);
+    const userRole = getUserRole(req);
+    res.status(201).json(processInvestorPii(created, userRole));
   } catch (error) {
     console.error("Error creating investor:", error);
     res.status(500).json({ error: "Failed to create investor" });
@@ -82,7 +92,8 @@ investorPortalRouter.get("/:id", async (req: Request, res: Response) => {
 
     if (!investor) return res.status(404).json({ error: "Investor not found" });
 
-    res.json(investor);
+    const userRole = getUserRole(req);
+    res.json(processInvestorPii(investor, userRole));
   } catch (error) {
     console.error("Error fetching investor:", error);
     res.status(500).json({ error: "Failed to fetch investor" });
@@ -95,15 +106,19 @@ investorPortalRouter.put("/:id", async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     if (!orgId) return res.status(401).json({ error: "Unauthorized" });
 
+    const body = { ...req.body };
+    encryptPiiFields(body);
+
     const [updated] = await db
       .update(investors)
-      .set(req.body)
+      .set(body)
       .where(and(eq(investors.id, req.params.id), eq(investors.orgId, orgId)))
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Investor not found" });
 
-    res.json(updated);
+    const userRole = getUserRole(req);
+    res.json(processInvestorPii(updated, userRole));
   } catch (error) {
     console.error("Error updating investor:", error);
     res.status(500).json({ error: "Failed to update investor" });

@@ -7,14 +7,18 @@ import {
   TRIGGER_TYPES,
   WORKFLOW_TEMPLATES,
 } from '../services/workflow-engine';
+import { parsePagination, paginatedResponse } from '../utils/pagination';
 
 export const workflowAutomationRouter = Router();
 
 // ── List all automations for the org ───────────────────────────────────
 workflowAutomationRouter.get('/', async (req: any, res) => {
   try {
-    const automations = await storage.getWorkflowAutomations(req.user.orgId);
-    res.json(automations);
+    const pag = parsePagination(req.query, { pageSize: 25 });
+    const allAutomations = await storage.getWorkflowAutomations(req.user.orgId);
+    const total = allAutomations.length;
+    const paged = allAutomations.slice(pag.offset, pag.offset + pag.limit);
+    res.json(paginatedResponse(paged, total, pag));
   } catch (error: any) {
     console.error('Failed to list workflow automations:', error);
     res.status(500).json({ error: 'Failed to list workflow automations' });

@@ -14,7 +14,8 @@
  * fund CRUD — use /api/funds/* as the canonical entry point.
  */
 import { Router, Request, Response } from 'express';
-import { eq, and, desc, sql, sum } from 'drizzle-orm';
+import { eq, and, desc, sql, sum, count as drizzleCount } from 'drizzle-orm';
+import { parsePagination, paginatedResponse } from '../utils/pagination';
 import {
   fundsV2,
   fundDealsV2,
@@ -49,14 +50,19 @@ fundManagementRouter.get('/funds', async (req: Request, res: Response) => {
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const db = await getDb();
+    const pag = parsePagination(req.query as Record<string, any>, { pageSize: 25 });
 
+    const [{ total }] = await db.select({ total: drizzleCount() }).from(fundsV2)
+      .where(eq(fundsV2.orgId, orgId));
     const funds = await db
       .select()
       .from(fundsV2)
       .where(eq(fundsV2.orgId, orgId))
-      .orderBy(desc(fundsV2.createdAt));
+      .orderBy(desc(fundsV2.createdAt))
+      .limit(pag.limit)
+      .offset(pag.offset);
 
-    res.json(funds);
+    res.json(paginatedResponse(funds, Number(total), pag));
   } catch (error) {
     console.error('Error fetching funds:', error);
     res.status(500).json({ error: 'Failed to fetch funds' });
@@ -155,13 +161,18 @@ fundManagementRouter.get('/funds/:id/deals', async (req: Request, res: Response)
 
     if (!fund) return res.status(404).json({ error: 'Fund not found' });
 
+    const pag = parsePagination(req.query as Record<string, any>, { pageSize: 25 });
+    const [{ total }] = await db.select({ total: drizzleCount() }).from(fundDealsV2)
+      .where(eq(fundDealsV2.fundId, req.params.id));
     const deals = await db
       .select()
       .from(fundDealsV2)
       .where(eq(fundDealsV2.fundId, req.params.id))
-      .orderBy(desc(fundDealsV2.addedAt));
+      .orderBy(desc(fundDealsV2.addedAt))
+      .limit(pag.limit)
+      .offset(pag.offset);
 
-    res.json(deals);
+    res.json(paginatedResponse(deals, Number(total), pag));
   } catch (error) {
     console.error('Error fetching fund deals:', error);
     res.status(500).json({ error: 'Failed to fetch fund deals' });
@@ -211,6 +222,21 @@ fundManagementRouter.put('/fund-deals/:id', async (req: Request, res: Response) 
 
     const db = await getDb();
 
+    // Verify fund-deal belongs to this org via parent fund
+    const [existing] = await db
+      .select({ id: fundDealsV2.id, fundId: fundDealsV2.fundId })
+      .from(fundDealsV2)
+      .where(eq(fundDealsV2.id, req.params.id));
+
+    if (!existing) return res.status(404).json({ error: 'Fund deal not found' });
+
+    const [fund] = await db
+      .select({ id: fundsV2.id })
+      .from(fundsV2)
+      .where(and(eq(fundsV2.id, existing.fundId), eq(fundsV2.orgId, orgId)));
+
+    if (!fund) return res.status(404).json({ error: 'Fund deal not found' });
+
     const [updated] = await db
       .update(fundDealsV2)
       .set(req.body)
@@ -233,6 +259,21 @@ fundManagementRouter.delete('/fund-deals/:id', async (req: Request, res: Respons
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
 
     const db = await getDb();
+
+    // Verify fund-deal belongs to this org via parent fund
+    const [existing] = await db
+      .select({ id: fundDealsV2.id, fundId: fundDealsV2.fundId })
+      .from(fundDealsV2)
+      .where(eq(fundDealsV2.id, req.params.id));
+
+    if (!existing) return res.status(404).json({ error: 'Fund deal not found' });
+
+    const [fund] = await db
+      .select({ id: fundsV2.id })
+      .from(fundsV2)
+      .where(and(eq(fundsV2.id, existing.fundId), eq(fundsV2.orgId, orgId)));
+
+    if (!fund) return res.status(404).json({ error: 'Fund deal not found' });
 
     const [deleted] = await db
       .delete(fundDealsV2)
@@ -594,12 +635,17 @@ fundManagementRouter.get('/capital-accounts/fund/:fundId', async (req: Request, 
 
     if (!fund) return res.status(404).json({ error: 'Fund not found' });
 
+    const pag = parsePagination(req.query as Record<string, any>, { pageSize: 25 });
+    const [{ total }] = await db.select({ total: drizzleCount() }).from(capitalAccounts)
+      .where(eq(capitalAccounts.fundId, req.params.fundId));
     const accounts = await db
       .select()
       .from(capitalAccounts)
-      .where(eq(capitalAccounts.fundId, req.params.fundId));
+      .where(eq(capitalAccounts.fundId, req.params.fundId))
+      .limit(pag.limit)
+      .offset(pag.offset);
 
-    res.json(accounts);
+    res.json(paginatedResponse(accounts, Number(total), pag));
   } catch (error) {
     console.error('Error fetching capital accounts:', error);
     res.status(500).json({ error: 'Failed to fetch capital accounts' });
@@ -672,13 +718,33 @@ fundManagementRouter.get('/capital-accounts/:id/entries', async (req: Request, r
 
     const db = await getDb();
 
+    // Verify capital account belongs to this org via parent fund
+    const [account] = await db
+      .select({ id: capitalAccounts.id, fundId: capitalAccounts.fundId })
+      .from(capitalAccounts)
+      .where(eq(capitalAccounts.id, req.params.id));
+
+    if (!account) return res.status(404).json({ error: 'Capital account not found' });
+
+    const [fund] = await db
+      .select({ id: fundsV2.id })
+      .from(fundsV2)
+      .where(and(eq(fundsV2.id, account.fundId), eq(fundsV2.orgId, orgId)));
+
+    if (!fund) return res.status(404).json({ error: 'Capital account not found' });
+
+    const pag = parsePagination(req.query as Record<string, any>, { pageSize: 50 });
+    const [{ total }] = await db.select({ total: drizzleCount() }).from(capitalAccountEntries)
+      .where(eq(capitalAccountEntries.capitalAccountId, req.params.id));
     const entries = await db
       .select()
       .from(capitalAccountEntries)
       .where(eq(capitalAccountEntries.capitalAccountId, req.params.id))
-      .orderBy(desc(capitalAccountEntries.createdAt));
+      .orderBy(desc(capitalAccountEntries.createdAt))
+      .limit(pag.limit)
+      .offset(pag.offset);
 
-    res.json(entries);
+    res.json(paginatedResponse(entries, Number(total), pag));
   } catch (error) {
     console.error('Error fetching capital account entries:', error);
     res.status(500).json({ error: 'Failed to fetch capital account entries' });

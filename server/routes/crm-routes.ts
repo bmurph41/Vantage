@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { eq, and, or, desc, asc, gte, sql, inArray, notInArray, ilike, isNull } from "drizzle-orm";
+import { eq, and, or, desc, asc, gte, sql, inArray, notInArray, ilike, isNull, count as drizzleCount } from "drizzle-orm";
+import { parsePagination, paginatedResponse } from "../utils/pagination";
 import { CSVImportService } from "../csv-import-service";
 import { DuplicateDetectionService } from "../duplicate-detection-service";
 import { CompanyLinkingService } from "../company-linking-service";
@@ -624,8 +625,11 @@ export function registerCRMRoutes(
   // CRM Leads
   app.get("/api/crm/leads", async (req: any, res) => {
     try {
-      const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
-      res.json(leads);
+      const pag = parsePagination(req.query, { pageSize: 50 });
+      const allLeads = await storage.getCrmLeadsForOrg(req.user.orgId);
+      const total = allLeads.length;
+      const paged = allLeads.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
       console.error("Failed to get leads:", error);
       res.status(500).json({ error: "Failed to retrieve leads" });
@@ -1574,20 +1578,22 @@ export function registerCRMRoutes(
     try {
       const orgId = req.user.orgId;
       const { entityType } = req.query;
-      
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
       const { crmLists } = await import('@shared/schema');
-      const { eq, and, desc } = await import('drizzle-orm');
-      
-      let query = db.select().from(crmLists).where(eq(crmLists.orgId, orgId));
-      
-      if (entityType) {
-        query = db.select().from(crmLists).where(
-          and(eq(crmLists.orgId, orgId), eq(crmLists.entityType, entityType))
-        );
-      }
-      
-      const lists = await query.orderBy(desc(crmLists.updatedAt));
-      res.json(lists);
+      const { eq, and, desc, count: drizzleCountFn } = await import('drizzle-orm');
+
+      const whereClause = entityType
+        ? and(eq(crmLists.orgId, orgId), eq(crmLists.entityType, entityType))
+        : eq(crmLists.orgId, orgId);
+
+      const [{ total }] = await db.select({ total: drizzleCountFn() }).from(crmLists).where(whereClause);
+      const lists = await db.select().from(crmLists).where(whereClause)
+        .orderBy(desc(crmLists.updatedAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(lists, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get CRM lists:", error);
       res.status(500).json({ error: "Failed to retrieve lists" });
@@ -1772,11 +1778,19 @@ export function registerCRMRoutes(
   app.get("/api/products", async (req: any, res) => {
     try {
       const { crmProducts } = await import("@shared/schema");
+      const { count: drizzleCountFn } = await import("drizzle-orm");
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
+      const [{ total }] = await db.select({ total: drizzleCountFn() }).from(crmProducts)
+        .where(eq(crmProducts.orgId, orgId));
       const products = await db.select().from(crmProducts)
         .where(eq(crmProducts.orgId, orgId))
-        .orderBy(desc(crmProducts.createdAt));
-      res.json(products);
+        .orderBy(desc(crmProducts.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(products, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get products:", error);
       res.status(500).json({ error: "Failed to retrieve products" });
@@ -1837,11 +1851,19 @@ export function registerCRMRoutes(
   app.get("/api/labels", async (req: any, res) => {
     try {
       const { crmContactsLabels } = await import("@shared/schema");
+      const { count: drizzleCountFn } = await import("drizzle-orm");
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 50 });
+
+      const [{ total }] = await db.select({ total: drizzleCountFn() }).from(crmContactsLabels)
+        .where(eq(crmContactsLabels.orgId, orgId));
       const labels = await db.select().from(crmContactsLabels)
         .where(eq(crmContactsLabels.orgId, orgId))
-        .orderBy(desc(crmContactsLabels.createdAt));
-      res.json(labels);
+        .orderBy(desc(crmContactsLabels.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(labels, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get labels:", error);
       res.status(500).json({ error: "Failed to retrieve labels" });
@@ -1902,11 +1924,19 @@ export function registerCRMRoutes(
   app.get("/api/forms", async (req: any, res) => {
     try {
       const { crmForms } = await import("@shared/schema");
+      const { count: drizzleCountFn } = await import("drizzle-orm");
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
+      const [{ total }] = await db.select({ total: drizzleCountFn() }).from(crmForms)
+        .where(eq(crmForms.orgId, orgId));
       const forms = await db.select().from(crmForms)
         .where(eq(crmForms.orgId, orgId))
-        .orderBy(desc(crmForms.createdAt));
-      res.json(forms);
+        .orderBy(desc(crmForms.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(forms, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get forms:", error);
       res.status(500).json({ error: "Failed to retrieve forms" });
@@ -2008,10 +2038,18 @@ export function registerCRMRoutes(
   app.get("/api/forms/:id/submissions", async (req: any, res) => {
     try {
       const { crmFormSubmissions } = await import("@shared/schema");
+      const { count: drizzleCountFn } = await import("drizzle-orm");
+      const pag = parsePagination(req.query, { pageSize: 25 });
+      const whereClause = and(eq(crmFormSubmissions.formId, req.params.id), eq(crmFormSubmissions.orgId, req.user.orgId));
+
+      const [{ total }] = await db.select({ total: drizzleCountFn() }).from(crmFormSubmissions).where(whereClause);
       const submissions = await db.select().from(crmFormSubmissions)
-        .where(and(eq(crmFormSubmissions.formId, req.params.id), eq(crmFormSubmissions.orgId, req.user.orgId)))
-        .orderBy(desc(crmFormSubmissions.createdAt));
-      res.json(submissions);
+        .where(whereClause)
+        .orderBy(desc(crmFormSubmissions.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(submissions, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get form submissions:", error);
       res.status(500).json({ error: "Failed to retrieve form submissions" });
@@ -2217,8 +2255,11 @@ export function registerCRMRoutes(
   // CRM Activities
   app.get("/api/crm/activities", async (req: any, res) => {
     try {
-      const activities = await storage.getCrmActivitiesForOrg(req.user.id);
-      res.json(activities);
+      const pag = parsePagination(req.query, { pageSize: 50 });
+      const allActivities = await storage.getCrmActivitiesForOrg(req.user.id);
+      const total = allActivities.length;
+      const paged = allActivities.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
       console.error("Failed to get activities:", error);
       res.status(500).json({ error: "Failed to retrieve activities" });
@@ -2230,7 +2271,7 @@ export function registerCRMRoutes(
       const activity = await storage.createCrmActivity({ ...req.body, userId: req.user.id });
       
       if (activity.entityType && activity.entityId && req.user.orgId) {
-        const { associateActivity } = await import('./services/activity-association-service');
+        const { associateActivity } = await import('../services/activity-association-service');
         const associations = await associateActivity(activity.id, activity.entityType, activity.entityId, req.user.orgId);
         res.json({ ...activity, associations });
       } else {
@@ -3785,6 +3826,7 @@ export function registerCRMRoutes(
 
   app.get("/api/prospecting/activities", async (req: any, res) => {
     try {
+      const pag = parsePagination(req.query, { pageSize: 50 });
       const filters: any = {};
       if (req.query.contactId) filters.contactId = req.query.contactId;
       if (req.query.companyId) filters.companyId = req.query.companyId;
@@ -3792,8 +3834,10 @@ export function registerCRMRoutes(
       if (req.query.dealId) filters.dealId = req.query.dealId;
       if (req.query.prospectingEntryId) filters.prospectingEntryId = req.query.prospectingEntryId;
       if (req.query.userId) filters.userId = req.query.userId;
-      const activities = await storage.getProspectingActivities(req.user.orgId, filters);
-      res.json(activities);
+      const allActivities = await storage.getProspectingActivities(req.user.orgId, filters);
+      const total = allActivities.length;
+      const paged = allActivities.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
       console.error("Failed to get prospecting activities:", error);
       res.status(500).json({ error: "Failed to retrieve prospecting activities" });
@@ -3955,10 +3999,17 @@ export function registerCRMRoutes(
   app.get("/api/prospecting/market-targets", async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
+      const [{ total }] = await db.select({ total: drizzleCount() }).from(marketTargets)
+        .where(eq(marketTargets.orgId, orgId));
       const targets = await db.select().from(marketTargets)
         .where(eq(marketTargets.orgId, orgId))
-        .orderBy(desc(marketTargets.createdAt));
-      res.json(targets);
+        .orderBy(desc(marketTargets.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(targets, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get market targets:", error);
       res.status(500).json({ error: "Failed to retrieve market targets" });
@@ -4027,10 +4078,17 @@ export function registerCRMRoutes(
   app.get("/api/prospecting/campaigns", async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
+      const [{ total }] = await db.select({ total: drizzleCount() }).from(outreachCampaigns)
+        .where(eq(outreachCampaigns.orgId, orgId));
       const campaigns = await db.select().from(outreachCampaigns)
         .where(eq(outreachCampaigns.orgId, orgId))
-        .orderBy(desc(outreachCampaigns.createdAt));
-      res.json(campaigns);
+        .orderBy(desc(outreachCampaigns.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(campaigns, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get outreach campaigns:", error);
       res.status(500).json({ error: "Failed to retrieve outreach campaigns" });
@@ -4126,10 +4184,17 @@ export function registerCRMRoutes(
   app.get("/api/prospecting/templates", async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
+      const pag = parsePagination(req.query, { pageSize: 25 });
+
+      const [{ total }] = await db.select({ total: drizzleCount() }).from(outreachTemplates)
+        .where(eq(outreachTemplates.orgId, orgId));
       const templates = await db.select().from(outreachTemplates)
         .where(eq(outreachTemplates.orgId, orgId))
-        .orderBy(desc(outreachTemplates.createdAt));
-      res.json(templates);
+        .orderBy(desc(outreachTemplates.createdAt))
+        .limit(pag.limit)
+        .offset(pag.offset);
+
+      res.json(paginatedResponse(templates, Number(total), pag));
     } catch (error: any) {
       console.error("Failed to get outreach templates:", error);
       res.status(500).json({ error: "Failed to retrieve outreach templates" });
@@ -4199,8 +4264,11 @@ export function registerCRMRoutes(
   // Leads aliases
   app.get("/api/leads", async (req: any, res) => {
     try {
-      const leads = await storage.getCrmLeadsForOrg(req.user.orgId);
-      res.json(leads);
+      const pag = parsePagination(req.query, { pageSize: 50 });
+      const allLeads = await storage.getCrmLeadsForOrg(req.user.orgId);
+      const total = allLeads.length;
+      const paged = allLeads.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
       console.error("Failed to get leads:", error);
       res.status(500).json({ error: "Failed to retrieve leads" });
@@ -4366,8 +4434,11 @@ export function registerCRMRoutes(
   // Deals aliases
   app.get("/api/deals", async (req: any, res) => {
     try {
-      const deals = await storage.getCrmDealsForOrg(req.user.orgId);
-      res.json(deals);
+      const pag = parsePagination(req.query, { pageSize: 50 });
+      const allDeals = await storage.getCrmDealsForOrg(req.user.orgId);
+      const total = allDeals.length;
+      const paged = allDeals.slice(pag.offset, pag.offset + pag.limit);
+      res.json(paginatedResponse(paged, total, pag));
     } catch (error: any) {
       console.error("Failed to get deals:", error);
       res.status(500).json({ error: "Failed to retrieve deals" });
@@ -7858,7 +7929,7 @@ export function registerCRMRoutes(
 
       const needsGeocoding = results.filter(r => r.lat == null && r.lng == null && (r.address || r.city));
       if (needsGeocoding.length > 0) {
-        const { geocodingService } = await import('./services/geocodingService');
+        const { geocodingService } = await import('../services/geocodingService');
         const BATCH_LIMIT = 25;
         const toGeocode = needsGeocoding.slice(0, BATCH_LIMIT);
         const geocodePromises = toGeocode.map(async (loc) => {
@@ -9449,7 +9520,7 @@ export function registerCRMRoutes(
   // Geocoding Service Routes
   app.post('/api/sales-comps/geocode', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       const { address, city, state, zip, country } = req.body;
 
       if (!geocodingService.isConfigured()) {
@@ -9470,7 +9541,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/:id/geocode', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const compId = req.params.id;
@@ -9517,7 +9588,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/batch-geocode', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { compIds } = req.body;
@@ -9585,7 +9656,7 @@ export function registerCRMRoutes(
   // Address autocomplete for real-time suggestions
   app.get('/api/sales-comps/address-autocomplete', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       const { input, sessionToken } = req.query;
 
       if (!geocodingService.isConfigured()) {
@@ -9611,7 +9682,7 @@ export function registerCRMRoutes(
   // Geocode by place ID (from autocomplete selection)
   app.post('/api/sales-comps/geocode-place', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       const { placeId } = req.body;
 
       if (!geocodingService.isConfigured()) {
@@ -9637,7 +9708,7 @@ export function registerCRMRoutes(
   // Geocoding service stats
   app.get('/api/sales-comps/geocoding/stats', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
 
       if (!geocodingService.isConfigured()) {
         return res.json({
@@ -9657,7 +9728,7 @@ export function registerCRMRoutes(
   // Data Quality Service Routes
   app.get('/api/sales-comps/:id/quality-score', async (req: any, res) => {
     try {
-      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const { dataQualityService } = await import('../services/salescomps/dataQualityService');
       const orgId = req.user.orgId;
       const compId = req.params.id;
 
@@ -9676,7 +9747,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/batch-quality-score', async (req: any, res) => {
     try {
-      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const { dataQualityService } = await import('../services/salescomps/dataQualityService');
       const orgId = req.user.orgId;
       const { compIds } = req.body;
 
@@ -9699,7 +9770,7 @@ export function registerCRMRoutes(
 
   app.patch('/api/sales-comps/:id/update-quality-score', async (req: any, res) => {
     try {
-      const { dataQualityService } = await import('./services/salescomps/dataQualityService');
+      const { dataQualityService } = await import('../services/salescomps/dataQualityService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const compId = req.params.id;
@@ -9728,7 +9799,7 @@ export function registerCRMRoutes(
   // Validation Service Routes
   app.get('/api/sales-comps/validation-rules', async (req: any, res) => {
     try {
-      const { validationService } = await import('./services/salescomps/validationService');
+      const { validationService } = await import('../services/salescomps/validationService');
       const orgId = req.user.orgId;
 
       const orgRules = await validationService.getOrganizationRules(orgId);
@@ -9746,7 +9817,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/validate', async (req: any, res) => {
     try {
-      const { validationService } = await import('./services/salescomps/validationService');
+      const { validationService } = await import('../services/salescomps/validationService');
       const orgId = req.user.orgId;
       const { rows } = req.body;
 
@@ -9764,7 +9835,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/detect-outliers', async (req: any, res) => {
     try {
-      const { validationService } = await import('./services/salescomps/validationService');
+      const { validationService } = await import('../services/salescomps/validationService');
       const { rows, field, method } = req.body;
 
       if (!Array.isArray(rows) || !field) {
@@ -9782,7 +9853,7 @@ export function registerCRMRoutes(
   // Comp History Service Routes
   app.get('/api/sales-comps/:id/history', async (req: any, res) => {
     try {
-      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const { compHistoryService } = await import('../services/salescomps/compHistoryService');
       const orgId = req.user.orgId;
       const compId = req.params.id;
       const limit = parseInt(req.query.limit as string) || 50;
@@ -9797,7 +9868,7 @@ export function registerCRMRoutes(
 
   app.get('/api/sales-comps/:id/history/field/:field', async (req: any, res) => {
     try {
-      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const { compHistoryService } = await import('../services/salescomps/compHistoryService');
       const orgId = req.user.orgId;
       const compId = req.params.id;
       const field = req.params.field;
@@ -9812,7 +9883,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/:id/history/rollback/:historyId', async (req: any, res) => {
     try {
-      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const { compHistoryService } = await import('../services/salescomps/compHistoryService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const compId = req.params.id;
@@ -9828,7 +9899,7 @@ export function registerCRMRoutes(
 
   app.get('/api/sales-comps/history/recent', async (req: any, res) => {
     try {
-      const { compHistoryService } = await import('./services/salescomps/compHistoryService');
+      const { compHistoryService } = await import('../services/salescomps/compHistoryService');
       const orgId = req.user.orgId;
       const limit = parseInt(req.query.limit as string) || 100;
 
@@ -9843,7 +9914,7 @@ export function registerCRMRoutes(
   // Comp Adjustment Service Routes
   app.post('/api/sales-comps/:id/adjustment', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const compId = req.params.id;
@@ -9867,7 +9938,7 @@ export function registerCRMRoutes(
 
   app.get('/api/sales-comps/:id/adjustment', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const compId = req.params.id;
       const targetPropertyId = req.query.targetPropertyId as string | undefined;
@@ -9886,7 +9957,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/:id/calculate-adjustment', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const compId = req.params.id;
       const adjustments = req.body;
@@ -9906,7 +9977,7 @@ export function registerCRMRoutes(
 
   app.post('/api/sales-comps/comparison-grid', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const userId = req.user.id;
       const { targetPropertyId, compIds } = req.body;
@@ -9931,7 +10002,7 @@ export function registerCRMRoutes(
 
   app.get('/api/sales-comps/project/:projectId/adjustments', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const projectId = req.params.projectId;
 
@@ -9945,7 +10016,7 @@ export function registerCRMRoutes(
 
   app.delete('/api/sales-comps/adjustment/:adjustmentId', async (req: any, res) => {
     try {
-      const { compAdjustmentService } = await import('./services/salescomps/compAdjustmentService');
+      const { compAdjustmentService } = await import('../services/salescomps/compAdjustmentService');
       const orgId = req.user.orgId;
       const adjustmentId = req.params.adjustmentId;
 
@@ -9960,7 +10031,7 @@ export function registerCRMRoutes(
   // Geocoding status check
   app.get('/api/sales-comps/geocoding/status', async (req: any, res) => {
     try {
-      const { geocodingService } = await import('./services/salescomps/geocodingService');
+      const { geocodingService } = await import('../services/salescomps/geocodingService');
       res.json({
         configured: geocodingService.isConfigured(),
         requestCount: geocodingService.getRequestCount(),
@@ -10414,7 +10485,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ message: "Invalid entity type" });
       }
       
-      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      const { duplicateMatchingService } = await import('../services/duplicateMatchingService');
       const matches = await duplicateMatchingService.runDuplicateDetection(
         orgId, 
         entityType as 'property' | 'contact' | 'company', 
@@ -10442,7 +10513,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ message: "Invalid entity type" });
       }
       
-      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      const { duplicateMatchingService } = await import('../services/duplicateMatchingService');
       const matches = await duplicateMatchingService.getMatchesForPending(
         orgId, 
         entityType as 'property' | 'contact' | 'company', 
@@ -10475,7 +10546,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ message: "Target entity ID required for merge" });
       }
       
-      const { duplicateMatchingService } = await import('./services/duplicateMatchingService');
+      const { duplicateMatchingService } = await import('../services/duplicateMatchingService');
       
       if (resolution === 'merge') {
         const result = await storage.mergePendingWithExisting(
@@ -10864,7 +10935,7 @@ export function registerCRMRoutes(
       const orgId = req.user.orgId;
       
       // Check for analytics_pro pack
-      const { packService } = await import("./services/pack-service"); const activePacks = await packService.getActivePacks(orgId); const hasProAccess = activePacks.includes("analytics_pro") || 
+      const { packService } = await import("../services/pack-service"); const activePacks = await packService.getActivePacks(orgId); const hasProAccess = activePacks.includes("analytics_pro") || 
                           req.user.role === 'admin';
       
       if (!hasProAccess) {
@@ -10874,7 +10945,7 @@ export function registerCRMRoutes(
         });
       }
       
-      const { generateCrossModuleInsights } = await import('./services/market-intelligence-pro-service');
+      const { generateCrossModuleInsights } = await import('../services/market-intelligence-pro-service');
       const report = await generateCrossModuleInsights(orgId);
       res.json(report);
     } catch (error: any) {
@@ -10887,7 +10958,7 @@ export function registerCRMRoutes(
   app.get('/api/analytics/market-intelligence-pro/summary', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { getMarketIntelligenceProSummary } = await import('./services/market-intelligence-pro-service');
+      const { getMarketIntelligenceProSummary } = await import('../services/market-intelligence-pro-service');
       const summary = await getMarketIntelligenceProSummary(orgId);
       res.json(summary);
     } catch (error: any) {
@@ -11082,7 +11153,7 @@ export function registerCRMRoutes(
 
       const needsGeocoding = results.filter(r => r.lat == null && r.lng == null && (r.address || r.city));
       if (needsGeocoding.length > 0) {
-        const { geocodingService } = await import('./services/geocodingService');
+        const { geocodingService } = await import('../services/geocodingService');
         const toGeocode = needsGeocoding.slice(0, 25);
         const geocodePromises = toGeocode.map(async (loc) => {
           try {
@@ -12115,7 +12186,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ error: 'snapshotMonth and snapshotYear are required' });
       }
       
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const snapshot = await rentRollSnapshotService.createSnapshot(
         orgId,
         req.params.rentRollId,
@@ -12134,7 +12205,7 @@ export function registerCRMRoutes(
   app.get('/api/operations/rent-rolls/:rentRollId/snapshots', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const snapshots = await rentRollSnapshotService.getSnapshotsForRentRoll(
         req.params.rentRollId,
         orgId
@@ -12150,7 +12221,7 @@ export function registerCRMRoutes(
   app.get('/api/operations/rent-roll-snapshots/:snapshotId/details', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       
       const snapshot = await rentRollSnapshotService.getSnapshot(req.params.snapshotId, orgId);
       if (!snapshot) {
@@ -12169,7 +12240,7 @@ export function registerCRMRoutes(
   app.get('/api/operations/rent-roll-snapshots/:currentId/compare/:previousId?', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       
       const comparison = await rentRollSnapshotService.compareSnapshots(
         req.params.currentId,
@@ -12193,7 +12264,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ error: 'Start and end year/month are required' });
       }
       
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const snapshots = await rentRollSnapshotService.getTimeSeries(
         req.params.rentRollId,
         orgId,
@@ -12219,7 +12290,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ error: 'Year and month are required' });
       }
       
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const aggregation = await rentRollSnapshotService.getPortfolioAggregation(
         orgId,
         parseInt(year as string),
@@ -12240,7 +12311,7 @@ export function registerCRMRoutes(
   // Get bindings for a budget
   app.get('/api/operations/budgets/:budgetId/rent-roll-bindings', authenticateUser, async (req: any, res) => {
     try {
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const bindings = await rentRollSnapshotService.getBindingsForBudget(req.params.budgetId);
       res.json(bindings);
     } catch (error: any) {
@@ -12252,7 +12323,7 @@ export function registerCRMRoutes(
   // Create a binding
   app.post('/api/operations/budgets/:budgetId/rent-roll-bindings', authenticateUser, async (req: any, res) => {
     try {
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const binding = await rentRollSnapshotService.createBinding({
         ...req.body,
         budgetId: req.params.budgetId,
@@ -12267,7 +12338,7 @@ export function registerCRMRoutes(
   // Update a binding
   app.patch('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const binding = await rentRollSnapshotService.updateBinding(req.params.bindingId, req.body);
       if (!binding) {
         return res.status(404).json({ error: 'Binding not found' });
@@ -12282,7 +12353,7 @@ export function registerCRMRoutes(
   // Delete a binding
   app.delete('/api/operations/rent-roll-bindings/:bindingId', authenticateUser, requireRentRoll(), async (req: any, res) => {
     try {
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const deleted = await rentRollSnapshotService.deleteBinding(req.params.bindingId);
       if (!deleted) {
         return res.status(404).json({ error: 'Binding not found' });
@@ -12304,7 +12375,7 @@ export function registerCRMRoutes(
         return res.status(400).json({ error: 'Month and year are required' });
       }
       
-      const { rentRollSnapshotService } = await import('./services/rent-roll-snapshot-service');
+      const { rentRollSnapshotService } = await import('../services/rent-roll-snapshot-service');
       const result = await rentRollSnapshotService.syncBudgetActualsFromRentRoll(
         req.params.budgetId,
         orgId,
@@ -13072,8 +13143,11 @@ export function registerCRMRoutes(
   app.get('/api/modeling/projects', authenticateUser, async (req: any, res) => {
     try {
       const orgId = req.user.orgId;
-      const projects = await storage.getModelingProjects(orgId);
-      
+      const pag = parsePagination(req.query, { pageSize: 25 });
+      const allProjects = await storage.getModelingProjects(orgId);
+      const total = allProjects.length;
+      const projects = allProjects.slice(pag.offset, pag.offset + pag.limit);
+
       const { modelingActuals, modelingFinancialPeriods, users: usersTable } = await import('@shared/schema');
 
       const userIds = [...new Set(projects.map(p => (p as any).createdBy).filter(Boolean))];
@@ -13090,8 +13164,8 @@ export function registerCRMRoutes(
           console.warn('Failed to fetch user names for modeling projects:', e);
         }
       }
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
-      
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
+
       const projectsWithMetrics = await Promise.all(projects.map(async (project) => {
         let purchasePrice = project.purchasePrice ? parseFloat(project.purchasePrice.toString()) : null;
         let year1CapRate = project.year1CapRate ? parseFloat(project.year1CapRate.toString()) : null;
@@ -13229,7 +13303,7 @@ export function registerCRMRoutes(
         };
       }));
       
-      res.json(projectsWithMetrics);
+      res.json(paginatedResponse(projectsWithMetrics, total, pag));
     } catch (error: any) {
       console.error('Failed to fetch modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch modeling projects' });
@@ -13511,7 +13585,7 @@ export function registerCRMRoutes(
   // Compute direct input financials (live preview — no DB write)
   app.post('/api/modeling/projects/:projectId/compute-direct-input', authenticateUser, async (req: any, res) => {
     try {
-      const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
+      const { computeDirectInputFinancials } = await import('../services/direct-input-engine');
       const { assetClass, inputAssumptions, unitMix } = req.body;
       if (!assetClass || !inputAssumptions) {
         return res.status(400).json({ error: 'assetClass and inputAssumptions are required' });
@@ -13532,8 +13606,8 @@ export function registerCRMRoutes(
     try {
       const orgId = req.user.orgId;
       const { projectId } = req.params;
-      const { computeDirectInputFinancials } = await import('./services/direct-input-engine');
-      const { computeMultiYearProjection, buildProjectionConfig } = await import('./services/multi-year-projection-engine');
+      const { computeDirectInputFinancials } = await import('../services/direct-input-engine');
+      const { computeMultiYearProjection, buildProjectionConfig } = await import('../services/multi-year-projection-engine');
       const { pool } = await import('./db');
       const r1 = await pool.query('SELECT id, asset_class, custom_metrics FROM modeling_projects WHERE id = $1 AND org_id = $2', [projectId, orgId]);
       const project = r1.rows[0];
@@ -13567,7 +13641,7 @@ export function registerCRMRoutes(
       const assetClass = project.asset_class ?? 'multifamily';
       if (COMMERCIAL.has(assetClass)) {
         try {
-          const { syncLeaseRollupToAssumptions } = await import('./services/commercial-lease-bridge');
+          const { syncLeaseRollupToAssumptions } = await import('../services/commercial-lease-bridge');
           await syncLeaseRollupToAssumptions(projectId, orgId);
         } catch (leaseErr) {
           console.warn('[multiYearProjection] lease sync failed:', leaseErr);
@@ -16134,7 +16208,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const multiYearData = await proFormaEngineService.getMultiYearHistoricalPL(projectId, orgId);
       res.json(multiYearData);
     } catch (error: any) {
@@ -16154,7 +16228,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const historicalData = await proFormaEngineService.getHistoricalPL(
         projectId, 
         orgId, 
@@ -16179,7 +16253,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const proFormaData = await proFormaEngineService.generateProForma(projectId, orgId, scenarioType);
       res.json(proFormaData);
     } catch (error: any) {
@@ -16198,7 +16272,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
 
       const scenarioTypes = ['base', 'aggressive', 'conservative'];
       const scenarioLabels: Record<string, { name: string; description: string }> = {
@@ -16338,7 +16412,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
       
       const summaryData = {
@@ -16394,7 +16468,7 @@ export function registerCRMRoutes(
       const { projectId, scenario = 'base' } = req.body;
       if (!projectId) return res.status(400).json({ error: 'projectId is required' });
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
       
       const proFormaData = {
@@ -16411,7 +16485,7 @@ export function registerCRMRoutes(
         exitValue: proForma.metrics.exitValue,
       };
       
-      const { capitalStackService } = await import('./services/capital-stack-service');
+      const { capitalStackService } = await import('../services/capital-stack-service');
       const projections = await capitalStackService.generateProjectionsFromProForma(orgId, capitalStackId, proFormaData);
       
       res.json({
@@ -16443,11 +16517,11 @@ export function registerCRMRoutes(
         return res.status(400).json({ error: 'projectId, targetMetric, and targetValue are required' });
       }
       
-      const { proFormaEngineService } = await import('./services/pro-forma-engine-service');
+      const { proFormaEngineService } = await import('../services/pro-forma-engine-service');
       const proForma = await proFormaEngineService.generateProForma(projectId, orgId, scenario);
       const m = proForma.metrics;
       
-      const { dealPricingService } = await import('./services/deal-pricing-service');
+      const { dealPricingService } = await import('../services/deal-pricing-service');
       let result: any;
       
       if (targetMetric === 'irr') {
@@ -16509,8 +16583,8 @@ export function registerCRMRoutes(
       const savedConfig = customMetrics.monteCarloConfig || null;
 
       if (!savedResults) {
-        const { monteCarloService } = await import('./services/monte-carlo-service');
-        const baseFinancials = await (await import('./services/deal-pricing-service')).dealPricingService.getProjectFinancials(projectId, orgId);
+        const { monteCarloService } = await import('../services/monte-carlo-service');
+        const baseFinancials = await (await import('../services/deal-pricing-service')).dealPricingService.getProjectFinancials(projectId, orgId);
         const dealPricingInputs = customMetrics.dealPricing || {};
         const purchasePrice = dealPricingInputs.purchasePrice || (baseFinancials.purchasePrice ? Number(baseFinancials.purchasePrice) : 5000000);
         const year1NOI = baseFinancials.year1NOI || 500000;
@@ -16540,7 +16614,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { monteCarloService } = await import('./services/monte-carlo-service');
+      const { monteCarloService } = await import('../services/monte-carlo-service');
       const simulationInput: { iterations: number; confidenceLevel: number; variables?: any } = {
         iterations,
         confidenceLevel,
@@ -16623,7 +16697,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { monteCarloService } = await import('./services/monte-carlo-service');
+      const { monteCarloService } = await import('../services/monte-carlo-service');
       const quickResult = await monteCarloService.quickSimulation(projectId, orgId);
       res.json(quickResult);
     } catch (error: any) {
@@ -16649,7 +16723,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const { dcfCalculatorService } = await import('../services/dcf-calculator-service');
       const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId);
       res.json(analysis);
     } catch (error: any) {
@@ -16672,7 +16746,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const { dcfCalculatorService } = await import('../services/dcf-calculator-service');
       const analysis = await dcfCalculatorService.performDCFAnalysis(projectId, orgId, scenarios);
       res.json(analysis);
     } catch (error: any) {
@@ -16688,7 +16762,7 @@ export function registerCRMRoutes(
     try {
       const { input } = req.body;
       
-      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const { dcfCalculatorService } = await import('../services/dcf-calculator-service');
       const result = dcfCalculatorService.quickCalculate(input);
       res.json(result);
     } catch (error: any) {
@@ -16704,7 +16778,7 @@ export function registerCRMRoutes(
     try {
       const { input } = req.body;
       
-      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const { dcfCalculatorService } = await import('../services/dcf-calculator-service');
       const npv = dcfCalculatorService.quickNPV(input);
       res.json({ npv });
     } catch (error: any) {
@@ -16720,7 +16794,7 @@ export function registerCRMRoutes(
     try {
       const { baseInput, var1Config, var2Config, metric } = req.body;
       
-      const { dcfCalculatorService } = await import('./services/dcf-calculator-service');
+      const { dcfCalculatorService } = await import('../services/dcf-calculator-service');
       const matrix = dcfCalculatorService.generateSensitivityMatrix(
         baseInput,
         var1Config,
@@ -16750,7 +16824,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const { marinaProfitCenterService } = await import('../services/marina-profit-center-service');
       const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId);
       res.json(financialModel);
     } catch (error: any) {
@@ -16771,7 +16845,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const { marinaProfitCenterService } = await import('../services/marina-profit-center-service');
       const breakdown = await marinaProfitCenterService.getProfitCenterBreakdown(projectId, orgId, year);
       res.json(breakdown);
     } catch (error: any) {
@@ -16792,7 +16866,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { marinaProfitCenterService } = await import('./services/marina-profit-center-service');
+      const { marinaProfitCenterService } = await import('../services/marina-profit-center-service');
       const financialModel = await marinaProfitCenterService.calculateMarinaFinancials(projectId, orgId, assumptions);
       res.json(financialModel);
     } catch (error: any) {
@@ -16817,7 +16891,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const { leaseCashFlowEngine } = await import('../services/lease-cashflow-engine');
       const cashFlowData = await leaseCashFlowEngine.calculatePropertyCashFlow(
         projectId, 
         orgId, 
@@ -16841,7 +16915,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const { leaseCashFlowEngine } = await import('../services/lease-cashflow-engine');
       const rolloverData = await leaseCashFlowEngine.getRolloverSchedule(projectId, orgId);
       res.json(rolloverData);
     } catch (error: any) {
@@ -16861,7 +16935,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const { leaseCashFlowEngine } = await import('../services/lease-cashflow-engine');
       const tenantData = await leaseCashFlowEngine.getTenantPerformance(projectId, orgId);
       res.json(tenantData);
     } catch (error: any) {
@@ -16882,7 +16956,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
       
-      const { leaseCashFlowEngine } = await import('./services/lease-cashflow-engine');
+      const { leaseCashFlowEngine } = await import('../services/lease-cashflow-engine');
       const cashFlowData = await leaseCashFlowEngine.calculatePropertyCashFlow(
         projectId, 
         orgId, 
@@ -16913,7 +16987,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       
       const result = await operationsDataSyncService.syncOperationsData({
         projectId,
@@ -16944,7 +17018,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       
       const actuals = await operationsDataSyncService.getActualsForProject(
         projectId, 
@@ -16965,7 +17039,7 @@ export function registerCRMRoutes(
         .forEach(o => { deptOverrideMap[o.lineItemKey] = o.overrideDepartment!; });
 
       // Group by category and subcategory for P&L display
-      const { inferDepartment } = await import('./utils/department-mapping');
+      const { inferDepartment } = await import('../utils/department-mapping');
       const grouped = actuals.reduce((acc: any, item) => {
         const subcategory = item.subcategory || '';
         if (excludeSet.has(subcategory)) return acc;
@@ -17016,7 +17090,7 @@ export function registerCRMRoutes(
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
       const monthlyAmount = (parseFloat(annualAmount) / 12).toFixed(2);
-      const { inferDepartment } = await import('./utils/department-mapping');
+      const { inferDepartment } = await import('../utils/department-mapping');
       const dept = department || inferDepartment(subcategory, category);
       const lineDesc = `${dept}: ${subcategory}`;
       const inserted: string[] = [];
@@ -17125,7 +17199,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       const years = await operationsDataSyncService.getAvailableYears(projectId);
 
       res.json({ years });
@@ -17147,7 +17221,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       const yearList = years ? String(years).split(',').map(Number) : [];
       const actualsData = await operationsDataSyncService.getActualsForMultipleYears(projectId, yearList);
 
@@ -17166,7 +17240,7 @@ export function registerCRMRoutes(
       overrides.filter(o => o.overrideType === 'department' && o.isActive && o.overrideCategory)
         .forEach(o => { categoryOverrideMap[o.lineItemKey] = o.overrideCategory!; });
 
-      const { inferDepartment: inferDepartmentFn } = await import('./utils/department-mapping');
+      const { inferDepartment: inferDepartmentFn } = await import('../utils/department-mapping');
       // Group each year's data
       const groupedByYear: Record<number, any> = {};
       for (const [year, actuals] of Object.entries(actualsData)) {
@@ -17213,7 +17287,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       const history = await operationsDataSyncService.getSyncJobHistory(projectId);
 
       res.json(history);
@@ -17234,7 +17308,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { operationsDataSyncService } = await import('./services/operations-data-sync-service');
+      const { operationsDataSyncService } = await import('../services/operations-data-sync-service');
       const summary = await operationsDataSyncService.getDataSourceSummary(projectId);
 
       res.json(summary);
@@ -17259,7 +17333,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenarios = await scenarioVersioningService.getCurrentScenarios(projectId);
 
       res.json(scenarios);
@@ -17281,7 +17355,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenarios = await scenarioVersioningService.initializeDefaultScenarios(projectId, orgId, userId);
 
       res.json(scenarios);
@@ -17304,7 +17378,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.createScenario({
         orgId,
         projectId,
@@ -17336,7 +17410,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.getScenarioById(scenarioId);
 
       if (!scenario) {
@@ -17363,7 +17437,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.updateScenario({
         scenarioId,
         userId,
@@ -17395,7 +17469,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const history = await scenarioVersioningService.getScenarioVersionHistory(projectId, scenarioType as any, limit);
 
       res.json(history);
@@ -17417,7 +17491,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const restored = await scenarioVersioningService.restoreVersion(scenarioId, userId);
 
       res.json(restored);
@@ -17439,7 +17513,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.submitForApproval(scenarioId, userId);
 
       res.json(scenario);
@@ -17462,7 +17536,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.approveScenario(scenarioId, userId, notes);
 
       res.json(scenario);
@@ -17485,7 +17559,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const scenario = await scenarioVersioningService.rejectScenario(scenarioId, userId, notes);
 
       res.json(scenario);
@@ -17507,7 +17581,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const history = await scenarioVersioningService.getAuditHistory(projectId, {
         limit: limit ? parseInt(limit as string) : undefined,
         entityType: entityType as string
@@ -17532,7 +17606,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const comparison = await scenarioVersioningService.compareScenarios(projectId, scenarioIds);
 
       res.json(comparison);
@@ -17555,7 +17629,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { icMemoService } = await import('./services/ic-memo-service');
+      const { icMemoService } = await import('../services/ic-memo-service');
       const memoData = await icMemoService.generateMemoData(projectId, orgId, userId);
 
       if (format === 'text') {
@@ -17585,7 +17659,7 @@ export function registerCRMRoutes(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { scenarioVersioningService } = await import('./services/scenario-versioning-service');
+      const { scenarioVersioningService } = await import('../services/scenario-versioning-service');
       const auditLog = await scenarioVersioningService.getAuditHistory(projectId, { 
         limit, 
         entityType 

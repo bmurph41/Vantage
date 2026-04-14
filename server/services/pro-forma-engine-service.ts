@@ -16,6 +16,7 @@
  * - Historical P&L COGS separation
  */
 
+import Decimal from 'decimal.js';
 import { db } from '../db';
 import { calculateXIRR, type DatedCashFlow } from '../utils/financial-calculations';
 import { 
@@ -373,10 +374,10 @@ export class ProFormaEngineService {
     // 3. PARSE SCENARIO ASSUMPTIONS (Granular)
     // ========================================
     
-    const flatRevenueGrowthRate = parseFloat(scenario?.revenueGrowthRate?.toString() || '3') / 100;
-    const flatExpenseGrowthRate = parseFloat(scenario?.expenseGrowthRate?.toString() || '2.5') / 100;
-    const exitCapRate = parseFloat(scenario?.exitCapRate?.toString() || '7.5') / 100;
-    const purchasePrice = parseFloat(project.purchasePrice?.toString() || '0');
+    const flatRevenueGrowthRate = new Decimal(scenario?.revenueGrowthRate?.toString() || '3').dividedBy(100);
+    const flatExpenseGrowthRate = new Decimal(scenario?.expenseGrowthRate?.toString() || '2.5').dividedBy(100);
+    const exitCapRate = new Decimal(scenario?.exitCapRate?.toString() || '7.5').dividedBy(100);
+    const purchasePrice = new Decimal(project.purchasePrice?.toString() || '0');
     
     const stabilizedNoiMode = (config?.stabilizedNoiMode as StabilizedNoiMode) || 'fixed_year';
     const stabilizedNoiYear = config?.stabilizedNoiYear || 3;
@@ -392,7 +393,7 @@ export class ProFormaEngineService {
       universalRate: number;
       typeRates: Record<string, number>;
       locationRates: Record<string, number>;
-    } = assumptions.storageGrowth || { mode: 'universal', universalRate: flatRevenueGrowthRate * 100, typeRates: {}, locationRates: {} };
+    } = assumptions.storageGrowth || { mode: 'universal', universalRate: flatRevenueGrowthRate.times(100).toNumber(), typeRates: {}, locationRates: {} };
     
     const yearlyGrowthRates: Record<string, Record<string, number>> = assumptions.yearlyGrowthRates?.revenue || {};
     const yearlyExpenseGrowth: Record<string, Record<string, number>> = assumptions.yearlyGrowthRates?.expenses || {};
@@ -409,11 +410,11 @@ export class ProFormaEngineService {
     // - 'noi': management fee, capex reserves as % of NOI
     const belowTheLine = assumptions.belowTheLine || {};
     const belowTheLineBasis: 'revenue' | 'noi' = belowTheLine.basis || 'revenue';
-    const managementFeePct = (belowTheLine.managementFeePct || 0) / 100;
-    const capexPct = (belowTheLine.capexPct ?? 2) / 100;
-    const capexAmount = belowTheLine.capexAmount || 0;
-    const reservesPct = (belowTheLine.reservesPct || 0) / 100;
-    const reservesAmount = belowTheLine.reservesAmount || 0;
+    const managementFeePct = new Decimal(belowTheLine.managementFeePct || 0).dividedBy(100);
+    const capexPct = new Decimal(belowTheLine.capexPct ?? 2).dividedBy(100);
+    const capexAmount = new Decimal(belowTheLine.capexAmount || 0);
+    const reservesPct = new Decimal(belowTheLine.reservesPct || 0).dividedBy(100);
+    const reservesAmount = new Decimal(belowTheLine.reservesAmount || 0);
     
     // Above/below line position for each item (default: 'below' = after NOI)
     const mgmtFeeLinePos: 'above' | 'below' = belowTheLine.managementFeeLinePosition || 'below';
@@ -422,13 +423,13 @@ export class ProFormaEngineService {
     
     // Exit assumptions
     const exitAssumptions = assumptions.exitAssumptions || {};
-    const sellingFeePct = (exitAssumptions.sellingFeePct ?? 2) / 100;
-    const loanExitFeePct = (exitAssumptions.loanExitFeePct || 0) / 100;
+    const sellingFeePct = new Decimal(exitAssumptions.sellingFeePct ?? 2).dividedBy(100);
+    const loanExitFeePct = new Decimal(exitAssumptions.loanExitFeePct || 0).dividedBy(100);
 
     // Property tax assumptions
     const propertyTaxConfig = assumptions.propertyTax || null;
-    const workingCapitalRecoveryPct = (exitAssumptions.workingCapitalRecoveryPct ?? 100) / 100;
-    const workingCapitalAmount = exitAssumptions.workingCapitalAmount || 0;
+    const workingCapitalRecoveryPct = new Decimal(exitAssumptions.workingCapitalRecoveryPct ?? 100).dividedBy(100);
+    const workingCapitalAmount = new Decimal(exitAssumptions.workingCapitalAmount || 0);
     
     // ========================================
     // 4. AGGREGATE BASE AMOUNTS FROM ACTUALS (by latest historical year)
@@ -575,80 +576,80 @@ export class ProFormaEngineService {
     // 6. BUILD MONTHLY PROJECTIONS (Granular)
     // ========================================
     
-    const getRevenueGrowthForDept = (department: string, subcategory: string, year?: number): number => {
+    const getRevenueGrowthForDept = (department: string, subcategory: string, year?: number): Decimal => {
       const assumptionKey = departmentToAssumptionKey(department);
-      
+
       if (year !== undefined && lineItemOverrides[subcategory]?.[String(year)] !== undefined) {
-        return lineItemOverrides[subcategory][String(year)] / 100;
+        return new Decimal(lineItemOverrides[subcategory][String(year)]).dividedBy(100);
       }
-      
+
       if (year !== undefined && yearlyGrowthRates[String(year)]?.[assumptionKey] !== undefined) {
-        return yearlyGrowthRates[String(year)][assumptionKey] / 100;
+        return new Decimal(yearlyGrowthRates[String(year)][assumptionKey]).dividedBy(100);
       }
-      
+
       if (!hasGranularAssumptions) return flatRevenueGrowthRate;
-      
+
       if (department === 'Storage') {
         const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
         if (storageGrowthData.mode === 'per_type' && storageTypeKey && storageGrowthData.typeRates[storageTypeKey] !== undefined) {
-          return storageGrowthData.typeRates[storageTypeKey] / 100;
+          return new Decimal(storageGrowthData.typeRates[storageTypeKey]).dividedBy(100);
         }
         if (storageGrowthData.mode === 'granular' && storageTypeKey && storageGrowthData.locationRates) {
           const locationRate = Object.entries(storageGrowthData.locationRates)
             .find(([key]) => key.startsWith(storageTypeKey || ''));
-          if (locationRate) return locationRate[1] / 100;
+          if (locationRate) return new Decimal(locationRate[1]).dividedBy(100);
         }
-        return (storageGrowthData.universalRate ?? flatRevenueGrowthRate * 100) / 100;
+        return new Decimal(storageGrowthData.universalRate ?? flatRevenueGrowthRate.times(100).toNumber()).dividedBy(100);
       }
-      
+
       if (granularGrowthRates[assumptionKey] !== undefined) {
-        return granularGrowthRates[assumptionKey] / 100;
+        return new Decimal(granularGrowthRates[assumptionKey]).dividedBy(100);
       }
-      
+
       return flatRevenueGrowthRate;
     };
     
-    const getExpenseGrowthForCategory = (subcategory: string, department: string, year?: number): number => {
+    const getExpenseGrowthForCategory = (subcategory: string, department: string, year?: number): Decimal => {
       const key = departmentToAssumptionKey(department);
-      
+
       if (year !== undefined && lineItemOverrides[subcategory]?.[String(year)] !== undefined) {
-        return lineItemOverrides[subcategory][String(year)] / 100;
+        return new Decimal(lineItemOverrides[subcategory][String(year)]).dividedBy(100);
       }
-      
+
       if (year !== undefined && yearlyExpenseGrowth[String(year)]?.[key] !== undefined) {
-        return yearlyExpenseGrowth[String(year)][key] / 100;
+        return new Decimal(yearlyExpenseGrowth[String(year)][key]).dividedBy(100);
       }
-      
+
       if (!hasGranularAssumptions) return flatExpenseGrowthRate;
-      
+
       if (granularExpenseGrowth[key] !== undefined) {
-        return granularExpenseGrowth[key] / 100;
+        return new Decimal(granularExpenseGrowth[key]).dividedBy(100);
       }
-      
+
       const lowerSubcat = subcategory.toLowerCase();
       for (const [expKey, rate] of Object.entries(granularExpenseGrowth)) {
         if (lowerSubcat.includes(expKey.replace(/_/g, ' '))) {
-          return rate / 100;
+          return new Decimal(rate).dividedBy(100);
         }
       }
-      
+
       return flatExpenseGrowthRate;
     };
     
-    const getOccupancyAdjustment = (department: string, subcategory: string, year: number): number => {
-      if (department !== 'Storage') return 1.0;
-      
+    const getOccupancyAdjustment = (department: string, subcategory: string, year: number): Decimal => {
+      if (department !== 'Storage') return new Decimal(1);
+
       const storageTypeKey = storageSubcategoryToTypeKey(subcategory);
-      if (!storageTypeKey || Object.keys(granularOccupancy).length === 0) return 1.0;
-      
+      if (!storageTypeKey || Object.keys(granularOccupancy).length === 0) return new Decimal(1);
+
       const typeOccupancy = granularOccupancy[storageTypeKey];
-      if (!typeOccupancy) return 1.0;
-      
-      const currentOccPct = typeOccupancy[String(year)] ?? 85;
-      const baseOccPct = typeOccupancy[String(latestHistoricalYear)] ?? 85;
-      
-      if (baseOccPct <= 0) return 1.0;
-      return currentOccPct / baseOccPct;
+      if (!typeOccupancy) return new Decimal(1);
+
+      const currentOccPct = new Decimal(typeOccupancy[String(year)] ?? 85);
+      const baseOccPct = new Decimal(typeOccupancy[String(latestHistoricalYear)] ?? 85);
+
+      if (baseOccPct.lte(0)) return new Decimal(1);
+      return currentOccPct.dividedBy(baseOccPct);
     };
     
     const actualsMonthlyLookup: Record<string, Record<string, number>> = {};
@@ -659,7 +660,7 @@ export class ProFormaEngineService {
       if (!actualsMonthlyLookup[subcat]) {
         actualsMonthlyLookup[subcat] = {};
       }
-      actualsMonthlyLookup[subcat][key] = (actualsMonthlyLookup[subcat][key] || 0) + parseFloat(actual.amount?.toString() || '0');
+      actualsMonthlyLookup[subcat][key] = new Decimal(actualsMonthlyLookup[subcat][key] || 0).plus(new Decimal(actual.amount?.toString() || '0')).toNumber();
       if (!actualsMonthsPerYearPerSubcat[subcat]) actualsMonthsPerYearPerSubcat[subcat] = {};
       if (!actualsMonthsPerYearPerSubcat[subcat][actual.year]) actualsMonthsPerYearPerSubcat[subcat][actual.year] = new Set();
       actualsMonthsPerYearPerSubcat[subcat][actual.year].add(actual.month);
@@ -674,35 +675,35 @@ export class ProFormaEngineService {
     const revenueLineItems: LineItem[] = Object.entries(revenueBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
       const annualGrowthRate = getRevenueGrowthForDept(department, name);
-      const baseMonthly = data.amount / 12;
+      const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
-      
-      let cumulativeGrowth = 1.0;
+
+      let cumulativeGrowth = new Decimal(1);
       let prevYear: number | null = null;
-      let currentMonthlyRate = annualToMonthlyRate(annualGrowthRate);
-      
+      let currentMonthlyRate = new Decimal(annualToMonthlyRate(annualGrowthRate.toNumber()));
+
       for (const period of monthlyPeriods) {
         if (hasYearlyGrowthRates && period.year !== prevYear) {
           const yearRate = getRevenueGrowthForDept(department, name, period.year);
-          currentMonthlyRate = annualToMonthlyRate(yearRate);
+          currentMonthlyRate = new Decimal(annualToMonthlyRate(yearRate.toNumber()));
           prevYear = period.year;
         }
-        
+
         if (period.index > 0) {
-          cumulativeGrowth *= (1 + currentMonthlyRate);
+          cumulativeGrowth = cumulativeGrowth.times(new Decimal(1).plus(currentMonthlyRate));
         }
 
         if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
           continue;
         }
-        
-        let projectedAmount = baseMonthly * cumulativeGrowth;
-        
+
+        let projectedAmount = baseMonthly.times(cumulativeGrowth);
+
         const occAdj = getOccupancyAdjustment(department, name, period.year);
-        projectedAmount *= occAdj;
-        
-        projectionsMonthly[period.key] = Math.round(projectedAmount);
+        projectedAmount = projectedAmount.times(occAdj);
+
+        projectionsMonthly[period.key] = projectedAmount.round().toNumber();
       }
       
       const projections = annualPeriods.map(year => {
@@ -719,7 +720,7 @@ export class ProFormaEngineService {
         subcategory: data.subcategory,
         department,
         baseAmount: data.amount,
-        growthRate: annualGrowthRate * 100,
+        growthRate: annualGrowthRate.times(100).toNumber(),
         projections,
         projectionsMonthly,
         isRevenue: true
@@ -729,9 +730,9 @@ export class ProFormaEngineService {
     const cogsLineItems: LineItem[] = Object.entries(cogsBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
       const annualGrowthRate = getExpenseGrowthForCategory(name, department);
-      const baseMonthly = data.amount / 12;
+      const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
-      
+
       for (const period of monthlyPeriods) {
         if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
@@ -740,64 +741,64 @@ export class ProFormaEngineService {
 
       if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
-        const projectedMarginPct = marginData.projected / 100;
+        const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         const revenueKey = department === 'Fuel' ? 'fuel_dock' : departmentToAssumptionKey(department);
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
           departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory)) === revenueKey
         );
-        
+
         if (matchingRevenue) {
-          const revBase = matchingRevenue[1].amount;
-          let revCumGrowth = 1.0;
+          const revBase = new Decimal(matchingRevenue[1].amount);
+          let revCumGrowth = new Decimal(1);
           let revPrevYear: number | null = null;
-          let revMonthlyRate = annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0]));
-          
+          let revMonthlyRate = new Decimal(annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0]).toNumber()));
+
           for (const period of monthlyPeriods) {
             if (hasYearlyGrowthRates && period.year !== revPrevYear) {
-              revMonthlyRate = annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0], period.year));
+              revMonthlyRate = new Decimal(annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0], period.year).toNumber()));
               revPrevYear = period.year;
             }
-            if (period.index > 0) revCumGrowth *= (1 + revMonthlyRate);
+            if (period.index > 0) revCumGrowth = revCumGrowth.times(new Decimal(1).plus(revMonthlyRate));
             if (projectionsMonthly[period.key] !== undefined) continue;
-            const projectedRevMonth = (revBase / 12) * revCumGrowth;
-            projectionsMonthly[period.key] = Math.round(projectedRevMonth * (1 - projectedMarginPct));
+            const projectedRevMonth = revBase.dividedBy(12).times(revCumGrowth);
+            projectionsMonthly[period.key] = projectedRevMonth.times(new Decimal(1).minus(projectedMarginPct)).round().toNumber();
           }
         } else {
-          let cumGrowth = 1.0;
+          let cumGrowth = new Decimal(1);
           let pYear: number | null = null;
-          let mRate = annualToMonthlyRate(annualGrowthRate);
+          let mRate = new Decimal(annualToMonthlyRate(annualGrowthRate.toNumber()));
           for (const period of monthlyPeriods) {
             if (hasYearlyGrowthRates && period.year !== pYear) {
-              mRate = annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year));
+              mRate = new Decimal(annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year).toNumber()));
               pYear = period.year;
             }
-            if (period.index > 0) cumGrowth *= (1 + mRate);
+            if (period.index > 0) cumGrowth = cumGrowth.times(new Decimal(1).plus(mRate));
             if (projectionsMonthly[period.key] !== undefined) continue;
-            projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
+            projectionsMonthly[period.key] = baseMonthly.times(cumGrowth).round().toNumber();
           }
         }
       } else {
-        let cumGrowth = 1.0;
+        let cumGrowth = new Decimal(1);
         let pYear: number | null = null;
-        let mRate = annualToMonthlyRate(annualGrowthRate);
+        let mRate = new Decimal(annualToMonthlyRate(annualGrowthRate.toNumber()));
         for (const period of monthlyPeriods) {
           if (hasYearlyGrowthRates && period.year !== pYear) {
-            mRate = annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year));
+            mRate = new Decimal(annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year).toNumber()));
             pYear = period.year;
           }
-          if (period.index > 0) cumGrowth *= (1 + mRate);
+          if (period.index > 0) cumGrowth = cumGrowth.times(new Decimal(1).plus(mRate));
           if (projectionsMonthly[period.key] !== undefined) continue;
-          projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
+          projectionsMonthly[period.key] = baseMonthly.times(cumGrowth).round().toNumber();
         }
       }
-      
+
       const projections = annualPeriods.map(year => {
         return year.monthIndices.reduce((sum, mi) => {
           const period = monthlyPeriods[mi];
           return sum + (projectionsMonthly[period.key] || 0);
         }, 0);
       });
-      
+
       return {
         id: `cogs-${idx}`,
         name,
@@ -805,7 +806,7 @@ export class ProFormaEngineService {
         subcategory: data.subcategory,
         department,
         baseAmount: data.amount,
-        growthRate: annualGrowthRate * 100,
+        growthRate: annualGrowthRate.times(100).toNumber(),
         projections,
         projectionsMonthly,
         isRevenue: false
@@ -822,36 +823,38 @@ export class ProFormaEngineService {
 
     const getPropertyTaxMonthly = (yearIndex: number): number | null => {
       if (!propertyTaxConfig || !propertyTaxConfig.millageRate) return null;
-      const baseTaxableValue = propertyTaxConfig.taxableValueMode === 'purchase_price'
-        ? (propertyTaxConfig.purchasePrice || 0)
-        : (propertyTaxConfig.taxableValue || 0);
-      if (baseTaxableValue <= 0) return null;
+      const baseTaxableValue = new Decimal(
+        propertyTaxConfig.taxableValueMode === 'purchase_price'
+          ? (propertyTaxConfig.purchasePrice || 0)
+          : (propertyTaxConfig.taxableValue || 0)
+      );
+      if (baseTaxableValue.lte(0)) return null;
 
       let currentTaxable = baseTaxableValue;
 
       if (yearIndex === 0) {
         if (propertyTaxConfig.reassessOnSale && propertyTaxConfig.year1TaxJumpPct > 0) {
-          currentTaxable = baseTaxableValue * (1 + propertyTaxConfig.year1TaxJumpPct / 100);
+          currentTaxable = baseTaxableValue.times(new Decimal(1).plus(new Decimal(propertyTaxConfig.year1TaxJumpPct).dividedBy(100)));
         }
       } else {
         if (propertyTaxConfig.reassessOnSale && propertyTaxConfig.year1TaxJumpPct > 0) {
-          currentTaxable = baseTaxableValue * (1 + propertyTaxConfig.year1TaxJumpPct / 100);
+          currentTaxable = baseTaxableValue.times(new Decimal(1).plus(new Decimal(propertyTaxConfig.year1TaxJumpPct).dividedBy(100)));
         }
-        const growthRate = (propertyTaxConfig.standardGrowthRate || 2) / 100;
-        currentTaxable = currentTaxable * Math.pow(1 + growthRate, yearIndex);
+        const growthRate = new Decimal(propertyTaxConfig.standardGrowthRate || 2).dividedBy(100);
+        currentTaxable = currentTaxable.times(new Decimal(1).plus(growthRate).pow(yearIndex));
       }
 
-      const divisor = propertyTaxConfig.millageRatePer || 1000;
-      const annualTax = (currentTaxable / divisor) * propertyTaxConfig.millageRate;
-      return Math.round(annualTax / 12);
+      const divisor = new Decimal(propertyTaxConfig.millageRatePer || 1000);
+      const annualTax = currentTaxable.dividedBy(divisor).times(propertyTaxConfig.millageRate);
+      return annualTax.dividedBy(12).round().toNumber();
     };
 
     const expenseLineItems: LineItem[] = Object.entries(expensesBySubcat).map(([name, data], idx) => {
       const department = data.department || inferDepartment(name, data.category);
       const annualGrowthRate = getExpenseGrowthForCategory(name, department);
-      const baseMonthly = data.amount / 12;
+      const baseMonthly = new Decimal(data.amount).dividedBy(12);
       const projectionsMonthly: Record<string, number> = {};
-      
+
       for (const period of monthlyPeriods) {
         if (period.isActual && actualsMonthlyLookup[name]?.[period.key] && !isAnnualOnlyData(name, period.year)) {
           projectionsMonthly[period.key] = Math.round(actualsMonthlyLookup[name][period.key]);
@@ -866,69 +869,69 @@ export class ProFormaEngineService {
           if (taxMonthly !== null) {
             projectionsMonthly[period.key] = taxMonthly;
           } else {
-            projectionsMonthly[period.key] = Math.round(baseMonthly);
+            projectionsMonthly[period.key] = baseMonthly.round().toNumber();
           }
         }
       } else if (granularMargins[departmentToAssumptionKey(department)]) {
         const marginData = granularMargins[departmentToAssumptionKey(department)];
-        const projectedMarginPct = marginData.projected / 100;
+        const projectedMarginPct = new Decimal(marginData.projected).dividedBy(100);
         const revenueKey = department === 'Fuel' ? 'fuel_dock' : 'ship_store';
         const matchingRevenue = Object.entries(revenueBySubcat).find(([_, rd]) =>
           departmentToAssumptionKey(rd.department || inferDepartment(rd.subcategory)) === revenueKey
         );
-        
+
         if (matchingRevenue) {
-          const revBase = matchingRevenue[1].amount;
-          let revCumGrowth = 1.0;
+          const revBase = new Decimal(matchingRevenue[1].amount);
+          let revCumGrowth = new Decimal(1);
           let revPrevYear: number | null = null;
-          let revMonthlyRate = annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0]));
-          
+          let revMonthlyRate = new Decimal(annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0]).toNumber()));
+
           for (const period of monthlyPeriods) {
             if (hasYearlyGrowthRates && period.year !== revPrevYear) {
-              revMonthlyRate = annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0], period.year));
+              revMonthlyRate = new Decimal(annualToMonthlyRate(getRevenueGrowthForDept(department, matchingRevenue[0], period.year).toNumber()));
               revPrevYear = period.year;
             }
-            if (period.index > 0) revCumGrowth *= (1 + revMonthlyRate);
+            if (period.index > 0) revCumGrowth = revCumGrowth.times(new Decimal(1).plus(revMonthlyRate));
             if (projectionsMonthly[period.key] !== undefined) continue;
-            const projectedRevMonth = (revBase / 12) * revCumGrowth;
-            projectionsMonthly[period.key] = Math.round(projectedRevMonth * (1 - projectedMarginPct));
+            const projectedRevMonth = revBase.dividedBy(12).times(revCumGrowth);
+            projectionsMonthly[period.key] = projectedRevMonth.times(new Decimal(1).minus(projectedMarginPct)).round().toNumber();
           }
         } else {
-          let cumGrowth = 1.0;
+          let cumGrowth = new Decimal(1);
           let pYear: number | null = null;
-          let mRate = annualToMonthlyRate(annualGrowthRate);
+          let mRate = new Decimal(annualToMonthlyRate(annualGrowthRate.toNumber()));
           for (const period of monthlyPeriods) {
             if (hasYearlyGrowthRates && period.year !== pYear) {
-              mRate = annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year));
+              mRate = new Decimal(annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year).toNumber()));
               pYear = period.year;
             }
-            if (period.index > 0) cumGrowth *= (1 + mRate);
+            if (period.index > 0) cumGrowth = cumGrowth.times(new Decimal(1).plus(mRate));
             if (projectionsMonthly[period.key] !== undefined) continue;
-            projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
+            projectionsMonthly[period.key] = baseMonthly.times(cumGrowth).round().toNumber();
           }
         }
       } else {
-        let cumGrowth = 1.0;
+        let cumGrowth = new Decimal(1);
         let pYear: number | null = null;
-        let mRate = annualToMonthlyRate(annualGrowthRate);
+        let mRate = new Decimal(annualToMonthlyRate(annualGrowthRate.toNumber()));
         for (const period of monthlyPeriods) {
           if (hasYearlyGrowthRates && period.year !== pYear) {
-            mRate = annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year));
+            mRate = new Decimal(annualToMonthlyRate(getExpenseGrowthForCategory(name, department, period.year).toNumber()));
             pYear = period.year;
           }
-          if (period.index > 0) cumGrowth *= (1 + mRate);
+          if (period.index > 0) cumGrowth = cumGrowth.times(new Decimal(1).plus(mRate));
           if (projectionsMonthly[period.key] !== undefined) continue;
-          projectionsMonthly[period.key] = Math.round(baseMonthly * cumGrowth);
+          projectionsMonthly[period.key] = baseMonthly.times(cumGrowth).round().toNumber();
         }
       }
-      
+
       const projections = annualPeriods.map(year => {
         return year.monthIndices.reduce((sum, mi) => {
           const period = monthlyPeriods[mi];
           return sum + (projectionsMonthly[period.key] || 0);
         }, 0);
       });
-      
+
       return {
         id: `exp-${idx}`,
         name,
@@ -936,7 +939,7 @@ export class ProFormaEngineService {
         subcategory: data.subcategory,
         department,
         baseAmount: data.amount,
-        growthRate: annualGrowthRate * 100,
+        growthRate: annualGrowthRate.times(100).toNumber(),
         projections,
         projectionsMonthly,
         isRevenue: false
@@ -961,42 +964,42 @@ export class ProFormaEngineService {
     const cashFlowMonthly: Record<string, number> = {};
     
     for (const period of monthlyPeriods) {
-      const revTotal = revenueLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0);
-      const cogsTotal = cogsLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0);
-      const expTotal = expenseLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0);
-      
-      const gp = revTotal - cogsTotal;
-      const rawNoi = gp - expTotal;
+      const revTotal = new Decimal(revenueLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0));
+      const cogsTotal = new Decimal(cogsLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0));
+      const expTotal = new Decimal(expenseLineItems.reduce((sum, item) => sum + (item.projectionsMonthly[period.key] || 0), 0));
+
+      const gp = revTotal.minus(cogsTotal);
+      const rawNoi = gp.minus(expTotal);
       const pctBasis = belowTheLineBasis === 'noi' ? rawNoi : revTotal;
-      const mgmtFee = Math.round(pctBasis * managementFeePct);
-      const capexVal = capexAmount > 0 ? Math.round(capexAmount / 12) : Math.round(pctBasis * capexPct);
-      const reserveVal = reservesAmount > 0 ? Math.round(reservesAmount / 12) : Math.round(pctBasis * reservesPct);
-      
+      const mgmtFee = pctBasis.times(managementFeePct).round();
+      const capexVal = capexAmount.gt(0) ? capexAmount.dividedBy(12).round() : pctBasis.times(capexPct).round();
+      const reserveVal = reservesAmount.gt(0) ? reservesAmount.dividedBy(12).round() : pctBasis.times(reservesPct).round();
+
       // Items marked 'above' are deducted before NOI; 'below' items deducted after
-      const aboveLineMgmt = mgmtFeeLinePos === 'above' ? mgmtFee : 0;
-      const aboveLineCapex = capexLinePos === 'above' ? capexVal : 0;
-      const aboveLineReserves = reservesLinePos === 'above' ? reserveVal : 0;
-      const noiVal = rawNoi - aboveLineMgmt - aboveLineCapex - aboveLineReserves;
-      
-      const belowLineMgmt = mgmtFeeLinePos === 'below' ? mgmtFee : 0;
-      const belowLineCapex = capexLinePos === 'below' ? capexVal : 0;
-      const belowLineReserves = reservesLinePos === 'below' ? reserveVal : 0;
+      const aboveLineMgmt = mgmtFeeLinePos === 'above' ? mgmtFee : new Decimal(0);
+      const aboveLineCapex = capexLinePos === 'above' ? capexVal : new Decimal(0);
+      const aboveLineReserves = reservesLinePos === 'above' ? reserveVal : new Decimal(0);
+      const noiVal = rawNoi.minus(aboveLineMgmt).minus(aboveLineCapex).minus(aboveLineReserves);
+
+      const belowLineMgmt = mgmtFeeLinePos === 'below' ? mgmtFee : new Decimal(0);
+      const belowLineCapex = capexLinePos === 'below' ? capexVal : new Decimal(0);
+      const belowLineReserves = reservesLinePos === 'below' ? reserveVal : new Decimal(0);
       const debtSvc = 0; // Will be updated after debt integration
-      const cfBeforeDebt = noiVal - belowLineMgmt - belowLineCapex - belowLineReserves;
-      const levCf = cfBeforeDebt - debtSvc;
-      
-      revenueTotalsMonthly[period.key] = revTotal;
-      cogsTotalsMonthly[period.key] = cogsTotal;
-      grossProfitMonthly[period.key] = gp;
-      expenseTotalsMonthly[period.key] = expTotal;
-      noiMonthly[period.key] = noiVal;
-      capexMonthly[period.key] = capexVal;
-      managementFeeMonthly[period.key] = mgmtFee;
-      reservesMonthly[period.key] = reserveVal;
+      const cfBeforeDebt = noiVal.minus(belowLineMgmt).minus(belowLineCapex).minus(belowLineReserves);
+      const levCf = cfBeforeDebt.minus(debtSvc);
+
+      revenueTotalsMonthly[period.key] = revTotal.toNumber();
+      cogsTotalsMonthly[period.key] = cogsTotal.toNumber();
+      grossProfitMonthly[period.key] = gp.toNumber();
+      expenseTotalsMonthly[period.key] = expTotal.toNumber();
+      noiMonthly[period.key] = noiVal.toNumber();
+      capexMonthly[period.key] = capexVal.toNumber();
+      managementFeeMonthly[period.key] = mgmtFee.toNumber();
+      reservesMonthly[period.key] = reserveVal.toNumber();
       debtServiceMonthly[period.key] = debtSvc;
-      cashFlowBeforeDebtServiceMonthly[period.key] = cfBeforeDebt;
-      leveredCashFlowMonthly[period.key] = levCf;
-      cashFlowMonthly[period.key] = levCf;
+      cashFlowBeforeDebtServiceMonthly[period.key] = cfBeforeDebt.toNumber();
+      leveredCashFlowMonthly[period.key] = levCf.toNumber();
+      cashFlowMonthly[period.key] = levCf.toNumber();
     }
     
     // Annual rollups
@@ -1091,11 +1094,12 @@ export class ProFormaEngineService {
     // ========================================
     
     // Exit value based on terminal NOI
-    const exitNoi = noi[noi.length - 1] || 0;
-    const exitValue = exitCapRate > 0 ? Math.round(exitNoi / exitCapRate) : 0;
-    
+    const exitNoiD = new Decimal(noi[noi.length - 1] || 0);
+    const exitValueD = exitCapRate.gt(0) ? exitNoiD.dividedBy(exitCapRate).round() : new Decimal(0);
+    const exitValue = exitValueD.toNumber();
+
     // Going-in cap rate
-    const goingInCapRate = purchasePrice > 0 ? (noi[0] / purchasePrice) * 100 : 0;
+    const goingInCapRate = purchasePrice.gt(0) ? new Decimal(noi[0] || 0).dividedBy(purchasePrice).times(100).toNumber() : 0;
     
     // Stabilized NOI calculation
     const stabilizedNoiPeriodIndex = getStabilizedNoiPeriodIndex(
@@ -1150,7 +1154,7 @@ export class ProFormaEngineService {
           totalDebtService = Object.values(debtSchedule.annualDebtService).reduce((a, b) => a + b, 0);
           
           debtYield = debtScheduleService.calculateDebtYield(year1Noi, debtSchedule.totalDebtAtClose);
-          ltv = purchasePrice > 0 ? (debtSchedule.totalDebtAtClose / purchasePrice) * 100 : 0;
+          ltv = purchasePrice.gt(0) ? new Decimal(debtSchedule.totalDebtAtClose).dividedBy(purchasePrice).times(100).toNumber() : 0;
           
           // Update monthly and annual debt service + levered cash flow
           for (const period of monthlyPeriods) {
@@ -1208,7 +1212,7 @@ export class ProFormaEngineService {
           avgDscr = dscrMetrics.avgDscr;
           totalDebtService = Object.values(debtSchedule.annualDebtService).reduce((a, b) => a + b, 0);
           debtYield = debtScheduleService.calculateDebtYield(year1Noi, debtSchedule.totalDebtAtClose);
-          ltv = purchasePrice > 0 ? (debtSchedule.totalDebtAtClose / purchasePrice) * 100 : 0;
+          ltv = purchasePrice.gt(0) ? new Decimal(debtSchedule.totalDebtAtClose).dividedBy(purchasePrice).times(100).toNumber() : 0;
           for (const period of monthlyPeriods) {
             const ds = debtScheduleService.getDebtServiceForPeriod(debtSchedule, period.key);
             debtServiceMonthly[period.key] = Math.round(ds.payment);
@@ -1230,64 +1234,73 @@ export class ProFormaEngineService {
     // ========================================
     
     // Exit waterfall
-    const sellingFees = Math.round(exitValue * sellingFeePct);
+    const sellingFeesD = exitValueD.times(sellingFeePct).round();
+    const sellingFees = sellingFeesD.toNumber();
     const lastProjectionPeriodKey = monthlyPeriods[monthlyPeriods.length - 1]?.key;
     const exitPeriodDebt = debtSchedule?.schedule?.find(p => p.periodKey === lastProjectionPeriodKey);
     const lastScheduleEntry = exitPeriodDebt || debtSchedule?.schedule?.[debtSchedule.schedule.length - 1];
-    const loanPayoff = Math.round(lastScheduleEntry?.totalBalance || 0);
-    const loanExitFees = Math.round(loanPayoff * loanExitFeePct);
-    const workingCapitalRecovery = Math.round(workingCapitalAmount * workingCapitalRecoveryPct);
-    const netExitProceeds = exitValue - sellingFees - loanPayoff - loanExitFees + workingCapitalRecovery;
-    
+    const loanPayoffD = new Decimal(lastScheduleEntry?.totalBalance || 0).round();
+    const loanPayoff = loanPayoffD.toNumber();
+    const loanExitFeesD = loanPayoffD.times(loanExitFeePct).round();
+    const loanExitFees = loanExitFeesD.toNumber();
+    const workingCapitalRecoveryD = workingCapitalAmount.times(workingCapitalRecoveryPct).round();
+    const workingCapitalRecovery = workingCapitalRecoveryD.toNumber();
+    const netExitProceedsD = exitValueD.minus(sellingFeesD).minus(loanPayoffD).minus(loanExitFeesD).plus(workingCapitalRecoveryD);
+    const netExitProceeds = netExitProceedsD.toNumber();
+
     // LEVERED XIRR: Uses equity invested and cash flows after debt service
-    const loanProceeds = debtSchedule?.totalDebtAtClose || 0;
-    const totalEquityInvested = purchasePrice - loanProceeds + workingCapitalAmount;
+    const loanProceedsD = new Decimal(debtSchedule?.totalDebtAtClose || 0);
+    const totalEquityInvestedD = purchasePrice.minus(loanProceedsD).plus(workingCapitalAmount);
+    const totalEquityInvested = totalEquityInvestedD.toNumber();
     const leveredDatedCashFlows: DatedCashFlow[] = [
       { date: projectionStartDate, amount: -totalEquityInvested }
     ];
-    let totalLeveredDistributions = 0;
+    let totalLeveredDistD = new Decimal(0);
     for (let i = 0; i < monthlyPeriods.length; i++) {
       const period = monthlyPeriods[i];
-      let cf = leveredCashFlowMonthly[period.key] || 0;
-      
+      let cfD = new Decimal(leveredCashFlowMonthly[period.key] || 0);
+
       if (i === monthlyPeriods.length - 1) {
-        cf += netExitProceeds;
+        cfD = cfD.plus(netExitProceedsD);
       }
-      
-      totalLeveredDistributions += cf;
-      leveredDatedCashFlows.push({ date: period.date, amount: cf });
+
+      totalLeveredDistD = totalLeveredDistD.plus(cfD);
+      leveredDatedCashFlows.push({ date: period.date, amount: cfD.toNumber() });
     }
-    
+    const totalLeveredDistributions = totalLeveredDistD.toNumber();
+
     const leveredXirrResult = calculateXIRR(leveredDatedCashFlows, 0.1);
-    const annualizedIrr = Math.round(leveredXirrResult * 10000) / 100;
-    
+    const annualizedIrr = new Decimal(leveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+
     // Levered equity multiple
-    const equityMultiple = totalEquityInvested > 0 ? (totalLeveredDistributions / totalEquityInvested) : 0;
-    
+    const equityMultiple = totalEquityInvestedD.gt(0) ? totalLeveredDistD.dividedBy(totalEquityInvestedD).toNumber() : 0;
+
     // UNLEVERED XIRR: Uses total purchase price and cash flows before debt service (NOI - MgmtFee - CapEx - Reserves)
-    const totalUnleveredInvestment = purchasePrice + workingCapitalAmount;
-    const unleveredNetExitProceeds = exitValue - sellingFees + workingCapitalRecovery;
+    const totalUnleveredInvestmentD = purchasePrice.plus(workingCapitalAmount);
+    const totalUnleveredInvestment = totalUnleveredInvestmentD.toNumber();
+    const unleveredNetExitProceedsD = exitValueD.minus(sellingFeesD).plus(workingCapitalRecoveryD);
     const unleveredDatedCashFlows: DatedCashFlow[] = [
       { date: projectionStartDate, amount: -totalUnleveredInvestment }
     ];
-    let totalUnleveredDistributions = 0;
+    let totalUnleveredDistD = new Decimal(0);
     for (let i = 0; i < monthlyPeriods.length; i++) {
       const period = monthlyPeriods[i];
-      let cf = cashFlowBeforeDebtServiceMonthly[period.key] || 0;
-      
+      let cfD = new Decimal(cashFlowBeforeDebtServiceMonthly[period.key] || 0);
+
       if (i === monthlyPeriods.length - 1) {
-        cf += unleveredNetExitProceeds;
+        cfD = cfD.plus(unleveredNetExitProceedsD);
       }
-      
-      totalUnleveredDistributions += cf;
-      unleveredDatedCashFlows.push({ date: period.date, amount: cf });
+
+      totalUnleveredDistD = totalUnleveredDistD.plus(cfD);
+      unleveredDatedCashFlows.push({ date: period.date, amount: cfD.toNumber() });
     }
-    
+    const totalUnleveredDistributions = totalUnleveredDistD.toNumber();
+
     const unleveredXirrResult = calculateXIRR(unleveredDatedCashFlows, 0.1);
-    const unleveredIrr = Math.round(unleveredXirrResult * 10000) / 100;
-    
+    const unleveredIrr = new Decimal(unleveredXirrResult).times(10000).round().dividedBy(100).toNumber();
+
     // Unlevered equity multiple
-    const unleveredEquityMultiple = totalUnleveredInvestment > 0 ? (totalUnleveredDistributions / totalUnleveredInvestment) : 0;
+    const unleveredEquityMultiple = totalUnleveredInvestmentD.gt(0) ? totalUnleveredDistD.dividedBy(totalUnleveredInvestmentD).toNumber() : 0;
     
     // ========================================
     // 10. RETURN COMPLETE PRO FORMA
@@ -1359,10 +1372,10 @@ export class ProFormaEngineService {
       
       metrics: {
         goingInCapRate,
-        exitCapRate: exitCapRate * 100,
-        revenueGrowthRate: flatRevenueGrowthRate * 100,
-        expenseGrowthRate: flatExpenseGrowthRate * 100,
-        purchasePrice,
+        exitCapRate: exitCapRate.times(100).toNumber(),
+        revenueGrowthRate: flatRevenueGrowthRate.times(100).toNumber(),
+        expenseGrowthRate: flatExpenseGrowthRate.times(100).toNumber(),
+        purchasePrice: purchasePrice.toNumber(),
         exitValue,
         totalReturn: totalLeveredDistributions,
         irr: annualizedIrr,

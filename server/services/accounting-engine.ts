@@ -5,7 +5,7 @@
  * Intercompany Eliminations, Revenue Recognition (ASC 606)
  */
 
-import { db } from '../db';
+import { db, pool } from '../db';
 import { sql, eq, and, gte, lte, desc, asc, inArray, isNull, or } from 'drizzle-orm';
 import Decimal from 'decimal.js';
 import crypto from 'crypto';
@@ -516,14 +516,16 @@ class AccountingEngine {
     limit?: number;
     offset?: number;
   }): Promise<{ entries: JournalEntry[]; total: number }> {
-    const conditions: string[] = [`je.org_id = '${orgId}'`];
-    if (filters.status) conditions.push(`je.status = '${filters.status}'`);
-    if (filters.source) conditions.push(`je.source = '${filters.source}'`);
-    if (filters.startDate) conditions.push(`je.entry_date >= '${filters.startDate}'::date`);
-    if (filters.endDate) conditions.push(`je.entry_date <= '${filters.endDate}'::date`);
-    if (filters.search) conditions.push(`(je.memo ILIKE '%${filters.search}%' OR je.entry_number ILIKE '%${filters.search}%')`);
+    const conditions: string[] = [`je.org_id = $1`];
+    const params: any[] = [orgId];
+    let paramIdx = 2;
+    if (filters.status) { conditions.push(`je.status = $${paramIdx}`); params.push(filters.status); paramIdx++; }
+    if (filters.source) { conditions.push(`je.source = $${paramIdx}`); params.push(filters.source); paramIdx++; }
+    if (filters.startDate) { conditions.push(`je.entry_date >= $${paramIdx}::date`); params.push(filters.startDate); paramIdx++; }
+    if (filters.endDate) { conditions.push(`je.entry_date <= $${paramIdx}::date`); params.push(filters.endDate); paramIdx++; }
+    if (filters.search) { conditions.push(`(je.memo ILIKE $${paramIdx} OR je.entry_number ILIKE $${paramIdx})`); params.push(`%${filters.search}%`); paramIdx++; }
     if (filters.accountId) {
-      conditions.push(`EXISTS (SELECT 1 FROM journal_entry_lines jel WHERE jel.journal_entry_id = je.id AND jel.account_id = '${filters.accountId}')`);
+      conditions.push(`EXISTS (SELECT 1 FROM journal_entry_lines jel WHERE jel.journal_entry_id = je.id AND jel.account_id = $${paramIdx})`); params.push(filters.accountId); paramIdx++;
     }
 
     const where = conditions.join(' AND ');
@@ -531,8 +533,8 @@ class AccountingEngine {
     const offset = filters.offset || 0;
 
     const [entries, countResult] = await Promise.all([
-      db.execute(sql.raw(`SELECT je.* FROM journal_entries je WHERE ${where} ORDER BY je.entry_date DESC, je.created_at DESC LIMIT ${limit} OFFSET ${offset}`)),
-      db.execute(sql.raw(`SELECT count(*)::int as total FROM journal_entries je WHERE ${where}`)),
+      pool.query(`SELECT je.* FROM journal_entries je WHERE ${where} ORDER BY je.entry_date DESC, je.created_at DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`, [...params, limit, offset]),
+      pool.query(`SELECT count(*)::int as total FROM journal_entries je WHERE ${where}`, params),
     ]);
 
     return {
@@ -856,19 +858,21 @@ class AccountingEngine {
     limit?: number;
     offset?: number;
   }): Promise<{ invoices: ARInvoice[]; total: number }> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters.status) conditions.push(`status = '${filters.status}'`);
-    if (filters.customerId) conditions.push(`customer_id = '${filters.customerId}'`);
-    if (filters.startDate) conditions.push(`issue_date >= '${filters.startDate}'::date`);
-    if (filters.endDate) conditions.push(`issue_date <= '${filters.endDate}'::date`);
+    const conditions: string[] = [`org_id = $1`];
+    const params: any[] = [orgId];
+    let paramIdx = 2;
+    if (filters.status) { conditions.push(`status = $${paramIdx}`); params.push(filters.status); paramIdx++; }
+    if (filters.customerId) { conditions.push(`customer_id = $${paramIdx}`); params.push(filters.customerId); paramIdx++; }
+    if (filters.startDate) { conditions.push(`issue_date >= $${paramIdx}::date`); params.push(filters.startDate); paramIdx++; }
+    if (filters.endDate) { conditions.push(`issue_date <= $${paramIdx}::date`); params.push(filters.endDate); paramIdx++; }
 
     const where = conditions.join(' AND ');
     const limit = filters.limit || 50;
     const offset = filters.offset || 0;
 
     const [invoices, countResult] = await Promise.all([
-      db.execute(sql.raw(`SELECT * FROM ar_invoices WHERE ${where} ORDER BY issue_date DESC LIMIT ${limit} OFFSET ${offset}`)),
-      db.execute(sql.raw(`SELECT count(*)::int as total FROM ar_invoices WHERE ${where}`)),
+      pool.query(`SELECT * FROM ar_invoices WHERE ${where} ORDER BY issue_date DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`, [...params, limit, offset]),
+      pool.query(`SELECT count(*)::int as total FROM ar_invoices WHERE ${where}`, params),
     ]);
 
     return {
@@ -1161,20 +1165,22 @@ class AccountingEngine {
     limit?: number;
     offset?: number;
   }): Promise<{ bills: APBill[]; total: number }> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters.status) conditions.push(`status = '${filters.status}'`);
-    if (filters.vendorId) conditions.push(`vendor_id = '${filters.vendorId}'`);
-    if (filters.startDate) conditions.push(`issue_date >= '${filters.startDate}'::date`);
-    if (filters.endDate) conditions.push(`issue_date <= '${filters.endDate}'::date`);
-    if (filters.is1099Eligible !== undefined) conditions.push(`is_1099_eligible = ${filters.is1099Eligible}`);
+    const conditions: string[] = [`org_id = $1`];
+    const params: any[] = [orgId];
+    let paramIdx = 2;
+    if (filters.status) { conditions.push(`status = $${paramIdx}`); params.push(filters.status); paramIdx++; }
+    if (filters.vendorId) { conditions.push(`vendor_id = $${paramIdx}`); params.push(filters.vendorId); paramIdx++; }
+    if (filters.startDate) { conditions.push(`issue_date >= $${paramIdx}::date`); params.push(filters.startDate); paramIdx++; }
+    if (filters.endDate) { conditions.push(`issue_date <= $${paramIdx}::date`); params.push(filters.endDate); paramIdx++; }
+    if (filters.is1099Eligible !== undefined) { conditions.push(`is_1099_eligible = $${paramIdx}`); params.push(filters.is1099Eligible); paramIdx++; }
 
     const where = conditions.join(' AND ');
     const limit = filters.limit || 50;
     const offset = filters.offset || 0;
 
     const [bills, countResult] = await Promise.all([
-      db.execute(sql.raw(`SELECT * FROM ap_bills WHERE ${where} ORDER BY issue_date DESC LIMIT ${limit} OFFSET ${offset}`)),
-      db.execute(sql.raw(`SELECT count(*)::int as total FROM ap_bills WHERE ${where}`)),
+      pool.query(`SELECT * FROM ap_bills WHERE ${where} ORDER BY issue_date DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`, [...params, limit, offset]),
+      pool.query(`SELECT count(*)::int as total FROM ap_bills WHERE ${where}`, params),
     ]);
 
     return {
@@ -1653,23 +1659,27 @@ class AccountingEngine {
     assignedTo?: string;
   }, userId: string): Promise<MonthEndCloseStep> {
     const now = new Date();
-    const updates: string[] = [`updated_at = '${now.toISOString()}'`];
+    const updates: string[] = [];
+    const params: any[] = [];
+    let pIdx = 1;
 
+    updates.push(`updated_at = $${pIdx}`); params.push(now.toISOString()); pIdx++;
     if (data.status) {
-      updates.push(`status = '${data.status}'`);
+      updates.push(`status = $${pIdx}`); params.push(data.status); pIdx++;
       if (data.status === 'completed') {
-        updates.push(`completed_by = '${userId}'`);
-        updates.push(`completed_at = '${now.toISOString()}'`);
+        updates.push(`completed_by = $${pIdx}`); params.push(userId); pIdx++;
+        updates.push(`completed_at = $${pIdx}`); params.push(now.toISOString()); pIdx++;
       }
     }
-    if (data.notes !== undefined) updates.push(`notes = '${data.notes}'`);
-    if (data.assignedTo !== undefined) updates.push(`assigned_to = '${data.assignedTo}'`);
+    if (data.notes !== undefined) { updates.push(`notes = $${pIdx}`); params.push(data.notes); pIdx++; }
+    if (data.assignedTo !== undefined) { updates.push(`assigned_to = $${pIdx}`); params.push(data.assignedTo); pIdx++; }
 
-    await db.execute(sql.raw(`
+    params.push(stepId, closeId);
+    await pool.query(`
       UPDATE month_end_close_steps
       SET ${updates.join(', ')}
-      WHERE id = '${stepId}' AND close_id = '${closeId}'
-    `));
+      WHERE id = $${pIdx} AND close_id = $${pIdx + 1}
+    `, params);
 
     const result = await db.execute(sql`
       SELECT * FROM month_end_close_steps WHERE id = ${stepId} AND close_id = ${closeId}
@@ -1924,15 +1934,17 @@ class AccountingEngine {
   async listRevenueContracts(orgId: string, filters?: {
     status?: string; limit?: number; offset?: number;
   }): Promise<{ contracts: RevenueContract[]; total: number }> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters?.status) conditions.push(`status = '${filters.status}'`);
+    const conditions: string[] = [`org_id = $1`];
+    const params: any[] = [orgId];
+    let paramIdx = 2;
+    if (filters?.status) { conditions.push(`status = $${paramIdx}`); params.push(filters.status); paramIdx++; }
     const where = conditions.join(' AND ');
     const limit = filters?.limit || 50;
     const offset = filters?.offset || 0;
 
     const [contracts, countResult] = await Promise.all([
-      db.execute(sql.raw(`SELECT * FROM revenue_contracts WHERE ${where} ORDER BY start_date DESC LIMIT ${limit} OFFSET ${offset}`)),
-      db.execute(sql.raw(`SELECT count(*)::int as total FROM revenue_contracts WHERE ${where}`)),
+      pool.query(`SELECT * FROM revenue_contracts WHERE ${where} ORDER BY start_date DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`, [...params, limit, offset]),
+      pool.query(`SELECT count(*)::int as total FROM revenue_contracts WHERE ${where}`, params),
     ]);
 
     const results: RevenueContract[] = [];
@@ -2072,15 +2084,17 @@ class AccountingEngine {
     startDate?: string;
     endDate?: string;
   }): Promise<IntercompanyTransaction[]> {
-    const conditions: string[] = [`org_id = '${orgId}'`];
-    if (filters?.isEliminated !== undefined) conditions.push(`is_eliminated = ${filters.isEliminated}`);
-    if (filters?.entityId) conditions.push(`(from_entity_id = '${filters.entityId}' OR to_entity_id = '${filters.entityId}')`);
-    if (filters?.startDate) conditions.push(`transaction_date >= '${filters.startDate}'::date`);
-    if (filters?.endDate) conditions.push(`transaction_date <= '${filters.endDate}'::date`);
+    const conditions: string[] = [`org_id = $1`];
+    const params: any[] = [orgId];
+    let pIdx = 2;
+    if (filters?.isEliminated !== undefined) { conditions.push(`is_eliminated = $${pIdx}`); params.push(filters.isEliminated); pIdx++; }
+    if (filters?.entityId) { conditions.push(`(from_entity_id = $${pIdx} OR to_entity_id = $${pIdx})`); params.push(filters.entityId); pIdx++; }
+    if (filters?.startDate) { conditions.push(`transaction_date >= $${pIdx}::date`); params.push(filters.startDate); pIdx++; }
+    if (filters?.endDate) { conditions.push(`transaction_date <= $${pIdx}::date`); params.push(filters.endDate); pIdx++; }
 
-    const result = await db.execute(sql.raw(
-      `SELECT * FROM intercompany_transactions WHERE ${conditions.join(' AND ')} ORDER BY transaction_date DESC`
-    ));
+    const result = await pool.query(
+      `SELECT * FROM intercompany_transactions WHERE ${conditions.join(' AND ')} ORDER BY transaction_date DESC`, params
+    );
 
     return (result.rows as any[]).map(row => ({
       id: row.id, orgId: row.org_id,

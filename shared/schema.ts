@@ -27983,6 +27983,24 @@ export const capitalAccountEntries = pgTable("capital_account_entries", {
 export type CapitalAccountEntry = typeof capitalAccountEntries.$inferSelect;
 export type InsertCapitalAccountEntry = typeof capitalAccountEntries.$inferInsert;
 
+// ── B.5 Fund Ledger Entries (IMMUTABLE — use pool.query, not Drizzle) ──
+
+export const fundLedgerEntries = pgTable("fund_ledger_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  fundId: varchar("fund_id").notNull().references(() => fundsV2.id),
+  investorId: varchar("investor_id").references(() => fundInvestors.id),
+  entryType: varchar("entry_type").notNull(),
+  amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
+  description: text("description"),
+  referenceId: varchar("reference_id"),
+  effectiveDate: timestamp("effective_date").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: varchar("created_by"),
+});
+export type FundLedgerEntry = typeof fundLedgerEntries.$inferSelect;
+export type InsertFundLedgerEntry = typeof fundLedgerEntries.$inferInsert;
+
 // ── C.1 Tenant Portal ───────────────────────────────────────────────────
 
 export const tenantUsers = pgTable("tenant_users", {

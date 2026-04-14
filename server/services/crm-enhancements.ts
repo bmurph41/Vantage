@@ -11,7 +11,7 @@
  * - Quick VDR Creation from Deal
  */
 
-import { db } from '../db';
+import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import Decimal from 'decimal.js';
@@ -225,7 +225,7 @@ class CRMEnhancements {
 
     const placeholders = dealIds.map((_, i) => `$${i + 2}`).join(', ');
 
-    const result = await db.execute(sql.raw(`
+    const result = await pool.query(`
       SELECT
         d.id AS deal_id,
         d.name AS deal_name,
@@ -246,7 +246,7 @@ class CRMEnhancements {
       WHERE d.org_id = $1
         AND d.id IN (${placeholders})
       ORDER BY d.name ASC
-    `));
+    `, [orgId, ...dealIds]);
 
     return (result.rows as any[]).map(r => ({
       dealId: r.deal_id,
@@ -420,15 +420,17 @@ class CRMEnhancements {
       toDate?: Date;
     } = {}
   ): Promise<EmailEngagement> {
-    const conditions: string[] = [`e.org_id = '${orgId}'`];
-    if (filters.contactId) conditions.push(`e.contact_id = '${filters.contactId}'`);
-    if (filters.campaignId) conditions.push(`e.campaign_id = '${filters.campaignId}'`);
-    if (filters.fromDate) conditions.push(`e.sent_at >= '${filters.fromDate.toISOString()}'`);
-    if (filters.toDate) conditions.push(`e.sent_at <= '${filters.toDate.toISOString()}'`);
+    const conditions: string[] = [`e.org_id = $1`];
+    const params: any[] = [orgId];
+    let paramIdx = 2;
+    if (filters.contactId) { conditions.push(`e.contact_id = $${paramIdx}`); params.push(filters.contactId); paramIdx++; }
+    if (filters.campaignId) { conditions.push(`e.campaign_id = $${paramIdx}`); params.push(filters.campaignId); paramIdx++; }
+    if (filters.fromDate) { conditions.push(`e.sent_at >= $${paramIdx}`); params.push(filters.fromDate.toISOString()); paramIdx++; }
+    if (filters.toDate) { conditions.push(`e.sent_at <= $${paramIdx}`); params.push(filters.toDate.toISOString()); paramIdx++; }
 
     const where = conditions.join(' AND ');
 
-    const result = await db.execute(sql.raw(`
+    const result = await pool.query(`
       SELECT
         COUNT(*) AS total_sent,
         COUNT(CASE WHEN e.open_count > 0 THEN 1 END) AS total_opened,
@@ -437,7 +439,7 @@ class CRMEnhancements {
         COUNT(DISTINCT CASE WHEN e.click_count > 0 THEN e.contact_id END) AS unique_clicks
       FROM crm_emails e
       WHERE ${where}
-    `));
+    `, params);
 
     const stats = (result.rows as any[])[0] || {};
     const totalSent = Number(stats.total_sent || 0);
@@ -445,7 +447,7 @@ class CRMEnhancements {
     const totalClicked = Number(stats.total_clicked || 0);
 
     // Daily breakdown
-    const dailyResult = await db.execute(sql.raw(`
+    const dailyResult = await pool.query(`
       SELECT
         DATE(et.created_at) AS date,
         COUNT(CASE WHEN et.tracking_type = 'open' THEN 1 END) AS opens,
@@ -456,7 +458,7 @@ class CRMEnhancements {
       GROUP BY DATE(et.created_at)
       ORDER BY DATE(et.created_at) DESC
       LIMIT 90
-    `));
+    `, params);
 
     return {
       totalSent,
@@ -822,22 +824,26 @@ class CRMEnhancements {
     }>
   ): Promise<void> {
     const now = new Date();
-    const sets: string[] = [`updated_at = '${now.toISOString()}'`];
+    const sets: string[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
 
-    if (data.title !== undefined) sets.push(`title = '${data.title.replace(/'/g, "''")}'`);
-    if (data.description !== undefined) sets.push(`description = '${(data.description || '').replace(/'/g, "''")}'`);
-    if (data.startTime) sets.push(`start_time = '${data.startTime.toISOString()}'`);
-    if (data.endTime) sets.push(`end_time = '${data.endTime.toISOString()}'`);
-    if (data.location !== undefined) sets.push(`location = '${(data.location || '').replace(/'/g, "''")}'`);
-    if (data.attendees) sets.push(`attendees = '${JSON.stringify(data.attendees)}'::jsonb`);
-    if (data.linkedTaskId !== undefined) sets.push(`linked_task_id = '${data.linkedTaskId}'`);
-    if (data.linkedDealId !== undefined) sets.push(`linked_deal_id = '${data.linkedDealId}'`);
+    sets.push(`updated_at = $${paramIdx}`); params.push(now.toISOString()); paramIdx++;
+    if (data.title !== undefined) { sets.push(`title = $${paramIdx}`); params.push(data.title); paramIdx++; }
+    if (data.description !== undefined) { sets.push(`description = $${paramIdx}`); params.push(data.description || ''); paramIdx++; }
+    if (data.startTime) { sets.push(`start_time = $${paramIdx}`); params.push(data.startTime.toISOString()); paramIdx++; }
+    if (data.endTime) { sets.push(`end_time = $${paramIdx}`); params.push(data.endTime.toISOString()); paramIdx++; }
+    if (data.location !== undefined) { sets.push(`location = $${paramIdx}`); params.push(data.location || ''); paramIdx++; }
+    if (data.attendees) { sets.push(`attendees = $${paramIdx}::jsonb`); params.push(JSON.stringify(data.attendees)); paramIdx++; }
+    if (data.linkedTaskId !== undefined) { sets.push(`linked_task_id = $${paramIdx}`); params.push(data.linkedTaskId); paramIdx++; }
+    if (data.linkedDealId !== undefined) { sets.push(`linked_deal_id = $${paramIdx}`); params.push(data.linkedDealId); paramIdx++; }
 
-    await db.execute(sql.raw(`
+    params.push(eventId, orgId);
+    await pool.query(`
       UPDATE calendar_events
       SET ${sets.join(', ')}
-      WHERE id = '${eventId}' AND org_id = '${orgId}'
-    `));
+      WHERE id = $${paramIdx} AND org_id = $${paramIdx + 1}
+    `, params);
   }
 
   /**
@@ -1362,23 +1368,25 @@ class CRMEnhancements {
     // Resolve recipients from segment query or explicit list
     let contactIds: string[] = data.contactIds || [];
     if (data.segmentQuery && !contactIds.length) {
-      const segResult = await db.execute(sql.raw(`
+      // NOTE: segmentQuery is a server-generated filter expression, not direct user input.
+      // Parameterize orgId; segmentQuery is trusted internal SQL built by the segment builder.
+      const segResult = await pool.query(`
         SELECT id FROM crm_contacts
-        WHERE org_id = '${orgId}' AND deleted_at IS NULL
+        WHERE org_id = $1 AND deleted_at IS NULL
           AND unsubscribed_at IS NULL
           AND ${data.segmentQuery}
-      `));
+      `, [orgId]);
       contactIds = (segResult.rows as any[]).map(r => r.id);
     }
 
     // Filter out unsubscribed contacts
     if (contactIds.length) {
       const placeholders = contactIds.map((_, i) => `$${i + 2}`).join(', ');
-      const filterResult = await db.execute(sql.raw(`
+      const filterResult = await pool.query(`
         SELECT id FROM crm_contacts
         WHERE org_id = $1 AND id IN (${placeholders})
           AND unsubscribed_at IS NULL AND deleted_at IS NULL
-      `));
+      `, [orgId, ...contactIds]);
       contactIds = (filterResult.rows as any[]).map(r => (r as any).id);
     }
 
@@ -1467,11 +1475,12 @@ class CRMEnhancements {
     if (data.contactIds?.length) {
       recipientCount = data.contactIds.length;
     } else if (data.segmentQuery) {
-      const countResult = await db.execute(sql.raw(`
+      // NOTE: segmentQuery is a server-generated filter expression, not direct user input.
+      const countResult = await pool.query(`
         SELECT COUNT(*) AS cnt FROM crm_contacts
-        WHERE org_id = '${orgId}' AND deleted_at IS NULL
+        WHERE org_id = $1 AND deleted_at IS NULL
           AND unsubscribed_at IS NULL AND ${data.segmentQuery}
-      `));
+      `, [orgId]);
       recipientCount = Number((countResult.rows as any[])[0]?.cnt || 0);
     }
 

@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js';
-import { db } from '../db';
+import { db, pool } from '../db';
 import {
   funds,
   fundInvestors,
@@ -33,6 +33,9 @@ import {
   type InsertFundWaterfallCalculation,
 } from '@shared/schema';
 import { eq, and, desc, asc, sql, gte, lte, inArray, sum } from 'drizzle-orm';
+
+/** Transaction-aware DB handle — either the root `db` or a `tx` from db.transaction() */
+type DbOrTx = typeof db;
 
 export interface FundMetrics {
   committedCapital: number;
@@ -1002,16 +1005,18 @@ export class FundService {
     orgId: string,
     fundId: string,
     result: WaterfallDistributionResult,
-    metrics: FundMetrics
+    metrics: FundMetrics,
+    txn?: DbOrTx
   ): Promise<FundWaterfallCalculation> {
-    await db.update(fundWaterfallCalculations)
+    const d = txn || db;
+    await d.update(fundWaterfallCalculations)
       .set({ isLatest: false })
       .where(and(
         eq(fundWaterfallCalculations.fundId, fundId),
         eq(fundWaterfallCalculations.isLatest, true)
       ));
 
-    const [saved] = await db.insert(fundWaterfallCalculations).values({
+    const [saved] = await d.insert(fundWaterfallCalculations).values({
       orgId,
       fundId,
       calculationDate: new Date(),
@@ -1124,13 +1129,15 @@ export class FundService {
   private async updateFundCalledCapital(
     orgId: string,
     fundId: string,
-    additionalAmount: number
+    additionalAmount: number,
+    txn?: DbOrTx
   ): Promise<void> {
+    const d = txn || db;
     const fund = await this.getFund(orgId, fundId);
     if (!fund) return;
 
     const current = dn(fund.calledCapital);
-    await db.update(funds)
+    await d.update(funds)
       .set({
         calledCapital: String(current + additionalAmount),
         updatedAt: new Date(),
@@ -1141,13 +1148,15 @@ export class FundService {
   private async updateFundDistributedCapital(
     orgId: string,
     fundId: string,
-    additionalAmount: number
+    additionalAmount: number,
+    txn?: DbOrTx
   ): Promise<void> {
+    const d = txn || db;
     const fund = await this.getFund(orgId, fundId);
     if (!fund) return;
 
     const current = dn(fund.distributedCapital);
-    await db.update(funds)
+    await d.update(funds)
       .set({
         distributedCapital: String(current + additionalAmount),
         updatedAt: new Date(),
@@ -1175,15 +1184,17 @@ export class FundService {
   private async updateInvestorCalledCapital(
     orgId: string,
     investorId: string,
-    additionalAmount: number
+    additionalAmount: number,
+    txn?: DbOrTx
   ): Promise<void> {
+    const d = txn || db;
     const investor = await this.getInvestor(orgId, investorId);
     if (!investor) return;
 
     const currentCalled = dn(investor.calledCapital);
     const commitment = dn(investor.commitmentAmount);
 
-    await db.update(fundInvestors)
+    await d.update(fundInvestors)
       .set({
         calledCapital: String(currentCalled + additionalAmount),
         unfundedCommitment: String(commitment - (currentCalled + additionalAmount)),
@@ -1196,15 +1207,17 @@ export class FundService {
   private async updateInvestorDistributedCapital(
     orgId: string,
     investorId: string,
-    additionalAmount: number
+    additionalAmount: number,
+    txn?: DbOrTx
   ): Promise<void> {
+    const d = txn || db;
     const investor = await this.getInvestor(orgId, investorId);
     if (!investor) return;
 
     const currentDistributed = dn(investor.distributedCapital);
     const currentBalance = dn(investor.capitalAccountBalance);
 
-    await db.update(fundInvestors)
+    await d.update(fundInvestors)
       .set({
         distributedCapital: String(currentDistributed + additionalAmount),
         capitalAccountBalance: String(currentBalance - additionalAmount),
@@ -1235,98 +1248,100 @@ export class FundService {
     totalAccrued: number;
     details: { investorId: string; investorName: string; accrualAmount: number; newAccruedBalance: number }[];
   }> {
-    const fund = await this.getFund(orgId, fundId);
-    if (!fund) throw new Error('Fund not found');
+    return await db.transaction(async (tx) => {
+      const fund = await this.getFund(orgId, fundId);
+      if (!fund) throw new Error('Fund not found');
 
-    const investors = await this.getInvestorsByFund(orgId, fundId);
-    const prefRate = dn(fund.preferredReturn, '0.08');
-    const compounding = options.compoundingMethod || 'simple';
-    const periodMonths = options.periodMonths || 3;
-    const periodFraction = periodMonths / 12;
-    const asOfDate = options.asOfDate || new Date();
+      const investors = await this.getInvestorsByFund(orgId, fundId);
+      const prefRate = dn(fund.preferredReturn, '0.08');
+      const compounding = options.compoundingMethod || 'simple';
+      const periodMonths = options.periodMonths || 3;
+      const periodFraction = periodMonths / 12;
+      const asOfDate = options.asOfDate || new Date();
 
-    const details: { investorId: string; investorName: string; accrualAmount: number; newAccruedBalance: number }[] = [];
-    let totalAccrued = 0;
+      const details: { investorId: string; investorName: string; accrualAmount: number; newAccruedBalance: number }[] = [];
+      let totalAccrued = 0;
 
-    for (const investor of investors) {
-      if (!investor.isActive) continue;
+      for (const investor of investors) {
+        if (!investor.isActive) continue;
 
-      const calledCapital = dn(investor.calledCapital);
-      const distributedCapital = dn(investor.distributedCapital);
-      const returnedCapital = dn(investor.returnedCapital);
-      const currentAccrued = dn(investor.preferredReturnAccrued);
-      const currentPaid = dn(investor.preferredReturnPaid);
+        const calledCapital = dn(investor.calledCapital);
+        const distributedCapital = dn(investor.distributedCapital);
+        const returnedCapital = dn(investor.returnedCapital);
+        const currentAccrued = dn(investor.preferredReturnAccrued);
+        const currentPaid = dn(investor.preferredReturnPaid);
 
-      // Unreturned capital basis for preferred return calculation
-      const unreturnedCapital = calledCapital - returnedCapital;
-      if (unreturnedCapital <= 0) continue;
+        // Unreturned capital basis for preferred return calculation
+        const unreturnedCapital = calledCapital - returnedCapital;
+        if (unreturnedCapital <= 0) continue;
 
-      // Include unpaid accrued pref in compounding base
-      const unpaidPref = currentAccrued - currentPaid;
+        // Include unpaid accrued pref in compounding base
+        const unpaidPref = currentAccrued - currentPaid;
 
-      let accrualAmount: number;
+        let accrualAmount: number;
 
-      switch (compounding) {
-        case 'annual':
-          // Compound annually: accrual on (unreturned capital + unpaid pref) for the period
-          accrualAmount = (unreturnedCapital + unpaidPref) * prefRate * periodFraction;
-          break;
-        case 'quarterly':
-          // Compound quarterly: (1 + r/4)^periods - 1 applied to base
-          accrualAmount = (unreturnedCapital + unpaidPref) * (Math.pow(1 + prefRate / 4, periodMonths / 3) - 1);
-          break;
-        case 'continuous':
-          // Continuous compounding: e^(rt) - 1 applied to base
-          accrualAmount = (unreturnedCapital + unpaidPref) * (Math.exp(prefRate * periodFraction) - 1);
-          break;
-        default: // simple
-          accrualAmount = unreturnedCapital * prefRate * periodFraction;
-          break;
+        switch (compounding) {
+          case 'annual':
+            // Compound annually: accrual on (unreturned capital + unpaid pref) for the period
+            accrualAmount = (unreturnedCapital + unpaidPref) * prefRate * periodFraction;
+            break;
+          case 'quarterly':
+            // Compound quarterly: (1 + r/4)^periods - 1 applied to base
+            accrualAmount = (unreturnedCapital + unpaidPref) * (Math.pow(1 + prefRate / 4, periodMonths / 3) - 1);
+            break;
+          case 'continuous':
+            // Continuous compounding: e^(rt) - 1 applied to base
+            accrualAmount = (unreturnedCapital + unpaidPref) * (Math.exp(prefRate * periodFraction) - 1);
+            break;
+          default: // simple
+            accrualAmount = unreturnedCapital * prefRate * periodFraction;
+            break;
+        }
+
+        accrualAmount = Math.round(accrualAmount * 100) / 100;
+        if (accrualAmount <= 0) continue;
+
+        const newAccruedBalance = currentAccrued + accrualAmount;
+
+        // Update investor record
+        await tx.update(fundInvestors)
+          .set({
+            preferredReturnAccrued: String(newAccruedBalance),
+            updatedAt: new Date(),
+          })
+          .where(eq(fundInvestors.id, investor.id));
+
+        details.push({
+          investorId: investor.id,
+          investorName: investor.investorName,
+          accrualAmount,
+          newAccruedBalance,
+        });
+
+        totalAccrued += accrualAmount;
       }
 
-      accrualAmount = Math.round(accrualAmount * 100) / 100;
-      if (accrualAmount <= 0) continue;
+      // Record as capital movement for the fund
+      if (totalAccrued > 0) {
+        await tx.insert(fundCapitalMovements).values({
+          orgId,
+          fundId,
+          movementType: 'fee',
+          movementDate: asOfDate,
+          amount: String(totalAccrued),
+          preferredReturn: String(totalAccrued),
+          status: 'completed',
+          description: `Preferred return accrual (${compounding}) for ${periodMonths}-month period ending ${asOfDate.toISOString().split('T')[0]}`,
+          createdBy: null,
+        });
+      }
 
-      const newAccruedBalance = currentAccrued + accrualAmount;
-
-      // Update investor record
-      await db.update(fundInvestors)
-        .set({
-          preferredReturnAccrued: String(newAccruedBalance),
-          updatedAt: new Date(),
-        })
-        .where(eq(fundInvestors.id, investor.id));
-
-      details.push({
-        investorId: investor.id,
-        investorName: investor.investorName,
-        accrualAmount,
-        newAccruedBalance,
-      });
-
-      totalAccrued += accrualAmount;
-    }
-
-    // Record as capital movement for the fund
-    if (totalAccrued > 0) {
-      await db.insert(fundCapitalMovements).values({
-        orgId,
-        fundId,
-        movementType: 'fee',
-        movementDate: asOfDate,
-        amount: String(totalAccrued),
-        preferredReturn: String(totalAccrued),
-        status: 'completed',
-        description: `Preferred return accrual (${compounding}) for ${periodMonths}-month period ending ${asOfDate.toISOString().split('T')[0]}`,
-        createdBy: null,
-      });
-    }
-
-    return {
-      investorsAccrued: details.length,
-      totalAccrued: Math.round(totalAccrued * 100) / 100,
-      details,
-    };
+      return {
+        investorsAccrued: details.length,
+        totalAccrued: Math.round(totalAccrued * 100) / 100,
+        details,
+      };
+    });
   }
 
   // ============================================================================
@@ -1476,106 +1491,108 @@ export class FundService {
     }[];
     totalAllocated: number;
   }> {
-    const fund = await this.getFund(orgId, fundId);
-    if (!fund) throw new Error('Fund not found');
+    return await db.transaction(async (tx) => {
+      const fund = await this.getFund(orgId, fundId);
+      if (!fund) throw new Error('Fund not found');
 
-    const investors = await this.getInvestorsByFund(orgId, fundId);
-    if (investors.length === 0) throw new Error('No active investors in fund');
+      const investors = await this.getInvestorsByFund(orgId, fundId);
+      if (investors.length === 0) throw new Error('No active investors in fund');
 
-    const totalCommitment = investors.reduce(
-      (sum, inv) => sum + dn(inv.commitmentAmount),
-      0
-    );
+      const totalCommitment = investors.reduce(
+        (sum, inv) => sum + dn(inv.commitmentAmount),
+        0
+      );
 
-    // Validate call doesn't exceed unfunded commitments
-    const totalUnfunded = investors.reduce(
-      (sum, inv) => sum + dn(inv.unfundedCommitment),
-      0
-    );
+      // Validate call doesn't exceed unfunded commitments
+      const totalUnfunded = investors.reduce(
+        (sum, inv) => sum + dn(inv.unfundedCommitment),
+        0
+      );
 
-    if (data.totalAmount > totalUnfunded) {
-      throw new Error(`Capital call of $${data.totalAmount.toLocaleString()} exceeds total unfunded commitments of $${totalUnfunded.toLocaleString()}`);
-    }
+      if (data.totalAmount > totalUnfunded) {
+        throw new Error(`Capital call of $${data.totalAmount.toLocaleString()} exceeds total unfunded commitments of $${totalUnfunded.toLocaleString()}`);
+      }
 
-    // Determine call number
-    const existingMovements = await this.getCapitalMovementsByFund(orgId, fundId);
-    const callCount = existingMovements.filter(m => m.movementType === 'call').length;
-    const callNumber = data.callNumber || callCount + 1;
+      // Determine call number
+      const existingMovements = await this.getCapitalMovementsByFund(orgId, fundId);
+      const callCount = existingMovements.filter(m => m.movementType === 'call').length;
+      const callNumber = data.callNumber || callCount + 1;
 
-    // Create the fund-level capital movement
-    const [capitalCall] = await db.insert(fundCapitalMovements).values({
-      orgId,
-      fundId,
-      movementType: 'call',
-      movementDate: new Date(),
-      dueDate: new Date(data.dueDate),
-      amount: String(data.totalAmount),
-      callNumber,
-      callPurpose: data.purpose as any,
-      dealAllocationId: data.dealAllocationId || null,
-      status: 'pending',
-      description: data.notes || `Capital call #${callNumber}: ${data.purpose}`,
-      createdBy: userId,
-    }).returning();
-
-    // Generate per-investor line items
-    const investorLineItems: {
-      investorId: string;
-      investorName: string;
-      commitmentPct: number;
-      amountCalled: number;
-      unfundedBefore: number;
-      unfundedAfter: number;
-    }[] = [];
-
-    let totalAllocated = 0;
-
-    for (const investor of investors) {
-      const commitment = dn(investor.commitmentAmount);
-      const commitmentPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
-      const unfundedBefore = dn(investor.unfundedCommitment);
-
-      // Calculate pro-rata share, but cap at investor's unfunded commitment
-      let amountCalled = Math.round(data.totalAmount * commitmentPct * 100) / 100;
-      amountCalled = Math.min(amountCalled, unfundedBefore);
-
-      if (amountCalled <= 0) continue;
-
-      const unfundedAfter = unfundedBefore - amountCalled;
-
-      // Create per-investor capital movement
-      await db.insert(fundCapitalMovements).values({
+      // Create the fund-level capital movement
+      const [capitalCall] = await tx.insert(fundCapitalMovements).values({
         orgId,
         fundId,
-        fundInvestorId: investor.id,
         movementType: 'call',
         movementDate: new Date(),
         dueDate: new Date(data.dueDate),
-        amount: String(amountCalled),
+        amount: String(data.totalAmount),
         callNumber,
         callPurpose: data.purpose as any,
+        dealAllocationId: data.dealAllocationId || null,
         status: 'pending',
-        description: `Capital call #${callNumber} - ${investor.investorName}`,
+        description: data.notes || `Capital call #${callNumber}: ${data.purpose}`,
         createdBy: userId,
-      });
+      }).returning();
 
-      investorLineItems.push({
-        investorId: investor.id,
-        investorName: investor.investorName,
-        commitmentPct: Math.round(commitmentPct * 10000) / 100,
-        amountCalled,
-        unfundedBefore,
-        unfundedAfter,
-      });
+      // Generate per-investor line items
+      const investorLineItems: {
+        investorId: string;
+        investorName: string;
+        commitmentPct: number;
+        amountCalled: number;
+        unfundedBefore: number;
+        unfundedAfter: number;
+      }[] = [];
 
-      totalAllocated += amountCalled;
-    }
+      let totalAllocated = 0;
 
-    return {
-      capitalCall,
-      investorLineItems,
-      totalAllocated: Math.round(totalAllocated * 100) / 100,
-    };
+      for (const investor of investors) {
+        const commitment = dn(investor.commitmentAmount);
+        const commitmentPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
+        const unfundedBefore = dn(investor.unfundedCommitment);
+
+        // Calculate pro-rata share, but cap at investor's unfunded commitment
+        let amountCalled = Math.round(data.totalAmount * commitmentPct * 100) / 100;
+        amountCalled = Math.min(amountCalled, unfundedBefore);
+
+        if (amountCalled <= 0) continue;
+
+        const unfundedAfter = unfundedBefore - amountCalled;
+
+        // Create per-investor capital movement
+        await tx.insert(fundCapitalMovements).values({
+          orgId,
+          fundId,
+          fundInvestorId: investor.id,
+          movementType: 'call',
+          movementDate: new Date(),
+          dueDate: new Date(data.dueDate),
+          amount: String(amountCalled),
+          callNumber,
+          callPurpose: data.purpose as any,
+          status: 'pending',
+          description: `Capital call #${callNumber} - ${investor.investorName}`,
+          createdBy: userId,
+        });
+
+        investorLineItems.push({
+          investorId: investor.id,
+          investorName: investor.investorName,
+          commitmentPct: Math.round(commitmentPct * 10000) / 100,
+          amountCalled,
+          unfundedBefore,
+          unfundedAfter,
+        });
+
+        totalAllocated += amountCalled;
+      }
+
+      return {
+        capitalCall,
+        investorLineItems,
+        totalAllocated: Math.round(totalAllocated * 100) / 100,
+      };
+    });
   }
 
   /**
@@ -1590,59 +1607,61 @@ export class FundService {
     investorsUpdated: number;
     totalReceived: number;
   }> {
-    const fund = await this.getFund(orgId, fundId);
-    if (!fund) throw new Error('Fund not found');
+    return await db.transaction(async (tx) => {
+      const fund = await this.getFund(orgId, fundId);
+      if (!fund) throw new Error('Fund not found');
 
-    // Find all movements for this call
-    const movements = await db.select()
-      .from(fundCapitalMovements)
-      .where(and(
-        eq(fundCapitalMovements.fundId, fundId),
-        eq(fundCapitalMovements.orgId, orgId),
-        eq(fundCapitalMovements.callNumber, callNumber),
-        eq(fundCapitalMovements.movementType, 'call'),
-      ));
+      // Find all movements for this call
+      const movements = await tx.select()
+        .from(fundCapitalMovements)
+        .where(and(
+          eq(fundCapitalMovements.fundId, fundId),
+          eq(fundCapitalMovements.orgId, orgId),
+          eq(fundCapitalMovements.callNumber, callNumber),
+          eq(fundCapitalMovements.movementType, 'call'),
+        ));
 
-    let investorsUpdated = 0;
-    let totalReceived = 0;
+      let investorsUpdated = 0;
+      let totalReceived = 0;
 
-    for (const movement of movements) {
-      if (movement.status === 'completed') continue;
+      for (const movement of movements) {
+        if (movement.status === 'completed') continue;
 
-      // Mark movement as completed
-      await db.update(fundCapitalMovements)
-        .set({ status: 'completed', updatedAt: new Date() })
-        .where(eq(fundCapitalMovements.id, movement.id));
+        // Mark movement as completed
+        await tx.update(fundCapitalMovements)
+          .set({ status: 'completed', updatedAt: new Date() })
+          .where(eq(fundCapitalMovements.id, movement.id));
 
-      const amount = dn(movement.amount);
+        const amount = dn(movement.amount);
 
-      // Update investor balances if investor-specific
-      if (movement.fundInvestorId) {
-        await this.updateInvestorCalledCapital(orgId, movement.fundInvestorId, amount);
-        investorsUpdated++;
+        // Update investor balances if investor-specific
+        if (movement.fundInvestorId) {
+          await this.updateInvestorCalledCapital(orgId, movement.fundInvestorId, amount, tx);
+          investorsUpdated++;
+        }
+
+        totalReceived += amount;
       }
 
-      totalReceived += amount;
-    }
+      // Update fund-level called capital
+      if (totalReceived > 0) {
+        await this.updateFundCalledCapital(orgId, fundId, totalReceived, tx);
 
-    // Update fund-level called capital
-    if (totalReceived > 0) {
-      await this.updateFundCalledCapital(orgId, fundId, totalReceived);
+        // Create cash flow entry
+        await tx.insert(fundCashFlows).values({
+          orgId,
+          fundId,
+          flowDate: new Date(),
+          flowType: 'inflow',
+          grossAmount: String(totalReceived),
+          netAmount: String(totalReceived),
+          investmentAmount: String(totalReceived),
+          description: `Capital call #${callNumber} completed: $${totalReceived.toLocaleString()}`,
+        });
+      }
 
-      // Create cash flow entry
-      await db.insert(fundCashFlows).values({
-        orgId,
-        fundId,
-        flowDate: new Date(),
-        flowType: 'inflow',
-        grossAmount: String(totalReceived),
-        netAmount: String(totalReceived),
-        investmentAmount: String(totalReceived),
-        description: `Capital call #${callNumber} completed: $${totalReceived.toLocaleString()}`,
-      });
-    }
-
-    return { investorsUpdated, totalReceived: Math.round(totalReceived * 100) / 100 };
+      return { investorsUpdated, totalReceived: Math.round(totalReceived * 100) / 100 };
+    });
   }
 
   // ============================================================================
@@ -1679,159 +1698,161 @@ export class FundService {
     totalDistributed: number;
     gpCarry: number;
   }> {
-    const fund = await this.getFund(orgId, fundId);
-    if (!fund) throw new Error('Fund not found');
+    return await db.transaction(async (tx) => {
+      const fund = await this.getFund(orgId, fundId);
+      if (!fund) throw new Error('Fund not found');
 
-    const investors = await this.getInvestorsByFund(orgId, fundId);
-    const metrics = await this.calculateFundMetrics(orgId, fundId);
+      const investors = await this.getInvestorsByFund(orgId, fundId);
+      const metrics = await this.calculateFundMetrics(orgId, fundId);
 
-    // Run waterfall
-    const yearsHeld = data.yearsHeld || (fund.investmentPeriodYears || 5);
-    const waterfallResult = this.calculateWaterfallDistribution(
-      data.totalProceeds,
-      metrics.calledCapital,
-      dn(fund.preferredReturn, '0.08'),
-      dn(fund.gpCatchUpPct, '1.00'),
-      fund.promoteTiers || [{ irrHurdle: 0.08, gpSplit: 20, lpSplit: 80 }],
-      yearsHeld
-    );
+      // Run waterfall
+      const yearsHeld = data.yearsHeld || (fund.investmentPeriodYears || 5);
+      const waterfallResult = this.calculateWaterfallDistribution(
+        data.totalProceeds,
+        metrics.calledCapital,
+        dn(fund.preferredReturn, '0.08'),
+        dn(fund.gpCatchUpPct, '1.00'),
+        fund.promoteTiers || [{ irrHurdle: 0.08, gpSplit: 20, lpSplit: 80 }],
+        yearsHeld
+      );
 
-    // Store waterfall calculation
-    await this.storeWaterfallCalculation(orgId, fundId, waterfallResult, metrics);
+      // Store waterfall calculation
+      await this.storeWaterfallCalculation(orgId, fundId, waterfallResult, metrics, tx);
 
-    // Calculate ownership percentages
-    const totalCommitment = investors.reduce(
-      (sum, inv) => sum + dn(inv.commitmentAmount),
-      0
-    );
+      // Calculate ownership percentages
+      const totalCommitment = investors.reduce(
+        (sum, inv) => sum + dn(inv.commitmentAmount),
+        0
+      );
 
-    const investorDistributions: {
-      investorId: string;
-      investorName: string;
-      ownershipPct: number;
-      returnOfCapital: number;
-      preferredReturn: number;
-      profitShare: number;
-      carriedInterest: number;
-      totalDistribution: number;
-    }[] = [];
+      const investorDistributions: {
+        investorId: string;
+        investorName: string;
+        ownershipPct: number;
+        returnOfCapital: number;
+        preferredReturn: number;
+        profitShare: number;
+        carriedInterest: number;
+        totalDistribution: number;
+      }[] = [];
 
-    let totalDistributed = 0;
+      let totalDistributed = 0;
 
-    for (const investor of investors) {
-      const commitment = dn(investor.commitmentAmount);
-      const ownershipPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
-      const isGp = investor.investorType === 'gp';
+      for (const investor of investors) {
+        const commitment = dn(investor.commitmentAmount);
+        const ownershipPct = totalCommitment > 0 ? commitment / totalCommitment : 0;
+        const isGp = investor.investorType === 'gp';
 
-      // LP gets pro-rata share of LP distributions
-      // GP gets their carry plus pro-rata share of any GP commitment returns
-      let returnOfCapital: number;
-      let preferredReturn: number;
-      let profitShare: number;
-      let carriedInterest: number;
+        // LP gets pro-rata share of LP distributions
+        // GP gets their carry plus pro-rata share of any GP commitment returns
+        let returnOfCapital: number;
+        let preferredReturn: number;
+        let profitShare: number;
+        let carriedInterest: number;
 
-      if (isGp) {
-        returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
-        preferredReturn = waterfallResult.preferredReturn * ownershipPct;
-        carriedInterest = waterfallResult.totalGpDistribution - (waterfallResult.returnOfCapital * ownershipPct);
-        profitShare = 0;
-      } else {
-        returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
-        preferredReturn = waterfallResult.preferredReturn * ownershipPct;
+        if (isGp) {
+          returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
+          preferredReturn = waterfallResult.preferredReturn * ownershipPct;
+          carriedInterest = waterfallResult.totalGpDistribution - (waterfallResult.returnOfCapital * ownershipPct);
+          profitShare = 0;
+        } else {
+          returnOfCapital = waterfallResult.returnOfCapital * ownershipPct;
+          preferredReturn = waterfallResult.preferredReturn * ownershipPct;
 
-        // LP profit share is their pro-rata of remaining LP distributions after ROC and pref
-        const lpRemainder = waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn;
-        profitShare = lpRemainder > 0 ? lpRemainder * ownershipPct : 0;
-        carriedInterest = 0;
+          // LP profit share is their pro-rata of remaining LP distributions after ROC and pref
+          const lpRemainder = waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn;
+          profitShare = lpRemainder > 0 ? lpRemainder * ownershipPct : 0;
+          carriedInterest = 0;
+        }
+
+        const totalDistribution = Math.round((returnOfCapital + preferredReturn + profitShare + carriedInterest) * 100) / 100;
+
+        // Create distribution capital movement for this investor
+        await tx.insert(fundCapitalMovements).values({
+          orgId,
+          fundId,
+          fundInvestorId: investor.id,
+          movementType: 'distribution',
+          movementDate: new Date(),
+          amount: String(totalDistribution),
+          returnOfCapital: String(Math.round(returnOfCapital * 100) / 100),
+          preferredReturn: String(Math.round(preferredReturn * 100) / 100),
+          carriedInterest: String(Math.round(carriedInterest * 100) / 100),
+          dealAllocationId: data.dealAllocationId || null,
+          status: 'completed',
+          description: `${data.distributionType} distribution - ${investor.investorName}`,
+          createdBy: userId,
+        });
+
+        // Update investor balances
+        await this.updateInvestorDistributedCapital(orgId, investor.id, totalDistribution, tx);
+
+        // Update preferred return paid
+        if (preferredReturn > 0) {
+          const currentPrefPaid = dn(investor.preferredReturnPaid);
+          await tx.update(fundInvestors)
+            .set({
+              preferredReturnPaid: String(currentPrefPaid + preferredReturn),
+              updatedAt: new Date(),
+            })
+            .where(eq(fundInvestors.id, investor.id));
+        }
+
+        // Update carried interest paid (GP only)
+        if (carriedInterest > 0 && isGp) {
+          const currentCarryPaid = dn(investor.carriedInterestPaid);
+          const currentCarryEarned = dn(investor.carriedInterestEarned);
+          await tx.update(fundInvestors)
+            .set({
+              carriedInterestEarned: String(Math.max(currentCarryEarned, currentCarryPaid + carriedInterest)),
+              carriedInterestPaid: String(currentCarryPaid + carriedInterest),
+              updatedAt: new Date(),
+            })
+            .where(eq(fundInvestors.id, investor.id));
+        }
+
+        investorDistributions.push({
+          investorId: investor.id,
+          investorName: investor.investorName,
+          ownershipPct: Math.round(ownershipPct * 10000) / 100,
+          returnOfCapital: Math.round(returnOfCapital * 100) / 100,
+          preferredReturn: Math.round(preferredReturn * 100) / 100,
+          profitShare: Math.round(profitShare * 100) / 100,
+          carriedInterest: Math.round(carriedInterest * 100) / 100,
+          totalDistribution,
+        });
+
+        totalDistributed += totalDistribution;
       }
 
-      const totalDistribution = Math.round((returnOfCapital + preferredReturn + profitShare + carriedInterest) * 100) / 100;
+      // Update fund-level distributed capital
+      await this.updateFundDistributedCapital(orgId, fundId, totalDistributed, tx);
 
-      // Create distribution capital movement for this investor
-      await db.insert(fundCapitalMovements).values({
+      // Create cash flow entry
+      await tx.insert(fundCashFlows).values({
         orgId,
         fundId,
-        fundInvestorId: investor.id,
-        movementType: 'distribution',
-        movementDate: new Date(),
-        amount: String(totalDistribution),
-        returnOfCapital: String(Math.round(returnOfCapital * 100) / 100),
-        preferredReturn: String(Math.round(preferredReturn * 100) / 100),
-        carriedInterest: String(Math.round(carriedInterest * 100) / 100),
-        dealAllocationId: data.dealAllocationId || null,
-        status: 'completed',
-        description: `${data.distributionType} distribution - ${investor.investorName}`,
-        createdBy: userId,
+        flowDate: new Date(),
+        flowType: 'outflow',
+        grossAmount: String(-totalDistributed),
+        netAmount: String(-totalDistributed),
+        returnOfCapital: String(waterfallResult.returnOfCapital),
+        preferredReturn: String(waterfallResult.preferredReturn),
+        gainDistribution: String(waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn),
+        carriedInterest: String(waterfallResult.totalGpDistribution),
+        description: `${data.distributionType} distribution: $${totalDistributed.toLocaleString()}`,
       });
 
-      // Update investor balances
-      await this.updateInvestorDistributedCapital(orgId, investor.id, totalDistribution);
+      // Recalculate fund metrics
+      await this.recalculateFundMetrics(orgId, fundId, tx);
 
-      // Update preferred return paid
-      if (preferredReturn > 0) {
-        const currentPrefPaid = dn(investor.preferredReturnPaid);
-        await db.update(fundInvestors)
-          .set({
-            preferredReturnPaid: String(currentPrefPaid + preferredReturn),
-            updatedAt: new Date(),
-          })
-          .where(eq(fundInvestors.id, investor.id));
-      }
-
-      // Update carried interest paid (GP only)
-      if (carriedInterest > 0 && isGp) {
-        const currentCarryPaid = dn(investor.carriedInterestPaid);
-        const currentCarryEarned = dn(investor.carriedInterestEarned);
-        await db.update(fundInvestors)
-          .set({
-            carriedInterestEarned: String(Math.max(currentCarryEarned, currentCarryPaid + carriedInterest)),
-            carriedInterestPaid: String(currentCarryPaid + carriedInterest),
-            updatedAt: new Date(),
-          })
-          .where(eq(fundInvestors.id, investor.id));
-      }
-
-      investorDistributions.push({
-        investorId: investor.id,
-        investorName: investor.investorName,
-        ownershipPct: Math.round(ownershipPct * 10000) / 100,
-        returnOfCapital: Math.round(returnOfCapital * 100) / 100,
-        preferredReturn: Math.round(preferredReturn * 100) / 100,
-        profitShare: Math.round(profitShare * 100) / 100,
-        carriedInterest: Math.round(carriedInterest * 100) / 100,
-        totalDistribution,
-      });
-
-      totalDistributed += totalDistribution;
-    }
-
-    // Update fund-level distributed capital
-    await this.updateFundDistributedCapital(orgId, fundId, totalDistributed);
-
-    // Create cash flow entry
-    await db.insert(fundCashFlows).values({
-      orgId,
-      fundId,
-      flowDate: new Date(),
-      flowType: 'outflow',
-      grossAmount: String(-totalDistributed),
-      netAmount: String(-totalDistributed),
-      returnOfCapital: String(waterfallResult.returnOfCapital),
-      preferredReturn: String(waterfallResult.preferredReturn),
-      gainDistribution: String(waterfallResult.totalLpDistribution - waterfallResult.returnOfCapital - waterfallResult.preferredReturn),
-      carriedInterest: String(waterfallResult.totalGpDistribution),
-      description: `${data.distributionType} distribution: $${totalDistributed.toLocaleString()}`,
+      return {
+        waterfallResult,
+        investorDistributions,
+        totalDistributed: Math.round(totalDistributed * 100) / 100,
+        gpCarry: Math.round((waterfallResult.totalGpDistribution - waterfallResult.gpCatchUp) * 100) / 100,
+      };
     });
-
-    // Recalculate fund metrics
-    await this.recalculateFundMetrics(orgId, fundId);
-
-    return {
-      waterfallResult,
-      investorDistributions,
-      totalDistributed: Math.round(totalDistributed * 100) / 100,
-      gpCarry: Math.round((waterfallResult.totalGpDistribution - waterfallResult.gpCatchUp) * 100) / 100,
-    };
   }
 
   // ============================================================================
@@ -2097,10 +2118,251 @@ export class FundService {
     return { updatedDeals };
   }
 
-  async recalculateFundMetrics(orgId: string, fundId: string): Promise<void> {
+  // ============================================================================
+  // IMMUTABLE LEDGER — Capital Account Ledger (pool.query, not Drizzle)
+  // ============================================================================
+
+  /**
+   * Insert an immutable ledger entry. Uses pool.query() because the table
+   * has PostgreSQL RULES that prevent UPDATE/DELETE (Drizzle won't work).
+   */
+  async insertLedgerEntry(
+    orgId: string,
+    fundId: string,
+    investorId: string | null,
+    entryType: string,
+    amount: number,
+    description: string | null,
+    referenceId: string | null = null,
+    effectiveDate: Date = new Date(),
+    createdBy: string | null = null
+  ): Promise<{ id: string }> {
+    const validTypes = [
+      'capital_call', 'distribution', 'pref_return_accrual',
+      'management_fee', 'carried_interest', 'adjustment',
+      'return_of_capital', 'reversal',
+    ];
+    if (!validTypes.includes(entryType)) {
+      throw new Error(`Invalid ledger entry type: ${entryType}`);
+    }
+    if (amount === 0) {
+      throw new Error('Ledger entry amount must be non-zero');
+    }
+
+    const result = await pool.query(
+      `INSERT INTO fund_ledger_entries
+        (org_id, fund_id, investor_id, entry_type, amount, description, reference_id, effective_date, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id`,
+      [orgId, fundId, investorId, entryType, amount, description, referenceId, effectiveDate, createdBy]
+    );
+
+    return { id: result.rows[0].id };
+  }
+
+  /**
+   * Derive capital account balance from the immutable ledger.
+   * If investorId is provided, returns that investor's balance.
+   * Otherwise returns fund-level totals grouped by entry type.
+   */
+  async getLedgerBalance(
+    orgId: string,
+    fundId: string,
+    investorId?: string
+  ): Promise<
+    | { investorId: string; balance: number; breakdown: Record<string, number> }
+    | { fundTotal: number; byType: Record<string, number>; byInvestor: Record<string, number> }
+  > {
+    if (investorId) {
+      const result = await pool.query(
+        `SELECT entry_type, COALESCE(SUM(amount), 0) AS total
+         FROM fund_ledger_entries
+         WHERE org_id = $1 AND fund_id = $2 AND investor_id = $3
+         GROUP BY entry_type`,
+        [orgId, fundId, investorId]
+      );
+
+      const breakdown: Record<string, number> = {};
+      let balance = 0;
+      for (const row of result.rows) {
+        const val = parseFloat(row.total);
+        breakdown[row.entry_type] = val;
+        balance += val;
+      }
+
+      return { investorId, balance, breakdown };
+    }
+
+    // Fund-level: totals by type and by investor
+    const byTypeResult = await pool.query(
+      `SELECT entry_type, COALESCE(SUM(amount), 0) AS total
+       FROM fund_ledger_entries
+       WHERE org_id = $1 AND fund_id = $2
+       GROUP BY entry_type`,
+      [orgId, fundId]
+    );
+
+    const byType: Record<string, number> = {};
+    let fundTotal = 0;
+    for (const row of byTypeResult.rows) {
+      const val = parseFloat(row.total);
+      byType[row.entry_type] = val;
+      fundTotal += val;
+    }
+
+    const byInvestorResult = await pool.query(
+      `SELECT investor_id, COALESCE(SUM(amount), 0) AS total
+       FROM fund_ledger_entries
+       WHERE org_id = $1 AND fund_id = $2 AND investor_id IS NOT NULL
+       GROUP BY investor_id`,
+      [orgId, fundId]
+    );
+
+    const byInvestor: Record<string, number> = {};
+    for (const row of byInvestorResult.rows) {
+      byInvestor[row.investor_id] = parseFloat(row.total);
+    }
+
+    return { fundTotal, byType, byInvestor };
+  }
+
+  /**
+   * Get paginated ledger entries with optional date range and investor filter.
+   */
+  async getLedgerEntries(
+    orgId: string,
+    fundId: string,
+    investorId?: string,
+    options: { startDate?: Date; endDate?: Date; limit?: number; offset?: number } = {}
+  ): Promise<{ entries: any[]; total: number }> {
+    const limit = options.limit ?? 50;
+    const offset = options.offset ?? 0;
+
+    const conditions: string[] = ['org_id = $1', 'fund_id = $2'];
+    const params: any[] = [orgId, fundId];
+    let paramIdx = 3;
+
+    if (investorId) {
+      conditions.push(`investor_id = $${paramIdx}`);
+      params.push(investorId);
+      paramIdx++;
+    }
+    if (options.startDate) {
+      conditions.push(`effective_date >= $${paramIdx}`);
+      params.push(options.startDate);
+      paramIdx++;
+    }
+    if (options.endDate) {
+      conditions.push(`effective_date <= $${paramIdx}`);
+      params.push(options.endDate);
+      paramIdx++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM fund_ledger_entries WHERE ${whereClause}`,
+      params
+    );
+    const total = countResult.rows[0].total;
+
+    const dataResult = await pool.query(
+      `SELECT id, org_id, fund_id, investor_id, entry_type, amount,
+              description, reference_id, effective_date, created_at, created_by
+       FROM fund_ledger_entries
+       WHERE ${whereClause}
+       ORDER BY effective_date DESC, created_at DESC
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, limit, offset]
+    );
+
+    const entries = dataResult.rows.map(row => ({
+      id: row.id,
+      orgId: row.org_id,
+      fundId: row.fund_id,
+      investorId: row.investor_id,
+      entryType: row.entry_type,
+      amount: parseFloat(row.amount),
+      description: row.description,
+      referenceId: row.reference_id,
+      effectiveDate: row.effective_date,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+    }));
+
+    return { entries, total };
+  }
+
+  /**
+   * Reconcile derived ledger balances vs stored mutable capitalAccountBalance
+   * on each investor. Returns list of discrepancies.
+   */
+  async reconcileLedgerVsStored(
+    orgId: string,
+    fundId: string
+  ): Promise<{
+    investorCount: number;
+    discrepancies: {
+      investorId: string;
+      investorName: string;
+      storedBalance: number;
+      ledgerBalance: number;
+      difference: number;
+    }[];
+    allMatch: boolean;
+  }> {
+    const investors = await this.getInvestorsByFund(orgId, fundId);
+
+    // Get all investor ledger balances in one query
+    const ledgerResult = await pool.query(
+      `SELECT investor_id, COALESCE(SUM(amount), 0) AS ledger_balance
+       FROM fund_ledger_entries
+       WHERE org_id = $1 AND fund_id = $2 AND investor_id IS NOT NULL
+       GROUP BY investor_id`,
+      [orgId, fundId]
+    );
+
+    const ledgerMap: Record<string, number> = {};
+    for (const row of ledgerResult.rows) {
+      ledgerMap[row.investor_id] = parseFloat(row.ledger_balance);
+    }
+
+    const discrepancies: {
+      investorId: string;
+      investorName: string;
+      storedBalance: number;
+      ledgerBalance: number;
+      difference: number;
+    }[] = [];
+
+    for (const inv of investors) {
+      const storedBalance = dn(inv.capitalAccountBalance);
+      const ledgerBalance = ledgerMap[inv.id] ?? 0;
+      const difference = Math.round((storedBalance - ledgerBalance) * 100) / 100;
+
+      if (Math.abs(difference) >= 0.01) {
+        discrepancies.push({
+          investorId: inv.id,
+          investorName: inv.investorName,
+          storedBalance,
+          ledgerBalance,
+          difference,
+        });
+      }
+    }
+
+    return {
+      investorCount: investors.length,
+      discrepancies,
+      allMatch: discrepancies.length === 0,
+    };
+  }
+
+  async recalculateFundMetrics(orgId: string, fundId: string, txn?: DbOrTx): Promise<void> {
+    const d = txn || db;
     const metrics = await this.calculateFundMetrics(orgId, fundId);
 
-    await db.update(funds)
+    await d.update(funds)
       .set({
         grossIrr: metrics.grossIrr ? String(metrics.grossIrr) : null,
         netIrr: metrics.netIrr ? String(metrics.netIrr) : null,

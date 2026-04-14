@@ -10,6 +10,7 @@ import { AIAssistant } from "@/components/ai-assistant";
 import { OpsModuleGuard } from "@/components/operations/OpsModuleGuard";
 import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/PageLoader";
+import { PageErrorBoundary } from "@/components/ErrorBoundary";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const CRMDashboard = lazy(() => import("@/pages/crm-dashboard"));
@@ -365,9 +366,11 @@ function UnifiedLayout({ children }: { children: React.ReactNode }) {
         </Suspense>
         <Breadcrumb />
         <main className="flex-1 overflow-auto mobile-main-content min-w-0">
-          <Suspense fallback={<PageLoader />}>
-            {children}
-          </Suspense>
+          <PageErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              {children}
+            </Suspense>
+          </PageErrorBoundary>
         </main>
       </div>
       <CommandPalette />

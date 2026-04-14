@@ -54,8 +54,13 @@ export class EnterpriseAuthService {
         return { success: false, error: 'Invalid credentials', errorCode: 'INVALID_CREDENTIALS' };
       }
 
-      // Note: accounts are never locked. After too many failed attempts, we send
-      // a warning email with a password reset link instead of blocking access.
+      // Block deactivated users
+      if (!user.isActive) {
+        await this.logSecurityEvent(user.id, user.orgId, 'login_failure', {
+          reason: 'account_disabled'
+        }, deviceInfo, false);
+        return { success: false, error: 'Account is disabled. Contact your administrator.', errorCode: 'ACCOUNT_DISABLED' };
+      }
 
       // Check if SSO is enforced
       const org = await this.getOrganization(user.orgId);
@@ -93,11 +98,27 @@ export class EnterpriseAuthService {
         };
       }
 
+      // Enforce concurrent session limits before creating new session
+      try {
+        const { seatEnforcementService } = await import('./seat-enforcement-service');
+        const enforcement = await seatEnforcementService.enforceSessionLimitsOnLogin(user.id, user.orgId);
+        if (enforcement.evictedSessions > 0) {
+          logger.info({
+            userId: user.id,
+            evicted: enforcement.evictedSessions,
+            maxSessions: enforcement.maxSessions,
+          }, 'Evicted old sessions on new login');
+        }
+      } catch (enforcementErr) {
+        // Don't block login if enforcement fails — log and continue
+        logger.warn({ error: enforcementErr }, 'Session enforcement check failed');
+      }
+
       // Create session
       const session = await this.createSession(user, deviceInfo, org?.sessionTimeoutMinutes);
       await this.updateLastLogin(user.id);
-      await this.logSecurityEvent(user.id, user.orgId, 'login_success', { 
-        method: 'password' 
+      await this.logSecurityEvent(user.id, user.orgId, 'login_success', {
+        method: 'password'
       }, deviceInfo, true);
 
       return { success: true, user, session };
@@ -144,11 +165,20 @@ export class EnterpriseAuthService {
             })
             .where(eq(users.id, user.id));
         } else if (ssoConfig?.jitProvisioningEnabled) {
-          // JIT provision new user
+          // JIT provision new user — check seat availability first
+          const { seatEnforcementService } = await import('./seat-enforcement-service');
+          const { allowed: seatAvailable, reason: seatReason } = await seatEnforcementService.canAddUser(orgId);
+          if (!seatAvailable) {
+            await this.logSecurityEvent(null, orgId, 'sso_login_failure', {
+              reason: 'seat_limit_reached', email,
+            }, deviceInfo, false);
+            return { success: false, error: seatReason || 'No seats available', errorCode: 'SEAT_LIMIT_REACHED' };
+          }
+
           const emailDomain = email.split('@')[1];
           if (org?.allowedEmailDomains && !org.allowedEmailDomains.includes(emailDomain)) {
-            await this.logSecurityEvent(null, orgId, 'sso_login_failure', { 
-              reason: 'domain_not_allowed', email 
+            await this.logSecurityEvent(null, orgId, 'sso_login_failure', {
+              reason: 'domain_not_allowed', email
             }, deviceInfo, false);
             return { success: false, error: 'Email domain not allowed', errorCode: 'DOMAIN_NOT_ALLOWED' };
           }
@@ -195,10 +225,18 @@ export class EnterpriseAuthService {
         };
       }
 
+      // Enforce concurrent session limits before creating new session
+      try {
+        const { seatEnforcementService } = await import('./seat-enforcement-service');
+        await seatEnforcementService.enforceSessionLimitsOnLogin(user!.id, orgId);
+      } catch (enforcementErr) {
+        logger.warn({ error: enforcementErr }, 'Session enforcement check failed (SSO)');
+      }
+
       const session = await this.createSession(user!, deviceInfo, org?.sessionTimeoutMinutes);
       await this.updateLastLogin(user!.id);
-      await this.logSecurityEvent(user!.id, orgId, 'sso_login_success', { 
-        provider 
+      await this.logSecurityEvent(user!.id, orgId, 'sso_login_success', {
+        provider
       }, deviceInfo, true);
 
       return { success: true, user: user!, session };

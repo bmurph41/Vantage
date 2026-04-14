@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { logger } from '../lib/logger';
 import { isProduction } from '../config/env';
+import { ApiError } from '../utils/api-errors';
 
 export class AppError extends Error {
   constructor(
@@ -91,6 +92,28 @@ export function centralizedErrorHandler(
     });
   }
   
+  if (err instanceof ApiError) {
+    const logMethod = err.status >= 500 ? 'error' : 'warn';
+    log[logMethod]({
+      type: 'api_error',
+      requestId,
+      statusCode: err.status,
+      code: err.code,
+      message: err.message,
+      details: err.details,
+      stack: err.status >= 500 ? err.stack : undefined,
+    });
+
+    return res.status(err.status).json({
+      error: {
+        code: err.code,
+        message: isProduction() && err.status >= 500 ? 'Internal server error' : err.message,
+        ...(err.details && !isProduction() && { details: err.details }),
+      },
+      requestId,
+    });
+  }
+
   if (err instanceof AppError) {
     const logMethod = err.statusCode >= 500 ? 'error' : 'warn';
     log[logMethod]({

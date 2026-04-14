@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { eq, and, or, desc, sql } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray } from "drizzle-orm";
 import { geocodingService } from "../services/geocodingService";
 import { ownedAssetsService } from "../services/owned-assets-service";
 import { dashboardService } from "../services/dashboard-service";
@@ -212,7 +212,7 @@ export function registerExternalRoutes(
     try {
       const orgId = req.user.orgId;
       const { moduleType, filters, limit } = req.body;
-      const { getFilteredModuleData } = await import('./services/custom-module-service');
+      const { getFilteredModuleData } = await import('../services/custom-module-service');
       
       const data = await getFilteredModuleData({ moduleType, filters, limit }, orgId);
       res.json(data);
@@ -227,7 +227,7 @@ export function registerExternalRoutes(
     try {
       const orgId = req.user.orgId;
       const { visualizationType, moduleType, config } = req.body;
-      const { dashboardService } = await import('./services/dashboard-service');
+      const { dashboardService } = await import('../services/dashboard-service');
       
       const previewData = await dashboardService.generateModulePreview(
         orgId,
@@ -334,7 +334,7 @@ export function registerExternalRoutes(
           case 'deal': {
             const deals = await db.select({ id: crmDeals.id, name: crmDeals.name, amount: crmDeals.amount, status: crmDeals.status })
               .from(crmDeals)
-              .where(and(eq(crmDeals.orgId, orgId), sql`${crmDeals.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(crmDeals.orgId, orgId), inArray(crmDeals.id, itemIds)));
             const dealsMap = new Map(deals.map(d => [d.id, d]));
             for (const item of typeItems) {
               const deal = dealsMap.get(item.itemId);
@@ -347,7 +347,7 @@ export function registerExternalRoutes(
           case 'contact': {
             const contacts = await db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName, email: crmContacts.email })
               .from(crmContacts)
-              .where(and(eq(crmContacts.orgId, orgId), sql`${crmContacts.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(crmContacts.orgId, orgId), inArray(crmContacts.id, itemIds)));
             const contactsMap = new Map(contacts.map(c => [c.id, c]));
             for (const item of typeItems) {
               const contact = contactsMap.get(item.itemId);
@@ -360,7 +360,7 @@ export function registerExternalRoutes(
           case 'company': {
             const companies = await db.select({ id: crmCompanies.id, name: crmCompanies.name, industry: crmCompanies.industry })
               .from(crmCompanies)
-              .where(and(eq(crmCompanies.orgId, orgId), sql`${crmCompanies.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(crmCompanies.orgId, orgId), inArray(crmCompanies.id, itemIds)));
             const companiesMap = new Map(companies.map(c => [c.id, c]));
             for (const item of typeItems) {
               const company = companiesMap.get(item.itemId);
@@ -373,7 +373,7 @@ export function registerExternalRoutes(
           case 'property': {
             const properties = await db.select({ id: crmProperties.id, name: crmProperties.name, city: crmProperties.city, state: crmProperties.state })
               .from(crmProperties)
-              .where(and(eq(crmProperties.orgId, orgId), sql`${crmProperties.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(crmProperties.orgId, orgId), inArray(crmProperties.id, itemIds)));
             const propertiesMap = new Map(properties.map(p => [p.id, p]));
             for (const item of typeItems) {
               const property = propertiesMap.get(item.itemId);
@@ -386,7 +386,7 @@ export function registerExternalRoutes(
           case 'modelingProject': {
             const models = await db.select({ id: modelingProjects.id, name: modelingProjects.name, status: modelingProjects.status, location: modelingProjects.location })
               .from(modelingProjects)
-              .where(and(eq(modelingProjects.orgId, orgId), sql`${modelingProjects.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(modelingProjects.orgId, orgId), inArray(modelingProjects.id, itemIds)));
             const modelsMap = new Map(models.map(m => [m.id, m]));
             for (const item of typeItems) {
               const model = modelsMap.get(item.itemId);
@@ -399,7 +399,7 @@ export function registerExternalRoutes(
           case 'ddProject': {
             const ddProjects = await db.select({ id: projects.id, name: projects.name, status: projects.status })
               .from(projects)
-              .where(and(eq(projects.orgId, orgId), sql`${projects.id} = ANY(ARRAY[${sql.raw(itemIds.map(id => `'${id}'`).join(','))}]::text[])`));
+              .where(and(eq(projects.orgId, orgId), inArray(projects.id, itemIds)));
             const projectsMap = new Map(ddProjects.map(p => [p.id, p]));
             for (const item of typeItems) {
               const project = projectsMap.get(item.itemId);
@@ -480,7 +480,7 @@ export function registerExternalRoutes(
         .where(and(
           eq(userPinnedItems.userId, userId),
           eq(userPinnedItems.orgId, orgId),
-          sql`${userPinnedItems.id} = ANY(ARRAY[${sql.raw(staleItemIds.map((id: string) => `'${id}'`).join(','))}]::text[])`
+          inArray(userPinnedItems.id, staleItemIds)
         ))
         .returning();
       

@@ -497,6 +497,135 @@
 - [feature] [done] Entitlements system
 - [feature] [done] Institutional readiness
 
+---
+
+## 🚨 TIER 0 — SHOWSTOPPERS (Must fix before any live client)
+
+> **Diagnostic Date: 2026-04-14**
+> These items were identified by a full institutional-grade production readiness audit.
+> ALL Tier 0 items must be resolved before any institutional or private client deployment.
+> Estimated overall platform readiness: ~59%. Target: 90%+ after Tier 0 + Tier 1.
+
+### 0A — SQL Injection Remediation
+
+- [security] [todo] Fix SQL injection in security-compliance-service.ts — Lines 495-498: `sql.raw()` with unparameterized `filters.eventType` and `filters.severity` string concatenation; replace with Drizzle parameterized `eq()` / `and()` conditions or `$1`-style placeholders in pool.query()
+
+- [security] [todo] Fix SQL injection in accounting-engine.ts — Lines 534-535, 870, 1176, 1934: `db.execute(sql.raw(...))` with string-concatenated WHERE clauses; refactor each to use Drizzle query builder or parameterized pool.query() with `$1, $2` placeholders
+
+- [security] [todo] Fix SQL injection in external-routes.ts — Line 337: `sql.raw(itemIds.map(id => \`'${id}'\`).join(','))` for array IN clause; replace with Drizzle `inArray()` operator or `ANY($1::text[])` parameterized pattern
+
+- [security] [todo] Fix SQL injection in storage.ts — Line 6115: `sql.raw(filters.storageTypes.map((t: string) => \`'${t}'\`).join(','))` for storage type filter; replace with `inArray()` or parameterized `ANY()` array
+
+- [security] [todo] Fix SQL injection in crm-enhancements.ts — Lines 228, 431, 448, 836, 1365, 1377, 1470: Multiple `sql.raw()` calls with user-derived input; audit each occurrence and replace with parameterized queries
+
+### 0B — Organization Isolation Fixes
+
+- [security] [todo] Add orgId filter to fund-management-routes.ts PUT /fund-deals/:id — Line 217: `.where(eq(fundDealsV2.id, req.params.id))` has NO orgId check; add `and(eq(fundDealsV2.id, req.params.id), eq(fundDealsV2.orgId, orgId))` or validate fund ownership atomically
+
+- [security] [todo] Add orgId filter to fund-management-routes.ts DELETE /fund-deals/:id — Line 239: same issue as PUT; add orgId to WHERE clause
+
+- [security] [todo] Add orgId filter to capital account endpoints — Lines 600, 678, 730: GET /capital-accounts/:fundId, GET /capital-accounts/:id/entries, POST /capital-accounts/:id/entries all fetch data without orgId in the primary query; add atomic orgId validation (not post-fetch check which has race condition)
+
+- [security] [todo] Audit all route files for missing orgId filters — Grep all `server/routes/` for `.where(eq(...id, req.params...))` patterns that lack an accompanying orgId condition on org-scoped tables; fix each occurrence
+
+### 0C — Transaction Safety for Financial Operations
+
+- [security] [todo] Wrap distribution execution in db.transaction() — `server/services/distribution-approval-service.ts` `execute()` method performs 4+ sequential DB operations (draft lookup, compliance checks, fund distribution processing, draft update, audit log) without transaction; wrap in `await db.transaction(async (tx) => { ... })` passing tx to each step
+
+- [security] [todo] Wrap fund distribution processing in db.transaction() — `server/services/fund-service.ts` `processFundDistribution()` performs waterfall calculation, investor distribution storage, and fund balance updates as separate operations; wrap in transaction to prevent partial execution
+
+- [security] [todo] Wrap capital call operations in db.transaction() — `server/services/fund-service.ts` `createFundCapitalCall()` and `completeFundCapitalCall()` update multiple tables (capital movements, investor records, fund balances); wrap each in transaction
+
+- [security] [todo] Wrap preferred return accrual in db.transaction() — `server/services/fund-service.ts` `accruePreferredReturn()` updates multiple investor records; wrap in transaction for atomicity
+
+- [security] [todo] Audit all multi-step financial operations for transaction wrapping — Search `server/services/` for methods that perform 2+ sequential DB writes on financial data; wrap each in `db.transaction()`; target: fund-service.ts, distribution-approval-service.ts, period-lock-service.ts, capital-stack-service.ts
+
+### 0D — Demo Auth Gating
+
+- [security] [todo] Gate demo auth fallback behind explicit env var — In `server/middleware/authenticate.ts` lines 44-52, the hardcoded admin fallback fires automatically when `NODE_ENV !== 'production'`; change to require `ALLOW_DEMO_AUTH=true` explicitly; log a warning on every fallback usage; add integration test verifying fallback is blocked when env var is absent
+
+---
+
+## 🔶 TIER 0.5 — INSTITUTIONAL REQUIREMENTS (Before client onboarding)
+
+### 0.5A — Input Validation (Top 100 Routes)
+
+- [security] [todo] Add zod input validation to all fund management routes — `server/routes/modeling-routes.ts` fund endpoints (lines 4731-6100): all POST/PUT/PATCH routes accepting capital call amounts, distribution amounts, investor data, period dates must validate with zod schemas; create `server/validators/fund-validators.ts` with schemas for: CreateCapitalCallInput, ProcessDistributionInput, InvestorCreateInput, PeriodLockInput; apply via `schema.parse(req.body)` in each route handler
+
+- [security] [todo] Add zod input validation to all CRM write routes — `server/routes/crm-routes.ts`: POST/PUT/PATCH routes for deals, contacts, companies, properties, tasks, activities; create `server/validators/crm-validators.ts`; validate deal amounts as positive numbers, email formats, phone formats, date ranges; apply to top 50 CRM write endpoints
+
+- [security] [todo] Add zod input validation to modeling write routes — `server/routes/modeling-routes.ts`: POST/PATCH routes for scenarios, assumptions, projections, sensitivity configs; create `server/validators/modeling-validators.ts`; validate numeric ranges (growth rates -50% to 100%, cap rates 1-30%, etc.)
+
+- [security] [todo] Add zod input validation to operations/dashboard routes — All POST/PUT routes in operations, executive-dashboard, analytics routes; validate date ranges, numeric filters, pagination params (page >= 1, pageSize 1-100)
+
+### 0.5B — Ledger-Based Capital Accounts
+
+- [feature] [todo] Create fund_ledger_entries table — Migration: `fund_ledger_entries` with columns: `id` uuid PK, `org_id`, `fund_id` FK, `investor_id` FK, `entry_type` enum('capital_call', 'distribution', 'pref_return_accrual', 'management_fee', 'carried_interest', 'adjustment'), `amount` numeric(18,2), `description`, `effective_date`, `created_at`, `created_by`; add immutable RULE (prevent UPDATE/DELETE like financial_audit_log); add CHECK constraint `amount != 0`
+
+- [feature] [todo] Refactor fund-service.ts to derive capital account balances from ledger — Replace all direct `capitalAccountBalance` updates with ledger entry inserts; add `deriveCapitalBalance(orgId, fundId, investorId)` method that SELECTs SUM(amount) grouped by entry_type from fund_ledger_entries; replace `getCapitalAccount()` to compute balance on-the-fly from ledger; deprecate mutable balance field
+
+- [feature] [todo] Add ledger reconciliation endpoint — GET `/api/modeling/projects/:projectId/fund/:fundId/ledger-reconciliation` that compares stored balance vs. derived balance for all investors; flag discrepancies; add auto-fix endpoint that resets stored balance to match ledger sum
+
+### 0.5C — Decimal.js Migration for Financial Engines
+
+- [feature] [todo] Migrate pro-forma-engine-service.ts from parseFloat to Decimal.js — Replace all `parseFloat()` calls (est. 40+) with `new Decimal()` for: revenue growth compounding, expense escalation, NOI calculation, CapEx/reserves, management fees, debt service; ensure all intermediate calculations use `.plus()`, `.times()`, `.dividedBy()`; convert to number only at final output; import Decimal from existing `decimal.js` dependency
+
+- [feature] [todo] Migrate dcf-calculator-service.ts from parseFloat to Decimal.js — Replace parseFloat in: sensitivity matrix calculations, NPV computation, terminal value, cash-on-cash return, going-in cap rate; use Decimal for all intermediate steps; round appropriately at output (2 decimals for currency, 4 for rates)
+
+- [feature] [todo] Migrate remaining financial services from parseFloat to Decimal.js — Audit and fix: deal-pricing-service.ts, capital-stack-service.ts, debt-schedule-service.ts, monte-carlo-service.ts (at least for final aggregations), lease-cashflow-engine.ts; target: zero parseFloat in any service that touches capital amounts
+
+### 0.5D — Waterfall Engine Fixes
+
+- [feature] [todo] Make GP commitment percentage configurable in waterfall engine — `shared/exit/waterfall-engine.ts` line 179: hardcoded `gpCommitmentPct = 0.02`; add `gpCommitmentPct` to `WaterfallInput` interface with default 0.02; pass through from fund configuration; update all callers
+
+- [feature] [todo] Add LP/GP IRR calculation to waterfall engine — Lines 214-215 return null for LP/GP IRRs; implement: construct LP cash flow series (contributions negative, distributions positive) and GP cash flow series; compute XIRR for each using existing `calculateXIRR()` from `shared/finance/xirr.ts`; return in waterfall result
+
+- [feature] [todo] Add monthly preferred return accrual to waterfall engine — Currently pref return only calculated at exit (terminal); add option for periodic accrual (monthly/quarterly/annual) that compounds over hold period; store accrued amounts per period; integrate with fund-service.ts `accruePreferredReturn()`
+
+### 0.5E — Frontend Error Boundaries
+
+- [feature] [todo] Wrap all major routes with PageErrorBoundary in Router.tsx — The `PageErrorBoundary` and `SectionErrorBoundary` classes exist but are NOT used in the router; in `client/src/Router.tsx`, wrap each top-level `<Route element={...}>` with `<PageErrorBoundary>`; ensure error boundary renders a user-friendly fallback ("Something went wrong — click to reload") instead of white screen; add error logging via the existing error event system
+
+- [feature] [todo] Add SectionErrorBoundary to dashboard module panels — In `client/src/pages/dashboard.tsx`, wrap each dashboard module/card with `<SectionErrorBoundary>` so a single failing widget doesn't take down the entire dashboard; apply same pattern to modeling workspace tabs
+
+### 0.5F — Structured Error Responses
+
+- [feature] [todo] Create centralized error response utility — Create `server/utils/api-errors.ts` with typed error factory: `ApiError` class with `code` (machine-readable, e.g., 'FUND_NOT_FOUND'), `message` (human-readable), `status` (HTTP code), `details` (optional field-level errors); export `badRequest()`, `notFound()`, `forbidden()`, `conflict()`, `internal()` helpers; update `server/middleware/error-handler.ts` to format ApiError instances consistently
+
+- [feature] [todo] Replace generic "Failed to..." error messages in top 50 routes — Audit `server/routes/modeling-routes.ts` and `server/routes/crm-routes.ts` for catch blocks returning `{ error: "Failed to..." }`; replace with specific error codes and messages using the ApiError utility; log the original error with stack trace via pino logger; return sanitized error to client
+
+### 0.5G — Pagination Enforcement
+
+- [feature] [todo] Add pagination middleware/helper — Create `server/utils/pagination.ts` with `parsePagination(req)` helper that extracts `page` (default 1, min 1), `pageSize` (default 25, max 100) from query params with validation; returns `{ limit, offset, page, pageSize }`; apply to all list endpoints in modeling-routes.ts and crm-routes.ts that return arrays without LIMIT
+
+- [feature] [todo] Add pagination to top 30 unbounded list endpoints — Identify list routes returning full result sets (no LIMIT); add pagination using the helper; priority: deals list, contacts list, activities, leases, fund investors, capital movements, workflow executions, notifications, document templates, marketplace listings; return `{ data, total, page, pageSize, totalPages }` envelope
+
+### 0.5H — FK Cascade Audit
+
+- [migration] [todo] Add ON DELETE CASCADE/SET NULL to unprotected foreign keys — Run audit: query `information_schema.table_constraints` for all FK constraints where `delete_rule = 'NO ACTION'` on tables with org_id; prioritize: user deletion cascades (tasks, activities, sessions), org deletion cascades (all org-scoped tables), project deletion cascades (all project-child tables); create migration script using ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT ... ON DELETE CASCADE pattern; target: fix top 100 most-used FK relationships
+
+### 0.5I — CI/CD Pipeline
+
+- [infra] [todo] Create GitHub Actions CI workflow — Create `.github/workflows/ci.yml` with: checkout, node setup (v20), npm ci, npm run check (TypeScript), npm test (vitest), npm audit --audit-level=high; trigger on push to main and all PR branches; add status badge to README; add branch protection rule requiring CI pass before merge
+
+### 0.5J — Tax Engine Implementation
+
+- [feature] [todo] Implement cost segregation engine — In `server/services/tax-waterfall/`, implement `costSegregationEngine.ts`: allocate purchase price into component classes (5-yr personal property 15-20%, 15-yr land improvements 10-15%, 27.5/39-yr real property 65-75%, land 5-15%); compute accelerated depreciation schedules per class (MACRS); calculate annual depreciation deduction; compute tax shield value (deduction × marginal rate)
+
+- [feature] [todo] Implement depreciation schedule service — Create `server/services/tax-waterfall/depreciation-service.ts`: generate year-by-year depreciation for each cost seg class; support straight-line and MACRS methods; handle partial first-year (mid-month convention for real property, half-year for personal property); compute accumulated depreciation and remaining basis per year
+
+- [feature] [todo] Implement Section 1250/1245 recapture calculations — In the existing tax waterfall types, implement actual computation: unrecaptured Section 1250 gain = min(gain, accumulated depreciation on real property) taxed at 25%; Section 1245 recapture = min(gain, accumulated depreciation on personal property) taxed at ordinary rates; remaining gain taxed at LTCG rates; integrate state capital gains rates from existing state rate table
+
+### 0.5K — PII Encryption at Rest
+
+- [security] [todo] Implement field-level PII encryption — Create `server/services/encryption-service.ts` using AES-256-GCM (key from existing env var pattern); encrypt on write / decrypt on read for fields: investor SSN, investor tax_id, contact SSN if stored; store as `enc:iv:ciphertext` pattern (already used for Google API keys); add migration to encrypt existing plaintext values; add decrypt middleware for API responses to authorized roles only
+
+### 0.5L — Backup & Disaster Recovery
+
+- [infra] [todo] Document backup and recovery procedures — Create `docs/operations/backup-recovery.md` with: Neon automated backup verification steps, PITR (point-in-time recovery) procedure, manual pg_dump script for local backup, restore procedure with verification queries, RTO/RPO targets; verify Neon backup retention period in account settings; add a weekly backup verification cron that runs `SELECT count(*) FROM critical_tables` and alerts if counts drop unexpectedly
+
+---
+
 ## Failed / Blocked
 - [feature] [failed] Build IC Deal Review Deck — token resolver extensions, 3 API routes, section renderer, frontend generate flow — see agents/specs/ic-deal-review-deck-spec.md — 
 - [feature] [todo] Implement Email Send Integration for Workflow Automation — see agents/specs/email-send-integration-spec.md — 

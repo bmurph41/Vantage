@@ -8,7 +8,7 @@ import { enterpriseAuthService } from '../services/enterprise-auth-service';
 import { setTenantContext, clearTenantContext } from './tenant-context';
 
 if (process.env.ALLOW_DEMO_AUTH === 'true') {
-  console.warn('[AUTH] ⚠️  Demo auth is ENABLED. Disable ALLOW_DEMO_AUTH for production.');
+  console.warn('[AUTH] ⚠️ ALLOW_DEMO_AUTH is enabled — demo credentials active. Do NOT use in production.');
 }
 
 // Public paths that don't require authentication
@@ -41,7 +41,9 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
 
     // Development fallback — mirrors /api/auth/me behaviour so all routes
     // resolve the same admin user when no real session is present.
-    if (!(req as any).user && process.env.NODE_ENV !== 'production') {
+    // Requires ALLOW_DEMO_AUTH=true to be explicitly set (not just non-production).
+    if (!(req as any).user && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEMO_AUTH === 'true') {
+      console.warn('[AUTH] Using demo auth fallback for request:', req.path);
       (req as any).user = {
         id: "85c9cd7a-c453-4dba-9817-d032d5712c4e",
         orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4",

@@ -158,6 +158,17 @@ orgSettingsRouter.post("/team/invite", async (req: Request, res: Response) => {
 
     if (!email) return res.status(400).json({ error: "email is required" });
 
+    // ── Seat enforcement: check if org has available seats ──
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    const { allowed, reason, seatStatus } = await seatEnforcementService.canAddUser(orgId);
+    if (!allowed) {
+      return res.status(403).json({
+        error: reason,
+        code: 'SEAT_LIMIT_REACHED',
+        seatStatus,
+      });
+    }
+
     const [existing] = await db.select().from(users).where(eq(users.email, email));
     if (existing) {
       if (existing.orgId === orgId) {

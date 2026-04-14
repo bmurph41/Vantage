@@ -167,6 +167,130 @@ router.get('/usage', async (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Seat Management — prevents subscription sharing
+// ═══════════════════════════════════════════════════════════════════════════
+
+// GET /seats — current seat usage & availability
+router.get('/seats', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    const seatStatus = await seatEnforcementService.getSeatStatus(orgId!);
+    res.json(seatStatus);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /seats/details — which users are consuming seats + session info
+router.get('/seats/details', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    const [seatStatus, details] = await Promise.all([
+      seatEnforcementService.getSeatStatus(orgId!),
+      seatEnforcementService.getSeatDetails(orgId!),
+    ]);
+    res.json({ seatStatus, users: details });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /seats/purchase — buy additional seats
+router.post('/seats/purchase', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { seats } = req.body;
+
+    if (!seats || typeof seats !== 'number' || seats < 1) {
+      return res.status(400).json({ error: 'seats must be a positive integer' });
+    }
+
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    const result = await seatEnforcementService.purchaseSeats(orgId!, seats);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /seats/remove — remove unused seats
+router.post('/seats/remove', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { seats } = req.body;
+
+    if (!seats || typeof seats !== 'number' || seats < 1) {
+      return res.status(400).json({ error: 'seats must be a positive integer' });
+    }
+
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    const result = await seatEnforcementService.removeSeats(orgId!, seats);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /seats/deactivate-user — deactivate a user and free their seat
+router.post('/seats/deactivate-user', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const actorUserId = (req as any).user?.id;
+    const { userId: targetUserId } = req.body;
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    await seatEnforcementService.deactivateUser(orgId!, targetUserId, actorUserId);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /seats/reactivate-user — reactivate a deactivated user (if seat available)
+router.post('/seats/reactivate-user', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const { userId: targetUserId } = req.body;
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const { seatEnforcementService } = await import('../services/seat-enforcement-service');
+    await seatEnforcementService.reactivateUser(orgId!, targetUserId);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /seats/pricing — get per-seat pricing for all tiers
+router.get('/seats/pricing', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { PER_SEAT_PRICING } = await import('../services/seat-enforcement-service');
+    const pricing = Object.entries(SUBSCRIPTION_TIERS).map(([key, tier]) => ({
+      tier: key,
+      name: tier.name,
+      baseSeats: tier.limits.seats === -1 ? 'Unlimited' : tier.limits.seats,
+      basePrice: {
+        monthly: tier.priceMonthly,
+        annual: tier.priceAnnual,
+      },
+      perAdditionalSeat: PER_SEAT_PRICING[key] || null,
+    }));
+    res.json(pricing);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /portal — generate Stripe portal session URL
 router.post('/portal', async (req: Request, res: Response, next: NextFunction) => {
   try {

@@ -6,6 +6,7 @@ import { runListingScrape } from './runner/runScrape';
 import { insertLiv2SourceSchema } from './schema';
 import { checkMarketplaceScrapeUrl, getAllowedMarinaDomains } from './fetch/ssrfGuard';
 import { findDuplicatesInBatch, findDuplicatesForListing } from './identity/duplicateDetector';
+import { parsePagination, paginatedResponse } from '../../utils/pagination';
 
 const router = Router();
 
@@ -112,14 +113,16 @@ router.get('/runs/:id', async (req, res) => {
 
 router.get('/listings', async (req, res) => {
   try {
-    const { domain, state, limit, offset } = req.query;
-    const listings = await liv2Repo.getCurrentListings({
+    const { domain, state } = req.query;
+    const pag = parsePagination(req.query as Record<string, any>, { pageSize: 25 });
+    // Fetch all matching listings (repo handles domain/state filtering)
+    const allListings = await liv2Repo.getCurrentListings({
       domain: domain as string,
       state: state as string,
-      limit: limit ? parseInt(limit as string) : undefined,
-      offset: offset ? parseInt(offset as string) : undefined,
     });
-    res.json(listings);
+    const total = allListings.length;
+    const paged = allListings.slice(pag.offset, pag.offset + pag.limit);
+    res.json(paginatedResponse(paged, total, pag));
   } catch (error) {
     console.error('[LIV2] Get listings error:', error);
     res.status(500).json({ error: 'Failed to get listings' });
