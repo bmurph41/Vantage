@@ -23,7 +23,7 @@ class GeocodingService {
   private cacheTTL = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
   constructor() {
-    this.apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+    this.apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
     if (!this.apiKey) {
     }
   }

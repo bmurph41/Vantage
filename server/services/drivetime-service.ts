@@ -38,7 +38,7 @@ export class DriveTimeService {
   private cacheTTL = 24 * 60 * 60 * 1000;
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.GOOGLE_MAPS_API_KEY || '';
+    this.apiKey = apiKey || process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
   }
 
   async getDriveTimeDistance(

@@ -62,7 +62,7 @@ export class GeocodingService {
   private readonly CACHE_EXPIRY_DAYS = 90;
 
   constructor() {
-    this.apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+    this.apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
     if (!this.apiKey) {
       console.warn('[Geocoding] No GOOGLE_MAPS_API_KEY found - geocoding will be disabled');
     }
