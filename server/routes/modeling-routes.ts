@@ -4435,6 +4435,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         .where(eq(nwcLines.modelingProjectId, projectId))
         .orderBy(asc(nwcLines.sortOrder));
       
+      void logProjectActivity(projectId, req.user.id, 'saved transaction closing data', {});
       res.json({
         summary: savedSummary,
         closingCostLines: savedClosingLines,
@@ -6218,6 +6219,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       } catch (syncErr) {
         console.warn("[Loan→CapStack Sync] Failed on create:", syncErr);
       }
+      void logProjectActivity(projectId, userId, 'added a loan', { loanId: loan.id });
       res.json(loan);
     } catch (error: any) {
       console.error('Failed to create loan:', error);
@@ -6246,6 +6248,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         console.warn("[Loan→CapStack Sync] Failed on update:", syncErr);
       }
       if (!updated) return res.status(404).json({ error: 'Loan not found' });
+      void logProjectActivity(projectId, req.user.id, 'updated a loan', { loanId });
       res.json(updated);
     } catch (error: any) {
       console.error('Failed to update loan:', error);
@@ -9107,9 +9110,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   // ==================== SCENARIO COLLABORATION ROUTES ====================
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // Helpers
 
-  /** Returns the project row (id, createdBy) if it belongs to orgId, else null */
   async function verifyProjectAccess(projectId: string, orgId: string) {
     const [project] = await db
       .select({ id: modelingProjects.id, createdBy: modelingProjects.createdBy })
@@ -9119,11 +9121,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     return project ?? null;
   }
 
-  /**
-   * Returns true when the requesting user is allowed to mutate collaborators.
-   * Only the project creator or an org-level owner role may add/remove/update
-   * collaborators.  Regular editors and viewers are blocked.
-   */
   function canManageCollaborators(
     project: { createdBy: string | null },
     userId: string,
@@ -9132,7 +9129,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     return project.createdBy === userId || userRole === 'owner';
   }
 
-  /** Computes two-character initials from a display name */
   function initials(name: string | null): string {
     if (!name) return '??';
     const parts = name.trim().split(/\s+/);
@@ -9149,7 +9145,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   }
 
-  /** Fire-and-forget activity insert — never throws, errors are only logged */
   async function logProjectActivity(
     projectId: string,
     userId: string,
@@ -9163,7 +9158,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   }
 
-  // ── Collaborators ─────────────────────────────────────────────────────────
+  // Collaborators
 
   // GET /api/modeling/projects/:projectId/collaborators
   app.get('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
@@ -9186,7 +9181,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       if (!projectRow) return res.status(404).json({ error: 'Project not found' });
 
-      // ── Seeding: backfill creator + historical actors as collaborators ─────────
+      // Backfill creator + historical activity actors as collaborators if not yet seeded
       // Run unconditionally checking creator presence so that adding a collaborator
       // via POST before the first GET does not prevent creator seeding.
       const [creatorRow] = await db
@@ -9233,9 +9228,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         }
       }
 
-      // ── Read authorization ────────────────────────────────────────────────────
-      // Only project owners, org-level owners, and users explicitly in the
-      // collaborator list may view who has access to a project.
+      // Read authorization: owner, org-owner, or listed collaborator
       const isProjectOwner = projectRow.createdBy === userId;
       const isOrgOwner     = userRole === 'owner';
 
@@ -9254,7 +9247,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         }
       }
 
-      // ── Fetch the (now-seeded) collaborator list ──────────────────────────────
       const collaborators = await db
         .select({
           id: modelingProjectCollaborators.id,
@@ -9436,7 +9428,7 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     }
   });
 
-  // ── Activity Log ─────────────────────────────────────────────────────────
+  // Activity log
 
   // GET /api/modeling/projects/:projectId/activity
   // Only project members (owner, collaborators) or org-owners may view activity.
@@ -9495,17 +9487,34 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
   });
 
   // POST /api/modeling/projects/:projectId/activity
-  // General-purpose endpoint: the frontend or other routes can POST an action string here.
   app.post('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId as string;
+      const orgId    = req.user.orgId as string;
+      const userId   = req.user.id as string;
+      const userRole = req.user.role as string;
       const { action, metadata } = req.body as { action?: string; metadata?: Record<string, unknown> };
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
-      await logProjectActivity(projectId, req.user.id as string, action || 'updated project', metadata || {});
+      const isProjectOwner = project.createdBy === userId;
+      const isOrgOwner     = userRole === 'owner';
+      if (!isProjectOwner && !isOrgOwner) {
+        const [memberRow] = await db
+          .select({ userId: modelingProjectCollaborators.userId })
+          .from(modelingProjectCollaborators)
+          .where(and(
+            eq(modelingProjectCollaborators.projectId, projectId),
+            eq(modelingProjectCollaborators.userId, userId),
+          ))
+          .limit(1);
+        if (!memberRow) {
+          return res.status(403).json({ error: 'You do not have access to this project' });
+        }
+      }
+
+      await logProjectActivity(projectId, userId, action || 'updated project', metadata || {});
 
       res.json({ success: true });
     } catch (error: unknown) {
