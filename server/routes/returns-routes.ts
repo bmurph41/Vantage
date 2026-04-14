@@ -834,4 +834,108 @@ router.post('/after-tax-analysis', async (req: Request, res: Response, next: Nex
   }
 });
 
+router.get("/portfolio/debt", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const projects = await storage.listModelingProjects(orgId);
+
+    const { loans: loansTable } = await import("@shared/schema");
+    const { eq, and } = await import("drizzle-orm");
+    const { computeCapitalStackSummary } = await import("@shared/debt/debt-engine");
+    type DebtEngineInput = import("@shared/debt/debt-engine").DebtEngineInput;
+
+    let totalDebt = 0;
+    let totalPurchasePrice = 0;
+    let weightedRateNum = 0;
+    let totalAnnualDebtService = 0;
+    let totalAnnualNOI = 0;
+    const assets: any[] = [];
+
+    for (const project of projects) {
+      const purchasePrice = parseFloat(project.purchasePrice?.toString() || "0");
+      const projectLoans = await db
+        .select()
+        .from(loansTable)
+        .where(and(eq(loansTable.projectId, project.id), eq(loansTable.orgId, orgId)));
+
+      if (projectLoans.length === 0) continue;
+
+      const engineInputs: DebtEngineInput[] = projectLoans.map((loan: any) => ({
+        loanAmount: parseFloat(loan.loanAmount?.toString() || "0"),
+        termMonths: loan.termMonths,
+        amortMonths: loan.amortMonths,
+        interestOnlyMonths: loan.interestOnlyMonths,
+        rateType: loan.rateType as "fixed" | "floating",
+        fixedRate: loan.fixedRate ? parseFloat(loan.fixedRate) : undefined,
+        initialIndexBps: loan.initialIndexBps ?? undefined,
+        spreadBps: loan.spreadBps ?? undefined,
+        indexFloorBps: loan.indexFloorBps ?? undefined,
+        capitalizeOriginationFees: loan.capitalizeOriginationFees,
+        originationFeePct: loan.originationFeePct ? parseFloat(loan.originationFeePct) : undefined,
+        underwritingFee: loan.underwritingFee ? parseFloat(loan.underwritingFee) : undefined,
+        legalFee: loan.legalFee ? parseFloat(loan.legalFee) : undefined,
+        appraisalFee: loan.appraisalFee ? parseFloat(loan.appraisalFee) : undefined,
+        otherClosingCosts: loan.otherClosingCosts ? parseFloat(loan.otherClosingCosts) : undefined,
+        annualServicingFee: loan.annualServicingFee ? parseFloat(loan.annualServicingFee) : undefined,
+        exitFeePct: loan.exitFeePct ? parseFloat(loan.exitFeePct) : undefined,
+        prepayType: (loan.prepayType || "none") as "none" | "stepdown" | "yield_maint" | "defeasance",
+        stepdownSchedule: loan.stepdownScheduleJson as number[] | undefined,
+      }));
+
+      let annualNoi = 0;
+      try {
+        const { proFormaEngineService } = await import("../services/pro-forma-engine-service");
+        const pf = await proFormaEngineService.generateProForma(project.id, orgId, "base");
+        if (pf?.annualProjections?.length > 0) {
+          annualNoi = pf.annualProjections[0]?.noi ?? pf.annualProjections[0]?.netOperatingIncome ?? 0;
+        }
+      } catch (_) {}
+
+      const summary = computeCapitalStackSummary(engineInputs, purchasePrice, 0, 0, 0, annualNoi);
+
+      assets.push({
+        projectId: project.id,
+        name: (project as any).marinaName || (project as any).dealName || `Project ${project.id.slice(0, 6)}`,
+        purchasePrice,
+        totalDebt: summary.totalDebt,
+        ltv: summary.ltv,
+        blendedRate: summary.blendedRate,
+        annualDebtService: summary.annualDebtService,
+        dscr: summary.dscr,
+        debtYield: summary.debtYield,
+        equity: summary.totalEquity,
+        loanCount: projectLoans.length,
+        annualNOI: annualNoi,
+      });
+
+      totalDebt += summary.totalDebt;
+      totalPurchasePrice += purchasePrice;
+      weightedRateNum += summary.blendedRate * summary.totalDebt;
+      totalAnnualDebtService += summary.annualDebtService;
+      totalAnnualNOI += annualNoi;
+    }
+
+    const portfolioLTV = totalPurchasePrice > 0 ? Math.round((totalDebt / totalPurchasePrice) * 10000) / 10000 : 0;
+    const portfolioDSCR = totalAnnualDebtService > 0 ? Math.round((totalAnnualNOI / totalAnnualDebtService) * 100) / 100 : null;
+    const weightedAvgRate = totalDebt > 0 ? Math.round((weightedRateNum / totalDebt) * 100000) / 100000 : 0;
+
+    res.json({
+      portfolio: {
+        totalDebt,
+        totalEquity: totalPurchasePrice - totalDebt,
+        totalPurchasePrice,
+        ltv: portfolioLTV,
+        blendedRate: weightedAvgRate,
+        dscr: portfolioDSCR,
+        annualDebtService: totalAnnualDebtService,
+        totalAnnualNOI,
+        assetCount: assets.length,
+      },
+      assets,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

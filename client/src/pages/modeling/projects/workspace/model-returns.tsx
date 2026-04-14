@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -793,6 +793,30 @@ function TaxAnalysisPanel({ projectId, pf }: { projectId: string; pf: any }) {
   });
 
   const [result, setResult] = useState<any>(null);
+  const [debtAutoPopulated, setDebtAutoPopulated] = useState(false);
+
+  const { data: projectLoans } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', projectId, 'loans'],
+    enabled: !!projectId,
+  });
+
+  useEffect(() => {
+    if (!projectLoans || projectLoans.length === 0 || debtAutoPopulated) return;
+    const totalLoan = projectLoans.reduce((sum: number, l: any) =>
+      sum + parseFloat(l.loanAmount?.toString() || '0'), 0);
+    if (totalLoan <= 0) return;
+    const primary = projectLoans[0];
+    const rate = primary.fixedRate ? parseFloat(primary.fixedRate) : 0.065;
+    const amortYrs = primary.amortMonths ? Math.round(primary.amortMonths / 12) : 30;
+    setInputs(prev => ({
+      ...prev,
+      loanAmount: totalLoan,
+      interestRate: rate,
+      amortizationYears: amortYrs,
+      equityInvested: purchasePrice > 0 ? purchasePrice - totalLoan : prev.equityInvested,
+    }));
+    setDebtAutoPopulated(true);
+  }, [projectLoans, debtAutoPopulated, purchasePrice]);
 
   const mutation = useMutation({
     mutationFn: async (payload: TaxInputs) => {

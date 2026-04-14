@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -201,6 +201,64 @@ export default function DebtScenariosIndex() {
 
   // State for linking scenarios to projects
   const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
+
+  // Auto-fetch linked project data so inputs stay in sync
+  const { data: linkedProject } = useQuery<any>({
+    queryKey: ['/api/modeling/projects', linkedProjectId],
+    enabled: !!linkedProjectId,
+  });
+
+  const { data: linkedProjectLoans } = useQuery<any[]>({
+    queryKey: ['/api/modeling/projects', linkedProjectId, 'loans'],
+    enabled: !!linkedProjectId,
+  });
+
+  const [lastSyncedProjectId, setLastSyncedProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!linkedProjectId || linkedProjectId === lastSyncedProjectId) return;
+    if (!linkedProject) return;
+
+    setLastSyncedProjectId(linkedProjectId);
+
+    const pp = parseFloat(linkedProject.purchasePrice?.toString() || '0');
+    if (pp <= 0) return;
+
+    const ppStr = formatNumberWithCommas(Math.round(pp).toString());
+    const capRate = parseFloat(inputs.capRate) || 8;
+    const noiStr = formatNumberWithCommas(Math.round(pp * capRate / 100).toString());
+
+    let patch: Partial<ScenarioInputs> = { purchasePrice: ppStr, noi: noiStr };
+
+    if (linkedProjectLoans && linkedProjectLoans.length > 0) {
+      const totalLoan = linkedProjectLoans.reduce((s: number, l: any) =>
+        s + parseFloat(l.loanAmount?.toString() || '0'), 0);
+      const primary = linkedProjectLoans[0];
+      const ltv = pp > 0 ? (totalLoan / pp) * 100 : 70;
+      const amort = primary.amortMonths ? Math.round(primary.amortMonths / 12) : 25;
+      const term = primary.termMonths ? Math.round(primary.termMonths / 12) : 10;
+      const io = primary.interestOnlyMonths ? Math.round(primary.interestOnlyMonths / 12) : 0;
+      const spreadBps = primary.spreadBps != null
+        ? primary.spreadBps
+        : primary.fixedRate ? Math.round(parseFloat(primary.fixedRate) * 10000) : 250;
+      patch = {
+        ...patch,
+        loanAmount: formatNumberWithCommas(Math.round(totalLoan).toString()),
+        ltvPercent: ltv.toFixed(2),
+        amortizationYears: amort.toString(),
+        loanTermYears: term.toString(),
+        interestOnlyYears: io.toString(),
+        spreadBps: spreadBps.toString(),
+      };
+    } else {
+      const ltvPct = parseFloat(inputs.ltvPercent) || 70;
+      patch.loanAmount = formatNumberWithCommas(Math.round(pp * ltvPct / 100).toString());
+    }
+
+    setInputs(prev => ({ ...prev, ...patch }));
+    const projectName = (linkedProject as any).marinaName || (linkedProject as any).dealName || 'project';
+    toast({ title: 'Synced from project', description: `Loaded data for ${projectName}` });
+  }, [linkedProject, linkedProjectLoans, linkedProjectId, lastSyncedProjectId]);
 
   // Mutation: Save scenario
   const saveMutation = useMutation({

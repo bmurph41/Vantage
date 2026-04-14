@@ -75,6 +75,15 @@ export default function PortfolioReturns() {
     },
   });
 
+  const { data: debtData, isLoading: debtLoading } = useQuery<any>({
+    queryKey: ['/api/returns/portfolio/debt'],
+    queryFn: async () => {
+      const res = await fetch('/api/returns/portfolio/debt');
+      if (!res.ok) throw new Error('Failed to fetch portfolio debt');
+      return res.json();
+    },
+  });
+
   const metrics = data?.aggregate?.metrics;
   const attribution = data?.aggregate?.attribution;
   const cumulativeSeries = data?.aggregate?.cumulativeSeries;
@@ -179,12 +188,46 @@ export default function PortfolioReturns() {
         </Card>
       )}
 
+      {!hasData && debtData?.assets?.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Landmark className="h-4 w-4" /> Portfolio Debt Summary
+            </CardTitle>
+            <CardDescription>Aggregated across {debtData.portfolio.assetCount} asset{debtData.portfolio.assetCount !== 1 ? 's' : ''} with debt</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Debt</p>
+                <p className="text-xl font-bold">{formatCurrencyCompact(debtData.portfolio.totalDebt)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Blended LTV</p>
+                <p className="text-xl font-bold">{(debtData.portfolio.ltv * 100).toFixed(1)}%</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Wtd Avg Rate</p>
+                <p className="text-xl font-bold">{(debtData.portfolio.blendedRate * 100).toFixed(2)}%</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Portfolio DSCR</p>
+                <p className="text-xl font-bold">{debtData.portfolio.dscr != null ? `${debtData.portfolio.dscr.toFixed(2)}x` : 'N/A'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {hasData && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="attribution">Attribution</TabsTrigger>
             <TabsTrigger value="properties">Properties</TabsTrigger>
+            <TabsTrigger value="debt">
+              <Landmark className="h-3.5 w-3.5 mr-1.5" />Debt
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6 mt-4">
@@ -322,6 +365,174 @@ export default function PortfolioReturns() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="debt" className="space-y-6 mt-4">
+            {debtLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
+              </div>
+            ) : !debtData?.assets?.length ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Landmark className="h-10 w-10 text-muted-foreground mb-3" />
+                  <h3 className="text-base font-semibold">No Debt Recorded</h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-sm mt-1">
+                    Add loans in the Debt Inputs tab of each project workspace to see portfolio-level debt analytics here.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <KpiCard
+                    title="Total Portfolio Debt"
+                    value={formatCurrencyCompact(debtData.portfolio.totalDebt)}
+                    icon={Landmark}
+                    trend="down"
+                  />
+                  <KpiCard
+                    title="Blended LTV"
+                    value={`${(debtData.portfolio.ltv * 100).toFixed(1)}%`}
+                    icon={Percent}
+                    trend={debtData.portfolio.ltv > 0.75 ? 'down' : 'neutral'}
+                  />
+                  <KpiCard
+                    title="Wtd Avg Rate"
+                    value={`${(debtData.portfolio.blendedRate * 100).toFixed(2)}%`}
+                    icon={TrendingUp}
+                    trend="neutral"
+                  />
+                  <KpiCard
+                    title="Portfolio DSCR"
+                    value={debtData.portfolio.dscr != null ? `${debtData.portfolio.dscr.toFixed(2)}x` : 'N/A'}
+                    icon={Activity}
+                    trend={debtData.portfolio.dscr != null && debtData.portfolio.dscr >= 1.25 ? 'up' : 'down'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Debt vs Equity by Asset</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={debtData.assets} margin={{ top: 4, right: 8, left: 0, bottom: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 10 }}
+                            angle={-35}
+                            textAnchor="end"
+                            interval={0}
+                            height={55}
+                          />
+                          <YAxis tickFormatter={(v: number) => formatCurrencyCompact(v)} tick={{ fontSize: 10 }} />
+                          <Tooltip
+                            formatter={(val: number, name: string) => [formatCurrencyCompact(val), name]}
+                            labelStyle={{ fontSize: 12 }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="totalDebt" name="Debt" fill="#ef4444" radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="equity" name="Equity" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Annual Debt Service by Asset</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={debtData.assets} margin={{ top: 4, right: 8, left: 0, bottom: 40 }}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 10 }}
+                            angle={-35}
+                            textAnchor="end"
+                            interval={0}
+                            height={55}
+                          />
+                          <YAxis tickFormatter={(v: number) => formatCurrencyCompact(v)} tick={{ fontSize: 10 }} />
+                          <Tooltip
+                            formatter={(val: number, name: string) => [formatCurrencyCompact(val), name]}
+                            labelStyle={{ fontSize: 12 }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="annualDebtService" name="Annual Debt Service" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                          <Bar dataKey="annualNOI" name="NOI" fill="#10b981" radius={[3, 3, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Asset-Level Debt Detail</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="pl-4">Asset</TableHead>
+                            <TableHead className="text-right">Purchase Price</TableHead>
+                            <TableHead className="text-right">Total Debt</TableHead>
+                            <TableHead className="text-right">Equity</TableHead>
+                            <TableHead className="text-right">LTV</TableHead>
+                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">Annual DS</TableHead>
+                            <TableHead className="text-right">DSCR</TableHead>
+                            <TableHead className="text-right">Debt Yield</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {debtData.assets.map((asset: any) => (
+                            <TableRow key={asset.projectId}>
+                              <TableCell className="pl-4 font-medium text-sm">{asset.name}</TableCell>
+                              <TableCell className="text-right text-sm">{formatCurrencyCompact(asset.purchasePrice)}</TableCell>
+                              <TableCell className="text-right text-sm text-red-600 dark:text-red-400">{formatCurrencyCompact(asset.totalDebt)}</TableCell>
+                              <TableCell className="text-right text-sm text-blue-600 dark:text-blue-400">{formatCurrencyCompact(asset.equity)}</TableCell>
+                              <TableCell className="text-right text-sm">{(asset.ltv * 100).toFixed(1)}%</TableCell>
+                              <TableCell className="text-right text-sm">{(asset.blendedRate * 100).toFixed(2)}%</TableCell>
+                              <TableCell className="text-right text-sm">{formatCurrencyCompact(asset.annualDebtService)}</TableCell>
+                              <TableCell className="text-right text-sm">
+                                <span className={asset.dscr != null && asset.dscr >= 1.25 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : asset.dscr != null && asset.dscr < 1.0 ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+                                  {asset.dscr != null ? `${asset.dscr.toFixed(2)}x` : '—'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {asset.debtYield != null ? `${(asset.debtYield * 100).toFixed(2)}%` : '—'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                        <tfoot>
+                          <TableRow className="border-t-2 font-semibold bg-muted/40">
+                            <TableCell className="pl-4 text-sm">Portfolio Total</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrencyCompact(debtData.portfolio.totalPurchasePrice)}</TableCell>
+                            <TableCell className="text-right text-sm text-red-600 dark:text-red-400">{formatCurrencyCompact(debtData.portfolio.totalDebt)}</TableCell>
+                            <TableCell className="text-right text-sm text-blue-600 dark:text-blue-400">{formatCurrencyCompact(debtData.portfolio.totalEquity)}</TableCell>
+                            <TableCell className="text-right text-sm">{(debtData.portfolio.ltv * 100).toFixed(1)}%</TableCell>
+                            <TableCell className="text-right text-sm">{(debtData.portfolio.blendedRate * 100).toFixed(2)}%</TableCell>
+                            <TableCell className="text-right text-sm">{formatCurrencyCompact(debtData.portfolio.annualDebtService)}</TableCell>
+                            <TableCell className="text-right text-sm">
+                              {debtData.portfolio.dscr != null ? `${debtData.portfolio.dscr.toFixed(2)}x` : '—'}
+                            </TableCell>
+                            <TableCell className="text-right text-sm">—</TableCell>
+                          </TableRow>
+                        </tfoot>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       )}
