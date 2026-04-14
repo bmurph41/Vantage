@@ -98,6 +98,7 @@ import modelingRentRollRoutes from "./routes/modeling-rent-roll-routes";
 import marinaIntegrationsRoutes from "./routes/marina-integrations-routes";
 import authRoutes from "./routes/auth-routes";
 import analyticsRoutes from "./routes/analytics-routes";
+import legalBenchmarkingRoutes from "./routes/legal-benchmarking-routes";
 import { registerEntityLinkingRoutes, registerEventMonitoringRoutes } from "./routes/entity-linking";
 import contactIntelligenceRoutes from "./routes/contact-intelligence";
 import playbookRoutes from "./routes/playbook-routes";
@@ -1016,6 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEntityLinkingRoutes(app);
   registerEventMonitoringRoutes(app);
   app.use("/api/analytics", authenticateUser, requirePack("analytics_pro"), analyticsRoutes);
+  app.use("/api", authenticateUser, legalBenchmarkingRoutes);
   app.use("/api/ai-assistant", authenticateUser, aiAssistantRoutes);
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
   app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);

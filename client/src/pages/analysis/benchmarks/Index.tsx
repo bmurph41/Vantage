@@ -68,7 +68,7 @@ export default function BenchmarksIndex() {
   });
 
   const refreshMutation = useMutation({
-    mutationFn: () => apiRequest("/api/capital-markets/rates/refresh", { method: "POST", body: JSON.stringify({ lookbackDays: 365 }) }),
+    mutationFn: () => apiRequest("POST", "/api/capital-markets/rates/refresh", { lookbackDays: 365 }),
     onSuccess: (data: any) => {
       toast({ title: "Rates Refreshed", description: data.message || "Market rates have been updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/benchmarks/fred"] });

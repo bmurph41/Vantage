@@ -144,10 +144,20 @@ router.get('/marina/summary', async (req: Request, res: Response) => {
   try {
     const orgId = (req as any).user?.orgId || (req as any).tenantId || (req as any).orgId;
     if (!orgId) return res.status(401).json({ error: 'Unauthorized' });
-    
-    const kpis = await marinaKpiCalculator.calculateKpis({ orgId });
 
-    // Return simplified summary for dashboard
+    const timeout = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('KPI calculation timed out')), 8000)
+    );
+
+    const kpis = await Promise.race([
+      marinaKpiCalculator.calculateKpis({ orgId }),
+      timeout,
+    ]);
+
+    if (!kpis) {
+      return res.json({ occupancyRate: 0, totalSlips: 0, occupiedSlips: 0, adr: 0, revPalf: 0, grossRevenue: 0, ancillaryRevenue: 0, noi: 0, noiMargin: 0, dscr: null, dataQualityScore: 0, asOf: new Date() });
+    }
+
     res.json({
       occupancyRate: kpis.occupancy.occupancyRate,
       totalSlips: kpis.occupancy.totalSlips,
@@ -163,6 +173,9 @@ router.get('/marina/summary', async (req: Request, res: Response) => {
       asOf: kpis.asOf,
     });
   } catch (error: any) {
+    if (error.message === 'KPI calculation timed out') {
+      return res.json({ occupancyRate: 0, totalSlips: 0, occupiedSlips: 0, adr: 0, revPalf: 0, grossRevenue: 0, ancillaryRevenue: 0, noi: 0, noiMargin: 0, dscr: null, dataQualityScore: 0, asOf: new Date() });
+    }
     console.error('[Analytics] Error fetching summary:', error);
     res.status(500).json({ 
       error: 'Failed to fetch summary',
