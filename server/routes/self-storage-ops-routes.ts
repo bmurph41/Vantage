@@ -67,26 +67,27 @@ router.get('/stats', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     const marinaId = req.query.marinaId as string | undefined;
 
-    let conditions: any[] = [eq(opsSelfStorageUnits.orgId, orgId)];
-    if (marinaId) conditions.push(eq(opsSelfStorageUnits.marinaId, marinaId as string));
-
-    const units = await db.select().from(opsSelfStorageUnits).where(and(...conditions));
+    const statsConds: string[] = [`org_id = '${orgId}'`];
+    if (marinaId) statsConds.push(`marina_id = '${marinaId}'`);
+    const units: any[] = (await db.execute(
+      sql.raw(`SELECT *, move_out_date FROM ops_self_storage_units WHERE ${statsConds.join(' AND ')}`)
+    )).rows;
 
     const totalUnits = units.length;
     const occupiedUnits = units.filter(u => u.status === 'occupied').length;
     const occupancyPct = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
-    const rates = units.filter(u => u.monthlyRate).map(u => parseFloat(u.monthlyRate || '0'));
+    const rates = units.filter(u => u.monthly_rate).map(u => parseFloat(u.monthly_rate || '0'));
     const averageUnitRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
 
-    // Revenue per SF
-    const totalRevenue = units
-      .filter(u => u.status === 'occupied' && u.monthlyRate)
-      .reduce((sum, u) => sum + parseFloat(u.monthlyRate || '0'), 0);
+    // Revenue per SF + total monthly revenue
+    const totalMonthlyRevenue = units
+      .filter(u => u.status === 'occupied' && u.monthly_rate)
+      .reduce((sum, u) => sum + parseFloat(u.monthly_rate || '0'), 0);
     const totalSF = units
       .filter(u => u.status === 'occupied')
       .reduce((sum, u) => sum + sizeToSqFt(u.size), 0);
-    const revenuePerSF = totalSF > 0 ? totalRevenue / totalSF : 0;
+    const revenuePerSF = totalSF > 0 ? totalMonthlyRevenue / totalSF : 0;
 
     // Unit occupancy grid: size × status breakdown
     const sizeGrid: Record<string, { occupied: number; available: number; delinquent: number; reserved: number; maintenance: number }> = {};
@@ -106,28 +107,31 @@ router.get('/stats', async (req: Request, res: Response) => {
         ...counts,
         total: counts.occupied + counts.available + counts.delinquent + counts.reserved + counts.maintenance,
       }));
-    // Legacy unitSizeMix for backwards compat
     const unitSizeMix = unitOccupancyGrid.map(g => ({ size: g.size, count: g.total }));
 
-    // Move-in/out trend (last 6 months from moveInDate data)
+    // Move-in/out trend (last 6 months)
     const now = new Date();
     const moveInOutTrend: Array<{ month: string; moveIns: number; moveOuts: number }> = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mStart = d.toISOString().split('T')[0];
       const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-      const moveIns = units.filter(u => u.moveInDate && u.moveInDate >= mStart && u.moveInDate <= mEnd).length;
-      moveInOutTrend.push({
-        month: d.toLocaleString('default', { month: 'short' }),
-        moveIns,
-        moveOuts: 0, // no explicit moveOut tracked in this table
-      });
+      const moveIns = units.filter(u => {
+        const mid = u.move_in_date ? String(u.move_in_date).slice(0, 10) : null;
+        return mid && mid >= mStart && mid <= mEnd;
+      }).length;
+      const moveOuts = units.filter(u => {
+        const mod = u.move_out_date ? String(u.move_out_date).slice(0, 10) : null;
+        return mod && mod >= mStart && mod <= mEnd;
+      }).length;
+      moveInOutTrend.push({ month: d.toLocaleString('default', { month: 'short' }), moveIns, moveOuts });
     }
 
     res.json({
       totalUnits,
       occupancyPct: Math.round(occupancyPct * 10) / 10,
       occupancyChange: 0,
+      totalMonthlyRevenue: Math.round(totalMonthlyRevenue * 100) / 100,
       revenuePerSF: Math.round(revenuePerSF * 100) / 100,
       revenuePerSFChange: 0,
       averageUnitRate: Math.round(averageUnitRate * 100) / 100,
@@ -150,33 +154,32 @@ router.get('/units', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     const { size, type, status, search, marinaId } = req.query;
 
-    let conditions: any[] = [eq(opsSelfStorageUnits.orgId, orgId)];
-    if (marinaId) conditions.push(eq(opsSelfStorageUnits.marinaId, marinaId as string));
-    if (size && size !== 'all') conditions.push(eq(opsSelfStorageUnits.size, size as string));
-    if (type && type !== 'all') conditions.push(eq(opsSelfStorageUnits.unitType, type as string));
-    if (status && status !== 'all') conditions.push(eq(opsSelfStorageUnits.status, status as string));
+    const unitsConds: string[] = [`org_id = '${orgId}'`];
+    if (marinaId) unitsConds.push(`marina_id = '${marinaId}'`);
+    if (size && size !== 'all') unitsConds.push(`size = '${size}'`);
+    if (type && type !== 'all') unitsConds.push(`unit_type = '${type}'`);
+    if (status && status !== 'all') unitsConds.push(`status = '${status}'`);
     if (search) {
-      conditions.push(
-        or(
-          ilike(opsSelfStorageUnits.unitNumber, `%${search}%`),
-          ilike(opsSelfStorageUnits.tenantName, `%${search}%`),
-        )
-      );
+      const s = String(search).replace(/'/g, "''");
+      unitsConds.push(`(unit_number ILIKE '%${s}%' OR tenant_name ILIKE '%${s}%')`);
     }
 
-    const units = await db.select().from(opsSelfStorageUnits).where(and(...conditions));
+    const rawUnits: any[] = (await db.execute(
+      sql.raw(`SELECT *, move_out_date FROM ops_self_storage_units WHERE ${unitsConds.join(' AND ')} ORDER BY unit_number`)
+    )).rows;
 
-    const mapped = units.map(u => ({
+    const mapped = rawUnits.map(u => ({
       id: u.id,
-      unitNumber: u.unitNumber,
+      unitNumber: u.unit_number,
       size: u.size,
-      unitType: u.unitType,
+      unitType: u.unit_type,
       status: u.status,
-      monthlyRate: u.monthlyRate || null,
-      tenantName: u.tenantName || null,
-      moveInDate: u.moveInDate || null,
-      autopayEnabled: u.autopayEnabled ?? false,
-      insuranceActive: u.insuranceActive ?? false,
+      monthlyRate: u.monthly_rate || null,
+      tenantName: u.tenant_name || null,
+      moveInDate: u.move_in_date ? String(u.move_in_date).slice(0, 10) : null,
+      moveOutDate: u.move_out_date ? String(u.move_out_date).slice(0, 10) : null,
+      autopayEnabled: u.autopay_enabled ?? false,
+      insuranceActive: u.insurance_active ?? false,
     }));
 
     res.json(mapped);

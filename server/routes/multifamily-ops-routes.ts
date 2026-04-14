@@ -148,12 +148,15 @@ router.get('/units', async (req: Request, res: Response) => {
     const mapped = units.map(u => ({
       id: u.id,
       unitNumber: u.unitNumber,
-      type: u.unitType,
-      sqFt: u.sqft || 0,
+      unitType: u.unitType,
+      sqft: u.sqft ?? null,
+      bedrooms: u.bedrooms ?? null,
       status: u.status,
-      currentRent: parseFloat(u.currentRent || '0'),
-      marketRent: parseFloat(u.marketRent || '0'),
-      tenant: u.tenantName || null,
+      currentRent: u.currentRent || null,
+      marketRent: u.marketRent || null,
+      tenantName: u.tenantName || null,
+      leaseStart: u.leaseStart || null,
+      leaseEnd: u.leaseEnd || null,
     }));
 
     res.json(mapped);

@@ -27,6 +27,7 @@ interface SelfStorageStats {
   totalUnits: number;
   occupancyPct: number;
   occupancyChange: number;
+  totalMonthlyRevenue: number;
   revenuePerSF: number;
   revenuePerSFChange: number;
   averageUnitRate: number;
@@ -45,6 +46,7 @@ interface StorageUnit {
   monthlyRate: string | null;
   tenantName: string | null;
   moveInDate: string | null;
+  moveOutDate: string | null;
   autopayEnabled: boolean;
   insuranceActive: boolean;
 }
@@ -146,11 +148,15 @@ export default function SelfStorageDashboard() {
     .filter(u => u.moveInDate && u.moveInDate >= thisMonthStart && u.moveInDate <= thisMonthEnd)
     .sort((a, b) => (b.moveInDate! > a.moveInDate! ? 1 : -1));
 
+  const thisMonthMoveOuts = units
+    .filter(u => u.moveOutDate && u.moveOutDate >= thisMonthStart && u.moveOutDate <= thisMonthEnd)
+    .sort((a, b) => (b.moveOutDate! > a.moveOutDate! ? 1 : -1));
+
   const monthLabel = now.toLocaleString("default", { month: "long", year: "numeric" });
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KpiCard title="Total Units" value={stats?.totalUnits} icon={Box} format="number" />
         <KpiCard
           title="Occupancy Rate"
@@ -171,6 +177,12 @@ export default function SelfStorageDashboard() {
           value={stats?.averageUnitRate}
           change={stats?.rateChange}
           icon={Warehouse}
+          format="currency"
+        />
+        <KpiCard
+          title="Monthly Revenue"
+          value={stats?.totalMonthlyRevenue}
+          icon={DollarSign}
           format="currency"
         />
         <Card>
@@ -270,17 +282,17 @@ export default function SelfStorageDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Move-in Log — {monthLabel}</CardTitle>
-            <CardDescription>Tenants who moved in this month</CardDescription>
+            <CardTitle>Move-in / Move-out Log — {monthLabel}</CardTitle>
+            <CardDescription>Tenant activity recorded this month</CardDescription>
           </CardHeader>
           <CardContent>
             {unitsLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
               </div>
-            ) : thisMonthMoveIns.length === 0 ? (
+            ) : thisMonthMoveIns.length === 0 && thisMonthMoveOuts.length === 0 ? (
               <div className="flex items-center justify-center h-48 text-muted-foreground">
-                No move-ins recorded for {monthLabel}.
+                No move activity recorded for {monthLabel}.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -290,22 +302,33 @@ export default function SelfStorageDashboard() {
                       <th className="text-left py-2 pr-4 font-medium">Unit</th>
                       <th className="text-left py-2 pr-4 font-medium">Size</th>
                       <th className="text-left py-2 pr-4 font-medium">Tenant</th>
-                      <th className="text-left py-2 pr-4 font-medium">Move-in</th>
+                      <th className="text-left py-2 pr-4 font-medium">Type</th>
+                      <th className="text-left py-2 pr-4 font-medium">Date</th>
                       <th className="text-left py-2 font-medium">Rate/Mo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {thisMonthMoveIns.map((unit) => (
-                      <tr key={unit.id} className="border-b last:border-0 hover:bg-muted/50">
-                        <td className="py-2 pr-4 font-medium">{unit.unitNumber}</td>
-                        <td className="py-2 pr-4">{unit.size}</td>
-                        <td className="py-2 pr-4">{unit.tenantName || "—"}</td>
-                        <td className="py-2 pr-4">{unit.moveInDate || "—"}</td>
-                        <td className="py-2">
-                          {unit.monthlyRate ? `$${parseFloat(unit.monthlyRate).toFixed(0)}` : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {[
+                      ...thisMonthMoveIns.map(u => ({ ...u, _type: "in" as const, _date: u.moveInDate! })),
+                      ...thisMonthMoveOuts.map(u => ({ ...u, _type: "out" as const, _date: u.moveOutDate! })),
+                    ]
+                      .sort((a, b) => (b._date > a._date ? 1 : -1))
+                      .map((unit) => (
+                        <tr key={`${unit.id}-${unit._type}`} className="border-b last:border-0 hover:bg-muted/50">
+                          <td className="py-2 pr-4 font-medium">{unit.unitNumber}</td>
+                          <td className="py-2 pr-4">{unit.size}</td>
+                          <td className="py-2 pr-4">{unit.tenantName || "—"}</td>
+                          <td className="py-2 pr-4">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${unit._type === "in" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"}`}>
+                              {unit._type === "in" ? "Move-in" : "Move-out"}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4">{unit._date || "—"}</td>
+                          <td className="py-2">
+                            {unit.monthlyRate ? `$${parseFloat(unit.monthlyRate).toFixed(0)}` : "—"}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
