@@ -9136,6 +9136,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
 
+  // 'owner' is a valid role — used when seeding the project creator into the collaborators
+  // table and when an org-level owner is added. Invitations default to 'viewer' or 'editor'.
   const VALID_ROLES = ['viewer', 'editor', 'owner'] as const;
   type CollabRole = (typeof VALID_ROLES)[number];
 
