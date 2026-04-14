@@ -9356,13 +9356,16 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
       }
 
-      await db
+      const [updated] = await db
         .update(modelingProjectCollaborators)
         .set({ role })
         .where(and(
           eq(modelingProjectCollaborators.id, collaboratorId),
           eq(modelingProjectCollaborators.projectId, projectId),
-        ));
+        ))
+        .returning({ id: modelingProjectCollaborators.id });
+
+      if (!updated) return res.status(404).json({ error: 'Collaborator not found' });
 
       await logProjectActivity(projectId, userId, `updated collaborator role to ${role}`, { collaboratorId, role });
 
@@ -9388,12 +9391,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
       }
 
-      await db
+      const [deleted] = await db
         .delete(modelingProjectCollaborators)
         .where(and(
           eq(modelingProjectCollaborators.id, collaboratorId),
           eq(modelingProjectCollaborators.projectId, projectId),
-        ));
+        ))
+        .returning({ id: modelingProjectCollaborators.id });
+
+      if (!deleted) return res.status(404).json({ error: 'Collaborator not found' });
 
       await logProjectActivity(projectId, userId, 'removed a collaborator', { collaboratorId });
 
@@ -9423,12 +9429,15 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
       }
 
-      await db
+      const [deleted] = await db
         .delete(modelingProjectCollaborators)
         .where(and(
           eq(modelingProjectCollaborators.projectId, projectId),
           eq(modelingProjectCollaborators.userId, targetUserId),
-        ));
+        ))
+        .returning({ id: modelingProjectCollaborators.id });
+
+      if (!deleted) return res.status(404).json({ error: 'Collaborator not found' });
 
       await logProjectActivity(projectId, userId, 'removed a collaborator', { targetUserId });
 
