@@ -11260,6 +11260,33 @@ export const modelingProjects = pgTable('modeling_projects', {
   orgOutcomeIdx: index('modeling_projects_org_outcome_idx').on(table.orgId, table.dealOutcome),
 }));
 
+// Modeling Project Collaborators - tracks who has been granted access to a project
+export const modelingProjectCollaborators = pgTable('modeling_project_collaborators', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: text('role').notNull().default('viewer'), // 'viewer' | 'editor' | 'owner'
+  addedAt: timestamp('added_at').notNull().defaultNow(),
+  addedBy: varchar('added_by').references(() => users.id),
+}, (table) => ({
+  projectUserUnique: unique('mp_collab_project_user_unique').on(table.projectId, table.userId),
+  projectIdx: index('mp_collab_project_idx').on(table.projectId),
+  userIdx: index('mp_collab_user_idx').on(table.userId),
+}));
+
+// Modeling Project Activity Log - per-project audit trail of saves and changes
+export const modelingProjectActivity = pgTable('modeling_project_activity', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').notNull().references(() => modelingProjects.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: text('action').notNull(), // human-readable description, e.g. "updated Pro Forma assumptions"
+  metadata: jsonb('metadata').default(sql`'{}'`),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index('mp_activity_project_idx').on(table.projectId),
+  projectCreatedAtIdx: index('mp_activity_project_created_at_idx').on(table.projectId, table.createdAt),
+}));
+
 // Valuation Snapshots - Point-in-time valuation captures for historical tracking
 export const valuationSnapshotTriggerEnum = pgEnum("valuation_snapshot_trigger", [
   "manual",           // User manually triggered
@@ -12987,6 +13014,22 @@ export const updateModelingProjectSchema = insertModelingProjectSchema.partial()
 export type ModelingProject = typeof modelingProjects.$inferSelect;
 export type InsertModelingProject = z.infer<typeof insertModelingProjectSchema>;
 export type UpdateModelingProject = z.infer<typeof updateModelingProjectSchema>;
+
+// Collaborator schemas
+export const insertModelingProjectCollaboratorSchema = createInsertSchema(modelingProjectCollaborators).omit({
+  id: true,
+  addedAt: true,
+});
+export type ModelingProjectCollaborator = typeof modelingProjectCollaborators.$inferSelect;
+export type InsertModelingProjectCollaborator = z.infer<typeof insertModelingProjectCollaboratorSchema>;
+
+// Activity log schemas
+export const insertModelingProjectActivitySchema = createInsertSchema(modelingProjectActivity).omit({
+  id: true,
+  createdAt: true,
+});
+export type ModelingProjectActivityEntry = typeof modelingProjectActivity.$inferSelect;
+export type InsertModelingProjectActivity = z.infer<typeof insertModelingProjectActivitySchema>;
 
 // Valuation Snapshot schemas
 export const insertValuationSnapshotSchema = createInsertSchema(valuationSnapshots).omit({

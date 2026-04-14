@@ -16,6 +16,8 @@ import fs from "fs-extra";
 import crypto from "crypto";
 import {
   modelingProjects,
+  modelingProjectCollaborators,
+  modelingProjectActivity,
   rentRolls,
   rentRollEntries,
   transactionClosingSummary,
@@ -9094,6 +9096,220 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     } catch (error: any) {
       console.error('Failed to fetch recent modeling projects:', error);
       res.status(500).json({ error: 'Failed to fetch recent modeling projects' });
+    }
+  });
+
+  // ==================== SCENARIO COLLABORATION ROUTES ====================
+
+  // Helper to verify project ownership / access for the requesting org
+  async function verifyProjectAccess(projectId: string, orgId: string) {
+    const [project] = await db
+      .select({ id: modelingProjects.id, createdBy: modelingProjects.createdBy })
+      .from(modelingProjects)
+      .where(and(eq(modelingProjects.id, projectId), eq(modelingProjects.orgId, orgId)))
+      .limit(1);
+    return project ?? null;
+  }
+
+  // GET /api/modeling/projects/:projectId/collaborators
+  // Returns all org members who have been added to this project, joined with user details
+  app.get('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const orgId = req.user.orgId;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const collaborators = await db
+        .select({
+          id: modelingProjectCollaborators.id,
+          userId: modelingProjectCollaborators.userId,
+          role: modelingProjectCollaborators.role,
+          addedAt: modelingProjectCollaborators.addedAt,
+          name: users.name,
+          email: users.email,
+        })
+        .from(modelingProjectCollaborators)
+        .innerJoin(users, eq(users.id, modelingProjectCollaborators.userId))
+        .where(eq(modelingProjectCollaborators.projectId, projectId))
+        .orderBy(asc(modelingProjectCollaborators.addedAt));
+
+      // Map role → permission shape expected by the UI
+      const mapped = collaborators.map((c, i) => ({
+        id: c.id,
+        userId: c.userId,
+        name: c.name,
+        email: c.email,
+        permission: c.role === 'owner' ? 'full-access' : c.role === 'editor' ? 'can-edit' : 'view-only',
+        role: c.role,
+        status: 'offline' as const,
+        addedAt: c.addedAt,
+        colorIndex: i % 8,
+      }));
+
+      res.json(mapped);
+    } catch (error: any) {
+      console.error('Failed to fetch collaborators:', error.message);
+      res.status(500).json({ error: 'Failed to fetch collaborators' });
+    }
+  });
+
+  // POST /api/modeling/projects/:projectId/collaborators
+  // Adds a user (by email) as a collaborator with the given role
+  app.post('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const orgId = req.user.orgId;
+      const { email, role = 'viewer' } = req.body;
+
+      if (!email) return res.status(400).json({ error: 'email is required' });
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      // Find the user by email within the same org
+      const [targetUser] = await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(and(eq(users.email, email.trim().toLowerCase()), eq(users.orgId, orgId)))
+        .limit(1);
+
+      if (!targetUser) {
+        return res.status(404).json({ error: 'No user with that email found in your organisation' });
+      }
+
+      // Upsert — if already a collaborator update their role, else insert
+      await db
+        .insert(modelingProjectCollaborators)
+        .values({
+          projectId,
+          userId: targetUser.id,
+          role,
+          addedBy: req.user.id,
+        })
+        .onConflictDoUpdate({
+          target: [modelingProjectCollaborators.projectId, modelingProjectCollaborators.userId],
+          set: { role },
+        });
+
+      // Log the activity
+      await db.insert(modelingProjectActivity).values({
+        projectId,
+        userId: req.user.id,
+        action: `added ${targetUser.name} as a collaborator (${role})`,
+        metadata: { targetUserId: targetUser.id, role },
+      });
+
+      res.json({ success: true, user: targetUser, role });
+    } catch (error: any) {
+      console.error('Failed to add collaborator:', error.message);
+      res.status(500).json({ error: 'Failed to add collaborator' });
+    }
+  });
+
+  // PATCH /api/modeling/projects/:projectId/collaborators/:collaboratorId
+  // Updates the role of an existing collaborator
+  app.patch('/api/modeling/projects/:projectId/collaborators/:collaboratorId', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId, collaboratorId } = req.params;
+      const orgId = req.user.orgId;
+      const { role } = req.body;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      await db
+        .update(modelingProjectCollaborators)
+        .set({ role })
+        .where(and(
+          eq(modelingProjectCollaborators.id, collaboratorId),
+          eq(modelingProjectCollaborators.projectId, projectId),
+        ));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to update collaborator:', error.message);
+      res.status(500).json({ error: 'Failed to update collaborator' });
+    }
+  });
+
+  // DELETE /api/modeling/projects/:projectId/collaborators/:collaboratorId
+  app.delete('/api/modeling/projects/:projectId/collaborators/:collaboratorId', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId, collaboratorId } = req.params;
+      const orgId = req.user.orgId;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      await db
+        .delete(modelingProjectCollaborators)
+        .where(and(
+          eq(modelingProjectCollaborators.id, collaboratorId),
+          eq(modelingProjectCollaborators.projectId, projectId),
+        ));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to remove collaborator:', error.message);
+      res.status(500).json({ error: 'Failed to remove collaborator' });
+    }
+  });
+
+  // GET /api/modeling/projects/:projectId/activity
+  // Returns the 50 most recent activity log entries for a project, joined with user name
+  app.get('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const orgId = req.user.orgId;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      const entries = await db
+        .select({
+          id: modelingProjectActivity.id,
+          action: modelingProjectActivity.action,
+          metadata: modelingProjectActivity.metadata,
+          createdAt: modelingProjectActivity.createdAt,
+          userName: users.name,
+          userId: modelingProjectActivity.userId,
+        })
+        .from(modelingProjectActivity)
+        .leftJoin(users, eq(users.id, modelingProjectActivity.userId))
+        .where(eq(modelingProjectActivity.projectId, projectId))
+        .orderBy(desc(modelingProjectActivity.createdAt))
+        .limit(50);
+
+      res.json(entries);
+    } catch (error: any) {
+      console.error('Failed to fetch project activity:', error.message);
+      res.status(500).json({ error: 'Failed to fetch project activity' });
+    }
+  });
+
+  // POST /api/modeling/projects/:projectId/activity  (internal — called from other save routes)
+  app.post('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
+    try {
+      const { projectId } = req.params;
+      const orgId = req.user.orgId;
+      const { action, metadata } = req.body;
+
+      const project = await verifyProjectAccess(projectId, orgId);
+      if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      await db.insert(modelingProjectActivity).values({
+        projectId,
+        userId: req.user.id,
+        action: action || 'updated project',
+        metadata: metadata || {},
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to log activity:', error.message);
+      res.status(500).json({ error: 'Failed to log activity' });
     }
   });
 }
