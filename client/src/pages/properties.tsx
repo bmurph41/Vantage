@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, AlertTriangle, CheckCircle } from "lucide-react";
+import { Upload, Plus, Search, Edit, Trash2, MapPin, Anchor, Building, DollarSign, Home, TrendingUp, FolderPlus, AlertTriangle, CheckCircle, BarChart3 } from "lucide-react";
 import { FileUpload } from "@/components/file-upload";
 import PropertyFormModal from "@/components/modals/property-form-modal";
 import { CreatePropertyWizardModal } from "@/components/modals/create-property-wizard-modal";
@@ -156,6 +156,11 @@ export default function Properties() {
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
   });
+
+  const { data: modelCoverage } = useQuery<{ propertyIds: string[]; companyIds: string[]; contactIds: string[] }>({
+    queryKey: ['/api/modeling/property-coverage'],
+  });
+  const modeledPropertyIds = new Set(modelCoverage?.propertyIds ?? []);
 
   const duplicateGroups = useMemo(() => findDuplicateGroups(properties), [properties]);
   const duplicateIds = useMemo(() => {
@@ -331,6 +336,8 @@ export default function Properties() {
   const marinas = properties.filter(p => p.type === 'marina').length;
   const available = properties.filter(p => p.status === 'available' || (p as any).listingStatus === 'on_market').length;
   const underContract = properties.filter(p => p.status === 'under_contract' || (p as any).listingStatus === 'under_contract' || (p as any).listingStatus === 'under_loi').length;
+  const modeledCount = properties.filter(p => modeledPropertyIds.has(p.id)).length;
+  const modelCoveragePct = totalProperties > 0 ? Math.round((modeledCount / totalProperties) * 100) : 0;
 
   const columns: CrmColumn<Property>[] = [
     {
@@ -351,6 +358,12 @@ export default function Properties() {
               >
                 {property.title}
               </button>
+              {modeledPropertyIds.has(property.id) && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-emerald-50 text-emerald-700 border-emerald-300 flex-shrink-0" title="Financial model built for this property">
+                  <BarChart3 className="w-2.5 h-2.5 mr-0.5" />
+                  Modeled
+                </Badge>
+              )}
               {duplicateIds.has(property.id) && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-700 border-amber-300 flex-shrink-0">
                   <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />
@@ -494,7 +507,7 @@ export default function Properties() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-white border-b border-gray-200">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -503,6 +516,18 @@ export default function Properties() {
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Home className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 border-emerald-200 bg-emerald-50/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-emerald-600 mb-1">Models Built</p>
+                <p className="text-2xl font-bold text-emerald-700">{modeledCount}</p>
+                <p className="text-xs text-emerald-500 mt-0.5">{modelCoveragePct}% coverage</p>
+              </div>
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-emerald-600" />
               </div>
             </div>
           </Card>

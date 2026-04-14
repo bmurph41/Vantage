@@ -212,6 +212,12 @@ export function DetailDrawer({
     enabled: entityType === 'company' && !!entityId,
   });
 
+  const { data: _modelCoverage } = useQuery<{ propertyIds: string[]; companyIds: string[]; contactIds: string[] }>({
+    queryKey: ['/api/modeling/property-coverage'],
+  });
+  const modeledPropertyIds = new Set(_modelCoverage?.propertyIds ?? []);
+  const modeledCompanyIds = new Set(_modelCoverage?.companyIds ?? []);
+
   // Fetch companies linked to contact
   const { data: contactCompanies = [] } = useQuery<any[]>({
     queryKey: ['/api/contacts', entityId, 'companies'],
@@ -1492,13 +1498,22 @@ export function DetailDrawer({
                       <div className="space-y-2">
                         {companyProperties.map((link: any) => {
                           const property = link.property || link;
+                          const isModeled = modeledPropertyIds.has(property.id);
                           return (
-                            <div key={property.id || link.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+                            <div key={property.id || link.id} className={`flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors ${isModeled ? 'border-emerald-200 bg-emerald-50/30' : ''}`}>
                               <div className="w-10 h-10 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center text-cyan-700 dark:text-cyan-300">
                                 <Anchor className="h-5 w-5" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{property.name || property.address || "Unnamed Property"}</div>
+                                <div className="font-medium truncate flex items-center gap-1.5">
+                                  {property.name || property.address || "Unnamed Property"}
+                                  {isModeled && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0">
+                                      <BarChart3 className="h-2.5 w-2.5" />
+                                      Modeled
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-sm text-muted-foreground truncate">
                                   {property.city && property.state ? `${property.city}, ${property.state}` : property.status || "-"}
                                 </div>
@@ -1707,7 +1722,15 @@ export function DetailDrawer({
                                     <Anchor className="h-6 w-6" />
                                   </div>
                                   <div>
-                                    <h3 className="font-semibold text-lg">{property.title || property.name || property.address || "Unnamed Property"}</h3>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-lg">{property.title || property.name || property.address || "Unnamed Property"}</h3>
+                                      {modeledPropertyIds.has(property.id) && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0">
+                                          <BarChart3 className="h-2.5 w-2.5" />
+                                          Modeled
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       {link.role && <span>{formatRole(link.role)}</span>}
                                       <Badge variant={

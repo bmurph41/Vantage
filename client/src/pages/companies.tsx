@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Upload, Search, Globe, Users, MapPin, TrendingUp, Download, Phone, Settings, Calendar, Briefcase, Home, Loader2, User, ChevronRight, Anchor, DollarSign, Merge, AlertTriangle, BarChart3 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import CompanyFormModal from "@/components/modals/company-form-modal";
@@ -126,6 +126,11 @@ export default function Companies() {
   const { data: companies, isLoading, isError: companiesError } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
+
+  const { data: modelCoverage } = useQuery<{ propertyIds: string[]; companyIds: string[]; contactIds: string[] }>({
+    queryKey: ['/api/modeling/property-coverage'],
+  });
+  const modeledCompanyIds = new Set(modelCoverage?.companyIds ?? []);
 
   // Fetch properties for the properties modal
   const { data: companyProperties = [] } = useQuery<Property[]>({
@@ -419,12 +424,20 @@ export default function Companies() {
             <Building className="w-4 h-4 text-white" />
           </div>
           <div className="min-w-0">
-            <button
-              onClick={(e) => handleNameClick(e, company)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
-            >
-              {company.name}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={(e) => handleNameClick(e, company)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+              >
+                {company.name}
+              </button>
+              {modeledCompanyIds.has(company.id) && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0" title="Linked to a modeled property">
+                  <BarChart3 className="h-2.5 w-2.5" />
+                  Modeled
+                </span>
+              )}
+            </div>
             {company.address && (
               <div className="text-xs text-gray-500 truncate flex items-center gap-1">
                 <MapPin className="w-3 h-3" />

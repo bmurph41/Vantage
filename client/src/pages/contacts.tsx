@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Mail, Phone, Building, Upload, Users, User, Star, Download, Thermometer, BarChart3 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { CrmListsManager } from "@/components/crm/panels/CrmListsManager";
 import { useToast } from "@/hooks/use-toast";
@@ -76,6 +76,11 @@ export default function Contacts() {
   const { data: contacts = [], isLoading, isError: contactsError } = useQuery<ContactWithCompany[]>({
     queryKey: ['/api/contacts'],
   });
+
+  const { data: modelCoverage } = useQuery<{ propertyIds: string[]; companyIds: string[]; contactIds: string[] }>({
+    queryKey: ['/api/modeling/property-coverage'],
+  });
+  const modeledContactIds = new Set(modelCoverage?.contactIds ?? []);
 
   const capitalizeFirst = (str: string | null | undefined) => {
     if (!str) return null;
@@ -286,12 +291,20 @@ export default function Contacts() {
             {getInitials(contact.firstName, contact.lastName)}
           </div>
           <div className="min-w-0">
-            <button
-              onClick={(e) => handleNameClick(e, contact)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
-            >
-              {contact.firstName} {contact.lastName}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={(e) => handleNameClick(e, contact)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate block text-left"
+              >
+                {contact.firstName} {contact.lastName}
+              </button>
+              {modeledContactIds.has(contact.id) && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex-shrink-0" title="Linked to a modeled property">
+                  <BarChart3 className="h-2.5 w-2.5" />
+                  Modeled
+                </span>
+              )}
+            </div>
             <div className="text-xs text-gray-500 truncate">
               {capitalizeFirst(contact.position || contact.role) || '—'}
             </div>

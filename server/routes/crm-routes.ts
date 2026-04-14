@@ -45,6 +45,7 @@ import {
   crmNotes,
   crmContactCompanies,
   crmCompanyProperties,
+  crmContactProperties,
   insertCrmTaskSchema,
   salesComps,
   rateComps,
@@ -13137,6 +13138,43 @@ export function registerCRMRoutes(
     } catch (error: any) {
       console.error('Failed to compare acquisition projects:', error);
       res.status(500).json({ error: 'Failed to compare projects' });
+    }
+  });
+
+  app.get('/api/modeling/property-coverage', authenticateUser, async (req: any, res) => {
+    try {
+      const orgId = req.user.orgId;
+      const rows = await db
+        .select({ propertyId: modelingProjects.propertyId, companyId: modelingProjects.companyId })
+        .from(modelingProjects)
+        .where(and(eq(modelingProjects.orgId, orgId)));
+
+      const propertyIds = [...new Set(rows.map(r => r.propertyId).filter(Boolean))] as string[];
+      const directCompanyIds = [...new Set(rows.map(r => r.companyId).filter(Boolean))] as string[];
+
+      let contactIds: string[] = [];
+      let companyIdsViaProps: string[] = [];
+
+      if (propertyIds.length > 0) {
+        const contactLinks = await db
+          .select({ contactId: crmContactProperties.contactId })
+          .from(crmContactProperties)
+          .where(inArray(crmContactProperties.propertyId, propertyIds));
+        contactIds = [...new Set(contactLinks.map(r => r.contactId).filter(Boolean))] as string[];
+
+        const companyLinks = await db
+          .select({ companyId: crmCompanyProperties.companyId })
+          .from(crmCompanyProperties)
+          .where(inArray(crmCompanyProperties.propertyId, propertyIds));
+        companyIdsViaProps = [...new Set(companyLinks.map(r => r.companyId).filter(Boolean))] as string[];
+      }
+
+      const companyIds = [...new Set([...directCompanyIds, ...companyIdsViaProps])];
+
+      res.json({ propertyIds, companyIds, contactIds });
+    } catch (error: any) {
+      console.error('Failed to get model coverage:', error);
+      res.status(500).json({ error: 'Failed to retrieve model coverage' });
     }
   });
 
