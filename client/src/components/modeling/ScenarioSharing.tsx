@@ -12,8 +12,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type CollabPermission = 'view-only' | 'can-edit' | 'full-access';
 type CollabRole       = 'viewer' | 'editor' | 'owner';
 
@@ -44,8 +42,6 @@ interface ScenarioSharingProps {
   projectId: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const AVATAR_COLORS = [
   'bg-blue-500',
   'bg-purple-500',
@@ -75,36 +71,27 @@ function permissionLabel(p: CollabPermission): string {
   return 'Full Access';
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
   const { toast } = useToast();
   const [emailInput, setEmailInput]           = useState('');
   const [permissionInput, setPermissionInput] = useState<CollabPermission>('can-edit');
 
-  // ── Collaborators query ──────────────────────────────────────────────────
   const {
     data: collaborators = [],
     isLoading: collabLoading,
   } = useQuery<Collaborator[]>({
     queryKey: ['/api/modeling/projects', projectId, 'collaborators'],
-    queryFn: (): Promise<Collaborator[]> =>
-      fetch(`/api/modeling/projects/${projectId}/collaborators`).then(r => r.json()),
     enabled: !!projectId,
   });
 
-  // ── Activity query ───────────────────────────────────────────────────────
   const {
     data: activityLog = [],
     isLoading: activityLoading,
   } = useQuery<ActivityEntry[]>({
     queryKey: ['/api/modeling/projects', projectId, 'activity'],
-    queryFn: (): Promise<ActivityEntry[]> =>
-      fetch(`/api/modeling/projects/${projectId}/activity`).then(r => r.json()),
     enabled: !!projectId,
   });
 
-  // ── Add collaborator mutation ────────────────────────────────────────────
   const addMutation = useMutation({
     mutationFn: ({ email, role }: { email: string; role: CollabRole }) =>
       apiRequest('POST', `/api/modeling/projects/${projectId}/collaborators`, { email, role }),
@@ -121,7 +108,6 @@ export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
     },
   });
 
-  // ── Update role mutation ─────────────────────────────────────────────────
   const updateRoleMutation = useMutation({
     mutationFn: ({ collaboratorId, role }: { collaboratorId: string; role: CollabRole }) =>
       apiRequest('PATCH', `/api/modeling/projects/${projectId}/collaborators/${collaboratorId}`, { role }),
@@ -130,7 +116,6 @@ export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
     },
   });
 
-  // ── Remove collaborator mutation ─────────────────────────────────────────
   const removeMutation = useMutation({
     mutationFn: (collaboratorId: string) =>
       apiRequest('DELETE', `/api/modeling/projects/${projectId}/collaborators/${collaboratorId}`),

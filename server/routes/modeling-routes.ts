@@ -9183,53 +9183,6 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
       if (!projectRow) return res.status(404).json({ error: 'Project not found' });
 
-      // Backfill creator + historical activity actors as collaborators if not yet seeded
-      // Run unconditionally checking creator presence so that adding a collaborator
-      // via POST before the first GET does not prevent creator seeding.
-      const [creatorRow] = await db
-        .select({ userId: modelingProjectCollaborators.userId })
-        .from(modelingProjectCollaborators)
-        .where(and(
-          eq(modelingProjectCollaborators.projectId, projectId),
-          projectRow.createdBy ? eq(modelingProjectCollaborators.userId, projectRow.createdBy) : sql`false`,
-        ))
-        .limit(1);
-
-      if (!creatorRow) {
-        // Creator not yet seeded — backfill creator + updatedBy + activity actors
-        const actorIds = new Set<string>();
-        if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
-        if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
-
-        const activityActors = await db
-          .selectDistinct({ userId: modelingProjectActivity.userId })
-          .from(modelingProjectActivity)
-          .where(and(
-            eq(modelingProjectActivity.projectId, projectId),
-            sql`${modelingProjectActivity.userId} IS NOT NULL`,
-          ));
-
-        for (const a of activityActors) {
-          if (a.userId) actorIds.add(a.userId);
-        }
-
-        // Validate actors exist in the org
-        const validActors = actorIds.size > 0
-          ? await db
-              .select({ id: users.id })
-              .from(users)
-              .where(and(inArray(users.id, [...actorIds]), eq(users.orgId, orgId)))
-          : [];
-
-        for (const actor of validActors) {
-          const role: CollabRole = actor.id === projectRow.createdBy ? 'owner' : 'editor';
-          await db
-            .insert(modelingProjectCollaborators)
-            .values({ projectId, userId: actor.id, role, addedBy: projectRow.createdBy ?? undefined })
-            .onConflictDoNothing();
-        }
-      }
-
       // Read authorization: owner, org-owner, or listed collaborator
       const isProjectOwner = projectRow.createdBy === userId;
       const isOrgOwner     = userRole === 'owner';
@@ -9246,6 +9199,51 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
         if (!memberRow) {
           return res.status(403).json({ error: 'You do not have access to this project' });
+        }
+      }
+
+      // Backfill: seed project creator + historical activity actors as collaborators.
+      // Runs after auth so unauthenticated callers never trigger a write side-effect.
+      // Uses onConflictDoNothing so it is safe to call on every authorized GET.
+      const [creatorRow] = await db
+        .select({ userId: modelingProjectCollaborators.userId })
+        .from(modelingProjectCollaborators)
+        .where(and(
+          eq(modelingProjectCollaborators.projectId, projectId),
+          projectRow.createdBy ? eq(modelingProjectCollaborators.userId, projectRow.createdBy) : sql`false`,
+        ))
+        .limit(1);
+
+      if (!creatorRow) {
+        const actorIds = new Set<string>();
+        if (projectRow.createdBy) actorIds.add(projectRow.createdBy);
+        if (projectRow.updatedBy) actorIds.add(projectRow.updatedBy);
+
+        const activityActors = await db
+          .selectDistinct({ userId: modelingProjectActivity.userId })
+          .from(modelingProjectActivity)
+          .where(and(
+            eq(modelingProjectActivity.projectId, projectId),
+            sql`${modelingProjectActivity.userId} IS NOT NULL`,
+          ));
+
+        for (const a of activityActors) {
+          if (a.userId) actorIds.add(a.userId);
+        }
+
+        const validActors = actorIds.size > 0
+          ? await db
+              .select({ id: users.id })
+              .from(users)
+              .where(and(inArray(users.id, [...actorIds]), eq(users.orgId, orgId)))
+          : [];
+
+        for (const actor of validActors) {
+          const role: CollabRole = actor.id === projectRow.createdBy ? 'owner' : 'editor';
+          await db
+            .insert(modelingProjectCollaborators)
+            .values({ projectId, userId: actor.id, role, addedBy: projectRow.createdBy ?? undefined })
+            .onConflictDoNothing();
         }
       }
 
