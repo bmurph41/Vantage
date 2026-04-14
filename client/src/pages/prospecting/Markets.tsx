@@ -38,6 +38,7 @@ export default function MarketTargets() {
 
   const { data: markets = [], isLoading } = useQuery<MarketTarget[]>({
     queryKey: ['/api/prospecting/market-targets'],
+    select: (res: any) => Array.isArray(res) ? res : (res?.data ?? []),
   });
 
   const createMutation = useMutation({
