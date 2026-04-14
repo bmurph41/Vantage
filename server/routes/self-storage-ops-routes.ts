@@ -67,23 +67,28 @@ router.get('/stats', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     const marinaId = req.query.marinaId as string | undefined;
 
-    const statsConds: string[] = [`org_id = '${orgId}'`];
-    if (marinaId) statsConds.push(`marina_id = '${marinaId}'`);
-    const units: any[] = (await db.execute(
-      sql.raw(`SELECT *, move_out_date FROM ops_self_storage_units WHERE ${statsConds.join(' AND ')}`)
-    )).rows;
+    let conditions: any[] = [eq(opsSelfStorageUnits.orgId, orgId)];
+    if (marinaId) conditions.push(eq(opsSelfStorageUnits.marinaId, marinaId));
+
+    const units = await db.select().from(opsSelfStorageUnits).where(and(...conditions));
+
+    // Fetch move_out_date separately via parameterized query (column not in Drizzle schema)
+    const modQuery = marinaId
+      ? sql`SELECT id, move_out_date FROM ops_self_storage_units WHERE org_id = ${orgId} AND marina_id = ${marinaId}`
+      : sql`SELECT id, move_out_date FROM ops_self_storage_units WHERE org_id = ${orgId}`;
+    const modRows = (await db.execute(modQuery)).rows as Array<{ id: string; move_out_date: string | null }>;
 
     const totalUnits = units.length;
     const occupiedUnits = units.filter(u => u.status === 'occupied').length;
     const occupancyPct = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
-    const rates = units.filter(u => u.monthly_rate).map(u => parseFloat(u.monthly_rate || '0'));
+    const rates = units.filter(u => u.monthlyRate).map(u => parseFloat(u.monthlyRate || '0'));
     const averageUnitRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
 
     // Revenue per SF + total monthly revenue
     const totalMonthlyRevenue = units
-      .filter(u => u.status === 'occupied' && u.monthly_rate)
-      .reduce((sum, u) => sum + parseFloat(u.monthly_rate || '0'), 0);
+      .filter(u => u.status === 'occupied' && u.monthlyRate)
+      .reduce((sum, u) => sum + parseFloat(u.monthlyRate || '0'), 0);
     const totalSF = units
       .filter(u => u.status === 'occupied')
       .reduce((sum, u) => sum + sizeToSqFt(u.size), 0);
@@ -116,12 +121,9 @@ router.get('/stats', async (req: Request, res: Response) => {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const mStart = d.toISOString().split('T')[0];
       const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-      const moveIns = units.filter(u => {
-        const mid = u.move_in_date ? String(u.move_in_date).slice(0, 10) : null;
-        return mid && mid >= mStart && mid <= mEnd;
-      }).length;
-      const moveOuts = units.filter(u => {
-        const mod = u.move_out_date ? String(u.move_out_date).slice(0, 10) : null;
+      const moveIns = units.filter(u => u.moveInDate && u.moveInDate >= mStart && u.moveInDate <= mEnd).length;
+      const moveOuts = modRows.filter(r => {
+        const mod = r.move_out_date ? String(r.move_out_date).slice(0, 10) : null;
         return mod && mod >= mStart && mod <= mEnd;
       }).length;
       moveInOutTrend.push({ month: d.toLocaleString('default', { month: 'short' }), moveIns, moveOuts });
@@ -154,32 +156,44 @@ router.get('/units', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     const { size, type, status, search, marinaId } = req.query;
 
-    const unitsConds: string[] = [`org_id = '${orgId}'`];
-    if (marinaId) unitsConds.push(`marina_id = '${marinaId}'`);
-    if (size && size !== 'all') unitsConds.push(`size = '${size}'`);
-    if (type && type !== 'all') unitsConds.push(`unit_type = '${type}'`);
-    if (status && status !== 'all') unitsConds.push(`status = '${status}'`);
+    let unitsConds: any[] = [eq(opsSelfStorageUnits.orgId, orgId)];
+    if (marinaId) unitsConds.push(eq(opsSelfStorageUnits.marinaId, marinaId as string));
+    if (size && size !== 'all') unitsConds.push(eq(opsSelfStorageUnits.size, size as string));
+    if (type && type !== 'all') unitsConds.push(eq(opsSelfStorageUnits.unitType, type as string));
+    if (status && status !== 'all') unitsConds.push(eq(opsSelfStorageUnits.status, status as string));
     if (search) {
-      const s = String(search).replace(/'/g, "''");
-      unitsConds.push(`(unit_number ILIKE '%${s}%' OR tenant_name ILIKE '%${s}%')`);
+      unitsConds.push(or(
+        ilike(opsSelfStorageUnits.unitNumber, `%${search}%`),
+        ilike(opsSelfStorageUnits.tenantName, `%${search}%`),
+      ));
     }
 
-    const rawUnits: any[] = (await db.execute(
-      sql.raw(`SELECT *, move_out_date FROM ops_self_storage_units WHERE ${unitsConds.join(' AND ')} ORDER BY unit_number`)
-    )).rows;
+    const rawUnits = await db.select().from(opsSelfStorageUnits).where(and(...unitsConds));
+
+    // Fetch move_out_date via parameterized query (column not in Drizzle schema)
+    const moveOutMap = new Map<string, string | null>();
+    if (rawUnits.length > 0) {
+      const modQuery = marinaId
+        ? sql`SELECT id, move_out_date FROM ops_self_storage_units WHERE org_id = ${orgId} AND marina_id = ${marinaId as string}`
+        : sql`SELECT id, move_out_date FROM ops_self_storage_units WHERE org_id = ${orgId}`;
+      const modRows = (await db.execute(modQuery)).rows as Array<{ id: string; move_out_date: string | null }>;
+      for (const r of modRows) {
+        moveOutMap.set(r.id, r.move_out_date ? String(r.move_out_date).slice(0, 10) : null);
+      }
+    }
 
     const mapped = rawUnits.map(u => ({
       id: u.id,
-      unitNumber: u.unit_number,
+      unitNumber: u.unitNumber,
       size: u.size,
-      unitType: u.unit_type,
+      unitType: u.unitType,
       status: u.status,
-      monthlyRate: u.monthly_rate || null,
-      tenantName: u.tenant_name || null,
-      moveInDate: u.move_in_date ? String(u.move_in_date).slice(0, 10) : null,
-      moveOutDate: u.move_out_date ? String(u.move_out_date).slice(0, 10) : null,
-      autopayEnabled: u.autopay_enabled ?? false,
-      insuranceActive: u.insurance_active ?? false,
+      monthlyRate: u.monthlyRate || null,
+      tenantName: u.tenantName || null,
+      moveInDate: u.moveInDate || null,
+      moveOutDate: moveOutMap.get(u.id) ?? null,
+      autopayEnabled: u.autopayEnabled ?? false,
+      insuranceActive: u.insuranceActive ?? false,
     }));
 
     res.json(mapped);
