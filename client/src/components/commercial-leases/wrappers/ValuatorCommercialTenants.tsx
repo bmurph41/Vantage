@@ -1,19 +1,5 @@
-/**
- * ValuatorCommercialTenants
- * =========================
- * Drop-in replacement for the Valuator → Commercial Tenants tab.
- * Wraps the unified components with Valuator context.
- * 
- * USAGE: Replace the existing ValuatorCommercialTenantsTab:
- * 
- *   // In your valuator workspace page:
- *   import ValuatorCommercialTenants from '@/components/commercial-leases/wrappers/ValuatorCommercialTenants';
- *   <ValuatorCommercialTenants projectId={projectId} projectName={projectName} />
- */
-
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Building2 } from "lucide-react";
 import { LeaseContextProvider } from "../LeaseContextProvider";
@@ -22,13 +8,9 @@ import { UnifiedLeaseForm } from "../UnifiedLeaseForm";
 import { UnifiedLeaseDetail } from "../UnifiedLeaseDetail";
 import { ConnectDialog } from "../ConnectDialog";
 
-// You'll need to get orgId from your auth context. Example:
-// import { useAuth } from "@/hooks/use-auth";
-
 interface ValuatorCommercialTenantsProps {
   projectId: string;
   projectName?: string;
-  /** If this project is linked to an Operations property */
   propertyId?: string;
 }
 
@@ -37,10 +19,8 @@ export default function ValuatorCommercialTenants({
   projectName,
   propertyId,
 }: ValuatorCommercialTenantsProps) {
-  // TODO: Replace with your actual auth hook
-  // const { user } = useAuth();
-  // const orgId = user?.orgId || "";
-  const orgId = ""; // ← Wire to your auth context
+  const { user } = useAuth();
+  const orgId = user?.orgId || "";
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);

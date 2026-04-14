@@ -1,9 +1,3 @@
-// TODO: Missing SalesComps-specific utilities:
-// - @/lib/api (salesCompsApi)
-// - @/lib/queryKeys
-// - @/lib/authUtils
-// - @shared/schema types (UpdateSalesComp)
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

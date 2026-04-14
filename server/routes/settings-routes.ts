@@ -183,14 +183,6 @@ const DEFAULT_SETTINGS = {
 // GET /api/settings/me - Get current user settings
 // ============================================================================
     router.get('/me', async (req: AuthenticatedRequest, res: Response) => {
-      console.log('[Settings Debug]', { 
-        userId: getUserId(req), 
-        nodeEnv: process.env.NODE_ENV, 
-        hasUser: !!req.user, 
-        hasSession: !!req.session,
-        sessionUser: (req.session as any)?.user,
-        passportUser: (req.session as any)?.passport?.user
-      });
       try {
         const userId = getUserId(req);
     const orgId = getOrgId(req);

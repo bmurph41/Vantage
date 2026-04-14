@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { BarChart3, FolderPlus, Trash2, ChevronLeft, ChevronRight, Filter, ChevronUp } from "lucide-react";
@@ -28,10 +29,7 @@ export default function SalesCompsIndex() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // TODO: Replace with actual Vantage auth when available
-  const user = { role: 'Admin' };
-  const isAuthenticated = true;
-  const isLoading = false;
+  const { user, isLoading } = useAuth();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({
@@ -165,10 +163,10 @@ export default function SalesCompsIndex() {
     );
   }
 
-  const canCreate = user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as any).role);
-  const canManageColumns = user && ['Owner', 'Admin'].includes((user as any).role);
-  const canDelete = user && ['Owner', 'Admin', 'Analyst'].includes((user as any).role);
-  const canAddToProject = user && ['Owner', 'Broker', 'Analyst', 'Admin'].includes((user as any).role);
+  const canCreate = user && ['owner', 'broker', 'editor', 'admin'].includes(user.role);
+  const canManageColumns = user && ['owner', 'admin'].includes(user.role);
+  const canDelete = user && ['owner', 'admin', 'editor'].includes(user.role);
+  const canAddToProject = user && ['owner', 'broker', 'editor', 'admin'].includes(user.role);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
