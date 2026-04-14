@@ -3,7 +3,6 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -13,10 +12,39 @@ import { formatDistanceToNow } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type CollabPermission = 'view-only' | 'can-edit' | 'full-access';
+type CollabRole       = 'viewer' | 'editor' | 'owner';
+
+interface Collaborator {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  initials: string;
+  permission: CollabPermission;
+  role: CollabRole;
+  addedAt: string;
+  colorIndex: number;
+}
+
+interface ActivityEntry {
+  id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  userName: string | null;
+  userId: string | null;
+  userInitials: string;
+}
+
 interface ScenarioSharingProps {
   scenarioId: string;
   projectId: string;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const AVATAR_COLORS = [
   'bg-blue-500',
@@ -27,62 +55,58 @@ const AVATAR_COLORS = [
   'bg-cyan-500',
   'bg-indigo-500',
   'bg-red-500',
-];
+] as const;
 
-function getPermissionIcon(permission: string) {
-  switch (permission) {
-    case 'view-only': return <Eye className="h-3 w-3" />;
-    case 'can-edit':  return <Edit className="h-3 w-3" />;
-    case 'full-access': return <Shield className="h-3 w-3" />;
-    default: return <Eye className="h-3 w-3" />;
-  }
+function permissionToRole(permission: CollabPermission): CollabRole {
+  if (permission === 'full-access') return 'owner';
+  if (permission === 'can-edit')    return 'editor';
+  return 'viewer';
 }
 
-function getPermissionLabel(permission: string): string {
-  switch (permission) {
-    case 'view-only':   return 'View Only';
-    case 'can-edit':    return 'Can Edit';
-    case 'full-access': return 'Full Access';
-    default:            return 'View Only';
-  }
+function PermissionIcon({ permission }: { permission: CollabPermission }) {
+  if (permission === 'view-only')   return <Eye className="h-3 w-3" />;
+  if (permission === 'can-edit')    return <Edit className="h-3 w-3" />;
+  return <Shield className="h-3 w-3" />;
 }
 
-function permissionToRole(permission: string): string {
-  switch (permission) {
-    case 'full-access': return 'owner';
-    case 'can-edit':    return 'editor';
-    default:            return 'viewer';
-  }
+function permissionLabel(p: CollabPermission): string {
+  if (p === 'view-only')   return 'View Only';
+  if (p === 'can-edit')    return 'Can Edit';
+  return 'Full Access';
 }
 
-export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps) {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function ScenarioSharing({ projectId }: ScenarioSharingProps) {
   const { toast } = useToast();
-  const [emailInput, setEmailInput]         = useState('');
-  const [permissionInput, setPermissionInput] = useState<'view-only' | 'can-edit' | 'full-access'>('can-edit');
+  const [emailInput, setEmailInput]           = useState('');
+  const [permissionInput, setPermissionInput] = useState<CollabPermission>('can-edit');
 
-  // ── Collaborators query ────────────────────────────────────────────────────
+  // ── Collaborators query ──────────────────────────────────────────────────
   const {
     data: collaborators = [],
     isLoading: collabLoading,
-  } = useQuery<any[]>({
+  } = useQuery<Collaborator[]>({
     queryKey: ['/api/modeling/projects', projectId, 'collaborators'],
-    queryFn: () => fetch(`/api/modeling/projects/${projectId}/collaborators`).then(r => r.json()),
+    queryFn: (): Promise<Collaborator[]> =>
+      fetch(`/api/modeling/projects/${projectId}/collaborators`).then(r => r.json()),
     enabled: !!projectId,
   });
 
-  // ── Activity query ─────────────────────────────────────────────────────────
+  // ── Activity query ───────────────────────────────────────────────────────
   const {
     data: activityLog = [],
     isLoading: activityLoading,
-  } = useQuery<any[]>({
+  } = useQuery<ActivityEntry[]>({
     queryKey: ['/api/modeling/projects', projectId, 'activity'],
-    queryFn: () => fetch(`/api/modeling/projects/${projectId}/activity`).then(r => r.json()),
+    queryFn: (): Promise<ActivityEntry[]> =>
+      fetch(`/api/modeling/projects/${projectId}/activity`).then(r => r.json()),
     enabled: !!projectId,
   });
 
-  // ── Add collaborator mutation ──────────────────────────────────────────────
+  // ── Add collaborator mutation ────────────────────────────────────────────
   const addMutation = useMutation({
-    mutationFn: ({ email, role }: { email: string; role: string }) =>
+    mutationFn: ({ email, role }: { email: string; role: CollabRole }) =>
       apiRequest('POST', `/api/modeling/projects/${projectId}/collaborators`, { email, role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'collaborators'] });
@@ -91,23 +115,22 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
       setPermissionInput('can-edit');
       toast({ title: 'Collaborator added' });
     },
-    onError: async (err: any) => {
-      let msg = 'Failed to add collaborator';
-      try { const j = await err.json?.(); if (j?.error) msg = j.error; } catch {}
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to add collaborator';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
     },
   });
 
-  // ── Update role mutation ───────────────────────────────────────────────────
+  // ── Update role mutation ─────────────────────────────────────────────────
   const updateRoleMutation = useMutation({
-    mutationFn: ({ collaboratorId, role }: { collaboratorId: string; role: string }) =>
+    mutationFn: ({ collaboratorId, role }: { collaboratorId: string; role: CollabRole }) =>
       apiRequest('PATCH', `/api/modeling/projects/${projectId}/collaborators/${collaboratorId}`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/modeling/projects', projectId, 'collaborators'] });
     },
   });
 
-  // ── Remove collaborator mutation ───────────────────────────────────────────
+  // ── Remove collaborator mutation ─────────────────────────────────────────
   const removeMutation = useMutation({
     mutationFn: (collaboratorId: string) =>
       apiRequest('DELETE', `/api/modeling/projects/${projectId}/collaborators/${collaboratorId}`),
@@ -147,7 +170,14 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddCollaborator(); }}
               className="flex-1"
             />
-            <Select value={permissionInput} onValueChange={(v: any) => setPermissionInput(v)}>
+            <Select
+              value={permissionInput}
+              onValueChange={(v: string) => {
+                if (v === 'view-only' || v === 'can-edit' || v === 'full-access') {
+                  setPermissionInput(v);
+                }
+              }}
+            >
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -179,15 +209,15 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
                   No collaborators yet — share this scenario to get started.
                 </div>
               ) : (
-                collaborators.map((c: any) => (
+                collaborators.map((c) => (
                   <div
                     key={c.id}
                     className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1">
-                      <Avatar className={`h-8 w-8 ${AVATAR_COLORS[c.colorIndex ?? 0]}`}>
-                        <AvatarFallback className={`${AVATAR_COLORS[c.colorIndex ?? 0]} text-white font-semibold text-xs`}>
-                          {c.name?.charAt(0).toUpperCase() ?? '?'}
+                      <Avatar className={`h-8 w-8 ${AVATAR_COLORS[c.colorIndex] ?? AVATAR_COLORS[0]}`}>
+                        <AvatarFallback className={`${AVATAR_COLORS[c.colorIndex] ?? AVATAR_COLORS[0]} text-white font-semibold text-xs`}>
+                          {c.initials}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -199,9 +229,14 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
                     <div className="flex items-center gap-2 ml-2">
                       <Select
                         value={c.permission}
-                        onValueChange={(v: any) =>
-                          updateRoleMutation.mutate({ collaboratorId: c.id, role: permissionToRole(v) })
-                        }
+                        onValueChange={(v: string) => {
+                          if (v === 'view-only' || v === 'can-edit' || v === 'full-access') {
+                            updateRoleMutation.mutate({
+                              collaboratorId: c.id,
+                              role: permissionToRole(v),
+                            });
+                          }
+                        }}
                       >
                         <SelectTrigger className="w-28 h-8 text-xs">
                           <SelectValue />
@@ -252,18 +287,18 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {collaborators.map((c: any) => (
+                {collaborators.map((c) => (
                   <div key={c.id} className="flex items-center gap-2">
-                    <Avatar className={`h-10 w-10 ${AVATAR_COLORS[c.colorIndex ?? 0]}`}>
-                      <AvatarFallback className={`${AVATAR_COLORS[c.colorIndex ?? 0]} text-white font-semibold`}>
-                        {c.name?.charAt(0).toUpperCase() ?? '?'}
+                    <Avatar className={`h-10 w-10 ${AVATAR_COLORS[c.colorIndex] ?? AVATAR_COLORS[0]}`}>
+                      <AvatarFallback className={`${AVATAR_COLORS[c.colorIndex] ?? AVATAR_COLORS[0]} text-white font-semibold`}>
+                        {c.initials}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <div className="text-sm font-medium">{c.name}</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        {getPermissionIcon(c.permission)}
-                        {getPermissionLabel(c.permission)}
+                        <PermissionIcon permission={c.permission} />
+                        {permissionLabel(c.permission)}
                       </div>
                     </div>
                   </div>
@@ -308,22 +343,29 @@ export function ScenarioSharing({ scenarioId, projectId }: ScenarioSharingProps)
                 No activity yet — changes to this project will appear here.
               </div>
             ) : (
-              activityLog.map((entry: any, index: number) => (
+              activityLog.map((entry, index) => (
                 <div key={entry.id} className="flex items-start gap-3 py-2 text-sm">
                   <div className="flex flex-col items-center mt-1">
-                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                     {index < activityLog.length - 1 && (
                       <div className="h-6 w-0.5 bg-border my-1" />
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-foreground">
-                      <span className="font-medium">{entry.userName ?? 'Unknown user'}</span>
-                      {' '}
-                      <span className="text-muted-foreground">{entry.action}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    <Avatar className="h-6 w-6 flex-shrink-0 bg-muted">
+                      <AvatarFallback className="text-[10px] font-semibold text-muted-foreground">
+                        {entry.userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-foreground">
+                        <span className="font-medium">{entry.userName ?? 'Unknown user'}</span>
+                        {' '}
+                        <span className="text-muted-foreground">{entry.action}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
+                      </div>
                     </div>
                   </div>
                 </div>

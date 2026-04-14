@@ -2336,6 +2336,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         console.warn('[Audit] Failed to log revenue source change:', auditErr);
       }
 
+      void logProjectActivity(projectId, userId, 'updated revenue source configuration', { changedKeys: Object.keys(revenueSourceByDept) });
+
       res.json({ success: true, revenueSourceByDept });
     } catch (error: any) {
       console.error('Failed to update revenue source config:', error);
@@ -3490,6 +3492,8 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         userId,
         orgId
       });
+
+      void logProjectActivity(projectId, userId, `created exit scenario "${scenario.name}"`, { scenarioId: scenario.id });
       
       res.status(201).json(scenario);
     } catch (error: any) {
@@ -3518,7 +3522,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
       if (!scenario) {
         return res.status(404).json({ error: 'Exit scenario not found' });
       }
-      
+
+      void logProjectActivity(projectId, userId, `updated exit scenario "${scenario.name || scenarioId}"`, { scenarioId });
+
       res.json(scenario);
     } catch (error: any) {
       console.error('Failed to update exit scenario:', error);
@@ -9101,7 +9107,9 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
 
   // ==================== SCENARIO COLLABORATION ROUTES ====================
 
-  // Helper to verify project ownership / access for the requesting org
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /** Returns the project row (id, createdBy) if it belongs to orgId, else null */
   async function verifyProjectAccess(projectId: string, orgId: string) {
     const [project] = await db
       .select({ id: modelingProjects.id, createdBy: modelingProjects.createdBy })
@@ -9111,8 +9119,53 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
     return project ?? null;
   }
 
+  /**
+   * Returns true when the requesting user is allowed to mutate collaborators.
+   * Only the project creator or an org-level owner role may add/remove/update
+   * collaborators.  Regular editors and viewers are blocked.
+   */
+  function canManageCollaborators(
+    project: { createdBy: string | null },
+    userId: string,
+    userRole: string,
+  ): boolean {
+    return project.createdBy === userId || userRole === 'owner';
+  }
+
+  /** Computes two-character initials from a display name */
+  function initials(name: string | null): string {
+    if (!name) return '??';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  const VALID_ROLES = ['viewer', 'editor', 'owner'] as const;
+  type CollabRole = (typeof VALID_ROLES)[number];
+
+  function assertValidRole(role: string): asserts role is CollabRole {
+    if (!VALID_ROLES.includes(role as CollabRole)) {
+      throw Object.assign(new Error('Invalid role'), { statusCode: 400 });
+    }
+  }
+
+  /** Fire-and-forget activity insert — never throws, errors are only logged */
+  async function logProjectActivity(
+    projectId: string,
+    userId: string,
+    action: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<void> {
+    try {
+      await db.insert(modelingProjectActivity).values({ projectId, userId, action, metadata });
+    } catch (err: unknown) {
+      console.error('logProjectActivity failed:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  // ── Collaborators ─────────────────────────────────────────────────────────
+
   // GET /api/modeling/projects/:projectId/collaborators
-  // Returns all org members who have been added to this project, joined with user details
   app.get('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
@@ -9135,40 +9188,44 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         .where(eq(modelingProjectCollaborators.projectId, projectId))
         .orderBy(asc(modelingProjectCollaborators.addedAt));
 
-      // Map role → permission shape expected by the UI
       const mapped = collaborators.map((c, i) => ({
         id: c.id,
         userId: c.userId,
         name: c.name,
         email: c.email,
+        initials: initials(c.name),
         permission: c.role === 'owner' ? 'full-access' : c.role === 'editor' ? 'can-edit' : 'view-only',
         role: c.role,
-        status: 'offline' as const,
         addedAt: c.addedAt,
         colorIndex: i % 8,
       }));
 
       res.json(mapped);
-    } catch (error: any) {
-      console.error('Failed to fetch collaborators:', error.message);
+    } catch (error: unknown) {
+      console.error('Failed to fetch collaborators:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to fetch collaborators' });
     }
   });
 
   // POST /api/modeling/projects/:projectId/collaborators
-  // Adds a user (by email) as a collaborator with the given role
+  // Only the project owner or org-owner may add collaborators.
   app.post('/api/modeling/projects/:projectId/collaborators', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId;
-      const { email, role = 'viewer' } = req.body;
+      const orgId  = req.user.orgId as string;
+      const userId = req.user.id as string;
+      const { email, role = 'viewer' } = req.body as { email?: string; role?: string };
 
       if (!email) return res.status(400).json({ error: 'email is required' });
+      try { assertValidRole(role); } catch { return res.status(400).json({ error: 'role must be viewer, editor, or owner' }); }
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
-      // Find the user by email within the same org
+      if (!canManageCollaborators(project, userId, req.user.role as string)) {
+        return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
+      }
+
       const [targetUser] = await db
         .select({ id: users.id, name: users.name, email: users.email })
         .from(users)
@@ -9179,45 +9236,41 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         return res.status(404).json({ error: 'No user with that email found in your organisation' });
       }
 
-      // Upsert — if already a collaborator update their role, else insert
       await db
         .insert(modelingProjectCollaborators)
-        .values({
-          projectId,
-          userId: targetUser.id,
-          role,
-          addedBy: req.user.id,
-        })
+        .values({ projectId, userId: targetUser.id, role, addedBy: userId })
         .onConflictDoUpdate({
           target: [modelingProjectCollaborators.projectId, modelingProjectCollaborators.userId],
           set: { role },
         });
 
-      // Log the activity
-      await db.insert(modelingProjectActivity).values({
-        projectId,
-        userId: req.user.id,
-        action: `added ${targetUser.name} as a collaborator (${role})`,
-        metadata: { targetUserId: targetUser.id, role },
-      });
+      await logProjectActivity(projectId, userId, `added ${targetUser.name} as a collaborator (${role})`, { targetUserId: targetUser.id, role });
 
       res.json({ success: true, user: targetUser, role });
-    } catch (error: any) {
-      console.error('Failed to add collaborator:', error.message);
+    } catch (error: unknown) {
+      console.error('Failed to add collaborator:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to add collaborator' });
     }
   });
 
   // PATCH /api/modeling/projects/:projectId/collaborators/:collaboratorId
-  // Updates the role of an existing collaborator
+  // Only the project owner or org-owner may update collaborator roles.
   app.patch('/api/modeling/projects/:projectId/collaborators/:collaboratorId', authenticateUser, async (req: any, res) => {
     try {
       const { projectId, collaboratorId } = req.params;
-      const orgId = req.user.orgId;
-      const { role } = req.body;
+      const orgId  = req.user.orgId as string;
+      const userId = req.user.id as string;
+      const { role } = req.body as { role?: string };
+
+      if (!role) return res.status(400).json({ error: 'role is required' });
+      try { assertValidRole(role); } catch { return res.status(400).json({ error: 'role must be viewer, editor, or owner' }); }
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      if (!canManageCollaborators(project, userId, req.user.role as string)) {
+        return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
+      }
 
       await db
         .update(modelingProjectCollaborators)
@@ -9227,21 +9280,29 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           eq(modelingProjectCollaborators.projectId, projectId),
         ));
 
+      await logProjectActivity(projectId, userId, `updated collaborator role to ${role}`, { collaboratorId, role });
+
       res.json({ success: true });
-    } catch (error: any) {
-      console.error('Failed to update collaborator:', error.message);
+    } catch (error: unknown) {
+      console.error('Failed to update collaborator:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to update collaborator' });
     }
   });
 
   // DELETE /api/modeling/projects/:projectId/collaborators/:collaboratorId
+  // Only the project owner or org-owner may remove collaborators.
   app.delete('/api/modeling/projects/:projectId/collaborators/:collaboratorId', authenticateUser, async (req: any, res) => {
     try {
       const { projectId, collaboratorId } = req.params;
-      const orgId = req.user.orgId;
+      const orgId  = req.user.orgId as string;
+      const userId = req.user.id as string;
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
+
+      if (!canManageCollaborators(project, userId, req.user.role as string)) {
+        return res.status(403).json({ error: 'Only the project owner may manage collaborators' });
+      }
 
       await db
         .delete(modelingProjectCollaborators)
@@ -9250,19 +9311,22 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           eq(modelingProjectCollaborators.projectId, projectId),
         ));
 
+      await logProjectActivity(projectId, userId, 'removed a collaborator', { collaboratorId });
+
       res.json({ success: true });
-    } catch (error: any) {
-      console.error('Failed to remove collaborator:', error.message);
+    } catch (error: unknown) {
+      console.error('Failed to remove collaborator:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to remove collaborator' });
     }
   });
 
+  // ── Activity Log ─────────────────────────────────────────────────────────
+
   // GET /api/modeling/projects/:projectId/activity
-  // Returns the 50 most recent activity log entries for a project, joined with user name
   app.get('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId;
+      const orgId = req.user.orgId as string;
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -9282,33 +9346,34 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
         .orderBy(desc(modelingProjectActivity.createdAt))
         .limit(50);
 
-      res.json(entries);
-    } catch (error: any) {
-      console.error('Failed to fetch project activity:', error.message);
+      const mapped = entries.map(e => ({
+        ...e,
+        userInitials: initials(e.userName),
+      }));
+
+      res.json(mapped);
+    } catch (error: unknown) {
+      console.error('Failed to fetch project activity:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to fetch project activity' });
     }
   });
 
-  // POST /api/modeling/projects/:projectId/activity  (internal — called from other save routes)
+  // POST /api/modeling/projects/:projectId/activity
+  // General-purpose endpoint: the frontend or other routes can POST an action string here.
   app.post('/api/modeling/projects/:projectId/activity', authenticateUser, async (req: any, res) => {
     try {
       const { projectId } = req.params;
-      const orgId = req.user.orgId;
-      const { action, metadata } = req.body;
+      const orgId = req.user.orgId as string;
+      const { action, metadata } = req.body as { action?: string; metadata?: Record<string, unknown> };
 
       const project = await verifyProjectAccess(projectId, orgId);
       if (!project) return res.status(404).json({ error: 'Project not found' });
 
-      await db.insert(modelingProjectActivity).values({
-        projectId,
-        userId: req.user.id,
-        action: action || 'updated project',
-        metadata: metadata || {},
-      });
+      await logProjectActivity(projectId, req.user.id as string, action || 'updated project', metadata || {});
 
       res.json({ success: true });
-    } catch (error: any) {
-      console.error('Failed to log activity:', error.message);
+    } catch (error: unknown) {
+      console.error('Failed to log activity:', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Failed to log activity' });
     }
   });
