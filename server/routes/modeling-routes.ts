@@ -9201,23 +9201,25 @@ app.delete('/api/doc-intel/custom-document-types/:id', authenticateUser, async (
           .limit(1);
 
         if (!memberRow) {
-          // Check whether this user has any historical activity on the project.
-          // If they do, they are a historical actor and should be granted access
-          // and seeded as editor immediately so they are not blocked.
-          const [activityRow] = await db
-            .select({ id: modelingProjectActivity.id })
-            .from(modelingProjectActivity)
-            .where(and(
-              eq(modelingProjectActivity.projectId, projectId),
-              eq(modelingProjectActivity.userId, userId),
-            ))
-            .limit(1);
+          // Grant access to known historical contributors: project's updatedBy field
+          // (catches editors before activity logging existed) or any activity row.
+          const isUpdatedBy = projectRow.updatedBy === userId;
+          const [activityRow] = isUpdatedBy
+            ? [{ id: 'known' }]
+            : await db
+                .select({ id: modelingProjectActivity.id })
+                .from(modelingProjectActivity)
+                .where(and(
+                  eq(modelingProjectActivity.projectId, projectId),
+                  eq(modelingProjectActivity.userId, userId),
+                ))
+                .limit(1);
 
           if (!activityRow) {
             return res.status(403).json({ error: 'You do not have access to this project' });
           }
 
-          // Seed the historical actor now so subsequent calls pass membership check
+          // Seed inline so subsequent calls pass the membership check
           await db
             .insert(modelingProjectCollaborators)
             .values({ projectId, userId, role: 'editor', addedBy: projectRow.createdBy ?? undefined })
