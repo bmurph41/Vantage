@@ -2,6 +2,98 @@
 
 ## Current State (2026-04-15)
 
+### ✅ COMPLETE — Deal Timeline Gantt: A+B+C + Deposits Lane (2026-04-15, late evening)
+
+Full overhaul of the Deal Timeline tab (`client/src/components/deals/deal-timeline-tab.tsx`,
+already mounted on the deal detail page). Applied the FM Design System v2
+motion language established by the DD animation, folded DD + extensions into a
+dedicated gantt lane backed by the real `dealExtensions` table, added a
+deposits lane backed by `dealDeposits`, and added a stage progression bar
+above the gantt.
+
+**Critical finding during verification read:** the existing timeline endpoint
+(`buildTimelineEventsForDeal` at `server/routes/crm-pipeline-enhancements-routes.ts:42`)
+was ONLY pulling denormalized key_dates from `crmDeals` (ddExpirationDate,
+firstDepositDueDate, secondDepositDueDate). The richer `dealExtensions` and
+`dealDeposits` tables were invisible to the timeline. The old top-of-tab
+`DealTimelineVisualizer` was also reading the DEPRECATED `extensionDays[]`
+integer array with a "first N executed" heuristic — inconsistent with the
+real `dealExtensions.executed` flags. Both gaps are now fixed via client-side
+fetches on the existing `/crm/deals/:id/extensions` and `/crm/deals/:id/deposits`
+endpoints. No backend changes.
+
+**Files**
+- `client/src/components/deals/dd-segment-row.tsx` NEW — inline gantt renderer
+  for DD period. Paints base DD (Deep Marine Blue), executed extensions
+  (Harbor Teal with glow pulse + `+Nd` chip), and pending extensions
+  (dashed Harbor Teal ghost). Accepts parent `getXPx` and `baseDelay` so it
+  shares the gantt coordinate system and staggers after the lane fades in.
+  Tooltips on each segment.
+- `client/src/components/deals/deal-stage-progress-bar.tsx` NEW — connected
+  stage progression bar above the gantt. Chronologically sorts
+  `stage_change` events from the timeline endpoint, draws Deep Marine Blue
+  for completed stages, Harbor Teal (pulsing scale) for current, slate
+  ghost for upcoming. Each stage is a staggered entrance; connector lines
+  draw in between stages.
+- `client/src/components/deals/deal-timeline-tab.tsx` REWRITTEN:
+  - Removed stale top `DealTimelineVisualizer` (used deprecated
+    `extensionDays[]` array)
+  - Added `DealStageProgressBar` at the top, sourced from the stage_change
+    events (always fetched regardless of lane visibility)
+  - Reordered category lanes: stages / due_diligence / key_dates /
+    deposits / tasks / playbook / milestones / red_flags / activities
+  - New `due_diligence` lane renders `DDSegmentRow` with real
+    `dealExtensions` fetched from `/api/crm/deals/:id/extensions`
+  - New `deposits` lane with `DepositMarker` components (green paid check,
+    pink pending, red pulsing overdue); amount label in compact $k/$M form;
+    tooltip shows depositNumber, anchor, due/paid dates, refundable flag,
+    applied-to-price flag
+  - Replaced static 2px dashed cyan today line with pulsing amber marker
+    matching `DDTimelineAnimation` (framer-motion infinite scale/opacity)
+  - Wrapped gantt container + lane rows + events + left-column labels in
+    framer-motion with staggered entrance (~0.18 + 0.08 × laneIdx)
+  - Point events (diamond/icon/circle) animate in with spring
+    (stiffness 400, damping 18-20); range bars use `scaleX` grow from left
+  - **Collision handling** via `layoutEventsWithCollision()`: point events
+    within 12px of each other stack vertically in 3 rows (top=8, mid=16,
+    bot=24) so markers don't overlap in the same lane
+  - Custom deadlines visually distinguished from built-in key dates:
+    rotate-45 hollow outline diamond (purple border) vs filled diamond
+  - SUPPRESSED_KEY_DATE_LABELS set removes the old denormalized DD/deposit
+    key_dates from the key_dates lane now that DD + Deposits have their
+    own lanes — no duplication
+  - Time bounds calculation now includes `dealExtensions` total days and
+    `dealDeposits.calculatedDueDate/actualPaidDate` so the gantt extends
+    far enough right
+  - Always fetches stages regardless of lane toggle (so the progression
+    bar keeps working even if the Stages lane is hidden)
+
+**Validation**
+- `tsc --noEmit` clean on all touched files
+- HMR should pick up changes without restart
+
+**Design cohesion**
+- Same motion tokens as DD animation (`--motion-ease-standard`,
+  `--motion-duration-enter`, `--motion-duration-grant` in `index.css`)
+- Same Deep Marine Blue / Harbor Teal / amber / emerald palette
+- Same animation idioms (scaleX grow, spring pop, pulsing today marker)
+
+**Known follow-ups**
+- Stage progression bar currently only includes stages that appear in
+  `crm_deal_stage_history` — stages the deal never entered are invisible.
+  Could overlay the canonical pipeline stage list as ghost markers for
+  full lifecycle visibility
+- `layoutEventsWithCollision` caps at 3 vertical rows; deals with >3
+  markers in the same 12px window still overlap on the 3rd row
+- Stage bars in the gantt swimlane are still separate from the top
+  progression bar — slight visual redundancy but different grain (top =
+  sequence, lane = duration in time)
+- Milestone lane approval events don't yet use custom colors
+- The DD lane doesn't yet have a PSA or DD-ends cap (those are on the
+  top stage-progression bar as implicit markers via key_dates lane)
+
+---
+
 ### ✅ COMPLETE — DD Timeline Animation (2026-04-15, evening)
 
 Animated horizontal Due Diligence timeline rendered on the modeling workspace
