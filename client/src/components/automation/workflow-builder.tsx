@@ -20,7 +20,7 @@ import {
   Calendar, User, Building, Handshake,
   Clock, Filter, Target, ArrowRight
 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface WorkflowTrigger {
@@ -446,6 +446,18 @@ interface ActionEditorProps {
 }
 
 function ActionEditor({ action, index, onUpdate, onRemove }: ActionEditorProps) {
+  const { data: templatesData } = useQuery<{ templates: { id: string; name: string; subject: string; category: string }[] }>({
+    queryKey: ['/api/workflow-email/templates', 'active'],
+    queryFn: async () => {
+      const res = await fetch('/api/workflow-email/templates?isActive=true');
+      if (!res.ok) return { templates: [] };
+      return res.json();
+    },
+    enabled: action.type === 'send_email',
+  });
+
+  const emailTemplates = templatesData?.templates || [];
+
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'create_task': return Calendar;
@@ -552,18 +564,18 @@ function ActionEditor({ action, index, onUpdate, onRemove }: ActionEditorProps) 
           <div>
             <Label className="text-xs">Content Source</Label>
             <Select
-              value={action.parameters.templateId ? 'template' : 'custom'}
+              value={action.parameters.templateId !== undefined ? 'template' : 'custom'}
               onValueChange={(value) => {
                 if (value === 'template') {
+                  // Initialize templateId to empty string to enter template mode
                   onUpdate({
                     ...action,
-                    parameters: { ...action.parameters, subject: undefined, body: undefined }
+                    parameters: { ...action.parameters, templateId: '', subject: undefined, body: undefined }
                   });
                 } else {
-                  onUpdate({
-                    ...action,
-                    parameters: { ...action.parameters, templateId: undefined }
-                  });
+                  // Remove templateId to enter custom mode
+                  const { templateId: _removed, ...rest } = action.parameters;
+                  onUpdate({ ...action, parameters: rest });
                 }
               }}
             >
@@ -576,7 +588,33 @@ function ActionEditor({ action, index, onUpdate, onRemove }: ActionEditorProps) 
               </SelectContent>
             </Select>
           </div>
-          {!action.parameters.templateId && (
+          {action.parameters.templateId !== undefined ? (
+            <div>
+              <Label className="text-xs">Select Template</Label>
+              <Select
+                value={action.parameters.templateId || ''}
+                onValueChange={(val) => onUpdate({
+                  ...action,
+                  parameters: { ...action.parameters, templateId: val }
+                })}
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Choose a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {emailTemplates.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-gray-400 italic">No templates available</div>
+                  )}
+                  {emailTemplates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      <span>{t.name}</span>
+                      <span className="text-gray-400 text-xs ml-2">({t.category})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
             <>
               <div>
                 <Label className="text-xs">Subject</Label>

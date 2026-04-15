@@ -100,6 +100,7 @@ export function evaluateConditions(
 interface WorkflowAction {
   type: string;
   params: Record<string, any>;
+  parameters?: Record<string, any>; // Some builders use `parameters` instead of `params`
 }
 
 async function executeAction(
@@ -258,47 +259,210 @@ async function executeAction(
         break;
       }
 
-      case 'email.send': {
-        const toEmail = action.params.to
-          ? interpolateTemplate(action.params.to, entity, eventData)
-          : entity.email;
-        if (!toEmail) {
+      case 'email.send':
+      case 'send_email': {
+        // Support both action.params and action.parameters (different builders use different keys)
+        const p = action.params ?? action.parameters ?? {};
+
+        // Fail fast if in template mode but no template was actually selected
+        if (p.templateId !== undefined && !p.templateId) {
           result.success = false;
-          result.detail = 'No recipient email address';
+          result.detail = 'Email template mode is selected but no template was chosen';
           break;
         }
-        const subject = interpolateTemplate(action.params.subject || '', entity, eventData);
-        const bodyHtml = interpolateTemplate(action.params.body || '', entity, eventData);
-        const wrappedHtml = wrapEmailTemplate(bodyHtml);
+
+        // ── Step 1: Fetch owner row (used for both recipient resolution and context) ──
+        const ownerIdRaw = entity.ownerId || entity.assignedTo || automationCreatedBy;
+        let ownerEmail = entity.assignedToEmail || entity.ownerEmail || '';
+        let ownerName = '';
+        if (ownerIdRaw) {
+          try {
+            const ownerRow = await pool.query(
+              'SELECT email, COALESCE(first_name || \' \' || last_name, first_name, last_name, username, email) AS display_name FROM users WHERE id::text = $1 LIMIT 1',
+              [String(ownerIdRaw)]
+            );
+            if (ownerRow.rows.length > 0) {
+              ownerEmail = ownerRow.rows[0].email || ownerEmail;
+              ownerName = ownerRow.rows[0].display_name || '';
+            }
+          } catch (_) { /* non-fatal */ }
+        }
+
+        // ── Step 2: Fetch primary contact for deal context ──
+        let contactCtx: Record<string, string> = {};
+        if (eventData.entityType === 'deal' && entity.contactId) {
+          try {
+            const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, entity.contactId));
+            if (contact) {
+              contactCtx = {
+                firstName: contact.firstName || '',
+                lastName: contact.lastName || '',
+                email: contact.email || '',
+              };
+            }
+          } catch (_) { /* non-fatal */ }
+        } else if (eventData.entityType === 'contact') {
+          contactCtx = {
+            firstName: entity.firstName || '',
+            lastName: entity.lastName || '',
+            email: entity.email || '',
+          };
+        }
+
+        // ── Step 3: Fetch org name ──
+        let orgName = '';
+        try {
+          const orgRow = await pool.query('SELECT name FROM organizations WHERE id::text = $1 LIMIT 1', [String(orgId)]);
+          orgName = orgRow.rows[0]?.name || '';
+        } catch (_) { /* non-fatal */ }
+
+        // ── Step 4: Build canonical nested context for {{deal.X}}, {{contact.X}} tokens ──
+        // Use Record<string, any> so interpolateTemplate accepts it without casts
+        const dealValue = entity.value || entity.amount || entity.dealValue;
+        const templateContext: Record<string, any> = {
+          deal: {
+            propertyName: entity.title || entity.marinaName || entity.name || '',
+            stage: entity.stage || '',
+            value: dealValue ? `$${Number(dealValue).toLocaleString()}` : '',
+            assetClass: entity.assetClass || '',
+            daysInStage: String(entity.daysInCurrentStage || entity.daysInStage || 0),
+            state: entity.state || '',
+            city: entity.city || '',
+            assignedToName: ownerName,
+          },
+          contact: contactCtx,
+          org: { name: orgName },
+          user: { name: ownerName },
+          rule: { name: eventData.automationName || eventData.ruleName || '' },
+        };
+
+        // ── Step 5: Resolve recipient email ──
+        const recipientType = p.recipientType || 'custom';
+        let toEmail: string;
+        if (recipientType === 'deal_owner' || p.to === 'deal_owner') {
+          toEmail = ownerEmail;
+        } else if (recipientType === 'contact' || p.to === 'primary_contact') {
+          toEmail = contactCtx.email || entity.email || entity.contactEmail || '';
+        } else {
+          toEmail = p.to
+            ? interpolateTemplate(p.to, templateContext, eventData)
+            : entity.email || '';
+        }
+        if (!toEmail) {
+          result.success = false;
+          result.detail = 'No recipient email address resolved';
+          break;
+        }
+
+        // ── Step 6: Resolve subject and body — prefer templateId if set ──
+        let renderedSubject: string;
+        let renderedHtml: string;
+        let usedTemplateId: string | null = null;
+
+        if (p.templateId) {
+          try {
+            const tplResult = await pool.query(
+              'SELECT * FROM workflow_email_templates WHERE id = $1 AND org_id = $2 AND is_active = true',
+              [p.templateId, orgId]
+            );
+            if (tplResult.rows.length === 0) {
+              result.success = false;
+              result.detail = `Email template ${p.templateId} not found`;
+              break;
+            }
+            const tpl = tplResult.rows[0];
+            // Use canonical nested context for accurate {{deal.X}} / {{contact.X}} resolution
+            renderedSubject = interpolateTemplate(tpl.subject, templateContext, eventData);
+            renderedHtml = wrapEmailTemplate(interpolateTemplate(tpl.body_html, templateContext, eventData));
+            usedTemplateId = p.templateId;
+          } catch (tplErr: any) {
+            result.success = false;
+            result.detail = `Failed to load template: ${tplErr.message}`;
+            break;
+          }
+        } else {
+          // Custom content: merge flat entity (for legacy {stage} tokens) with nested context
+          // (for {{deal.propertyName}} tokens) so both formats work consistently
+          const rawSubject = p.subject || '';
+          const rawBody = p.body || '';
+          if (!rawSubject && !rawBody) {
+            result.success = false;
+            result.detail = 'Email action is missing both subject and body';
+            break;
+          }
+          const mergedContext: Record<string, any> = { ...entity, ...templateContext };
+          renderedSubject = interpolateTemplate(rawSubject, mergedContext, eventData);
+          renderedHtml = wrapEmailTemplate(interpolateTemplate(rawBody, mergedContext, eventData));
+        }
+
+        const renderedText = renderedHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+        // Determine provider for logging based on available API keys
+        const emailProvider = process.env.SENDGRID_API_KEY ? 'sendgrid'
+          : process.env.RESEND_API_KEY ? 'resend'
+          : 'console';
+
         const sent = await sendEmail({
           to: toEmail,
-          subject,
-          text: bodyHtml.replace(/<[^>]*>/g, ''),
-          html: wrappedHtml,
-          from: action.params.fromName
-            ? { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com', name: action.params.fromName }
+          subject: renderedSubject,
+          text: renderedText,
+          html: renderedHtml,
+          from: p.fromName
+            ? { email: process.env.SENDGRID_FROM_EMAIL || 'noreply@vantage.com', name: p.fromName }
             : undefined,
         });
+
+        // ── Step 7: Log to workflow_email_log (correct entity linkage) ──
+        const logDealId = eventData.entityType === 'deal' ? (entity.id || null) : null;
+        const logContactId = eventData.entityType === 'contact' ? (entity.id || null) : (entity.contactId || null);
+        try {
+          await pool.query(
+            `INSERT INTO workflow_email_log
+               (org_id, template_id, recipient_email, recipient_type, subject, body_preview, status, provider, sent_at, deal_id, contact_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            [
+              orgId,
+              usedTemplateId,
+              toEmail,
+              recipientType,
+              renderedSubject,
+              renderedHtml.substring(0, 500),
+              sent ? 'sent' : 'failed',
+              sent ? emailProvider : null,
+              sent ? new Date() : null,
+              logDealId,
+              logContactId,
+            ]
+          );
+        } catch (_logErr) { /* non-fatal */ }
+
         if (sent) {
-          // Log to workflow_email_log
-          try {
-            await pool.query(
-              `INSERT INTO workflow_email_log (id, org_id, to_email, subject, body_html, status, sent_at, deal_id, contact_id, rule_name)
-               VALUES (gen_random_uuid(), $1, $2, $3, $4, 'sent', NOW(), $5, $6, $7)`,
-              [orgId, toEmail, subject, bodyHtml, entity.id || null, entity.contactId || null, action.params.ruleName || null]
-            );
-          } catch (_logErr) { /* non-fatal */ }
-          // Log CRM activity
+          // ── Step 8: Log CRM activity for deal side (always) ──
+          const crmEntityType = eventData.entityType === 'contact' ? 'contact' : 'deal';
           await storage.createCrmActivity({
             type: 'email',
-            subject: `Automated email: ${subject}`,
+            subject: `Automated email: ${renderedSubject}`,
             description: `Email sent to ${toEmail} via workflow automation`,
             direction: 'outbound',
-            entityType: entity.contactId ? 'contact' : 'deal',
-            entityId: entity.contactId || entity.id,
+            entityType: crmEntityType,
+            entityId: entity.id,
             orgId,
           });
-          result.detail = `Email sent to ${toEmail}: "${subject}"`;
+          // Also log a contact-side activity when a deal-triggered email goes to a primary contact
+          if (eventData.entityType === 'deal' && entity.contactId) {
+            try {
+              await storage.createCrmActivity({
+                type: 'email',
+                subject: `Automated email: ${renderedSubject}`,
+                description: `Email sent to ${toEmail} via workflow automation (deal: ${entity.title || entity.id})`,
+                direction: 'outbound',
+                entityType: 'contact',
+                entityId: entity.contactId,
+                orgId,
+              });
+            } catch (_) { /* non-fatal: best-effort contact-side activity */ }
+          }
+          result.detail = `Email sent to ${toEmail}: "${renderedSubject}"`;
         } else {
           result.success = false;
           result.detail = `Email send failed to ${toEmail}`;
@@ -326,10 +490,17 @@ function interpolateTemplate(
   eventData: Record<string, any>,
 ): string {
   if (!template) return '';
-  return template.replace(/\{(\w+(?:\.\w+)*)\}/g, (_match, path) => {
+  // Support {{path}} syntax (used by email templates and spec)
+  let result = template.replace(/\{\{([\w.]+)\}\}/g, (_match, path) => {
     const val = getNestedValue(entity, path) ?? getNestedValue(eventData, path);
     return val != null ? String(val) : '';
   });
+  // Also support {path} syntax (legacy single-brace format)
+  result = result.replace(/\{(\w+(?:\.\w+)*)\}/g, (_match, path) => {
+    const val = getNestedValue(entity, path) ?? getNestedValue(eventData, path);
+    return val != null ? String(val) : '';
+  });
+  return result;
 }
 
 // ── Entity fetcher ─────────────────────────────────────────────────────
