@@ -3,6 +3,7 @@ import { useParams, useLocation, useSearch } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import BrokerFeedbackPanel from '@/components/broker/BrokerFeedbackPanel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -893,6 +894,7 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="overview" className="mt-4 space-y-4">
           <OverviewDynamic project={project} pricingData={pricingData} financials={financials} onTabChange={handleTabChange} />
+          {projectId && <BrokerFeedbackPanel targetType="modeling-project" targetId={projectId} />}
         </TabsContent>
 
         <TabsContent value="inputs" className="space-y-6" data-tour="valuator-inputs">

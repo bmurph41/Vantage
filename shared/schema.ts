@@ -19452,6 +19452,9 @@ export const brokerProfiles = pgTable("broker_profiles", {
   bio: text("bio"),
   specialties: jsonb("specialties"),
   languages: jsonb("languages"),
+  criteria: jsonb("criteria"),
+  criteriaUpdatedAt: timestamp("criteria_updated_at"),
+  autoLearnEnabled: boolean("auto_learn_enabled").notNull().default(false),
   yearsExperience: integer("years_experience"),
   licenseNumber: varchar("license_number", { length: 100 }),
   licenseState: varchar("license_state", { length: 2 }),
@@ -19496,6 +19499,28 @@ export const brokerAdvisoryPackages = pgTable("broker_advisory_packages", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   profileIdx: index("broker_advisory_packages_profile_idx").on(table.brokerProfileId),
+}));
+
+export const brokerEvaluations = pgTable("broker_evaluations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()::text`),
+  brokerProfileId: varchar("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull(),
+  targetType: varchar("target_type", { length: 32 }).notNull(),
+  targetId: varchar("target_id").notNull(),
+  verdict: varchar("verdict", { length: 16 }).notNull(),
+  score: integer("score").notNull(),
+  matchedCriteria: jsonb("matched_criteria").notNull().default(sql`'[]'::jsonb`),
+  failedCriteria: jsonb("failed_criteria").notNull().default(sql`'[]'::jsonb`),
+  narrative: text("narrative"),
+  narrativeModel: varchar("narrative_model", { length: 64 }),
+  criteriaSnapshot: jsonb("criteria_snapshot").notNull(),
+  targetSnapshot: jsonb("target_snapshot").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => ({
+  brokerIdx: index("broker_evaluations_broker_idx").on(table.brokerProfileId),
+  targetIdx: index("broker_evaluations_target_idx").on(table.targetType, table.targetId),
+  expiresIdx: index("broker_evaluations_expires_idx").on(table.expiresAt),
 }));
 
 export const brokerSubscriptions = pgTable("broker_subscriptions", {

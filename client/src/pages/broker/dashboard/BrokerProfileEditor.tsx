@@ -13,6 +13,8 @@ import {
   usePublishMyProfile,
   useUnpublishMyProfile,
 } from "@/hooks/use-broker-dashboard";
+import BrokerCriteriaEditor from "@/components/broker/BrokerCriteriaEditor";
+import type { BrokerCriteria } from "@shared/broker/criteria";
 
 export default function BrokerProfileEditor() {
   const { toast } = useToast();
@@ -32,6 +34,7 @@ export default function BrokerProfileEditor() {
     website: "",
     linkedinUrl: "",
   });
+  const [criteria, setCriteria] = useState<BrokerCriteria | null>(null);
 
   useEffect(() => {
     if (data?.profile) {
@@ -46,12 +49,13 @@ export default function BrokerProfileEditor() {
         website: data.profile.website || "",
         linkedinUrl: data.profile.linkedinUrl || "",
       });
+      setCriteria((data.profile as any).criteria || null);
     }
   }, [data?.profile?.id]);
 
   const handleSave = async () => {
     try {
-      await updateMut.mutateAsync(form);
+      await updateMut.mutateAsync({ ...form, criteria: criteria || undefined } as any);
       toast({ title: "Profile saved" });
     } catch (e: any) {
       toast({ title: "Save failed", description: e?.message || "", variant: "destructive" });
@@ -157,6 +161,8 @@ export default function BrokerProfileEditor() {
             </div>
           </CardContent>
         </Card>
+
+        <BrokerCriteriaEditor value={criteria} onChange={setCriteria} />
       </div>
     </BrokerDashboardLayout>
   );

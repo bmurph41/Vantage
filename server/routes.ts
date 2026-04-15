@@ -169,6 +169,7 @@ import {
 import brokerBillingRoutes from "./routes/broker-billing-routes";
 import brokerClaimsRoutes from "./routes/broker-claims-routes";
 import brokerDashboardRoutes from "./routes/broker-dashboard-routes";
+import brokerFeedbackRoutes from "./routes/broker-feedback-routes";
 import marketplaceIngestionRouter from "./routes/marketplace-ingestion-routes";
 import dealScoringRoutes from "./routes/deal-scoring-routes";
 import competitiveTrackingRoutes from "./routes/competitive-tracking-routes";
@@ -581,6 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/broker-billing", authenticateUser, enforceTenant, brokerBillingRoutes);
   app.use("/api/broker-claims", authenticateUser, enforceTenant, brokerClaimsRoutes);
   app.use("/api/broker-dashboard", authenticateUser, enforceTenant, brokerDashboardRoutes);
+  app.use("/api/broker-feedback", authenticateUser, enforceTenant, brokerFeedbackRoutes);
   app.use(
     "/api/admin/marketplace-ingestion",
     authenticateUser,

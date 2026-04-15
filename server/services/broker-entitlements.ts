@@ -69,6 +69,7 @@ export const MARKETPLACE_PLUS_TIERS: Record<MarketplacePlusTier, MarketplaceTier
       "saved_searches",
       "listing_alerts",
       "broker_recommendations",
+      "broker_feedback_verdict",
       "csv_export_limited",
     ],
   },
@@ -91,6 +92,9 @@ export const MARKETPLACE_PLUS_TIERS: Record<MarketplacePlusTier, MarketplaceTier
       "saved_searches",
       "listing_alerts",
       "broker_recommendations",
+      "broker_feedback_verdict",
+      "broker_feedback_narrative",
+      "broker_feedback_modeling",
       "csv_export_unlimited",
       "comp_set_builder",
       "early_access_24h",
@@ -110,9 +114,25 @@ export const MARKETPLACE_PLUS_TIERS: Record<MarketplacePlusTier, MarketplaceTier
     earlyAccessHours: 24,
     allowBrokerMessaging: true,
     allowOffMarketAlerts: true,
-    features: ["everything"],
+    features: [
+      "everything",
+      "broker_feedback_verdict",
+      "broker_feedback_narrative",
+      "broker_feedback_modeling",
+    ],
   },
 };
+
+/**
+ * Check if a given tier includes a named feature flag. Used by the feedback
+ * endpoints to gate narrative + modeling project feedback behind Pro+.
+ */
+export function tierHasFeature(tier: MarketplacePlusTier, feature: string): boolean {
+  const def = MARKETPLACE_PLUS_TIERS[tier];
+  if (!def) return false;
+  if (def.features.includes("everything")) return true;
+  return def.features.includes(feature);
+}
 
 export interface EffectiveBrokerEntitlement {
   tier: MarketplacePlusTier;

@@ -135,6 +135,8 @@ const EDITABLE_PROFILE_FIELDS = [
   "contactPhone",
   "website",
   "linkedinUrl",
+  "criteria",
+  "autoLearnEnabled",
 ] as const;
 
 router.patch("/my-profile", async (req: Request, res: Response) => {
@@ -153,6 +155,9 @@ router.patch("/my-profile", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "No editable fields provided" });
     }
     updates.updatedAt = new Date();
+    if ("criteria" in updates) {
+      updates.criteriaUpdatedAt = new Date();
+    }
 
     const [updated] = await db
       .update(brokerProfiles)

@@ -105,6 +105,7 @@ import {
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import BrokerFeedbackPanel from "@/components/broker/BrokerFeedbackPanel";
 import {
   Tooltip,
   TooltipContent,
@@ -1922,6 +1923,11 @@ function ListingDetailPanel({
             )}
 
             <div className="p-5 space-y-5">
+              {/* Broker feedback from followed brokers */}
+              {l.canonicalListingId && (
+                <BrokerFeedbackPanel targetType="listing" targetId={l.canonicalListingId} />
+              )}
+
               {/* Key metrics */}
               <div>
                 <SectionLabel>Financial Snapshot</SectionLabel>
