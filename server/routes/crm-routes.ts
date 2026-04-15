@@ -69,6 +69,7 @@ import {
   modelingProjectActivity,
   marketTargets,
   insertMarketTargetSchema,
+  insertModelingProjectSchema,
 } from "@shared/schema";
 import {
   salesCompCreateSchema,
@@ -13459,7 +13460,7 @@ export function registerCRMRoutes(
           if (defaultPipeline) {
             pipelineId = defaultPipeline.id;
             // Get first stage of the pipeline
-            const stages = await storage.getCrmPipelineStagesForPipeline(pipelineId);
+            const stages = await storage.getCrmPipelineStagesByPipeline(pipelineId);
             if (stages && stages.length > 0) {
               stageId = stages[0].id;
             }

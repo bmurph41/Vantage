@@ -502,7 +502,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 3. Development fallback — mirrors /api/auth/me behaviour so GET and POST
       //    both resolve the same admin user when no real session is present.
-      if (!resolvedUser && process.env.NODE_ENV !== 'production') {
+      //    Also triggers if a DB user was found but has no orgId (e.g. Replit OAuth
+      //    user created without an org assignment yet).
+      if ((!resolvedUser || !resolvedUser.orgId) && process.env.NODE_ENV !== 'production') {
         resolvedUser = { id: "85c9cd7a-c453-4dba-9817-d032d5712c4e", orgId: "cd3719c3-ef82-4ccc-acb9-261c80fb64b4", role: "owner", email: "brettmurphy41@gmail.com", name: "Brett Murphy" };
       }
       

@@ -20,7 +20,7 @@ const EXEMPT_PATHS = [
   '/api/auth/mfa',
   '/api/stripe/webhook',
   '/api/webhooks',
-  '/api/modeling/projects/',
+  '/api/modeling/projects',
   '/api/ai-assistant/',
   '/api/v1/', // API key-authenticated routes are exempt from CSRF
   '/api/dashboards/widgets/', // Read-only widget queries, protected by auth middleware
