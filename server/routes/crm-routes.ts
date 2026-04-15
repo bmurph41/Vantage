@@ -16,6 +16,7 @@ import { ownedAssetsService } from "../services/owned-assets-service";
 import { marketingService } from "../services/marketing-service";
 import { requireRentRoll } from "../middleware/pack-guard";
 import { ParserService } from "../services/salescomps/parser";
+import { FilterBuilder } from "../services/salescomps/filterBuilder";
 import { generateAIInsights } from "../services/salescomps/aiInsightsService";
 import {
   calculateMetrics,
@@ -79,6 +80,8 @@ import {
   compColumnUpdateSchema,
   compFiltersSchema,
 } from "../utils/salescomps-zod-schemas";
+
+const filterBuilder = new FilterBuilder();
 
 const uploadSalesComps = multer({
   storage: multer.memoryStorage(),
@@ -8104,6 +8107,9 @@ export function registerCRMRoutes(
 
       res.json({ comps, total, page: filters.page, pageSize: filters.pageSize });
     } catch (error: any) {
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid filter parameters", issues: error.errors });
+      }
       console.error("Error fetching comps:", error);
       res.status(500).json({ message: "Failed to fetch comps" });
     }
