@@ -2,6 +2,103 @@
 
 ## Current State (2026-04-15)
 
+### ✅ COMPLETE — Broker Feedback & Evaluation Layer (2026-04-15, afternoon)
+
+Built the evaluator/training layer on top of the existing broker platform. Brokers
+can now define structured recommendation criteria, and Marketplace+ subscribers see
+real-time pass/watch/pursue verdicts from every broker they follow — on marketplace
+listings and on their own modeling projects. Monetization piggybacks on existing
+Marketplace+ tiers (Free/Solo/Pro/Institutional); no new Stripe SKU.
+
+**Scope decision:** Option B — platform-only SKUs, brokers uncompensated directly
+(lead-gen via profile CTAs). Auto-training deferred to v2; v1 is manual criteria
+entry + deterministic rules + Claude Haiku narrative.
+
+**Schema (scripts/step4_broker_feedback_schema.mjs)**
+- `broker_profiles.criteria JSONB` — structured `BrokerCriteria` (asset classes,
+  markets, cap rate floor, DSCR/LTV/IRR targets, hold period window, deal size
+  range, risk tolerance, outlook narrative)
+- `broker_profiles.auto_learn_enabled BOOLEAN` — reserved for v2
+- `broker_profiles.criteria_updated_at TIMESTAMP`
+- `broker_evaluations` NEW — cached verdicts keyed on
+  `(broker_profile_id, target_type, target_id)` with 24h TTL, `verdict`/`score`/
+  `matched_criteria`/`failed_criteria`/`narrative`/`criteria_snapshot`/
+  `target_snapshot`. CHECK constraints on verdict + score + target_type.
+  Drizzle schema updated in `shared/schema.ts`.
+
+**Shared types**
+- `shared/broker/criteria.ts` NEW — `BrokerCriteria`, `RiskTolerance`, `Verdict`,
+  `CriterionResult`, `EvaluationResult`. Single source of truth for frontend +
+  backend.
+
+**Backend services**
+- `server/services/broker-evaluator-service.ts` NEW (~450 lines):
+  - `loadListingTarget()` / `loadModelingTarget()` normalize
+    `marina_listings` and `modeling_projects` rows (plus
+    `modeling_project_config` via raw `pool.query`, RLS-safe) into a
+    `NormalizedTarget`
+  - `runRules()` — deterministic rules engine; each set criterion is a gate,
+    score = matched/total × 100, verdict: ≥80 pursue / ≥50 watch / <50 pass
+  - `generateNarrative()` — optional Claude Haiku call
+    (`claude-haiku-4-5-20251001`), returns 2-sentence broker-voice note
+  - `evaluateTarget()` — cache-first, uses `broker_evaluations` upsert with 24h
+    TTL
+  - `getFeedbackForTarget()` — fans out across all brokers the user actively
+    follows (via `broker_follow_history` join)
+- `server/services/broker-entitlements.ts` — added
+  `broker_feedback_verdict` to Solo+, `broker_feedback_narrative` +
+  `broker_feedback_modeling` to Pro+, and a new `tierHasFeature()` helper
+- `server/routes/broker-dashboard-routes.ts` — added `criteria` +
+  `autoLearnEnabled` to `EDITABLE_PROFILE_FIELDS`; PATCH `/my-profile` now
+  stamps `criteria_updated_at` when criteria changes
+
+**Backend routes**
+- `server/routes/broker-feedback-routes.ts` NEW mounted at
+  `/api/broker-feedback`:
+  - `GET /listing/:id` — verdicts for a marketplace listing (all followed
+    brokers); narrative stripped server-side below Pro tier
+  - `GET /modeling-project/:id` — same for modeling projects; 403s Free/Solo
+    users (modeling feedback is Pro+ only)
+  - `POST /evaluate` — explicit single-broker evaluation (force recompute)
+- Mounted in `server/routes.ts` under `authenticateUser + enforceTenant`
+
+**Frontend**
+- `client/src/hooks/use-broker-feedback.ts` NEW — React Query hooks
+  `useListingBrokerFeedback()` + `useModelingProjectBrokerFeedback()` with
+  `brokerFeedbackKeys` factory
+- `client/src/components/broker/BrokerCriteriaEditor.tsx` NEW — criteria form
+  (asset-class chips, market codes, cap rate floor, DSCR/LTV/IRR, hold window,
+  deal size window, risk tolerance, outlook narrative textarea)
+- `client/src/components/broker/BrokerFeedbackPanel.tsx` NEW — reusable
+  verdict card with pursue/watch/pass pills, matched/failed criteria chips,
+  Haiku narrative (gated), inline upgrade prompt for Free/Solo
+- `client/src/pages/broker/dashboard/BrokerProfileEditor.tsx` — embedded
+  `BrokerCriteriaEditor`, criteria state merged into `handleSave()` payload
+- `client/src/pages/marinamatch/MarketplaceListings.tsx` — mounted
+  `<BrokerFeedbackPanel targetType="listing">` inside `ListingDetailPanel`
+  above the Financial Snapshot
+- `client/src/pages/modeling/projects/workspace.tsx` — mounted
+  `<BrokerFeedbackPanel targetType="modeling-project">` in the Overview tab
+
+**Validation**
+- `step4_broker_feedback_schema.mjs` applied cleanly
+- `tsc --noEmit` on all touched files — no errors
+- Dev server restarted (`pkill -f 'tsx server' && npm run dev`), all existing
+  broker routes still 200; new `/api/broker-feedback/listing/:id` returns 200
+
+**Known follow-ups**
+- Auto-training loop (scan broker's own deal pipeline outcomes, adjust
+  criteria thresholds nightly with `manualOverride` protection)
+- Per-broker analytics (verdict volume, follower engagement) for the broker
+  dashboard
+- Listing detail sheet's `canonicalListingId` assumes it maps 1:1 to
+  `marina_listings.id` (per Task #20 ingestion v2 migration); confirm before
+  broader release
+- PDF/email delivery of verdicts for asynchronous "broker digest" flow
+- Flat-bounty broker compensation system (Option A) when broker count warrants
+
+---
+
 ### ✅ COMPLETE — Deal Marketplace + Broker Platform (2026-04-15)
 
 Multi-week work on the universal Deal Marketplace and broker-facing SaaS landed
