@@ -2260,7 +2260,7 @@ export function registerCRMRoutes(
   app.get("/api/crm/activities", async (req: any, res) => {
     try {
       const pag = parsePagination(req.query, { pageSize: 50 });
-      const allActivities = await storage.getCrmActivitiesForOrg(req.user.id);
+      const allActivities = await storage.getCrmActivitiesForOrg(req.user.orgId);
       const total = allActivities.length;
       const paged = allActivities.slice(pag.offset, pag.offset + pag.limit);
       res.json(paginatedResponse(paged, total, pag));

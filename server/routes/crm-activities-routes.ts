@@ -106,7 +106,7 @@ router.get('/', async (req, res) => {
         activity: crmActivities,
         owner: {
           id: users.id,
-          name: users.displayName,
+          name: users.name,
           email: users.email,
         }
       })
