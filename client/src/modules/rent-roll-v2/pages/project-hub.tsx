@@ -44,7 +44,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import DashboardNav from "../components/navigation/DashboardNav";
 import { createLocation } from "../lib/locationApi";
-import { getRentRollConfig, getSupportedRentRollAssetClasses } from "@shared/rent-roll-config";
+import { getRentRollConfig } from "@shared/rent-roll-config";
+import { useAssetClasses } from "@/hooks/use-asset-classes";
 
 // Per-asset-class unit type lists for the project creation wizard
 const ASSET_CLASS_UNIT_TYPES: Record<string, string[]> = {
@@ -61,25 +62,22 @@ const ASSET_CLASS_UNIT_TYPES: Record<string, string[]> = {
   medical_office: ["Exam Suite", "Medical Suite", "Lab Space", "Physical Therapy", "Imaging"],
 };
 
-// Asset class display metadata for the picker
-const ASSET_CLASS_OPTIONS = [
-  { value: "marina", label: "Marina", icon: Ship, color: "text-blue-600" },
-  { value: "self_storage", label: "Self-Storage", icon: Box, color: "text-orange-600" },
-  { value: "rv_park", label: "RV Park / Campground", icon: Car, color: "text-green-600" },
-  { value: "multifamily", label: "Multifamily", icon: Home, color: "text-purple-600" },
-  { value: "hotel", label: "Hotel / STR", icon: Hotel, color: "text-pink-600" },
-  { value: "retail", label: "Retail", icon: Store, color: "text-yellow-600" },
-  { value: "office", label: "Office", icon: Building2, color: "text-sky-600" },
-  { value: "industrial", label: "Industrial", icon: Factory, color: "text-slate-600" },
-  { value: "mixed_use", label: "Mixed Use", icon: Layers, color: "text-teal-600" },
-];
+// Static icon/color map — labels and ordering come from the DB via useAssetClasses()
+const ASSET_CLASS_ICONS: Record<string, { icon: React.ComponentType<{ className?: string }>; color: string }> = {
+  marina:       { icon: Ship,      color: "text-blue-600" },
+  self_storage: { icon: Box,       color: "text-orange-600" },
+  rv_park:      { icon: Car,       color: "text-green-600" },
+  multifamily:  { icon: Home,      color: "text-purple-600" },
+  hotel:        { icon: Hotel,     color: "text-pink-600" },
+  str:          { icon: Hotel,     color: "text-rose-600" },
+  retail:       { icon: Store,     color: "text-yellow-600" },
+  office:       { icon: Building2, color: "text-sky-600" },
+  industrial:   { icon: Factory,   color: "text-slate-600" },
+  mixed_use:    { icon: Layers,    color: "text-teal-600" },
+};
 
 function getUnitTypesForAssetClass(assetClass: string): string[] {
   return ASSET_CLASS_UNIT_TYPES[assetClass] || ASSET_CLASS_UNIT_TYPES["marina"];
-}
-
-function getAssetClassLabel(assetClass: string): string {
-  return ASSET_CLASS_OPTIONS.find(o => o.value === assetClass)?.label || "Property";
 }
 
 const storageTypeConfigSchema = z.object({
@@ -169,6 +167,7 @@ interface DuplicateCheckResult {
 export default function ProjectHub() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const { options: assetClassOptions, getLabel: getAssetClassLabel } = useAssetClasses();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectHubMetrics | null>(null);
   const [editName, setEditName] = useState("");
@@ -1144,8 +1143,10 @@ export default function ProjectHub() {
                       <FormItem>
                         <FormLabel className="text-sm font-medium">Asset Class *</FormLabel>
                         <div className="grid grid-cols-3 gap-2 mt-2">
-                          {ASSET_CLASS_OPTIONS.map((opt) => {
-                            const IconComp = opt.icon;
+                          {assetClassOptions.map((opt) => {
+                            const iconMeta = ASSET_CLASS_ICONS[opt.value];
+                            const IconComp = iconMeta?.icon ?? Building2;
+                            const color = iconMeta?.color ?? "text-muted-foreground";
                             const isSelected = field.value === opt.value;
                             return (
                               <div
@@ -1159,7 +1160,7 @@ export default function ProjectHub() {
                                 data-testid={`select-asset-class-${opt.value}`}
                               >
                                 <div className="flex flex-col items-center gap-1.5 text-center">
-                                  <IconComp className={`h-5 w-5 ${isSelected ? "text-primary" : opt.color}`} />
+                                  <IconComp className={`h-5 w-5 ${isSelected ? "text-primary" : color}`} />
                                   <div className="text-xs font-medium leading-tight">{opt.label}</div>
                                 </div>
                               </div>

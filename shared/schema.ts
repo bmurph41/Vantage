@@ -26782,10 +26782,10 @@ export const syncLogStatusEnum = pgEnum("sync_log_status", [
 
 export const platformAssetClasses = pgTable("platform_asset_classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  key: platformAssetClassEnum("key").notNull().unique(),
+  key: text("key").notNull().unique(),
   label: varchar("label", { length: 100 }).notNull(),
   shortLabel: varchar("short_label", { length: 30 }),
-  category: assetClassCategoryEnum("category").notNull(),
+  category: text("category").notNull().default("specialty"),
   description: text("description"),
   icon: varchar("icon", { length: 50 }),
   enabled: boolean("enabled").notNull().default(false),
@@ -26795,6 +26795,14 @@ export const platformAssetClasses = pgTable("platform_asset_classes", {
   defaultDataSources: jsonb("default_data_sources").default(sql`'[]'`),
   coaTaxonomyPackKey: varchar("coa_taxonomy_pack_key", { length: 50 }),
   ddTemplateKey: varchar("dd_template_key", { length: 100 }),
+  // Dynamic asset class fields for DB-driven configuration
+  sizeLabel: text("size_label"),
+  occLabel: text("occ_label"),
+  priceUnit: text("price_unit"),
+  revenueStreams: jsonb("revenue_streams").default(sql`'[]'`),
+  demandKey: text("demand_key"),
+  group: text("group"),
+  color: text("color"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

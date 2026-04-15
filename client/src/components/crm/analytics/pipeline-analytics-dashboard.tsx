@@ -39,7 +39,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ASSET_CLASS_OPTIONS } from "../asset-class-fields";
+import { useAssetClasses } from "@/hooks/use-asset-classes";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -99,6 +99,7 @@ const STAGE_COLORS = ["#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b", "#10b981", "#e
 // ─── Main Dashboard ───────────────────────────────────────────────
 
 export function PipelineAnalyticsDashboard() {
+  const { options: assetClassOptions } = useAssetClasses();
   const [filters, setFilters] = useState<AnalyticsFilters>({
     assetClass: "all",
     dateRange: "all",
@@ -142,7 +143,7 @@ export function PipelineAnalyticsDashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Asset Classes</SelectItem>
-              {ASSET_CLASS_OPTIONS.map((opt) => (
+              {assetClassOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>

@@ -21,7 +21,7 @@ import { Plus, Search, Pencil, Trash2, TrendingUp, BarChart3, FileSpreadsheet, S
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { uwStageLabels } from '@shared/schema';
-import { ASSET_CLASS_OPTIONS } from '@/components/crm/asset-class-fields';
+import { useAssetClasses } from '@/hooks/use-asset-classes';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from 'wouter';
 import { useLocation } from 'wouter';
@@ -72,6 +72,7 @@ type ModelingProject = {
 export default function ModelingProjectsPage() {
   const { simplifiedMode } = useDisplayMode();
   const { toast } = useToast();
+  const { getLabel: getAssetClassLabel } = useAssetClasses();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProject, setSelectedProject] = useState<ModelingProject | null>(null);
@@ -401,7 +402,7 @@ export default function ModelingProjectsPage() {
                           </TableCell>
                           <TableCell className="text-center pb-0">
                             <Badge variant="outline" className="text-[10px] capitalize">
-                              {ASSET_CLASS_OPTIONS.find(a => a.value === project.assetClass)?.label || project.assetClass || "Marina"}
+                              {getAssetClassLabel(project.assetClass) || project.assetClass || "Marina"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center pb-0">

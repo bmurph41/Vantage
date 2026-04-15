@@ -39,7 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal } from "@shared/schema";
-import { ASSET_CLASS_OPTIONS, getAssetClassConfig } from "@/components/crm/asset-class-fields";
+import { useAssetClasses } from "@/hooks/use-asset-classes";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -60,6 +60,7 @@ interface ExportSection {
 
 export function LPExportDialog({ open, onOpenChange }: LPExportDialogProps) {
   const { toast } = useToast();
+  const { options: assetClassOptions } = useAssetClasses();
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportTitle, setReportTitle] = useState("Quarterly Pipeline Report");
   const [reportPeriod, setReportPeriod] = useState(() => {
@@ -355,7 +356,7 @@ ${enabledSections.has("forecast") ? `
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Asset Classes</SelectItem>
-                {ASSET_CLASS_OPTIONS.map((opt) => (
+                {assetClassOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>

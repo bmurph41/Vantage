@@ -352,6 +352,7 @@ import coaRoutes from './routes/coa-routes';
 import coaTaxonomyRoutes from './routes/coa-taxonomy-routes';
 import { propertyDataRouter } from "./routes/property-data-routes";
 import { assetClassContextRouter } from "./routes/asset-class-context-routes";
+import { publicAssetClassRouter, adminAssetClassRouter } from "./routes/admin/asset-classes-routes";
 import icRouter from "./routes/ic-routes";
 import lpRouter from "./routes/lp-routes";
 import leadScoringRouter from "./routes/lead-scoring-routes";
@@ -1052,7 +1053,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/marina-comps", authenticateUser, enforceTenant, marinaCompRoutes);
   app.use("/api/valuations", authenticateUser, enforceTenant, valuationTimelineRoutes);
   app.use(authenticateUser, propertyDataRouter);
+  app.use("/api/asset-classes", publicAssetClassRouter);
   app.use("/api/asset-classes", authenticateUser, assetClassContextRouter);
+  app.use("/api/admin/asset-classes", authenticateUser, adminAssetClassRouter);
   app.use("/api/ic", authenticateUser, enforceTenant, icRouter);
   app.use("/api/lp", authenticateUser, enforceTenant, requireEntitlement("lp_portal"), lpRouter);
   app.use("/api/lead-scoring", authenticateUser, enforceTenant, leadScoringRouter);

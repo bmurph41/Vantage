@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAssetClasses } from "@/hooks/use-asset-classes";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,16 +134,6 @@ const NOTIFICATION_CATEGORIES = [
   },
 ];
 
-const ASSET_CLASS_OPTIONS = [
-  "Full-Service Marina",
-  "Dry Storage",
-  "Fuel Dock",
-  "Boatyard",
-  "Mixed-Use Waterfront",
-  "RV / Campground",
-  "Yacht Club",
-  "Commercial Port",
-];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -188,6 +179,7 @@ export default function UserSettingsPage() {
   const [activeSection, setActiveSection] = useState<SectionId>("profile");
   const { toast } = useToast();
   const { user: authUser } = useAuth();
+  const { options: assetClassOptions } = useAssetClasses();
 
   // ── Profile State ──────────────────────────────────────────────────────────
   const [profileName, setProfileName] = useState("");
@@ -652,14 +644,14 @@ export default function UserSettingsPage() {
                 <Label>Asset Class Interests</Label>
                 <p className="text-sm text-muted-foreground">Select the asset classes you track or invest in</p>
                 <div className="flex flex-wrap gap-2">
-                  {ASSET_CLASS_OPTIONS.map((cls) => (
+                  {assetClassOptions.map((opt) => (
                     <Badge
-                      key={cls}
-                      variant={selectedAssetClasses.includes(cls) ? "default" : "outline"}
+                      key={opt.value}
+                      variant={selectedAssetClasses.includes(opt.value) ? "default" : "outline"}
                       className="cursor-pointer transition-colors hover:opacity-80"
-                      onClick={() => toggleAssetClass(cls)}
+                      onClick={() => toggleAssetClass(opt.value)}
                     >
-                      {cls}
+                      {opt.label}
                     </Badge>
                   ))}
                 </div>

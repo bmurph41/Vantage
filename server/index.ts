@@ -13,6 +13,8 @@ import { startScheduler as startListingScheduler } from "./marinamatch/services/
 import { autoSeedGlobalBrokerSources } from "./marinamatch/services/global-broker-sources";
 import { seedIntegrations } from "./integrations";
 import { seedMarinaTaxonomyPack } from "./services/coa-taxonomy-seed";
+import { seedCanonicalAssetClasses } from "./routes/admin/asset-classes-routes";
+import { runStartupMigrations } from "./db-startup-migrations";
 import { docIntelService } from "./services/doc-intel-service";
 
 import { configureSecurityMiddleware } from "./middleware/security";
@@ -515,6 +517,12 @@ server.listen({
       seedMarinaTaxonomyPack()
         .then((packId) => log(`[COA] Marina taxonomy pack ready: ${packId}`))
         .catch((error) => log(`[COA] Failed to seed taxonomy: ${error}`));
+
+      // Run DB migrations first (enum→text, add columns), then seed canonical rows
+      runStartupMigrations()
+        .then(() => seedCanonicalAssetClasses())
+        .then(() => console.log('[AssetClass] Canonical asset classes ready'))
+        .catch((error) => console.error(`[AssetClass] Startup failed:`, error));
 
     });
   } catch (error) {

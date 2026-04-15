@@ -8,9 +8,6 @@
  *   POST   /api/admin/data-sources/:id/sync  — Trigger manual sync
  *   GET    /api/admin/data-sources/:id/logs  — Sync history
  *   DELETE /api/admin/data-sources/:id       — Delete data source
- *   GET    /api/admin/asset-classes          — List all asset classes
- *   PATCH  /api/admin/asset-classes/:key     — Update asset class config
- *   POST   /api/admin/asset-classes/seed     — Seed default asset classes
  *
  * User-facing endpoints:
  *   GET    /api/property-data/search         — Search across all sources
@@ -26,7 +23,7 @@
 
 import { Router } from "express";
 import { db } from "../db";
-import { platformDataSources, platformAssetClasses } from "@shared/schema";
+import { platformDataSources } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { propertyDataService } from "../services/property-data-service";
@@ -169,119 +166,6 @@ propertyDataRouter.delete("/api/admin/data-sources/:id", async (req: any, res) =
   } catch (error: any) {
     console.error("Error deleting data source:", error);
     res.status(500).json({ error: "Failed to delete data source" });
-  }
-});
-
-// =============================================
-// Admin: Asset Classes
-// =============================================
-
-propertyDataRouter.get("/api/admin/asset-classes", async (req: any, res) => {
-  if (!requireAdmin(req, res)) return;
-
-  try {
-    const classes = await db
-      .select()
-      .from(platformAssetClasses)
-      .orderBy(platformAssetClasses.sortOrder);
-    res.json({ assetClasses: classes });
-  } catch (error: any) {
-    console.error("Error fetching asset classes:", error);
-    res.status(500).json({ error: "Failed to fetch asset classes" });
-  }
-});
-
-const updateAssetClassSchema = z.object({
-  enabled: z.boolean().optional(),
-  config: z.record(z.any()).optional(),
-  enabledModules: z.array(z.string()).optional(),
-  defaultDataSources: z.array(z.string()).optional(),
-  coaTaxonomyPackKey: z.string().optional(),
-  ddTemplateKey: z.string().optional(),
-});
-
-propertyDataRouter.patch("/api/admin/asset-classes/:key", async (req: any, res) => {
-  if (!requireAdmin(req, res)) return;
-
-  try {
-    const data = updateAssetClassSchema.parse(req.body);
-
-    const [updated] = await db
-      .update(platformAssetClasses)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(platformAssetClasses.key, req.params.key as any))
-      .returning();
-
-    if (!updated) {
-      return res.status(404).json({ error: "Asset class not found" });
-    }
-
-    res.json({ assetClass: updated });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Validation error", details: error.errors });
-    }
-    console.error("Error updating asset class:", error);
-    res.status(500).json({ error: "Failed to update asset class" });
-  }
-});
-
-propertyDataRouter.post("/api/admin/asset-classes/seed", async (req: any, res) => {
-  if (!requireAdmin(req, res)) return;
-
-  try {
-    const defaults = [
-      { key: "sfr", label: "Single Family Home", shortLabel: "SFR", category: "residential", icon: "Home", sortOrder: 1,
-        config: { defaultBeds: 3, defaultBaths: 2, typicalCapRate: 0.06 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso"] },
-      { key: "duplex", label: "Duplex", shortLabel: "Duplex", category: "residential", icon: "Building", sortOrder: 2,
-        config: { units: 2, typicalCapRate: 0.065 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso"] },
-      { key: "triplex", label: "Triplex", shortLabel: "Triplex", category: "residential", icon: "Building", sortOrder: 3,
-        config: { units: 3, typicalCapRate: 0.065 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso"] },
-      { key: "quadplex", label: "Quadplex", shortLabel: "Quadplex", category: "residential", icon: "Building", sortOrder: 4,
-        config: { units: 4, typicalCapRate: 0.065 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso"] },
-      { key: "multifamily", label: "Multifamily (5+ Units)", shortLabel: "Multifamily", category: "residential", icon: "Building2", sortOrder: 5,
-        config: { minUnits: 5, typicalCapRate: 0.055 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso", "redfin"] },
-      { key: "str", label: "Short-Term Rental (Airbnb/VRBO)", shortLabel: "STR", category: "hospitality", icon: "Palmtree", sortOrder: 6,
-        config: { seasonalPricing: true, typicalOccupancy: 0.7 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "vdr", "dueDiligence"],
-        defaultDataSources: ["zillow_bridge", "mls_reso"] },
-      { key: "marina", label: "Marina", shortLabel: "Marina", category: "specialty", icon: "Anchor", sortOrder: 7, enabled: true,
-        config: { slipBased: true, fuelRevenue: true, typicalCapRate: 0.07 },
-        enabledModules: ["crm", "salesComps", "modeling", "proForma", "rentRoll", "fuelSales", "shipStore", "vdr", "dueDiligence", "docket"],
-        defaultDataSources: [] },
-    ];
-
-    for (const item of defaults) {
-      const existing = await db
-        .select({ id: platformAssetClasses.id })
-        .from(platformAssetClasses)
-        .where(eq(platformAssetClasses.key, item.key as any))
-        .limit(1);
-
-      if (existing.length === 0) {
-        await db.insert(platformAssetClasses).values(item as any);
-      }
-    }
-
-    const all = await db
-      .select()
-      .from(platformAssetClasses)
-      .orderBy(platformAssetClasses.sortOrder);
-
-    res.json({ message: "Asset classes seeded", assetClasses: all });
-  } catch (error: any) {
-    console.error("Error seeding asset classes:", error);
-    res.status(500).json({ error: "Failed to seed asset classes" });
   }
 });
 

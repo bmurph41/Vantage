@@ -626,12 +626,10 @@ export const ASSET_CLASS_CONFIGS: Record<AssetClass, AssetClassConfig> = {
   business: businessConfig,
 };
 
-export const ASSET_CLASS_OPTIONS = Object.values(ASSET_CLASS_CONFIGS).map(c => ({
-  value: c.id,
-  label: c.label,
-  icon: c.icon,
-}));
-
+/**
+ * Returns the static icon/KPI field config for a given asset class key.
+ * For DB-driven label and enabled state, use the `useAssetClasses()` hook instead.
+ */
 export function getAssetClassConfig(assetClass: string | null | undefined): AssetClassConfig {
   return ASSET_CLASS_CONFIGS[(assetClass as AssetClass)] || ASSET_CLASS_CONFIGS.marina;
 }
