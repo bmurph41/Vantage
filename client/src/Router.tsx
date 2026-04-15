@@ -65,6 +65,7 @@ const DealWorkspace = lazy(() => import("@/pages/deal-workspace"));
 const DDReviewDashboard = lazy(() => import("@/pages/dd-review"));
 const DealDetail = lazy(() => import("@/pages/deal-detail"));
 const DealComparison = lazy(() => import("@/pages/deal-comparison"));
+const DealComparisonModels = lazy(() => import("@/pages/deal-comparison-models"));
 const DealTimelinePage = lazy(() => import("@/pages/deal-timeline"));
 const Properties = lazy(() => import("@/pages/properties"));
 const PendingProperties = lazy(() => import("@/pages/pending-properties"));
@@ -1754,6 +1755,17 @@ function Router() {
           <GatedLayout pack="crm_pipeline">
             <DealComparison />
           </GatedLayout>
+        )}
+      </Route>
+      <Route path="/crm/deals/compare-models">
+        {() => (
+          <AuthGuard>
+            <GatedLayout pack="crm_pipeline">
+              <Suspense fallback={<PageLoader />}>
+                <DealComparisonModels />
+              </Suspense>
+            </GatedLayout>
+          </AuthGuard>
         )}
       </Route>
       <Route path="/crm/deals/:dealId">

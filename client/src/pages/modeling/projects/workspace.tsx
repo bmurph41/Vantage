@@ -98,6 +98,7 @@ import CommercialLeasesWorkspace from './workspace/commercial-leases';
 import ModelingProjectIntegrationPanel from '@/components/modeling/ModelingProjectIntegrationPanel';
 import WorkspaceProFormaCharts from './workspace/pro-forma-charts';
 import ScenarioComparisonCharts from './workspace/scenario-comparison-charts';
+import WorkspaceDealComparison from './workspace/deal-comparison';
 import ExportModel from './workspace/export-model';
 import SensitivityTornado from './workspace/sensitivity-tornado';
 import ValidationWarnings from './workspace/validation-warnings';
@@ -211,6 +212,7 @@ const TAB_GROUPS: TabGroup[] = [
       { value: 'analytics', label: 'Analytics', icon: SlidersHorizontal },
       { value: 'proforma-charts', label: 'Charts', icon: BarChart3 },
       { value: 'scenario-compare', label: 'Compare', icon: Layers },
+      { value: 'deal-compare', label: 'Deal Compare', icon: Scale },
       { value: 'sensitivity', label: 'Sensitivity', icon: Tornado },
       { value: 'monte-carlo', label: 'Monte Carlo', icon: Activity },
       { value: 'stress-testing', label: 'Stress Tests', icon: Shield },
@@ -950,10 +952,10 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="investment-materials" className="mt-4 space-y-6">
           {/* IC Deal Review Deck */}
-          <ICDeckGenerateButton dealId={(project as any)?.dealId} projectId={projectId!} />
+          <ICDeckGenerateButton dealId={project?.dealId} projectId={projectId!} />
 
           {/* Offering Memorandum */}
-          <OMGenerateButton dealId={(project as any)?.dealId} projectId={projectId!} />
+          <OMGenerateButton dealId={project?.dealId} projectId={projectId!} />
 
           <Card>
             <CardHeader>
@@ -1066,6 +1068,14 @@ export default function ProjectWorkspace() {
 
         <TabsContent value="scenario-compare" className="mt-4 space-y-4">
           <ScenarioComparisonCharts projectId={projectId!} onTabChange={handleTabChange} />
+        </TabsContent>
+        <TabsContent value="deal-compare" className="mt-4 space-y-4">
+          <WorkspaceDealComparison
+            projectId={projectId!}
+            onTabChange={handleTabChange}
+            pinnedDealId={project?.dealId ? String(project.dealId) : undefined}
+            initialDealIds={project?.dealId ? [String(project.dealId)] : []}
+          />
         </TabsContent>
 
         <TabsContent value="sensitivity" className="mt-4 space-y-4">

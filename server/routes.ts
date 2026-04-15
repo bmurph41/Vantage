@@ -30,7 +30,7 @@ import { operationsEngineRouter } from "./routes/operations-engine-routes";
 import { reportingEngineRouter } from "./routes/reporting-engine-routes";
 import { integrationsEngineRouter } from "./routes/integrations-engine-routes";
 import { workflowEnhancementsRouter } from "./routes/workflow-enhancements-routes";
-import { crmEnhancementsRouter } from "./routes/crm-enhancements-routes";
+import { crmEnhancementsRouter, dealCompareFullHandler } from "./routes/crm-enhancements-routes";
 import { lpPortalRouter } from "./routes/lp-portal-routes";
 import { workflowAutomationRouter } from "./routes/workflow-automation-routes";
 import { workflowEmailRouter } from "./routes/workflow-email-routes";
@@ -1040,6 +1040,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/integrations-v2", authenticateUser, enforceTenant, integrationsEngineRouter);
   app.use("/api/workflow-v2", authenticateUser, enforceTenant, workflowEnhancementsRouter);
   app.use("/api/crm-v2", authenticateUser, enforceTenant, crmEnhancementsRouter);
+  // Spec-required alias: POST /api/deals/compare-full → same handler as /api/crm-v2/deals/compare-full
+  app.post("/api/deals/compare-full", authenticateUser, enforceTenant, dealCompareFullHandler);
   app.use("/api/lp-portal", lpPortalRouter); // LP portal has its own auth
 
   // Dockit Marina Operations Module - mounted at /dockit/api

@@ -10,11 +10,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { SavedViewsManager } from "@/components/crm/saved-views-manager";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   Search, Plus, LayoutGrid, List, Users, DollarSign, TrendingUp,
   Target, Clock, Flame, Filter, Settings2, BarChart3, Activity,
   CheckSquare, Bookmark, ArrowRight, Calendar, MapPin, ChevronDown,
-  Zap, Eye, AlertTriangle, Award,
+  Zap, Eye, AlertTriangle, Award, Scale, X,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -100,6 +103,8 @@ export default function DealWorkspace() {
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [activeAssetClass, setActiveAssetClass] = useState<string>("all");
   const [activeSavedView, setActiveSavedView] = useState<string>("all_deals");
+  const [comparePickerOpen, setComparePickerOpen] = useState(false);
+  const [compareSelectedIds, setCompareSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const newUrl = `/deal-workspace?view=${activeView}`;
@@ -128,7 +133,7 @@ export default function DealWorkspace() {
 
     const weightedValue = openDeals.reduce((sum, d) => {
       const amt = Number(d.amount) || 0;
-      const prob = ((d as any).probability ?? 50) / 100;
+      const prob = (d.probability ?? 50) / 100;
       return sum + amt * prob;
     }, 0);
 
@@ -158,7 +163,7 @@ export default function DealWorkspace() {
   const assetClassCounts = useMemo(() => {
     const counts: Record<string, number> = { all: deals.length };
     deals.forEach(d => {
-      const ac = (d as any).assetClass || 'other';
+      const ac = d.assetClass || 'other';
       counts[ac] = (counts[ac] || 0) + 1;
     });
     return counts;
@@ -231,10 +236,95 @@ export default function DealWorkspace() {
                 onActiveViewChange={(id) => setActiveSavedView(id || "all_deals")}
               />
 
-              <Button variant="outline" size="sm" className="h-9"
-                onClick={() => setLocation('/crm/deals/compare')}>
-                <BarChart3 className="w-4 h-4 mr-1.5" /> Compare
-              </Button>
+              {/* Compare Models Picker */}
+              <Popover open={comparePickerOpen} onOpenChange={setComparePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                    <Scale className="w-4 h-4" />
+                    Compare Models
+                    {compareSelectedIds.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                        {compareSelectedIds.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="end">
+                  <div className="p-3 border-b">
+                    <p className="text-xs font-semibold">Select deals to compare</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Choose 2–6 deals with financial models</p>
+                  </div>
+                  {compareSelectedIds.length > 0 && (
+                    <div className="px-3 py-2 border-b flex flex-wrap gap-1">
+                      {compareSelectedIds.map((id) => {
+                        const d = deals.find((x) => String(x.id) === id);
+                        return (
+                          <Badge key={id} variant="secondary" className="text-[10px] gap-1 pr-1">
+                            {d?.name || id}
+                            <button onClick={() => setCompareSelectedIds((prev) => prev.filter((x) => x !== id))}>
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Command>
+                    <CommandInput placeholder="Search deals…" />
+                    <CommandList className="max-h-48">
+                      <CommandEmpty>No deals found.</CommandEmpty>
+                      <CommandGroup>
+                        {deals
+                          .filter((d) => !compareSelectedIds.includes(String(d.id)))
+                          .filter((d) => !!d.modelingProjectId)
+                          .slice(0, 20)
+                          .map((deal) => (
+                            <CommandItem
+                              key={deal.id}
+                              value={`${deal.name} ${deal.id}`}
+                              onSelect={() => {
+                                if (compareSelectedIds.length < 6) {
+                                  setCompareSelectedIds((prev) => [...prev, String(deal.id)]);
+                                }
+                              }}
+                              className="cursor-pointer text-sm"
+                            >
+                              {deal.name || 'Untitled'}
+                              {deal.amount && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {formatCurrency(Number(deal.amount))}
+                                </span>
+                              )}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                  <div className="p-2 border-t flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1 h-7 text-xs"
+                      disabled={compareSelectedIds.length < 2}
+                      onClick={() => {
+                        setComparePickerOpen(false);
+                        setLocation(`/crm/deals/compare-models?ids=${compareSelectedIds.join(',')}`);
+                      }}
+                    >
+                      Compare {compareSelectedIds.length >= 2 ? `${compareSelectedIds.length} Deals` : '(select 2+)'}
+                    </Button>
+                    {compareSelectedIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs px-2"
+                        onClick={() => setCompareSelectedIds([])}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               <Button onClick={handleAddNew} className="h-9" data-testid="button-add-new">
                 <Plus className="w-4 h-4 mr-1.5" />
